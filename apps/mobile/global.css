@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --color-background: #E6F4FE; /* Match MinkHub light background roughly, or pure white */
+    --color-background: #fff;
     --color-foreground: #1f1f1f;
     --color-primary: #007aff;
     --color-secondary: #8c8c8c;

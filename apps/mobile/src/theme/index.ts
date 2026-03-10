@@ -5,10 +5,10 @@ export const MinkLightTheme = {
     colors: {
         ...DefaultTheme.colors,
         primary: '#007aff',
-        background: '#E6F4FE',
+        background: '#ffffff',
         card: '#ffffff',
         text: '#1f1f1f',
-        border: '#d9d9d9',
+        border: 'transparent',
         notification: '#ff3b30',
     },
 };
@@ -19,9 +19,9 @@ export const MinkDarkTheme = {
         ...DarkTheme.colors,
         primary: '#0a84ff',
         background: '#000000',
-        card: '#1c1c1e',
+        card: '#000000',
         text: '#f0f0f0',
-        border: '#424242',
+        border: 'transparent',
         notification: '#ff453a',
     },
 };

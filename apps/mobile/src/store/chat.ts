@@ -1,134 +1,157 @@
+/**
+ * Chat (message) store — manages messages for the active session.
+ *
+ * Mirrors the web chat store logic:
+ *   - Fetch messages from backend
+ *   - Send user messages, trigger AI response
+ *   - Handle streaming responses
+ */
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export interface ChatMessage {
-    id: string;
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    createdAt: number;
-}
+import { aiChatApi, messageApi } from '../lib/api';
+import type { ChatMessage } from '../types';
 
-export interface ChatSession {
-    id: string;
-    title: string;
-    description?: string;
-    avatar?: string;
-    updatedAt: number;
-}
+interface ChatState {
+    /** Messages keyed by sessionId */
+    messagesBySession: Record<string, ChatMessage[]>;
+    /** Whether a message is currently being generated */
+    generating: boolean;
+    /** Streaming content buffer for the current generation */
+    streamBuffer: string;
 
-interface ChatStoreState {
-    sessions: ChatSession[];
-    messages: Record<string, ChatMessage[]>;
-    activeSessionId: string | null;
-}
-
-interface ChatStoreActions {
-    createSession: (title?: string) => string;
-    deleteSession: (id: string) => void;
-    setActiveSession: (id: string) => void;
-    sendMessage: (sessionId: string, content: string) => void;
+    // Actions
+    fetchMessages: (sessionId: string) => Promise<void>;
+    sendMessage: (sessionId: string, content: string) => Promise<void>;
     clearMessages: (sessionId: string) => void;
 }
 
-export const useChatStore = create<ChatStoreState & ChatStoreActions>()(
-    persist(
-        (set, get) => ({
-            sessions: [
-                {
-                    id: 'default',
-                    title: 'Welcome to MinkHub',
-                    description: 'A new chat experience is here.',
-                    updatedAt: Date.now(),
+export const useChatStore = create<ChatState>((set, get) => ({
+    messagesBySession: {},
+    generating: false,
+    streamBuffer: '',
+
+    fetchMessages: async (sessionId: string) => {
+        try {
+            const messages = await messageApi.list(sessionId);
+            set((s) => ({
+                messagesBySession: {
+                    ...s.messagesBySession,
+                    [sessionId]: messages ?? [],
                 },
-            ],
-            messages: {
-                default: [
-                    {
-                        id: 'init-msg',
-                        role: 'assistant',
-                        content: 'Hello! I am MinkHub. How can I help you today?',
-                        createdAt: Date.now(),
-                    },
-                ],
-            },
-            activeSessionId: null,
-
-            createSession: (title = 'New Chat') => {
-                const id = `session-${Date.now()}`;
-                set((state) => ({
-                    sessions: [
-                        { id, title, updatedAt: Date.now() },
-                        ...state.sessions,
-                    ],
-                    messages: { ...state.messages, [id]: [] },
-                }));
-                return id;
-            },
-
-            deleteSession: (id) => {
-                set((state) => {
-                    const newSessions = state.sessions.filter((s) => s.id !== id);
-                    const newMessages = { ...state.messages };
-                    delete newMessages[id];
-                    return {
-                        sessions: newSessions,
-                        messages: newMessages,
-                        activeSessionId: state.activeSessionId === id ? null : state.activeSessionId,
-                    };
-                });
-            },
-
-            setActiveSession: (id) => set({ activeSessionId: id }),
-
-            sendMessage: (sessionId, content) => {
-                const userMsg: ChatMessage = {
-                    id: `msg-${Date.now()}`,
-                    role: 'user',
-                    content,
-                    createdAt: Date.now(),
-                };
-
-                // Add user message
-                set((state) => ({
-                    messages: {
-                        ...state.messages,
-                        [sessionId]: [...(state.messages[sessionId] || []), userMsg],
-                    },
-                    sessions: state.sessions.map((s) =>
-                        s.id === sessionId ? { ...s, updatedAt: Date.now() } : s
-                    ),
-                }));
-
-                // Mock assistant response (In a real app, this calls tRPC / streaming API)
-                setTimeout(() => {
-                    const assistantMsg: ChatMessage = {
-                        id: `msg-${Date.now()}-reply`,
-                        role: 'assistant',
-                        content: `This is a mock response from MinkHub for: "${content}"`,
-                        createdAt: Date.now(),
-                    };
-                    set((state) => ({
-                        messages: {
-                            ...state.messages,
-                            [sessionId]: [...(state.messages[sessionId] || []), assistantMsg],
-                        },
-                        sessions: state.sessions.map((s) =>
-                            s.id === sessionId ? { ...s, updatedAt: Date.now() } : s
-                        ),
-                    }));
-                }, 1000);
-            },
-
-            clearMessages: (sessionId) => {
-                set((state) => ({
-                    messages: { ...state.messages, [sessionId]: [] },
-                }));
-            },
-        }),
-        {
-            name: 'minkhub-chat-storage',
-            storage: createJSONStorage(() => AsyncStorage),
+            }));
+        } catch (err) {
+            console.warn('[ChatStore] fetchMessages error:', err);
         }
-    )
-);
+    },
+
+    sendMessage: async (sessionId: string, content: string) => {
+        const userMsg: ChatMessage = {
+            id: `user-${Date.now()}`,
+            sessionId,
+            role: 'user',
+            content,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        // Optimistically add user message
+        set((s) => ({
+            messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: [...(s.messagesBySession[sessionId] || []), userMsg],
+            },
+        }));
+
+        // Try to persist on backend
+        try {
+            await messageApi.create(sessionId, content);
+        } catch (err) {
+            console.warn('[ChatStore] persist user message error:', err);
+        }
+
+        // Create a placeholder for the assistant response
+        const assistantMsgId = `assistant-${Date.now()}`;
+        const assistantMsg: ChatMessage = {
+            id: assistantMsgId,
+            sessionId,
+            role: 'assistant',
+            content: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        set((s) => ({
+            generating: true,
+            streamBuffer: '',
+            messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: [...(s.messagesBySession[sessionId] || []), assistantMsg],
+            },
+        }));
+
+        // Try streaming AI response
+        try {
+            const allMessages = get().messagesBySession[sessionId] || [];
+            const contextMessages = allMessages
+                .filter((m) => m.role === 'user' || m.role === 'assistant')
+                .map((m) => ({ role: m.role, content: m.content }));
+
+            const response = await aiChatApi.createAssistantMessage(sessionId, contextMessages);
+
+            if (response.body) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let accumulated = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    accumulated += chunk;
+
+                    // Update the assistant message content in real-time
+                    set((s) => ({
+                        streamBuffer: accumulated,
+                        messagesBySession: {
+                            ...s.messagesBySession,
+                            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                                m.id === assistantMsgId ? { ...m, content: accumulated } : m,
+                            ),
+                        },
+                    }));
+                }
+            }
+        } catch (err) {
+            console.warn('[ChatStore] AI streaming error:', err);
+            // Put a fallback error message
+            set((s) => ({
+                messagesBySession: {
+                    ...s.messagesBySession,
+                    [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                        m.id === assistantMsgId
+                            ? { ...m, content: "I'm having trouble connecting. Please check your network." }
+                            : m,
+                    ),
+                },
+            }));
+        } finally {
+            set({ generating: false, streamBuffer: '' });
+
+            // Background refresh to sync with server
+            get().fetchMessages(sessionId);
+        }
+    },
+
+    clearMessages: (sessionId: string) => {
+        set((s) => ({
+            messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: [],
+            },
+        }));
+    },
+}));
+
+// Re-export types for backward compat
+export type { ChatMessage } from '../types';

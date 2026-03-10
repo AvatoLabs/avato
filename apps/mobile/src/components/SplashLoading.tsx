@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Image,Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -32,6 +33,13 @@ export default function SplashLoading() {
       -1,
       false
     );
+
+    return () => {
+      // Cancel animations on unmount to prevent infinite loop crashes on Android
+      cancelAnimation(breathScale);
+      cancelAnimation(breathOpacity);
+      cancelAnimation(spinRotation);
+    };
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({

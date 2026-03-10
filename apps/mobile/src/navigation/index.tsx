@@ -1,82 +1,142 @@
+/**
+ * Navigation — single unified navigator with all screens.
+ */
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Compass, MessageSquare, User } from 'lucide-react-native';
+import { MessageSquare, Sparkles, User } from 'lucide-react-native';
 import React from 'react';
+import { Platform } from 'react-native';
 
+import { useI18n } from '../lib/i18n';
+import AIProvidersScreen from '../screens/AIProvidersScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
+import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
+import LanguagePickerScreen from '../screens/LanguagePickerScreen';
+import ModelPickerScreen from '../screens/ModelPickerScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ServerConfigScreen from '../screens/ServerConfigScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import ThemePickerScreen from '../screens/ThemePickerScreen';
+import { tokens } from '../theme/tokens';
 
-const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
-function MainTabs() {
+function BottomTabs() {
   const { colors } = useTheme();
+  const { t } = useI18n();
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.border,
+        tabBarActiveTintColor: '#007aff',
+        tabBarInactiveTintColor: colors.text + '60',
         tabBarStyle: {
           backgroundColor: colors.card,
-          borderTopColor: colors.border,
+          borderTopWidth: 0, // Removed hard border
+          elevation: 0,
+          paddingTop: 8,
+          shadowOpacity: 0.05, // Extremely subtle shadow instead of hard line
+          shadowOffset: { width: 0, height: -2 },
+          shadowRadius: 10,
+          ...(Platform.OS === 'android' ? { height: 60, paddingBottom: 8 } : {}),
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+          fontWeight: tokens.typography.weight.medium as any,
         },
       }}
     >
       <Tab.Screen
         component={ChatListScreen}
-        name="ChatsTab"
+        name="Chats"
         options={{
-          tabBarLabel: 'Chats',
-          tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+              <MessageSquare color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          ),
+          tabBarLabel: t.tabChats,
         }}
       />
       <Tab.Screen
         component={DiscoverScreen}
-        name="DiscoverTab"
+        name="Discover"
         options={{
-          tabBarLabel: 'Discover',
-          tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+              <Sparkles color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          ),
+          tabBarLabel: t.studioTitle,
         }}
       />
       <Tab.Screen
         component={ProfileScreen}
-        name="ProfileTab"
+        name="Me"
         options={{
-          tabBarLabel: 'Me',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+              <User color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          ),
+          tabBarLabel: t.workspaceTitle,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-export default function RootNavigator() {
-  const { colors } = useTheme();
+interface RootNavigatorProps {
+  initialRoute?: 'ServerConfig' | 'MainTabs';
+}
 
+export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigatorProps) {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.card },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: '600' },
-      }}
+      initialRouteName={initialRoute}
+      screenOptions={{ headerShown: false }}
     >
-      {/* The main tab navigator is the root of the stack */}
       <Stack.Screen
-        component={MainTabs}
-        name="MainTabs"
-        options={{ headerShown: false }}
+        component={ServerConfigScreen}
+        initialParams={{ firstLaunch: initialRoute === 'ServerConfig' }}
+        name="ServerConfig"
+        options={{ animation: 'slide_from_bottom' }}
       />
-      {/* Screens pushed on top of the tabs hide the tab bar automatically in NativeStack (on iOS. On Android we might need tweaks, but default is usually fine) */}
+      <Stack.Screen component={BottomTabs} name="MainTabs" />
       <Stack.Screen
         component={ChatDetailScreen}
         name="ChatDetail"
-        options={{ title: 'Chat' }}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={ChatSettingsScreen}
+        name="ChatSettings"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={SettingsScreen}
+        name="Settings"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={AIProvidersScreen}
+        name="AIProviders"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={ModelPickerScreen}
+        name="ModelPicker"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={LanguagePickerScreen}
+        name="LanguagePicker"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={ThemePickerScreen}
+        name="ThemePicker"
+        options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>
   );
