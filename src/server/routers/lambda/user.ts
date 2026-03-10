@@ -66,8 +66,8 @@ export const userRouter = router({
       // `after` may fail outside request scope (e.g., in tests), ignore silently
     }
 
-    // For desktop mode, ensure user exists before getting state
-    if (isDesktop) {
+    // For desktop mode or NoAuth mode, ensure user exists before getting state
+    if (isDesktop || process.env.NOAUTH_MODE === '1') {
       await UserModel.makeSureUserExist(ctx.serverDB, ctx.userId);
     }
 
