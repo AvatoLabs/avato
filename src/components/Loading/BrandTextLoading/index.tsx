@@ -12,8 +12,11 @@ const BrandTextLoading = ({ debugId }: BrandTextLoadingProps) => {
   return (
     <div className={styles.container}>
       <div aria-label="Loading" className={styles.brand} role="status">
-        <img alt={BRANDING_NAME} className={styles.logo} src="/avatars/lobe-ai.png" />
-        <span className={styles.brandText}>{BRANDING_NAME}</span>
+        <div className={styles.minkLogoWrapper}>
+          <div className={styles.minkSpinner} />
+          <img alt={BRANDING_NAME} className={styles.minkLogoImg} src="/avatars/lobe-ai.png" />
+        </div>
+        <span className={styles.minkText}>{BRANDING_NAME}</span>
       </div>
       {showDebug && (
         <div className={styles.debug}>
