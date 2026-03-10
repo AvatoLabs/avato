@@ -18,13 +18,13 @@ Related: [LOBE-2417](https://linear.app/lobehub/issue/LOBE-2417/建立核心产�
 
 ### 产品架构覆盖
 
-| 模块             | 子功能                            | 优先级 | 状态 |
-| ---------------- | --------------------------------- | ------ | ---- |
-| **Agent**        | Builder, 对话，Task               | P0     | 🚧   |
-| **Agent Group**  | Builder, 群聊                     | P0     | ⏳   |
-| **Page（文稿）** | 侧边栏 CRUD ✅，文档编辑，Copilot | P0     | 🚧   |
-| **知识库**       | 创建，上传，RAG 对话              | P1     | ⏳   |
-| **记忆**         | 查看，编辑，关联                  | P2     | ⏳   |
+| 模块              | 子功能                     | 优先级 | 状态 |
+| --------------- | ----------------------- | --- | -- |
+| **Agent**       | Builder, 对话，Task        | P0  | 🚧 |
+| **Agent Group** | Builder, 群聊             | P0  | ⏳  |
+| **Page（文稿）**    | 侧边栏 CRUD ✅，文档编辑，Copilot | P0  | 🚧 |
+| **知识库**         | 创建，上传，RAG 对话            | P1  | ⏳  |
+| **记忆**          | 查看，编辑，关联                | P2  | ⏳  |
 
 ### 标签系统
 
@@ -131,14 +131,14 @@ bun e2e/scripts/setup.ts --clean
 
 ### 脚本选项
 
-| 选项             | 说明                         |
-| ---------------- | ---------------------------- |
-| `--clean`        | 清理现有容器和进程           |
+| 选项               | 说明             |
+| ---------------- | -------------- |
+| `--clean`        | 清理现有容器和进程      |
 | `--skip-db`      | 跳过数据库设置（使用已有的） |
-| `--skip-migrate` | 跳过数据库迁移               |
-| `--build`        | 启动前构建应用               |
-| `--start`        | 设置完成后启动服务器         |
-| `--port <port>`  | 服务器端口（默认 3006）      |
+| `--skip-migrate` | 跳过数据库迁移        |
+| `--build`        | 启动前构建应用        |
+| `--start`        | 设置完成后启动服务器     |
+| `--port <port>`  | 服务器端口（默认 3006） |
 
 **重要提示**:
 
@@ -225,7 +225,7 @@ await llmMockManager.setup(this.page);
 
 ```typescript
 // 为特定用户消息设置响应
-llmMockManager.setResponse('你好', '你好！我是 Lobe AI，有什么可以帮助你的？');
+llmMockManager.setResponse('你好', '你好！我是 Mink AI，有什么可以帮助你的？');
 
 // 清除所有自定义响应
 llmMockManager.clearResponses();

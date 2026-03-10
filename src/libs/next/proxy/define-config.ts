@@ -202,6 +202,11 @@ export function defineConfig() {
 
     const response = defaultMiddleware(req);
 
+    // NoAuth mode: skip session check entirely for self-hosted deployments
+    if (process.env.NOAUTH_MODE === '1') {
+      return response;
+    }
+
     // when enable auth protection, only public route is not protected, others are all protected
     const isProtected = !isPublicRoute(req);
 
