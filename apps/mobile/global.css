@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: #E6F4FE; /* Match MinkHub light background roughly, or pure white */
+    --color-foreground: #1f1f1f;
+    --color-primary: #007aff;
+    --color-secondary: #8c8c8c;
+    --color-border: #d9d9d9;
+    --color-card: #fff;
+  }
+
+  .dark {
+    --color-background: #000;
+    --color-foreground: #f0f0f0;
+    --color-primary: #0a84ff;
+    --color-secondary: #a6a6a6;
+    --color-border: #424242;
+    --color-card: #1c1c1e;
+  }
+}
