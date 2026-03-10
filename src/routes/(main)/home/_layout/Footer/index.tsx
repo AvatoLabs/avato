@@ -1,19 +1,8 @@
 'use client';
 
-import { SOCIAL_URL } from '@lobechat/business-const';
 import { useAnalytics } from '@lobehub/analytics/react';
-import { type MenuProps } from '@lobehub/ui';
-import { ActionIcon, DropdownMenu, Flexbox, Icon } from '@lobehub/ui';
-import { DiscordIcon } from '@lobehub/ui/icons';
-import {
-  Book,
-  CircleHelp,
-  Feather,
-  FileClockIcon,
-  FlaskConical,
-  Github,
-  Rocket,
-} from 'lucide-react';
+import { ActionIcon, Flexbox } from '@lobehub/ui';
+import { FlaskConical } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -21,12 +10,10 @@ import { Link } from 'react-router-dom';
 import ChangelogModal from '@/components/ChangelogModal';
 import HighlightNotification from '@/components/HighlightNotification';
 import LabsModal from '@/components/LabsModal';
-import { DOCUMENTS_REFER_URL, GITHUB } from '@/const/url';
 import ThemeButton from '@/features/User/UserPanel/ThemeButton';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors/systemStatus';
-import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/slices/settings/selectors';
 
@@ -41,7 +28,7 @@ const PRODUCT_HUNT_NOTIFICATION = {
 const Footer = memo(() => {
   const { t } = useTranslation('common');
   const { analytics } = useAnalytics();
-  const { hideGitHub } = useServerConfigStore(featureFlagsSelectors);
+
   const isDevMode = useUserStore((s) => userGeneralSettingsSelectors.config(s).isDevMode);
   const [isLabsModalOpen, setIsLabsModalOpen] = useState(false);
   const [shouldLoadChangelog, setShouldLoadChangelog] = useState(false);
@@ -129,73 +116,12 @@ const Footer = memo(() => {
     });
   };
 
-  const helpMenuItems: MenuProps['items'] = useMemo(
-    () => [
-      {
-        icon: <Icon icon={Book} />,
-        key: 'docs',
-        label: (
-          <a href={DOCUMENTS_REFER_URL} rel="noopener noreferrer" target="_blank">
-            {t('userPanel.docs')}
-          </a>
-        ),
-      },
-      {
-        icon: <Icon icon={Feather} />,
-        key: 'feedback',
-        label: t('userPanel.feedback'),
-        onClick: handleOpenFeedbackModal,
-      },
-      {
-        icon: <Icon icon={DiscordIcon} />,
-        key: 'discord',
-        label: (
-          <a href={SOCIAL_URL.discord} rel="noopener noreferrer" target="_blank">
-            {t('userPanel.discord')}
-          </a>
-        ),
-      },
-      {
-        type: 'divider',
-      },
-      {
-        icon: <Icon icon={FileClockIcon} />,
-        key: 'changelog',
-        label: t('changelog'),
-        onClick: handleOpenChangelogModal,
-      },
-      {
-        icon: <Icon icon={FlaskConical} />,
-        key: 'labs',
-        label: t('labs'),
-        onClick: handleOpenLabsModal,
-      },
-      ...(isWithinTimeWindow
-        ? [
-            {
-              icon: <Icon icon={Rocket} />,
-              key: 'productHunt',
-              label: 'Product Hunt',
-              onClick: handleOpenProductHuntCard,
-            },
-          ]
-        : []),
-    ],
-    [t, isWithinTimeWindow],
-  );
+
 
   return (
     <>
       <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={8}>
         <Flexbox horizontal align={'center'} flex={1} gap={2}>
-          <DropdownMenu items={helpMenuItems} placement="topLeft">
-            <ActionIcon aria-label={t('userPanel.help')} icon={CircleHelp} size={16} />
-          </DropdownMenu>
-          {!hideGitHub && (
-            <a aria-label={'GitHub'} href={GITHUB} rel="noopener noreferrer" target={'_blank'}>
-              <ActionIcon icon={Github} size={16} title={'GitHub'} />
-            </a>
-          )}
           {isDevMode && (
             <Link to="/eval">
               <ActionIcon icon={FlaskConical} size={16} title="Evaluation Lab" />
