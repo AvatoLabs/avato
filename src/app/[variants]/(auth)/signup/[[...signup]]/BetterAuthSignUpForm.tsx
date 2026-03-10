@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Icon, Text } from '@lobehub/ui';
+import { Button, Icon, Text } from '@minkhub/ui';
 import { Form, Input } from 'antd';
 import { Lock, Mail } from 'lucide-react';
 import Link from 'next/link';

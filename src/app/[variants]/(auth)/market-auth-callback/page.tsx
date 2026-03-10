@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, FluentEmoji, Text } from '@lobehub/ui';
+import { Button, FluentEmoji, Text } from '@minkhub/ui';
 import { Result } from 'antd';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';

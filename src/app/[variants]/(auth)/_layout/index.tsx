@@ -1,7 +1,7 @@
 'use client';
 
-import { COPYRIGHT_FULL } from '@lobechat/business-const';
-import { Center, Flexbox, Text } from '@lobehub/ui';
+import { COPYRIGHT_FULL } from '@minkchat/business-const';
+import { Center, Flexbox, Text } from '@minkhub/ui';
 import { Divider } from 'antd';
 import { cx } from 'antd-style';
 import { type FC, type PropsWithChildren } from 'react';

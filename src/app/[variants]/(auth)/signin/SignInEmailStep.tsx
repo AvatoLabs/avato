@@ -1,5 +1,5 @@
-import { BRANDING_NAME } from '@lobechat/business-const';
-import { Alert, Button, Flexbox, Icon, Input, Skeleton, Text } from '@lobehub/ui';
+import { BRANDING_NAME } from '@minkchat/business-const';
+import { Alert, Button, Flexbox, Icon, Input, Skeleton, Text } from '@minkhub/ui';
 import { type FormInstance, type InputRef } from 'antd';
 import { Badge, Divider, Form } from 'antd';
 import { createStaticStyles } from 'antd-style';

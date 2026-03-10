@@ -341,7 +341,7 @@
   "sharePage.error.unauthorized.action": "サインイン",
   "sharePage.error.unauthorized.subtitle": "この共有されたトピックを表示するには、サインインしてください。",
   "sharePage.error.unauthorized.title": "サインインが必要です",
-  "sharePageDisclaimer": "このコンテンツはユーザーによって共有されたものであり、LobeHub の見解を示すものではありません。LobeHub は、この共有コンテンツに起因するいかなる結果についても責任を負いません。",
+  "sharePageDisclaimer": "このコンテンツはユーザーによって共有されたものであり、MinkHub の見解を示すものではありません。MinkHub は、この共有コンテンツに起因するいかなる結果についても責任を負いません。",
   "stt.action": "音声入力",
   "stt.loading": "認識中…",
   "stt.prettifying": "推敲中…",

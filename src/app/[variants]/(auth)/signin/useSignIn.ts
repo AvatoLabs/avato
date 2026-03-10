@@ -1,4 +1,4 @@
-import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
+import { ENABLE_BUSINESS_FEATURES } from '@minkchat/business-const';
 import { Form } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import { isBuiltinProvider, normalizeProviderId } from '@/libs/better-auth/utils
 import { useAuthServerConfigStore } from '../_layout/AuthServerConfigProvider';
 import { EMAIL_REGEX, USERNAME_REGEX } from './SignInEmailStep';
 
-const LAST_AUTH_PROVIDER_KEY = 'lobehub:auth:last-provider:v1';
+const LAST_AUTH_PROVIDER_KEY = 'minkhub:auth:last-provider:v1';
 
 type Step = 'email' | 'password';
 

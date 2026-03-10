@@ -2,7 +2,7 @@
 
 import 'antd/dist/reset.css';
 
-import { ConfigProvider, ThemeProvider } from '@lobehub/ui';
+import { ConfigProvider, ThemeProvider } from '@minkhub/ui';
 import { App } from 'antd';
 import * as motion from 'motion/react-m';
 import Link from 'next/link';

@@ -1,4 +1,4 @@
-import { Avatar, Center, Flexbox, FluentEmoji, Icon } from '@lobehub/ui';
+import { Avatar, Center, Flexbox, FluentEmoji, Icon } from '@minkhub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { Link2Icon } from 'lucide-react';
 import React, { memo } from 'react';

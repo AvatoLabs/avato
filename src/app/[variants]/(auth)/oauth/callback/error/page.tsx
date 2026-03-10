@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Flexbox, FluentEmoji, Highlighter, Text } from '@lobehub/ui';
+import { Button, Flexbox, FluentEmoji, Highlighter, Text } from '@minkhub/ui';
 import { Result } from 'antd';
 import Link from 'next/link';
 import { parseAsString, useQueryState } from 'nuqs';
