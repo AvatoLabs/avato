@@ -4,6 +4,7 @@ import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { themeColors } from '../../theme';
 import { tokens } from '../../theme/tokens';
 
 interface WorkflowCardProps {
@@ -17,14 +18,21 @@ interface WorkflowCardProps {
 /**
  * WorkflowCard — Featured horizontal card for Studio screen's hero section.
  */
-export function WorkflowCard({ title, description, tag, icon: IconComp, onPress }: WorkflowCardProps) {
+export function WorkflowCard({
+  title,
+  description,
+  tag,
+  icon: IconComp,
+  onPress,
+}: WorkflowCardProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const colors = isDark ? themeColors.dark : themeColors.light;
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      className="w-[220px] rounded-xl overflow-hidden mr-3 active:opacity-80"
+      className="w-[220px] rounded-xl overflow-hidden mr-3 shadow-sm active:opacity-80"
       onPress={onPress}
     >
       <BlurView
@@ -34,7 +42,7 @@ export function WorkflowCard({ title, description, tag, icon: IconComp, onPress 
       >
         <View className="flex-row items-center justify-between mb-3">
           <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-            <IconComp color={isDark ? '#0a84ff' : '#007aff'} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <IconComp color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </View>
           {tag && (
             <View className="bg-primary/10 px-2.5 py-1 rounded-full">
@@ -42,7 +50,10 @@ export function WorkflowCard({ title, description, tag, icon: IconComp, onPress 
             </View>
           )}
         </View>
-        <Text className="text-foreground text-[16px] font-semibold tracking-tight mb-1" numberOfLines={1}>
+        <Text
+          className="text-foreground text-[16px] font-semibold tracking-tight mb-1"
+          numberOfLines={1}
+        >
           {title}
         </Text>
         <Text className="text-secondary text-[12px] leading-[16px] font-medium" numberOfLines={2}>

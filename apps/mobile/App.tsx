@@ -1,36 +1,80 @@
 import './global.css';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
-import React, { useEffect, useState } from 'react';
-import { useColorScheme as useSystemColorScheme } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import React, { useEffect, useRef, useState } from 'react';
+import { Text, useColorScheme as useSystemColorScheme, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import SplashLoading from './src/components/SplashLoading';
+import SplashScreen from './src/components/splash/SplashScreen';
+import { ToastContainer, useToast } from './src/components/ui/Toast';
 import { hasConfiguredUrl } from './src/lib/api';
 import { useI18n } from './src/lib/i18n';
 import RootNavigator from './src/navigation';
 import { useSessionStore } from './src/store/session';
 import { MinkDarkTheme, MinkLightTheme } from './src/theme';
 
+const ONBOARDING_KEY = 'minkhub_onboarding_complete';
+
+function OfflineBanner() {
+  const insets = useSafeAreaInsets();
+  const t = useI18n((s) => s.t);
+  return (
+    <View style={{ position: 'absolute', top: insets.top, left: 0, right: 0, zIndex: 999 }}>
+      <View style={{ backgroundColor: '#ff3b30', paddingVertical: 6, alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{t.errorOffline}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function App() {
   const { colorScheme } = useColorScheme();
   const systemScheme = useSystemColorScheme();
   const [isAppReady, setIsAppReady] = useState(false);
-  const [initialRoute, setInitialRoute] = useState<'ServerConfig' | 'MainTabs'>('MainTabs');
+  const [isOffline, setIsOffline] = useState(false);
+  const wasOffline = useRef(false);
+  const [initialRoute, setInitialRoute] = useState<
+    'OnboardingWelcome' | 'ServerConfig' | 'MainTabs'
+  >('MainTabs');
   const loadLocale = useI18n((s) => s.loadLocale);
+  const t = useI18n((s) => s.t);
 
-  // Determine effective color scheme (NativeWind handles className, we need this for nav theme + status bar)
+  // Determine effective color scheme
   const effectiveScheme = colorScheme || systemScheme || 'light';
   const isDark = effectiveScheme === 'dark';
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      setIsOffline(offline);
+      if (wasOffline.current && !offline) {
+        useToast.getState().show('success', t.toastConnectionRestored);
+      }
+      wasOffline.current = offline;
+    });
+    return () => unsubscribe();
+  }, [t]);
 
   useEffect(() => {
     const init = async () => {
       // Load persisted locale
       await loadLocale();
 
+      // Check onboarding
+      const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
       const hasUrl = await hasConfiguredUrl();
+
+      if (!onboardingDone && !hasUrl) {
+        setInitialRoute('OnboardingWelcome');
+        setIsAppReady(true);
+        return;
+      }
+
       if (!hasUrl) {
         setInitialRoute('ServerConfig');
         setIsAppReady(true);
@@ -50,17 +94,19 @@ export default function App() {
   }, []);
 
   if (!isAppReady) {
-    return <SplashLoading />;
+    return <SplashScreen />;
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer
-        theme={isDark ? MinkDarkTheme : MinkLightTheme}
-      >
-        <RootNavigator initialRoute={initialRoute} />
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <NavigationContainer theme={isDark ? MinkDarkTheme : MinkLightTheme}>
+          <RootNavigator initialRoute={initialRoute} />
+          {isOffline && <OfflineBanner />}
+          <ToastContainer />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

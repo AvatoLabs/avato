@@ -8,18 +8,12 @@
  * No duplication: Workspace shows status & quick toggles. Settings shows full config.
  * Avatar tap → Settings (profile editing is backend-dependent, not yet available).
  */
-import {
-  ChevronRight,
-  Globe,
-  LogOut,
-  Moon,
-  Palette,
-  Settings,
-} from 'lucide-react-native';
+import { ChevronRight, Globe, LogOut, Moon, Palette, Pencil, Settings } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  RefreshControl,
   ScrollView,
   Switch,
   Text,
@@ -28,11 +22,15 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SectionBlock } from '../components/ui/SectionBlock';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
 import { clearAuth } from '../lib/api';
-import { useI18n } from '../lib/i18n';
+import { haptics } from '../lib/haptics';
+import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
+import { getMessageCount, getStreak } from '../lib/streak';
+import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 
 interface SettingsRowProps {
@@ -61,7 +59,7 @@ function SettingsRow({
       disabled={!onPress && !rightElement}
       onPress={onPress}
     >
-      <View className="w-8 h-8 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-4">
+      <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
         <IconComp color={iconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
       </View>
       <View className="flex-1">
@@ -70,7 +68,10 @@ function SettingsRow({
           <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">{subtitle}</Text>
         )}
       </View>
-      {rightElement || (showArrow && onPress && <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />)}
+      {rightElement ||
+        (showArrow && onPress && (
+          <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+        ))}
     </TouchableOpacity>
   );
 }
@@ -78,7 +79,29 @@ function SettingsRow({
 export default function ProfileScreen({ navigation }: any) {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const sessionCount = useSessionStore((s) => s.sessions.length);
+
+  const [streak, setStreak] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    const [s, m] = await Promise.all([getStreak(), getMessageCount()]);
+    setStreak(s);
+    setMessageCount(m);
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    haptics.light();
+    await loadStats();
+    setRefreshing(false);
+  }, [loadStats]);
 
   const handleSignOut = () => {
     Alert.alert(t.meSignOutConfirm, t.meSignOutDesc, [
@@ -105,6 +128,14 @@ export default function ProfileScreen({ navigation }: any) {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            colors={['#007aff']}
+            refreshing={refreshing}
+            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            onRefresh={onRefresh}
+          />
+        }
       >
         {/* Workspace Overview — taps into full Settings */}
         <Animated.View entering={FadeInDown.delay(50).duration(350)}>
@@ -119,32 +150,67 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
+        {/* Usage Stats */}
+        <Animated.View entering={FadeInDown.delay(80).duration(350)}>
+          <View className="flex-row px-5 gap-3 mb-4">
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+              <Text className="text-foreground text-[20px] font-bold">{messageCount}</Text>
+              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                {t.statsMessages}
+              </Text>
+            </View>
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+              <Text className="text-foreground text-[20px] font-bold">{sessionCount}</Text>
+              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                {t.statsSessions}
+              </Text>
+            </View>
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+              <Text className="text-foreground text-[20px] font-bold">{streak}</Text>
+              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                {t.statsStreak}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
         {/* Runtime — quick status cards (unique to Workspace, NOT in Settings) */}
         <Animated.View entering={FadeInDown.delay(100).duration(350)}>
           <SectionBlock title={t.workspaceRuntime}>
             <View className="px-3">
               <View className="flex-row gap-3 mb-1">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="flex-1 bg-foreground/5 dark:bg-white/5 rounded-xl p-4 active:bg-foreground/10"
+                <PressableScale
+                  className="flex-1 rounded-xl p-4 border border-black/5 dark:border-white/[0.06]"
                   onPress={() => navigation.navigate('ModelPicker')}
                 >
-                  <Text className="text-secondary/50 text-[10.5px] font-medium uppercase tracking-wider mb-2">{t.workspaceModel}</Text>
-                  <Text className="text-foreground text-[14px] font-medium tracking-tight">GPT-4o Mini</Text>
+                  <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mb-2">
+                    {t.workspaceModel}
+                  </Text>
+                  <Text className="text-foreground text-[14px] font-medium tracking-tight">
+                    GPT-4o Mini
+                  </Text>
                   <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">OpenAI</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="flex-1 bg-foreground/5 dark:bg-white/5 rounded-xl p-4 active:bg-foreground/10"
+                </PressableScale>
+                <PressableScale
+                  className="flex-1 rounded-xl p-4 border border-black/5 dark:border-white/[0.06]"
                   onPress={() => navigation.navigate('ServerConfig')}
                 >
-                  <Text className="text-secondary/50 text-[10.5px] font-medium uppercase tracking-wider mb-2">{t.workspaceEndpoint}</Text>
-                  <Text className="text-foreground text-[14px] font-medium tracking-tight" numberOfLines={1}>localhost:3010</Text>
+                  <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mb-2">
+                    {t.workspaceEndpoint}
+                  </Text>
+                  <Text
+                    className="text-foreground text-[14px] font-medium tracking-tight"
+                    numberOfLines={1}
+                  >
+                    localhost:3010
+                  </Text>
                   <View className="flex-row items-center mt-1">
                     <View className="w-1.5 h-1.5 rounded-full bg-secondary/30 mr-1.5" />
-                    <Text className="text-secondary/50 text-[11px] font-medium">{t.workspaceNotConnected}</Text>
+                    <Text className="text-secondary/50 text-[11px] font-medium">
+                      {t.workspaceNotConnected}
+                    </Text>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               </View>
             </View>
           </SectionBlock>
@@ -162,7 +228,7 @@ export default function ProfileScreen({ navigation }: any) {
                 rightElement={
                   <Switch
                     thumbColor="#fff"
-                    trackColor={{ false: '#e0e0e0', true: '#007aff' }}
+                    trackColor={{ false: isDark ? '#3a3a3c' : '#e0e0e0', true: '#007aff' }}
                     value={isDark}
                     onValueChange={toggleColorScheme}
                   />
@@ -171,55 +237,79 @@ export default function ProfileScreen({ navigation }: any) {
               <SettingsRow
                 icon={Globe}
                 label={t.meLanguage}
-                subtitle="English"
+                subtitle={LOCALE_DISPLAY_NAMES[locale] || locale}
                 onPress={() => navigation.navigate('LanguagePicker')}
               />
               <SettingsRow
                 icon={Palette}
                 iconColor="#9c27b0"
                 label={t.meTheme}
-                subtitle={isDark ? 'Dark' : 'Light'}
+                subtitle={isDark ? t.themeDark : t.themeLight}
                 onPress={() => navigation.navigate('ThemePicker')}
               />
             </View>
           </SectionBlock>
         </Animated.View>
 
-        {/* All Settings — single entry point, no duplication */}
+        {/* Edit Profile */}
         <Animated.View entering={FadeInDown.delay(200).duration(350)}>
           <View className="px-5 mb-4">
-            <TouchableOpacity
-              activeOpacity={0.7}
-              className="flex-row items-center bg-foreground/5 dark:bg-white/5 rounded-xl px-5 py-4 active:bg-foreground/10"
-              onPress={() => navigation.navigate('Settings')}
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-4 mb-3 border border-black/5 dark:border-white/[0.06]"
+              onPress={() => navigation.navigate('ProfileEdit')}
             >
-              <View className="w-8 h-8 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-4">
-                <Settings color={isDark ? '#888' : '#666'} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <Pencil color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
-                <Text className="text-foreground text-[15px] font-medium tracking-tight">{t.meAllSettings}</Text>
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                  Server, AI Providers, Data, Voice, About
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.profileEdit}
                 </Text>
               </View>
               <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
-            </TouchableOpacity>
+            </PressableScale>
+          </View>
+        </Animated.View>
+
+        {/* All Settings — single entry point, no duplication */}
+        <Animated.View entering={FadeInDown.delay(250).duration(350)}>
+          <View className="px-5 mb-4">
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-4 border border-black/5 dark:border-white/[0.06]"
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <Settings
+                  color={isDark ? '#888' : '#666'}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.meAllSettings}
+                </Text>
+                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  {t.meAllSettingsDesc}
+                </Text>
+              </View>
+              <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </PressableScale>
           </View>
         </Animated.View>
 
         {/* Sign Out */}
         <Animated.View entering={FadeInDown.delay(250).duration(350)}>
           <View className="px-5 mt-2 mb-4">
-            <TouchableOpacity
-              activeOpacity={0.7}
-              className="bg-foreground/5 dark:bg-white/5 rounded-xl py-4 items-center active:bg-foreground/10"
+            <PressableScale
+              className="rounded-xl py-4 items-center border border-black/5 dark:border-white/[0.06]"
               onPress={handleSignOut}
             >
               <View className="flex-row items-center gap-2">
                 <LogOut color="#ff3b30" size={16} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="text-[#ff3b30] font-medium text-[14.5px]">{t.meSignOut}</Text>
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </Animated.View>
 

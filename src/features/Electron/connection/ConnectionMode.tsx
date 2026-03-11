@@ -146,10 +146,10 @@ const ConnectionMode = memo<ConnectionModeProps>(({ setWaiting }) => {
             </div>
           </Flexbox>
           <Option
-            description={t('sync.lobehubCloud.description')}
+            description={t('sync.minkhubCloud.description')}
             icon={LobeHub}
             isSelected={selectedOption === StorageModeEnum.Cloud}
-            label={t('sync.lobehubCloud.title')}
+            label={t('sync.minkhubCloud.title')}
             value={StorageModeEnum.Cloud}
             onClick={handleSelectOption}
           />

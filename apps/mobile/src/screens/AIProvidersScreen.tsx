@@ -1,33 +1,20 @@
 /**
  * AIProvidersScreen — Manage AI service provider API keys.
  */
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Key,
-  Plus,
-} from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ArrowLeft, Eye, EyeOff, Key } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import React, { useState } from 'react';
-import {
-  Alert,
-  Image as RNImage,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
+
+const STORAGE_KEY_PROVIDERS = 'minkhub_ai_providers';
 
 interface Provider {
   apiKey: string;
@@ -40,14 +27,78 @@ interface Provider {
 }
 
 const DEFAULT_PROVIDERS: Provider[] = [
-  { apiKey: '', color: '#10a37f', enabled: false, endpoint: '', id: 'openai', initial: 'OA', name: 'OpenAI' },
-  { apiKey: '', color: '#c96442', enabled: false, endpoint: '', id: 'anthropic', initial: 'AN', name: 'Anthropic' },
-  { apiKey: '', color: '#0066ff', enabled: false, endpoint: '', id: 'google', initial: 'GE', name: 'Google Gemini' },
-  { apiKey: '', color: '#4a6cf7', enabled: false, endpoint: '', id: 'deepseek', initial: 'DS', name: 'DeepSeek' },
-  { apiKey: '', color: '#ff6600', enabled: false, endpoint: '', id: 'openrouter', initial: 'OR', name: 'OpenRouter' },
-  { apiKey: '', color: '#6c3baa', enabled: false, endpoint: '', id: 'ollama', initial: 'OL', name: 'Ollama (Local)' },
-  { apiKey: '', color: '#333', enabled: false, endpoint: '', id: 'groq', initial: 'GQ', name: 'Groq' },
-  { apiKey: '', color: '#1a1a2e', enabled: false, endpoint: '', id: 'custom', initial: 'CU', name: 'Custom Provider' },
+  {
+    apiKey: '',
+    color: '#10a37f',
+    enabled: false,
+    endpoint: '',
+    id: 'openai',
+    initial: 'OA',
+    name: 'OpenAI',
+  },
+  {
+    apiKey: '',
+    color: '#c96442',
+    enabled: false,
+    endpoint: '',
+    id: 'anthropic',
+    initial: 'AN',
+    name: 'Anthropic',
+  },
+  {
+    apiKey: '',
+    color: '#0066ff',
+    enabled: false,
+    endpoint: '',
+    id: 'google',
+    initial: 'GE',
+    name: 'Google Gemini',
+  },
+  {
+    apiKey: '',
+    color: '#4a6cf7',
+    enabled: false,
+    endpoint: '',
+    id: 'deepseek',
+    initial: 'DS',
+    name: 'DeepSeek',
+  },
+  {
+    apiKey: '',
+    color: '#ff6600',
+    enabled: false,
+    endpoint: '',
+    id: 'openrouter',
+    initial: 'OR',
+    name: 'OpenRouter',
+  },
+  {
+    apiKey: '',
+    color: '#6c3baa',
+    enabled: false,
+    endpoint: '',
+    id: 'ollama',
+    initial: 'OL',
+    name: 'Ollama (Local)',
+  },
+  {
+    apiKey: '',
+    color: '#333',
+    enabled: false,
+    endpoint: '',
+    id: 'groq',
+    initial: 'GQ',
+    name: 'Groq',
+  },
+  {
+    apiKey: '',
+    color: '#1a1a2e',
+    enabled: false,
+    endpoint: '',
+    id: 'custom',
+    initial: 'CU',
+    name: 'Custom Provider',
+  },
 ];
 
 export default function AIProvidersScreen({ navigation }: any) {
@@ -60,28 +111,45 @@ export default function AIProvidersScreen({ navigation }: any) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 
+  // Load persisted provider config on mount
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY_PROVIDERS).then((raw) => {
+      if (raw) {
+        try {
+          const saved: Provider[] = JSON.parse(raw);
+          // Merge saved state into defaults (preserves new providers added in code)
+          setProviders((defaults) =>
+            defaults.map((d) => {
+              const s = saved.find((p) => p.id === d.id);
+              return s ? { ...d, apiKey: s.apiKey, endpoint: s.endpoint, enabled: s.enabled } : d;
+            }),
+          );
+        } catch {
+          /* ignore corrupt data */
+        }
+      }
+    });
+  }, []);
+
   const toggleProvider = (id: string) => {
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p)),
-    );
+    setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p)));
   };
 
   const updateApiKey = (id: string, key: string) => {
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, apiKey: key } : p)),
-    );
+    setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, apiKey: key } : p)));
   };
 
   const updateEndpoint = (id: string, endpoint: string) => {
-    setProviders((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, endpoint } : p)),
-    );
+    setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, endpoint } : p)));
   };
 
-  const handleSave = (id: string) => {
+  const handleSave = async (id: string) => {
     const provider = providers.find((p) => p.id === id);
     if (provider?.apiKey) {
-      Alert.alert('Saved', `${provider.name} configuration saved.`);
+      // Persist to AsyncStorage
+      await AsyncStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
+      haptics.success();
+      Alert.alert(t.providerSavedTitle, t.providerSavedDesc.replace('{name}', provider.name));
       setExpandedId(null);
     }
   };
@@ -91,7 +159,11 @@ export default function AIProvidersScreen({ navigation }: any) {
       <ScreenHeader
         title={t.aiProvidersTitle}
         leftElement={
-          <ArrowLeft color={isDark ? '#fff' : '#111'} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft
+            color={isDark ? '#fff' : '#111'}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         }
         onPressLeft={() => navigation.goBack()}
       />
@@ -104,21 +176,18 @@ export default function AIProvidersScreen({ navigation }: any) {
 
         {/* Provider List */}
         {providers.map((provider, index) => (
-          <Animated.View
-            entering={FadeInDown.delay(index * 40).duration(250)}
-            key={provider.id}
-          >
+          <Animated.View entering={FadeInDown.delay(index * 40).duration(250)} key={provider.id}>
             <View className="mx-5 mb-3 bg-foreground/5 dark:bg-white/5 rounded-2xl overflow-hidden">
               {/* Provider Header */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="flex-row items-center px-4 py-4"
-                onPress={() =>
-                  setExpandedId(expandedId === provider.id ? null : provider.id)
-                }
+                onPress={() => setExpandedId(expandedId === provider.id ? null : provider.id)}
               >
                 <View className="w-9 h-9 rounded-full bg-foreground/5 dark:bg-white/10 items-center justify-center mr-3">
-                  <Text className="text-foreground/70 text-[11px] font-semibold">{provider.initial}</Text>
+                  <Text className="text-foreground/70 text-[11px] font-semibold">
+                    {provider.initial}
+                  </Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
@@ -131,10 +200,10 @@ export default function AIProvidersScreen({ navigation }: any) {
                   )}
                 </View>
                 <Switch
-                  onValueChange={() => toggleProvider(provider.id)}
                   thumbColor="#fff"
-                  trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
+                  trackColor={{ false: isDark ? '#3a3a3c' : '#e0e0e0', true: '#4caf50' }}
                   value={provider.enabled}
+                  onValueChange={() => toggleProvider(provider.id)}
                 />
               </TouchableOpacity>
 
@@ -146,15 +215,19 @@ export default function AIProvidersScreen({ navigation }: any) {
                     {t.aiProvidersApiKey}
                   </Text>
                   <View className="flex-row items-center bg-foreground/5 dark:bg-white/5 rounded-xl px-3 h-11 mb-3">
-                    <Key color={isDark ? '#888' : '#999'} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                    <Key
+                      color={isDark ? '#888' : '#999'}
+                      size={14}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
                     <TextInput
                       autoCapitalize="none"
                       className="flex-1 ml-2 text-foreground text-[14px]"
-                      onChangeText={(v) => updateApiKey(provider.id, v)}
                       placeholder="sk-..."
-                      placeholderTextColor="#8c8c8c"
+                      placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
                       secureTextEntry={!showKeys[provider.id]}
                       value={provider.apiKey}
+                      onChangeText={(v) => updateApiKey(provider.id, v)}
                     />
                     <TouchableOpacity
                       onPress={() =>
@@ -180,10 +253,10 @@ export default function AIProvidersScreen({ navigation }: any) {
                     <TextInput
                       autoCapitalize="none"
                       className="flex-1 text-foreground text-[14px]"
-                      onChangeText={(v) => updateEndpoint(provider.id, v)}
                       placeholder="https://api.example.com/v1"
-                      placeholderTextColor="#8c8c8c"
+                      placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
                       value={provider.endpoint}
+                      onChangeText={(v) => updateEndpoint(provider.id, v)}
                     />
                   </View>
 
@@ -193,9 +266,7 @@ export default function AIProvidersScreen({ navigation }: any) {
                     className="bg-primary rounded-xl py-3 items-center active:opacity-90"
                     onPress={() => handleSave(provider.id)}
                   >
-                    <Text className="text-white font-medium text-[14px]">
-                      {t.aiProvidersSave}
-                    </Text>
+                    <Text className="text-white font-medium text-[14px]">{t.aiProvidersSave}</Text>
                   </TouchableOpacity>
                 </View>
               )}

@@ -497,7 +497,7 @@ const AgentTool = memo<AgentToolProps>(
               {
                 children: builtinItems,
                 key: 'lobehub',
-                label: t('skillStore.tabs.lobehub'),
+                label: t('skillStore.tabs.minkhub'),
                 type: 'group' as const,
               },
             ]
@@ -606,7 +606,7 @@ const AgentTool = memo<AgentToolProps>(
         items.push({
           children: lobehubGroupItems,
           key: 'installed-lobehub',
-          label: t('skillStore.tabs.lobehub'),
+          label: t('skillStore.tabs.minkhub'),
           type: 'group',
         });
       }

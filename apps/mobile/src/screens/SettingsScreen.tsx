@@ -1,6 +1,7 @@
 /**
  * SettingsScreen — Full settings page with i18n and proper navigation.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowLeft,
   Bot,
@@ -18,19 +19,13 @@ import {
   Volume2,
 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import React from 'react';
-import {
-  Linking,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { useI18n } from '../lib/i18n';
+import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
 interface SettingsRowProps {
@@ -95,14 +90,25 @@ export default function SettingsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  const [defaultModel, setDefaultModel] = useState<string>('');
+  useEffect(() => {
+    AsyncStorage.getItem('minkhub_default_model').then((v) => {
+      if (v) setDefaultModel(v);
+    });
+  }, []);
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t.settingsTitle}
         leftElement={
-          <ArrowLeft color={isDark ? '#fff' : '#111'} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft
+            color={isDark ? '#fff' : '#111'}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         }
         onPressLeft={() => navigation.goBack()}
       />
@@ -130,15 +136,15 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Brain}
             iconColor="#007aff"
             label={t.settingsDefaultModel}
-            subtitle="gpt-4o-mini"
+            subtitle={defaultModel || t.settingsNotConfigured}
             onPress={() => navigation.navigate('ModelPicker')}
           />
           <SettingsRow
             icon={Bot}
             iconColor="#007aff"
             label={t.settingsDefaultAgent}
-            subtitle="MinkHub Assistant"
-            onPress={() => {}}
+            subtitle={t.settingsNotConfigured}
+            onPress={() => navigation.navigate('AgentDetail', { identifier: 'default' })}
           />
         </SettingsSection>
 
@@ -147,14 +153,14 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Globe}
             iconColor="#f5a623"
             label={t.settingsLanguage}
-            subtitle="English"
+            subtitle={LOCALE_DISPLAY_NAMES[locale] || locale}
             onPress={() => navigation.navigate('LanguagePicker')}
           />
           <SettingsRow
             icon={Palette}
             iconColor="#9c27b0"
             label={t.settingsTheme}
-            subtitle={isDark ? 'Dark' : 'Light'}
+            subtitle={isDark ? t.themeDark : t.themeLight}
             onPress={() => navigation.navigate('ThemePicker')}
           />
         </SettingsSection>
@@ -164,15 +170,14 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Cloud}
             iconColor="#03a9f4"
             label={t.settingsSyncBackup}
-            subtitle={t.settingsNotConfigured}
-            onPress={() => {}}
+            subtitle={t.dataManageComingSoon}
           />
           <SettingsRow
             icon={Database}
             iconColor="#607d8b"
             label={t.settingsStorageManagement}
             subtitle={t.settingsStorageManagementDesc}
-            onPress={() => {}}
+            onPress={() => navigation.navigate('DataManagement')}
           />
         </SettingsSection>
 
@@ -181,13 +186,13 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Mic}
             iconColor="#ff5722"
             label={t.settingsSpeechRecognition}
-            onPress={() => {}}
+            subtitle={t.dataManageComingSoon}
           />
           <SettingsRow
             icon={Volume2}
             iconColor="#4caf50"
             label={t.settingsTts}
-            onPress={() => {}}
+            subtitle={t.dataManageComingSoon}
           />
         </SettingsSection>
 
@@ -203,7 +208,7 @@ export default function SettingsScreen({ navigation }: any) {
             iconColor="#8c8c8c"
             label={t.settingsAboutMinkhub}
             subtitle={t.settingsAboutMinkhubDesc}
-            onPress={() => Linking.openURL('https://github.com/lobehub/lobe-chat')}
+            onPress={() => navigation.navigate('About')}
           />
         </SettingsSection>
       </ScrollView>

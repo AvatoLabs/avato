@@ -155,7 +155,7 @@ const Platform = memo<PlatformProps>(
         case PlatformType.LobeHub: {
           return {
             platform: 'LobeHub',
-            steps: t('skills.details.sidebar.platform.steps.lobehub'),
+            steps: t('skills.details.sidebar.platform.steps.minkhub'),
           };
         }
         case PlatformType.Claude: {
@@ -314,7 +314,7 @@ const Platform = memo<PlatformProps>(
               variant={lite ? 'borderless' : 'outlined'}
             >
               {genLayout(identifier, active, {
-                lobehub: t('skills.details.sidebar.platform.layout.lobehub'),
+                lobehub: t('skills.details.sidebar.platform.layout.minkhub'),
                 resourcesHint: t('skills.details.sidebar.platform.layout.resourcesHint'),
               })}
             </Highlighter>

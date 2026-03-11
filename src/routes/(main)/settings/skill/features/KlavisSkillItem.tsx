@@ -167,13 +167,13 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
     modal.confirm({
       cancelText: t('cancel', { ns: 'common' }),
       centered: true,
-      content: t('tools.lobehubSkill.disconnectConfirm.desc', { name: serverType.label }),
+      content: t('tools.minkhubSkill.disconnectConfirm.desc', { name: serverType.label }),
       okButtonProps: { danger: true },
-      okText: t('tools.lobehubSkill.disconnect'),
+      okText: t('tools.minkhubSkill.disconnect'),
       onOk: async () => {
         await removeKlavisServer(server.identifier);
       },
-      title: t('tools.lobehubSkill.disconnectConfirm.title', { name: serverType.label }),
+      title: t('tools.minkhubSkill.disconnectConfirm.title', { name: serverType.label }),
     });
   };
 

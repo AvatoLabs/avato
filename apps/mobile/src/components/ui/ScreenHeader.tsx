@@ -9,12 +9,14 @@ interface ScreenHeaderProps {
   onPressLeft?: () => void;
   onPressRight?: () => void;
   rightElement?: React.ReactNode;
+  subtitle?: string;
   title: string;
   titleCompact?: boolean;
 }
 
 export function ScreenHeader({
   title,
+  subtitle,
   leftElement,
   rightElement,
   onPressLeft,
@@ -26,17 +28,12 @@ export function ScreenHeader({
   const isDark = colorScheme === 'dark';
 
   return (
-    <BlurView
-      intensity={85}
-      style={{ paddingTop: insets.top }}
-      tint={isDark ? 'dark' : 'light'}
-
-    >
+    <BlurView intensity={85} style={{ paddingTop: insets.top }} tint={isDark ? 'dark' : 'light'}>
       <View className="flex-row items-center justify-between px-5 py-3">
         {leftElement ? (
           <TouchableOpacity
             activeOpacity={0.6}
-             className="w-10 h-10 items-start justify-center -ml-2"
+            className="w-10 h-10 items-start justify-center -ml-2"
             disabled={!onPressLeft}
             onPress={onPressLeft}
           >
@@ -47,16 +44,21 @@ export function ScreenHeader({
         )}
 
         <View className="flex-1 items-center justify-center">
-             <Text
-                className={`text-foreground font-medium tracking-wide ${titleCompact ? 'text-[15px]' : 'text-lg font-semibold'}`}
-                numberOfLines={1}
-            >
-                {title}
+          <Text
+            className={`text-foreground ${titleCompact ? 'text-[15px] font-medium tracking-tight' : 'text-[22px] font-extrabold tracking-tighter'}`}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {subtitle && (
+            <Text className="text-secondary/40 text-[11px] font-medium mt-0.5" numberOfLines={1}>
+              {subtitle}
             </Text>
+          )}
         </View>
 
         {rightElement ? (
-           <TouchableOpacity
+          <TouchableOpacity
             activeOpacity={0.6}
             className="w-10 h-10 items-end justify-center -mr-2"
             disabled={!onPressRight}

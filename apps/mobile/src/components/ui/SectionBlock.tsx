@@ -16,7 +16,7 @@ export function SectionBlock({ title, action, onAction, children }: SectionBlock
   return (
     <View className="mb-6">
       <View className="flex-row items-center justify-between px-5 mb-3">
-        <Text className="text-foreground text-[15px] font-semibold tracking-tight">
+        <Text className="text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
           {title}
         </Text>
         {action && (

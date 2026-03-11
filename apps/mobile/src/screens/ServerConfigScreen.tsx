@@ -1,13 +1,7 @@
 /**
  * ServerConfigScreen — Configure the backend server URL.
  */
-import {
-  AlertCircle,
-  CheckCircle2,
-  Globe,
-  Loader2,
-  Wifi,
-} from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, Globe, Loader2, Wifi } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
 import {
@@ -55,7 +49,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
 
   const handleTest = async () => {
     if (!url.trim()) {
-      Alert.alert('Error', 'Please enter a server URL');
+      Alert.alert(t.validationError, t.validationEnterUrl);
       return;
     }
 
@@ -70,11 +64,11 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
         setStatus('success');
       } else {
         setStatus('error');
-        setErrorMsg('Server responded but healthcheck failed');
+        setErrorMsg(t.serverHealthcheckFailed);
       }
     } catch (err: any) {
       setStatus('error');
-      setErrorMsg(err?.message || 'Connection failed');
+      setErrorMsg(err?.message || t.serverConnectionFailed);
     } finally {
       setTesting(false);
     }
@@ -82,7 +76,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!url.trim()) {
-      Alert.alert('Error', 'Please enter a server URL');
+      Alert.alert(t.validationError, t.validationEnterUrl);
       return;
     }
 
@@ -127,10 +121,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             <View className="mx-5 mt-6 mb-6 rounded-[20px] bg-foreground/5 dark:bg-white/5 p-5">
               <View className="flex-row items-center mb-3">
                 <View className="w-10 h-10 rounded-full items-center justify-center mr-3 overflow-hidden">
-                  <RNImage
-                    className="w-10 h-10"
-                    source={require('../../assets/icon.png')}
-                  />
+                  <RNImage className="w-10 h-10" source={require('../../assets/icon.png')} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-[16px] font-semibold text-foreground tracking-tight">
@@ -154,14 +145,18 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                 {t.serverUrlLabel}
               </Text>
               <View className="bg-foreground/5 dark:bg-white/5 rounded-2xl px-4 py-1 flex-row items-center">
-                <Globe color={isDark ? '#888' : '#999'} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Globe
+                  color={isDark ? '#888' : '#999'}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <TextInput
                   autoCapitalize="none"
                   autoCorrect={false}
                   className="flex-1 ml-3 text-foreground text-[16px] py-3.5"
                   keyboardType="url"
                   placeholder={t.serverUrlPlaceholder}
-                  placeholderTextColor="#8c8c8c"
+                  placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
                   returnKeyType="done"
                   value={url}
                   onChangeText={setUrl}
@@ -177,20 +172,18 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                 {t.serverQuickFill}
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {[
-                  'http://192.168.1.100:3010',
-                  'http://10.0.0.1:3010',
-                  'http://localhost:3010',
-                ].map((preset) => (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="bg-foreground/5 dark:bg-white/5 px-3.5 py-2 rounded-full"
-                    key={preset}
-                    onPress={() => setUrl(preset)}
-                  >
-                    <Text className="text-foreground text-[13px] font-medium">{preset}</Text>
-                  </TouchableOpacity>
-                ))}
+                {['http://192.168.1.100:3010', 'http://10.0.0.1:3010', 'http://localhost:3010'].map(
+                  (preset) => (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="bg-foreground/5 dark:bg-white/5 px-3.5 py-2 rounded-full"
+                      key={preset}
+                      onPress={() => setUrl(preset)}
+                    >
+                      <Text className="text-foreground text-[13px] font-medium">{preset}</Text>
+                    </TouchableOpacity>
+                  ),
+                )}
               </View>
             </View>
           </Animated.View>
@@ -204,9 +197,19 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               onPress={handleTest}
             >
               {testing ? (
-                <Loader2 color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} style={{ marginRight: 8 }} />
+                <Loader2
+                  color="#007aff"
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 8 }}
+                />
               ) : (
-                <Wifi color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} style={{ marginRight: 8 }} />
+                <Wifi
+                  color="#007aff"
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 8 }}
+                />
               )}
               <Text className="text-primary font-medium text-[15px]">
                 {testing ? t.serverTesting : t.serverTestConnection}
@@ -218,7 +221,12 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {status === 'success' && (
             <Animated.View entering={FadeIn.duration(300)}>
               <View className="mx-5 mb-4 bg-[#e8f5e9]/80 dark:bg-[#1b3a1b]/60 rounded-2xl p-4 flex-row items-center">
-                <CheckCircle2 color="#4caf50" size={20} strokeWidth={tokens.icon.strokeWidth} style={{ marginRight: 10 }} />
+                <CheckCircle2
+                  color="#4caf50"
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 10 }}
+                />
                 <Text className="text-[#2e7d32] dark:text-[#81c784] text-[14px] font-medium flex-1">
                   {t.serverSuccess}
                 </Text>
@@ -229,7 +237,12 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {status === 'error' && (
             <Animated.View entering={FadeIn.duration(300)}>
               <View className="mx-5 mb-4 bg-[#fbe9e7]/80 dark:bg-[#3a1b1b]/60 rounded-2xl p-4 flex-row items-start">
-                <AlertCircle color="#f44336" size={20} strokeWidth={tokens.icon.strokeWidth} style={{ marginRight: 10, marginTop: 1 }} />
+                <AlertCircle
+                  color="#f44336"
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 10, marginTop: 1 }}
+                />
                 <View className="flex-1">
                   <Text className="text-[#c62828] dark:text-[#ef9a9a] text-[14px] font-medium">
                     {t.serverFailed}

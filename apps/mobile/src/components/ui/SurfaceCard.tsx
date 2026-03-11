@@ -10,14 +10,19 @@ interface SurfaceCardProps extends ViewProps {
 }
 
 /**
- * A borderless card using subtle background opacity instead of hard strokes.
+ * A glassmorphic card using subtle background opacity and a thin border for depth.
  */
-export function SurfaceCard({ children, onPress, className = '', elevated = false, ...props }: SurfaceCardProps) {
-  const baseClasses = 'rounded-2xl overflow-hidden';
-  // Use a very subtle background, no border!
+export function SurfaceCard({
+  children,
+  onPress,
+  className = '',
+  elevated = false,
+  ...props
+}: SurfaceCardProps) {
+  const baseClasses = 'rounded-xl overflow-hidden border border-black/5 dark:border-white/10';
   const surfaceClasses = elevated
-      ? 'bg-foreground/5 dark:bg-white/10'
-      : 'bg-transparent active:bg-foreground/5';
+    ? 'bg-foreground/5 dark:bg-white/10'
+    : 'bg-transparent active:bg-foreground/5';
 
   if (onPress) {
     return (
@@ -25,7 +30,7 @@ export function SurfaceCard({ children, onPress, className = '', elevated = fals
         activeOpacity={0.7}
         className={`${baseClasses} ${surfaceClasses} ${className}`}
         onPress={onPress}
-        {...props}
+        {...(props as any)}
       >
         {children}
       </TouchableOpacity>

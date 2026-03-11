@@ -1,34 +1,45 @@
 /**
- * ChatDetailScreen — Full chat experience matching the PWA.
+ * ChatDetailScreen — Full chat experience with MessageBubble, Topics, and file attachments.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
-import {
-  ArrowLeft,
-  PlusCircle,
-  Send,
-  Settings,
-  User,
-} from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import { ArrowLeft, BookText, Paperclip, Send, Settings } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   FlatList,
   Image as RNImage,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useChatStore } from '../store/chat';
+import FilePreview from '../components/ui/FilePreview';
+import MessageBubble from '../components/ui/MessageBubble';
+import PressableScale from '../components/ui/PressableScale';
+import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useChatStore } from '../store/chat';
+import { useFileStore } from '../store/file';
 import { useSessionStore } from '../store/session';
+import { useTopicStore } from '../store/topic';
 import { tokens } from '../theme/tokens';
 import type { ChatMessage } from '../types';
 
@@ -47,141 +58,138 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
 
+  const activeTopic = useTopicStore((s) => s.activeTopic);
+  const fetchTopics = useTopicStore((s) => s.fetchTopics);
+
+  const pendingFiles = useFileStore((s) => s.pendingFiles);
+  const addFile = useFileStore((s) => s.addFile);
+
   const [inputText, setInputText] = useState('');
+  const [sessionModel, setSessionModel] = useState<string>('');
   const flatListRef = useRef<FlatList>(null);
 
+  // Load per-session model name for header display
   useEffect(() => {
-    fetchMessages(sessionId);
-  }, [sessionId, fetchMessages]);
+    (async () => {
+      let modelName = '';
+      try {
+        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.model) modelName = saved.model;
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!modelName) {
+        try {
+          const global = await AsyncStorage.getItem('minkhub_default_model');
+          if (global) modelName = global;
+        } catch {
+          /* ignore */
+        }
+      }
+      setSessionModel(modelName);
+    })();
+  }, [sessionId]);
+
+  // Rotating placeholder hints
+  const hints = useMemo(
+    () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
+    [t],
+  );
+  const [hintIndex, setHintIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setHintIndex((i) => (i + 1) % hints.length), 4000);
+    return () => clearInterval(timer);
+  }, [hints.length]);
 
   useEffect(() => {
-    navigation.setOptions({
-      headerShown: false,
-    });
+    fetchMessages(sessionId, activeTopic ?? undefined);
+    fetchTopics(sessionId);
+  }, [sessionId, fetchMessages, fetchTopics, activeTopic]);
+
+  useEffect(() => {
+    navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  const handleSend = () => {
+  const sendScale = useSharedValue(1);
+  const sendAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendScale.value }],
+  }));
+
+  const handleSend = useCallback(() => {
     if (!inputText.trim() || generating) return;
-    sendMessage(sessionId, inputText.trim());
+    haptics.light();
+    sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    sendMessage(sessionId, inputText.trim(), activeTopic ?? undefined);
     setInputText('');
     Keyboard.dismiss();
-  };
+  }, [inputText, generating, sendMessage, sessionId, activeTopic, sendScale]);
 
-  const markdownStyles = {
-    body: {
-      color: isDark ? '#e0e0e0' : '#1a1a1a',
-      fontSize: 15.5,
-      lineHeight: 24,
-    },
-    code_inline: {
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-      borderRadius: 6,
-      color: isDark ? '#5bc0de' : '#e83e8c',
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: 13.5,
-      paddingHorizontal: 5,
-    },
-    fence: {
-      backgroundColor: isDark ? '#1a1a2e' : '#f5f5f5',
-      borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-      borderRadius: 10,
-      borderWidth: 0.5,
-      padding: 12,
-    },
-    code_block: {
-      backgroundColor: isDark ? '#1a1a2e' : '#f5f5f5',
-      borderRadius: 10,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: 13,
-      padding: 12,
-    },
-    paragraph: {
-      marginBottom: 4,
-      marginTop: 4,
-    },
-    link: {
-      color: '#007aff',
-    },
-    heading1: {
-      color: isDark ? '#fff' : '#111',
-      fontSize: 22,
-      fontWeight: '700' as const,
-      marginBottom: 8,
-      marginTop: 12,
-    },
-    heading2: {
-      color: isDark ? '#fff' : '#111',
-      fontSize: 18,
-      fontWeight: '600' as const,
-      marginBottom: 6,
-      marginTop: 10,
-    },
-    list_item: {
-      marginBottom: 4,
-    },
-  };
+  const handleAttach = useCallback(() => {
+    const options = [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument];
+    const pickImage = async (source: 'camera' | 'gallery') => {
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: 'images',
+              quality: 0.8,
+              allowsMultipleSelection: true,
+            });
 
-  const userMarkdownStyles = {
-    ...markdownStyles,
-    body: { ...markdownStyles.body, color: '#ffffff' },
-    code_inline: {
-      ...markdownStyles.code_inline,
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      color: '#ffffff',
-    },
-    fence: {
-      ...markdownStyles.fence,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      borderColor: 'rgba(255,255,255,0.1)',
-    },
-    code_block: {
-      ...markdownStyles.code_block,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      color: '#ffffff',
-    },
-    link: { color: '#b3d9ff' },
-    heading1: { ...markdownStyles.heading1, color: '#fff' },
-    heading2: { ...markdownStyles.heading2, color: '#fff' },
-  };
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.fileName || 'image.jpg',
+            type: asset.mimeType || 'image/jpeg',
+            size: asset.fileSize || 0,
+            uri: asset.uri,
+          });
+        }
+      }
+    };
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isUser = item.role === 'user';
+    const pickDocument = async () => {
+      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            size: asset.size || 0,
+            uri: asset.uri,
+          });
+        }
+      }
+    };
 
-    return (
-      <Animated.View entering={FadeIn.duration(200)}>
-        <View
-          className={`flex-row w-full mb-5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
-        >
-          {!isUser && (
-            <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-3 overflow-hidden">
-              <RNImage
-                className="w-7 h-7 rounded-lg"
-                source={require('../../assets/icon.png')}
-              />
-            </View>
-          )}
+    haptics.selection();
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 0, title: t.fileAttach },
+        (index) => {
+          if (index === 1) pickImage('camera');
+          else if (index === 2) pickImage('gallery');
+          else if (index === 3) pickDocument();
+        },
+      );
+    } else {
+      // Android: directly open gallery as primary action
+      pickImage('gallery');
+    }
+  }, [addFile, t]);
 
-          <View
-            className={`max-w-[78%] px-4 py-3 ${
-              isUser
-                ? 'bg-primary rounded-[20px] rounded-tr-[6px]'
-                : 'bg-foreground/5 dark:bg-white/5 rounded-[20px] rounded-tl-[6px]'
-            }`}
-          >
-            <Markdown style={isUser ? userMarkdownStyles : markdownStyles}>
-              {item.content || (generating ? '...' : '')}
-            </Markdown>
-          </View>
-
-          {isUser && (
-            <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center ml-3">
-              <User color={isDark ? '#ccc' : '#555'} size={18} strokeWidth={tokens.icon.strokeWidth} />
-            </View>
-          )}
-        </View>
-      </Animated.View>
-    );
-  };
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => (
+      <MessageBubble generating={generating} message={item} sessionId={sessionId} />
+    ),
+    [sessionId, generating],
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -194,38 +202,78 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       >
         <View className="flex-row items-center justify-between px-4 py-2.5">
           <View className="flex-row items-center flex-1">
-            <TouchableOpacity
-              activeOpacity={0.7}
-              className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10 mr-2"
-              onPress={() => navigation.goBack()}
+            <PressableScale
+              accessibilityLabel="Go back"
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full mr-2"
+              onPress={() => {
+                haptics.light();
+                navigation.goBack();
+              }}
             >
-              <ArrowLeft color={isDark ? '#fff' : '#111'} size={22} strokeWidth={tokens.icon.strokeWidth} />
-            </TouchableOpacity>
-            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
-              <RNImage
-                className="w-6 h-6 rounded-md"
-                source={require('../../assets/icon.png')}
+              <ArrowLeft
+                color={isDark ? '#fff' : '#111'}
+                size={22}
+                strokeWidth={tokens.icon.strokeWidth}
               />
+            </PressableScale>
+            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
+              <RNImage className="w-6 h-6 rounded-md" source={require('../../assets/icon.png')} />
             </View>
             <View className="flex-1">
-              <Text className="text-[16px] font-medium text-foreground tracking-tight" numberOfLines={1}>
+              <Text
+                className="text-[16px] font-medium text-foreground tracking-tight"
+                numberOfLines={1}
+              >
                 {session?.title || t.chatTitle}
               </Text>
-              {generating && (
-                <Text className="text-primary text-[12px] mt-0.5 font-medium">{t.chatThinking}</Text>
-              )}
+              {generating ? (
+                <Text className="text-primary text-[12px] mt-0.5 font-medium">
+                  {t.chatThinking}
+                </Text>
+              ) : sessionModel ? (
+                <Text
+                  className="text-secondary/50 text-[12px] mt-0.5 font-medium"
+                  numberOfLines={1}
+                >
+                  {sessionModel}
+                </Text>
+              ) : null}
             </View>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
-            onPress={() =>
-              navigation.navigate('ChatSettings', { sessionId })
-            }
-          >
-            <Settings color={isDark ? '#aaa' : '#666'} size={20} strokeWidth={tokens.icon.strokeWidth} />
-          </TouchableOpacity>
+          <View className="flex-row items-center">
+            <PressableScale
+              accessibilityLabel="Topics"
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full"
+              onPress={() => {
+                haptics.light();
+                navigation.navigate('TopicList', { sessionId });
+              }}
+            >
+              <BookText
+                color={isDark ? '#aaa' : '#666'}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Settings"
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full ml-1"
+              onPress={() => {
+                haptics.light();
+                navigation.navigate('ChatSettings', { sessionId });
+              }}
+            >
+              <Settings
+                color={isDark ? '#aaa' : '#666'}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+          </View>
         </View>
       </BlurView>
 
@@ -241,17 +289,42 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           ref={flatListRef}
           renderItem={renderMessage}
           ListEmptyComponent={
-            <View className="flex-1 items-center justify-center pt-20">
-              <RNImage
-                className="w-20 h-20 rounded-3xl mb-6"
-                source={require('../../assets/mink-logo.png')}
-              />
-              <Text className="text-foreground font-medium text-xl tracking-tight">
-                {t.chatEmptyTitle}
-              </Text>
-              <Text className="text-secondary/70 text-[15px] mt-3 text-center px-10 leading-6 font-medium">
-                {t.chatEmptyDesc}
-              </Text>
+            <View className="flex-1 items-center justify-center pt-16">
+              <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
+                <RNImage
+                  className="w-20 h-20 rounded-3xl mb-6"
+                  source={require('../../assets/mink-logo.png')}
+                />
+              </Animated.View>
+              <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>
+                <Text className="text-foreground font-extrabold text-xl tracking-tighter">
+                  {t.chatEmptyWave}
+                </Text>
+              </Animated.View>
+              <Animated.View entering={FadeInUp.delay(300).duration(400).springify()}>
+                <Text className="text-secondary/50 text-[13px] mt-2 text-center px-10 leading-6">
+                  {t.chatEmptyDesc}
+                </Text>
+              </Animated.View>
+              {/* Suggestion chips */}
+              <Animated.View
+                className="flex-row flex-wrap justify-center gap-2 mt-6 px-6"
+                entering={FadeInDown.delay(450).duration(350)}
+              >
+                {[t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4].map((label) => (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="px-4 py-2.5 rounded-full border border-black/5 dark:border-white/[0.06]"
+                    key={label}
+                    onPress={() => {
+                      haptics.light();
+                      setInputText(label);
+                    }}
+                  >
+                    <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </Animated.View>
             </View>
           }
           contentContainerStyle={{
@@ -259,52 +332,77 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             paddingBottom: 12,
             paddingTop: 12,
           }}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
-          onLayout={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
 
-        {/* Input Area */}
-        <BlurView
-          className="flex-row items-end px-3 pt-3"
-          intensity={80}
-          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-          tint={isDark ? 'dark' : 'light'}
+        {/* Input Area — Floating Pill */}
+        <View
+          style={{
+            paddingBottom: Math.max(insets.bottom, 8),
+            paddingHorizontal: 16,
+            paddingTop: 4,
+          }}
         >
-          <TouchableOpacity
-            activeOpacity={0.7}
-            className="p-2 mb-1 opacity-60 active:opacity-100"
+          <BlurView
+            className="rounded-[26px] overflow-hidden"
+            intensity={80}
+            tint={isDark ? 'dark' : 'light'}
+            style={{
+              borderWidth: 0.5,
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            }}
           >
-            <PlusCircle color={isDark ? '#ccc' : '#555'} size={24} strokeWidth={tokens.icon.strokeWidth} />
-          </TouchableOpacity>
-
-          <View className="flex-1 bg-foreground/5 dark:bg-white/5 rounded-3xl mx-2 min-h-[44px] max-h-32 flex-row items-end px-1">
-            <TextInput
-              multiline
-              className="flex-1 px-4 py-2.5 text-foreground text-[16px] leading-[22px]"
-              editable={!generating}
-              placeholder={generating ? t.chatGenerating : t.chatAskAnything}
-              placeholderTextColor="#8c8c8c"
-              style={{ textAlignVertical: 'top' }}
-              value={inputText}
-              onChangeText={setInputText}
-            />
-            {inputText.trim() ? (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                className="w-9 h-9 bg-primary rounded-full items-center justify-center mb-1 mr-0.5 active:bg-[#005bb5]"
-                onPress={handleSend}
-              >
-                <Send color="#fff" size={17} strokeWidth={tokens.icon.strokeWidth} style={{ marginLeft: 1 }} />
-              </TouchableOpacity>
-            ) : (
-              <View className="w-9 h-9 mb-1" />
+            {pendingFiles.length > 0 && (
+              <View className="px-3 pt-2">
+                <FilePreview />
+              </View>
             )}
-          </View>
-        </BlurView>
+            <View className="flex-row items-end px-2 py-1.5">
+              <TouchableOpacity
+                accessibilityLabel="Attach file"
+                accessibilityRole="button"
+                activeOpacity={0.7}
+                className="w-9 h-9 items-center justify-center rounded-full mb-0.5 opacity-60 active:opacity-100"
+                onPress={handleAttach}
+              >
+                <Paperclip
+                  color={isDark ? '#ccc' : '#555'}
+                  size={22}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+              <TextInput
+                multiline
+                className="flex-1 px-2 py-2 text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
+                editable={!generating}
+                placeholder={generating ? t.chatGenerating : hints[hintIndex]}
+                placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+                style={{ textAlignVertical: 'top' }}
+                value={inputText}
+                onChangeText={setInputText}
+              />
+              {inputText.trim() ? (
+                <Animated.View style={sendAnimStyle}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    className="w-9 h-9 bg-primary rounded-full items-center justify-center mb-0.5"
+                    onPress={handleSend}
+                  >
+                    <Send
+                      color="#fff"
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginLeft: 1 }}
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              ) : (
+                <View className="w-9 h-9 mb-0.5" />
+              )}
+            </View>
+          </BlurView>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
