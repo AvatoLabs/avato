@@ -2,7 +2,6 @@
  * TopicItem — A single topic row for TopicListScreen.
  */
 import { Heart, MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { memo, useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
@@ -23,8 +22,6 @@ interface TopicItemProps {
 
 const TopicItem = memo<TopicItemProps>(
   ({ topic, isActive, onPress, onFavorite, onDelete, onRename }) => {
-    const { colorScheme } = useColorScheme();
-    const isDark = colorScheme === 'dark';
     const { t } = useI18n();
     const toast = useToast();
     const [menuVisible, setMenuVisible] = useState(false);
@@ -117,11 +114,7 @@ const TopicItem = memo<TopicItemProps>(
               setMenuVisible(true);
             }}
           >
-            <MoreHorizontal
-              color={isDark ? '#aaa' : '#666'}
-              size={18}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <MoreHorizontal color="#666" size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </TouchableOpacity>
 
@@ -136,12 +129,9 @@ const TopicItem = memo<TopicItemProps>(
             className="flex-1 justify-end bg-black/40"
             onPress={() => setMenuVisible(false)}
           >
-            <Pressable
-              className="bg-white dark:bg-neutral-900 rounded-t-2xl pb-8"
-              onPress={(e) => e.stopPropagation()}
-            >
+            <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
               <View className="items-center pt-3 pb-2">
-                <View className="w-9 h-1 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+                <View className="w-9 h-1 rounded-full bg-neutral-300" />
               </View>
               <View className="px-4">
                 <Pressable
@@ -153,12 +143,12 @@ const TopicItem = memo<TopicItemProps>(
                   }}
                 >
                   <Heart
-                    color={topic.favorite ? '#ff3b30' : isDark ? '#d0d0d0' : '#333'}
+                    color={topic.favorite ? '#ff3b30' : '#333'}
                     fill={topic.favorite ? '#ff3b30' : 'none'}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
-                  <Text className="ml-3 text-base text-neutral-800 dark:text-neutral-200">
+                  <Text className="ml-3 text-base text-neutral-800">
                     {topic.favorite ? t.actionUnfavorite : t.actionFavorite}
                   </Text>
                 </Pressable>
@@ -167,14 +157,8 @@ const TopicItem = memo<TopicItemProps>(
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                     onPress={handleRename}
                   >
-                    <Pencil
-                      color={isDark ? '#d0d0d0' : '#333'}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
-                    <Text className="ml-3 text-base text-neutral-800 dark:text-neutral-200">
-                      {t.actionRename}
-                    </Text>
+                    <Pencil color="#333" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-neutral-800">{t.actionRename}</Text>
                   </Pressable>
                 )}
                 <Pressable
@@ -187,7 +171,7 @@ const TopicItem = memo<TopicItemProps>(
               </View>
               <View className="px-4 mt-2">
                 <Pressable
-                  className="items-center py-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-800"
+                  className="items-center py-3.5 rounded-xl bg-neutral-100"
                   onPress={() => setMenuVisible(false)}
                 >
                   <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>

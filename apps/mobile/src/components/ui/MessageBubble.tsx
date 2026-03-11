@@ -2,7 +2,6 @@
  * MessageBubble — Renders a single chat message with long-press support.
  */
 import { User } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { memo, useCallback, useState } from 'react';
 import {
   Alert,
@@ -32,8 +31,6 @@ interface MessageBubbleProps {
 }
 
 const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating }) => {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const isUser = message.role === 'user';
   const { t } = useI18n();
   const toast = useToast();
@@ -90,7 +87,7 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
     ]);
   }, [sessionId, message.id, deleteMessage, t, toast]);
 
-  const mc = isDark ? tokens.markdownColors.dark : tokens.markdownColors.light;
+  const mc = tokens.markdownColors;
 
   const markdownStyles = {
     body: {
@@ -172,7 +169,7 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
         <TouchableOpacity activeOpacity={0.8} delayLongPress={300} onLongPress={handleLongPress}>
           <View className={`flex-row w-full mb-5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
             {!isUser && (
-              <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-3 overflow-hidden">
+              <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 items-center justify-center mr-3 overflow-hidden">
                 <RNImage
                   className="w-7 h-7 rounded-lg"
                   source={require('../../../assets/icon.png')}
@@ -184,7 +181,7 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
               className={`max-w-[78%] px-4 py-3 ${
                 isUser
                   ? 'bg-primary rounded-3xl rounded-tr-[6px]'
-                  : 'bg-foreground/5 dark:bg-white/5 rounded-3xl rounded-tl-[6px]'
+                  : 'bg-foreground/5 rounded-3xl rounded-tl-[6px]'
               }`}
             >
               {isEditing ? (
@@ -214,7 +211,7 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
                   </View>
                 </View>
               ) : !message.content && generating ? (
-                <TypingIndicator color={isDark ? '#8e8e93' : '#636366'} />
+                <TypingIndicator color="#636366" />
               ) : (
                 <Markdown style={isUser ? userMarkdownStyles : markdownStyles}>
                   {message.content || ''}
@@ -223,12 +220,8 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
             </View>
 
             {isUser && (
-              <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center ml-3">
-                <User
-                  color={isDark ? '#ccc' : '#555'}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+              <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 items-center justify-center ml-3">
+                <User color="#555" size={18} strokeWidth={tokens.icon.strokeWidth} />
               </View>
             )}
           </View>

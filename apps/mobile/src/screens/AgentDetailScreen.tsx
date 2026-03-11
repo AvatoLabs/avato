@@ -2,7 +2,6 @@
  * AgentDetailScreen — Detailed view of a market agent.
  */
 import { ArrowLeft, Bot } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -18,8 +17,6 @@ import { tokens } from '../theme/tokens';
 export default function AgentDetailScreen({ route, navigation }: any) {
   const identifier = route.params?.identifier;
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const agentDetail = useDiscoverStore((s) => s.agentDetail);
@@ -57,11 +54,7 @@ export default function AgentDetailScreen({ route, navigation }: any) {
               navigation.goBack();
             }}
           >
-            <ArrowLeft
-              color={isDark ? '#fff' : '#111'}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
           </PressableScale>
           <Text className="flex-1 text-[17px] font-semibold text-foreground text-center mr-9">
             {t.discoverAgentDetail}
@@ -76,7 +69,7 @@ export default function AgentDetailScreen({ route, navigation }: any) {
           <RefreshControl
             colors={['#007aff']}
             refreshing={refreshing}
-            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            tintColor="#007aff"
             onRefresh={onRefresh}
           />
         }
@@ -130,7 +123,7 @@ export default function AgentDetailScreen({ route, navigation }: any) {
           </>
         ) : (
           <View className="items-center pt-20">
-            <Bot color={isDark ? '#555' : '#ccc'} size={48} strokeWidth={1} />
+            <Bot color="#ccc" size={48} strokeWidth={1} />
             <Text className="text-secondary/50 mt-4">{t.loading}</Text>
           </View>
         )}

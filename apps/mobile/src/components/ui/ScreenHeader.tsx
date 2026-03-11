@@ -1,5 +1,4 @@
 import { BlurView } from 'expo-blur';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,11 +23,9 @@ export function ScreenHeader({
   titleCompact = false,
 }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   return (
-    <BlurView intensity={85} style={{ paddingTop: insets.top }} tint={isDark ? 'dark' : 'light'}>
+    <BlurView intensity={85} style={{ paddingTop: insets.top }} tint="light">
       <View className="flex-row items-center justify-between px-5 py-3">
         {leftElement ? (
           <TouchableOpacity

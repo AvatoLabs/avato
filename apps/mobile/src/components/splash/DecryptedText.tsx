@@ -1,19 +1,15 @@
 /**
  * DecryptedText — Characters start as random symbols and resolve one by one.
  * Inspired by reactbits.dev/text-animations/decrypted-text.
- *
- * Each character shuffles rapidly through random glyphs until its "reveal" moment,
- * then locks to the real letter with a haptic tick.
  */
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { haptics } from '../../lib/haptics';
 
 const GLYPHS = '!@#$%^&*_+-=<>?/|{}[]~';
-const SHUFFLE_INTERVAL = 50; // ms between random glyph swaps
-const REVEAL_INTERVAL = 90; // ms between character reveals
+const SHUFFLE_INTERVAL = 50;
+const REVEAL_INTERVAL = 90;
 
 interface DecryptedTextProps {
   color?: string;
@@ -21,9 +17,7 @@ interface DecryptedTextProps {
 }
 
 export default function DecryptedText({ text, color }: DecryptedTextProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const textColor = color ?? (isDark ? '#ffffff' : '#111111');
+  const textColor = color ?? '#111111';
 
   const [revealedCount, setRevealedCount] = useState(0);
   const [display, setDisplay] = useState<string[]>(() =>
@@ -32,7 +26,6 @@ export default function DecryptedText({ text, color }: DecryptedTextProps) {
 
   const revealedRef = useRef(0);
 
-  // Rapid glyph shuffle for unrevealed characters
   useEffect(() => {
     const timer = setInterval(() => {
       setDisplay((prev) =>
@@ -44,7 +37,6 @@ export default function DecryptedText({ text, color }: DecryptedTextProps) {
     return () => clearInterval(timer);
   }, [text]);
 
-  // Progressive reveal
   const revealTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const startReveal = useCallback(() => {
     revealTimer.current = setInterval(() => {
@@ -58,7 +50,6 @@ export default function DecryptedText({ text, color }: DecryptedTextProps) {
   }, [text.length]);
 
   useEffect(() => {
-    // Small delay before starting reveal for dramatic effect
     const delay = setTimeout(startReveal, 200);
     return () => {
       clearTimeout(delay);
@@ -67,23 +58,18 @@ export default function DecryptedText({ text, color }: DecryptedTextProps) {
   }, [startReveal]);
 
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 28 }}>
       {display.map((char, i) => (
-        <View key={i} style={{ color: textColor } as any}>
+        <View key={i}>
           <Text
             style={{
-              color:
-                i < revealedCount
-                  ? textColor
-                  : isDark
-                    ? 'rgba(255,255,255,0.35)'
-                    : 'rgba(0,0,0,0.25)',
+              color: i < revealedCount ? textColor : 'rgba(0,0,0,0.25)',
               fontFamily: 'monospace',
-              fontSize: 30,
+              fontSize: 34,
               fontWeight: '800',
               letterSpacing: 3,
               textAlign: 'center',
-              width: 22,
+              width: 25,
             }}
           >
             {char}

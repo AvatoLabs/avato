@@ -2,7 +2,6 @@
  * ModelListScreen — Full list of available AI models.
  */
 import { ArrowLeft, Brain } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -17,8 +16,6 @@ import { tokens } from '../theme/tokens';
 
 export default function ModelListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const models = useDiscoverStore((s) => s.models);
@@ -43,11 +40,14 @@ export default function ModelListScreen({ navigation }: any) {
     ? models.filter((m) => m.displayName.toLowerCase().includes(search.toLowerCase()))
     : models;
 
-  // Group by provider
+  // Group by provider, deduplicate by model id within each group
   const grouped = filtered.reduce<Record<string, typeof models>>((acc, m) => {
     const key = m.providerName || m.providerId;
     if (!acc[key]) acc[key] = [];
-    acc[key].push(m);
+    // Skip duplicates within the same provider group
+    if (!acc[key].some((existing) => existing.id === m.id)) {
+      acc[key].push(m);
+    }
     return acc;
   }, {});
 
@@ -64,11 +64,7 @@ export default function ModelListScreen({ navigation }: any) {
               navigation.goBack();
             }}
           >
-            <ArrowLeft
-              color={isDark ? '#fff' : '#111'}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
           </PressableScale>
           <Text className="text-[17px] font-semibold text-foreground">{t.discoverModels}</Text>
           <View className="w-9" />
@@ -77,11 +73,11 @@ export default function ModelListScreen({ navigation }: any) {
 
       <Animated.View entering={FadeInDown.delay(50).duration(300)}>
         <View className="px-4 pb-3">
-          <View className="bg-foreground/5 dark:bg-white/5 rounded-xl px-4 py-2.5">
+          <View className="bg-foreground/5 rounded-xl px-4 py-2.5">
             <TextInput
               className="text-foreground text-[15px]"
               placeholder={t.modelPickerSearch}
-              placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+              placeholderTextColor="#8c8c8c"
               value={search}
               onChangeText={setSearch}
             />
@@ -91,7 +87,7 @@ export default function ModelListScreen({ navigation }: any) {
 
       {initialLoading ? (
         <View className="flex-1 items-center pt-20">
-          <ActivityIndicator color={isDark ? '#0a84ff' : '#007aff'} size="small" />
+          <ActivityIndicator color="#007aff" size="small" />
         </View>
       ) : (
         <FlatList
@@ -100,7 +96,7 @@ export default function ModelListScreen({ navigation }: any) {
           keyExtractor={([provider]) => provider}
           ListEmptyComponent={
             <View className="items-center pt-16">
-              <Brain color={isDark ? '#555' : '#ccc'} size={48} strokeWidth={1} />
+              <Brain color="#ccc" size={48} strokeWidth={1} />
               <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
             </View>
           }
@@ -108,7 +104,7 @@ export default function ModelListScreen({ navigation }: any) {
             <RefreshControl
               colors={['#007aff']}
               refreshing={refreshing}
-              tintColor={isDark ? '#0a84ff' : '#007aff'}
+              tintColor="#007aff"
               onRefresh={onRefresh}
             />
           }

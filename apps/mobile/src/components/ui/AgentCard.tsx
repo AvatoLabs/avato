@@ -16,7 +16,7 @@ interface AgentCardProps {
 
 const AgentCard = memo<AgentCardProps>(({ agent, onPress }) => (
   <PressableScale
-    className="rounded-2xl p-4 mr-3 border border-black/5 dark:border-white/[0.06]"
+    className="rounded-2xl p-4 mr-3 border border-black/5"
     style={{ width: 200 }}
     onPress={onPress}
   >

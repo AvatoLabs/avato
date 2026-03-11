@@ -2,7 +2,6 @@
  * AboutScreen — App info, version, links, and credits.
  */
 import { ArrowLeft, ExternalLink, Github, Heart } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Image as RNImage, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -20,11 +19,9 @@ function LinkRow({
   iconColor,
   label,
   url,
-  isDark,
 }: {
   icon: any;
   iconColor: string;
-  isDark: boolean;
   label: string;
   url: string;
 }) {
@@ -37,25 +34,19 @@ function LinkRow({
         Linking.openURL(url);
       }}
     >
-      <View className="w-8 h-8 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-4">
+      <View className="w-8 h-8 rounded-full bg-foreground/5 items-center justify-center mr-4">
         <IconComp color={iconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
       </View>
       <Text className="flex-1 text-foreground text-[15.5px] font-medium tracking-tight">
         {label}
       </Text>
-      <ExternalLink
-        color={isDark ? '#636366' : '#c0c0c0'}
-        size={16}
-        strokeWidth={tokens.icon.strokeWidth}
-      />
+      <ExternalLink color="#c0c0c0" size={16} strokeWidth={tokens.icon.strokeWidth} />
     </TouchableOpacity>
   );
 }
 
 export default function AboutScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   return (
@@ -69,11 +60,7 @@ export default function AboutScreen({ navigation }: any) {
             navigation.goBack();
           }}
         >
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
         </PressableScale>
         <Text className="text-[17px] font-semibold text-foreground">{t.meAbout}</Text>
         <View className="w-9 h-9" />
@@ -89,7 +76,7 @@ export default function AboutScreen({ navigation }: any) {
           className="items-center mt-10 mb-6"
           entering={FadeInDown.delay(50).duration(350)}
         >
-          <View className="w-20 h-20 rounded-3xl bg-foreground/5 dark:bg-white/5 items-center justify-center mb-4 overflow-hidden">
+          <View className="w-20 h-20 rounded-3xl bg-foreground/5 items-center justify-center mb-4 overflow-hidden">
             <RNImage className="w-16 h-16 rounded-2xl" source={require('../../assets/icon.png')} />
           </View>
           <Text className="text-foreground text-[22px] font-bold tracking-tight">MinkHub</Text>
@@ -112,22 +99,19 @@ export default function AboutScreen({ navigation }: any) {
           </Text>
           <LinkRow
             icon={Github}
-            iconColor={isDark ? '#d0d0d0' : '#333'}
-            isDark={isDark}
+            iconColor="#333"
             label="GitHub Repository"
             url="https://github.com/lobehub/lobe-chat"
           />
           <LinkRow
             icon={ExternalLink}
             iconColor="#007aff"
-            isDark={isDark}
             label="Official Website"
             url="https://lobehub.com"
           />
           <LinkRow
             icon={Heart}
             iconColor="#ff3b30"
-            isDark={isDark}
             label="Sponsor"
             url="https://opencollective.com/lobehub"
           />

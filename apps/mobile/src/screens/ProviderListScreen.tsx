@@ -2,7 +2,6 @@
  * ProviderListScreen — Full list of AI providers.
  */
 import { ArrowLeft, Server } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -17,8 +16,6 @@ import { tokens } from '../theme/tokens';
 
 export default function ProviderListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const providers = useDiscoverStore((s) => s.providers);
@@ -49,11 +46,7 @@ export default function ProviderListScreen({ navigation }: any) {
               navigation.goBack();
             }}
           >
-            <ArrowLeft
-              color={isDark ? '#fff' : '#111'}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
           </PressableScale>
           <Text className="text-[17px] font-semibold text-foreground">{t.discoverProviders}</Text>
           <View className="w-9" />
@@ -62,7 +55,7 @@ export default function ProviderListScreen({ navigation }: any) {
 
       {initialLoading ? (
         <View className="flex-1 items-center pt-20">
-          <ActivityIndicator color={isDark ? '#0a84ff' : '#007aff'} size="small" />
+          <ActivityIndicator color="#007aff" size="small" />
         </View>
       ) : (
         <FlatList
@@ -72,7 +65,7 @@ export default function ProviderListScreen({ navigation }: any) {
           renderItem={({ item }) => <ProviderCard provider={item} />}
           ListEmptyComponent={
             <View className="items-center pt-16">
-              <Server color={isDark ? '#555' : '#ccc'} size={48} strokeWidth={1} />
+              <Server color="#ccc" size={48} strokeWidth={1} />
               <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
             </View>
           }
@@ -80,7 +73,7 @@ export default function ProviderListScreen({ navigation }: any) {
             <RefreshControl
               colors={['#007aff']}
               refreshing={refreshing}
-              tintColor={isDark ? '#0a84ff' : '#007aff'}
+              tintColor="#007aff"
               onRefresh={onRefresh}
             />
           }

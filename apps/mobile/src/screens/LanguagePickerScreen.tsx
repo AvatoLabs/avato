@@ -2,7 +2,6 @@
  * LanguagePickerScreen — Select app language with i18n.
  */
 import { ArrowLeft, Check } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,8 +19,6 @@ const LANGUAGES: { code: Locale; label: string; name: string }[] = [
 
 export default function LanguagePickerScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { locale, setLocale, t } = useI18n();
 
   const handleSelect = async (code: Locale) => {
@@ -33,14 +30,12 @@ export default function LanguagePickerScreen({ navigation }: any) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t.languageTitle}
-        leftElement={
-          <ArrowLeft color={isDark ? '#fff' : '#111'} size={22} strokeWidth={tokens.icon.strokeWidth} />
-        }
+        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         onPressLeft={() => navigation.goBack()}
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}>
-        <View className="mx-5 rounded-2xl overflow-hidden bg-foreground/5 dark:bg-white/5">
+        <View className="mx-5 rounded-2xl overflow-hidden bg-foreground/5">
           {LANGUAGES.map((lang) => (
             <TouchableOpacity
               activeOpacity={0.6}
@@ -48,13 +43,17 @@ export default function LanguagePickerScreen({ navigation }: any) {
               key={lang.code}
               onPress={() => handleSelect(lang.code)}
             >
-              <View className="w-8 h-8 rounded-full bg-foreground/5 dark:bg-white/5 items-center justify-center mr-4">
+              <View className="w-8 h-8 rounded-full bg-foreground/5 items-center justify-center mr-4">
                 <Text className="text-foreground/60 text-[11px] font-semibold">{lang.label}</Text>
               </View>
-              <Text className={`flex-1 text-[15.5px] font-medium tracking-tight ${locale === lang.code ? 'text-primary' : 'text-foreground'}`}>
+              <Text
+                className={`flex-1 text-[15.5px] font-medium tracking-tight ${locale === lang.code ? 'text-primary' : 'text-foreground'}`}
+              >
                 {lang.name}
               </Text>
-              {locale === lang.code && <Check color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />}
+              {locale === lang.code && (
+                <Check color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              )}
             </TouchableOpacity>
           ))}
         </View>

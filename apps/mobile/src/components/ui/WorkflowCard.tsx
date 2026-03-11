@@ -1,6 +1,5 @@
 import { BlurView } from 'expo-blur';
 import type { LucideIcon } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -25,9 +24,7 @@ export function WorkflowCard({
   icon: IconComp,
   onPress,
 }: WorkflowCardProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? themeColors.dark : themeColors.light;
+  const colors = themeColors.light;
 
   return (
     <TouchableOpacity
@@ -35,11 +32,7 @@ export function WorkflowCard({
       className="w-[220px] rounded-xl overflow-hidden mr-3 shadow-sm active:opacity-80"
       onPress={onPress}
     >
-      <BlurView
-        className="flex-1 p-4 border border-black/5 dark:border-white/10"
-        intensity={isDark ? 20 : 40}
-        tint={isDark ? 'dark' : 'light'}
-      >
+      <BlurView className="flex-1 p-4 border border-black/5" intensity={40} tint="light">
         <View className="flex-row items-center justify-between mb-3">
           <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
             <IconComp color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />

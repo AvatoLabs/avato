@@ -2,7 +2,6 @@
  * ProviderSetupScreen — Onboarding step 2: connect to server.
  */
 import { ArrowLeft, Check, Server } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -14,8 +13,6 @@ import { tokens } from '../../theme/tokens';
 
 export default function ProviderSetupScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const [serverUrl, setServerUrl] = useState('');
@@ -54,11 +51,7 @@ export default function ProviderSetupScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
       </View>
 
@@ -78,7 +71,7 @@ export default function ProviderSetupScreen({ navigation }: any) {
         <Text className="text-secondary/60 text-[12px] font-medium uppercase tracking-wider mb-2 px-1">
           {t.serverUrlLabel}
         </Text>
-        <View className="bg-foreground/5 dark:bg-white/5 rounded-xl px-4 py-3">
+        <View className="bg-foreground/5 rounded-xl px-4 py-3">
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -93,7 +86,7 @@ export default function ProviderSetupScreen({ navigation }: any) {
         {/* Test Connection */}
         <TouchableOpacity
           activeOpacity={0.7}
-          className="mt-4 flex-row items-center justify-center py-3 rounded-xl bg-foreground/5 dark:bg-white/5"
+          className="mt-4 flex-row items-center justify-center py-3 rounded-xl bg-foreground/5"
           disabled={testing}
           onPress={handleTest}
         >

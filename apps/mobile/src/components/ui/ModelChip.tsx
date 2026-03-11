@@ -16,9 +16,7 @@ export function ModelChip({ name, provider, active = false, onPress }: ModelChip
     <TouchableOpacity
       activeOpacity={0.7}
       className={`px-4 py-2 rounded-xl mr-2.5 border ${
-        active
-          ? 'bg-primary/10 dark:bg-primary/20 border-primary/20'
-          : 'bg-foreground/5 dark:bg-white/5 border-black/5 dark:border-white/10'
+        active ? 'bg-primary/10 border-primary/20' : 'bg-foreground/5 border-black/5'
       } active:opacity-80`}
       onPress={onPress}
     >
@@ -29,9 +27,13 @@ export function ModelChip({ name, provider, active = false, onPress }: ModelChip
       >
         {name}
       </Text>
-      <Text className={`text-[12px] font-medium mt-0.5 ${
-        active ? 'text-primary/70' : 'text-secondary'
-      }`}>{provider}</Text>
+      <Text
+        className={`text-[12px] font-medium mt-0.5 ${
+          active ? 'text-primary/70' : 'text-secondary'
+        }`}
+      >
+        {provider}
+      </Text>
     </TouchableOpacity>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View, type TouchableOpacityProps } from 'react-native';
+import { Text, TouchableOpacity, type TouchableOpacityProps, View } from 'react-native';
 
 interface QuickActionChipProps extends TouchableOpacityProps {
   active?: boolean;
@@ -10,14 +10,20 @@ interface QuickActionChipProps extends TouchableOpacityProps {
 /**
  * A pill-shaped button for quick actions, tags, or tabs, using subtle layering.
  */
-export function QuickActionChip({ label, icon, active = false, className = '', ...props }: QuickActionChipProps) {
+export function QuickActionChip({
+  label,
+  icon,
+  active = false,
+  className = '',
+  ...props
+}: QuickActionChipProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       className={`flex-row items-center px-4 py-2 rounded-full border ${
         active
-            ? 'bg-primary/10 border-primary/20 dark:bg-primary/20 dark:border-primary/30'
-            : 'bg-foreground/5 border-transparent dark:bg-white/5 active:bg-foreground/10'
+          ? 'bg-primary/10 border-primary/20'
+          : 'bg-foreground/5 border-transparent active:bg-foreground/10'
       } ${className}`}
       {...props}
     >

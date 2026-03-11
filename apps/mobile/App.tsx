@@ -4,9 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'nativewind';
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, useColorScheme as useSystemColorScheme, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,8 +14,9 @@ import { ToastContainer, useToast } from './src/components/ui/Toast';
 import { hasConfiguredUrl } from './src/lib/api';
 import { useI18n } from './src/lib/i18n';
 import RootNavigator from './src/navigation';
+import { useConnectionStore } from './src/store/connection';
 import { useSessionStore } from './src/store/session';
-import { MinkDarkTheme, MinkLightTheme } from './src/theme';
+import { MinkLightTheme } from './src/theme';
 
 const ONBOARDING_KEY = 'minkhub_onboarding_complete';
 
@@ -33,8 +33,6 @@ function OfflineBanner() {
 }
 
 export default function App() {
-  const { colorScheme } = useColorScheme();
-  const systemScheme = useSystemColorScheme();
   const [isAppReady, setIsAppReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
@@ -44,13 +42,11 @@ export default function App() {
   const loadLocale = useI18n((s) => s.loadLocale);
   const t = useI18n((s) => s.t);
 
-  // Determine effective color scheme
-  const effectiveScheme = colorScheme || systemScheme || 'light';
-  const isDark = effectiveScheme === 'dark';
-
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      // Only check physical network layer — isInternetReachable pings public
+      // internet which is unreliable when the user connects to a LAN server.
+      const offline = !state.isConnected;
       setIsOffline(offline);
       if (wasOffline.current && !offline) {
         useToast.getState().show('success', t.toastConnectionRestored);
@@ -87,6 +83,9 @@ export default function App() {
         // Offline
       }
 
+      // Check server connectivity (non-blocking)
+      useConnectionStore.getState().checkConnection();
+
       const timer = setTimeout(() => setIsAppReady(true), 2000);
       return () => clearTimeout(timer);
     };
@@ -100,11 +99,11 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer theme={isDark ? MinkDarkTheme : MinkLightTheme}>
+        <NavigationContainer theme={MinkLightTheme}>
           <RootNavigator initialRoute={initialRoute} />
           {isOffline && <OfflineBanner />}
           <ToastContainer />
-          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <StatusBar style="dark" />
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>

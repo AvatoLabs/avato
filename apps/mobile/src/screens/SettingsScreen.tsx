@@ -4,6 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowLeft,
+  Blocks,
   Bot,
   Brain,
   ChevronRight,
@@ -18,7 +19,6 @@ import {
   Shield,
   Volume2,
 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
 import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -39,7 +39,7 @@ interface SettingsRowProps {
 
 function SettingsRow({
   icon: IconComp,
-  iconBg = 'bg-foreground/5 dark:bg-white/5',
+  iconBg = 'bg-foreground/5',
   iconColor = '#007aff',
   label,
   onPress,
@@ -88,8 +88,6 @@ function SettingsSection({
 
 export default function SettingsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t, locale } = useI18n();
 
   const [defaultModel, setDefaultModel] = useState<string>('');
@@ -103,13 +101,7 @@ export default function SettingsScreen({ navigation }: any) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t.settingsTitle}
-        leftElement={
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
+        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         onPressLeft={() => navigation.goBack()}
       />
 
@@ -146,6 +138,13 @@ export default function SettingsScreen({ navigation }: any) {
             subtitle={t.settingsNotConfigured}
             onPress={() => navigation.navigate('AgentDetail', { identifier: 'default' })}
           />
+          <SettingsRow
+            icon={Blocks}
+            iconColor="#e83e8c"
+            label={t.skillsTitle}
+            subtitle={t.skillsDesc}
+            onPress={() => navigation.navigate('SkillSettings')}
+          />
         </SettingsSection>
 
         <SettingsSection delay={150} title={t.settingsGeneral}>
@@ -160,7 +159,7 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Palette}
             iconColor="#9c27b0"
             label={t.settingsTheme}
-            subtitle={isDark ? t.themeDark : t.themeLight}
+            subtitle={t.themeLight}
             onPress={() => navigation.navigate('ThemePicker')}
           />
         </SettingsSection>

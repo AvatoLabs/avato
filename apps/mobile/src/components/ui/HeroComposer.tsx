@@ -1,6 +1,5 @@
 import { BlurView } from 'expo-blur';
 import { Send } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import Animated, {
@@ -34,9 +33,7 @@ export function HeroComposer({
   onSubmit,
   modelLabel = 'GPT-4o Mini',
 }: HeroComposerProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? themeColors.dark : themeColors.light;
+  const colors = themeColors.light;
 
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -51,11 +48,7 @@ export function HeroComposer({
 
   return (
     <View className="mx-5 mb-5 rounded-xl overflow-hidden shadow-sm">
-      <BlurView
-        className="border border-black/5 dark:border-white/10"
-        intensity={isDark ? 20 : 40}
-        tint={isDark ? 'dark' : 'light'}
-      >
+      <BlurView className="border border-black/5" intensity={40} tint="light">
         <View className="px-4 pt-4 pb-3">
           <TextInput
             multiline
@@ -68,7 +61,7 @@ export function HeroComposer({
           />
         </View>
         <View className="flex-row items-center justify-between px-4 pb-3.5 pt-1">
-          <View className="flex-row items-center px-3 py-1.5 rounded-full border border-black/5 dark:border-white/[0.06]">
+          <View className="flex-row items-center px-3 py-1.5 rounded-full border border-black/5">
             <View className="w-2 h-2 rounded-full bg-primary mr-2" />
             <Text className="text-secondary/60 text-[11px] font-semibold tracking-tight">
               {modelLabel}

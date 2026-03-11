@@ -11,13 +11,4 @@
     --color-border: #d9d9d9;
     --color-card: #fff;
   }
-
-  .dark {
-    --color-background: #000;
-    --color-foreground: #f0f0f0;
-    --color-primary: #0a84ff;
-    --color-secondary: #a6a6a6;
-    --color-border: #424242;
-    --color-card: #1c1c1e;
-  }
 }

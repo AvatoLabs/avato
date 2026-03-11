@@ -16,7 +16,6 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -40,6 +39,7 @@ import { SectionBlock } from '../components/ui/SectionBlock';
 import SessionGroupHeader from '../components/ui/SessionGroupHeader';
 import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
+import { userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getStreak, recordUsage } from '../lib/streak';
@@ -62,8 +62,6 @@ function formatTimeAgo(dateStr: string): string {
 export default function ChatListScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   // Dynamic greeting based on time of day + active chat count
   const greeting = useMemo(() => {
@@ -100,10 +98,22 @@ export default function ChatListScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialized) fetchSessions();
     fetchGroups();
+    // Load user profile for avatar
+    userApi
+      .getUser()
+      .then((u) => {
+        if (u?.avatar) setUserAvatar(u.avatar);
+        if (u?.fullName || u?.username) setUserName(u.fullName || u.username || null);
+      })
+      .catch(() => {
+        /* ignore */
+      });
     // Record usage for streak tracking + milestone celebration
     recordUsage().then(() =>
       getStreak().then((s) => {
@@ -313,17 +323,17 @@ export default function ChatListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        subtitle={
-          sessions.length > 0
-            ? t.activeChats.replace('{count}', String(sessions.length))
-            : undefined
-        }
         title={greeting}
         leftElement={
-          <RNImage
-            className="w-7 h-7 rounded-full opacity-80"
-            source={require('../../assets/icon.png')}
-          />
+          userAvatar ? (
+            <RNImage className="w-8 h-8 rounded-full" source={{ uri: userAvatar }} />
+          ) : (
+            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+              <Text className="text-primary text-[12px] font-bold">
+                {(userName || 'U').slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )
         }
         rightElement={
           <View className="flex-row items-center">
@@ -338,6 +348,12 @@ export default function ChatListScreen({ navigation }: any) {
             <MessageSquarePlus color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
           </View>
         }
+        subtitle={
+          sessions.length > 0
+            ? t.activeChats.replace('{count}', String(sessions.length))
+            : undefined
+        }
+        onPressLeft={() => navigation.navigate('Me')}
         onPressRight={handleCreateChat}
       />
 
@@ -349,7 +365,7 @@ export default function ChatListScreen({ navigation }: any) {
           <RefreshControl
             colors={['#007aff']}
             refreshing={refreshing}
-            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            tintColor="#007aff"
             onRefresh={onRefresh}
           />
         }
@@ -375,17 +391,13 @@ export default function ChatListScreen({ navigation }: any) {
         {/* Search Bar */}
         <Animated.View entering={FadeInDown.delay(75).duration(350)}>
           <View className="px-5 mt-2 mb-1">
-            <View className="flex-row items-center bg-foreground/5 dark:bg-white/5 rounded-xl px-3.5 py-2.5">
-              <Search
-                color={isDark ? '#636366' : '#8c8c8c'}
-                size={16}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+            <View className="flex-row items-center bg-foreground/5 rounded-xl px-3.5 py-2.5">
+              <Search color="#8c8c8c" size={16} strokeWidth={tokens.icon.strokeWidth} />
               <TextInput
                 className="flex-1 ml-2.5 text-foreground text-[14.5px]"
                 clearButtonMode="while-editing"
                 placeholder={t.chatListSearch}
-                placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+                placeholderTextColor="#8c8c8c"
                 returnKeyType="search"
                 value={searchText}
                 onChangeText={setSearchText}
@@ -449,12 +461,9 @@ export default function ChatListScreen({ navigation }: any) {
           className="flex-1 justify-end bg-black/40"
           onPress={() => setActionSession(null)}
         >
-          <Pressable
-            className="bg-white dark:bg-neutral-900 rounded-t-2xl pb-8"
-            onPress={(e) => e.stopPropagation()}
-          >
+          <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
             <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+              <View className="w-9 h-1 rounded-full bg-neutral-300" />
             </View>
             <View className="px-4">
               {/* Pin/Unpin */}
@@ -475,7 +484,7 @@ export default function ChatListScreen({ navigation }: any) {
                 }}
               >
                 <Pin color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-neutral-800 dark:text-neutral-200">
+                <Text className="ml-3 text-base text-neutral-800">
                   {actionSession?.pinned ? t.actionUnpin : t.actionPin}
                 </Text>
               </Pressable>
@@ -486,9 +495,7 @@ export default function ChatListScreen({ navigation }: any) {
                 onPress={() => actionSession && handleRename(actionSession)}
               >
                 <Pencil color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-neutral-800 dark:text-neutral-200">
-                  {t.actionRename}
-                </Text>
+                <Text className="ml-3 text-base text-neutral-800">{t.actionRename}</Text>
               </Pressable>
 
               {/* Move to Group */}
@@ -497,9 +504,7 @@ export default function ChatListScreen({ navigation }: any) {
                 onPress={() => actionSession && handleMoveToGroup(actionSession)}
               >
                 <FolderOpen color="#f5a623" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-neutral-800 dark:text-neutral-200">
-                  {t.groupMoveSession}
-                </Text>
+                <Text className="ml-3 text-base text-neutral-800">{t.groupMoveSession}</Text>
               </Pressable>
 
               {/* Delete */}
@@ -530,7 +535,7 @@ export default function ChatListScreen({ navigation }: any) {
 
             <View className="px-4 mt-2">
               <Pressable
-                className="items-center py-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-800"
+                className="items-center py-3.5 rounded-xl bg-neutral-100"
                 onPress={() => setActionSession(null)}
               >
                 <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>

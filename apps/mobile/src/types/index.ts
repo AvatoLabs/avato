@@ -178,5 +178,161 @@ export interface UserProfile {
   email?: string;
   fullName?: string;
   id: string;
+  interests?: string[];
   username?: string;
+}
+
+// ---- AI Provider Runtime State (mirrors server AiProviderRuntimeState) ----
+
+export interface RuntimeModelAbilities {
+  files?: boolean;
+  functionCall?: boolean;
+  reasoning?: boolean;
+  search?: boolean;
+  vision?: boolean;
+}
+
+export interface RuntimeEnabledModel {
+  abilities: RuntimeModelAbilities;
+  contextWindowTokens?: number;
+  displayName?: string;
+  enabled?: boolean;
+  id: string;
+  providerId: string;
+  releasedAt?: string;
+  type: string;
+}
+
+export interface RuntimeEnabledProvider {
+  id: string;
+  logo?: string;
+  name?: string;
+  source: string;
+}
+
+export interface AiProviderRuntimeState {
+  enabledAiModels: RuntimeEnabledModel[];
+  enabledAiProviders: RuntimeEnabledProvider[];
+  enabledChatAiProviders: RuntimeEnabledProvider[];
+}
+
+/** Provider + its chat models, built client-side from runtime state */
+export interface ProviderWithModels {
+  children: RuntimeEnabledModel[];
+  id: string;
+  logo?: string;
+  name: string;
+}
+
+// ---- AI Provider List / Detail (mirrors server types) ----
+
+export interface AiProviderListItem {
+  description?: string;
+  enabled: boolean;
+  id: string;
+  logo?: string;
+  name?: string;
+  sort?: number;
+  source: string;
+}
+
+export interface AiProviderDetailItem {
+  checkModel?: string;
+  description?: string;
+  enabled: boolean;
+  fetchOnClient?: boolean;
+  homeUrl?: string;
+  id: string;
+  keyVaults?: Record<string, any>;
+  logo?: string;
+  modelsUrl?: string;
+  name: string;
+  settings: AiProviderSettings;
+  source: string;
+}
+
+export interface AiProviderSettings {
+  /** 'apiKey' | 'oauthDeviceFlow' */
+  authType?: string;
+  defaultShowBrowserRequest?: boolean;
+  disableBrowserRequest?: boolean;
+  modelEditable?: boolean;
+  proxyUrl?: { desc?: string; placeholder: string; title?: string } | false;
+  showAddNewModel?: boolean;
+  showApiKey?: boolean;
+  showChecker?: boolean;
+  showDeployName?: boolean;
+  showModelFetcher?: boolean;
+  supportResponsesApi?: boolean;
+}
+
+export interface AiProviderModelItem {
+  abilities?: { functionCall?: boolean; reasoning?: boolean; search?: boolean; vision?: boolean };
+  displayName?: string;
+  enabled: boolean;
+  id: string;
+  source?: string;
+  type?: string;
+}
+
+// ---- Skill / Plugin ----
+
+export type LobeToolType = 'builtin' | 'customPlugin' | 'plugin';
+
+export interface PluginManifestMeta {
+  avatar?: string;
+  description?: string;
+  title?: string;
+}
+
+export interface PluginManifest {
+  author?: string;
+  homepage?: string;
+  identifier: string;
+  meta?: PluginManifestMeta;
+  type?: string;
+}
+
+/** Installed plugin / tool (mirrors LobeTool from server) */
+export interface InstalledPlugin {
+  createdAt?: string;
+  customParams?: Record<string, any>;
+  identifier: string;
+  manifest?: PluginManifest;
+  runtimeType?: string;
+  settings?: Record<string, any>;
+  source?: string;
+  type: LobeToolType;
+  updatedAt?: string;
+}
+
+/** Agent skill item from agentSkills.list */
+export interface AgentSkillItem {
+  content?: string;
+  createdAt?: string;
+  description?: string;
+  id: string;
+  identifier?: string;
+  manifest?: Record<string, any>;
+  name: string;
+  source?: 'builtin' | 'market' | 'user';
+  updatedAt?: string;
+  zipFileHash?: string;
+}
+
+/** MCP custom plugin params */
+export interface CustomPluginParams {
+  apiMode?: string;
+  avatar?: string;
+  description?: string;
+  manifestUrl?: string;
+  mcp?: {
+    args?: string[];
+    command?: string;
+    env?: Record<string, string>;
+    type?: 'http' | 'stdio' | 'cloud';
+    url?: string;
+  };
+  name?: string;
+  settings?: Record<string, any>;
 }

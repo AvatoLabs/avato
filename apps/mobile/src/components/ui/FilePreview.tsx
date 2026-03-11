@@ -19,10 +19,7 @@ const FilePreview = memo(() => {
       {pendingFiles.map((file) => {
         const isImage = file.type.startsWith('image/');
         return (
-          <View
-            className="w-16 h-16 mr-2 rounded-xl overflow-hidden bg-foreground/5 dark:bg-white/5"
-            key={file.id}
-          >
+          <View className="w-16 h-16 mr-2 rounded-xl overflow-hidden bg-foreground/5" key={file.id}>
             {isImage ? (
               <Image className="w-full h-full" resizeMode="cover" source={{ uri: file.uri }} />
             ) : (

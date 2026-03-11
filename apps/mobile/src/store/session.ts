@@ -61,8 +61,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   createSession: async (title = 'New Conversation') => {
     try {
-      const result = await sessionApi.create(title);
-      const newId = result?.id ?? `local-${Date.now()}`;
+      // sessionApi.create now returns the session ID string directly
+      const newId = (await sessionApi.create(title)) ?? `local-${Date.now()}`;
 
       // Optimistic: add a placeholder locally then refresh
       const placeholder: ChatSession = {
@@ -84,8 +84,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return newId;
     } catch (err) {
       console.warn('[SessionStore] createSession error:', err);
+      const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t.errorOffline);
+      useToast.getState().show('error', t[messageKey]);
       // Fallback to local-only session
       const localId = `local-${Date.now()}`;
       const fallback: ChatSession = {
@@ -156,10 +157,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   duplicateSession: async (id: string) => {
     try {
-      const result = await sessionApi.duplicate(id);
-      if (result?.id) {
+      // cloneSession returns the new session ID string directly
+      const newId = await sessionApi.duplicate(id);
+      if (newId) {
         get().fetchSessions();
-        return result.id;
+        return newId;
       }
       return null;
     } catch (err) {

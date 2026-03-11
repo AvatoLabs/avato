@@ -26,10 +26,12 @@ import ProviderSetupScreen from '../screens/onboarding/ProviderSetupScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import ProviderListScreen from '../screens/ProviderListScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SessionGroupScreen from '../screens/SessionGroupScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SkillSettingsScreen from '../screens/SkillSettingsScreen';
 import ThemePickerScreen from '../screens/ThemePickerScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { tokens } from '../theme/tokens';
@@ -175,6 +177,11 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
+        component={ProviderDetailScreen}
+        name="ProviderDetail"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         component={ModelPickerScreen}
         name="ModelPicker"
         options={{ animation: 'slide_from_right' }}
@@ -197,6 +204,11 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={DataManagementScreen}
         name="DataManagement"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={SkillSettingsScreen}
+        name="SkillSettings"
         options={{ animation: 'slide_from_right' }}
       />
 

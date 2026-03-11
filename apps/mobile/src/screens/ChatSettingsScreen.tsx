@@ -13,7 +13,6 @@ import {
   Thermometer,
   Trash2,
 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -31,8 +30,6 @@ import { tokens } from '../theme/tokens';
 export default function ChatSettingsScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId;
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
@@ -102,15 +99,9 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.chatSettingsTitle}
-        leftElement={
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
         rightElement={<Text className="text-primary font-medium text-[15px]">{t.save}</Text>}
+        title={t.chatSettingsTitle}
+        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         onPressLeft={() => {
           saveSettings();
           navigation.goBack();
@@ -125,7 +116,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Session Info */}
         <Animated.View entering={FadeInDown.delay(50).duration(300)}>
-          <View className="mx-5 mt-5 mb-6 rounded-[20px] bg-foreground/5 dark:bg-white/5 p-5 flex-row items-center">
+          <View className="mx-5 mt-5 mb-6 rounded-[20px] bg-foreground/5 p-5 flex-row items-center">
             <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-4">
               <Bot color="#007aff" size={22} strokeWidth={tokens.icon.strokeWidth} />
             </View>
@@ -147,7 +138,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
               {t.chatSettingsModel}
             </Text>
             <PressableScale
-              className="bg-foreground/5 dark:bg-white/5 rounded-2xl"
+              className="bg-foreground/5 rounded-2xl"
               onPress={() => {
                 haptics.light();
                 navigation.navigate('ModelPicker', { sessionId });
@@ -168,11 +159,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                     {t.chatSettingsModelHint}
                   </Text>
                 </View>
-                <ChevronRight
-                  color={isDark ? '#636366' : '#8c8c8c'}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <ChevronRight color="#8c8c8c" size={18} strokeWidth={tokens.icon.strokeWidth} />
               </View>
             </PressableScale>
           </View>
@@ -184,7 +171,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
               {t.chatSettingsTemperature}
             </Text>
-            <View className="bg-foreground/5 dark:bg-white/5 rounded-2xl px-4 py-4 flex-row items-center">
+            <View className="bg-foreground/5 rounded-2xl px-4 py-4 flex-row items-center">
               <Thermometer
                 color="#f5a623"
                 size={18}
@@ -195,7 +182,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 className="flex-1 text-foreground text-[15px]"
                 keyboardType="decimal-pad"
                 placeholder="0.7"
-                placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+                placeholderTextColor="#8c8c8c"
                 value={temperature}
                 onChangeText={setTemperature}
               />
@@ -210,10 +197,10 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
               {t.chatSettingsSystemPrompt}
             </Text>
-            <View className="bg-foreground/5 dark:bg-white/5 rounded-2xl px-4 py-3">
+            <View className="bg-foreground/5 rounded-2xl px-4 py-3">
               <View className="flex-row items-center mb-2">
                 <Sliders
-                  color={isDark ? '#aaa' : '#666'}
+                  color="#666"
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 8 }}
@@ -226,7 +213,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 multiline
                 className="text-foreground text-[14px] leading-5 min-h-[100px]"
                 placeholder={t.chatSettingsSystemPromptPlaceholder}
-                placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+                placeholderTextColor="#8c8c8c"
                 style={{ textAlignVertical: 'top' }}
                 value={systemPrompt}
                 onChangeText={setSystemPrompt}
@@ -241,7 +228,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
               {t.chatSettingsDangerZone}
             </Text>
-            <View className="bg-foreground/5 dark:bg-white/5 rounded-2xl overflow-hidden">
+            <View className="bg-foreground/5 rounded-2xl overflow-hidden">
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-row items-center px-5 py-4 active:bg-foreground/5"

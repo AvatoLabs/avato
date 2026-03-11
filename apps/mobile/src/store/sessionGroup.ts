@@ -38,10 +38,11 @@ export const useSessionGroupStore = create<SessionGroupState>((set, get) => ({
 
   createGroup: async (name: string) => {
     try {
-      const result = await sessionGroupApi.create(name);
-      if (result?.id) {
+      // createSessionGroup now returns the group ID string directly
+      const newId = await sessionGroupApi.create(name);
+      if (newId) {
         const newGroup: SessionGroup = {
-          id: result.id,
+          id: newId,
           name,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

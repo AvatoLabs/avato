@@ -2,7 +2,7 @@
  * SplashScreen — Orchestrator that sequences all splash effects in phases.
  *
  * Timeline:
- *   0.0s  Phase 0: Dark canvas
+ *   0.0s  Phase 0: Canvas
  *   0.2s  Phase 1: Aurora background fades in
  *   0.5s  Phase 2: Floating particles begin
  *   0.8s  Phase 3: Logo spotlight enters
@@ -10,7 +10,6 @@
  *   1.8s  Phase 5: BlurTagline reveals "Your AI Workspace"
  *   2.5s  Phase 6: Exit — whole view scales up + fades out
  */
-import { useColorScheme } from 'nativewind';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
@@ -31,8 +30,6 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onFinish }: SplashScreenProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [phase, setPhase] = useState(0);
 
   // Exit animation values
@@ -64,10 +61,8 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     transform: [{ scale: exitScale.value }],
   }));
 
-  const bgColor = isDark ? '#0a0a1a' : '#f0f0ff';
-
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: bgColor }, exitStyle]}>
+    <Animated.View style={[{ flex: 1, backgroundColor: '#f0f0ff' }, exitStyle]}>
       {/* Background layers */}
       {phase >= 1 && <AuroraBackground />}
       {phase >= 2 && <FloatingParticles />}

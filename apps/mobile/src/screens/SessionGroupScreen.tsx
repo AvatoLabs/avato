@@ -2,7 +2,6 @@
  * SessionGroupScreen — Manage session groups (create, rename, delete).
  */
 import { ArrowLeft, Edit3, Folder, Plus, Trash2 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect } from 'react';
 import { Alert, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -15,8 +14,6 @@ import type { SessionGroup } from '../types';
 
 export default function SessionGroupScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const groups = useSessionGroupStore((s) => s.groups);
@@ -77,7 +74,7 @@ export default function SessionGroupScreen({ navigation }: any) {
 
   const renderGroup = ({ item, index }: { item: SessionGroup; index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 50).duration(250)}>
-      <View className="flex-row items-center px-5 py-4 mx-3 mb-2 rounded-xl border border-black/5 dark:border-white/[0.06]">
+      <View className="flex-row items-center px-5 py-4 mx-3 mb-2 rounded-xl border border-black/5">
         <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3">
           <Folder color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
@@ -90,7 +87,7 @@ export default function SessionGroupScreen({ navigation }: any) {
           </Text>
         </View>
         <TouchableOpacity className="p-2 mr-1" onPress={() => handleRename(item)}>
-          <Edit3 color={isDark ? '#888' : '#666'} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Edit3 color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <TouchableOpacity className="p-2" onPress={() => handleDelete(item)}>
           <Trash2 color="#ff3b30" size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -108,11 +105,7 @@ export default function SessionGroupScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <Text className="text-[17px] font-semibold text-foreground">{t.groupTitle}</Text>
         <TouchableOpacity
@@ -131,7 +124,7 @@ export default function SessionGroupScreen({ navigation }: any) {
         renderItem={renderGroup}
         ListEmptyComponent={
           <View className="items-center pt-20 px-8">
-            <Folder color={isDark ? '#555' : '#ccc'} size={48} strokeWidth={1} />
+            <Folder color="#ccc" size={48} strokeWidth={1} />
             <Text className="text-secondary/50 text-[15px] font-medium mt-4">{t.groupEmpty}</Text>
             <Text className="text-secondary/40 text-[13px] mt-1 text-center">
               {t.groupEmptyDesc}

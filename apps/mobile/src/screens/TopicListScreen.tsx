@@ -2,7 +2,6 @@
  * TopicListScreen — Lists topics for a session with search, create, and management.
  */
 import { ArrowLeft, MessageCircle, Plus } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -28,8 +27,6 @@ import { tokens } from '../theme/tokens';
 export default function TopicListScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId;
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
   const toast = useToast();
 
@@ -106,11 +103,7 @@ export default function TopicListScreen({ route, navigation }: any) {
             navigation.goBack();
           }}
         >
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
         </PressableScale>
         <Text className="text-[17px] font-semibold text-foreground">{t.topicTitle}</Text>
         <PressableScale
@@ -123,11 +116,11 @@ export default function TopicListScreen({ route, navigation }: any) {
 
       {/* Search */}
       <View className="px-4 pb-3">
-        <View className="bg-foreground/5 dark:bg-white/5 rounded-xl px-4 py-2.5 flex-row items-center">
+        <View className="bg-foreground/5 rounded-xl px-4 py-2.5 flex-row items-center">
           <TextInput
             className="flex-1 text-foreground text-[15px]"
             placeholder={t.topicSearch}
-            placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+            placeholderTextColor="#8c8c8c"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -144,7 +137,7 @@ export default function TopicListScreen({ route, navigation }: any) {
           onPress={() => handleSwitchTopic(null)}
         >
           <MessageCircle
-            color={activeTopic === null ? '#007aff' : isDark ? '#888' : '#666'}
+            color={activeTopic === null ? '#007aff' : '#666'}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -177,7 +170,7 @@ export default function TopicListScreen({ route, navigation }: any) {
           <RefreshControl
             colors={['#007aff']}
             refreshing={refreshing}
-            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            tintColor="#007aff"
             onRefresh={onRefresh}
           />
         }

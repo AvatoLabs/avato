@@ -6,7 +6,6 @@
  * Runs entirely on the UI thread via react-native-reanimated.
  */
 import { LinearGradient } from 'expo-linear-gradient';
-import { useColorScheme } from 'nativewind';
 import React, { useEffect } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import Animated, {
@@ -23,9 +22,6 @@ const { width: W, height: H } = Dimensions.get('window');
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function AuroraBackground() {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   // Each layer drifts at a different period
   const t1 = useSharedValue(0);
   const t2 = useSharedValue(0);
@@ -83,18 +79,9 @@ export default function AuroraBackground() {
     ],
   }));
 
-  // Color palettes — typed as tuples for LinearGradient
-  const colors1: [string, string, string] = isDark
-    ? ['#0a0a1a', '#1e1b4b', '#312e81']
-    : ['#f0f0ff', '#e0e7ff', '#c4b5fd'];
-
-  const colors2: [string, string, string] = isDark
-    ? ['transparent', '#4338ca', 'transparent']
-    : ['transparent', '#818cf8', 'transparent'];
-
-  const colors3: [string, string, string] = isDark
-    ? ['transparent', '#6366f1', 'transparent']
-    : ['transparent', '#a5b4fc', 'transparent'];
+  const colors1: [string, string, string] = ['#f0f0ff', '#e0e7ff', '#c4b5fd'];
+  const colors2: [string, string, string] = ['transparent', '#818cf8', 'transparent'];
+  const colors3: [string, string, string] = ['transparent', '#a5b4fc', 'transparent'];
 
   return (
     <>

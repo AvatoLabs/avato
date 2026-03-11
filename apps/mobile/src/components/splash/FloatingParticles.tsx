@@ -5,7 +5,6 @@
  * Each particle has independent Y drift, X sway, and opacity breathing.
  * All animation runs on the UI thread via react-native-reanimated.
  */
-import { useColorScheme } from 'nativewind';
 import React, { useEffect, useMemo } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -51,12 +50,10 @@ function Particle({ config, color }: { config: ParticleConfig; color: string }) 
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    // Y axis: float upward continuously
     drift.value = withDelay(
       config.delay,
       withRepeat(withTiming(1, { duration: config.driftSpeed, easing: Easing.linear }), -1, false),
     );
-    // X axis: gentle horizontal sway
     sway.value = withDelay(
       config.delay,
       withRepeat(
@@ -65,7 +62,6 @@ function Particle({ config, color }: { config: ParticleConfig; color: string }) 
         true,
       ),
     );
-    // Opacity: breathe in/out
     opacity.value = withDelay(
       config.delay,
       withRepeat(
@@ -102,10 +98,8 @@ function Particle({ config, color }: { config: ParticleConfig; color: string }) 
 }
 
 export default function FloatingParticles() {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const particles = useMemo(() => generateParticles(), []);
-  const color = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.12)';
+  const color = 'rgba(0,0,0,0.12)';
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>

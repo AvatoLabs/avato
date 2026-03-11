@@ -1,7 +1,6 @@
 /**
  * DiscoverScreen → Tabbed marketplace (Agents / Models / Providers).
  */
-import { useColorScheme } from 'nativewind';
 import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutAnimation, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -22,8 +21,6 @@ type Tab = 'agents' | 'models' | 'providers';
 
 export default function DiscoverScreen({ navigation }: any) {
   const { t } = useI18n();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const [activeTab, setActiveTab] = useState<Tab>('agents');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -77,7 +74,7 @@ export default function DiscoverScreen({ navigation }: any) {
     : models;
 
   const filteredProviders = searchQuery
-    ? providers.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? providers.filter((p) => (p.name || p.id).toLowerCase().includes(searchQuery.toLowerCase()))
     : providers;
 
   return (
@@ -92,7 +89,7 @@ export default function DiscoverScreen({ navigation }: any) {
           <RefreshControl
             colors={['#007aff']}
             refreshing={refreshing}
-            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            tintColor="#007aff"
             onRefresh={onRefresh}
           />
         }
@@ -112,9 +109,7 @@ export default function DiscoverScreen({ navigation }: any) {
             <PressableScale
               key={tab.key}
               className={`px-4 py-2 rounded-full mr-2 ${
-                activeTab === tab.key
-                  ? 'bg-primary'
-                  : 'border border-black/5 dark:border-white/[0.06]'
+                activeTab === tab.key ? 'bg-primary' : 'border border-black/5'
               }`}
               onPress={() => {
                 haptics.selection();
@@ -197,7 +192,7 @@ export default function DiscoverScreen({ navigation }: any) {
           <Animated.View entering={FadeInDown.delay(100).duration(350)}>
             <SectionBlock title={t.discoverModels}>
               {filteredModels.map((model) => (
-                <ModelCard key={model.id} model={model} />
+                <ModelCard key={`${model.providerId}-${model.id}`} model={model} />
               ))}
               {filteredModels.length === 0 && (
                 <View className="items-center py-8">

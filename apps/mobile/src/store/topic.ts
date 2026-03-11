@@ -42,11 +42,20 @@ export const useTopicStore = create<TopicState>((set, get) => ({
 
   createTopic: async (sessionId: string, title: string) => {
     try {
-      const topic = await topicApi.create(sessionId, title);
-      if (topic) {
-        set((s) => ({ topics: [topic, ...s.topics] }));
+      // createTopic now returns the topic ID string, not a full Topic object
+      const topicId = await topicApi.create(sessionId, title);
+      if (topicId) {
+        const placeholder: Topic = {
+          id: topicId,
+          title,
+          sessionId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        set((s) => ({ topics: [placeholder, ...s.topics] }));
+        return placeholder;
       }
-      return topic;
+      return null;
     } catch (err) {
       console.warn('[TopicStore] createTopic error:', err);
       return null;

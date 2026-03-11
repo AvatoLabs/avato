@@ -1,5 +1,4 @@
 import { Search } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { TextInput, type TextInputProps, View } from 'react-native';
 
@@ -11,13 +10,11 @@ interface SearchFieldProps extends TextInputProps {
 }
 
 export function SearchField({ containerClassName = '', ...props }: SearchFieldProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? themeColors.dark : themeColors.light;
+  const colors = themeColors.light;
 
   return (
     <View
-      className={`flex-row items-center px-4 h-11 rounded-full border border-black/5 dark:border-white/[0.06] ${containerClassName}`}
+      className={`flex-row items-center px-4 h-11 rounded-full border border-black/5 ${containerClassName}`}
     >
       <Search color={colors.secondary} size={18} strokeWidth={tokens.icon.strokeWidth} />
       <TextInput

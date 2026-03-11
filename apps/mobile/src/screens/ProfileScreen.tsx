@@ -1,90 +1,43 @@
 /**
  * ProfileScreen → Workspace Control Center
  *
- * Layering strategy:
- * - Workspace tab: Overview card + Runtime cards + Preferences (quick access)
- * - Settings screen (push): Full config (Server, Providers, Model, Data, Voice, About)
+ * Layout:
+ *  - WorkspaceOverviewCard: Identity → ProfileEdit, Model → ModelPicker, Providers → AIProviders
+ *  - Usage Stats: messages, sessions, streak
+ *  - All Settings: single entry to full config
+ *  - Sign Out
  *
- * No duplication: Workspace shows status & quick toggles. Settings shows full config.
- * Avatar tap → Settings (profile editing is backend-dependent, not yet available).
+ * No duplication with SettingsScreen — all configuration (Language, Theme, Server,
+ * Data, Voice, About) lives exclusively in Settings.
  */
-import { ChevronRight, Globe, LogOut, Moon, Palette, Pencil, Settings } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
+import { useFocusEffect } from '@react-navigation/native';
+import { ChevronRight, LogOut, Settings } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { SectionBlock } from '../components/ui/SectionBlock';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { clearAuth } from '../lib/api';
+import { clearAuth, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
-import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
+import { useI18n } from '../lib/i18n';
 import { getMessageCount, getStreak } from '../lib/streak';
+import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 
-interface SettingsRowProps {
-  icon: any;
-  iconColor?: string;
-  label: string;
-  onPress?: () => void;
-  rightElement?: React.ReactNode;
-  showArrow?: boolean;
-  subtitle?: string;
-}
-
-function SettingsRow({
-  icon: IconComp,
-  iconColor = '#007aff',
-  label,
-  onPress,
-  rightElement,
-  showArrow = true,
-  subtitle,
-}: SettingsRowProps) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.6}
-      className="flex-row items-center px-4 py-3.5 mb-1 rounded-xl active:bg-foreground/5"
-      disabled={!onPress && !rightElement}
-      onPress={onPress}
-    >
-      <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-        <IconComp color={iconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
-      </View>
-      <View className="flex-1">
-        <Text className="text-foreground text-[15px] font-medium tracking-tight">{label}</Text>
-        {subtitle && (
-          <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">{subtitle}</Text>
-        )}
-      </View>
-      {rightElement ||
-        (showArrow && onPress && (
-          <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
-        ))}
-    </TouchableOpacity>
-  );
-}
-
 export default function ProfileScreen({ navigation }: any) {
-  const { colorScheme, toggleColorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const sessionCount = useSessionStore((s) => s.sessions.length);
+  const isConnected = useConnectionStore((s) => s.isConnected);
+  const checkConnection = useConnectionStore((s) => s.checkConnection);
 
   const [streak, setStreak] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
     const [s, m] = await Promise.all([getStreak(), getMessageCount()]);
@@ -92,16 +45,34 @@ export default function ProfileScreen({ navigation }: any) {
     setMessageCount(m);
   }, []);
 
+  const loadUser = useCallback(async () => {
+    try {
+      const u = await userApi.getUser();
+      if (u?.avatar) setUserAvatar(u.avatar);
+      if (u?.fullName || u?.username) setUserName(u.fullName || u.username || null);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    loadUser();
+  }, [loadStats, loadUser]);
+
+  // Re-check server connection every time the screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      checkConnection();
+    }, [checkConnection]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     haptics.light();
-    await loadStats();
+    await Promise.all([loadStats(), checkConnection(), loadUser()]);
     setRefreshing(false);
-  }, [loadStats]);
+  }, [loadStats, checkConnection, loadUser]);
 
   const handleSignOut = () => {
     Alert.alert(t.meSignOutConfirm, t.meSignOutDesc, [
@@ -132,20 +103,23 @@ export default function ProfileScreen({ navigation }: any) {
           <RefreshControl
             colors={['#007aff']}
             refreshing={refreshing}
-            tintColor={isDark ? '#0a84ff' : '#007aff'}
+            tintColor="#007aff"
             onRefresh={onRefresh}
           />
         }
       >
-        {/* Workspace Overview — taps into full Settings */}
+        {/* Workspace Overview — taps into profile / model / providers */}
         <Animated.View entering={FadeInDown.delay(50).duration(350)}>
           <View className="pt-3">
             <WorkspaceOverviewCard
               defaultModel="GPT-4o Mini"
-              isConnected={false}
+              isConnected={isConnected}
               providerCount={0}
-              userName={t.meUser}
-              onPress={() => navigation.navigate('Settings')}
+              userAvatar={userAvatar}
+              userName={userName || t.meUser}
+              onPress={() => navigation.navigate('ProfileEdit')}
+              onPressModel={() => navigation.navigate('ModelPicker')}
+              onPressProviders={() => navigation.navigate('AIProviders')}
             />
           </View>
         </Animated.View>
@@ -153,19 +127,19 @@ export default function ProfileScreen({ navigation }: any) {
         {/* Usage Stats */}
         <Animated.View entering={FadeInDown.delay(80).duration(350)}>
           <View className="flex-row px-5 gap-3 mb-4">
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
               <Text className="text-foreground text-[20px] font-bold">{messageCount}</Text>
               <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
                 {t.statsMessages}
               </Text>
             </View>
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
               <Text className="text-foreground text-[20px] font-bold">{sessionCount}</Text>
               <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
                 {t.statsSessions}
               </Text>
             </View>
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5 dark:border-white/[0.06]">
+            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
               <Text className="text-foreground text-[20px] font-bold">{streak}</Text>
               <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
                 {t.statsStreak}
@@ -174,116 +148,15 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
-        {/* Runtime — quick status cards (unique to Workspace, NOT in Settings) */}
+        {/* All Settings — single entry point */}
         <Animated.View entering={FadeInDown.delay(100).duration(350)}>
-          <SectionBlock title={t.workspaceRuntime}>
-            <View className="px-3">
-              <View className="flex-row gap-3 mb-1">
-                <PressableScale
-                  className="flex-1 rounded-xl p-4 border border-black/5 dark:border-white/[0.06]"
-                  onPress={() => navigation.navigate('ModelPicker')}
-                >
-                  <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mb-2">
-                    {t.workspaceModel}
-                  </Text>
-                  <Text className="text-foreground text-[14px] font-medium tracking-tight">
-                    GPT-4o Mini
-                  </Text>
-                  <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">OpenAI</Text>
-                </PressableScale>
-                <PressableScale
-                  className="flex-1 rounded-xl p-4 border border-black/5 dark:border-white/[0.06]"
-                  onPress={() => navigation.navigate('ServerConfig')}
-                >
-                  <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mb-2">
-                    {t.workspaceEndpoint}
-                  </Text>
-                  <Text
-                    className="text-foreground text-[14px] font-medium tracking-tight"
-                    numberOfLines={1}
-                  >
-                    localhost:3010
-                  </Text>
-                  <View className="flex-row items-center mt-1">
-                    <View className="w-1.5 h-1.5 rounded-full bg-secondary/30 mr-1.5" />
-                    <Text className="text-secondary/50 text-[11px] font-medium">
-                      {t.workspaceNotConnected}
-                    </Text>
-                  </View>
-                </PressableScale>
-              </View>
-            </View>
-          </SectionBlock>
-        </Animated.View>
-
-        {/* Preferences — quick toggles (unique to Workspace) */}
-        <Animated.View entering={FadeInDown.delay(150).duration(350)}>
-          <SectionBlock title={t.workspacePreferences}>
-            <View className="px-3">
-              <SettingsRow
-                icon={Moon}
-                iconColor={isDark ? '#f5a623' : '#6c6c6c'}
-                label={t.meDarkMode}
-                showArrow={false}
-                rightElement={
-                  <Switch
-                    thumbColor="#fff"
-                    trackColor={{ false: isDark ? '#3a3a3c' : '#e0e0e0', true: '#007aff' }}
-                    value={isDark}
-                    onValueChange={toggleColorScheme}
-                  />
-                }
-              />
-              <SettingsRow
-                icon={Globe}
-                label={t.meLanguage}
-                subtitle={LOCALE_DISPLAY_NAMES[locale] || locale}
-                onPress={() => navigation.navigate('LanguagePicker')}
-              />
-              <SettingsRow
-                icon={Palette}
-                iconColor="#9c27b0"
-                label={t.meTheme}
-                subtitle={isDark ? t.themeDark : t.themeLight}
-                onPress={() => navigation.navigate('ThemePicker')}
-              />
-            </View>
-          </SectionBlock>
-        </Animated.View>
-
-        {/* Edit Profile */}
-        <Animated.View entering={FadeInDown.delay(200).duration(350)}>
           <View className="px-5 mb-4">
             <PressableScale
-              className="flex-row items-center rounded-xl px-5 py-4 mb-3 border border-black/5 dark:border-white/[0.06]"
-              onPress={() => navigation.navigate('ProfileEdit')}
-            >
-              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Pencil color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                  {t.profileEdit}
-                </Text>
-              </View>
-              <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
-            </PressableScale>
-          </View>
-        </Animated.View>
-
-        {/* All Settings — single entry point, no duplication */}
-        <Animated.View entering={FadeInDown.delay(250).duration(350)}>
-          <View className="px-5 mb-4">
-            <PressableScale
-              className="flex-row items-center rounded-xl px-5 py-4 border border-black/5 dark:border-white/[0.06]"
+              className="flex-row items-center rounded-xl px-5 py-4 border border-black/5"
               onPress={() => navigation.navigate('Settings')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Settings
-                  color={isDark ? '#888' : '#666'}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Settings color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -299,10 +172,10 @@ export default function ProfileScreen({ navigation }: any) {
         </Animated.View>
 
         {/* Sign Out */}
-        <Animated.View entering={FadeInDown.delay(250).duration(350)}>
+        <Animated.View entering={FadeInDown.delay(150).duration(350)}>
           <View className="px-5 mt-2 mb-4">
             <PressableScale
-              className="rounded-xl py-4 items-center border border-black/5 dark:border-white/[0.06]"
+              className="rounded-xl py-4 items-center border border-black/5"
               onPress={handleSignOut}
             >
               <View className="flex-row items-center gap-2">

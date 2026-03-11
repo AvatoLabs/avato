@@ -3,7 +3,6 @@
  */
 import * as Clipboard from 'expo-clipboard';
 import { Copy, Pencil, RefreshCw, Trash2 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React, { memo, useCallback } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
@@ -34,8 +33,6 @@ interface MessageActionSheetProps {
 
 const MessageActionSheet = memo<MessageActionSheetProps>(
   ({ visible, onClose, content, role, onCopy, onEdit, onRegenerate, onDelete }) => {
-    const { colorScheme } = useColorScheme();
-    const isDark = colorScheme === 'dark';
     const { t } = useI18n();
     const toast = useToast();
 
@@ -67,11 +64,7 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
         key: 'copy',
         label: t.msgActionCopy,
         icon: (
-          <Copy
-            color={isDark ? '#d0d0d0' : '#333'}
-            size={tokens.icon.size.md}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <Copy color="#333" size={tokens.icon.size.md} strokeWidth={tokens.icon.strokeWidth} />
         ),
         onPress: handleCopy,
       },
@@ -82,7 +75,7 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
               label: t.msgActionEdit,
               icon: (
                 <Pencil
-                  color={isDark ? '#d0d0d0' : '#333'}
+                  color="#333"
                   size={tokens.icon.size.md}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -96,7 +89,7 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
         label: t.msgActionRegenerate,
         icon: (
           <RefreshCw
-            color={isDark ? '#d0d0d0' : '#333'}
+            color="#333"
             size={tokens.icon.size.md}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -121,13 +114,10 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
     return (
       <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
         <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-          <Pressable
-            className="bg-white dark:bg-neutral-900 rounded-t-2xl pb-8"
-            onPress={(e) => e.stopPropagation()}
-          >
+          <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
             {/* Handle bar */}
             <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+              <View className="w-9 h-1 rounded-full bg-neutral-300" />
             </View>
 
             {/* Actions */}
@@ -140,9 +130,7 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
                 >
                   <View className="mr-3">{action.icon}</View>
                   <Text
-                    className={`text-base ${
-                      action.danger ? 'text-red-500' : 'text-neutral-800 dark:text-neutral-200'
-                    }`}
+                    className={`text-base ${action.danger ? 'text-red-500' : 'text-neutral-800'}`}
                   >
                     {action.label}
                   </Text>
@@ -153,7 +141,7 @@ const MessageActionSheet = memo<MessageActionSheetProps>(
             {/* Cancel */}
             <View className="px-4 mt-2">
               <Pressable
-                className="items-center py-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 active:bg-neutral-200"
+                className="items-center py-3.5 rounded-xl bg-neutral-100 active:bg-neutral-200"
                 onPress={onClose}
               >
                 <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>

@@ -7,12 +7,12 @@ import { Text, View } from 'react-native';
 
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
-import type { DiscoverProvider } from '../../types';
+import type { AiProviderListItem } from '../../types';
 import PressableScale from './PressableScale';
 
 interface ProviderCardProps {
   onPress?: () => void;
-  provider: DiscoverProvider;
+  provider: AiProviderListItem;
 }
 
 const ProviderCard = memo<ProviderCardProps>(({ provider, onPress }) => {
@@ -30,7 +30,7 @@ const ProviderCard = memo<ProviderCardProps>(({ provider, onPress }) => {
           {provider.name}
         </Text>
         <Text className="text-secondary/50 text-[12px] font-medium mt-0.5" numberOfLines={1}>
-          {provider.description || `${provider.models.length} models`}
+          {provider.description || provider.source}
         </Text>
       </View>
       <View

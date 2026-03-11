@@ -19,10 +19,8 @@ export function SurfaceCard({
   elevated = false,
   ...props
 }: SurfaceCardProps) {
-  const baseClasses = 'rounded-xl overflow-hidden border border-black/5 dark:border-white/10';
-  const surfaceClasses = elevated
-    ? 'bg-foreground/5 dark:bg-white/10'
-    : 'bg-transparent active:bg-foreground/5';
+  const baseClasses = 'rounded-xl overflow-hidden border border-black/5';
+  const surfaceClasses = elevated ? 'bg-foreground/5' : 'bg-transparent active:bg-foreground/5';
 
   if (onPress) {
     return (

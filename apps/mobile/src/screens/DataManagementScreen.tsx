@@ -3,7 +3,6 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Download, RotateCcw, Trash2 } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -15,8 +14,6 @@ import { tokens } from '../theme/tokens';
 
 export default function DataManagementScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const handleClearCache = () => {
@@ -88,11 +85,7 @@ export default function DataManagementScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft
-            color={isDark ? '#fff' : '#111'}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <Text className="text-[17px] font-semibold text-foreground">{t.dataManageTitle}</Text>
         <View className="w-9" />
@@ -103,11 +96,11 @@ export default function DataManagementScreen({ navigation }: any) {
           <Animated.View entering={FadeInDown.delay(index * 50).duration(300)} key={item.label}>
             <TouchableOpacity
               activeOpacity={0.6}
-              className="flex-row items-center px-5 py-4 mx-4 mb-3 rounded-xl bg-foreground/5 dark:bg-white/5 active:bg-foreground/10"
+              className="flex-row items-center px-5 py-4 mx-4 mb-3 rounded-xl bg-foreground/5 active:bg-foreground/10"
               onPress={item.onPress}
             >
               <View
-                className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${item.danger ? 'bg-red-500/10' : 'bg-foreground/5 dark:bg-white/5'}`}
+                className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${item.danger ? 'bg-red-500/10' : 'bg-foreground/5'}`}
               >
                 <item.icon color={item.color} size={20} strokeWidth={tokens.icon.strokeWidth} />
               </View>

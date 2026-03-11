@@ -4,10 +4,10 @@
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
-import { aiModelApi, aiProviderApi, marketApi } from '../lib/api';
+import { aiProviderApi, marketApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
-import type { DiscoverModel, DiscoverProvider, MarketAgent } from '../types';
+import type { AiProviderListItem, DiscoverModel, MarketAgent } from '../types';
 
 interface DiscoverState {
   agentDetail: MarketAgent | null;
@@ -19,7 +19,7 @@ interface DiscoverState {
 
   loading: boolean;
   models: DiscoverModel[];
-  providers: DiscoverProvider[];
+  providers: AiProviderListItem[];
   searchQuery: string;
   setSearchQuery: (q: string) => void;
 }
@@ -47,8 +47,16 @@ export const useDiscoverStore = create<DiscoverState>((set) => ({
 
   fetchModels: async () => {
     try {
-      const models = await aiModelApi.list();
-      set({ models: models ?? [] });
+      // aiModel.getAiModelList doesn't exist on server;
+      // use aiProvider runtime state to get enabled models instead.
+      const state = await aiProviderApi.getRuntimeState();
+      const models = (state?.enabledAiModels ?? []).map((m: any) => ({
+        id: m.id,
+        displayName: m.displayName || m.id,
+        providerId: m.providerId,
+        type: m.type,
+      }));
+      set({ models: models as any });
     } catch (err) {
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;

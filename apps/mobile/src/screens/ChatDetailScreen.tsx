@@ -5,11 +5,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, BookText, Paperclip, Send, Settings } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
+import {
+  ArrowLeft,
+  BookText,
+  Brain,
+  Eraser,
+  Globe,
+  Paperclip,
+  Send,
+  Settings,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  Alert,
   FlatList,
   Image as RNImage,
   Keyboard,
@@ -34,6 +43,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FilePreview from '../components/ui/FilePreview';
 import MessageBubble from '../components/ui/MessageBubble';
 import PressableScale from '../components/ui/PressableScale';
+import { messageApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -48,8 +58,6 @@ const EMPTY_MESSAGES: ChatMessage[] = [];
 export default function ChatDetailScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId || 'default';
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
   const messages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
@@ -66,6 +74,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const [inputText, setInputText] = useState('');
   const [sessionModel, setSessionModel] = useState<string>('');
+  const [searchEnabled, setSearchEnabled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Load per-session model name for header display
@@ -184,6 +193,46 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     }
   }, [addFile, t]);
 
+  // ── Toolbar: Model ────────────────────────────────────────────────
+  const handleModelPress = useCallback(() => {
+    haptics.light();
+    navigation.navigate('ModelPicker', { sessionId });
+  }, [navigation, sessionId]);
+
+  // ── Toolbar: Search toggle ────────────────────────────────────────
+  const handleToggleSearch = useCallback(async () => {
+    haptics.light();
+    const next = !searchEnabled;
+    setSearchEnabled(next);
+    try {
+      await sessionApi.updateChatConfig(sessionId, { searchMode: next });
+    } catch {
+      /* best-effort */
+    }
+  }, [searchEnabled, sessionId]);
+
+  // ── Toolbar: Clear messages ───────────────────────────────────────
+  const handleClear = useCallback(() => {
+    if (messages.length === 0) return;
+    haptics.warning();
+    Alert.alert(t.chatClearTitle, t.chatClearMessage, [
+      { text: t.cancel, style: 'cancel' },
+      {
+        text: t.chatClearConfirm,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const ids = messages.map((m) => m.id);
+            await messageApi.removeAll(ids);
+            fetchMessages(sessionId, activeTopic ?? undefined);
+          } catch {
+            /* ignore */
+          }
+        },
+      },
+    ]);
+  }, [messages, t, sessionId, activeTopic, fetchMessages]);
+
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => (
       <MessageBubble generating={generating} message={item} sessionId={sessionId} />
@@ -194,12 +243,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       {/* Header */}
-      <BlurView
-        className="z-10"
-        intensity={90}
-        style={{ paddingTop: insets.top }}
-        tint={isDark ? 'dark' : 'light'}
-      >
+      <BlurView className="z-10" intensity={90} style={{ paddingTop: insets.top }} tint="light">
         <View className="flex-row items-center justify-between px-4 py-2.5">
           <View className="flex-row items-center flex-1">
             <PressableScale
@@ -211,11 +255,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.goBack();
               }}
             >
-              <ArrowLeft
-                color={isDark ? '#fff' : '#111'}
-                size={22}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
             <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
               <RNImage className="w-6 h-6 rounded-md" source={require('../../assets/icon.png')} />
@@ -252,11 +292,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.navigate('TopicList', { sessionId });
               }}
             >
-              <BookText
-                color={isDark ? '#aaa' : '#666'}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <BookText color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
             <PressableScale
               accessibilityLabel="Settings"
@@ -267,11 +303,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.navigate('ChatSettings', { sessionId });
               }}
             >
-              <Settings
-                color={isDark ? '#aaa' : '#666'}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <Settings color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
           </View>
         </View>
@@ -314,7 +346,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 {[t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4].map((label) => (
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    className="px-4 py-2.5 rounded-full border border-black/5 dark:border-white/[0.06]"
+                    className="px-4 py-2.5 rounded-full border border-black/5"
                     key={label}
                     onPress={() => {
                       haptics.light();
@@ -347,10 +379,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           <BlurView
             className="rounded-[26px] overflow-hidden"
             intensity={80}
-            tint={isDark ? 'dark' : 'light'}
+            tint="light"
             style={{
               borderWidth: 0.5,
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              borderColor: 'rgba(0,0,0,0.06)',
             }}
           >
             {pendingFiles.length > 0 && (
@@ -358,35 +390,71 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 <FilePreview />
               </View>
             )}
-            <View className="flex-row items-end px-2 py-1.5">
-              <TouchableOpacity
-                accessibilityLabel="Attach file"
-                accessibilityRole="button"
-                activeOpacity={0.7}
-                className="w-9 h-9 items-center justify-center rounded-full mb-0.5 opacity-60 active:opacity-100"
-                onPress={handleAttach}
-              >
-                <Paperclip
-                  color={isDark ? '#ccc' : '#555'}
-                  size={22}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
+            {/* Text input — full width */}
+            <View className="px-3 pt-2">
               <TextInput
                 multiline
-                className="flex-1 px-2 py-2 text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
+                className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
                 editable={!generating}
                 placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                placeholderTextColor={isDark ? '#636366' : '#8c8c8c'}
+                placeholderTextColor="#8c8c8c"
                 style={{ textAlignVertical: 'top' }}
                 value={inputText}
                 onChangeText={setInputText}
               />
+            </View>
+            {/* Action toolbar row */}
+            <View className="flex-row items-center px-2 pb-1.5 pt-1">
+              {/* Model */}
+              <TouchableOpacity
+                accessibilityLabel="Select model"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full"
+                onPress={handleModelPress}
+              >
+                <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+              {/* Search */}
+              <TouchableOpacity
+                accessibilityLabel="Toggle search"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handleToggleSearch}
+              >
+                <Globe
+                  color={searchEnabled ? '#2563eb' : '#666'}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+              {/* Attach */}
+              <TouchableOpacity
+                accessibilityLabel="Attach file"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handleAttach}
+              >
+                <Paperclip color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+              {/* Separator */}
+              <View className="w-px h-4 bg-black/10 mx-1" />
+              {/* Clear */}
+              <TouchableOpacity
+                accessibilityLabel="Clear messages"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full"
+                onPress={handleClear}
+              >
+                <Eraser color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+              {/* Spacer */}
+              <View className="flex-1" />
+              {/* Send */}
               {inputText.trim() ? (
                 <Animated.View style={sendAnimStyle}>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    className="w-9 h-9 bg-primary rounded-full items-center justify-center mb-0.5"
+                    className="w-9 h-9 bg-primary rounded-full items-center justify-center"
                     onPress={handleSend}
                   >
                     <Send
@@ -398,7 +466,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   </TouchableOpacity>
                 </Animated.View>
               ) : (
-                <View className="w-9 h-9 mb-0.5" />
+                <View className="w-9 h-9" />
               )}
             </View>
           </BlurView>

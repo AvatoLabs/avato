@@ -1,5 +1,4 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -23,9 +22,7 @@ interface QuickActionRowProps {
  * QuickActionRow — Horizontal row of 4 action pills for the home screen.
  */
 export function QuickActionRow({ actions, onPress }: QuickActionRowProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? themeColors.dark : themeColors.light;
+  const colors = themeColors.light;
 
   return (
     <View className="px-5 mb-6">
@@ -34,7 +31,7 @@ export function QuickActionRow({ actions, onPress }: QuickActionRowProps) {
           const IconComp = action.icon;
           return (
             <PressableScale
-              className="flex-1 border border-black/5 dark:border-white/[0.06] rounded-xl py-3 items-center justify-center"
+              className="flex-1 border border-black/5 rounded-xl py-3 items-center justify-center"
               key={action.key}
               onPress={() => {
                 haptics.light();

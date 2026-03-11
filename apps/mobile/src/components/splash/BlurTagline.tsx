@@ -1,10 +1,7 @@
 /**
  * BlurTagline — Text fades from blurred to sharp with upward float.
  * Inspired by reactbits.dev/text-animations/blur-text.
- *
- * Uses expo-blur with animated intensity + opacity + translateY.
  */
-import { useColorScheme } from 'nativewind';
 import React, { useEffect } from 'react';
 import { Text } from 'react-native';
 import Animated, {
@@ -19,9 +16,6 @@ interface BlurTaglineProps {
 }
 
 export default function BlurTagline({ text }: BlurTaglineProps) {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(14);
   const scale = useSharedValue(0.96);
@@ -39,11 +33,11 @@ export default function BlurTagline({ text }: BlurTaglineProps) {
   }));
 
   return (
-    <Animated.View style={[{ marginTop: 12 }, animStyle]}>
+    <Animated.View style={[{ marginTop: 16 }, animStyle]}>
       <Text
         style={{
-          color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
-          fontSize: 15,
+          color: 'rgba(0,0,0,0.4)',
+          fontSize: 16,
           fontWeight: '500',
           letterSpacing: 0.5,
           textAlign: 'center',
