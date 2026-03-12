@@ -12,11 +12,16 @@ const Layout = () => {
     navigate(`/settings/provider/${providerKey}`);
   };
 
-  return params.providerId === 'all' ? (
-    <ProviderMenu mobile={true} onProviderSelect={handleProviderSelect} />
-  ) : (
-    <Outlet />
-  );
+  /**
+   * Keep mobile provider details strictly aligned with web:
+   * all provider IDs (including `all`) should render through ProviderDetailPage.
+   * ProviderMenu remains as a fallback only when route params are missing.
+   */
+  if (!params.providerId) {
+    return <ProviderMenu mobile={true} onProviderSelect={handleProviderSelect} />;
+  }
+
+  return <Outlet />;
 };
 
 export default Layout;

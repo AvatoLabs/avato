@@ -5,8 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FolderOpen, MessageSquare, Palette, Puzzle, User } from 'lucide-react-native';
-import React from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image as RNImage, Platform, View } from 'react-native';
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -34,17 +34,51 @@ import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SessionGroupScreen from '../screens/SessionGroupScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import SkillDetailScreen from '../screens/SkillDetailScreen';
+import SkillMarketScreen from '../screens/SkillMarketScreen';
 import SkillSettingsScreen from '../screens/SkillSettingsScreen';
 import StatsScreen from '../screens/StatsScreen';
 import TopicListScreen from '../screens/TopicListScreen';
+import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+function MeTabIcon({ color, focused, size }: { color: string; focused: boolean; size: number }) {
+  const avatar = useUserStore((s) => s.avatar);
+
+  if (!avatar) {
+    return <User color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />;
+  }
+
+  const avatarSize = size - 2;
+  return (
+    <View
+      style={{
+        borderColor: focused ? '#007aff' : 'transparent',
+        borderRadius: 999,
+        borderWidth: focused ? 1.5 : 0,
+        padding: focused ? 1 : 0,
+      }}
+    >
+      <RNImage
+        source={{ uri: avatar }}
+        style={{ borderRadius: avatarSize / 2, height: avatarSize, width: avatarSize }}
+      />
+    </View>
+  );
+}
+
 function BottomTabs() {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const fetchUser = useUserStore((s) => s.fetchUser);
+  const isUserLoaded = useUserStore((s) => s.isLoaded);
+
+  useEffect(() => {
+    if (!isUserLoaded) void fetchUser();
+  }, [isUserLoaded, fetchUser]);
 
   return (
     <Tab.Navigator
@@ -122,11 +156,11 @@ function BottomTabs() {
         component={ProfileScreen}
         name="Me"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <User color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          tabBarIcon: ({ color, focused, size }) => (
+            <MeTabIcon color={color} focused={focused} size={size} />
           ),
-          tabBarLabel: t.settingsTitle,
-          tabBarAccessibilityLabel: 'Profile tab',
+          tabBarLabel: 'Me',
+          tabBarAccessibilityLabel: 'Me tab',
         }}
       />
     </Tab.Navigator>
@@ -229,6 +263,16 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={SkillSettingsScreen}
         name="SkillSettings"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={SkillDetailScreen}
+        name="SkillDetail"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={SkillMarketScreen}
+        name="SkillMarket"
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen

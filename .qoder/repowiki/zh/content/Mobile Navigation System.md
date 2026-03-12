@@ -4,6 +4,11 @@
 **本文档引用的文件**
 - [apps/mobile/App.tsx](file://apps/mobile/App.tsx)
 - [apps/mobile/src/navigation/index.tsx](file://apps/mobile/src/navigation/index.tsx)
+- [apps/mobile/src/screens/ArtworkScreen.tsx](file://apps/mobile/src/screens/ArtworkScreen.tsx)
+- [apps/mobile/src/screens/ResourceScreen.tsx](file://apps/mobile/src/screens/ResourceScreen.tsx)
+- [apps/mobile/src/screens/SettingsScreen.tsx](file://apps/mobile/src/screens/SettingsScreen.tsx)
+- [apps/mobile/src/screens/ProfileScreen.tsx](file://apps/mobile/src/screens/ProfileScreen.tsx)
+- [apps/mobile/src/screens/DiscoverScreen.tsx](file://apps/mobile/src/screens/DiscoverScreen.tsx)
 - [apps/mobile/src/screens/ChatListScreen.tsx](file://apps/mobile/src/screens/ChatListScreen.tsx)
 - [apps/mobile/src/screens/ServerConfigScreen.tsx](file://apps/mobile/src/screens/ServerConfigScreen.tsx)
 - [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx)
@@ -12,7 +17,19 @@
 - [apps/mobile/src/lib/api.ts](file://apps/mobile/src/lib/api.ts)
 - [apps/mobile/src/components/ui/ScreenHeader.tsx](file://apps/mobile/src/components/ui/ScreenHeader.tsx)
 - [apps/mobile/package.json](file://apps/mobile/package.json)
+- [locales/en-US/common.json](file://locales/en-US/common.json)
 </cite>
+
+## 更新摘要
+
+**所做更改**
+
+- 重构导航结构，新增 Artwork 标签页（带调色板图标）和 Resources 标签页
+- 将 Profile 标签页重命名为 Settings，创建更合理的创意工具、资源和技能管理导航流程
+- 新增 ResourceScreen 组件，提供文件资源管理功能
+- 新增 SettingsScreen 组件，提供完整设置管理界面
+- 更新底部标签导航器的标签配置，替换 Discover 标签为 Artwork 标签
+- 重新组织导航层级，优化用户体验流程
 
 ## 目录
 
@@ -55,9 +72,9 @@ Onboarding[引导流程导航]
 end
 subgraph "屏幕组件层"
 ChatList[聊天列表]
-ServerConfig[服务器配置]
-Welcome[欢迎页面]
-Profile[个人资料]
+Artwork[艺术作品生成]
+Resources[资源管理]
+Skills[技能设置]
 Settings[设置页面]
 end
 subgraph "状态管理层"
@@ -74,11 +91,15 @@ App --> RootNavigator
 RootNavigator --> BottomTabs
 RootNavigator --> NativeStack
 BottomTabs --> ChatList
-BottomTabs --> Profile
+BottomTabs --> Artwork
+BottomTabs --> Resources
+BottomTabs --> Skills
+BottomTabs --> Settings
 NativeStack --> ServerConfig
 NativeStack --> Welcome
 ChatList --> SessionStore
-ServerConfig --> ConnectionStore
+Artwork --> ConnectionStore
+Resources --> ConnectionStore
 SessionStore --> ApiService
 ConnectionStore --> NetworkService
 ```
@@ -86,12 +107,12 @@ ConnectionStore --> NetworkService
 **图表来源**
 
 - [apps/mobile/App.tsx:35-112](file://apps/mobile/App.tsx#L35-L112)
-- [apps/mobile/src/navigation/index.tsx:116-250](file://apps/mobile/src/navigation/index.tsx#L116-L250)
+- [apps/mobile/src/navigation/index.tsx:116-274](file://apps/mobile/src/navigation/index.tsx#L116-L274)
 
 **章节来源**
 
 - [apps/mobile/App.tsx:1-112](file://apps/mobile/App.tsx#L1-L112)
-- [apps/mobile/src/navigation/index.tsx:1-250](file://apps/mobile/src/navigation/index.tsx#L1-L250)
+- [apps/mobile/src/navigation/index.tsx:1-274](file://apps/mobile/src/navigation/index.tsx#L1-L274)
 
 ## 核心组件
 
@@ -113,14 +134,16 @@ ConnectionStore --> NetworkService
 导航层次结构：
 
 - 引导流程：欢迎页面 → 服务器配置 → 完成页面
-- 主应用：底部标签导航（聊天、技能、个人资料）
+- 主应用：底部标签导航（聊天、艺术作品、资源、技能、设置）
 - 设置页面：独立的导航栈
-- 发现功能：独立的导航栈
+- 艺术作品功能：独立的导航栈
+
+**更新** 新增了 Artwork 和 Resources 标签，替换了原有的 Discover 标签
 
 **章节来源**
 
 - [apps/mobile/App.tsx:35-112](file://apps/mobile/App.tsx#L35-L112)
-- [apps/mobile/src/navigation/index.tsx:116-250](file://apps/mobile/src/navigation/index.tsx#L116-L250)
+- [apps/mobile/src/navigation/index.tsx:116-274](file://apps/mobile/src/navigation/index.tsx#L116-L274)
 
 ## 架构概览
 
@@ -218,6 +241,182 @@ API --> Server
 
 - [apps/mobile/src/screens/ChatListScreen.tsx:1-550](file://apps/mobile/src/screens/ChatListScreen.tsx#L1-L550)
 - [apps/mobile/src/store/session.ts:1-185](file://apps/mobile/src/store/session.ts#L1-L185)
+
+### 艺术作品生成屏幕组件
+
+**新增** 艺术作品生成屏幕是新增的导航标签，专门用于图像生成功能。该组件提供了完整的 AI 图像生成工作流程。
+
+#### 主要功能模块
+
+1. **模型选择器**：支持多种 AI 图像生成模型的选择和配置
+2. **参数配置**：分辨率、宽高比、图像数量等生成参数设置
+3. **参考图像上传**：支持多张参考图像的上传和管理
+4. **生成队列管理**：实时显示生成任务状态和结果
+5. **历史记录查看**：查看和管理之前的生成批次
+
+#### 生成流程
+
+```mermaid
+stateDiagram-v2
+[*] --> Idle : 应用启动
+Idle --> Loading : 加载模型配置
+Loading --> Configuring : 显示配置界面
+Configuring --> Generating : 开始生成
+Generating --> Polling : 轮询状态
+Polling --> Success : 生成成功
+Polling --> Error : 生成失败
+Success --> Viewing : 查看结果
+Error --> Configuring : 重新配置
+Viewing --> Generating : 继续生成
+Viewing --> Configuring : 修改配置
+```
+
+**图表来源**
+
+- [apps/mobile/src/screens/ArtworkScreen.tsx:375-453](file://apps/mobile/src/screens/ArtworkScreen.tsx#L375-L453)
+
+#### 技术特性
+
+- **实时状态轮询**：自动轮询生成任务状态，最长轮询时间为 15 秒
+- **配置持久化**：使用 AsyncStorage 保存用户配置
+- **异步任务处理**：支持多个并发生成任务
+- **错误处理机制**：完善的错误捕获和用户提示
+
+**章节来源**
+
+- [apps/mobile/src/screens/ArtworkScreen.tsx:1-1032](file://apps/mobile/src/screens/ArtworkScreen.tsx#L1-L1032)
+
+### 资源管理屏幕组件
+
+**新增** 资源管理屏幕提供了完整的文件资源管理功能，支持多种文件类型的上传、下载和管理。
+
+#### 主要功能模块
+
+1. **文件分类管理**：按类型（全部、图片、文档、其他）分类显示
+2. **文件上传功能**：支持相机相册和文件选择器上传
+3. **文件搜索过滤**：支持关键词搜索和实时过滤
+4. **文件预览功能**：支持图片缩略图预览
+5. **文件删除管理**：支持单个和批量文件删除
+
+#### 文件管理流程
+
+```mermaid
+stateDiagram-v2
+[*] --> Loading : 应用启动
+Loading --> Displaying : 显示文件列表
+Displaying --> Searching : 搜索文件
+Searching --> Filtering : 过滤分类
+Filtering --> Uploading : 上传文件
+Uploading --> Success : 上传成功
+Uploading --> Error : 上传失败
+Success --> Displaying : 刷新列表
+Error --> Displaying : 显示错误
+Displaying --> Deleting : 删除文件
+Deleting --> Confirming : 确认删除
+Confirming --> Success : 删除成功
+Confirming --> Canceling : 取消删除
+Canceling --> Displaying : 返回列表
+```
+
+**图表来源**
+
+- [apps/mobile/src/screens/ResourceScreen.tsx:172-469](file://apps/mobile/src/screens/ResourceScreen.tsx#L172-L469)
+
+#### 技术特性
+
+- **多平台支持**：支持 iOS 和 Android 平台的文件操作
+- **分类显示**：智能识别文件类型并分类显示
+- **搜索功能**：支持关键词搜索和实时过滤
+- **上传管理**：支持多文件同时上传和进度显示
+- **删除确认**：防止误删的重要文件
+
+**章节来源**
+
+- [apps/mobile/src/screens/ResourceScreen.tsx:1-469](file://apps/mobile/src/screens/ResourceScreen.tsx#L1-L469)
+
+### 设置屏幕组件
+
+**更新** 将原有的 Profile 标签页重命名为 Settings，提供完整的设置管理功能。
+
+#### 功能分类
+
+1. **工作区概览**：用户信息、默认模型、AI 提供商状态
+2. **使用统计**：消息数、会话数、话题数统计
+3. **快速设置**：服务器配置、AI 提供商、默认模型、语言设置
+4. **更多设置**：高级设置、数据存储、语音设置、关于页面
+5. **账户管理**：退出登录功能
+
+#### 设置流程
+
+```mermaid
+flowchart TD
+Start[打开设置页面] --> LoadData[加载用户数据]
+LoadData --> DisplayOverview[显示工作区概览]
+DisplayOverview --> DisplayStats[显示使用统计]
+DisplayStats --> DisplayQuickSettings[显示快速设置]
+DisplayQuickSettings --> DisplayMoreSettings[显示更多设置]
+DisplayMoreSettings --> UserAction[用户操作]
+UserAction --> NavigateTo[跳转到对应设置页面]
+UserAction --> Logout[退出登录]
+NavigateTo --> DisplayOverview
+Logout --> ServerConfig[返回服务器配置]
+```
+
+**图表来源**
+
+- [apps/mobile/src/screens/ProfileScreen.tsx:38-346](file://apps/mobile/src/screens/ProfileScreen.tsx#L38-L346)
+
+#### 特殊功能
+
+- **实时统计**：显示准确的消息、会话、话题统计数据
+- **快速导航**：提供常用设置的快速入口
+- **账户安全**：提供安全的退出登录机制
+- **版本信息**：显示应用版本信息
+
+**章节来源**
+
+- [apps/mobile/src/screens/ProfileScreen.tsx:1-346](file://apps/mobile/src/screens/ProfileScreen.tsx#L1-L346)
+
+### 更多设置屏幕组件
+
+**新增** 更多设置屏幕提供了完整的高级设置管理功能。
+
+#### 设置分类
+
+1. **AI 配置**：默认代理设置
+2. **数据存储**：云同步备份、存储管理
+3. **语音设置**：语音识别、文本转语音
+4. **关于信息**：隐私政策、应用信息
+
+#### 设置管理流程
+
+```mermaid
+flowchart TD
+Start[打开更多设置] --> AiConfig[AI配置区域]
+AiConfig --> DataStorage[数据存储区域]
+DataStorage --> VoiceSettings[语音设置区域]
+VoiceSettings --> AboutInfo[关于信息区域]
+AboutInfo --> UserAction[用户操作]
+UserAction --> Navigate[跳转到对应功能]
+UserAction --> ExternalLink[打开外部链接]
+Navigate --> AiConfig
+ExternalLink --> Start
+```
+
+**图表来源**
+
+- [apps/mobile/src/screens/SettingsScreen.tsx:84-156](file://apps/mobile/src/screens/SettingsScreen.tsx#L84-L156)
+
+#### 技术特性
+
+- **模块化设计**：按功能区域组织设置项
+- **动画效果**：提供流畅的页面切换动画
+- **外部链接**：支持打开外部网页链接
+- **状态管理**：提供占位符和未来功能预留
+
+**章节来源**
+
+- [apps/mobile/src/screens/SettingsScreen.tsx:1-156](file://apps/mobile/src/screens/SettingsScreen.tsx#L1-L156)
 
 ### 服务器配置屏幕组件
 
@@ -441,6 +640,26 @@ Tailwind --> ReactNative
 - 验证主题配置中的颜色设置
 - 确认平台特定的样式设置
 
+#### 新增功能问题
+
+**问题**：Artwork 标签无法访问或功能异常
+
+- 检查 ArtworkScreen 组件的导入和注册
+- 验证 AI 模型配置和网络连接
+- 确认图像生成 API 的可用性
+
+**问题**：Resources 标签显示空白或加载失败
+
+- 检查 ResourceScreen 组件的导入和注册
+- 验证文件 API 接口和网络连接
+- 确认用户权限和认证状态
+
+**问题**：Settings 标签显示空白或加载失败
+
+- 检查 SettingsScreen 组件的导入和注册
+- 验证设置数据的 API 接口
+- 确认设置存储的读写权限
+
 #### 状态管理问题
 
 **问题**：状态更新后界面不刷新
@@ -486,5 +705,11 @@ Tailwind --> ReactNative
 - 实时网络状态监控和错误处理
 - 本地存储集成和数据持久化
 - 响应式设计和跨平台兼容性
+
+### 新功能价值
+
+**Artwork 标签**：为用户提供 AI 图像生成功能，支持多种模型和参数配置
+**Resources 标签**：提供完整的文件资源管理功能，支持多类型文件的上传、下载和管理
+**Settings 标签**：统一管理应用设置，提供更合理的导航流程和用户体验
 
 该导航系统为 LobeHub 移动应用提供了坚实的技术基础，能够支持复杂的功能需求和良好的用户体验。

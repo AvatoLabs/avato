@@ -62,7 +62,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   }));
 
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: '#f0f0ff' }, exitStyle]}>
+    <Animated.View style={[{ flex: 1, backgroundColor: '#f8f9fb' }, exitStyle]}>
       {/* Background layers */}
       {phase >= 1 && <AuroraBackground />}
       {phase >= 2 && <FloatingParticles />}

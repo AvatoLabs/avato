@@ -4,27 +4,34 @@
  * Shows: HeroComposer, QuickActions, Pinned, Custom Groups, Default sessions.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  Code2,
+  BotIcon,
   FolderOpen,
-  LineChart,
+  ImageIcon,
   MessageSquarePlus,
-  Pen,
   Pencil,
+  PenLineIcon,
   Pin,
   Search,
   Trash2,
-  Wand2,
+  UsersIcon,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   Image as RNImage,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -34,20 +41,26 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useShallow } from 'zustand/shallow';
 
 import { HeroComposer } from '../components/ui/HeroComposer';
+import MemoryToolSheet from '../components/ui/MemoryToolSheet';
+import { ModelDrawer } from '../components/ui/ModelDrawer';
+import PromptModal from '../components/ui/PromptModal';
 import { QuickActionRow } from '../components/ui/QuickActionRow';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SectionBlock } from '../components/ui/SectionBlock';
 import SessionGroupHeader from '../components/ui/SessionGroupHeader';
 import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
-import { userApi } from '../lib/api';
+import { agentApi, pluginApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getStreak, recordUsage } from '../lib/streak';
+import { useChatStore } from '../store/chat';
+import { useFileStore } from '../store/file';
+import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useSessionGroupStore } from '../store/sessionGroup';
 import { tokens } from '../theme/tokens';
-import type { ChatSession } from '../types';
+import type { ChatSession, InstalledPlugin, MobileMemoryEffort } from '../types';
 
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -73,15 +86,18 @@ function SessionLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
+  const iconSize = size * 0.6;
 
-  // Priority: provider logo from CDN → session avatar → app icon fallback
   if (provider && !imgError) {
     const url = `${ICON_CDN_BASE}/light/${provider}.png`;
     return (
-      <View className="items-center justify-center" style={{ width: size, height: size }}>
+      <View
+        className="rounded-full bg-foreground/5 items-center justify-center"
+        style={{ width: size, height: size }}
+      >
         <RNImage
           source={{ uri: url }}
-          style={{ width: size, height: size, borderRadius: size / 2 }}
+          style={{ width: iconSize, height: iconSize }}
           onError={() => setImgError(true)}
         />
       </View>
@@ -90,14 +106,15 @@ function SessionLogo({
 
   if (avatar) {
     return (
-      <Image
-        source={{ uri: avatar }}
-        style={{ width: size, height: size, borderRadius: size / 2, opacity: 0.9 }}
-      />
+      <View
+        className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
+        style={{ width: size, height: size }}
+      >
+        <Image source={{ uri: avatar }} style={{ width: size, height: size }} />
+      </View>
     );
   }
 
-  // Fallback: provider initials or app icon
   if (provider) {
     return (
       <View
@@ -112,10 +129,13 @@ function SessionLogo({
   }
 
   return (
-    <View className="items-center justify-center" style={{ width: size, height: size }}>
+    <View
+      className="rounded-full bg-foreground/5 items-center justify-center"
+      style={{ width: size, height: size }}
+    >
       <RNImage
         source={require('../../assets/icon.png')}
-        style={{ width: 24, height: 24, borderRadius: 4, opacity: 0.7 }}
+        style={{ width: iconSize, height: iconSize, borderRadius: 4 }}
       />
     </View>
   );
@@ -154,16 +174,23 @@ export default function ChatListScreen({ navigation }: any) {
 
   const groups = useSessionGroupStore((s) => s.groups);
   const fetchGroups = useSessionGroupStore((s) => s.fetchGroups);
+  const sendMessage = useChatStore((s) => s.sendMessage);
 
   const [heroText, setHeroText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
-  const [modelLabel, setModelLabel] = useState('GPT-4o Mini');
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
+  const [memorySheetVisible, setMemorySheetVisible] = useState(false);
+  const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+
+  const selectedProvider = useModelStore((s) => s.selectedProvider);
+  const fetchModels = useModelStore((s) => s.fetchModels);
+  const loadSelection = useModelStore((s) => s.loadSelection);
 
   // Load persisted expand/collapse state
   useEffect(() => {
@@ -181,16 +208,6 @@ export default function ChatListScreen({ navigation }: any) {
   useEffect(() => {
     if (!initialized) fetchSessions();
     fetchGroups();
-    // Load user profile for avatar
-    userApi
-      .getUser()
-      .then((u) => {
-        if (u?.avatar) setUserAvatar(u.avatar);
-        if (u?.fullName || u?.username) setUserName(u.fullName || u.username || null);
-      })
-      .catch(() => {
-        /* ignore */
-      });
     // Record usage for streak tracking + milestone celebration
     recordUsage().then(() =>
       getStreak().then((s) => {
@@ -204,6 +221,19 @@ export default function ChatListScreen({ navigation }: any) {
     );
   }, [initialized, fetchSessions, fetchGroups]);
 
+  // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (initialized) fetchSessions();
+    }, [initialized, fetchSessions]),
+  );
+
+  // Pre-load models and selection
+  useEffect(() => {
+    fetchModels();
+    loadSelection();
+  }, [fetchModels, loadSelection]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -216,21 +246,43 @@ export default function ChatListScreen({ navigation }: any) {
   }, [fetchSessions, fetchGroups, toast, t]);
 
   const handleCreateChat = async () => {
-    const newId = await createSession();
+    const newId = draftSessionId || (await createSession());
+    setDraftSessionId(null);
     haptics.success();
     navigation.navigate('ChatDetail', { sessionId: newId });
   };
 
   const handleHeroSubmit = async () => {
-    if (!heroText.trim()) return;
-    const newId = await createSession();
+    const prompt = heroText.trim();
+    if (!prompt) return;
+
+    const newId = draftSessionId || (await createSession(prompt.slice(0, 50)));
+    setDraftSessionId(null);
+
+    try {
+      await sessionApi.updateChatConfig(newId, {
+        memory: {
+          effort: memoryEffort,
+          enabled: memoryEnabled,
+        },
+        searchMode: searchEnabled ? 'on' : 'off',
+      });
+    } catch {
+      /* best-effort */
+    }
+
     navigation.navigate('ChatDetail', { sessionId: newId });
+    void sendMessage(newId, prompt, undefined, {
+      memoryEffort,
+      memoryEnabled,
+      searchEnabled,
+    });
     setHeroText('');
   };
 
   const handleModelPress = () => {
     haptics.light();
-    navigation.navigate('ModelPicker');
+    setModelDrawerVisible(true);
   };
 
   const handleToggleSearch = () => {
@@ -238,17 +290,128 @@ export default function ChatListScreen({ navigation }: any) {
     setSearchEnabled((v) => !v);
   };
 
-  const handleAttach = () => {
+  const handleToggleMemory = () => {
     haptics.light();
-    // TODO: Implement file attachment
+    setMemorySheetVisible(true);
   };
 
-  const handlePluginsPress = () => {
-    haptics.light();
-    // TODO: Navigate to plugins screen
-  };
+  const addFile = useFileStore((s) => s.addFile);
 
-  const handleQuickAction = async (_key: string) => {
+  const handleAttach = useCallback(() => {
+    const pickImage = async (source: 'camera' | 'gallery') => {
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: 'images',
+              quality: 0.8,
+              allowsMultipleSelection: true,
+            });
+
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.fileName || 'image.jpg',
+            type: asset.mimeType || 'image/jpeg',
+            size: asset.fileSize || 0,
+            uri: asset.uri,
+          });
+        }
+        toast.show('success', t.toastFilePicked);
+      }
+    };
+
+    const pickDocument = async () => {
+      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            size: asset.size || 0,
+            uri: asset.uri,
+          });
+        }
+        toast.show('success', t.toastFilePicked);
+      }
+    };
+
+    haptics.selection();
+    if (Platform.OS === 'ios') {
+      const options = [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument];
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: 0, title: t.fileAttach },
+        (index) => {
+          if (index === 1) pickImage('camera');
+          else if (index === 2) pickImage('gallery');
+          else if (index === 3) pickDocument();
+        },
+      );
+    } else {
+      pickImage('gallery');
+    }
+  }, [addFile, t, toast]);
+
+  // ── Skills drawer ─────────────────────────────────────────────────
+  const [skillsVisible, setSkillsVisible] = useState(false);
+  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [enabledSkills, setEnabledSkills] = useState<Set<string>>(new Set());
+
+  const handlePluginsPress = useCallback(() => {
+    haptics.light();
+    setSkillsVisible(true);
+    setLoadingSkills(true);
+    pluginApi
+      .list()
+      .then((list) => {
+        const plugins = list ?? [];
+        setInstalledPlugins(plugins);
+        setEnabledSkills(new Set(plugins.map((p) => p.identifier)));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSkills(false));
+  }, []);
+
+  const handleToggleSkill = useCallback((identifier: string) => {
+    haptics.light();
+    setEnabledSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(identifier)) {
+        next.delete(identifier);
+      } else {
+        next.add(identifier);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleQuickAction = async (key: string) => {
+    if (key === 'agent') {
+      haptics.success();
+      try {
+        const result = await agentApi.create();
+        if (result?.sessionId) {
+          fetchSessions();
+          navigation.navigate('ChatDetail', { sessionId: result.sessionId });
+        }
+      } catch {
+        const newId = await createSession();
+        navigation.navigate('ChatDetail', { sessionId: newId });
+      }
+      return;
+    }
+    if (key === 'group') {
+      navigation.navigate('SessionGroup');
+      return;
+    }
+    if (key === 'image') {
+      navigation.navigate('Artwork');
+      return;
+    }
+    // 'write' — default
     const newId = await createSession();
     navigation.navigate('ChatDetail', { sessionId: newId });
   };
@@ -296,31 +459,14 @@ export default function ChatListScreen({ navigation }: any) {
     setActionSession(session);
   }, []);
 
-  const handleRename = useCallback(
-    (session: ChatSession) => {
-      setActionSession(null);
-      Alert.prompt(
-        t.sessionRenameTitle,
-        undefined,
-        [
-          { text: t.cancel, style: 'cancel' },
-          {
-            text: t.save,
-            onPress: (newName?: string) => {
-              if (newName?.trim()) {
-                haptics.success();
-                renameSession(session.id, newName.trim());
-                toast.show('success', t.sessionRenamed);
-              }
-            },
-          },
-        ],
-        'plain-text',
-        session.title,
-      );
-    },
-    [t, renameSession, toast],
-  );
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<ChatSession | null>(null);
+
+  const handleRename = useCallback((session: ChatSession) => {
+    setActionSession(null);
+    setRenameTarget(session);
+    setTimeout(() => setRenameModalVisible(true), 300);
+  }, []);
 
   const handleMoveToGroup = useCallback(
     (session: ChatSession) => {
@@ -339,10 +485,10 @@ export default function ChatListScreen({ navigation }: any) {
   );
 
   const quickActions = [
-    { key: 'write', label: t.homeQuickWrite, icon: Pen },
-    { key: 'code', label: t.homeQuickCode, icon: Code2 },
-    { key: 'analyze', label: t.homeQuickAnalyze, icon: LineChart },
-    { key: 'create', label: t.homeQuickCreate, icon: Wand2 },
+    { key: 'agent', label: t.homeQuickCode, icon: BotIcon },
+    { key: 'group', label: t.homeQuickAnalyze, icon: UsersIcon },
+    { key: 'write', label: t.homeQuickWrite, icon: PenLineIcon },
+    { key: 'image', label: t.homeQuickCreate, icon: ImageIcon },
   ];
 
   const renderSessionRow = (item: ChatSession) => (
@@ -406,7 +552,7 @@ export default function ChatListScreen({ navigation }: any) {
             {item.description}
           </Text>
         </View>
-        <Text className="text-secondary/30 text-[10px] font-semibold uppercase tracking-widest">
+        <Text className="text-gray-400 text-[10px] font-medium tracking-wide">
           {formatTimeAgo(item.updatedAt)}
         </Text>
       </TouchableOpacity>
@@ -416,37 +562,15 @@ export default function ChatListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={greeting}
-        leftElement={
-          userAvatar ? (
-            <RNImage className="w-8 h-8 rounded-full" source={{ uri: userAvatar }} />
-          ) : (
-            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
-              <Text className="text-primary text-[12px] font-bold">
-                {(userName || 'U').slice(0, 2).toUpperCase()}
-              </Text>
-            </View>
-          )
-        }
         rightElement={
-          <View className="flex-row items-center">
-            <TouchableOpacity
-              accessibilityLabel="Session groups"
-              accessibilityRole="button"
-              className="mr-2"
-              onPress={() => navigation.navigate('SessionGroup')}
-            >
-              <FolderOpen color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
-            </TouchableOpacity>
-            <MessageSquarePlus color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
-          </View>
+          <MessageSquarePlus color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
+        title={greeting}
         subtitle={
           sessions.length > 0
             ? t.activeChats.replace('{count}', String(sessions.length))
             : undefined
         }
-        onPressLeft={() => navigation.navigate('Me')}
         onPressRight={handleCreateChat}
       />
 
@@ -473,7 +597,8 @@ export default function ChatListScreen({ navigation }: any) {
               </Text>
             )}
             <HeroComposer
-              modelLabel={modelLabel}
+              memoryEnabled={memoryEnabled}
+              modelProvider={selectedProvider || undefined}
               placeholder={t.homeHeroPlaceholder}
               searchEnabled={searchEnabled}
               value={heroText}
@@ -482,6 +607,7 @@ export default function ChatListScreen({ navigation }: any) {
               onModelPress={handleModelPress}
               onPluginsPress={handlePluginsPress}
               onSubmit={handleHeroSubmit}
+              onToggleMemory={handleToggleMemory}
               onToggleSearch={handleToggleSearch}
             />
           </View>
@@ -640,6 +766,120 @@ export default function ChatListScreen({ navigation }: any) {
                 <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <PromptModal
+        defaultValue={renameTarget?.title ?? ''}
+        submitLabel={t.save}
+        title={t.sessionRenameTitle}
+        visible={renameModalVisible}
+        onCancel={() => setRenameModalVisible(false)}
+        onSubmit={(newName) => {
+          setRenameModalVisible(false);
+          if (renameTarget) {
+            haptics.success();
+            renameSession(renameTarget.id, newName);
+            toast.show('success', t.sessionRenamed);
+          }
+        }}
+      />
+
+      {/* Model Drawer */}
+      <ModelDrawer
+        sessionId={draftSessionId ?? undefined}
+        visible={modelDrawerVisible}
+        onClose={() => setModelDrawerVisible(false)}
+      />
+
+      <MemoryToolSheet
+        effort={memoryEffort}
+        enabled={memoryEnabled}
+        visible={memorySheetVisible}
+        onClose={() => setMemorySheetVisible(false)}
+        onChangeEffort={(value) => {
+          setMemoryEnabled(true);
+          setMemoryEffort(value);
+        }}
+        onChangeEnabled={(value) => {
+          setMemoryEnabled(value);
+        }}
+      />
+
+      {/* Skills Drawer */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={skillsVisible}
+        onRequestClose={() => setSkillsVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end"
+          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          onPress={() => setSkillsVisible(false)}
+        >
+          <Pressable
+            className="bg-white rounded-t-3xl max-h-[70%]"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="items-center pt-3 pb-1">
+              <View className="w-10 h-1 rounded-full bg-black/10" />
+            </View>
+            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
+              <Text className="text-foreground text-[18px] font-bold tracking-tight">
+                {t.skillsTitle}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setSkillsVisible(false);
+                  navigation.navigate('Skills');
+                }}
+              >
+                <Text className="text-primary text-[14px] font-medium">{t.skillsConfigure}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView className="px-5 pb-8" style={{ maxHeight: 400 }}>
+              {loadingSkills ? (
+                <View className="items-center py-10">
+                  <ActivityIndicator color="#007aff" size="small" />
+                </View>
+              ) : installedPlugins.length === 0 ? (
+                <View className="items-center py-10">
+                  <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
+                  <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
+                    {t.skillsEmptyDesc}
+                  </Text>
+                </View>
+              ) : (
+                installedPlugins.map((plugin) => (
+                  <View
+                    className="flex-row items-center py-3.5 border-b border-black/[0.04]"
+                    key={plugin.identifier}
+                  >
+                    <View className="flex-1 mr-3">
+                      <Text
+                        className="text-foreground text-[15px] font-medium tracking-tight"
+                        numberOfLines={1}
+                      >
+                        {plugin.manifest?.meta?.title || plugin.identifier}
+                      </Text>
+                      {plugin.manifest?.meta?.description ? (
+                        <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                          {plugin.manifest.meta.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Switch
+                      trackColor={{ false: '#e5e5e5', true: '#007aff' }}
+                      value={enabledSkills.has(plugin.identifier)}
+                      onValueChange={() => handleToggleSkill(plugin.identifier)}
+                    />
+                  </View>
+                ))
+              )}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

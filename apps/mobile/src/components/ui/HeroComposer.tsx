@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
-import { Brain, Globe, Paperclip, Puzzle, Send } from 'lucide-react-native';
-import React, { useCallback } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { Brain, BrainCircuit, Cpu, Globe, Paperclip, Puzzle, Send } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { Image as RNImage, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,12 +15,14 @@ import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
 interface HeroComposerProps {
-  modelLabel?: string;
+  memoryEnabled?: boolean;
+  modelProvider?: string;
   onAttach?: () => void;
   onChangeText?: (text: string) => void;
   onModelPress?: () => void;
   onPluginsPress?: () => void;
   onSubmit?: () => void;
+  onToggleMemory?: () => void;
   onToggleSearch?: () => void;
   placeholder?: string;
   searchEnabled?: boolean;
@@ -29,21 +31,27 @@ interface HeroComposerProps {
 
 /**
  * HeroComposer — Large, prominent input area for the home screen.
- * Aligned with ChatDetailScreen input style: thin border, large radius, toolbar.
+ *
+ * Toolbar (aligned with web ActionBar):
+ *   [Model] [Search] [Memory] [Attach] [Skills] ... [Send]
  */
 export function HeroComposer({
+  modelProvider,
   placeholder = 'What do you want to do?',
   value = '',
   onChangeText,
   onSubmit,
   onModelPress,
   onToggleSearch,
+  onToggleMemory,
   onAttach,
   onPluginsPress,
-  modelLabel = 'GPT-4o Mini',
+  memoryEnabled = true,
   searchEnabled = false,
 }: HeroComposerProps) {
   const colors = themeColors.light;
+  const hasProvider = !!modelProvider?.trim();
+  const [providerLogoError, setProviderLogoError] = useState(false);
 
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -57,6 +65,8 @@ export function HeroComposer({
   }, [onSubmit, sendScale]);
 
   const hasText = value.trim().length > 0;
+
+  const MemoryIcon = memoryEnabled ? BrainCircuit : Brain;
 
   return (
     <View
@@ -90,7 +100,17 @@ export function HeroComposer({
             className="w-8 h-8 items-center justify-center rounded-full"
             onPress={onModelPress}
           >
-            <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            {hasProvider && !providerLogoError ? (
+              <RNImage
+                style={{ width: 20, height: 20, borderRadius: 4 }}
+                source={{
+                  uri: `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/light/${modelProvider}.png`,
+                }}
+                onError={() => setProviderLogoError(true)}
+              />
+            ) : (
+              <Cpu color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            )}
           </TouchableOpacity>
 
           {/* Search / Web */}
@@ -102,6 +122,20 @@ export function HeroComposer({
           >
             <Globe
               color={searchEnabled ? '#2563eb' : '#666'}
+              size={20}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          </TouchableOpacity>
+
+          {/* Memory toggle */}
+          <TouchableOpacity
+            accessibilityLabel="Toggle memory"
+            activeOpacity={0.7}
+            className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+            onPress={onToggleMemory}
+          >
+            <MemoryIcon
+              color={memoryEnabled ? '#2563eb' : '#666'}
               size={20}
               strokeWidth={tokens.icon.strokeWidth}
             />

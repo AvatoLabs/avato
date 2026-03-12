@@ -23,7 +23,6 @@ import { UserModel } from '@/database/models/user';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
-import { FileS3 } from '@/server/modules/S3';
 import { FileService } from '@/server/services/file';
 
 const usernameSchema = z
@@ -121,6 +120,21 @@ export const userRouter = router({
   }),
 
   updateAvatar: userProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+    const removeOldAvatar = async (nextAvatar?: string) => {
+      const userState = await ctx.userModel.getUserState(KeyVaultsGateKeeper.getUserKeyVaults);
+      const oldAvatarUrl = userState.avatar;
+      if (!oldAvatarUrl || !oldAvatarUrl.startsWith('/webapi/') || oldAvatarUrl === nextAvatar) {
+        return;
+      }
+
+      const oldFilePath = oldAvatarUrl.replace('/webapi/', '');
+      try {
+        await ctx.fileService.deleteFile(oldFilePath);
+      } catch {
+        // best-effort cleanup; avatar update should not fail because deletion failed
+      }
+    };
+
     // If it's Base64 data, need to upload to S3
     if (input.startsWith('data:image')) {
       try {
@@ -138,29 +152,17 @@ export const userRouter = router({
         }
         const base64Data = input.slice(commaIndex + 1);
 
-        // Create S3 client
-        const s3 = new FileS3();
-
         // Use UUID to generate unique filename to prevent caching issues
-        // Get old avatar URL for later deletion
-        const userState = await ctx.userModel.getUserState(KeyVaultsGateKeeper.getUserKeyVaults);
-        const oldAvatarUrl = userState.avatar;
-
         const fileName = `${uuidv4()}.${fileType}`;
         const filePath = `user/avatar/${ctx.userId}/${fileName}`;
 
         // Convert Base64 data to Buffer and upload to S3
         const buffer = Buffer.from(base64Data, 'base64');
 
-        await s3.uploadBuffer(filePath, buffer, mimeType);
-
-        // Delete old avatar
-        if (oldAvatarUrl && oldAvatarUrl.startsWith('/webapi/')) {
-          const oldFilePath = oldAvatarUrl.replace('/webapi/', '');
-          await s3.deleteFile(oldFilePath);
-        }
+        await ctx.fileService.uploadBuffer(filePath, buffer, mimeType);
 
         const avatarUrl = '/webapi/' + filePath;
+        await removeOldAvatar(avatarUrl);
 
         return ctx.userModel.updateUser({ avatar: avatarUrl });
       } catch (error) {
@@ -172,6 +174,7 @@ export const userRouter = router({
     }
 
     // If it's not Base64 data, directly use URL to update user avatar
+    await removeOldAvatar(input);
     return ctx.userModel.updateUser({ avatar: input });
   }),
 

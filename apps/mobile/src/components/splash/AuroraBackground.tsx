@@ -79,9 +79,9 @@ export default function AuroraBackground() {
     ],
   }));
 
-  const colors1: [string, string, string] = ['#f0f0ff', '#e0e7ff', '#c4b5fd'];
-  const colors2: [string, string, string] = ['transparent', '#818cf8', 'transparent'];
-  const colors3: [string, string, string] = ['transparent', '#a5b4fc', 'transparent'];
+  const colors1: [string, string, string] = ['#f8f9fb', '#eef1f5', '#dfe4ec'];
+  const colors2: [string, string, string] = ['transparent', '#b0bec5', 'transparent'];
+  const colors3: [string, string, string] = ['transparent', '#cfd8dc', 'transparent'];
 
   return (
     <>

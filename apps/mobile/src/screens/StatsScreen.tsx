@@ -7,7 +7,19 @@
  *  3. Activity heatmap (simplified grid for React Native)
  *  4. Rankings: Models / Assistants / Topics top-5
  */
-import { ArrowLeft, Flame, MessageSquare, Trophy } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  Clock3,
+  ClockArrowUp,
+  Crown,
+  Flame,
+  MessageSquare,
+  Sparkles,
+  Trophy,
+  Zap,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,7 +53,7 @@ function formatNumber(n: number): string {
 
 function lastMonthEnd(): string {
   const d = new Date();
-  d.setDate(0); // last day of previous month
+  d.setDate(0);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -52,38 +64,63 @@ function percentChange(current: number, prev: number): string | null {
   return pct >= 0 ? `+${pct}%` : `${pct}%`;
 }
 
+function formatDate(iso?: string): string {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
+
+const STAT_ICONS: Record<string, { bg: string; color: string; icon: any }> = {
+  messages: { icon: MessageSquare, color: '#007aff', bg: 'rgba(0,122,255,0.08)' },
+  sessions: { icon: Sparkles, color: '#af52de', bg: 'rgba(175,82,222,0.08)' },
+  topics: { icon: BookOpen, color: '#34c759', bg: 'rgba(52,199,89,0.08)' },
+  words: { icon: Zap, color: '#ff9500', bg: 'rgba(255,149,0,0.08)' },
+};
 
 function StatCard({
   title,
   value,
   prevValue,
   loading,
+  iconKey,
 }: {
+  iconKey: string;
   loading: boolean;
   prevValue?: number;
   title: string;
   value: number;
 }) {
-  const { t } = useI18n();
   const pct = prevValue !== undefined ? percentChange(value, prevValue) : null;
   const isPositive = pct?.startsWith('+');
+  const meta = STAT_ICONS[iconKey] || STAT_ICONS.messages;
+  const IconComp = meta.icon;
 
   return (
-    <View className="flex-1 py-4 items-center">
+    <View
+      className="flex-1 items-center rounded-2xl py-3 mx-1"
+      style={{ backgroundColor: meta.bg }}
+    >
       {loading ? (
         <ActivityIndicator color="#999" size="small" />
       ) : (
         <>
-          <Text className="text-foreground text-[22px] font-bold tracking-tight">
+          <View
+            className="rounded-full items-center justify-center mb-2"
+            style={{ backgroundColor: meta.bg, width: 32, height: 32 }}
+          >
+            <IconComp color={meta.color} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          </View>
+          <Text className="text-foreground text-[20px] font-bold tracking-tight">
             {formatNumber(value)}
           </Text>
-          <Text className="text-secondary/50 text-[11px] font-semibold mt-1">{title}</Text>
+          <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">{title}</Text>
           {pct && (
             <Text
               className={`text-[10px] font-medium mt-0.5 ${isPositive ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}
             >
-              {pct} {t.statsVsPrevMonth}
+              {pct}
             </Text>
           )}
         </>
@@ -97,28 +134,26 @@ const HEATMAP_COLORS = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
 function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }) {
   const { t } = useI18n();
   const { width: screenWidth } = useWindowDimensions();
-  // Container has px-5 (20px) on each side
-  const containerWidth = screenWidth - 40;
+  const SECTION_PX = 20;
+  const containerWidth = screenWidth - SECTION_PX * 2;
 
   if (loading) {
     return (
-      <View className="h-20 items-center justify-center">
+      <View className="h-24 items-center justify-center">
         <ActivityIndicator color="#999" size="small" />
       </View>
     );
   }
 
-  // Show last 20 weeks (140 days) to fit mobile width
   const NUM_WEEKS = 20;
   const GAP = 2;
   const recent = data.slice(-NUM_WEEKS * 7);
   const activeDays = data.filter((d) => d.level > 0).length;
   const hotDays = data.filter((d) => d.level >= 3).length;
 
-  // Dynamic cell size: fill full container width
   const cellSize = Math.floor((containerWidth - (NUM_WEEKS - 1) * GAP) / NUM_WEEKS);
+  const gridWidth = cellSize * NUM_WEEKS + (NUM_WEEKS - 1) * GAP;
 
-  // Build 7-row grid (Mon-Sun), each column = 1 week
   const weeks: HeatmapDay[][] = [];
   for (let i = 0; i < recent.length; i += 7) {
     weeks.push(recent.slice(i, i + 7));
@@ -127,9 +162,12 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
   return (
     <View>
       <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-foreground text-[15px] font-semibold tracking-tight">
-          {t.statsActivity}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <CalendarDays color="#666" size={15} strokeWidth={tokens.icon.strokeWidth} />
+          <Text className="text-foreground text-[15px] font-semibold tracking-tight">
+            {t.statsActivity}
+          </Text>
+        </View>
         <View className="flex-row gap-2">
           <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-foreground/5">
             <Text className="text-secondary/70 text-[11px] font-medium">
@@ -144,38 +182,42 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
           </View>
         </View>
       </View>
-      <View style={{ flexDirection: 'row', gap: GAP }}>
-        {weeks.map((week, wi) => (
-          <View key={wi} style={{ gap: GAP }}>
-            {week.map((day, di) => (
-              <View
-                key={`${wi}-${di}`}
-                style={{
-                  backgroundColor: HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0],
-                  borderRadius: 3,
-                  height: cellSize,
-                  width: cellSize,
-                }}
-              />
-            ))}
-            {/* Pad short weeks */}
-            {Array.from({ length: 7 - week.length }).map((_, pi) => (
-              <View
-                key={`pad-${wi}-${pi}`}
-                style={{
-                  backgroundColor: '#ebedf0',
-                  borderRadius: 3,
-                  height: cellSize,
-                  width: cellSize,
-                }}
-              />
-            ))}
-          </View>
-        ))}
+      {/* Center the grid precisely */}
+      <View style={{ alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: GAP, width: gridWidth }}>
+          {weeks.map((week, wi) => (
+            <View key={wi} style={{ gap: GAP }}>
+              {week.map((day, di) => (
+                <View
+                  key={`${wi}-${di}`}
+                  style={{
+                    backgroundColor: HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0],
+                    borderRadius: 3,
+                    height: cellSize,
+                    width: cellSize,
+                  }}
+                />
+              ))}
+              {Array.from({ length: 7 - week.length }).map((_, pi) => (
+                <View
+                  key={`pad-${wi}-${pi}`}
+                  style={{
+                    backgroundColor: '#ebedf0',
+                    borderRadius: 3,
+                    height: cellSize,
+                    width: cellSize,
+                  }}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
 }
+
+const RANK_MEDALS = ['#ffd700', '#c0c0c0', '#cd7f32'];
 
 function RankSection({
   data,
@@ -192,7 +234,7 @@ function RankSection({
   const maxCount = data.length > 0 ? data[0].count : 1;
 
   return (
-    <View className="mb-5">
+    <View className="mb-6">
       <View className="flex-row items-center gap-2 mb-3">
         {icon}
         <Text className="text-foreground text-[15px] font-semibold tracking-tight">{title}</Text>
@@ -202,30 +244,43 @@ function RankSection({
           <ActivityIndicator color="#999" size="small" />
         </View>
       ) : data.length === 0 ? (
-        <View className="py-6 items-center">
+        <View className="py-8 items-center rounded-2xl bg-foreground/[0.02]">
           <Text className="text-secondary/40 text-[13px] font-medium">{t.statsEmpty}</Text>
-          <Text className="text-secondary/30 text-[11px] mt-1">{t.statsEmptyDesc}</Text>
+          <Text className="text-secondary/25 text-[11px] mt-1">{t.statsEmptyDesc}</Text>
         </View>
       ) : (
-        data.slice(0, 5).map((item, i) => (
-          <View className="flex-row items-center mb-2" key={i}>
-            <Text className="text-secondary/50 text-[12px] font-bold w-5 text-center">{i + 1}</Text>
-            <View className="flex-1 mx-3">
-              <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-foreground text-[13px] font-medium flex-1" numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text className="text-secondary/60 text-[12px] font-medium ml-2">{item.count}</Text>
+        <View className="rounded-2xl overflow-hidden bg-foreground/[0.02] px-3 py-2">
+          {data.slice(0, 5).map((item, i) => (
+            <View className="flex-row items-center py-2" key={i}>
+              <View className="w-6 items-center">
+                {i < 3 ? (
+                  <Crown color={RANK_MEDALS[i]} fill={RANK_MEDALS[i]} size={14} />
+                ) : (
+                  <Text className="text-secondary/40 text-[12px] font-bold">{i + 1}</Text>
+                )}
               </View>
-              <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
-                <View
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
-                />
+              <View className="flex-1 mx-2.5">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text
+                    className="text-foreground text-[13px] font-medium flex-1"
+                    numberOfLines={1}
+                  >
+                    {item.name}
+                  </Text>
+                  <Text className="text-secondary/50 text-[12px] font-semibold tabular-nums ml-2">
+                    {item.count}
+                  </Text>
+                </View>
+                <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
+                  <View
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
+                  />
+                </View>
               </View>
             </View>
-          </View>
-        ))
+          ))}
+        </View>
       )}
     </View>
   );
@@ -332,6 +387,8 @@ export default function StatsScreen({ navigation }: any) {
     setRefreshing(false);
   }, [fetchAll]);
 
+  const regDays = data.registration?.duration;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -354,22 +411,28 @@ export default function StatsScreen({ navigation }: any) {
         }
       >
         {/* Welcome Banner */}
-        {data.registration?.duration && (
+        {regDays && (
           <Animated.View entering={FadeInDown.delay(30).duration(300)}>
-            <View className="px-5 mb-4">
-              <Text className="text-foreground text-[15px] font-medium">
-                {t.statsWelcome.replace('{days}', String(data.registration.duration))}
+            <View className="mx-5 mb-5 p-4 rounded-2xl bg-primary/[0.06]">
+              <Text className="text-foreground text-[16px] font-semibold leading-6">
+                {t.statsWelcome.replace('{days}', String(regDays))}
               </Text>
-              <View className="flex-row gap-4 mt-1">
-                {data.registration.createdAt && (
-                  <Text className="text-secondary/50 text-[11px] font-medium">
-                    {t.statsCreatedAt}: {data.registration.createdAt.split('T')[0]}
-                  </Text>
+              <View className="flex-row gap-4 mt-2">
+                {data.registration?.createdAt && (
+                  <View className="flex-row items-center gap-1">
+                    <Clock3 color="#999" size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="text-secondary/50 text-[11px] font-medium">
+                      {formatDate(data.registration.createdAt)}
+                    </Text>
+                  </View>
                 )}
-                {data.registration.updatedAt && (
-                  <Text className="text-secondary/50 text-[11px] font-medium">
-                    {t.statsUpdatedAt}: {data.registration.updatedAt.split('T')[0]}
-                  </Text>
+                {data.registration?.updatedAt && (
+                  <View className="flex-row items-center gap-1">
+                    <ClockArrowUp color="#999" size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="text-secondary/50 text-[11px] font-medium">
+                      {formatDate(data.registration.updatedAt)}
+                    </Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -378,27 +441,31 @@ export default function StatsScreen({ navigation }: any) {
 
         {/* Overview Cards */}
         <Animated.View entering={FadeInDown.delay(60).duration(300)}>
-          <View className="px-5 mb-5">
+          <View className="px-4 mb-5">
             <View className="flex-row">
               <StatCard
+                iconKey="messages"
                 loading={loading}
                 prevValue={data.prevMessages}
                 title={t.statsTotalMessages}
                 value={data.messages}
               />
               <StatCard
+                iconKey="sessions"
                 loading={loading}
                 prevValue={data.prevSessions}
                 title={t.statsTotalSessions}
                 value={data.sessions}
               />
               <StatCard
+                iconKey="topics"
                 loading={loading}
                 prevValue={data.prevTopics}
                 title={t.statsTotalTopics}
                 value={data.topics}
               />
               <StatCard
+                iconKey="words"
                 loading={loading}
                 prevValue={data.prevWords}
                 title={t.statsTotalWords}

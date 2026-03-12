@@ -1,12 +1,15 @@
 /**
  * MessageBubble — Renders a single chat message with long-press support.
+ * Includes collapsible Thinking section for reasoning content (mirrors web).
  */
-import { User } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, User } from 'lucide-react-native';
 import React, { memo, useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image as RNImage,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -42,6 +45,7 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
   const deleteMessage = useChatStore((s) => s.deleteMessage);
   const editMessage = useChatStore((s) => s.editMessage);
   const regenerateMessage = useChatStore((s) => s.regenerateMessage);
+  const isReasoning = useChatStore((s) => s.isReasoning);
 
   const handleLongPress = useCallback(() => {
     if (!generating) {
@@ -88,6 +92,24 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
   }, [sessionId, message.id, deleteMessage, t, toast]);
 
   const mc = tokens.markdownColors;
+
+  const reasoningMarkdownStyles = {
+    body: {
+      color: mc.text + '99',
+      fontSize: 13.5,
+      lineHeight: 20,
+    },
+    code_inline: {
+      backgroundColor: mc.codeInlineBg,
+      borderRadius: 4,
+      color: mc.codeInlineColor + '99',
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 12,
+      paddingHorizontal: 4,
+    },
+    paragraph: { marginBottom: 2, marginTop: 2 },
+    link: { color: mc.link + '99' },
+  };
 
   const markdownStyles = {
     body: {
@@ -210,12 +232,29 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
                     </TouchableOpacity>
                   </View>
                 </View>
-              ) : !message.content && generating ? (
-                <TypingIndicator color="#636366" />
               ) : (
-                <Markdown style={isUser ? userMarkdownStyles : markdownStyles}>
-                  {message.content || ''}
-                </Markdown>
+                <>
+                  {/* Thinking / Reasoning block (collapsible, like web) */}
+                  {!isUser && (message.reasoning?.content || (generating && isReasoning)) && (
+                    <ThinkingBlock
+                      content={message.reasoning?.content}
+                      duration={message.reasoning?.duration}
+                      markdownStyles={reasoningMarkdownStyles}
+                      thinking={generating && isReasoning && message.id.startsWith('assistant-')}
+                    />
+                  )}
+
+                  {/* Main content or loading */}
+                  {!message.content && generating ? (
+                    isReasoning ? null : (
+                      <TypingIndicator color="#636366" />
+                    )
+                  ) : message.content ? (
+                    <Markdown style={isUser ? userMarkdownStyles : markdownStyles}>
+                      {message.content}
+                    </Markdown>
+                  ) : null}
+                </>
               )}
             </View>
 
@@ -244,5 +283,64 @@ const MessageBubble = memo<MessageBubbleProps>(({ message, sessionId, generating
 });
 
 MessageBubble.displayName = 'MessageBubble';
+
+// ── ThinkingBlock (collapsible reasoning, mirrors web Thinking component) ──
+
+interface ThinkingBlockProps {
+  content?: string;
+  duration?: number;
+  markdownStyles: Record<string, any>;
+  thinking?: boolean;
+}
+
+const ThinkingBlock = memo<ThinkingBlockProps>(
+  ({ content, duration, thinking, markdownStyles }) => {
+    const { t } = useI18n();
+    const [expanded, setExpanded] = useState(false);
+
+    const durationLabel = duration
+      ? `${t.chatThoughtWithDuration} ${(duration / 1000).toFixed(1)}s`
+      : t.chatThought;
+
+    const showContent = expanded && !thinking && !!content;
+
+    return (
+      <View className="mb-2">
+        <TouchableOpacity
+          activeOpacity={0.7}
+          className="flex-row items-center py-1"
+          onPress={() => !thinking && setExpanded((v) => !v)}
+        >
+          {thinking ? (
+            <ActivityIndicator color="#007aff" size={12} style={{ marginRight: 4 }} />
+          ) : expanded ? (
+            <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+          ) : (
+            <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+          )}
+          {thinking ? (
+            <Text className="text-primary text-[12px] font-medium ml-1">{t.chatThinking}</Text>
+          ) : (
+            <Text className="text-secondary/50 text-[12px] font-medium ml-1">{durationLabel}</Text>
+          )}
+        </TouchableOpacity>
+
+        {showContent ? (
+          <View className="ml-4 mt-1">
+            <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 240 }}
+            >
+              <Markdown style={markdownStyles}>{content}</Markdown>
+            </ScrollView>
+          </View>
+        ) : null}
+      </View>
+    );
+  },
+);
+
+ThinkingBlock.displayName = 'ThinkingBlock';
 
 export default MessageBubble;

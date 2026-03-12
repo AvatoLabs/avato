@@ -19,6 +19,7 @@ import { useToast } from '../components/ui/Toast';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
@@ -304,13 +305,22 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       existing.provider = providerId;
       existing.vision = supportsVision;
       await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
+
+      // Immediately reflect in session store so recent-list logo updates instantly
+      useSessionStore
+        .getState()
+        .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
     } else {
       await AsyncStorage.setItem(STORAGE_KEY_MODEL, modelId);
       await AsyncStorage.setItem(STORAGE_KEY_PROVIDER, providerId);
     }
 
     toast.show('success', t.settingsSavedModel);
-    setTimeout(() => navigation.goBack(), 200);
+    setTimeout(() => {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
+    }, 200);
   };
 
   // ── Filter ───────────────────────────────────────────────────────
@@ -468,7 +478,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       <ScreenHeader
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.modelPickerTitle}
-        onPressLeft={() => navigation.goBack()}
+        onPressLeft={() => navigation.canGoBack() && navigation.goBack()}
       />
 
       {/* Search */}

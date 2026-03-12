@@ -10,6 +10,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import Constants from 'expo-constants';
 import {
   BarChart3,
   Brain,
@@ -28,12 +29,16 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { aiProviderApi, clearAuth, statsApi, userApi } from '../lib/api';
+import { aiProviderApi, clearAuth, statsApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
+import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
+
+const APP_NAME = Constants.expoConfig?.name ?? 'LobeHub';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 export default function ProfileScreen({ navigation }: any) {
   const { t, locale } = useI18n();
@@ -41,12 +46,17 @@ export default function ProfileScreen({ navigation }: any) {
   const isConnected = useConnectionStore((s) => s.isConnected);
   const checkConnection = useConnectionStore((s) => s.checkConnection);
 
+  const userAvatar = useUserStore((s) => s.avatar);
+  const userFullName = useUserStore((s) => s.fullName);
+  const userUsername = useUserStore((s) => s.username);
+  const fetchUser = useUserStore((s) => s.fetchUser);
+  const isUserLoaded = useUserStore((s) => s.isLoaded);
+  const userName = userFullName || userUsername;
+
   const [messageCount, setMessageCount] = useState(0);
   const [topicCount, setTopicCount] = useState(0);
   const [providerCount, setProviderCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
   const [defaultModel, setDefaultModel] = useState<string>('');
 
   const loadStats = useCallback(async () => {
@@ -63,23 +73,13 @@ export default function ProfileScreen({ navigation }: any) {
     setProviderCount(providers as number);
   }, []);
 
-  const loadUser = useCallback(async () => {
-    try {
-      const u = await userApi.getUser();
-      if (u?.avatar) setUserAvatar(u.avatar);
-      if (u?.fullName || u?.username) setUserName(u.fullName || u.username || null);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   useEffect(() => {
     loadStats();
-    loadUser();
+    if (!isUserLoaded) fetchUser();
     AsyncStorage.getItem('minkhub_default_model').then((v) => {
       if (v) setDefaultModel(v);
     });
-  }, [loadStats, loadUser]);
+  }, [loadStats, isUserLoaded, fetchUser]);
 
   // Re-check server connection every time the screen gains focus
   useFocusEffect(
@@ -91,9 +91,9 @@ export default function ProfileScreen({ navigation }: any) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     haptics.light();
-    await Promise.all([loadStats(), checkConnection(), loadUser()]);
+    await Promise.all([loadStats(), checkConnection(), fetchUser()]);
     setRefreshing(false);
-  }, [loadStats, checkConnection, loadUser]);
+  }, [loadStats, checkConnection, fetchUser]);
 
   const handleSignOut = () => {
     Alert.alert(t.meSignOutConfirm, t.meSignOutDesc, [
@@ -337,7 +337,7 @@ export default function ProfileScreen({ navigation }: any) {
 
         {/* Version */}
         <Text className="text-center text-secondary/30 text-[11px] font-medium mt-2">
-          MinkHub v1.0.0
+          {APP_NAME} v{APP_VERSION}
         </Text>
       </ScrollView>
     </View>

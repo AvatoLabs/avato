@@ -14,7 +14,6 @@ const LANGUAGES: { code: Locale; label: string; name: string }[] = [
   { code: 'en-US', label: 'EN', name: 'English' },
   { code: 'zh-CN', label: 'CN', name: '简体中文' },
   { code: 'zh-TW', label: 'TW', name: '繁體中文' },
-  { code: 'ja-JP', label: 'JP', name: '日本語' },
 ];
 
 export default function LanguagePickerScreen({ navigation }: any) {
@@ -29,8 +28,8 @@ export default function LanguagePickerScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.languageTitle}
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.languageTitle}
         onPressLeft={() => navigation.goBack()}
       />
 

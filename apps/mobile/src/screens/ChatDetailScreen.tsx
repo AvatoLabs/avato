@@ -1,7 +1,6 @@
 /**
  * ChatDetailScreen — Full chat experience with MessageBubble, Topics, and file attachments.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,9 +8,12 @@ import {
   ArrowLeft,
   BookText,
   Brain,
+  BrainCircuit,
+  Cpu,
   Eraser,
   Globe,
   Paperclip,
+  Puzzle,
   Send,
   Settings,
 } from 'lucide-react-native';
@@ -41,17 +43,20 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import FilePreview from '../components/ui/FilePreview';
+import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble from '../components/ui/MessageBubble';
+import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
 import { messageApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
+import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { tokens } from '../theme/tokens';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, MobileMemoryEffort } from '../types';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -62,6 +67,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const messages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
   const generating = useChatStore((s) => s.generating);
+  const isReasoning = useChatStore((s) => s.isReasoning);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
@@ -73,38 +79,32 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const addFile = useFileStore((s) => s.addFile);
 
   const [inputText, setInputText] = useState('');
-  const [sessionModel, setSessionModel] = useState<string>('');
-  const [modelSupportsVision, setModelSupportsVision] = useState(true);
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [toolsEnabled, setToolsEnabled] = useState(false);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
+  const [memorySheetVisible, setMemorySheetVisible] = useState(false);
+  const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
+  const [providerLogoError, setProviderLogoError] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  // Load per-session model name for header display
+  const sessionModel = useModelStore((s) => s.selectedModel);
+  const sessionProvider = useModelStore((s) => s.selectedProvider);
+  const fetchModels = useModelStore((s) => s.fetchModels);
+  const loadSelection = useModelStore((s) => s.loadSelection);
+  const modelSupportsVision = useModelStore((s) => {
+    if (!s.selectedModel || s.providers.length === 0) return true;
+    for (const p of s.providers) {
+      const m = p.children.find((c) => c.id === s.selectedModel);
+      if (m) return !!m.abilities?.vision;
+    }
+    return true;
+  });
+
   useEffect(() => {
-    (async () => {
-      let modelName = '';
-      let vision = true; // default to true for safety
-      try {
-        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (saved.model) modelName = saved.model;
-          if (saved.vision !== undefined) vision = !!saved.vision;
-        }
-      } catch {
-        /* ignore */
-      }
-      if (!modelName) {
-        try {
-          const global = await AsyncStorage.getItem('minkhub_default_model');
-          if (global) modelName = global;
-        } catch {
-          /* ignore */
-        }
-      }
-      setSessionModel(modelName);
-      setModelSupportsVision(vision);
-    })();
-  }, [sessionId]);
+    fetchModels();
+    loadSelection(sessionId);
+  }, [fetchModels, loadSelection, sessionId]);
 
   // Rotating placeholder hints
   const hints = useMemo(
@@ -126,6 +126,17 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
+  const sessionSearchMode = session?.chatConfig?.searchMode;
+  const sessionMemoryEnabled = session?.chatConfig?.memory?.enabled;
+  const sessionMemoryEffort = session?.chatConfig?.memory?.effort;
+
+  useEffect(() => {
+    if (!session?.chatConfig) return;
+    setSearchEnabled(sessionSearchMode ? sessionSearchMode !== 'off' : false);
+    setMemoryEnabled(sessionMemoryEnabled !== false);
+    setMemoryEffort(sessionMemoryEffort || 'medium');
+  }, [session?.id, sessionSearchMode, sessionMemoryEnabled, sessionMemoryEffort]);
+
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
@@ -136,10 +147,24 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    sendMessage(sessionId, inputText.trim(), activeTopic ?? undefined);
+    sendMessage(sessionId, inputText.trim(), activeTopic ?? undefined, {
+      memoryEffort,
+      memoryEnabled,
+      searchEnabled,
+    });
     setInputText('');
     Keyboard.dismiss();
-  }, [inputText, generating, sendMessage, sessionId, activeTopic, sendScale]);
+  }, [
+    inputText,
+    generating,
+    sendMessage,
+    sessionId,
+    activeTopic,
+    memoryEffort,
+    memoryEnabled,
+    searchEnabled,
+    sendScale,
+  ]);
 
   const handleAttach = useCallback(() => {
     const pickImage = async (source: 'camera' | 'gallery') => {
@@ -212,8 +237,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {
     haptics.light();
-    navigation.navigate('ModelPicker', { sessionId });
-  }, [navigation, sessionId]);
+    setModelDrawerVisible(true);
+  }, []);
 
   // ── Toolbar: Search toggle ────────────────────────────────────────
   const handleToggleSearch = useCallback(async () => {
@@ -221,11 +246,30 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     const next = !searchEnabled;
     setSearchEnabled(next);
     try {
-      await sessionApi.updateChatConfig(sessionId, { searchMode: next });
+      await sessionApi.updateChatConfig(sessionId, { searchMode: next ? 'on' : 'off' });
     } catch {
       /* best-effort */
     }
   }, [searchEnabled, sessionId]);
+
+  const updateMemoryConfig = useCallback(
+    async (nextEnabled: boolean, nextEffort: MobileMemoryEffort) => {
+      setMemoryEnabled(nextEnabled);
+      setMemoryEffort(nextEffort);
+
+      try {
+        await sessionApi.updateChatConfig(sessionId, {
+          memory: {
+            effort: nextEffort,
+            enabled: nextEnabled,
+          },
+        });
+      } catch {
+        /* best-effort */
+      }
+    },
+    [sessionId],
+  );
 
   // ── Toolbar: Clear messages ───────────────────────────────────────
   const handleClear = useCallback(() => {
@@ -273,9 +317,6 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             >
               <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
-            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2.5 overflow-hidden">
-              <RNImage className="w-6 h-6 rounded-md" source={require('../../assets/icon.png')} />
-            </View>
             <View className="flex-1">
               <Text
                 className="text-[16px] font-medium text-foreground tracking-tight"
@@ -285,13 +326,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               </Text>
               {generating ? (
                 <Text className="text-primary text-[12px] mt-0.5 font-medium">
-                  {t.chatThinking}
+                  {isReasoning ? t.chatThinking : t.chatGenerating}
                 </Text>
               ) : sessionModel ? (
-                <Text
-                  className="text-secondary/50 text-[12px] mt-0.5 font-medium"
-                  numberOfLines={1}
-                >
+                <Text className="text-[12px] mt-0.5 font-medium text-[#8c8c8c]" numberOfLines={1}>
                   {sessionModel}
                 </Text>
               ) : null}
@@ -428,7 +466,17 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="w-8 h-8 items-center justify-center rounded-full"
                 onPress={handleModelPress}
               >
-                <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                {sessionProvider && !providerLogoError ? (
+                  <RNImage
+                    style={{ width: 20, height: 20, borderRadius: 4 }}
+                    source={{
+                      uri: `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/light/${sessionProvider}.png`,
+                    }}
+                    onError={() => setProviderLogoError(true)}
+                  />
+                ) : (
+                  <Cpu color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                )}
               </TouchableOpacity>
               {/* Search */}
               <TouchableOpacity
@@ -451,6 +499,38 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 onPress={handleAttach}
               >
                 <Paperclip color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+              {/* Tools */}
+              <TouchableOpacity
+                accessibilityLabel="Toggle tools"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={() => {
+                  haptics.light();
+                  setToolsEnabled((v) => !v);
+                }}
+              >
+                <Puzzle
+                  color={toolsEnabled ? '#2563eb' : '#666'}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+              {/* Memory */}
+              <TouchableOpacity
+                accessibilityLabel="Toggle memory"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={() => {
+                  haptics.light();
+                  setMemorySheetVisible(true);
+                }}
+              >
+                {memoryEnabled ? (
+                  <BrainCircuit color="#2563eb" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                ) : (
+                  <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                )}
               </TouchableOpacity>
               {/* Separator */}
               <View className="w-px h-4 bg-black/10 mx-1" />
@@ -488,6 +568,25 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           </BlurView>
         </View>
       </KeyboardAvoidingView>
+
+      <ModelDrawer
+        sessionId={sessionId}
+        visible={modelDrawerVisible}
+        onClose={() => setModelDrawerVisible(false)}
+        onSelect={() => setProviderLogoError(false)}
+      />
+      <MemoryToolSheet
+        effort={memoryEffort}
+        enabled={memoryEnabled}
+        visible={memorySheetVisible}
+        onClose={() => setMemorySheetVisible(false)}
+        onChangeEffort={(value) => {
+          void updateMemoryConfig(true, value);
+        }}
+        onChangeEnabled={(value) => {
+          void updateMemoryConfig(value, memoryEffort);
+        }}
+      />
     </View>
   );
 }

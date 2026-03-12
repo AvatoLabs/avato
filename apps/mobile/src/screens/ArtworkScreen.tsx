@@ -40,6 +40,7 @@ import Animated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 
+import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
@@ -201,6 +202,7 @@ export default function ArtworkScreen({ navigation }: any) {
   const [ratio, setRatio] = useState('auto');
   const [locked, setLocked] = useState(false);
   const [imgCount, setImgCount] = useState(2);
+  const [customCountVisible, setCustomCountVisible] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [refImages, setRefImages] = useState<{ uri: string; url?: string }[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -909,18 +911,7 @@ export default function ArtworkScreen({ navigation }: any) {
                 })}
                 <TouchableOpacity
                   style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 }}
-                  onPress={() => {
-                    Alert.prompt?.(
-                      t.artworkImageCountCustom,
-                      '',
-                      (val) => {
-                        const n = Number(val);
-                        if (n > 0 && n <= 16) setImgCount(n);
-                      },
-                      'plain-text',
-                      String(imgCount),
-                    );
-                  }}
+                  onPress={() => setCustomCountVisible(true)}
                 >
                   <Text style={{ color: '#555', fontSize: 13, fontWeight: '500' }}>+</Text>
                 </TouchableOpacity>
@@ -929,6 +920,20 @@ export default function ArtworkScreen({ navigation }: any) {
           </Animated.View>
         </>
       )}
+
+      <PromptModal
+        defaultValue={String(imgCount)}
+        keyboardType="number-pad"
+        submitLabel="OK"
+        title={t.artworkImageCountCustom}
+        visible={customCountVisible}
+        onCancel={() => setCustomCountVisible(false)}
+        onSubmit={(val) => {
+          setCustomCountVisible(false);
+          const n = Number(val);
+          if (n > 0 && n <= 16) setImgCount(n);
+        }}
+      />
     </View>
   );
 }

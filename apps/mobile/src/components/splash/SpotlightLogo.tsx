@@ -75,7 +75,7 @@ export default function SpotlightLogo() {
           style={{ borderRadius: 60, flex: 1, height: 120, width: 120 }}
           tint="light"
         >
-          <View style={{ backgroundColor: 'rgba(129,140,248,0.12)', borderRadius: 60, flex: 1 }} />
+          <View style={{ backgroundColor: 'rgba(144,164,174,0.10)', borderRadius: 60, flex: 1 }} />
         </BlurView>
       </Animated.View>
 

@@ -26,12 +26,16 @@ interface SessionState {
   initialized: boolean;
   loading: boolean;
   moveToGroup: (sessionId: string, groupId: string) => Promise<void>;
+  /** IDs currently being deleted — fetchSessions filters these out to prevent "resurrection" */
+  pendingDeletes: Set<string>;
   pinSession: (id: string) => Promise<void>;
   removeSession: (id: string) => Promise<void>;
   renameSession: (id: string, title: string) => Promise<void>;
   sessions: ChatSession[];
   switchSession: (id: string) => void;
   unpinSession: (id: string) => Promise<void>;
+  /** Immediately update model/provider on a session (local-only, for instant UI feedback) */
+  updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -39,6 +43,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   loading: false,
   sessions: [],
   activeSessionId: null,
+  pendingDeletes: new Set<string>(),
 
   fetchSessions: async () => {
     set({ loading: true });
@@ -70,9 +75,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }
       }
 
+      const pending = get().pendingDeletes;
+      const filtered = (sessions ?? []).filter((s) => !pending.has(s.id));
+
       set({
-        sessions: sessions ?? [],
-        activeSessionId: stored || (sessions?.[0]?.id ?? null),
+        sessions: filtered,
+        activeSessionId: stored || (filtered[0]?.id ?? null),
         initialized: true,
         loading: false,
       });
@@ -129,15 +137,32 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   removeSession: async (id: string) => {
+    const target = get().sessions.find((s) => s.id === id);
+    const isChatGroup = target?.type === 'group';
+    const nextPending = new Set(get().pendingDeletes);
+    nextPending.add(id);
+
     set((s) => ({
       sessions: s.sessions.filter((sess) => sess.id !== id),
       activeSessionId: s.activeSessionId === id ? (s.sessions[0]?.id ?? null) : s.activeSessionId,
+      pendingDeletes: nextPending,
     }));
+
     try {
-      await sessionApi.remove(id);
+      if (isChatGroup) {
+        await sessionApi.removeChatGroup(id);
+      } else {
+        await sessionApi.remove(id);
+      }
     } catch (err) {
+      console.error('[SessionStore] removeSession FAILED:', id, err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorDeleteFailed);
+    } finally {
+      const cleaned = new Set(get().pendingDeletes);
+      cleaned.delete(id);
+      set({ pendingDeletes: cleaned });
+      get().fetchSessions();
     }
   },
 
@@ -205,5 +230,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       console.warn('[SessionStore] renameSession error:', err);
       get().fetchSessions();
     }
+  },
+
+  updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => {
+    set((s) => ({
+      sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, ...meta } : sess)),
+    }));
   },
 }));

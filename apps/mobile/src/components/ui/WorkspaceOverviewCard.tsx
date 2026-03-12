@@ -41,8 +41,15 @@ export function WorkspaceOverviewCard({
   const { t } = useI18n();
 
   return (
-    <View className="mx-5 mb-6 rounded-xl overflow-hidden shadow-sm">
-      <BlurView className="p-5 border border-black/5" intensity={40} tint="light">
+    <View
+      className="mx-5 mb-6 rounded-[26px]"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.85)',
+        borderColor: 'rgba(99,102,241,0.5)',
+        borderWidth: 1.5,
+      }}
+    >
+      <BlurView className="rounded-[25px] overflow-hidden p-5" intensity={80} tint="light">
         {/* Identity — tap → ProfileEdit */}
         <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
           <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-3.5 overflow-hidden">

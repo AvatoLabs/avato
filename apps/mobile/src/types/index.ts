@@ -10,6 +10,8 @@ export interface ChatSession {
   /** Agent identifier this session is talking to */
   agentId?: string;
   avatar?: string;
+  /** Session-level chat config persisted on server */
+  chatConfig?: MobileChatConfig;
   createdAt: string;
   description?: string;
   /** Group identifier for folder grouping */
@@ -22,11 +24,29 @@ export interface ChatSession {
   /** Provider identifier (e.g. 'openai', 'anthropic') */
   provider?: string;
   title: string;
+  /** 'agent' for regular sessions, 'group' for multi-agent chat groups */
+  type?: 'agent' | 'group';
   /** ISO timestamp */
   updatedAt: string;
 }
 
+export type MobileMemoryEffort = 'low' | 'medium' | 'high';
+
+export interface MobileChatConfig {
+  memory?: {
+    effort?: MobileMemoryEffort;
+    enabled?: boolean;
+    toolPermission?: 'read-only' | 'read-write';
+  };
+  searchMode?: 'auto' | 'off' | 'on';
+}
+
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
+
+export interface ModelReasoning {
+  content?: string;
+  duration?: number;
+}
 
 export interface ChatMessage {
   content: string;
@@ -39,6 +59,8 @@ export interface ChatMessage {
   model?: string;
   /** Parent message id (for branching) */
   parentId?: string;
+  /** Reasoning / thinking content from the model */
+  reasoning?: ModelReasoning | null;
   role: MessageRole;
   sessionId: string;
   updatedAt: string;

@@ -3,19 +3,12 @@
  */
 import { ArrowLeft, MessageCircle, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
+import PromptModal from '../components/ui/PromptModal';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
 import { haptics } from '../lib/haptics';
@@ -43,6 +36,7 @@ export default function TopicListScreen({ route, navigation }: any) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [createPromptVisible, setCreatePromptVisible] = useState(false);
 
   useEffect(() => {
     if (sessionId) fetchTopics(sessionId);
@@ -56,20 +50,8 @@ export default function TopicListScreen({ route, navigation }: any) {
   }, [fetchTopics, sessionId]);
 
   const handleCreateTopic = useCallback(() => {
-    Alert.prompt(
-      t.topicCreate,
-      undefined,
-      async (title) => {
-        if (title?.trim()) {
-          haptics.success();
-          await createTopic(sessionId, title.trim());
-        }
-      },
-      'plain-text',
-      '',
-      t.topicCreatePlaceholder,
-    );
-  }, [t, createTopic, sessionId, toast]);
+    setCreatePromptVisible(true);
+  }, []);
 
   const handleSwitchTopic = useCallback(
     (topicId: string | null) => {
@@ -84,7 +66,6 @@ export default function TopicListScreen({ route, navigation }: any) {
     ? topics.filter((tp) => tp.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : topics;
 
-  // Sort: favorites first, then by date
   const sortedTopics = [...filteredTopics].sort((a, b) => {
     if (a.favorite && !b.favorite) return -1;
     if (!a.favorite && b.favorite) return 1;
@@ -93,7 +74,6 @@ export default function TopicListScreen({ route, navigation }: any) {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-2.5">
         <PressableScale
           className="w-9 h-9 items-center justify-center rounded-full"
@@ -113,7 +93,6 @@ export default function TopicListScreen({ route, navigation }: any) {
         </PressableScale>
       </View>
 
-      {/* Search */}
       <View className="px-4 pb-3">
         <View className="bg-foreground/5 rounded-xl px-4 py-2.5 flex-row items-center">
           <TextInput
@@ -126,7 +105,6 @@ export default function TopicListScreen({ route, navigation }: any) {
         </View>
       </View>
 
-      {/* "All Messages" button — switches to null topic */}
       <Animated.View entering={FadeInDown.delay(50).duration(250)}>
         <TouchableOpacity
           activeOpacity={0.6}
@@ -150,7 +128,6 @@ export default function TopicListScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Topic List */}
       <FlatList
         contentContainerStyle={{ paddingBottom: 30 }}
         data={sortedTopics}
@@ -183,6 +160,19 @@ export default function TopicListScreen({ route, navigation }: any) {
             onRename={(newTitle) => updateTopic(item.id, newTitle)}
           />
         )}
+      />
+
+      <PromptModal
+        placeholder={t.topicCreatePlaceholder}
+        submitLabel={t.save}
+        title={t.topicCreate}
+        visible={createPromptVisible}
+        onCancel={() => setCreatePromptVisible(false)}
+        onSubmit={async (title) => {
+          setCreatePromptVisible(false);
+          haptics.success();
+          await createTopic(sessionId, title);
+        }}
       />
     </View>
   );

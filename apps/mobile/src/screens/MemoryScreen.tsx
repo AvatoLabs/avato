@@ -16,6 +16,7 @@ import {
   Calendar,
   ChevronLeft,
   Lightbulb,
+  Plus,
   Search,
   Settings2,
   Sparkles,
@@ -28,6 +29,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   ScrollView,
   Text,
@@ -234,6 +236,23 @@ function HomeTab() {
         )}
       </View>
 
+      {/* Extract Memories card */}
+      <View className="mb-6">
+        <View
+          className="bg-white rounded-2xl p-4"
+          style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <Text className="text-base font-semibold text-gray-800 mb-2">{t.memoryExtractTitle}</Text>
+          <Text className="text-sm text-gray-500 leading-5">{t.memoryExtractDesc}</Text>
+        </View>
+      </View>
+
       {/* Empty state if nothing at all */}
       {!persona?.content && !persona?.summary && roles.length === 0 && (
         <View className="items-center py-10">
@@ -255,6 +274,10 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createTitle, setCreateTitle] = useState('');
+  const [createSummary, setCreateSummary] = useState('');
+  const [createSubmitting, setCreateSubmitting] = useState(false);
 
   const fetchItems = useCallback(async () => {
     try {
@@ -297,6 +320,23 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
     setRefreshing(true);
     fetchItems();
   }, [fetchItems]);
+
+  const handleCreateSubmit = useCallback(async () => {
+    const title = createTitle.trim();
+    if (!title) return;
+    setCreateSubmitting(true);
+    try {
+      await memoryApi.createIdentity({ title, summary: createSummary.trim() || undefined });
+      setShowCreateModal(false);
+      setCreateTitle('');
+      setCreateSummary('');
+      fetchItems();
+    } catch {
+      /* ignore */
+    } finally {
+      setCreateSubmitting(false);
+    }
+  }, [createTitle, createSummary, fetchItems]);
 
   const handleDelete = useCallback(
     (item: AnyMemoryItem) => {
@@ -430,15 +470,86 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
 
   return (
     <View className="flex-1">
-      {/* Search toggle + count */}
+      {/* Search toggle + count + Create Identity (when identity tab) */}
       <View className="flex-row items-center justify-between px-5 py-2">
         <Text className="text-sm text-gray-400">
           {t.memoryTotalCount.replace('{count}', String(filtered.length))}
         </Text>
-        <TouchableOpacity onPress={() => setShowSearch((prev) => !prev)}>
-          <Search color="#9ca3af" size={18} strokeWidth={1.5} />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-3">
+          {layer === 'identity' ? (
+            <TouchableOpacity onPress={() => setShowCreateModal(true)}>
+              <Plus color={layerColor} size={20} strokeWidth={2} />
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity onPress={() => setShowSearch((prev) => !prev)}>
+            <Search color="#9ca3af" size={18} strokeWidth={1.5} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Create Identity Modal */}
+      {layer === 'identity' ? (
+        <Modal
+          transparent
+          animationType="fade"
+          visible={showCreateModal}
+          onRequestClose={() => setShowCreateModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            className="flex-1 justify-center bg-black/40 px-5"
+            onPress={() => setShowCreateModal(false)}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              className="bg-white rounded-2xl p-5"
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-lg font-semibold text-gray-900">
+                  {t.memoryCreateIdentity}
+                </Text>
+                <TouchableOpacity
+                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  onPress={() => setShowCreateModal(false)}
+                >
+                  <X color="#9ca3af" size={20} strokeWidth={1.5} />
+                </TouchableOpacity>
+              </View>
+              <Text className="text-sm font-medium text-gray-700 mb-1">{t.memoryCreateTitle}</Text>
+              <TextInput
+                className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-800"
+                placeholder={t.memoryCreateTitlePlaceholder}
+                placeholderTextColor="#9ca3af"
+                value={createTitle}
+                onChangeText={setCreateTitle}
+              />
+              <Text className="text-sm font-medium text-gray-700 mb-1">
+                {t.memoryCreateSummary}
+              </Text>
+              <TextInput
+                multiline
+                className="mb-5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-800"
+                numberOfLines={3}
+                placeholder={t.memoryCreateSummaryPlaceholder}
+                placeholderTextColor="#9ca3af"
+                value={createSummary}
+                onChangeText={setCreateSummary}
+              />
+              <TouchableOpacity
+                className="rounded-xl py-3 items-center"
+                disabled={!createTitle.trim() || createSubmitting}
+                style={{
+                  backgroundColor: createTitle.trim() && !createSubmitting ? layerColor : '#d1d5db',
+                }}
+                onPress={handleCreateSubmit}
+              >
+                <Text className="text-base font-semibold text-white">{t.memoryCreateSave}</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      ) : null}
 
       {/* Search bar */}
       {showSearch && (

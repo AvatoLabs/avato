@@ -546,10 +546,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               >
                 <View className="flex-1">
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
-                    {t.providerDetailChecker}
+                    {t.providerDetailChecking}
                   </Text>
                   <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
-                    {t.providerDetailCheckerDesc}
+                    {t.providerDetailDescription}
                   </Text>
                 </View>
                 {checking ? (
@@ -576,7 +576,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         <Animated.View entering={FadeInDown.delay(125).duration(250)}>
           <View className="px-5 mb-3 flex-row items-center justify-between">
             <Text className="text-foreground text-[16px] font-semibold tracking-tight">
-              {t.providerDetailModels}
+              {t.providerDetailNoModels}
             </Text>
             <Text className="text-secondary/50 text-[12px] font-medium">
               {enabledModelCount}/{models.length}

@@ -16,6 +16,7 @@ import {
   Plus,
   Puzzle,
   RefreshCw,
+  ShoppingBag,
   Trash2,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -75,9 +76,11 @@ function AgentSkillRow({
   index,
   t,
   onDelete,
+  onPress,
 }: {
   index: number;
   onDelete: (id: string) => void;
+  onPress?: () => void;
   skill: AgentSkillItem;
   t: any;
 }) {
@@ -94,25 +97,35 @@ function AgentSkillRow({
     <Animated.View entering={FadeInDown.delay(index * 25).duration(200)}>
       <View className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden">
         <View className="flex-row items-center px-4 py-3.5">
-          <View className="w-9 h-9 rounded-full bg-foreground/10 items-center justify-center mr-3">
-            <Puzzle color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
-          </View>
-          <View className="flex-1">
-            <View className="flex-row items-center gap-2">
-              <Text
-                className="text-foreground font-medium text-[15px] tracking-tight"
-                numberOfLines={1}
-              >
-                {skill.name}
-              </Text>
-              <SourceTag color={sourceColor} label={sourceLabel} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-row items-center flex-1 mr-2"
+            disabled={!onPress}
+            onPress={onPress}
+          >
+            <View className="w-9 h-9 rounded-full bg-foreground/10 items-center justify-center mr-3">
+              <Puzzle color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
-            {skill.description ? (
-              <Text className="text-secondary/50 text-[11px] font-medium mt-0.5" numberOfLines={1}>
-                {skill.description}
-              </Text>
-            ) : null}
-          </View>
+            <View className="flex-1">
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className="text-foreground font-medium text-[15px] tracking-tight"
+                  numberOfLines={1}
+                >
+                  {skill.name}
+                </Text>
+                <SourceTag color={sourceColor} label={sourceLabel} />
+              </View>
+              {skill.description ? (
+                <Text
+                  className="text-secondary/50 text-[11px] font-medium mt-0.5"
+                  numberOfLines={1}
+                >
+                  {skill.description}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
           <TouchableOpacity
             hitSlop={12}
             onPress={() => {
@@ -541,15 +554,31 @@ export default function SkillSettingsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.skillsTitle}
         leftElement={
           canGoBack ? (
             <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
           ) : undefined
         }
-        rightElement={<RefreshCw color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />}
-        title={t.skillsTitle}
+        rightElement={
+          <View className="flex-row items-center gap-1">
+            <TouchableOpacity
+              activeOpacity={0.6}
+              className="w-10 h-10 items-center justify-center"
+              onPress={() => navigation.navigate('SkillMarket')}
+            >
+              <ShoppingBag color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              className="w-10 h-10 items-center justify-center"
+              onPress={onRefresh}
+            >
+              <RefreshCw color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </TouchableOpacity>
+          </View>
+        }
         onPressLeft={canGoBack ? () => navigation.goBack() : undefined}
-        onPressRight={onRefresh}
       />
 
       {loading ? (
@@ -593,6 +622,12 @@ export default function SkillSettingsScreen({ navigation }: any) {
                       skill={skill}
                       t={t}
                       onDelete={handleDeleteSkill}
+                      onPress={() =>
+                        navigation.navigate('SkillDetail', {
+                          skillId: skill.id,
+                          skillName: skill.name,
+                        })
+                      }
                     />
                   ))}
                 </>
@@ -625,6 +660,12 @@ export default function SkillSettingsScreen({ navigation }: any) {
                       skill={skill}
                       t={t}
                       onDelete={handleDeleteSkill}
+                      onPress={() =>
+                        navigation.navigate('SkillDetail', {
+                          skillId: skill.id,
+                          skillName: skill.name,
+                        })
+                      }
                     />
                   ))}
                   {customPlugins.map((plugin, i) => (

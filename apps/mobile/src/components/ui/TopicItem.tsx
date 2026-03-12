@@ -9,6 +9,7 @@ import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
 import type { Topic } from '../../types';
+import PromptModal from './PromptModal';
 import { useToast } from './Toast';
 
 interface TopicItemProps {
@@ -25,29 +26,12 @@ const TopicItem = memo<TopicItemProps>(
     const { t } = useI18n();
     const toast = useToast();
     const [menuVisible, setMenuVisible] = useState(false);
+    const [renameVisible, setRenameVisible] = useState(false);
 
     const handleRename = useCallback(() => {
       setMenuVisible(false);
-      Alert.prompt(
-        t.topicRename,
-        undefined,
-        [
-          { text: t.cancel, style: 'cancel' },
-          {
-            text: t.save,
-            onPress: (newName?: string) => {
-              if (newName?.trim() && onRename) {
-                haptics.success();
-                onRename(newName.trim());
-                toast.show('success', t.topicRenamed);
-              }
-            },
-          },
-        ],
-        'plain-text',
-        topic.title,
-      );
-    }, [t, onRename, toast, topic.title]);
+      setTimeout(() => setRenameVisible(true), 300);
+    }, []);
 
     const handleDelete = useCallback(() => {
       setMenuVisible(false);
@@ -180,6 +164,22 @@ const TopicItem = memo<TopicItemProps>(
             </Pressable>
           </Pressable>
         </Modal>
+
+        <PromptModal
+          defaultValue={topic.title}
+          submitLabel={t.save}
+          title={t.topicRename}
+          visible={renameVisible}
+          onCancel={() => setRenameVisible(false)}
+          onSubmit={(newName) => {
+            setRenameVisible(false);
+            if (onRename) {
+              haptics.success();
+              onRename(newName);
+              toast.show('success', t.topicRenamed);
+            }
+          }}
+        />
       </>
     );
   },

@@ -14,7 +14,7 @@ import type { ChatRequestOptions } from '../lib/api';
 import { aiChatApi, messageApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, MobileMemoryEffort } from '../types';
 
 /**
  * Reads per-session chat settings (model, temperature, systemPrompt, provider)
@@ -55,90 +55,6 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   return opts;
 }
 
-/**
- * Lightweight SSE parser for extracting text content from the backend's
- * Server-Sent Events stream. The backend (via model-runtime) sends events
- * with `event: text` and JSON-encoded `data:` lines.
- *
- * Handles partial chunks by maintaining a line buffer across calls.
- */
-function extractTextFromSSE(raw: string, lineBuffer: string): { text: string; remaining: string } {
-  const combined = lineBuffer + raw;
-  const lines = combined.split('\n');
-  // The last element might be a partial line — keep it for next chunk
-  const remaining = lines.pop() ?? '';
-
-  let text = '';
-  let currentEvent = '';
-
-  for (const line of lines) {
-    if (line.startsWith('event:')) {
-      currentEvent = line.slice(6).trim();
-    } else if (line.startsWith('data:')) {
-      const dataStr = line.slice(5).trim();
-      // Only extract text content (skip tool_calls, usage, etc.)
-      if (currentEvent === 'text' || currentEvent === '') {
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (typeof parsed === 'string') {
-            text += parsed;
-          }
-        } catch {
-          // If not valid JSON, use as-is (some providers send plain text)
-          if (dataStr) text += dataStr;
-        }
-      }
-      // Reset event after processing data (each event: + data: pair is one SSE event)
-    } else if (line.trim() === '') {
-      // Empty line marks end of SSE event block — reset event type
-      currentEvent = '';
-    }
-  }
-
-  return { text, remaining };
-}
-
-/**
- * Reads an SSE stream from the response body and calls onChunk with the
- * extracted text for each chunk. Returns the full accumulated text.
- */
-async function readSSEStream(
-  response: Response,
-  onChunk: (accumulated: string) => void,
-): Promise<string> {
-  if (!response.body) return '';
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let accumulated = '';
-  let lineBuffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-    const { text, remaining } = extractTextFromSSE(chunk, lineBuffer);
-    lineBuffer = remaining;
-
-    if (text) {
-      accumulated += text;
-      onChunk(accumulated);
-    }
-  }
-
-  // Flush any remaining buffer
-  if (lineBuffer.trim()) {
-    const { text } = extractTextFromSSE('\n', lineBuffer);
-    if (text) {
-      accumulated += text;
-      onChunk(accumulated);
-    }
-  }
-
-  return accumulated;
-}
-
 interface ChatState {
   clearMessages: (sessionId: string) => void;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
@@ -150,10 +66,23 @@ interface ChatState {
   fetchMessages: (sessionId: string, topicId?: string) => Promise<void>;
   /** Whether a message is currently being generated */
   generating: boolean;
+  /** Whether the model is currently in reasoning/thinking phase */
+  isReasoning: boolean;
   /** Messages keyed by sessionId */
   messagesBySession: Record<string, ChatMessage[]>;
+  /** Timestamp when reasoning started (for computing duration) */
+  reasoningStartedAt: number | null;
   regenerateMessage: (sessionId: string, messageId: string) => Promise<void>;
-  sendMessage: (sessionId: string, content: string, topicId?: string) => Promise<void>;
+  sendMessage: (
+    sessionId: string,
+    content: string,
+    topicId?: string,
+    options?: {
+      memoryEffort?: MobileMemoryEffort;
+      memoryEnabled?: boolean;
+      searchEnabled?: boolean;
+    },
+  ) => Promise<void>;
   setEditingMessage: (id: string | null) => void;
   /** Streaming content buffer for the current generation */
   streamBuffer: string;
@@ -162,6 +91,8 @@ interface ChatState {
 export const useChatStore = create<ChatState>((set, get) => ({
   messagesBySession: {},
   generating: false,
+  isReasoning: false,
+  reasoningStartedAt: null,
   streamBuffer: '',
   editingMessageId: null,
 
@@ -181,7 +112,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (sessionId: string, content: string, topicId?: string) => {
+  sendMessage: async (
+    sessionId: string,
+    content: string,
+    topicId?: string,
+    options?: {
+      memoryEffort?: MobileMemoryEffort;
+      memoryEnabled?: boolean;
+      searchEnabled?: boolean;
+    },
+  ) => {
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sessionId,
@@ -199,9 +139,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    // Try to persist on backend
+    // Persist user message on backend
+    let userMessageServerId: string | undefined;
     try {
-      await messageApi.create(sessionId, content, topicId);
+      const result = await messageApi.create({
+        sessionId,
+        content,
+        role: 'user',
+        topicId,
+      });
+      userMessageServerId = result?.id;
     } catch (err) {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorSendFailed);
@@ -220,6 +167,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set((s) => ({
       generating: true,
+      isReasoning: false,
+      reasoningStartedAt: null,
       streamBuffer: '',
       messagesBySession: {
         ...s.messagesBySession,
@@ -227,7 +176,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    // Try streaming AI response
+    // Stream AI response via XHR (RN fetch lacks ReadableStream support)
     try {
       const allMessages = get().messagesBySession[sessionId] || [];
       const contextMessages = allMessages
@@ -236,28 +185,146 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
-      const response = await aiChatApi.createAssistantMessage(
+      chatOptions.sessionId = sessionId;
+      chatOptions.topicId = topicId;
+
+      if (options?.searchEnabled) {
+        chatOptions.enabledSearch = true;
+      }
+      chatOptions.memory = {
+        effort: options?.memoryEffort || 'medium',
+        enabled: options?.memoryEnabled !== false,
+      };
+
+      // Throttle store updates to avoid per-token re-renders
+      const THROTTLE_MS = 100;
+      let pendingReasoning: string | null = null;
+      let pendingText: string | null = null;
+      let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flushPending = () => {
+        throttleTimer = null;
+        const reasoning = pendingReasoning;
+        const text = pendingText;
+        pendingReasoning = null;
+        pendingText = null;
+
+        if (reasoning !== null && text === null) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMsgId ? { ...m, reasoning: { content: reasoning } } : m,
+              ),
+            },
+          }));
+        } else if (text !== null) {
+          const wasReasoning = get().isReasoning;
+          if (wasReasoning) {
+            const startedAt = get().reasoningStartedAt;
+            const duration = startedAt ? Date.now() - startedAt : undefined;
+            set((s) => ({
+              isReasoning: false,
+              streamBuffer: text,
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: text,
+                        reasoning: m.reasoning ? { ...m.reasoning, duration } : m.reasoning,
+                      }
+                    : m,
+                ),
+              },
+            }));
+          } else {
+            set((s) => ({
+              streamBuffer: text,
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, content: text } : m,
+                ),
+              },
+            }));
+          }
+        }
+      };
+
+      const scheduleFlush = () => {
+        if (!throttleTimer) {
+          throttleTimer = setTimeout(flushPending, THROTTLE_MS);
+        }
+      };
+
+      const result = await aiChatApi.createAssistantMessageStream(
         provider,
         contextMessages,
         chatOptions,
+        {
+          onReasoning: (accReasoning) => {
+            if (!get().reasoningStartedAt) {
+              set({ isReasoning: true, reasoningStartedAt: Date.now() });
+            }
+            pendingReasoning = accReasoning;
+            scheduleFlush();
+          },
+          onText: (accText) => {
+            pendingText = accText;
+            scheduleFlush();
+          },
+        },
       );
 
-      await readSSEStream(response, (accumulated) => {
+      // Flush any remaining pending updates
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+        throttleTimer = null;
+      }
+      pendingText = result.text;
+      flushPending();
+
+      // Finalize reasoning duration if it was still reasoning when stream ended
+      if (get().isReasoning) {
+        const startedAt = get().reasoningStartedAt;
+        const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
-          streamBuffer: accumulated,
+          isReasoning: false,
           messagesBySession: {
             ...s.messagesBySession,
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId ? { ...m, content: accumulated } : m,
+              m.id === assistantMsgId && m.reasoning
+                ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                : m,
             ),
           },
         }));
-      });
+      }
+
+      // Persist assistant message to backend (including reasoning if present)
+      const localMsg = (get().messagesBySession[sessionId] || []).find(
+        (m) => m.id === assistantMsgId,
+      );
+      try {
+        await messageApi.create({
+          sessionId,
+          content: result.text,
+          role: 'assistant',
+          model: chatOptions.model,
+          provider,
+          parentId: userMessageServerId,
+          topicId,
+          reasoning: localMsg?.reasoning || undefined,
+        });
+      } catch (err) {
+        console.warn('[ChatStore] Failed to persist assistant message:', err);
+      }
     } catch (err) {
       console.warn('[ChatStore] AI streaming error:', err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorNetwork);
-      // Put a fallback error message
       set((s) => ({
         messagesBySession: {
           ...s.messagesBySession,
@@ -267,10 +334,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     } finally {
-      set({ generating: false, streamBuffer: '' });
+      set({ generating: false, isReasoning: false, reasoningStartedAt: null, streamBuffer: '' });
 
-      // Background refresh to sync with server
-      get().fetchMessages(sessionId);
+      // Refresh from server to sync IDs and ensure consistency
+      setTimeout(() => get().fetchMessages(sessionId), 1500);
     }
   },
 
@@ -373,6 +440,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set((s) => ({
       generating: true,
+      isReasoning: false,
+      reasoningStartedAt: null,
       streamBuffer: '',
       messagesBySession: {
         ...s.messagesBySession,
@@ -383,23 +452,127 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
-      const response = await aiChatApi.createAssistantMessage(
+
+      const THROTTLE_MS = 100;
+      let pendingReasoning: string | null = null;
+      let pendingText: string | null = null;
+      let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flushPending = () => {
+        throttleTimer = null;
+        const reasoning = pendingReasoning;
+        const text = pendingText;
+        pendingReasoning = null;
+        pendingText = null;
+
+        if (reasoning !== null && text === null) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMsgId ? { ...m, reasoning: { content: reasoning } } : m,
+              ),
+            },
+          }));
+        } else if (text !== null) {
+          const wasReasoning = get().isReasoning;
+          if (wasReasoning) {
+            const startedAt = get().reasoningStartedAt;
+            const duration = startedAt ? Date.now() - startedAt : undefined;
+            set((s) => ({
+              isReasoning: false,
+              streamBuffer: text,
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: text,
+                        reasoning: m.reasoning ? { ...m.reasoning, duration } : m.reasoning,
+                      }
+                    : m,
+                ),
+              },
+            }));
+          } else {
+            set((s) => ({
+              streamBuffer: text,
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, content: text } : m,
+                ),
+              },
+            }));
+          }
+        }
+      };
+
+      const scheduleFlush = () => {
+        if (!throttleTimer) {
+          throttleTimer = setTimeout(flushPending, THROTTLE_MS);
+        }
+      };
+
+      const result = await aiChatApi.createAssistantMessageStream(
         provider,
         contextMessages,
         chatOptions,
+        {
+          onReasoning: (accReasoning) => {
+            if (!get().reasoningStartedAt) {
+              set({ isReasoning: true, reasoningStartedAt: Date.now() });
+            }
+            pendingReasoning = accReasoning;
+            scheduleFlush();
+          },
+          onText: (accText) => {
+            pendingText = accText;
+            scheduleFlush();
+          },
+        },
       );
 
-      await readSSEStream(response, (accumulated) => {
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+        throttleTimer = null;
+      }
+      pendingText = result.text;
+      flushPending();
+
+      if (get().isReasoning) {
+        const startedAt = get().reasoningStartedAt;
+        const duration = startedAt ? Date.now() - startedAt : undefined;
         set((s) => ({
-          streamBuffer: accumulated,
+          isReasoning: false,
           messagesBySession: {
             ...s.messagesBySession,
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-              m.id === assistantMsgId ? { ...m, content: accumulated } : m,
+              m.id === assistantMsgId && m.reasoning
+                ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                : m,
             ),
           },
         }));
-      });
+      }
+
+      // Persist assistant message to backend (including reasoning if present)
+      const localMsg = (get().messagesBySession[sessionId] || []).find(
+        (m) => m.id === assistantMsgId,
+      );
+      try {
+        await messageApi.create({
+          sessionId,
+          content: result.text,
+          role: 'assistant',
+          model: chatOptions.model,
+          provider,
+          reasoning: localMsg?.reasoning || undefined,
+        });
+      } catch (err) {
+        console.warn('[ChatStore] Failed to persist regenerated assistant message:', err);
+      }
     } catch (err) {
       console.warn('[ChatStore] regenerate streaming error:', err);
       const t = useI18n.getState().t;
@@ -413,8 +586,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     } finally {
-      set({ generating: false, streamBuffer: '' });
-      get().fetchMessages(sessionId);
+      set({ generating: false, isReasoning: false, reasoningStartedAt: null, streamBuffer: '' });
+      setTimeout(() => get().fetchMessages(sessionId), 1500);
     }
   },
 

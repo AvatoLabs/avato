@@ -1,6 +1,7 @@
 /**
  * AboutScreen — App info, version, links, and credits.
  */
+import Constants from 'expo-constants';
 import { ArrowLeft, ExternalLink, Github, Heart } from 'lucide-react-native';
 import React from 'react';
 import { Image as RNImage, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -12,7 +13,8 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
-const APP_VERSION = '1.0.0';
+const APP_NAME = Constants.expoConfig?.name ?? 'LobeHub';
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 function LinkRow({
   icon: IconComp,
@@ -79,7 +81,7 @@ export default function AboutScreen({ navigation }: any) {
           <View className="w-20 h-20 rounded-3xl bg-foreground/5 items-center justify-center mb-4 overflow-hidden">
             <RNImage className="w-16 h-16 rounded-2xl" source={require('../../assets/icon.png')} />
           </View>
-          <Text className="text-foreground text-[22px] font-bold tracking-tight">MinkHub</Text>
+          <Text className="text-foreground text-[22px] font-bold tracking-tight">{APP_NAME}</Text>
           <Text className="text-secondary/60 text-[14px] font-medium mt-1">v{APP_VERSION}</Text>
           <Text className="text-secondary/40 text-[13px] font-medium mt-0.5">Built on LobeHub</Text>
         </Animated.View>

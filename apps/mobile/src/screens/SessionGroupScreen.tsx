@@ -11,11 +11,12 @@ import {
   Trash,
   Trash2,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import PromptModal from '../components/ui/PromptModal';
 import { useI18n } from '../lib/i18n';
 import { useSessionStore } from '../store/session';
 import { useSessionGroupStore } from '../store/sessionGroup';
@@ -36,7 +37,12 @@ export default function SessionGroupScreen({ navigation }: any) {
 
   const sessions = useSessionStore((s) => s.sessions);
 
-  // Compute session count per group
+  const [promptVisible, setPromptVisible] = useState(false);
+  const [promptTitle, setPromptTitle] = useState('');
+  const [promptDefault, setPromptDefault] = useState('');
+  const [promptPlaceholder, setPromptPlaceholder] = useState('');
+  const [promptCallback, setPromptCallback] = useState<((val: string) => void) | null>(null);
+
   const sessionCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of sessions) {
@@ -51,34 +57,30 @@ export default function SessionGroupScreen({ navigation }: any) {
     fetchGroups();
   }, [fetchGroups]);
 
+  const openPrompt = (
+    title: string,
+    placeholder: string,
+    defaultValue: string,
+    cb: (val: string) => void,
+  ) => {
+    setPromptTitle(title);
+    setPromptPlaceholder(placeholder);
+    setPromptDefault(defaultValue);
+    setPromptCallback(() => cb);
+    setPromptVisible(true);
+  };
+
   const handleCreate = useCallback(() => {
-    Alert.prompt(
-      t.groupCreate,
-      undefined,
-      async (name) => {
-        if (name?.trim()) {
-          await createGroup(name.trim());
-        }
-      },
-      'plain-text',
-      '',
-      t.groupCreatePlaceholder,
-    );
+    openPrompt(t.groupCreate, t.groupCreatePlaceholder, '', async (name) => {
+      await createGroup(name);
+    });
   }, [t, createGroup]);
 
   const handleRename = useCallback(
     (group: SessionGroup) => {
-      Alert.prompt(
-        t.groupRename,
-        undefined,
-        async (name) => {
-          if (name?.trim()) {
-            await renameGroup(group.id, name.trim());
-          }
-        },
-        'plain-text',
-        group.name,
-      );
+      openPrompt(t.groupRename, '', group.name, async (name) => {
+        await renameGroup(group.id, name);
+      });
     },
     [t, renameGroup],
   );
@@ -128,7 +130,6 @@ export default function SessionGroupScreen({ navigation }: any) {
               {t.groupSessionCount.replace('{count}', String(count))}
             </Text>
           </View>
-          {/* Reorder buttons */}
           <View className="flex-col mr-1">
             <TouchableOpacity
               className="p-1"
@@ -160,7 +161,6 @@ export default function SessionGroupScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-2.5">
         <TouchableOpacity
           activeOpacity={0.7}
@@ -204,6 +204,19 @@ export default function SessionGroupScreen({ navigation }: any) {
             </Text>
           </View>
         }
+      />
+
+      <PromptModal
+        defaultValue={promptDefault}
+        placeholder={promptPlaceholder}
+        submitLabel={t.save}
+        title={promptTitle}
+        visible={promptVisible}
+        onCancel={() => setPromptVisible(false)}
+        onSubmit={(val) => {
+          setPromptVisible(false);
+          promptCallback?.(val);
+        }}
       />
     </View>
   );
