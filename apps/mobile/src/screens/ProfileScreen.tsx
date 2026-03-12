@@ -114,7 +114,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t.workspaceTitle} />
+      <ScreenHeader title={t.settingsTitle} />
 
       <ScrollView
         className="flex-1"
