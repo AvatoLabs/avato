@@ -255,7 +255,7 @@ export default function ResourceScreen() {
   const handlePickFile = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
       multiple: true,
-      copyToCacheDirectory: false,
+      copyToCacheDirectory: true,
     });
     if (result.canceled) return;
     for (const asset of result.assets) {
@@ -409,9 +409,10 @@ export default function ResourceScreen() {
         </View>
       ) : (
         <FlatList
+          ItemSeparatorComponent={() => <View className="mx-4 h-px bg-gray-100 dark:bg-gray-800" />}
           data={filtered}
           keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View className="mx-4 h-px bg-gray-100 dark:bg-gray-800" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <View className="items-center px-8">
               <View
@@ -438,7 +439,6 @@ export default function ResourceScreen() {
                 }
               : { paddingBottom: insets.bottom + 80 }
           }
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
             <FileRow apiBaseUrl={apiBase} item={item} onDelete={handleDelete} />
           )}

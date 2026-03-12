@@ -188,9 +188,23 @@ export default function ChatListScreen({ navigation }: any) {
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
 
+  const pendingFiles = useFileStore((s) => s.pendingFiles);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
+  const selectedModel = useModelStore((s) => s.selectedModel);
+  const modelProviders = useModelStore((s) => s.providers);
   const fetchModels = useModelStore((s) => s.fetchModels);
   const loadSelection = useModelStore((s) => s.loadSelection);
+  const modelSupportsVision = useMemo(() => {
+    if (!selectedModel || modelProviders.length === 0) return true;
+
+    for (const provider of modelProviders) {
+      if (selectedProvider && provider.id !== selectedProvider) continue;
+      const model = provider.children.find((m) => m.id === selectedModel);
+      if (model) return !!model.abilities?.vision;
+    }
+
+    return true;
+  }, [modelProviders, selectedModel, selectedProvider]);
 
   // Load persisted expand/collapse state
   useEffect(() => {
@@ -254,9 +268,14 @@ export default function ChatListScreen({ navigation }: any) {
 
   const handleHeroSubmit = async () => {
     const prompt = heroText.trim();
-    if (!prompt) return;
+    const hasAttachment = pendingFiles.length > 0;
+    if (!prompt && !hasAttachment) return;
 
-    const newId = draftSessionId || (await createSession(prompt.slice(0, 50)));
+    const sessionTitle = (prompt || pendingFiles[0]?.name || t.chatListNewConversation).slice(
+      0,
+      50,
+    );
+    const newId = draftSessionId || (await createSession(sessionTitle));
     setDraftSessionId(null);
 
     try {
@@ -340,19 +359,29 @@ export default function ChatListScreen({ navigation }: any) {
 
     haptics.selection();
     if (Platform.OS === 'ios') {
-      const options = [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument];
+      const options = modelSupportsVision
+        ? [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument]
+        : [t.cancel, t.fileDocument];
       ActionSheetIOS.showActionSheetWithOptions(
         { options, cancelButtonIndex: 0, title: t.fileAttach },
         (index) => {
-          if (index === 1) pickImage('camera');
-          else if (index === 2) pickImage('gallery');
-          else if (index === 3) pickDocument();
+          if (modelSupportsVision) {
+            if (index === 1) pickImage('camera');
+            else if (index === 2) pickImage('gallery');
+            else if (index === 3) pickDocument();
+          } else if (index === 1) {
+            pickDocument();
+          }
         },
       );
     } else {
-      pickImage('gallery');
+      if (modelSupportsVision) {
+        pickImage('gallery');
+      } else {
+        pickDocument();
+      }
     }
-  }, [addFile, t, toast]);
+  }, [addFile, modelSupportsVision, t, toast]);
 
   // ── Skills drawer ─────────────────────────────────────────────────
   const [skillsVisible, setSkillsVisible] = useState(false);
@@ -562,10 +591,10 @@ export default function ChatListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={greeting}
         rightElement={
           <MessageSquarePlus color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={greeting}
         subtitle={
           sessions.length > 0
             ? t.activeChats.replace('{count}', String(sessions.length))
@@ -597,6 +626,7 @@ export default function ChatListScreen({ navigation }: any) {
               </Text>
             )}
             <HeroComposer
+              hasAttachment={pendingFiles.length > 0}
               memoryEnabled={memoryEnabled}
               modelProvider={selectedProvider || undefined}
               placeholder={t.homeHeroPlaceholder}

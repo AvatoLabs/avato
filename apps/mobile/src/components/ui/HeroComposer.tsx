@@ -15,6 +15,7 @@ import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
 interface HeroComposerProps {
+  hasAttachment?: boolean;
   memoryEnabled?: boolean;
   modelProvider?: string;
   onAttach?: () => void;
@@ -48,6 +49,7 @@ export function HeroComposer({
   onPluginsPress,
   memoryEnabled = true,
   searchEnabled = false,
+  hasAttachment = false,
 }: HeroComposerProps) {
   const colors = themeColors.light;
   const hasProvider = !!modelProvider?.trim();
@@ -65,6 +67,7 @@ export function HeroComposer({
   }, [onSubmit, sendScale]);
 
   const hasText = value.trim().length > 0;
+  const canSend = hasText || hasAttachment;
 
   const MemoryIcon = memoryEnabled ? BrainCircuit : Brain;
 
@@ -165,7 +168,7 @@ export function HeroComposer({
           <View className="flex-1" />
 
           {/* Send button */}
-          {hasText ? (
+          {canSend ? (
             <Animated.View style={sendAnimStyle}>
               <PressableScale
                 className="w-9 h-9 bg-primary rounded-full items-center justify-center"

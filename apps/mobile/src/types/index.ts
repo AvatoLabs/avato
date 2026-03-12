@@ -137,6 +137,8 @@ export interface Topic {
 // ---- File / Attachment ----
 
 export interface FileAttachment {
+  /** Backend file record ID after upload */
+  fileId?: string;
   id: string;
   name: string;
   /** Upload progress 0-100 */

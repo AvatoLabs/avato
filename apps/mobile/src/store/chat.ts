@@ -15,6 +15,7 @@ import { aiChatApi, messageApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { ChatMessage, MobileMemoryEffort } from '../types';
+import { useFileStore } from './file';
 
 /**
  * Reads per-session chat settings (model, temperature, systemPrompt, provider)
@@ -54,6 +55,72 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   }
   return opts;
 }
+
+interface UploadedAttachment {
+  fileId: string;
+  name: string;
+  type: string;
+  url: string;
+}
+
+interface MobileUserMessageContentPartText {
+  text: string;
+  type: 'text';
+}
+
+interface MobileUserMessageContentPartImage {
+  image_url: {
+    detail?: 'auto' | 'high' | 'low';
+    url: string;
+  };
+  type: 'image_url';
+}
+
+type MobileUserMessageContentPart =
+  | MobileUserMessageContentPartImage
+  | MobileUserMessageContentPartText;
+
+interface MobileChatMessage {
+  content: string | MobileUserMessageContentPart[];
+  role: string;
+}
+
+const isImageAttachment = (mimeType: string) => mimeType.startsWith('image/');
+
+const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
+  attachments.map((f) => `[${f.name}]`).join('\n');
+
+const buildUserStreamContent = (
+  text: string,
+  attachments: UploadedAttachment[],
+): MobileChatMessage['content'] => {
+  const imageAttachments = attachments.filter((f) => isImageAttachment(f.type));
+  const nonImageAttachments = attachments.filter((f) => !isImageAttachment(f.type));
+
+  const textBlocks: string[] = [];
+  if (text) textBlocks.push(text);
+
+  if (nonImageAttachments.length > 0) {
+    const fileLines = nonImageAttachments.map((f) => `- ${f.name}: ${f.url}`);
+    textBlocks.push(`Attached files:\n${fileLines.join('\n')}`);
+  }
+
+  const parts: MobileUserMessageContentPart[] = [];
+  if (textBlocks.length > 0) {
+    parts.push({ text: textBlocks.join('\n\n'), type: 'text' });
+  }
+
+  for (const attachment of imageAttachments) {
+    parts.push({
+      image_url: { detail: 'auto', url: attachment.url },
+      type: 'image_url',
+    });
+  }
+
+  if (parts.length === 0) return '';
+  if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
+  return parts;
+};
 
 interface ChatState {
   clearMessages: (sessionId: string) => void;
@@ -122,11 +189,42 @@ export const useChatStore = create<ChatState>((set, get) => ({
       searchEnabled?: boolean;
     },
   ) => {
+    const textContent = content.trim();
+    const fileState = useFileStore.getState();
+    const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
+    if (attachments.some((f) => f.status === 'uploading')) return;
+
+    if (!textContent && attachments.length === 0) return;
+
+    const uploadedAttachments: UploadedAttachment[] = [];
+    if (attachments.length > 0) {
+      const uploaded = await Promise.all(
+        attachments.map(async (file) => {
+          const result = await useFileStore.getState().uploadFile(file.id);
+          if (!result) return null;
+
+          return {
+            fileId: result.fileId,
+            name: file.name,
+            type: file.type,
+            url: result.url,
+          } satisfies UploadedAttachment;
+        }),
+      );
+
+      const successful = uploaded.filter(Boolean) as UploadedAttachment[];
+      if (successful.length !== attachments.length) return;
+      uploadedAttachments.push(...successful);
+    }
+
+    const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
+    const attachedFileIds = uploadedAttachments.map((f) => f.fileId);
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sessionId,
       role: 'user',
-      content,
+      content: displayContent,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -144,10 +242,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await messageApi.create({
         sessionId,
-        content,
+        content: displayContent,
+        ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
         role: 'user',
         topicId,
-      });
+      } as any);
       userMessageServerId = result?.id;
     } catch (err) {
       const t = useI18n.getState().t;
@@ -175,13 +274,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         [sessionId]: [...(s.messagesBySession[sessionId] || []), assistantMsg],
       },
     }));
+    if (uploadedAttachments.length > 0) {
+      useFileStore.getState().clearPending();
+    }
 
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)
     try {
       const allMessages = get().messagesBySession[sessionId] || [];
       const contextMessages = allMessages
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, content: m.content }));
+        .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId)
+        .map<MobileChatMessage>((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+      if (uploadedAttachments.length > 0 && contextMessages.length > 0) {
+        const latest = contextMessages.at(-1);
+        if (latest?.role === 'user') {
+          latest.content = buildUserStreamContent(textContent, uploadedAttachments);
+        }
+      }
 
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
@@ -261,7 +373,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const result = await aiChatApi.createAssistantMessageStream(
         provider,
-        contextMessages,
+        contextMessages as any,
         chatOptions,
         {
           onReasoning: (accReasoning) => {

@@ -143,7 +143,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }));
 
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || generating) return;
+    if ((!inputText.trim() && pendingFiles.length === 0) || generating) return;
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -160,6 +160,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     sendMessage,
     sessionId,
     activeTopic,
+    pendingFiles.length,
     memoryEffort,
     memoryEnabled,
     searchEnabled,
@@ -546,7 +547,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               {/* Spacer */}
               <View className="flex-1" />
               {/* Send */}
-              {inputText.trim() ? (
+              {inputText.trim() || pendingFiles.length > 0 ? (
                 <Animated.View style={sendAnimStyle}>
                   <TouchableOpacity
                     activeOpacity={0.8}
