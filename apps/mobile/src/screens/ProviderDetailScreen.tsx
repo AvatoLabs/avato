@@ -308,8 +308,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t.providerDetailTitle}
           leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          title={t.providerDetailTitle}
           onPressLeft={() => navigation.goBack()}
         />
         <View className="flex-1 items-center justify-center">
@@ -322,8 +322,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={detail?.name || providerId}
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={detail?.name || providerId}
         onPressLeft={() => navigation.goBack()}
       />
 

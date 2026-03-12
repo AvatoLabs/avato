@@ -19,6 +19,8 @@ import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
 import LanguagePickerScreen from '../screens/LanguagePickerScreen';
+import MemoryDetailScreen from '../screens/MemoryDetailScreen';
+import MemoryScreen from '../screens/MemoryScreen';
 import ModelListScreen from '../screens/ModelListScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
 import CompletionScreen from '../screens/onboarding/CompletionScreen';
@@ -32,7 +34,7 @@ import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SessionGroupScreen from '../screens/SessionGroupScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import SkillSettingsScreen from '../screens/SkillSettingsScreen';
-import ThemePickerScreen from '../screens/ThemePickerScreen';
+import StatsScreen from '../screens/StatsScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { tokens } from '../theme/tokens';
 
@@ -192,11 +194,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
-        component={ThemePickerScreen}
-        name="ThemePicker"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
         component={ProfileEditScreen}
         name="ProfileEdit"
         options={{ animation: 'slide_from_right' }}
@@ -209,6 +206,21 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={SkillSettingsScreen}
         name="SkillSettings"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={StatsScreen}
+        name="Stats"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={MemoryScreen}
+        name="Memory"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={MemoryDetailScreen}
+        name="MemoryDetail"
         options={{ animation: 'slide_from_right' }}
       />
 

@@ -4,45 +4,57 @@
  * Layout:
  *  - WorkspaceOverviewCard: Identity → ProfileEdit, Model → ModelPicker, Providers → AIProviders
  *  - Usage Stats: messages, sessions, streak
- *  - All Settings: single entry to full config
+ *  - Quick Settings: Server Config, AI Providers, Default Model, Language
+ *  - More Settings: entry to remaining config
  *  - Sign Out
- *
- * No duplication with SettingsScreen — all configuration (Language, Theme, Server,
- * Data, Voice, About) lives exclusively in Settings.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronRight, LogOut, Settings } from 'lucide-react-native';
+import {
+  BarChart3,
+  Brain,
+  BrainCircuit,
+  ChevronRight,
+  Globe,
+  Key,
+  LogOut,
+  Server,
+  Settings,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { clearAuth, userApi } from '../lib/api';
+import { clearAuth, statsApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
-import { useI18n } from '../lib/i18n';
-import { getMessageCount, getStreak } from '../lib/streak';
+import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 
 export default function ProfileScreen({ navigation }: any) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const sessionCount = useSessionStore((s) => s.sessions.length);
   const isConnected = useConnectionStore((s) => s.isConnected);
   const checkConnection = useConnectionStore((s) => s.checkConnection);
 
-  const [streak, setStreak] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [topicCount, setTopicCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [defaultModel, setDefaultModel] = useState<string>('');
 
   const loadStats = useCallback(async () => {
-    const [s, m] = await Promise.all([getStreak(), getMessageCount()]);
-    setStreak(s);
-    setMessageCount(m);
+    const [msgs, topics] = await Promise.all([
+      statsApi.countMessages().catch(() => 0),
+      statsApi.countTopics().catch(() => 0),
+    ]);
+    setMessageCount(msgs as number);
+    setTopicCount(topics as number);
   }, []);
 
   const loadUser = useCallback(async () => {
@@ -58,6 +70,9 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     loadStats();
     loadUser();
+    AsyncStorage.getItem('minkhub_default_model').then((v) => {
+      if (v) setDefaultModel(v);
+    });
   }, [loadStats, loadUser]);
 
   // Re-check server connection every time the screen gains focus
@@ -124,32 +139,160 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
-        {/* Usage Stats */}
+        {/* Usage Stats — tap to view full stats */}
         <Animated.View entering={FadeInDown.delay(80).duration(350)}>
-          <View className="flex-row px-5 gap-3 mb-4">
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
-              <Text className="text-foreground text-[20px] font-bold">{messageCount}</Text>
-              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
-                {t.statsMessages}
-              </Text>
+          <PressableScale onPress={() => navigation.navigate('Stats')}>
+            <View className="flex-row px-5 gap-3 mb-4">
+              <View className="flex-1 py-3.5 items-center">
+                <Text className="text-foreground text-[20px] font-bold">{messageCount}</Text>
+                <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                  {t.statsMessages}
+                </Text>
+              </View>
+              <View className="flex-1 py-3.5 items-center">
+                <Text className="text-foreground text-[20px] font-bold">{sessionCount}</Text>
+                <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                  {t.statsSessions}
+                </Text>
+              </View>
+              <View className="flex-1 py-3.5 items-center">
+                <Text className="text-foreground text-[20px] font-bold">{topicCount}</Text>
+                <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
+                  {t.statsTotalTopics}
+                </Text>
+              </View>
             </View>
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
-              <Text className="text-foreground text-[20px] font-bold">{sessionCount}</Text>
-              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
-                {t.statsSessions}
-              </Text>
-            </View>
-            <View className="flex-1 rounded-xl p-4 items-center border border-black/5">
-              <Text className="text-foreground text-[20px] font-bold">{streak}</Text>
-              <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
-                {t.statsStreak}
-              </Text>
+          </PressableScale>
+          {/* Stats entry hint */}
+          <View className="px-5 mb-4">
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-3.5 border border-black/5"
+              onPress={() => navigation.navigate('Stats')}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <BarChart3 color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.statsTitle}
+                </Text>
+                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  {t.statsOverview}
+                </Text>
+              </View>
+              <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </PressableScale>
+          </View>
+        </Animated.View>
+
+        {/* Memory */}
+        <Animated.View entering={FadeInDown.delay(90).duration(350)}>
+          <View className="px-5 mb-4">
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-3.5 border border-black/5"
+              onPress={() => navigation.navigate('Memory')}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <BrainCircuit color="#8b5cf6" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.memoryTitle}
+                </Text>
+                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  {t.memoryDesc}
+                </Text>
+              </View>
+              <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </PressableScale>
+          </View>
+        </Animated.View>
+
+        {/* Quick Settings */}
+        <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+          <View className="px-5 mb-4">
+            <View className="rounded-xl border border-black/5 overflow-hidden">
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-4 py-3.5 border-b border-black/5"
+                onPress={() => navigation.navigate('ServerConfig')}
+              >
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                  <Server color="#4caf50" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.settingsServerConfig}
+                  </Text>
+                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                    {t.settingsServerConfigDesc}
+                  </Text>
+                </View>
+                <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-4 py-3.5 border-b border-black/5"
+                onPress={() => navigation.navigate('AIProviders')}
+              >
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                  <Key color="#e83e8c" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.settingsAiProviders}
+                  </Text>
+                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                    {t.settingsAiProvidersDesc}
+                  </Text>
+                </View>
+                <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-4 py-3.5 border-b border-black/5"
+                onPress={() => navigation.navigate('ModelPicker')}
+              >
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                  <Brain color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.settingsDefaultModel}
+                  </Text>
+                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                    {defaultModel || t.settingsNotConfigured}
+                  </Text>
+                </View>
+                <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-4 py-3.5"
+                onPress={() => navigation.navigate('LanguagePicker')}
+              >
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                  <Globe color="#f5a623" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.settingsLanguage}
+                  </Text>
+                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                    {LOCALE_DISPLAY_NAMES[locale] || locale}
+                  </Text>
+                </View>
+                <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
             </View>
           </View>
         </Animated.View>
 
-        {/* All Settings — single entry point */}
-        <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+        {/* More Settings */}
+        <Animated.View entering={FadeInDown.delay(120).duration(350)}>
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-4 border border-black/5"
@@ -160,10 +303,10 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                  {t.meAllSettings}
+                  {t.meMoreSettings}
                 </Text>
                 <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                  {t.meAllSettingsDesc}
+                  {t.meMoreSettingsDesc}
                 </Text>
               </View>
               <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />

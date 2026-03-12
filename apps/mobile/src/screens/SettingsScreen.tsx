@@ -1,31 +1,27 @@
 /**
- * SettingsScreen — Full settings page with i18n and proper navigation.
+ * SettingsScreen — "More Settings" page with remaining config items.
+ *
+ * Items moved to Workspace tab: Server Config, AI Providers, Default Model, Language
+ * Removed: Theme (deleted)
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowLeft,
   Blocks,
   Bot,
-  Brain,
   ChevronRight,
   Cloud,
   Database,
-  Globe,
   Info,
-  Key,
   Mic,
-  Palette,
-  Server,
   Shield,
   Volume2,
 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
+import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
 interface SettingsRowProps {
@@ -87,50 +83,18 @@ function SettingsSection({
 }
 
 export default function SettingsScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
-  const { t, locale } = useI18n();
-
-  const [defaultModel, setDefaultModel] = useState<string>('');
-  useEffect(() => {
-    AsyncStorage.getItem('minkhub_default_model').then((v) => {
-      if (v) setDefaultModel(v);
-    });
-  }, []);
+  const { t } = useI18n();
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.settingsTitle}
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.meMoreSettings}
         onPressLeft={() => navigation.goBack()}
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}>
-        <SettingsSection delay={50} title={t.settingsServer}>
-          <SettingsRow
-            icon={Server}
-            iconColor="#4caf50"
-            label={t.settingsServerConfig}
-            subtitle={t.settingsServerConfigDesc}
-            onPress={() => navigation.navigate('ServerConfig')}
-          />
-        </SettingsSection>
-
-        <SettingsSection delay={100} title={t.settingsAiConfig}>
-          <SettingsRow
-            icon={Key}
-            iconColor="#e83e8c"
-            label={t.settingsAiProviders}
-            subtitle={t.settingsAiProvidersDesc}
-            onPress={() => navigation.navigate('AIProviders')}
-          />
-          <SettingsRow
-            icon={Brain}
-            iconColor="#007aff"
-            label={t.settingsDefaultModel}
-            subtitle={defaultModel || t.settingsNotConfigured}
-            onPress={() => navigation.navigate('ModelPicker')}
-          />
+        <SettingsSection delay={50} title={t.settingsAiConfig}>
           <SettingsRow
             icon={Bot}
             iconColor="#007aff"
@@ -147,24 +111,7 @@ export default function SettingsScreen({ navigation }: any) {
           />
         </SettingsSection>
 
-        <SettingsSection delay={150} title={t.settingsGeneral}>
-          <SettingsRow
-            icon={Globe}
-            iconColor="#f5a623"
-            label={t.settingsLanguage}
-            subtitle={LOCALE_DISPLAY_NAMES[locale] || locale}
-            onPress={() => navigation.navigate('LanguagePicker')}
-          />
-          <SettingsRow
-            icon={Palette}
-            iconColor="#9c27b0"
-            label={t.settingsTheme}
-            subtitle={t.themeLight}
-            onPress={() => navigation.navigate('ThemePicker')}
-          />
-        </SettingsSection>
-
-        <SettingsSection delay={200} title={t.settingsDataStorage}>
+        <SettingsSection delay={100} title={t.settingsDataStorage}>
           <SettingsRow
             icon={Cloud}
             iconColor="#03a9f4"
@@ -180,7 +127,7 @@ export default function SettingsScreen({ navigation }: any) {
           />
         </SettingsSection>
 
-        <SettingsSection delay={250} title={t.settingsVoice}>
+        <SettingsSection delay={150} title={t.settingsVoice}>
           <SettingsRow
             icon={Mic}
             iconColor="#ff5722"
@@ -195,7 +142,7 @@ export default function SettingsScreen({ navigation }: any) {
           />
         </SettingsSection>
 
-        <SettingsSection delay={300} title={t.settingsAbout}>
+        <SettingsSection delay={200} title={t.settingsAbout}>
           <SettingsRow
             icon={Shield}
             iconColor="#34c759"

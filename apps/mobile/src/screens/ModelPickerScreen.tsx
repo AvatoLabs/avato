@@ -23,43 +23,80 @@ import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
 const STORAGE_KEY_MODEL = 'minkhub_default_model';
+const STORAGE_KEY_PROVIDER = 'minkhub_default_provider';
 
 // ── Fallback static list (used when server is unreachable) ─────────
 interface FallbackModel {
   displayName: string;
   id: string;
   provider: string;
+  /** The actual provider id used in API calls (e.g. 'openai', 'anthropic') */
+  providerId: string;
   tags?: string[];
 }
 
 const FALLBACK_MODELS: FallbackModel[] = [
-  { id: 'gpt-4o', displayName: 'GPT-4o', provider: 'OpenAI', tags: ['Popular', 'Multimodal'] },
+  {
+    id: 'gpt-4o',
+    displayName: 'GPT-4o',
+    provider: 'OpenAI',
+    providerId: 'openai',
+    tags: ['Popular', 'Multimodal'],
+  },
   {
     id: 'gpt-4o-mini',
     displayName: 'GPT-4o Mini',
     provider: 'OpenAI',
+    providerId: 'openai',
     tags: ['Fast', 'Affordable'],
   },
-  { id: 'o3-mini', displayName: 'o3 Mini', provider: 'OpenAI', tags: ['Reasoning'] },
+  {
+    id: 'o3-mini',
+    displayName: 'o3 Mini',
+    provider: 'OpenAI',
+    providerId: 'openai',
+    tags: ['Reasoning'],
+  },
   {
     id: 'claude-sonnet-4-20250514',
     displayName: 'Claude Sonnet 4',
     provider: 'Anthropic',
+    providerId: 'anthropic',
     tags: ['Popular'],
   },
   {
     id: 'claude-3-5-haiku-20241022',
     displayName: 'Claude 3.5 Haiku',
     provider: 'Anthropic',
+    providerId: 'anthropic',
     tags: ['Fast'],
   },
-  { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', provider: 'Google', tags: ['Fast'] },
-  { id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', provider: 'Google', tags: ['Powerful'] },
-  { id: 'deepseek-chat', displayName: 'DeepSeek V3', provider: 'DeepSeek', tags: ['Affordable'] },
+  {
+    id: 'gemini-2.5-flash',
+    displayName: 'Gemini 2.5 Flash',
+    provider: 'Google',
+    providerId: 'google',
+    tags: ['Fast'],
+  },
+  {
+    id: 'gemini-2.5-pro',
+    displayName: 'Gemini 2.5 Pro',
+    provider: 'Google',
+    providerId: 'google',
+    tags: ['Powerful'],
+  },
+  {
+    id: 'deepseek-chat',
+    displayName: 'DeepSeek V3',
+    provider: 'DeepSeek',
+    providerId: 'deepseek',
+    tags: ['Affordable'],
+  },
   {
     id: 'deepseek-reasoner',
     displayName: 'DeepSeek R1',
     provider: 'DeepSeek',
+    providerId: 'deepseek',
     tags: ['Reasoning'],
   },
 ];
@@ -239,7 +276,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   }, [fetchModels]);
 
   // ── Selection handler ────────────────────────────────────────────
-  const handleSelect = async (modelId: string) => {
+  const handleSelect = async (modelId: string, providerId: string) => {
     haptics.selection();
     setSelected(modelId);
 
@@ -252,9 +289,11 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         /* ignore */
       }
       existing.model = modelId;
+      existing.provider = providerId;
       await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
     } else {
       await AsyncStorage.setItem(STORAGE_KEY_MODEL, modelId);
+      await AsyncStorage.setItem(STORAGE_KEY_PROVIDER, providerId);
     }
 
     toast.show('success', t.settingsSavedModel);
@@ -305,7 +344,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                 accessibilityRole="button"
                 className="flex-row items-center px-4 py-3.5"
                 key={model.id}
-                onPress={() => handleSelect(model.id)}
+                onPress={() => handleSelect(model.id, provider.id)}
               >
                 <View className="mr-3">
                   <ProviderLogo logo={provider.logo} providerId={provider.id} size={28} />
@@ -375,7 +414,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                     accessibilityRole="button"
                     className="flex-row items-center px-4 py-3.5"
                     key={model.id}
-                    onPress={() => handleSelect(model.id)}
+                    onPress={() => handleSelect(model.id, model.providerId)}
                   >
                     <View className="mr-3">
                       <ProviderLogo providerId={pid} size={28} />
@@ -414,8 +453,8 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.modelPickerTitle}
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.modelPickerTitle}
         onPressLeft={() => navigation.goBack()}
       />
 

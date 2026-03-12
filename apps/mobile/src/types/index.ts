@@ -336,3 +336,149 @@ export interface CustomPluginParams {
   name?: string;
   settings?: Record<string, any>;
 }
+
+// ---- Stats / Rankings ----
+
+export interface ModelRankItem {
+  count: number;
+  id: string;
+}
+
+export interface SessionRankItem {
+  avatar?: string;
+  backgroundColor?: string;
+  count: number;
+  id: string;
+  title?: string;
+}
+
+export interface TopicRankItem {
+  count: number;
+  id: string;
+  sessionId?: string;
+  title?: string;
+}
+
+export interface HeatmapDay {
+  count: number;
+  date: string;
+  level: number;
+}
+
+export interface UserRegistrationDuration {
+  createdAt?: string;
+  duration?: number;
+  updatedAt?: string;
+}
+
+// ---- Memory ----
+
+export type MemoryLayer = 'identity' | 'context' | 'activity' | 'experience' | 'preference';
+
+/** Base fields shared across all memory layer items */
+export interface MemoryItemBase {
+  accessedCount?: number;
+  capturedAt?: string;
+  createdAt?: string;
+  id: string;
+  lastAccessedAt?: string;
+  memoryCategory?: string;
+  memoryLayer?: string;
+  memoryType?: string;
+  metadata?: Record<string, any>;
+  status?: string;
+  summary?: string;
+  tags?: string[];
+  title?: string;
+  updatedAt?: string;
+  userId?: string;
+}
+
+/** Identity layer item */
+export interface MemoryIdentityItem extends MemoryItemBase {
+  /** E.g. 'person', 'organization', 'role' */
+  type?: string;
+}
+
+/** Context layer item */
+export interface MemoryContextItem {
+  associatedObjects?: string[];
+  associatedSubjects?: string[];
+  createdAt?: string;
+  currentStatus?: string;
+  description?: string;
+  id: string;
+  scoreImpact?: number;
+  scoreUrgency?: number;
+  tags?: string[];
+  title?: string;
+  type?: string;
+  updatedAt?: string;
+  userMemoryIds?: string[];
+}
+
+/** Activity layer item */
+export interface MemoryActivityItem {
+  associatedLocations?: string[];
+  associatedObjects?: string[];
+  associatedSubjects?: string[];
+  capturedAt?: string;
+  createdAt?: string;
+  endsAt?: string;
+  feedback?: string;
+  id: string;
+  metadata?: Record<string, any>;
+  narrative?: string;
+  notes?: string;
+  startsAt?: string;
+  status?: string;
+  tags?: string[];
+  timezone?: string;
+  type?: string;
+  updatedAt?: string;
+  userMemoryId?: string;
+}
+
+/** Experience layer item */
+export interface MemoryExperienceItem {
+  action?: string;
+  capturedAt?: string;
+  createdAt?: string;
+  id: string;
+  keyLearning?: string;
+  metadata?: Record<string, any>;
+  possibleOutcome?: string;
+  reasoning?: string;
+  scoreConfidence?: number;
+  situation?: string;
+  tags?: string[];
+  type?: string;
+  updatedAt?: string;
+  userMemoryId?: string;
+}
+
+/** Preference layer item */
+export interface MemoryPreferenceItem {
+  conclusionDirectives?: string;
+  createdAt?: string;
+  id: string;
+  metadata?: Record<string, any>;
+  scorePriority?: number;
+  suggestions?: string;
+  tags?: string[];
+  type?: string;
+  updatedAt?: string;
+  userMemoryId?: string;
+}
+
+/** Persona document (from userMemory.getPersona) */
+export interface MemoryPersona {
+  content?: string;
+  summary?: string;
+}
+
+/** Paged query response */
+export interface MemoryPagedResult<T> {
+  items: T[];
+  total: number;
+}

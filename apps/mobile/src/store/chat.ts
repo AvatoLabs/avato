@@ -17,9 +17,9 @@ import { useI18n } from '../lib/i18n';
 import type { ChatMessage } from '../types';
 
 /**
- * Reads per-session chat settings (model, temperature, systemPrompt)
- * from AsyncStorage. Falls back to global default model if no per-session
- * model is configured.
+ * Reads per-session chat settings (model, temperature, systemPrompt, provider)
+ * from AsyncStorage. Falls back to global default model/provider if no
+ * per-session values are configured.
  */
 async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOptions> {
   const opts: ChatRequestOptions = {};
@@ -28,13 +28,14 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
     if (raw) {
       const saved = JSON.parse(raw);
       if (saved.model) opts.model = saved.model;
+      if (saved.provider) opts.provider = saved.provider;
       if (saved.temperature) opts.temperature = parseFloat(saved.temperature);
       if (saved.systemPrompt) opts.systemPrompt = saved.systemPrompt;
     }
   } catch {
     /* ignore */
   }
-  // Fallback to global default model if no per-session model
+  // Fallback to global default model/provider if no per-session values
   if (!opts.model) {
     try {
       const globalModel = await AsyncStorage.getItem('minkhub_default_model');
@@ -43,7 +44,99 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
       /* ignore */
     }
   }
+  if (!opts.provider) {
+    try {
+      const globalProvider = await AsyncStorage.getItem('minkhub_default_provider');
+      if (globalProvider) opts.provider = globalProvider;
+    } catch {
+      /* ignore */
+    }
+  }
   return opts;
+}
+
+/**
+ * Lightweight SSE parser for extracting text content from the backend's
+ * Server-Sent Events stream. The backend (via model-runtime) sends events
+ * with `event: text` and JSON-encoded `data:` lines.
+ *
+ * Handles partial chunks by maintaining a line buffer across calls.
+ */
+function extractTextFromSSE(raw: string, lineBuffer: string): { text: string; remaining: string } {
+  const combined = lineBuffer + raw;
+  const lines = combined.split('\n');
+  // The last element might be a partial line — keep it for next chunk
+  const remaining = lines.pop() ?? '';
+
+  let text = '';
+  let currentEvent = '';
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      currentEvent = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      const dataStr = line.slice(5).trim();
+      // Only extract text content (skip tool_calls, usage, etc.)
+      if (currentEvent === 'text' || currentEvent === '') {
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (typeof parsed === 'string') {
+            text += parsed;
+          }
+        } catch {
+          // If not valid JSON, use as-is (some providers send plain text)
+          if (dataStr) text += dataStr;
+        }
+      }
+      // Reset event after processing data (each event: + data: pair is one SSE event)
+    } else if (line.trim() === '') {
+      // Empty line marks end of SSE event block — reset event type
+      currentEvent = '';
+    }
+  }
+
+  return { text, remaining };
+}
+
+/**
+ * Reads an SSE stream from the response body and calls onChunk with the
+ * extracted text for each chunk. Returns the full accumulated text.
+ */
+async function readSSEStream(
+  response: Response,
+  onChunk: (accumulated: string) => void,
+): Promise<string> {
+  if (!response.body) return '';
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let lineBuffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+    const { text, remaining } = extractTextFromSSE(chunk, lineBuffer);
+    lineBuffer = remaining;
+
+    if (text) {
+      accumulated += text;
+      onChunk(accumulated);
+    }
+  }
+
+  // Flush any remaining buffer
+  if (lineBuffer.trim()) {
+    const { text } = extractTextFromSSE('\n', lineBuffer);
+    if (text) {
+      accumulated += text;
+      onChunk(accumulated);
+    }
+  }
+
+  return accumulated;
 }
 
 interface ChatState {
@@ -142,36 +235,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .map((m) => ({ role: m.role, content: m.content }));
 
       const chatOptions = await getSessionChatOptions(sessionId);
+      const provider = chatOptions.provider || 'openai';
       const response = await aiChatApi.createAssistantMessage(
-        sessionId,
+        provider,
         contextMessages,
         chatOptions,
       );
 
-      if (response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          accumulated += chunk;
-
-          // Update the assistant message content in real-time
-          set((s) => ({
-            streamBuffer: accumulated,
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, content: accumulated } : m,
-              ),
-            },
-          }));
-        }
-      }
+      await readSSEStream(response, (accumulated) => {
+        set((s) => ({
+          streamBuffer: accumulated,
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMsgId ? { ...m, content: accumulated } : m,
+            ),
+          },
+        }));
+      });
     } catch (err) {
       console.warn('[ChatStore] AI streaming error:', err);
       const t = useI18n.getState().t;
@@ -301,30 +382,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
+      const provider = chatOptions.provider || 'openai';
       const response = await aiChatApi.createAssistantMessage(
-        sessionId,
+        provider,
         contextMessages,
         chatOptions,
       );
-      if (response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          accumulated += decoder.decode(value, { stream: true });
-          set((s) => ({
-            streamBuffer: accumulated,
-            messagesBySession: {
-              ...s.messagesBySession,
-              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, content: accumulated } : m,
-              ),
-            },
-          }));
-        }
-      }
+
+      await readSSEStream(response, (accumulated) => {
+        set((s) => ({
+          streamBuffer: accumulated,
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMsgId ? { ...m, content: accumulated } : m,
+            ),
+          },
+        }));
+      });
     } catch (err) {
       console.warn('[ChatStore] regenerate streaming error:', err);
       const t = useI18n.getState().t;

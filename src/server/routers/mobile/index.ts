@@ -22,6 +22,8 @@ import { sessionGroupRouter } from '../lambda/sessionGroup';
 import { topicRouter } from '../lambda/topic';
 import { uploadRouter } from '../lambda/upload';
 import { userRouter } from '../lambda/user';
+import { userMemoriesRouter } from '../lambda/userMemories';
+import { userMemoryRouter } from '../lambda/userMemory';
 
 export const mobileRouter = router({
   agent: agentRouter,
@@ -43,4 +45,6 @@ export const mobileRouter = router({
   topic: topicRouter,
   upload: uploadRouter,
   user: userRouter,
+  userMemories: userMemoriesRouter,
+  userMemory: userMemoryRouter,
 });
