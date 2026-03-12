@@ -28,7 +28,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { clearAuth, statsApi, userApi } from '../lib/api';
+import { aiProviderApi, clearAuth, statsApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
@@ -43,18 +43,24 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [messageCount, setMessageCount] = useState(0);
   const [topicCount, setTopicCount] = useState(0);
+  const [providerCount, setProviderCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [defaultModel, setDefaultModel] = useState<string>('');
 
   const loadStats = useCallback(async () => {
-    const [msgs, topics] = await Promise.all([
+    const [msgs, topics, providers] = await Promise.all([
       statsApi.countMessages().catch(() => 0),
       statsApi.countTopics().catch(() => 0),
+      aiProviderApi
+        .list()
+        .then((list) => (list ?? []).filter((p: any) => p.enabled).length)
+        .catch(() => 0),
     ]);
     setMessageCount(msgs as number);
     setTopicCount(topics as number);
+    setProviderCount(providers as number);
   }, []);
 
   const loadUser = useCallback(async () => {
@@ -127,9 +133,9 @@ export default function ProfileScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(50).duration(350)}>
           <View className="pt-3">
             <WorkspaceOverviewCard
-              defaultModel="GPT-4o Mini"
+              defaultModel={defaultModel || t.settingsNotConfigured}
               isConnected={isConnected}
-              providerCount={0}
+              providerCount={providerCount}
               userAvatar={userAvatar}
               userName={userName || t.meUser}
               onPress={() => navigation.navigate('ProfileEdit')}

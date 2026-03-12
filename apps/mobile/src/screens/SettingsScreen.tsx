@@ -6,7 +6,6 @@
  */
 import {
   ArrowLeft,
-  Blocks,
   Bot,
   ChevronRight,
   Cloud,
@@ -101,13 +100,6 @@ export default function SettingsScreen({ navigation }: any) {
             label={t.settingsDefaultAgent}
             subtitle={t.settingsNotConfigured}
             onPress={() => navigation.navigate('AgentDetail', { identifier: 'default' })}
-          />
-          <SettingsRow
-            icon={Blocks}
-            iconColor="#e83e8c"
-            label={t.skillsTitle}
-            subtitle={t.skillsDesc}
-            onPress={() => navigation.navigate('SkillSettings')}
           />
         </SettingsSection>
 

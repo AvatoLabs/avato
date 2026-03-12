@@ -74,6 +74,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const [inputText, setInputText] = useState('');
   const [sessionModel, setSessionModel] = useState<string>('');
+  const [modelSupportsVision, setModelSupportsVision] = useState(true);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -81,11 +82,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   useEffect(() => {
     (async () => {
       let modelName = '';
+      let vision = true; // default to true for safety
       try {
         const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
         if (raw) {
           const saved = JSON.parse(raw);
           if (saved.model) modelName = saved.model;
+          if (saved.vision !== undefined) vision = !!saved.vision;
         }
       } catch {
         /* ignore */
@@ -99,6 +102,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         }
       }
       setSessionModel(modelName);
+      setModelSupportsVision(vision);
     })();
   }, [sessionId]);
 
@@ -138,7 +142,6 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [inputText, generating, sendMessage, sessionId, activeTopic, sendScale]);
 
   const handleAttach = useCallback(() => {
-    const options = [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument];
     const pickImage = async (source: 'camera' | 'gallery') => {
       const result =
         source === 'camera'
@@ -179,19 +182,32 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
     haptics.selection();
     if (Platform.OS === 'ios') {
+      // Build options based on model vision capability
+      const options = modelSupportsVision
+        ? [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument]
+        : [t.cancel, t.fileDocument];
+
       ActionSheetIOS.showActionSheetWithOptions(
         { options, cancelButtonIndex: 0, title: t.fileAttach },
         (index) => {
-          if (index === 1) pickImage('camera');
-          else if (index === 2) pickImage('gallery');
-          else if (index === 3) pickDocument();
+          if (modelSupportsVision) {
+            if (index === 1) pickImage('camera');
+            else if (index === 2) pickImage('gallery');
+            else if (index === 3) pickDocument();
+          } else {
+            if (index === 1) pickDocument();
+          }
         },
       );
     } else {
-      // Android: directly open gallery as primary action
-      pickImage('gallery');
+      // Android: open gallery if vision supported, otherwise document picker
+      if (modelSupportsVision) {
+        pickImage('gallery');
+      } else {
+        pickDocument();
+      }
     }
-  }, [addFile, t]);
+  }, [addFile, t, modelSupportsVision]);
 
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {

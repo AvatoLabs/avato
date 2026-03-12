@@ -45,6 +45,31 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const sessions = await sessionApi.list();
       const stored = await AsyncStorage.getItem('activeSessionId');
+
+      // Overlay per-session model/provider from AsyncStorage (local overrides server)
+      const settingsKeys = (sessions ?? []).map((s) => `minkhub_chat_settings_${s.id}`);
+      if (settingsKeys.length > 0) {
+        try {
+          const pairs = await AsyncStorage.multiGet(settingsKeys);
+          for (const [key, raw] of pairs) {
+            if (!raw) continue;
+            try {
+              const saved = JSON.parse(raw);
+              const sid = key.replace('minkhub_chat_settings_', '');
+              const sess = sessions?.find((s) => s.id === sid);
+              if (sess) {
+                if (saved.model) sess.model = saved.model;
+                if (saved.provider) sess.provider = saved.provider;
+              }
+            } catch {
+              /* ignore parse error */
+            }
+          }
+        } catch {
+          /* multiGet failed, use server-side values */
+        }
+      }
+
       set({
         sessions: sessions ?? [],
         activeSessionId: stored || (sessions?.[0]?.id ?? null),

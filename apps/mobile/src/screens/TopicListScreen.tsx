@@ -63,7 +63,6 @@ export default function TopicListScreen({ route, navigation }: any) {
         if (title?.trim()) {
           haptics.success();
           await createTopic(sessionId, title.trim());
-          toast.show('success', t.toastTopicCreated);
         }
       },
       'plain-text',

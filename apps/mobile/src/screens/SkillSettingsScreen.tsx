@@ -418,6 +418,7 @@ function AddCustomMcpModal({
 export default function SkillSettingsScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const canGoBack = navigation.canGoBack() && navigation.getState()?.type !== 'tab';
 
   const [agentSkills, setAgentSkills] = useState<AgentSkillItem[]>([]);
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
@@ -433,8 +434,8 @@ export default function SkillSettingsScreen({ navigation }: any) {
         agentSkillApi.list(),
         pluginApi.list(),
       ]);
-      setAgentSkills(skills ?? []);
-      setPlugins(installedPlugins ?? []);
+      setAgentSkills(Array.isArray(skills) ? skills : []);
+      setPlugins(Array.isArray(installedPlugins) ? installedPlugins : []);
     } catch {
       toast.show('error', t.errorNetwork);
     }
@@ -540,10 +541,14 @@ export default function SkillSettingsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.skillsTitle}
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          canGoBack ? (
+            <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
+          ) : undefined
+        }
         rightElement={<RefreshCw color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />}
-        onPressLeft={() => navigation.goBack()}
+        title={t.skillsTitle}
+        onPressLeft={canGoBack ? () => navigation.goBack() : undefined}
         onPressRight={onRefresh}
       />
 

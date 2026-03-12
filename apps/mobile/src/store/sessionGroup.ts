@@ -15,8 +15,10 @@ interface SessionGroupState {
 
   groups: SessionGroup[];
   loading: boolean;
+  removeAll: () => Promise<void>;
   removeGroup: (id: string) => Promise<void>;
   renameGroup: (id: string, name: string) => Promise<void>;
+  reorderGroup: (id: string, direction: 'up' | 'down') => Promise<void>;
 }
 
 export const useSessionGroupStore = create<SessionGroupState>((set, get) => ({
@@ -75,6 +77,36 @@ export const useSessionGroupStore = create<SessionGroupState>((set, get) => ({
       await sessionGroupApi.rename(id, name);
     } catch (err) {
       console.warn('[SessionGroupStore] renameGroup error:', err);
+      get().fetchGroups();
+    }
+  },
+
+  removeAll: async () => {
+    const prev = get().groups;
+    set({ groups: [] });
+    try {
+      await sessionGroupApi.removeAll();
+    } catch (err) {
+      console.warn('[SessionGroupStore] removeAll error:', err);
+      set({ groups: prev });
+    }
+  },
+
+  reorderGroup: async (id: string, direction: 'up' | 'down') => {
+    const groups = [...get().groups];
+    const idx = groups.findIndex((g) => g.id === id);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= groups.length) return;
+    // Swap
+    [groups[idx], groups[swapIdx]] = [groups[swapIdx], groups[idx]];
+    // Assign sort values
+    const sorted = groups.map((g, i) => ({ ...g, sort: i }));
+    set({ groups: sorted });
+    try {
+      await sessionGroupApi.updateOrder(sorted.map((g, i) => ({ id: g.id, sort: i })));
+    } catch (err) {
+      console.warn('[SessionGroupStore] reorderGroup error:', err);
       get().fetchGroups();
     }
   },

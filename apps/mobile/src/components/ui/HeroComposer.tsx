@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
-import { Send } from 'lucide-react-native';
+import { Brain, Globe, Paperclip, Puzzle, Send } from 'lucide-react-native';
 import React, { useCallback } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -16,22 +16,32 @@ import PressableScale from './PressableScale';
 
 interface HeroComposerProps {
   modelLabel?: string;
+  onAttach?: () => void;
   onChangeText?: (text: string) => void;
+  onModelPress?: () => void;
+  onPluginsPress?: () => void;
   onSubmit?: () => void;
+  onToggleSearch?: () => void;
   placeholder?: string;
+  searchEnabled?: boolean;
   value?: string;
 }
 
 /**
  * HeroComposer — Large, prominent input area for the home screen.
- * Feels like an AI command surface, not a search bar.
+ * Aligned with ChatDetailScreen input style: thin border, large radius, toolbar.
  */
 export function HeroComposer({
   placeholder = 'What do you want to do?',
   value = '',
   onChangeText,
   onSubmit,
+  onModelPress,
+  onToggleSearch,
+  onAttach,
+  onPluginsPress,
   modelLabel = 'GPT-4o Mini',
+  searchEnabled = false,
 }: HeroComposerProps) {
   const colors = themeColors.light;
 
@@ -40,19 +50,29 @@ export function HeroComposer({
     transform: [{ scale: sendScale.value }],
   }));
 
-  const handlePress = useCallback(() => {
+  const handleSend = useCallback(() => {
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     onSubmit?.();
   }, [onSubmit, sendScale]);
 
+  const hasText = value.trim().length > 0;
+
   return (
-    <View className="mx-5 mb-5 rounded-xl overflow-hidden shadow-sm">
-      <BlurView className="border border-black/5" intensity={40} tint="light">
-        <View className="px-4 pt-4 pb-3">
+    <View
+      className="mx-4 mb-4 rounded-[26px]"
+      style={{
+        borderWidth: 1.5,
+        borderColor: 'rgba(99,102,241,0.5)',
+        backgroundColor: 'rgba(255,255,255,0.85)',
+      }}
+    >
+      <BlurView className="rounded-[25px] overflow-hidden" intensity={80} tint="light">
+        {/* Text input area */}
+        <View className="px-3 pt-3">
           <TextInput
             multiline
-            className="text-foreground text-[16px] leading-[24px] min-h-[64px] font-medium"
+            className="text-foreground text-[16px] leading-[22px] min-h-[60px] max-h-28 font-medium"
             placeholder={placeholder}
             placeholderTextColor={colors.secondary}
             style={{ textAlignVertical: 'top' }}
@@ -60,26 +80,74 @@ export function HeroComposer({
             onChangeText={onChangeText}
           />
         </View>
-        <View className="flex-row items-center justify-between px-4 pb-3.5 pt-1">
-          <View className="flex-row items-center px-3 py-1.5 rounded-full border border-black/5">
-            <View className="w-2 h-2 rounded-full bg-primary mr-2" />
-            <Text className="text-secondary/60 text-[11px] font-semibold tracking-tight">
-              {modelLabel}
-            </Text>
-          </View>
-          <Animated.View style={sendAnimStyle}>
-            <PressableScale
-              className="w-10 h-10 bg-primary rounded-full items-center justify-center"
-              onPress={handlePress}
-            >
-              <Send
-                color="#fff"
-                size={17}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginLeft: 1 }}
-              />
-            </PressableScale>
-          </Animated.View>
+
+        {/* Toolbar row */}
+        <View className="flex-row items-center px-2 pb-1.5 pt-1">
+          {/* Model selector */}
+          <TouchableOpacity
+            accessibilityLabel="Select model"
+            activeOpacity={0.7}
+            className="w-8 h-8 items-center justify-center rounded-full"
+            onPress={onModelPress}
+          >
+            <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+
+          {/* Search / Web */}
+          <TouchableOpacity
+            accessibilityLabel="Toggle search"
+            activeOpacity={0.7}
+            className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+            onPress={onToggleSearch}
+          >
+            <Globe
+              color={searchEnabled ? '#2563eb' : '#666'}
+              size={20}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          </TouchableOpacity>
+
+          {/* Attach */}
+          <TouchableOpacity
+            accessibilityLabel="Attach file"
+            activeOpacity={0.7}
+            className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+            onPress={onAttach}
+          >
+            <Paperclip color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+
+          {/* Plugins */}
+          <TouchableOpacity
+            accessibilityLabel="Plugins"
+            activeOpacity={0.7}
+            className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+            onPress={onPluginsPress}
+          >
+            <Puzzle color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+
+          {/* Spacer */}
+          <View className="flex-1" />
+
+          {/* Send button */}
+          {hasText ? (
+            <Animated.View style={sendAnimStyle}>
+              <PressableScale
+                className="w-9 h-9 bg-primary rounded-full items-center justify-center"
+                onPress={handleSend}
+              >
+                <Send
+                  color="#fff"
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginLeft: 1 }}
+                />
+              </PressableScale>
+            </Animated.View>
+          ) : (
+            <View className="w-9 h-9" />
+          )}
         </View>
       </BlurView>
     </View>

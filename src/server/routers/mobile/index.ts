@@ -13,6 +13,10 @@ import { chunkRouter } from '../lambda/chunk';
 import { configRouter } from '../lambda/config';
 import { documentRouter } from '../lambda/document';
 import { fileRouter } from '../lambda/file';
+import { generationRouter } from '../lambda/generation';
+import { generationBatchRouter } from '../lambda/generationBatch';
+import { generationTopicRouter } from '../lambda/generationTopic';
+import { imageRouter } from '../lambda/image';
 import { knowledgeBaseRouter } from '../lambda/knowledgeBase';
 import { marketRouter } from '../lambda/market';
 import { messageRouter } from '../lambda/message';
@@ -35,7 +39,11 @@ export const mobileRouter = router({
   config: configRouter,
   document: documentRouter,
   file: fileRouter,
+  generation: generationRouter,
+  generationBatch: generationBatchRouter,
+  generationTopic: generationTopicRouter,
   healthcheck: publicProcedure.query(() => "i'm live!"),
+  image: imageRouter,
   knowledgeBase: knowledgeBaseRouter,
   market: marketRouter,
   message: messageRouter,

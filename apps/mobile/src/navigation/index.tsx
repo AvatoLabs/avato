@@ -4,7 +4,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { MessageSquare, Sparkles, User } from 'lucide-react-native';
+import { MessageSquare, Palette, Puzzle, User } from 'lucide-react-native';
 import React from 'react';
 import { Platform } from 'react-native';
 
@@ -13,11 +13,11 @@ import { useI18n } from '../lib/i18n';
 import AboutScreen from '../screens/AboutScreen';
 import AgentDetailScreen from '../screens/AgentDetailScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
+import ArtworkScreen from '../screens/ArtworkScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
-import DiscoverScreen from '../screens/DiscoverScreen';
 import LanguagePickerScreen from '../screens/LanguagePickerScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
@@ -85,14 +85,25 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen
-        component={DiscoverScreen}
-        name="Discover"
+        component={ArtworkScreen}
+        name="Artwork"
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Sparkles color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            <Palette color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.studioTitle,
-          tabBarAccessibilityLabel: 'Discover tab',
+          tabBarLabel: t.tabArtwork,
+          tabBarAccessibilityLabel: 'Artwork tab',
+        }}
+      />
+      <Tab.Screen
+        component={SkillSettingsScreen}
+        name="Skills"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Puzzle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          ),
+          tabBarLabel: t.skillsTitle,
+          tabBarAccessibilityLabel: 'Skills tab',
         }}
       />
       <Tab.Screen

@@ -3,6 +3,7 @@
  *
  * Shows: HeroComposer, QuickActions, Pinned, Custom Groups, Default sessions.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import {
   Code2,
@@ -59,6 +60,67 @@ function formatTimeAgo(dateStr: string): string {
   return `${days}d`;
 }
 
+// ── Provider Logo (CDN icon with initials fallback) ────────────────────
+const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
+
+function SessionLogo({
+  provider,
+  avatar,
+  size = 40,
+}: {
+  avatar?: string;
+  provider?: string;
+  size?: number;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  // Priority: provider logo from CDN → session avatar → app icon fallback
+  if (provider && !imgError) {
+    const url = `${ICON_CDN_BASE}/light/${provider}.png`;
+    return (
+      <View className="items-center justify-center" style={{ width: size, height: size }}>
+        <RNImage
+          source={{ uri: url }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          onError={() => setImgError(true)}
+        />
+      </View>
+    );
+  }
+
+  if (avatar) {
+    return (
+      <Image
+        source={{ uri: avatar }}
+        style={{ width: size, height: size, borderRadius: size / 2, opacity: 0.9 }}
+      />
+    );
+  }
+
+  // Fallback: provider initials or app icon
+  if (provider) {
+    return (
+      <View
+        className="rounded-full bg-foreground/5 items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        <Text className="text-foreground/60 text-[12px] font-semibold">
+          {provider.slice(0, 2).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View className="items-center justify-center" style={{ width: size, height: size }}>
+      <RNImage
+        source={require('../../assets/icon.png')}
+        style={{ width: 24, height: 24, borderRadius: 4, opacity: 0.7 }}
+      />
+    </View>
+  );
+}
+
 export default function ChatListScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
@@ -100,6 +162,21 @@ export default function ChatListScreen({ navigation }: any) {
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [searchEnabled, setSearchEnabled] = useState(false);
+  const [modelLabel, setModelLabel] = useState('GPT-4o Mini');
+
+  // Load persisted expand/collapse state
+  useEffect(() => {
+    AsyncStorage.getItem('minkhub_expanded_groups').then((val) => {
+      if (val) {
+        try {
+          setExpandedGroups(JSON.parse(val));
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!initialized) fetchSessions();
@@ -141,7 +218,6 @@ export default function ChatListScreen({ navigation }: any) {
   const handleCreateChat = async () => {
     const newId = await createSession();
     haptics.success();
-    toast.show('success', t.toastSessionCreated);
     navigation.navigate('ChatDetail', { sessionId: newId });
   };
 
@@ -152,13 +228,37 @@ export default function ChatListScreen({ navigation }: any) {
     setHeroText('');
   };
 
+  const handleModelPress = () => {
+    haptics.light();
+    navigation.navigate('ModelPicker');
+  };
+
+  const handleToggleSearch = () => {
+    haptics.light();
+    setSearchEnabled((v) => !v);
+  };
+
+  const handleAttach = () => {
+    haptics.light();
+    // TODO: Implement file attachment
+  };
+
+  const handlePluginsPress = () => {
+    haptics.light();
+    // TODO: Navigate to plugins screen
+  };
+
   const handleQuickAction = async (_key: string) => {
     const newId = await createSession();
     navigation.navigate('ChatDetail', { sessionId: newId });
   };
 
   const toggleGroup = (id: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+    setExpandedGroups((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      AsyncStorage.setItem('minkhub_expanded_groups', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
   };
 
   // Filter sessions by search text
@@ -277,20 +377,13 @@ export default function ChatListScreen({ navigation }: any) {
       <TouchableOpacity
         accessibilityLabel={item.title}
         accessibilityRole="button"
-        activeOpacity={0.6}
-        className="flex-row items-center px-5 py-3 active:bg-foreground/5"
+        activeOpacity={0.4}
+        className="flex-row items-center px-5 py-3 active:bg-foreground/10"
         onLongPress={() => handleLongPress(item)}
         onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
       >
         <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5">
-          {item.avatar ? (
-            <Image className="w-10 h-10 rounded-full opacity-90" source={{ uri: item.avatar }} />
-          ) : (
-            <RNImage
-              className="w-6 h-6 rounded-sm opacity-70"
-              source={require('../../assets/icon.png')}
-            />
-          )}
+          <SessionLogo avatar={item.avatar} provider={item.provider} size={40} />
         </View>
         <View className="flex-1 mr-3">
           <View className="flex-row items-center mb-0.5">
@@ -306,7 +399,7 @@ export default function ChatListScreen({ navigation }: any) {
               className="text-foreground text-[15px] font-medium tracking-tight"
               numberOfLines={1}
             >
-              {item.title}
+              {item.title || t.chatListNewConversation}
             </Text>
           </View>
           <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
@@ -380,10 +473,16 @@ export default function ChatListScreen({ navigation }: any) {
               </Text>
             )}
             <HeroComposer
+              modelLabel={modelLabel}
               placeholder={t.homeHeroPlaceholder}
+              searchEnabled={searchEnabled}
               value={heroText}
+              onAttach={handleAttach}
               onChangeText={setHeroText}
+              onModelPress={handleModelPress}
+              onPluginsPress={handlePluginsPress}
               onSubmit={handleHeroSubmit}
+              onToggleSearch={handleToggleSearch}
             />
           </View>
         </Animated.View>

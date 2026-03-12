@@ -9,7 +9,14 @@
  */
 import { ArrowLeft, Flame, MessageSquare, Trophy } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -89,6 +96,9 @@ const HEATMAP_COLORS = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
 
 function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }) {
   const { t } = useI18n();
+  const { width: screenWidth } = useWindowDimensions();
+  // Container has px-5 (20px) on each side
+  const containerWidth = screenWidth - 40;
 
   if (loading) {
     return (
@@ -99,9 +109,14 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
   }
 
   // Show last 20 weeks (140 days) to fit mobile width
-  const recent = data.slice(-140);
+  const NUM_WEEKS = 20;
+  const GAP = 2;
+  const recent = data.slice(-NUM_WEEKS * 7);
   const activeDays = data.filter((d) => d.level > 0).length;
   const hotDays = data.filter((d) => d.level >= 3).length;
+
+  // Dynamic cell size: fill full container width
+  const cellSize = Math.floor((containerWidth - (NUM_WEEKS - 1) * GAP) / NUM_WEEKS);
 
   // Build 7-row grid (Mon-Sun), each column = 1 week
   const weeks: HeatmapDay[][] = [];
@@ -129,32 +144,35 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
           </View>
         </View>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row gap-[2px]">
-          {weeks.map((week, wi) => (
-            <View className="gap-[2px]" key={wi}>
-              {week.map((day, di) => (
-                <View
-                  key={`${wi}-${di}`}
-                  style={{
-                    backgroundColor: HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0],
-                    borderRadius: 2,
-                    height: 8,
-                    width: 8,
-                  }}
-                />
-              ))}
-              {/* Pad short weeks */}
-              {Array.from({ length: 7 - week.length }).map((_, pi) => (
-                <View
-                  key={`pad-${wi}-${pi}`}
-                  style={{ backgroundColor: '#ebedf0', borderRadius: 2, height: 8, width: 8 }}
-                />
-              ))}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+      <View style={{ flexDirection: 'row', gap: GAP }}>
+        {weeks.map((week, wi) => (
+          <View key={wi} style={{ gap: GAP }}>
+            {week.map((day, di) => (
+              <View
+                key={`${wi}-${di}`}
+                style={{
+                  backgroundColor: HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0],
+                  borderRadius: 3,
+                  height: cellSize,
+                  width: cellSize,
+                }}
+              />
+            ))}
+            {/* Pad short weeks */}
+            {Array.from({ length: 7 - week.length }).map((_, pi) => (
+              <View
+                key={`pad-${wi}-${pi}`}
+                style={{
+                  backgroundColor: '#ebedf0',
+                  borderRadius: 3,
+                  height: cellSize,
+                  width: cellSize,
+                }}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -402,9 +420,9 @@ export default function StatsScreen({ navigation }: any) {
           <View className="px-5">
             <RankSection
               data={data.modelRank.map((m) => ({ count: m.count, name: m.id }))}
+              icon={<Trophy color="#f5a623" size={16} strokeWidth={tokens.icon.strokeWidth} />}
               loading={loading}
               title={t.statsModelsRank}
-              icon={<Trophy color="#f5a623" size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
             <RankSection
               loading={loading}

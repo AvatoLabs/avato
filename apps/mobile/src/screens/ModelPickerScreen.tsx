@@ -280,6 +280,18 @@ export default function ModelPickerScreen({ navigation, route }: any) {
     haptics.selection();
     setSelected(modelId);
 
+    // Resolve vision capability from the loaded model tree
+    let supportsVision = false;
+    if (serverModels) {
+      for (const provider of serverModels) {
+        const found = provider.children.find((m) => m.id === modelId && provider.id === providerId);
+        if (found) {
+          supportsVision = !!found.abilities?.vision;
+          break;
+        }
+      }
+    }
+
     if (sessionId) {
       let existing: Record<string, unknown> = {};
       try {
@@ -290,6 +302,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       }
       existing.model = modelId;
       existing.provider = providerId;
+      existing.vision = supportsVision;
       await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
     } else {
       await AsyncStorage.setItem(STORAGE_KEY_MODEL, modelId);

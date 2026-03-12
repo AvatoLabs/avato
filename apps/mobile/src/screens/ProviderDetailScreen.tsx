@@ -13,7 +13,7 @@
  * - Model list with individual enable/disable toggles
  */
 import { ArrowLeft, Check, Eye, EyeOff, Key, Save, Wifi, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
@@ -116,6 +116,37 @@ function SecureInputRow({
   );
 }
 
+// ── Known keyVault field metadata ────────────────────────────────────
+const VAULT_FIELD_META: Record<string, { label: string; placeholder: string; secure: boolean }> = {
+  apiKey: { label: 'API Key', placeholder: 'sk-...', secure: true },
+  accessKeyId: { label: 'Access Key ID', placeholder: 'AKIA...', secure: true },
+  secretAccessKey: { label: 'Secret Access Key', placeholder: '...', secure: true },
+  sessionToken: { label: 'Session Token', placeholder: '...', secure: true },
+  username: { label: 'Username', placeholder: '...', secure: false },
+  password: { label: 'Password', placeholder: '...', secure: true },
+  bearerToken: { label: 'Bearer Token', placeholder: '...', secure: true },
+  baseURL: { label: 'API Proxy URL', placeholder: 'https://api.example.com/v1', secure: false },
+  endpoint: { label: 'Endpoint', placeholder: 'https://...', secure: false },
+  baseURLOrAccountID: { label: 'Base URL / Account ID', placeholder: '...', secure: false },
+  region: { label: 'Region', placeholder: 'us-east-1', secure: false },
+  apiVersion: { label: 'API Version', placeholder: '2024-02-01', secure: false },
+};
+
+const FIELD_ORDER = [
+  'apiKey',
+  'accessKeyId',
+  'secretAccessKey',
+  'sessionToken',
+  'username',
+  'password',
+  'bearerToken',
+  'baseURL',
+  'endpoint',
+  'baseURLOrAccountID',
+  'region',
+  'apiVersion',
+];
+
 // ── Main Screen ──────────────────────────────────────────────────────
 export default function ProviderDetailScreen({ navigation, route }: any) {
   const providerId: string = route.params?.providerId ?? '';
@@ -131,11 +162,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<'success' | 'failed' | null>(null);
 
-  // Editable fields — keyvaults
-  const [apiKey, setApiKey] = useState('');
-  const [baseURL, setBaseURL] = useState('');
-  const [accessKeyId, setAccessKeyId] = useState('');
-  const [secretAccessKey, setSecretAccessKey] = useState('');
+  // Editable fields — unified keyVaults state
+  const [vaults, setVaults] = useState<Record<string, string>>({});
   const [enabled, setEnabled] = useState(false);
   const [fetchOnClient, setFetchOnClient] = useState(false);
 
@@ -151,11 +179,16 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         setDetail(providerDetail);
         setEnabled(providerDetail.enabled);
         setFetchOnClient(providerDetail.fetchOnClient ?? false);
-        // Pre-fill key vaults
-        setApiKey(providerDetail.keyVaults?.apiKey ?? '');
-        setBaseURL(providerDetail.keyVaults?.baseURL ?? '');
-        setAccessKeyId(providerDetail.keyVaults?.accessKeyId ?? '');
-        setSecretAccessKey(providerDetail.keyVaults?.secretAccessKey ?? '');
+        // Populate vaults from API response keyVaults
+        const v: Record<string, string> = {};
+        if (providerDetail.keyVaults) {
+          for (const [k, val] of Object.entries(providerDetail.keyVaults)) {
+            if (typeof val === 'string') v[k] = val;
+          }
+        }
+        // Always ensure baseURL key exists for proxy endpoint config
+        if (!('baseURL' in v)) v.baseURL = '';
+        setVaults(v);
       }
 
       setModels(providerModels ?? []);
@@ -207,10 +240,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     setSaving(true);
     try {
       const keyVaults: Record<string, string | undefined> = {};
-      if (apiKey) keyVaults.apiKey = apiKey;
-      if (baseURL) keyVaults.baseURL = baseURL;
-      if (accessKeyId) keyVaults.accessKeyId = accessKeyId;
-      if (secretAccessKey) keyVaults.secretAccessKey = secretAccessKey;
+      for (const [k, v] of Object.entries(vaults)) {
+        keyVaults[k] = v || undefined;
+      }
 
       await aiProviderApi.updateConfig(providerId, { keyVaults });
       haptics.success();
@@ -230,10 +262,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     try {
       // Save current config first so server has latest values
       const keyVaults: Record<string, string | undefined> = {};
-      if (apiKey) keyVaults.apiKey = apiKey;
-      if (baseURL) keyVaults.baseURL = baseURL;
-      if (accessKeyId) keyVaults.accessKeyId = accessKeyId;
-      if (secretAccessKey) keyVaults.secretAccessKey = secretAccessKey;
+      for (const [k, v] of Object.entries(vaults)) {
+        keyVaults[k] = v || undefined;
+      }
       await aiProviderApi.updateConfig(providerId, { keyVaults });
 
       // Then test via a lightweight model list fetch
@@ -285,15 +316,43 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
   // ── Derived display flags ────────────────────────────────────────
   const settings = detail?.settings;
-  const isCustom = detail?.source === 'custom';
-  const showApiKeyField = settings?.showApiKey !== false;
-  const showEndpointField = !!settings?.proxyUrl || isCustom;
-  const showChecker = settings?.showChecker !== false;
   const enabledModelCount = models.filter((m) => m.enabled).length;
 
-  // Show accessKeyId/secretAccessKey when keyVaults has them (e.g. Bedrock)
-  const showAccessKeyFields =
-    !!detail?.keyVaults?.accessKeyId || !!detail?.keyVaults?.secretAccessKey;
+  // Compute visible vault fields dynamically from API response
+  const visibleFields = useMemo(() => {
+    const fields: string[] = [];
+    const vaultKeys = Object.keys(vaults);
+    const hasAccessKeys =
+      vaultKeys.includes('accessKeyId') || vaultKeys.includes('secretAccessKey');
+    const hasUserPass = vaultKeys.includes('username') || vaultKeys.includes('password');
+
+    // Auth credential fields
+    if (hasAccessKeys) {
+      fields.push('accessKeyId', 'secretAccessKey');
+      if (vaultKeys.includes('sessionToken')) fields.push('sessionToken');
+    } else if (hasUserPass) {
+      fields.push('username', 'password');
+    } else if (settings?.showApiKey !== false) {
+      fields.push('apiKey');
+    }
+
+    // Always show baseURL for proxy endpoint configuration
+    if (!fields.includes('baseURL')) fields.push('baseURL');
+
+    // Add any other vault keys from the API not yet included
+    for (const key of vaultKeys) {
+      if (!fields.includes(key)) fields.push(key);
+    }
+
+    // Sort by defined order
+    fields.sort((a, b) => {
+      const ai = FIELD_ORDER.indexOf(a);
+      const bi = FIELD_ORDER.indexOf(b);
+      return (ai === -1 ? 100 : ai) - (bi === -1 ? 100 : bi);
+    });
+
+    return fields;
+  }, [vaults, settings]);
 
   // Show fetchOnClient toggle — same logic as web:
   // 1. not disabled by provider
@@ -301,8 +360,12 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   const showFetchOnClient =
     !settings?.disableBrowserRequest &&
     (settings?.defaultShowBrowserRequest ||
-      (showEndpointField && !!baseURL) ||
-      (showApiKeyField && !!apiKey));
+      !!vaults.baseURL ||
+      !!vaults.endpoint ||
+      !!vaults.apiKey ||
+      !!vaults.accessKeyId);
+
+  const showChecker = settings?.showChecker !== false;
 
   if (loading) {
     return (
@@ -371,61 +434,54 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           </View>
         </Animated.View>
 
-        {/* Configuration Section */}
-        {(showApiKeyField || showEndpointField || showAccessKeyFields) && (
+        {/* Configuration Section — dynamic fields */}
+        {visibleFields.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(250)}>
             <View className="mx-5 mb-4 bg-foreground/5 rounded-2xl p-4">
-              {/* API Key */}
-              {showApiKeyField && !showAccessKeyFields && (
-                <SecureInputRow
-                  label={t.providerDetailApiKey}
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChangeText={setApiKey}
-                />
-              )}
+              {visibleFields.map((fieldKey) => {
+                const meta = VAULT_FIELD_META[fieldKey] || {
+                  label: fieldKey
+                    .replaceAll(/([A-Z])/g, ' $1')
+                    .replace(/^./, (s) => s.toUpperCase()),
+                  placeholder: '...',
+                  secure:
+                    fieldKey.toLowerCase().includes('key') ||
+                    fieldKey.toLowerCase().includes('secret') ||
+                    fieldKey.toLowerCase().includes('token') ||
+                    fieldKey.toLowerCase().includes('password'),
+                };
 
-              {/* Access Key ID + Secret Access Key (Bedrock etc.) */}
-              {showAccessKeyFields && (
-                <>
-                  <SecureInputRow
-                    label={t.providerDetailAccessKeyId}
-                    placeholder="AKIA..."
-                    value={accessKeyId}
-                    onChangeText={setAccessKeyId}
-                  />
-                  <SecureInputRow
-                    label={t.providerDetailSecretAccessKey}
-                    placeholder="..."
-                    value={secretAccessKey}
-                    onChangeText={setSecretAccessKey}
-                  />
-                </>
-              )}
-
-              {/* Endpoint */}
-              {showEndpointField && (
-                <>
-                  <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
-                    {t.providerDetailEndpoint}
-                  </Text>
-                  <View className="bg-background rounded-xl px-3 h-11 mb-3 justify-center">
-                    <TextInput
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      className="flex-1 text-foreground text-[14px]"
-                      placeholderTextColor="#8c8c8c"
-                      value={baseURL}
-                      placeholder={
-                        typeof settings?.proxyUrl === 'object'
-                          ? settings.proxyUrl.placeholder
-                          : 'https://api.example.com/v1'
-                      }
-                      onChangeText={setBaseURL}
+                if (meta.secure) {
+                  return (
+                    <SecureInputRow
+                      key={fieldKey}
+                      label={meta.label}
+                      placeholder={meta.placeholder}
+                      value={vaults[fieldKey] || ''}
+                      onChangeText={(v) => setVaults((prev) => ({ ...prev, [fieldKey]: v }))}
                     />
+                  );
+                }
+
+                return (
+                  <View key={fieldKey}>
+                    <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
+                      {meta.label}
+                    </Text>
+                    <View className="bg-background rounded-xl px-3 h-11 mb-3 justify-center">
+                      <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        className="flex-1 text-foreground text-[14px]"
+                        placeholder={meta.placeholder}
+                        placeholderTextColor="#8c8c8c"
+                        value={vaults[fieldKey] || ''}
+                        onChangeText={(v) => setVaults((prev) => ({ ...prev, [fieldKey]: v }))}
+                      />
+                    </View>
                   </View>
-                </>
-              )}
+                );
+              })}
 
               {/* Save Button */}
               <TouchableOpacity

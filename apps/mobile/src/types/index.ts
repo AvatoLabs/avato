@@ -15,8 +15,12 @@ export interface ChatSession {
   /** Group identifier for folder grouping */
   groupId?: string;
   id: string;
+  /** Language model assigned to this session (e.g. 'gpt-4o') */
+  model?: string;
   /** If pinned, the session is always at the top */
   pinned?: boolean;
+  /** Provider identifier (e.g. 'openai', 'anthropic') */
+  provider?: string;
   title: string;
   /** ISO timestamp */
   updatedAt: string;
@@ -481,4 +485,84 @@ export interface MemoryPersona {
 export interface MemoryPagedResult<T> {
   items: T[];
   total: number;
+}
+
+// ---- Image Generation / Artwork ----
+
+export interface GenerationAsset {
+  height?: number;
+  originalUrl?: string;
+  thumbnailUrl?: string;
+  type?: string;
+  url?: string;
+  width?: number;
+}
+
+export interface GenerationItem {
+  asset?: GenerationAsset;
+  asyncTaskId?: string;
+  createdAt?: string;
+  fileId?: string;
+  generationBatchId?: string;
+  id: string;
+  seed?: number;
+  task: {
+    error?: { name: string; message?: string } | null;
+    status: string;
+  };
+  updatedAt?: string;
+}
+
+export interface GenerationBatchConfig {
+  [key: string]: any;
+  cfg?: number;
+  height?: number;
+  imageUrl?: string;
+  imageUrls?: string[];
+  prompt?: string;
+  seed?: number;
+  steps?: number;
+  width?: number;
+}
+
+export interface GenerationBatch {
+  config?: GenerationBatchConfig;
+  createdAt?: string;
+  generations: GenerationItem[];
+  generationTopicId?: string;
+  height?: number;
+  id: string;
+  model: string;
+  prompt: string;
+  provider: string;
+  ratio?: string;
+  updatedAt?: string;
+  width?: number;
+}
+
+export interface GenerationTopic {
+  coverUrl?: string;
+  createdAt?: string;
+  id: string;
+  title?: string;
+  type?: string;
+  updatedAt?: string;
+}
+
+/** Image model from enabled provider list */
+export interface ImageModelItem {
+  displayName?: string;
+  id: string;
+  parameters?: Record<string, any>;
+  pricing?: Record<string, any>;
+  resolutions?: string[];
+  type: string;
+}
+
+/** Provider with image models */
+export interface ImageProviderWithModels {
+  children: ImageModelItem[];
+  id: string;
+  logo?: string;
+  name: string;
 }
