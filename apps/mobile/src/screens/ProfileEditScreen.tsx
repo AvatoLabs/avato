@@ -141,7 +141,7 @@ export default function ProfileEditScreen({ navigation }: any) {
       haptics.success();
       toast.show('success', t.profileSaved);
     } catch {
-      toast.show('error', t.errorNetwork);
+      toast.show('error', t.fileUploadError);
     } finally {
       setSavingAvatar(false);
     }
@@ -341,12 +341,16 @@ export default function ProfileEditScreen({ navigation }: any) {
             <TouchableOpacity
               activeOpacity={0.7}
               className="flex-row items-center justify-between px-4 py-4 border-b border-black/[0.03]"
+              disabled={savingAvatar}
               onPress={handlePickAvatar}
             >
               <Text className="text-foreground text-[15px] font-medium tracking-tight">
                 {t.profileAvatar}
               </Text>
               <View className="flex-row items-center">
+                <Text className="text-primary text-[12px] font-medium mr-2">
+                  {t.profileChangePhoto}
+                </Text>
                 {savingAvatar ? (
                   <ActivityIndicator color="#007aff" size="small" />
                 ) : avatarUri ? (

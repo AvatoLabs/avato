@@ -20,6 +20,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   FlatList,
   Image as RNImage,
@@ -47,6 +48,7 @@ import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble from '../components/ui/MessageBubble';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
+import { useToast } from '../components/ui/Toast';
 import { messageApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -55,6 +57,7 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
+import { themeColors } from '../theme';
 import { tokens } from '../theme/tokens';
 import type { ChatMessage, MobileMemoryEffort } from '../types';
 
@@ -64,6 +67,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId || 'default';
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const toast = useToast();
+  const primaryColor = themeColors.light.primary;
 
   const messages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
   const generating = useChatStore((s) => s.generating);
@@ -188,11 +193,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             uri: asset.uri,
           });
         }
+        toast.show('success', t.toastFilePicked);
       }
     };
 
     const pickDocument = async () => {
-      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
       if (!result.canceled) {
         for (const asset of result.assets) {
           addFile({
@@ -203,6 +212,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             uri: asset.uri,
           });
         }
+        toast.show('success', t.toastFilePicked);
       }
     };
 
@@ -226,14 +236,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         },
       );
     } else {
-      // Android: open gallery if vision supported, otherwise document picker
       if (modelSupportsVision) {
-        pickImage('gallery');
+        Alert.alert(t.fileAttach, undefined, [
+          { text: t.fileCamera, onPress: () => void pickImage('camera') },
+          { text: t.fileGallery, onPress: () => void pickImage('gallery') },
+          { text: t.fileDocument, onPress: () => void pickDocument() },
+          { text: t.cancel, style: 'cancel' },
+        ]);
       } else {
-        pickDocument();
+        Alert.alert(t.fileAttach, undefined, [
+          { text: t.fileDocument, onPress: () => void pickDocument() },
+          { text: t.cancel, style: 'cancel' },
+        ]);
       }
     }
-  }, [addFile, t, modelSupportsVision]);
+  }, [addFile, t, toast, modelSupportsVision]);
 
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {
@@ -487,7 +504,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 onPress={handleToggleSearch}
               >
                 <Globe
-                  color={searchEnabled ? '#2563eb' : '#666'}
+                  color={searchEnabled ? primaryColor : '#666'}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -499,7 +516,23 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
                 onPress={handleAttach}
               >
-                <Paperclip color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <View className="relative items-center justify-center">
+                  <Paperclip
+                    color={pendingFiles.length > 0 ? primaryColor : '#666'}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  {pendingFiles.length > 0 && (
+                    <View
+                      className="absolute -right-2 -top-1 rounded-full bg-primary items-center justify-center"
+                      style={{ minWidth: 14, height: 14, paddingHorizontal: 3 }}
+                    >
+                      <Text className="text-[9px] font-semibold text-white">
+                        {pendingFiles.length > 9 ? '9+' : pendingFiles.length}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </TouchableOpacity>
               {/* Tools */}
               <TouchableOpacity
@@ -512,7 +545,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 }}
               >
                 <Puzzle
-                  color={toolsEnabled ? '#2563eb' : '#666'}
+                  color={toolsEnabled ? primaryColor : '#666'}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -528,7 +561,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 }}
               >
                 {memoryEnabled ? (
-                  <BrainCircuit color="#2563eb" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <BrainCircuit
+                    color={primaryColor}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 ) : (
                   <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
                 )}
@@ -552,14 +589,19 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   <TouchableOpacity
                     activeOpacity={0.8}
                     className="w-9 h-9 bg-primary rounded-full items-center justify-center"
+                    disabled={generating}
                     onPress={handleSend}
                   >
-                    <Send
-                      color="#fff"
-                      size={16}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginLeft: 1 }}
-                    />
+                    {generating ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Send
+                        color="#fff"
+                        size={16}
+                        strokeWidth={tokens.icon.strokeWidth}
+                        style={{ marginLeft: 1 }}
+                      />
+                    )}
                   </TouchableOpacity>
                 </Animated.View>
               ) : (

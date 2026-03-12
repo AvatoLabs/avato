@@ -320,8 +320,9 @@ export default function ArtworkScreen({ navigation }: any) {
     if (!result.canceled) {
       const newImgs = result.assets.map((a) => ({ uri: a.uri }));
       setRefImages((prev) => [...prev, ...newImgs]);
+      toast.show('success', t.toastFilePicked);
     }
-  }, []);
+  }, [t, toast]);
 
   // ── Load batches for topic ──
   const loadBatches = useCallback(async (tid: string) => {
@@ -383,6 +384,7 @@ export default function ArtworkScreen({ navigation }: any) {
     try {
       // Upload reference images if any
       const uploadedUrls: string[] = [];
+      let failedUploadCount = 0;
       for (const img of refImages) {
         if (img.url) {
           uploadedUrls.push(img.url);
@@ -392,9 +394,17 @@ export default function ArtworkScreen({ navigation }: any) {
             uploadedUrls.push(uploaded.url);
             img.url = uploaded.url;
           } catch {
-            /* skip */
+            failedUploadCount += 1;
           }
         }
+      }
+
+      if (failedUploadCount > 0 && uploadedUrls.length === 0 && refImages.length > 0) {
+        toast.show('error', t.fileUploadError);
+        return;
+      }
+      if (failedUploadCount > 0) {
+        toast.show('info', t.fileUploadFailed);
       }
 
       // Create topic if needed

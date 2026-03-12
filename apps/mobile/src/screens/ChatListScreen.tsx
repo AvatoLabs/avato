@@ -40,6 +40,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useShallow } from 'zustand/shallow';
 
+import FilePreview from '../components/ui/FilePreview';
 import { HeroComposer } from '../components/ui/HeroComposer';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
@@ -342,7 +343,10 @@ export default function ChatListScreen({ navigation }: any) {
     };
 
     const pickDocument = async () => {
-      const result = await DocumentPicker.getDocumentAsync({ multiple: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
       if (!result.canceled) {
         for (const asset of result.assets) {
           addFile({
@@ -376,9 +380,17 @@ export default function ChatListScreen({ navigation }: any) {
       );
     } else {
       if (modelSupportsVision) {
-        pickImage('gallery');
+        Alert.alert(t.fileAttach, undefined, [
+          { text: t.fileCamera, onPress: () => void pickImage('camera') },
+          { text: t.fileGallery, onPress: () => void pickImage('gallery') },
+          { text: t.fileDocument, onPress: () => void pickDocument() },
+          { text: t.cancel, style: 'cancel' },
+        ]);
       } else {
-        pickDocument();
+        Alert.alert(t.fileAttach, undefined, [
+          { text: t.fileDocument, onPress: () => void pickDocument() },
+          { text: t.cancel, style: 'cancel' },
+        ]);
       }
     }
   }, [addFile, modelSupportsVision, t, toast]);
@@ -626,6 +638,7 @@ export default function ChatListScreen({ navigation }: any) {
               </Text>
             )}
             <HeroComposer
+              attachmentCount={pendingFiles.length}
               hasAttachment={pendingFiles.length > 0}
               memoryEnabled={memoryEnabled}
               modelProvider={selectedProvider || undefined}
@@ -640,6 +653,11 @@ export default function ChatListScreen({ navigation }: any) {
               onToggleMemory={handleToggleMemory}
               onToggleSearch={handleToggleSearch}
             />
+            {pendingFiles.length > 0 && (
+              <View className="mx-4 -mt-2 mb-2 px-3 py-2 rounded-2xl bg-foreground/5">
+                <FilePreview />
+              </View>
+            )}
           </View>
         </Animated.View>
 

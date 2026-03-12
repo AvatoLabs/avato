@@ -5,21 +5,34 @@ import { X } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
+import { useI18n } from '../../lib/i18n';
 import { useFileStore } from '../../store/file';
 import { tokens } from '../../theme/tokens';
 
 const FilePreview = memo(() => {
+  const { t } = useI18n();
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const removeFile = useFileStore((s) => s.removeFile);
+  const uploadFile = useFileStore((s) => s.uploadFile);
 
   if (pendingFiles.length === 0) return null;
 
   return (
-    <ScrollView horizontal className="px-3 py-2" showsHorizontalScrollIndicator={false}>
+    <ScrollView horizontal className="py-1" showsHorizontalScrollIndicator={false}>
       {pendingFiles.map((file) => {
         const isImage = file.type.startsWith('image/');
+        const cardBorderClass =
+          file.status === 'error'
+            ? 'border border-red-300'
+            : file.status === 'done'
+              ? 'border border-emerald-300'
+              : 'border border-black/10';
+
         return (
-          <View className="w-16 h-16 mr-2 rounded-xl overflow-hidden bg-foreground/5" key={file.id}>
+          <View
+            className={`w-16 h-16 mr-2 rounded-xl overflow-hidden bg-foreground/5 ${cardBorderClass}`}
+            key={file.id}
+          >
             {isImage ? (
               <Image className="w-full h-full" resizeMode="cover" source={{ uri: file.uri }} />
             ) : (
@@ -37,12 +50,17 @@ const FilePreview = memo(() => {
             {file.status === 'uploading' && (
               <View className="absolute inset-0 bg-black/40 items-center justify-center">
                 <ActivityIndicator color="#fff" size="small" />
+                <Text className="text-[9px] text-white/90 font-medium mt-1">{t.fileUploading}</Text>
               </View>
             )}
             {file.status === 'error' && (
-              <View className="absolute inset-0 bg-red-500/30 items-center justify-center">
-                <Text className="text-white text-[10px] font-bold">!</Text>
-              </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                className="absolute inset-0 bg-red-500/45 items-center justify-center px-1"
+                onPress={() => void uploadFile(file.id)}
+              >
+                <Text className="text-white text-[10px] font-semibold">{t.retry}</Text>
+              </TouchableOpacity>
             )}
 
             {/* Remove button */}

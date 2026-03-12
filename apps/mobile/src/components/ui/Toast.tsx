@@ -41,10 +41,10 @@ export const useToast = create<ToastStore>((set) => ({
 }));
 
 // ── Colors ───────────────────────────────────────────────────────────
-const COLORS: Record<ToastType, { bg: string; icon: string }> = {
-  success: { bg: '#16a34a', icon: '#fff' },
-  error: { bg: '#dc2626', icon: '#fff' },
-  info: { bg: '#2563eb', icon: '#fff' },
+const COLORS: Record<ToastType, { bg: string; border: string; icon: string }> = {
+  success: { bg: '#15803d', border: '#166534', icon: '#fff' },
+  error: { bg: '#b42318', border: '#912018', icon: '#fff' },
+  info: { bg: '#1d4ed8', border: '#1e40af', icon: '#fff' },
 };
 
 const ICONS: Record<ToastType, React.ComponentType<any>> = {
@@ -85,23 +85,39 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
         transform: [{ translateY }],
         opacity,
         backgroundColor: colors.bg,
-        borderRadius: 14,
-        marginHorizontal: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        borderColor: colors.border,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginHorizontal: 16,
+        maxWidth: 680,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        width: '92%',
         flexDirection: 'row',
         alignItems: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 5,
+        alignSelf: 'center',
       }}
     >
-      <Icon color={colors.icon} size={18} strokeWidth={2.2} />
+      <View
+        style={{
+          alignItems: 'center',
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          borderRadius: 999,
+          height: 22,
+          justifyContent: 'center',
+          width: 22,
+        }}
+      >
+        <Icon color={colors.icon} size={14} strokeWidth={2.4} />
+      </View>
       <Text
         numberOfLines={2}
-        style={{ color: '#fff', fontSize: 14, fontWeight: '600', marginLeft: 10, flex: 1 }}
+        style={{ color: '#fff', fontSize: 13.5, fontWeight: '600', marginLeft: 8, flex: 1 }}
       >
         {item.message}
       </Text>

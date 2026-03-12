@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { Brain, BrainCircuit, Cpu, Globe, Paperclip, Puzzle, Send } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Image as RNImage, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image as RNImage, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,6 +15,7 @@ import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
 interface HeroComposerProps {
+  attachmentCount?: number;
   hasAttachment?: boolean;
   memoryEnabled?: boolean;
   modelProvider?: string;
@@ -37,6 +38,7 @@ interface HeroComposerProps {
  *   [Model] [Search] [Memory] [Attach] [Skills] ... [Send]
  */
 export function HeroComposer({
+  attachmentCount,
   modelProvider,
   placeholder = 'What do you want to do?',
   value = '',
@@ -67,7 +69,12 @@ export function HeroComposer({
   }, [onSubmit, sendScale]);
 
   const hasText = value.trim().length > 0;
-  const canSend = hasText || hasAttachment;
+  const effectiveAttachmentCount =
+    typeof attachmentCount === 'number' ? attachmentCount : hasAttachment ? 1 : 0;
+  const hasAttachedFile = effectiveAttachmentCount > 0;
+  const canSend = hasText || hasAttachedFile;
+  const attachmentBadgeText =
+    effectiveAttachmentCount > 9 ? '9+' : String(Math.max(effectiveAttachmentCount, 0));
 
   const MemoryIcon = memoryEnabled ? BrainCircuit : Brain;
 
@@ -76,7 +83,7 @@ export function HeroComposer({
       className="mx-4 mb-4 rounded-[26px]"
       style={{
         borderWidth: 1.5,
-        borderColor: 'rgba(99,102,241,0.5)',
+        borderColor: 'rgba(0,122,255,0.24)',
         backgroundColor: 'rgba(255,255,255,0.85)',
       }}
     >
@@ -124,7 +131,7 @@ export function HeroComposer({
             onPress={onToggleSearch}
           >
             <Globe
-              color={searchEnabled ? '#2563eb' : '#666'}
+              color={searchEnabled ? colors.primary : '#666'}
               size={20}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -138,7 +145,7 @@ export function HeroComposer({
             onPress={onToggleMemory}
           >
             <MemoryIcon
-              color={memoryEnabled ? '#2563eb' : '#666'}
+              color={memoryEnabled ? colors.primary : '#666'}
               size={20}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -151,7 +158,21 @@ export function HeroComposer({
             className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
             onPress={onAttach}
           >
-            <Paperclip color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <View className="relative items-center justify-center">
+              <Paperclip
+                color={hasAttachedFile ? colors.primary : '#666'}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+              {hasAttachedFile && (
+                <View
+                  className="absolute -right-2 -top-1 rounded-full bg-primary items-center justify-center"
+                  style={{ minWidth: 14, height: 14, paddingHorizontal: 3 }}
+                >
+                  <Text className="text-[9px] font-semibold text-white">{attachmentBadgeText}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
 
           {/* Plugins */}
