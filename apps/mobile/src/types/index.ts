@@ -566,3 +566,26 @@ export interface ImageProviderWithModels {
   logo?: string;
   name: string;
 }
+
+// ---- Resource / File ----
+
+export interface FileListItem {
+  chunkCount: number | null;
+  chunkingError: any | null;
+  chunkingStatus?: string | null;
+  content?: string | null;
+  createdAt: string;
+  editorData?: Record<string, any> | null;
+  embeddingError: any | null;
+  embeddingStatus?: string | null;
+  fileType: string;
+  finishEmbedding: boolean;
+  id: string;
+  metadata?: Record<string, any> | null;
+  name: string;
+  parentId?: string | null;
+  size: number;
+  sourceType: 'file' | 'document';
+  url: string;
+  userId?: string;
+}

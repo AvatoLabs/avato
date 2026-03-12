@@ -4,7 +4,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { MessageSquare, Palette, Puzzle, User } from 'lucide-react-native';
+import { FolderOpen, MessageSquare, Palette, Puzzle, User } from 'lucide-react-native';
 import React from 'react';
 import { Platform } from 'react-native';
 
@@ -30,6 +30,7 @@ import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import ProviderListScreen from '../screens/ProviderListScreen';
+import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SessionGroupScreen from '../screens/SessionGroupScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -96,6 +97,17 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen
+        component={ResourceScreen}
+        name="Resources"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <FolderOpen color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          ),
+          tabBarLabel: t.resourceTitle,
+          tabBarAccessibilityLabel: 'Resources tab',
+        }}
+      />
+      <Tab.Screen
         component={SkillSettingsScreen}
         name="Skills"
         options={{
@@ -113,7 +125,7 @@ function BottomTabs() {
           tabBarIcon: ({ color, size }) => (
             <User color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.workspaceTitle,
+          tabBarLabel: t.settingsTitle,
           tabBarAccessibilityLabel: 'Profile tab',
         }}
       />

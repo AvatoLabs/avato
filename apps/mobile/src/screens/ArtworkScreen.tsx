@@ -40,6 +40,7 @@ import Animated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
@@ -477,10 +478,10 @@ export default function ArtworkScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       {/* ── Header ── */}
-      <View
-        className="flex-row items-center pb-3"
-        style={{ paddingTop: 60, paddingHorizontal: containerPad }}
-      >
+      <ScreenHeader title={t.artworkTitle} />
+
+      {/* ── Model & Config Bar ── */}
+      <View className="flex-row items-center px-4 py-2">
         <TouchableOpacity
           className="flex-row items-center bg-card rounded-full px-3 py-2 flex-1 mr-3"
           onPress={() => {
@@ -625,12 +626,12 @@ export default function ArtworkScreen({ navigation }: any) {
             }}
           >
             <ScrollView
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingHorizontal: sidebarPad,
                 paddingTop: 60,
                 paddingBottom: 40,
               }}
-              showsVerticalScrollIndicator={false}
             >
               {/* Sidebar header */}
               <View className="flex-row items-center justify-between mb-2">
