@@ -20,6 +20,19 @@ import { MinkLightTheme } from './src/theme';
 
 const ONBOARDING_KEY = 'minkhub_onboarding_complete';
 
+// Suppress known harmless errors in development
+if (__DEV__) {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    const message = args.join(' ');
+    // Ignore expo-keep-awake activity errors (harmless in dev)
+    if (message.includes('ExpoKeepAwake') && message.includes('activity is no longer available')) {
+      return;
+    }
+    originalError(...args);
+  };
+}
+
 function OfflineBanner() {
   const insets = useSafeAreaInsets();
   const t = useI18n((s) => s.t);
