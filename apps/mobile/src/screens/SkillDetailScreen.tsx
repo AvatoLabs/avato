@@ -7,7 +7,14 @@
  * - External links
  */
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ChevronLeft, Code, FileText, Link as LinkIcon, Package } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  Code,
+  FileText,
+  Link as LinkIcon,
+  Package,
+  RefreshCw,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
@@ -51,12 +58,14 @@ export default function SkillDetailScreen() {
   const [plugin, setPlugin] = useState<InstalledPlugin | null>(null);
   const [resources, setResources] = useState<SkillResource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const toast = useToast();
   const insets = useSafeAreaInsets();
 
   const fetchSkill = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       if (skillType === 'plugin') {
         // Fetch plugin details
@@ -64,20 +73,25 @@ export default function SkillDetailScreen() {
         const foundPlugin = plugins.find((p) => p.identifier === skillId);
         if (foundPlugin) {
           setPlugin(foundPlugin);
+        } else {
+          setError(t.skillsDetailNotFound || 'Skill not found');
         }
       } else {
         // Fetch agent skill details
         const data = await agentSkillApi.getById(skillId);
         if (data) {
           setSkill(data);
+        } else {
+          setError(t.skillsDetailNotFound || 'Skill not found');
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch skill details:', error);
+    } catch (err) {
+      console.error('Failed to fetch skill details:', err);
+      setError(t.skillsMarketUnavailable || 'Failed to load skill details');
     } finally {
       setLoading(false);
     }
-  }, [skillId, skillType]);
+  }, [skillId, skillType, t]);
 
   // Handle install for Lobehub skills
   const handleInstall = async () => {
@@ -151,6 +165,12 @@ export default function SkillDetailScreen() {
     fetchSkill();
   }, [fetchSkill]);
 
+  // Handle retry on error
+  const handleRetry = useCallback(() => {
+    haptics.light();
+    fetchSkill();
+  }, [fetchSkill]);
+
   // Render action buttons based on skill type and status
   const renderActions = () => {
     if (skillType === 'plugin' && plugin) {
@@ -210,6 +230,20 @@ export default function SkillDetailScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#007aff" size="large" />
         </View>
+      ) : error ? (
+        <View className="flex-1 items-center justify-center px-8">
+          <Package color="#d1d5db" size={48} strokeWidth={1.2} />
+          <Text className="text-secondary/50 text-[15px] font-medium mt-4 text-center">
+            {error}
+          </Text>
+          <TouchableOpacity
+            className="mt-6 flex-row items-center gap-2 px-6 py-3 bg-primary rounded-xl"
+            onPress={handleRetry}
+          >
+            <RefreshCw color="#fff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <Text className="text-white text-[15px] font-semibold">{t.retry}</Text>
+          </TouchableOpacity>
+        </View>
       ) : !skill && !plugin ? (
         <View className="flex-1 items-center justify-center px-8">
           <Package color="#d1d5db" size={48} strokeWidth={1.2} />
@@ -220,12 +254,12 @@ export default function SkillDetailScreen() {
       ) : (
         <ScrollView
           className="flex-1"
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: 40 + insets.bottom,
             paddingHorizontal: 20,
             paddingTop: 16,
           }}
-          showsVerticalScrollIndicator={false}
         >
           {/* Action Buttons */}
           {renderActions()}
