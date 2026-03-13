@@ -362,7 +362,7 @@ export default function SkillDetailScreen() {
             </View>
           )}
 
-          {/* Manifest with Syntax Highlighting */}
+          {/* Manifest JSON */}
           {(skill?.manifest || plugin?.manifest) && (
             <View className="mb-4">
               <View className="flex-row items-center gap-2 mb-2">
