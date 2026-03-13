@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { Brain, BrainCircuit, Cpu, Globe, Paperclip, Puzzle, Send } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image as RNImage, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -21,6 +21,7 @@ interface HeroComposerProps {
   hasAttachment?: boolean;
   memoryEnabled?: boolean;
   modelProvider?: string;
+  modelProviderLogo?: string;
   onAttach?: () => void;
   onChangeText?: (text: string) => void;
   onModelPress?: () => void;
@@ -42,6 +43,7 @@ interface HeroComposerProps {
 export function HeroComposer({
   attachmentCount,
   modelProvider,
+  modelProviderLogo,
   placeholder = 'What do you want to do?',
   value = '',
   onChangeText,
@@ -56,8 +58,13 @@ export function HeroComposer({
   hasAttachment = false,
 }: HeroComposerProps) {
   const colors = themeColors.light;
-  const hasProvider = !!modelProvider?.trim();
   const [providerLogoError, setProviderLogoError] = useState(false);
+  const providerIconUrl =
+    modelProviderLogo || (modelProvider ? getProviderIconUrl(modelProvider) : undefined);
+
+  useEffect(() => {
+    setProviderLogoError(false);
+  }, [providerIconUrl]);
 
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -112,11 +119,11 @@ export function HeroComposer({
             className="w-8 h-8 items-center justify-center rounded-full"
             onPress={onModelPress}
           >
-            {hasProvider && !providerLogoError ? (
+            {providerIconUrl && !providerLogoError ? (
               <RNImage
                 style={{ width: 20, height: 20, borderRadius: 4 }}
                 source={{
-                  uri: getProviderIconUrl(modelProvider!),
+                  uri: providerIconUrl,
                 }}
                 onError={() => setProviderLogoError(true)}
               />

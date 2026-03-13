@@ -66,9 +66,7 @@ const UNIT_QUANTITY_RESOLVERS: Partial<Record<PricingUnitName, UnitQuantityResol
     }
 
     if (typeof usage.inputCachedTokens === 'number' && typeof usage.totalInputTokens === 'number') {
-      throw new Error(
-        'Missing inputCacheMissTokens! You can set it by inputCacheMissTokens = totalInputTokens - inputCachedTokens',
-      );
+      return usage.totalInputTokens - usage.inputCachedTokens + toolTokens;
     }
 
     // When tool tokens are present, totalInputTokens already includes them

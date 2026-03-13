@@ -147,6 +147,7 @@ interface ChatState {
     options?: {
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      plugins?: string[];
       searchEnabled?: boolean;
     },
   ) => Promise<void>;
@@ -186,6 +187,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     options?: {
       memoryEffort?: MobileMemoryEffort;
       memoryEnabled?: boolean;
+      plugins?: string[];
       searchEnabled?: boolean;
     },
   ) => {
@@ -237,6 +239,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
+    // Capture context messages synchronously before any await to prevent race conditions
+    // (e.g. fetchMessages overwriting the state while we wait for messageApi.create)
+    const capturedMessages = get().messagesBySession[sessionId] || [];
+    const contextMessages = capturedMessages
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map<MobileChatMessage>((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
     // Persist user message on backend
     let userMessageServerId: string | undefined;
     try {
@@ -280,14 +292,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)
     try {
-      const allMessages = get().messagesBySession[sessionId] || [];
-      const contextMessages = allMessages
-        .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.id !== assistantMsgId)
-        .map<MobileChatMessage>((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
       if (uploadedAttachments.length > 0 && contextMessages.length > 0) {
         const latest = contextMessages.at(-1);
         if (latest?.role === 'user') {
@@ -300,6 +304,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chatOptions.sessionId = sessionId;
       chatOptions.topicId = topicId;
 
+      // Set model/provider on the assistant message for immediate UI display
+      set((s) => ({
+        messagesBySession: {
+          ...s.messagesBySession,
+          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
+          ),
+        },
+      }));
+
       if (options?.searchEnabled) {
         chatOptions.enabledSearch = true;
       }
@@ -307,6 +321,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         effort: options?.memoryEffort || 'medium',
         enabled: options?.memoryEnabled !== false,
       };
+      if (options?.plugins?.length) {
+        chatOptions.plugins = options.plugins;
+      }
 
       // Throttle store updates to avoid per-token re-renders
       const THROTTLE_MS = 100;
@@ -409,6 +426,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
               m.id === assistantMsgId && m.reasoning
                 ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                : m,
+            ),
+          },
+        }));
+      }
+
+      // Store usage/performance on the assistant message
+      if (result.usage || result.performance) {
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    ...(result.usage ? { usage: result.usage as any } : {}),
+                    ...(result.performance ? { performance: result.performance as any } : {}),
+                    provider,
+                  }
                 : m,
             ),
           },
@@ -565,6 +601,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
 
+      // Set model/provider on the assistant message for immediate display
+      set((s) => ({
+        messagesBySession: {
+          ...s.messagesBySession,
+          [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+            m.id === assistantMsgId ? { ...m, model: chatOptions.model, provider } : m,
+          ),
+        },
+      }));
+
       const THROTTLE_MS = 100;
       let pendingReasoning: string | null = null;
       let pendingText: string | null = null;
@@ -663,6 +709,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
               m.id === assistantMsgId && m.reasoning
                 ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                : m,
+            ),
+          },
+        }));
+      }
+
+      // Store usage/performance on the regenerated assistant message
+      if (result.usage || result.performance) {
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMsgId
+                ? {
+                    ...m,
+                    ...(result.usage ? { usage: result.usage as any } : {}),
+                    ...(result.performance ? { performance: result.performance as any } : {}),
+                    provider,
+                  }
                 : m,
             ),
           },

@@ -48,6 +48,21 @@ export interface ModelReasoning {
   duration?: number;
 }
 
+export interface ModelTokenUsage {
+  inputCachedTokens?: number;
+  inputCacheMissTokens?: number;
+  outputReasoningTokens?: number;
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
+  totalTokens?: number;
+}
+
+export interface ModelPerformance {
+  latency?: number;
+  tps?: number;
+  ttft?: number;
+}
+
 export interface ChatMessage {
   content: string;
   /** ISO timestamp */
@@ -59,11 +74,17 @@ export interface ChatMessage {
   model?: string;
   /** Parent message id (for branching) */
   parentId?: string;
+  /** Performance metrics (TPS, TTFT) */
+  performance?: ModelPerformance | null;
+  /** Provider that generated the response */
+  provider?: string;
   /** Reasoning / thinking content from the model */
   reasoning?: ModelReasoning | null;
   role: MessageRole;
   sessionId: string;
   updatedAt: string;
+  /** Token usage stats */
+  usage?: ModelTokenUsage | null;
 }
 
 // ---- Agent ----

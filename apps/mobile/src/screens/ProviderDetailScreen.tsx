@@ -36,6 +36,7 @@ import { semanticColors } from '../constants/colors';
 import { aiModelApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useModelStore } from '../store/model';
 import { tokens } from '../theme/tokens';
 import type { AiProviderDetailItem, AiProviderModelItem } from '../types';
 
@@ -226,6 +227,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   const providerId: string = route.params?.providerId ?? '';
   const { t } = useI18n();
   const toast = useToast();
+  const refreshModelStore = useModelStore((s) => s.fetchModels);
 
   const [detail, setDetail] = useState<AiProviderDetailItem | null>(null);
   const [models, setModels] = useState<AiProviderModelItem[]>([]);
@@ -289,6 +291,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     setEnabled(newEnabled);
     try {
       await aiProviderApi.toggleEnabled(providerId, newEnabled);
+      void refreshModelStore(true);
     } catch {
       setEnabled(!newEnabled);
       toast.show('error', t.errorNetwork);
@@ -372,6 +375,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         providerId,
         enabled: newEnabled,
       });
+      void refreshModelStore(true);
     } catch {
       setModels((prev) =>
         prev.map((m) => (m.id === modelId ? { ...m, enabled: currentEnabled } : m)),

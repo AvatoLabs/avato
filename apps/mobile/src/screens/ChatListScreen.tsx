@@ -85,39 +85,34 @@ function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
 
 function SessionLogo({
   provider,
+  providerLogo,
   avatar,
-  size = 40,
+  size = 36,
 }: {
   avatar?: string;
   provider?: string;
+  providerLogo?: string;
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const iconSize = size * 0.6;
+  const iconSize = size * 0.65;
+  const iconUrl = providerLogo || (provider ? getProviderIconUrl(provider) : undefined);
 
-  if (provider && !imgError) {
-    const url = getProviderIconUrl(provider);
+  useEffect(() => {
+    setImgError(false);
+  }, [iconUrl]);
+
+  if (iconUrl && !imgError) {
     return (
       <View
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
         <RNImage
-          source={{ uri: url }}
+          source={{ uri: iconUrl }}
           style={{ width: iconSize, height: iconSize }}
           onError={() => setImgError(true)}
         />
-      </View>
-    );
-  }
-
-  if (avatar) {
-    return (
-      <View
-        className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
-        style={{ width: size, height: size }}
-      >
-        <Image source={{ uri: avatar }} style={{ width: size, height: size }} />
       </View>
     );
   }
@@ -128,9 +123,32 @@ function SessionLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 text-[12px] font-semibold">
+        <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.35 }}>
           {provider.slice(0, 2).toUpperCase()}
         </Text>
+      </View>
+    );
+  }
+
+  if (avatar) {
+    // If it's an emoji (length <= 4 and not a URL), render as text
+    if (avatar.length <= 4 && !avatar.startsWith('http')) {
+      return (
+        <View
+          className="rounded-full bg-foreground/5 items-center justify-center"
+          style={{ width: size, height: size }}
+        >
+          <Text style={{ fontSize: size * 0.6 }}>{avatar}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
+        style={{ width: size, height: size }}
+      >
+        <Image source={{ uri: avatar }} style={{ width: size, height: size }} />
       </View>
     );
   }
@@ -140,10 +158,9 @@ function SessionLogo({
       className="rounded-full bg-foreground/5 items-center justify-center"
       style={{ width: size, height: size }}
     >
-      <RNImage
-        source={require('../../assets/icon.png')}
-        style={{ width: iconSize, height: iconSize, borderRadius: 4 }}
-      />
+      <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.55 }}>
+        #
+      </Text>
     </View>
   );
 }
@@ -212,6 +229,28 @@ export default function ChatListScreen({ navigation }: any) {
 
     return true;
   }, [modelProviders, selectedModel, selectedProvider]);
+
+  const providerLogoById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const provider of modelProviders) {
+      if (provider.logo) {
+        map[provider.id] = provider.logo;
+      }
+    }
+    return map;
+  }, [modelProviders]);
+
+  const modelToProvider = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const provider of modelProviders) {
+      for (const model of provider.children) {
+        if (!map[model.id]) {
+          map[model.id] = provider.id;
+        }
+      }
+    }
+    return map;
+  }, [modelProviders]);
 
   // Load persisted expand/collapse state
   useEffect(() => {
@@ -293,6 +332,13 @@ export default function ChatListScreen({ navigation }: any) {
         },
         searchMode: searchEnabled ? 'on' : 'off',
       });
+      // Persist enabled plugins to the new agent
+      if (enabledSkills.size > 0) {
+        const agentConfig = await agentApi.getConfigBySession(newId);
+        if (agentConfig?.id) {
+          await agentApi.updateConfig(agentConfig.id, { plugins: [...enabledSkills] });
+        }
+      }
     } catch {
       /* best-effort */
     }
@@ -325,45 +371,61 @@ export default function ChatListScreen({ navigation }: any) {
 
   const handleAttach = useCallback(() => {
     const pickImage = async (source: 'camera' | 'gallery') => {
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
-          : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: 'images',
-              quality: 0.8,
-              allowsMultipleSelection: true,
-            });
-
-      if (!result.canceled) {
-        for (const asset of result.assets) {
-          addFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: asset.fileName || 'image.jpg',
-            type: asset.mimeType || 'image/jpeg',
-            size: asset.fileSize || 0,
-            uri: asset.uri,
-          });
+      try {
+        if (source === 'camera') {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') return;
+        } else {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') return;
         }
-        toast.show('success', t.toastFilePicked);
+
+        const result =
+          source === 'camera'
+            ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
+            : await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                quality: 0.8,
+                allowsMultipleSelection: true,
+              });
+
+        if (!result.canceled) {
+          for (const asset of result.assets) {
+            addFile({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: asset.fileName || 'image.jpg',
+              type: asset.mimeType || 'image/jpeg',
+              size: asset.fileSize || 0,
+              uri: asset.uri,
+            });
+          }
+          toast.show('success', t.toastFilePicked);
+        }
+      } catch {
+        // user cancelled permission/system prompt, ignore to avoid unhandled rejection
       }
     };
 
     const pickDocument = async () => {
-      const result = await DocumentPicker.getDocumentAsync({
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled) {
-        for (const asset of result.assets) {
-          addFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: asset.name,
-            type: asset.mimeType || 'application/octet-stream',
-            size: asset.size || 0,
-            uri: asset.uri,
-          });
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          multiple: true,
+          copyToCacheDirectory: true,
+        });
+        if (!result.canceled) {
+          for (const asset of result.assets) {
+            addFile({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: asset.name,
+              type: asset.mimeType || 'application/octet-stream',
+              size: asset.size || 0,
+              uri: asset.uri,
+            });
+          }
+          toast.show('success', t.toastFilePicked);
         }
-        toast.show('success', t.toastFilePicked);
+      } catch {
+        // ignore
       }
     };
 
@@ -376,11 +438,11 @@ export default function ChatListScreen({ navigation }: any) {
         { options, cancelButtonIndex: 0, title: t.fileAttach },
         (index) => {
           if (modelSupportsVision) {
-            if (index === 1) pickImage('camera');
-            else if (index === 2) pickImage('gallery');
-            else if (index === 3) pickDocument();
+            if (index === 1) void pickImage('camera');
+            else if (index === 2) void pickImage('gallery');
+            else if (index === 3) void pickDocument();
           } else if (index === 1) {
-            pickDocument();
+            void pickDocument();
           }
         },
       );
@@ -538,73 +600,85 @@ export default function ChatListScreen({ navigation }: any) {
     { key: 'image', label: t.homeQuickCreate, icon: ImageIcon },
   ];
 
-  const renderSessionRow = (item: ChatSession) => (
-    <SwipeableRow
-      key={item.id}
-      pinLabel={item.pinned ? t.actionUnpin : t.actionPin}
-      onDelete={() => {
-        Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
-          { text: t.cancel, style: 'cancel' },
-          {
-            text: t.delete,
-            style: 'destructive',
-            onPress: () => {
-              haptics.warning();
-              removeSession(item.id);
-              toast.show('info', t.toastSessionDeleted);
+  const selectedProviderLogo = selectedProvider ? providerLogoById[selectedProvider] : undefined;
+
+  const renderSessionRow = (item: ChatSession) => {
+    const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
+    const providerLogo = providerId ? providerLogoById[providerId] : undefined;
+
+    return (
+      <SwipeableRow
+        key={item.id}
+        pinLabel={item.pinned ? t.actionUnpin : t.actionPin}
+        onDelete={() => {
+          Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
+            { text: t.cancel, style: 'cancel' },
+            {
+              text: t.delete,
+              style: 'destructive',
+              onPress: () => {
+                haptics.warning();
+                removeSession(item.id);
+                toast.show('info', t.toastSessionDeleted);
+              },
             },
-          },
-        ]);
-      }}
-      onPin={() => {
-        haptics.light();
-        if (item.pinned) {
-          unpinSession(item.id);
-          toast.show('success', t.toastUnpinned);
-        } else {
-          pinSession(item.id);
-          toast.show('success', t.toastPinned);
-        }
-      }}
-    >
-      <TouchableOpacity
-        accessibilityLabel={item.title}
-        accessibilityRole="button"
-        activeOpacity={0.4}
-        className="flex-row items-center px-5 py-3 active:bg-foreground/10"
-        onLongPress={() => handleLongPress(item)}
-        onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
+          ]);
+        }}
+        onPin={() => {
+          haptics.light();
+          if (item.pinned) {
+            unpinSession(item.id);
+            toast.show('success', t.toastUnpinned);
+          } else {
+            pinSession(item.id);
+            toast.show('success', t.toastPinned);
+          }
+        }}
       >
-        <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5">
-          <SessionLogo avatar={item.avatar} provider={item.provider} size={40} />
-        </View>
-        <View className="flex-1 mr-3">
-          <View className="flex-row items-center mb-0.5">
-            {item.pinned && (
-              <Pin
-                color={semanticColors.primary}
-                size={11}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <Text
-              className="text-foreground text-[15px] font-medium tracking-tight"
-              numberOfLines={1}
-            >
-              {item.title || t.chatListNewConversation}
+        <TouchableOpacity
+          accessibilityLabel={item.title}
+          accessibilityRole="button"
+          activeOpacity={0.4}
+          className="flex-row items-start px-5 py-3 active:bg-foreground/10"
+          onLongPress={() => handleLongPress(item)}
+          onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
+        >
+          <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
+            <SessionLogo
+              avatar={item.avatar}
+              provider={providerId}
+              providerLogo={providerLogo}
+              size={36}
+            />
+          </View>
+          <View className="flex-1 mr-3 mt-0.5">
+            <View className="flex-row items-center mb-0.5">
+              {item.pinned && (
+                <Pin
+                  color={semanticColors.primary}
+                  size={11}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 4 }}
+                />
+              )}
+              <Text
+                className="text-foreground text-[15px] font-medium tracking-tight"
+                numberOfLines={1}
+              >
+                {item.title || t.chatListNewConversation}
+              </Text>
+            </View>
+            <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
+              {item.description}
             </Text>
           </View>
-          <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
-            {item.description}
+          <Text className="text-gray-400 text-[10px] font-medium tracking-wide">
+            {formatTimeAgo(item.updatedAt, t)}
           </Text>
-        </View>
-        <Text className="text-gray-400 text-[10px] font-medium tracking-wide">
-          {formatTimeAgo(item.updatedAt, t)}
-        </Text>
-      </TouchableOpacity>
-    </SwipeableRow>
-  );
+        </TouchableOpacity>
+      </SwipeableRow>
+    );
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -652,6 +726,7 @@ export default function ChatListScreen({ navigation }: any) {
               hasAttachment={pendingFiles.length > 0}
               memoryEnabled={memoryEnabled}
               modelProvider={selectedProvider || undefined}
+              modelProviderLogo={selectedProviderLogo}
               placeholder={t.homeHeroPlaceholder}
               searchEnabled={searchEnabled}
               value={heroText}

@@ -179,11 +179,6 @@ function providerInitials(id: string): string {
   return map[id] ?? id.slice(0, 2).toUpperCase();
 }
 
-function getProviderLogoUrl(providerId: string, logoUrl?: string): string {
-  if (logoUrl) return logoUrl;
-  return getProviderIconUrl(providerId);
-}
-
 /** Renders a provider logo as a round Image with initials fallback */
 function ProviderLogo({
   providerId,
@@ -195,7 +190,7 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = getProviderLogoUrl(providerId, logo);
+  const url = logo || getProviderIconUrl(providerId);
 
   if (imgError) {
     return (

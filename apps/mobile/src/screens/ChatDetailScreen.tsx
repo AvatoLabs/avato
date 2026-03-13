@@ -27,7 +27,11 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -51,7 +55,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { messageApi, sessionApi } from '../lib/api';
+import { agentApi, messageApi, pluginApi, sessionApi, topicApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -61,7 +65,7 @@ import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { themeColors } from '../theme';
 import { tokens } from '../theme/tokens';
-import type { ChatMessage, MobileMemoryEffort } from '../types';
+import type { ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -87,16 +91,24 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const [inputText, setInputText] = useState('');
   const [searchEnabled, setSearchEnabled] = useState(false);
-  const [toolsEnabled, setToolsEnabled] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
   const [memorySheetVisible, setMemorySheetVisible] = useState(false);
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const isScrolledToBottom = useRef(true);
+
+  // Skills drawer
+  const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
+  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set());
+  const [agentId, setAgentId] = useState<string | null>(null);
 
   const sessionModel = useModelStore((s) => s.selectedModel);
   const sessionProvider = useModelStore((s) => s.selectedProvider);
+  const modelProviders = useModelStore((s) => s.providers);
   const fetchModels = useModelStore((s) => s.fetchModels);
   const loadSelection = useModelStore((s) => s.loadSelection);
   const modelSupportsVision = useModelStore((s) => {
@@ -133,6 +145,22 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
+  useEffect(() => {
+    agentApi
+      .getConfigBySession(sessionId)
+      .then((config) => {
+        if (config) {
+          setAgentId(config.id);
+          setEnabledPlugins(new Set(config.plugins ?? []));
+        } else {
+          console.warn('[ChatDetail] no agent config for session:', sessionId);
+        }
+      })
+      .catch((err) => {
+        console.error('[ChatDetail] failed to load agent config:', err);
+      });
+  }, [sessionId]);
+
   const sessionSearchMode = session?.chatConfig?.searchMode;
   const sessionMemoryEnabled = session?.chatConfig?.memory?.enabled;
   const sessionMemoryEffort = session?.chatConfig?.memory?.effort;
@@ -143,6 +171,55 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     setMemoryEnabled(sessionMemoryEnabled !== false);
     setMemoryEffort(sessionMemoryEffort || 'medium');
   }, [session?.id, sessionSearchMode, sessionMemoryEnabled, sessionMemoryEffort]);
+
+  const handlePluginsPress = useCallback(() => {
+    haptics.light();
+    setSkillsSheetVisible(true);
+    setLoadingSkills(true);
+    pluginApi
+      .list()
+      .then((list) => {
+        setInstalledPlugins(list ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSkills(false));
+  }, []);
+
+  const handleTogglePlugin = useCallback(
+    (identifier: string) => {
+      haptics.light();
+      setEnabledPlugins((prev) => {
+        const next = new Set(prev);
+        if (next.has(identifier)) {
+          next.delete(identifier);
+        } else {
+          next.add(identifier);
+        }
+        if (agentId) {
+          const pluginArr = [...next];
+          console.info('[ChatDetail] persisting plugins:', pluginArr, 'agentId:', agentId);
+          agentApi.updateConfig(agentId, { plugins: pluginArr }).catch((err) => {
+            console.error('[ChatDetail] failed to persist plugins:', err);
+          });
+        } else {
+          console.warn('[ChatDetail] agentId is null, cannot persist plugin toggle');
+        }
+        return next;
+      });
+    },
+    [agentId],
+  );
+
+  const selectedProviderLogo = useMemo(
+    () => modelProviders.find((provider) => provider.id === sessionProvider)?.logo,
+    [modelProviders, sessionProvider],
+  );
+  const toolbarProviderLogo =
+    selectedProviderLogo || (sessionProvider ? getProviderIconUrl(sessionProvider) : undefined);
+
+  useEffect(() => {
+    setProviderLogoError(false);
+  }, [toolbarProviderLogo, sessionProvider]);
 
   const sendScale = useSharedValue(1);
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -157,6 +234,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     sendMessage(sessionId, inputText.trim(), activeTopic ?? undefined, {
       memoryEffort,
       memoryEnabled,
+      plugins: enabledPlugins.size > 0 ? [...enabledPlugins] : undefined,
       searchEnabled,
     });
     setInputText('');
@@ -166,6 +244,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     generating,
     sendMessage,
     sessionId,
+    enabledPlugins,
     activeTopic,
     pendingFiles.length,
     memoryEffort,
@@ -176,45 +255,61 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const handleAttach = useCallback(() => {
     const pickImage = async (source: 'camera' | 'gallery') => {
-      const result =
-        source === 'camera'
-          ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
-          : await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: 'images',
-              quality: 0.8,
-              allowsMultipleSelection: true,
-            });
-
-      if (!result.canceled) {
-        for (const asset of result.assets) {
-          addFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: asset.fileName || 'image.jpg',
-            type: asset.mimeType || 'image/jpeg',
-            size: asset.fileSize || 0,
-            uri: asset.uri,
-          });
+      try {
+        if (source === 'camera') {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') return;
+        } else {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') return;
         }
-        toast.show('success', t.toastFilePicked);
+
+        const result =
+          source === 'camera'
+            ? await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.8 })
+            : await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                quality: 0.8,
+                allowsMultipleSelection: true,
+              });
+
+        if (!result.canceled) {
+          for (const asset of result.assets) {
+            addFile({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: asset.fileName || 'image.jpg',
+              type: asset.mimeType || 'image/jpeg',
+              size: asset.fileSize || 0,
+              uri: asset.uri,
+            });
+          }
+          toast.show('success', t.toastFilePicked);
+        }
+      } catch {
+        // user cancelled permission/system prompt, ignore to avoid unhandled rejection
       }
     };
 
     const pickDocument = async () => {
-      const result = await DocumentPicker.getDocumentAsync({
-        multiple: true,
-        copyToCacheDirectory: true,
-      });
-      if (!result.canceled) {
-        for (const asset of result.assets) {
-          addFile({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name: asset.name,
-            type: asset.mimeType || 'application/octet-stream',
-            size: asset.size || 0,
-            uri: asset.uri,
-          });
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          multiple: true,
+          copyToCacheDirectory: true,
+        });
+        if (!result.canceled) {
+          for (const asset of result.assets) {
+            addFile({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: asset.name,
+              type: asset.mimeType || 'application/octet-stream',
+              size: asset.size || 0,
+              uri: asset.uri,
+            });
+          }
+          toast.show('success', t.toastFilePicked);
         }
-        toast.show('success', t.toastFilePicked);
+      } catch {
+        // ignore
       }
     };
 
@@ -229,11 +324,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         { options, cancelButtonIndex: 0, title: t.fileAttach },
         (index) => {
           if (modelSupportsVision) {
-            if (index === 1) pickImage('camera');
-            else if (index === 2) pickImage('gallery');
-            else if (index === 3) pickDocument();
+            if (index === 1) void pickImage('camera');
+            else if (index === 2) void pickImage('gallery');
+            else if (index === 3) void pickDocument();
           } else {
-            if (index === 1) pickDocument();
+            if (index === 1) void pickDocument();
           }
         },
       );
@@ -313,11 +408,33 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     ]);
   }, [messages, t, sessionId, activeTopic, fetchMessages]);
 
+  const handleSaveToTopic = useCallback(async () => {
+    if (activeTopic) {
+      toast.show('info', t.topicTitle);
+      return;
+    }
+    try {
+      const topicId = await topicApi.create(sessionId, t.topicTitle);
+      if (topicId) {
+        haptics.success();
+        toast.show('success', t.topicTitle);
+        fetchTopics(sessionId);
+      }
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
+  }, [sessionId, activeTopic, t, toast, fetchTopics]);
+
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => (
-      <MessageBubble generating={generating} message={item} sessionId={sessionId} />
+      <MessageBubble
+        generating={generating}
+        message={item}
+        sessionId={sessionId}
+        onSaveToTopic={handleSaveToTopic}
+      />
     ),
-    [sessionId, generating],
+    [sessionId, generating, handleSaveToTopic],
   );
 
   return (
@@ -406,6 +523,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           keyExtractor={(item) => item.id}
           ref={flatListRef}
           renderItem={renderMessage}
+          scrollEventThrottle={16}
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center pt-16">
               <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
@@ -450,8 +568,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             paddingBottom: 12,
             paddingTop: 12,
           }}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (isScrolledToBottom.current || generating) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
+          onLayout={() => {
+            if (isScrolledToBottom.current || generating) {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }
+          }}
+          onScroll={(e) => {
+            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+            isScrolledToBottom.current =
+              layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+          }}
         />
 
         {/* Input Area — Floating Pill */}
@@ -498,11 +629,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="w-8 h-8 items-center justify-center rounded-full"
                 onPress={handleModelPress}
               >
-                {sessionProvider && !providerLogoError ? (
+                {toolbarProviderLogo && !providerLogoError ? (
                   <RNImage
                     style={{ width: 20, height: 20, borderRadius: 4 }}
                     source={{
-                      uri: getProviderIconUrl(sessionProvider),
+                      uri: toolbarProviderLogo,
                     }}
                     onError={() => setProviderLogoError(true)}
                   />
@@ -557,13 +688,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 accessibilityLabel="Toggle tools"
                 activeOpacity={0.7}
                 className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
-                onPress={() => {
-                  haptics.light();
-                  setToolsEnabled((v) => !v);
-                }}
+                onPress={handlePluginsPress}
               >
                 <Puzzle
-                  color={toolsEnabled ? primaryColor : semanticColors.muted}
+                  color={enabledPlugins.size > 0 ? primaryColor : semanticColors.muted}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -656,6 +784,74 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           void updateMemoryConfig(value, memoryEffort);
         }}
       />
+
+      {/* Skills Drawer */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={skillsSheetVisible}
+        onRequestClose={() => setSkillsSheetVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end"
+          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          onPress={() => setSkillsSheetVisible(false)}
+        >
+          <Pressable
+            className="bg-white rounded-t-3xl max-h-[70%]"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="items-center pt-3 pb-1">
+              <View className="w-10 h-1 rounded-full bg-black/10" />
+            </View>
+            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
+              <Text className="text-foreground text-[18px] font-bold tracking-tight">
+                {t.skillsTitle}
+              </Text>
+            </View>
+            <ScrollView className="px-5 pb-8" style={{ maxHeight: 400 }}>
+              {loadingSkills ? (
+                <View className="items-center py-10">
+                  <ActivityIndicator color={semanticColors.primary} size="small" />
+                </View>
+              ) : installedPlugins.length === 0 ? (
+                <View className="items-center py-10">
+                  <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
+                  <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
+                    {t.skillsEmptyDesc}
+                  </Text>
+                </View>
+              ) : (
+                installedPlugins.map((plugin) => (
+                  <View
+                    className="flex-row items-center py-3.5 border-b border-black/[0.04]"
+                    key={plugin.identifier}
+                  >
+                    <View className="flex-1 mr-3">
+                      <Text
+                        className="text-foreground text-[15px] font-medium tracking-tight"
+                        numberOfLines={1}
+                      >
+                        {plugin.manifest?.meta?.title || plugin.identifier}
+                      </Text>
+                      {plugin.manifest?.meta?.description ? (
+                        <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                          {plugin.manifest.meta.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Switch
+                      trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                      value={enabledPlugins.has(plugin.identifier)}
+                      onValueChange={() => handleTogglePlugin(plugin.identifier)}
+                    />
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

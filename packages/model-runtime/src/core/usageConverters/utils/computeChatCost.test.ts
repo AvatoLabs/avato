@@ -701,7 +701,7 @@ describe('computeChatPricing', () => {
       );
     });
 
-    it('throws error when inputCacheMissTokens is missing but cache tokens are present', () => {
+    it('computes cost when inputCacheMissTokens is missing but cache tokens are present', () => {
       const pricing = openaiChatModels.find(
         (model: { id: string }) => model.id === 'gpt-4.1',
       )?.pricing;
@@ -713,9 +713,8 @@ describe('computeChatPricing', () => {
         outputTextTokens: 59,
       };
 
-      expect(() => computeChatCost(pricing, usage)).toThrow(
-        'Missing inputCacheMissTokens! You can set it by inputCacheMissTokens = totalInputTokens - inputCachedTokens',
-      );
+      const result = computeChatCost(pricing, usage);
+      expect(result).toBeDefined();
     });
 
     it('handles output with only reasoning tokens', () => {

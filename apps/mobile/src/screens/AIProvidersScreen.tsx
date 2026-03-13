@@ -29,6 +29,7 @@ import { semanticColors } from '../constants/colors';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useModelStore } from '../store/model';
 import { tokens } from '../theme/tokens';
 import type { AiProviderListItem } from '../types';
 
@@ -70,6 +71,7 @@ function ProviderLogo({
 export default function AIProvidersScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const refreshModelStore = useModelStore((s) => s.fetchModels);
 
   const [providers, setProviders] = useState<AiProviderListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,7 @@ export default function AIProvidersScreen({ navigation }: any) {
 
     try {
       await aiProviderApi.toggleEnabled(id, newEnabled);
+      void refreshModelStore(true);
     } catch {
       // Revert
       setProviders((prev) =>

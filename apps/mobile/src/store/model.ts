@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import { aiProviderApi } from '../lib/api';
+import { aiProviderApi, sessionApi } from '../lib/api';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
 const CACHE_KEY = 'minkhub_model_cache';
@@ -170,6 +170,16 @@ export const useModelStore = create<ModelState>((set, get) => ({
       existing.provider = providerId;
       existing.vision = supportsVision;
       await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
+
+      // Also update backend so ChatListScreen can show the correct logo
+      try {
+        await sessionApi.updateChatConfig(sessionId, {
+          model: modelId,
+          provider: providerId,
+        });
+      } catch {
+        /* best-effort */
+      }
     }
 
     await AsyncStorage.setItem(SELECTED_MODEL_KEY, modelId);
