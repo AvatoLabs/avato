@@ -12,7 +12,9 @@ import {
   ArrowLeft,
   Blocks,
   ChevronRight,
-  Download,
+  FileArchive,
+  Github,
+  Link as LinkIcon,
   Plus,
   Puzzle,
   RefreshCw,
@@ -24,6 +26,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
@@ -37,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { agentSkillApi, pluginApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -218,22 +222,24 @@ function PluginRow({
   );
 }
 
-// ── Import Modal ──────────────────────────────────────────────────
-function ImportModal({
+// ── Simple Import Modal (URL or GitHub) ───────────────────────────
+function SimpleImportModal({
   visible,
   onClose,
-  onImportUrl,
-  onImportGitHub,
-  t,
+  onImport,
+  title,
+  placeholder,
+  buttonText,
 }: {
+  buttonText: string;
   onClose: () => void;
-  onImportGitHub: (url: string) => void;
-  onImportUrl: (url: string) => void;
+  onImport: (value: string) => Promise<void>;
+  placeholder: string;
   t: any;
+  title: string;
   visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<'url' | 'github'>('url');
   const [value, setValue] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -241,11 +247,7 @@ function ImportModal({
     if (!value.trim()) return;
     setImporting(true);
     try {
-      if (mode === 'github') {
-        await onImportGitHub(value.trim());
-      } else {
-        await onImportUrl(value.trim());
-      }
+      await onImport(value.trim());
       setValue('');
       onClose();
     } catch {
@@ -257,57 +259,39 @@ function ImportModal({
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-background rounded-t-3xl" style={{ paddingBottom: insets.bottom + 16 }}>
-          <View className="px-6 pt-6 pb-4">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-foreground text-[18px] font-semibold">{t.skillsImport}</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text className="text-blue-500 text-[15px] font-medium">{t.done}</Text>
-              </TouchableOpacity>
-            </View>
+      <Pressable
+        className="flex-1 justify-end"
+        style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        onPress={onClose}
+      >
+        <Pressable
+          className="bg-white rounded-t-3xl"
+          style={{ paddingBottom: insets.bottom + 16 }}
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Handle */}
+          <View className="items-center pt-3 pb-1">
+            <View className="w-10 h-1 rounded-full bg-black/10" />
+          </View>
 
-            {/* Tab switcher */}
-            <View className="flex-row mb-4 bg-foreground/5 rounded-xl p-1">
-              <TouchableOpacity
-                className={`flex-1 py-2 rounded-lg items-center ${mode === 'url' ? 'bg-background' : ''}`}
-                onPress={() => setMode('url')}
-              >
-                <Text
-                  className={`text-[13px] font-medium ${mode === 'url' ? 'text-foreground' : 'text-secondary/60'}`}
-                >
-                  {t.skillsImportUrl}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className={`flex-1 py-2 rounded-lg items-center ${mode === 'github' ? 'bg-background' : ''}`}
-                onPress={() => setMode('github')}
-              >
-                <Text
-                  className={`text-[13px] font-medium ${mode === 'github' ? 'text-foreground' : 'text-secondary/60'}`}
-                >
-                  {t.skillsImportGithub}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          <View className="px-5 pb-4 pt-2">
+            <Text className="text-foreground text-[18px] font-bold tracking-tight mb-4">
+              {title}
+            </Text>
 
-            {/* Input */}
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
               className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-4"
               editable={!importing}
+              placeholder={placeholder}
               placeholderTextColor="#999"
               value={value}
-              placeholder={
-                mode === 'url' ? t.skillsImportUrlPlaceholder : t.skillsImportGithubPlaceholder
-              }
               onChangeText={setValue}
             />
 
-            {/* Import button */}
-            <TouchableOpacity
-              className={`rounded-xl py-3.5 items-center ${value.trim() ? 'bg-blue-500' : 'bg-foreground/10'}`}
+            <Pressable
+              className={`rounded-xl py-3.5 items-center ${value.trim() ? 'bg-primary' : 'bg-foreground/5'}`}
               disabled={!value.trim() || importing}
               onPress={handleImport}
             >
@@ -317,18 +301,54 @@ function ImportModal({
                 <Text
                   className={`font-semibold text-[15px] ${value.trim() ? 'text-white' : 'text-secondary/40'}`}
                 >
-                  {t.skillsImport}
+                  {buttonText}
                 </Text>
               )}
-            </TouchableOpacity>
+            </Pressable>
           </View>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
 
-// ── Add Custom MCP Modal ──────────────────────────────────────────
+// ── Quick Import JSON parser (HTTP only) ──────────────────────────
+function parseMcpJsonInput(value: string): {
+  error?: string;
+  identifier?: string;
+  url?: string;
+} {
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { error: 'invalidJson' };
+    }
+
+    // { "mcpServers": { "name": { "url": "..." } } }
+    if ('mcpServers' in parsed && typeof parsed.mcpServers === 'object') {
+      const keys = Object.keys(parsed.mcpServers);
+      if (keys.length === 0) return { error: 'invalidStructure' };
+      const id = keys[0];
+      const cfg = parsed.mcpServers[id];
+      if (cfg?.url) return { identifier: id, url: cfg.url };
+      return { error: 'invalidStructure' };
+    }
+
+    // { "name": { "url": "..." } }
+    const topKeys = Object.keys(parsed);
+    if (topKeys.length === 1) {
+      const id = topKeys[0];
+      const cfg = parsed[id];
+      if (cfg?.url) return { identifier: id, url: cfg.url };
+    }
+
+    return { error: 'invalidStructure' };
+  } catch {
+    return { error: 'invalidJson' };
+  }
+}
+
+// ── Add Custom MCP Modal (aligned with web DevModal) ─────────────
 function AddCustomMcpModal({
   visible,
   onClose,
@@ -336,22 +356,138 @@ function AddCustomMcpModal({
   t,
 }: {
   onClose: () => void;
-  onSave: (name: string, url: string) => void;
+  onSave: (params: {
+    auth?: { token?: string; type: 'none' | 'bearer' };
+    avatar?: string;
+    description?: string;
+    headers?: Record<string, string>;
+    identifier: string;
+    url: string;
+  }) => void;
   t: any;
   visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [url, setUrl] = useState('');
+  const [authType, setAuthType] = useState<'none' | 'bearer'>('none');
+  const [token, setToken] = useState('');
+  const [description, setDescription] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [headers, setHeaders] = useState<{ key: string; value: string }[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showQuickImport, setShowQuickImport] = useState(false);
+  const [quickImportText, setQuickImportText] = useState('');
+  const [quickImportError, setQuickImportError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<'success' | 'failed' | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const isConnectionReady = Boolean(identifier.trim() && url.trim());
+  const isQuickImportReady = Boolean(quickImportText.trim());
+
+  const resetForm = () => {
+    setIdentifier('');
+    setUrl('');
+    setAuthType('none');
+    setToken('');
+    setDescription('');
+    setAvatar('');
+    setHeaders([]);
+    setShowAdvanced(false);
+    setShowQuickImport(false);
+    setQuickImportText('');
+    setQuickImportError(null);
+    setSaving(false);
+    setTesting(false);
+    setTestResult(null);
+    setErrors({});
+  };
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!identifier.trim()) errs.identifier = t.skillsCustomMcpIdentifierRequired;
+    else if (!/^[\w-]+$/.test(identifier.trim()))
+      errs.identifier = t.skillsCustomMcpIdentifierInvalid;
+    if (!url.trim()) errs.url = t.skillsCustomMcpUrlRequired;
+    else {
+      try {
+        new URL(url.trim());
+      } catch {
+        errs.url = t.skillsCustomMcpUrlInvalid;
+      }
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleQuickImport = () => {
+    const text = quickImportText.trim();
+    if (!text) {
+      setQuickImportError(t.skillsCustomMcpQuickImportError);
+      return;
+    }
+    const result = parseMcpJsonInput(text);
+    if (result.error === 'invalidJson') {
+      setQuickImportError(t.skillsCustomMcpQuickImportInvalidJson);
+      return;
+    }
+    if (result.error === 'invalidStructure') {
+      setQuickImportError(t.skillsCustomMcpQuickImportInvalidStructure);
+      return;
+    }
+    if (result.identifier) setIdentifier(result.identifier);
+    if (result.url) setUrl(result.url);
+    setShowQuickImport(false);
+    setQuickImportError(null);
+    setTestResult(null);
+  };
+
+  const handleTestConnection = async () => {
+    if (!validate()) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { mcpApi } = await import('../lib/api');
+      const headersObj = headers.reduce<Record<string, string>>((acc, h) => {
+        if (h.key.trim()) acc[h.key.trim()] = h.value;
+        return acc;
+      }, {});
+      await mcpApi.getStreamableMcpServerManifest({
+        auth: authType === 'bearer' ? { token, type: 'bearer' } : { type: 'none' },
+        headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
+        identifier: identifier.trim(),
+        metadata: {
+          avatar: avatar.trim() || undefined,
+          description: description.trim() || undefined,
+        },
+        url: url.trim(),
+      });
+      setTestResult('success');
+    } catch {
+      setTestResult('failed');
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const handleSave = async () => {
-    if (!name.trim() || !url.trim()) return;
+    if (!validate()) return;
     setSaving(true);
     try {
-      await onSave(name.trim(), url.trim());
-      setName('');
-      setUrl('');
+      const headersObj = headers.reduce<Record<string, string>>((acc, h) => {
+        if (h.key.trim()) acc[h.key.trim()] = h.value;
+        return acc;
+      }, {});
+      await onSave({
+        auth: authType === 'bearer' ? { token, type: 'bearer' } : undefined,
+        avatar: avatar.trim() || undefined,
+        description: description.trim() || undefined,
+        headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
+        identifier: identifier.trim(),
+        url: url.trim(),
+      });
+      resetForm();
       onClose();
     } catch {
       // error handled by caller
@@ -360,69 +496,380 @@ function AddCustomMcpModal({
     }
   };
 
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-background rounded-t-3xl" style={{ paddingBottom: insets.bottom + 16 }}>
-          <View className="px-6 pt-6 pb-4">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-foreground text-[18px] font-semibold">
+    <Modal transparent animationType="slide" visible={visible} onRequestClose={handleClose}>
+      <Pressable
+        className="flex-1 justify-end"
+        style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        onPress={handleClose}
+      >
+        <Pressable
+          className="bg-white rounded-t-3xl"
+          style={{ maxHeight: '90%', paddingBottom: insets.bottom + 16 }}
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Handle */}
+          <View className="items-center pt-3 pb-1">
+            <View className="w-10 h-1 rounded-full bg-black/10" />
+          </View>
+
+          <ScrollView
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View className="px-5 pb-4 pt-2">
+              {/* Header */}
+              <Text className="text-foreground text-[18px] font-bold tracking-tight mb-4">
                 {t.skillsAddCustomMcp}
               </Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text className="text-blue-500 text-[15px] font-medium">{t.done}</Text>
-              </TouchableOpacity>
-            </View>
 
-            {/* Name */}
-            <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
-              {t.skillsCustomMcpName}
-            </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
-              editable={!saving}
-              placeholder={t.skillsCustomMcpNamePlaceholder}
-              placeholderTextColor="#999"
-              value={name}
-              onChangeText={setName}
-            />
-
-            {/* URL */}
-            <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
-              {t.skillsCustomMcpUrl}
-            </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-4"
-              editable={!saving}
-              placeholder={t.skillsCustomMcpUrlPlaceholder}
-              placeholderTextColor="#999"
-              value={url}
-              onChangeText={setUrl}
-            />
-
-            {/* Save button */}
-            <TouchableOpacity
-              className={`rounded-xl py-3.5 items-center ${name.trim() && url.trim() ? 'bg-blue-500' : 'bg-foreground/10'}`}
-              disabled={!name.trim() || !url.trim() || saving}
-              onPress={handleSave}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
+              {/* Quick Import */}
+              {showQuickImport ? (
+                <View className="mb-4">
+                  {quickImportError && (
+                    <View
+                      className="rounded-xl px-4 py-2.5 mb-2"
+                      style={{ backgroundColor: 'rgba(255,59,48,0.12)' }}
+                    >
+                      <Text className="text-red-500 text-[13px]">{quickImportError}</Text>
+                    </View>
+                  )}
+                  <TextInput
+                    multiline
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[13px] mb-2"
+                    numberOfLines={8}
+                    placeholder={t.skillsCustomMcpQuickImportPlaceholder}
+                    placeholderTextColor="#999"
+                    value={quickImportText}
+                    style={{
+                      borderColor: 'rgba(0,0,0,0.08)',
+                      borderWidth: 1,
+                      minHeight: 160,
+                      textAlignVertical: 'top',
+                    }}
+                    onChangeText={(v) => {
+                      setQuickImportText(v);
+                      if (quickImportError) setQuickImportError(null);
+                    }}
+                  />
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      className="flex-1 py-2.5 px-4 rounded-lg items-center"
+                      style={{ borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1 }}
+                      onPress={() => setShowQuickImport(false)}
+                    >
+                      <Text className="text-secondary/60 text-[13px] font-semibold">
+                        {t.cancel}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      className={`flex-1 rounded-lg py-2.5 px-4 items-center active:opacity-80 ${isQuickImportReady ? 'bg-primary' : 'bg-foreground/10'}`}
+                      disabled={!isQuickImportReady}
+                      onPress={handleQuickImport}
+                    >
+                      <Text
+                        className={`text-[13px] font-semibold ${isQuickImportReady ? 'text-white' : 'text-secondary/40'}`}
+                      >
+                        {t.confirm}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
               ) : (
-                <Text
-                  className={`font-semibold text-[15px] ${name.trim() && url.trim() ? 'text-white' : 'text-secondary/40'}`}
+                <Pressable
+                  className="rounded-2xl py-3.5 items-center mb-4 active:opacity-80"
+                  style={{
+                    backgroundColor: 'rgba(0,122,255,0.06)',
+                    borderColor: 'rgba(0,122,255,0.35)',
+                    borderRadius: 16,
+                    borderStyle: 'dashed',
+                    borderWidth: 1.5,
+                  }}
+                  onPress={() => {
+                    setQuickImportError(null);
+                    setShowQuickImport(true);
+                  }}
                 >
-                  {t.save}
-                </Text>
+                  <Text className="text-primary text-[14px] font-semibold">
+                    {t.skillsCustomMcpQuickImport}
+                  </Text>
+                </Pressable>
               )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+
+              {/* Identifier */}
+              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                {t.skillsCustomMcpIdentifier}
+              </Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                className={`bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-1 ${errors.identifier ? 'border border-red-500' : ''}`}
+                editable={!saving}
+                placeholder={t.skillsCustomMcpIdentifierPlaceholder}
+                placeholderTextColor="#999"
+                value={identifier}
+                onChangeText={(v) => {
+                  setIdentifier(v);
+                  if (errors.identifier) setErrors((e) => ({ ...e, identifier: '' }));
+                  setTestResult(null);
+                }}
+              />
+              {errors.identifier ? (
+                <Text className="text-red-500 text-[11px] mb-2">{errors.identifier}</Text>
+              ) : (
+                <View className="mb-2" />
+              )}
+
+              {/* URL */}
+              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                {t.skillsCustomMcpUrl}
+              </Text>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                className={`bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-1 ${errors.url ? 'border border-red-500' : ''}`}
+                editable={!saving}
+                keyboardType="url"
+                placeholder={t.skillsCustomMcpUrlPlaceholder}
+                placeholderTextColor="#999"
+                value={url}
+                onChangeText={(v) => {
+                  setUrl(v);
+                  if (errors.url) setErrors((e) => ({ ...e, url: '' }));
+                  setTestResult(null);
+                }}
+              />
+              {errors.url ? (
+                <Text className="text-red-500 text-[11px] mb-2">{errors.url}</Text>
+              ) : (
+                <View className="mb-2" />
+              )}
+
+              {/* Auth */}
+              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                {t.skillsCustomMcpAuth}
+              </Text>
+              <View
+                className="flex-row mb-3 bg-foreground/5 rounded-xl p-1"
+                style={{ borderColor: 'rgba(0,0,0,0.06)', borderWidth: 1 }}
+              >
+                <Pressable
+                  className={`flex-1 py-2.5 rounded-lg items-center border ${
+                    authType === 'none' ? 'bg-primary/10 border-primary/20' : 'border-transparent'
+                  }`}
+                  onPress={() => setAuthType('none')}
+                >
+                  <Text
+                    className={`text-[13px] font-semibold ${authType === 'none' ? 'text-primary' : 'text-secondary/60'}`}
+                  >
+                    {t.skillsCustomMcpAuthNone}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  className={`flex-1 py-2.5 rounded-lg items-center border ${
+                    authType === 'bearer' ? 'bg-primary/10 border-primary/20' : 'border-transparent'
+                  }`}
+                  onPress={() => setAuthType('bearer')}
+                >
+                  <Text
+                    className={`text-[13px] font-semibold ${authType === 'bearer' ? 'text-primary' : 'text-secondary/60'}`}
+                  >
+                    {t.skillsCustomMcpAuthBearer}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {authType === 'bearer' && (
+                <>
+                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                    {t.skillsCustomMcpToken}
+                  </Text>
+                  <TextInput
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
+                    editable={!saving}
+                    placeholder={t.skillsCustomMcpTokenPlaceholder}
+                    placeholderTextColor="#999"
+                    value={token}
+                    onChangeText={setToken}
+                  />
+                </>
+              )}
+
+              {/* Test Connection */}
+              <View className="mb-3">
+                <Pressable
+                  disabled={!isConnectionReady || testing}
+                  style={{ borderColor: 'rgba(0,0,0,0.08)', borderWidth: 1 }}
+                  className={`rounded-xl py-3 items-center active:opacity-80 ${
+                    isConnectionReady ? 'bg-primary' : 'bg-foreground/5'
+                  }`}
+                  onPress={handleTestConnection}
+                >
+                  {testing ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text
+                      className={`text-[13px] font-semibold ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                    >
+                      {t.skillsCustomMcpTestConnection}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+
+              {testResult && (
+                <View
+                  className={`rounded-xl px-4 py-2.5 mb-3 ${testResult === 'success' ? 'bg-green-500/10' : 'bg-red-500/10'}`}
+                >
+                  <Text
+                    className={`text-[13px] ${testResult === 'success' ? 'text-green-600' : 'text-red-500'}`}
+                  >
+                    {testResult === 'success'
+                      ? t.skillsCustomMcpTestSuccess
+                      : t.skillsCustomMcpTestFailed}
+                  </Text>
+                </View>
+              )}
+
+              {/* Advanced Toggle */}
+              <Pressable
+                className="flex-row items-center justify-between px-3 py-3 rounded-xl mb-2 active:opacity-80"
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.03)',
+                  borderColor: 'rgba(0,0,0,0.06)',
+                  borderWidth: 1,
+                }}
+                onPress={() => setShowAdvanced(!showAdvanced)}
+              >
+                <Text
+                  className={`text-[13px] font-semibold ${showAdvanced ? 'text-primary' : 'text-foreground/70'}`}
+                >
+                  {t.skillsCustomMcpAdvanced}
+                </Text>
+                <ChevronRight
+                  color={showAdvanced ? semanticColors.primary : '#999'}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ transform: [{ rotate: showAdvanced ? '90deg' : '0deg' }] }}
+                />
+              </Pressable>
+
+              {showAdvanced && (
+                <>
+                  {/* Headers */}
+                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                    {t.skillsCustomMcpHeaders}
+                  </Text>
+                  {headers.map((h, i) => (
+                    <View className="flex-row gap-2 mb-2" key={i}>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
+                        placeholder={t.skillsCustomMcpHeaderKey}
+                        placeholderTextColor="#999"
+                        value={h.key}
+                        onChangeText={(v) => {
+                          const newH = [...headers];
+                          newH[i] = { ...newH[i], key: v };
+                          setHeaders(newH);
+                        }}
+                      />
+                      <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
+                        placeholder={t.skillsCustomMcpHeaderValue}
+                        placeholderTextColor="#999"
+                        value={h.value}
+                        onChangeText={(v) => {
+                          const newH = [...headers];
+                          newH[i] = { ...newH[i], value: v };
+                          setHeaders(newH);
+                        }}
+                      />
+                      <Pressable
+                        className="justify-center px-1 active:opacity-60"
+                        onPress={() => setHeaders(headers.filter((_, idx) => idx !== i))}
+                      >
+                        <Trash2 color="#ff3b30" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable
+                    className="mb-3 active:opacity-60"
+                    onPress={() => setHeaders([...headers, { key: '', value: '' }])}
+                  >
+                    <Text className="text-primary text-[13px] font-medium">
+                      + {t.skillsCustomMcpHeadersAdd}
+                    </Text>
+                  </Pressable>
+
+                  {/* Description */}
+                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                    {t.skillsCustomMcpDesc}
+                  </Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
+                    editable={!saving}
+                    placeholder={t.skillsCustomMcpDescPlaceholder}
+                    placeholderTextColor="#999"
+                    value={description}
+                    onChangeText={setDescription}
+                  />
+
+                  {/* Avatar */}
+                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                    {t.skillsCustomMcpAvatar}
+                  </Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
+                    editable={!saving}
+                    keyboardType="url"
+                    placeholder={t.skillsCustomMcpAvatarPlaceholder}
+                    placeholderTextColor="#999"
+                    value={avatar}
+                    onChangeText={setAvatar}
+                  />
+                </>
+              )}
+
+              {/* Save button */}
+              <Pressable
+                className={`rounded-xl py-3.5 items-center mt-2 active:opacity-80 ${isConnectionReady ? 'bg-primary' : 'bg-foreground/5'}`}
+                disabled={!isConnectionReady || saving}
+                style={{ borderColor: 'rgba(0,0,0,0.08)', borderWidth: 1 }}
+                onPress={handleSave}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text
+                    className={`font-semibold text-[15px] ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                  >
+                    {t.save}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -437,7 +884,8 @@ export default function SkillSettingsScreen({ navigation }: any) {
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [importVisible, setImportVisible] = useState(false);
+  const [importUrlVisible, setImportUrlVisible] = useState(false);
+  const [importGithubVisible, setImportGithubVisible] = useState(false);
   const [addMcpVisible, setAddMcpVisible] = useState(false);
 
   // ── Fetch data ────────────────────────────────────────────────
@@ -527,18 +975,37 @@ export default function SkillSettingsScreen({ navigation }: any) {
     }
   };
 
-  const handleAddCustomMcp = async (name: string, url: string) => {
+  const handleAddCustomMcp = async (params: {
+    auth?: { token?: string; type: 'none' | 'bearer' };
+    avatar?: string;
+    description?: string;
+    headers?: Record<string, string>;
+    identifier: string;
+    url: string;
+  }) => {
     try {
-      const identifier = `custom-mcp-${Date.now()}`;
+      const mcpConfig: Record<string, any> = { type: 'http', url: params.url };
+      if (params.auth && params.auth.type !== 'none') {
+        mcpConfig.auth = params.auth;
+      }
+      if (params.headers) {
+        mcpConfig.headers = params.headers;
+      }
+
       await pluginApi.create({
         customParams: {
-          mcp: { type: 'http', url },
-          name,
+          avatar: params.avatar,
+          description: params.description,
+          mcp: mcpConfig,
         },
-        identifier,
+        identifier: params.identifier,
         manifest: {
-          identifier,
-          meta: { description: url, title: name },
+          identifier: params.identifier,
+          meta: {
+            avatar: params.avatar,
+            description: params.description || params.url,
+            title: params.identifier,
+          },
         },
         type: 'customPlugin',
       });
@@ -682,19 +1149,36 @@ export default function SkillSettingsScreen({ navigation }: any) {
             </>
           )}
 
-          {/* Action Buttons */}
-          <View className="px-5 mt-6 gap-3">
+          {/* Action Buttons — aligned with web AddSkillButton dropdown */}
+          <View className="px-5 mt-6 gap-2">
             <Animated.View entering={FadeInDown.delay(200).duration(300)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
-                onPress={() => setImportVisible(true)}
+                onPress={() => setImportUrlVisible(true)}
               >
                 <View className="flex-row items-center px-4 py-3.5">
                   <View className="w-8 h-8 rounded-full bg-blue-500/10 items-center justify-center mr-3">
-                    <Download color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                    <LinkIcon color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
                   </View>
                   <Text className="flex-1 text-foreground font-medium text-[15px]">
-                    {t.skillsImport}
+                    {t.skillsImportUrl}
+                  </Text>
+                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+              </PressableScale>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(225).duration(300)}>
+              <PressableScale
+                className="bg-foreground/5 rounded-2xl overflow-hidden"
+                onPress={() => setImportGithubVisible(true)}
+              >
+                <View className="flex-row items-center px-4 py-3.5">
+                  <View className="w-8 h-8 rounded-full bg-foreground/10 items-center justify-center mr-3">
+                    <Github color="#333" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  </View>
+                  <Text className="flex-1 text-foreground font-medium text-[15px]">
+                    {t.skillsImportGithub}
                   </Text>
                   <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
@@ -702,6 +1186,29 @@ export default function SkillSettingsScreen({ navigation }: any) {
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(250).duration(300)}>
+              <PressableScale
+                className="bg-foreground/5 rounded-2xl overflow-hidden"
+                onPress={() => {
+                  // TODO: Upload ZIP (requires file picker integration)
+                  toast.show('info', 'Coming soon');
+                }}
+              >
+                <View className="flex-row items-center px-4 py-3.5">
+                  <View className="w-8 h-8 rounded-full bg-orange-500/10 items-center justify-center mr-3">
+                    <FileArchive color="#f97316" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  </View>
+                  <Text className="flex-1 text-foreground font-medium text-[15px]">
+                    {t.skillsUploadZip}
+                  </Text>
+                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+              </PressableScale>
+            </Animated.View>
+
+            {/* Divider */}
+            <View className="h-px bg-foreground/10 mx-2 my-1" />
+
+            <Animated.View entering={FadeInDown.delay(275).duration(300)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
                 onPress={() => setAddMcpVisible(true)}
@@ -722,12 +1229,23 @@ export default function SkillSettingsScreen({ navigation }: any) {
       )}
 
       {/* Modals */}
-      <ImportModal
+      <SimpleImportModal
+        buttonText={t.skillsImportUrl}
+        placeholder={t.skillsImportUrlPlaceholder}
         t={t}
-        visible={importVisible}
-        onClose={() => setImportVisible(false)}
-        onImportGitHub={handleImportGitHub}
-        onImportUrl={handleImportUrl}
+        title={t.skillsImportUrl}
+        visible={importUrlVisible}
+        onClose={() => setImportUrlVisible(false)}
+        onImport={handleImportUrl}
+      />
+      <SimpleImportModal
+        buttonText={t.skillsImportGithub}
+        placeholder={t.skillsImportGithubPlaceholder}
+        t={t}
+        title={t.skillsImportGithub}
+        visible={importGithubVisible}
+        onClose={() => setImportGithubVisible(false)}
+        onImport={handleImportGitHub}
       />
       <AddCustomMcpModal
         t={t}

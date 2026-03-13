@@ -3,8 +3,10 @@
 import { LoadingOutlined } from '@ant-design/icons';
 import { Spin, Upload } from 'antd';
 import React, { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { fetchErrorNotification } from '@/components/Error/fetchErrorNotification';
+import { resolveAvatarUploadError } from '@/features/User/utils/resolveAvatarUploadError';
 import { useUserStore } from '@/store/user';
 import { imageToBase64 } from '@/utils/imageToBase64';
 import { createUploadImageHandler } from '@/utils/uploadFIle';
@@ -19,12 +21,14 @@ interface AvatarWithUploadProps extends UserAvatarProps {
 const AvatarWithUpload = memo<AvatarWithUploadProps>(
   ({ size = 40, compressSize = 256, ...rest }) => {
     const updateAvatar = useUserStore((state) => state.updateAvatar);
+    const { t } = useTranslation();
     const [uploading, setUploading] = React.useState<boolean>(false);
 
     const handleUploadAvatar = useCallback(
       createUploadImageHandler(async (avatar) => {
+        setUploading(true);
+
         try {
-          setUploading(true);
           // 准备图像
           const img = new Image();
           img.src = avatar;
@@ -40,19 +44,14 @@ const AvatarWithUpload = memo<AvatarWithUploadProps>(
 
           // 上传头像
           await updateAvatar(webpBase64);
-
-          setUploading(false);
         } catch (error) {
           console.error('Failed to upload avatar:', error);
+          fetchErrorNotification.error(resolveAvatarUploadError(error, t));
+        } finally {
           setUploading(false);
-
-          fetchErrorNotification.error({
-            errorMessage: error instanceof Error ? error.message : String(error),
-            status: 500,
-          });
         }
       }),
-      [compressSize, updateAvatar],
+      [compressSize, t, updateAvatar],
     );
 
     return (

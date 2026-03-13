@@ -18,20 +18,23 @@ const styles = createStaticStyles(({ css }) => ({
     min-width: 32px;
 
     .${ACTION_CLASS_NAME} {
-      width: 0;
+      transform: translateX(2px);
       margin-inline-end: 2px;
-      opacity: 0;
-      transition: opacity 0.2s ${cssVar.motionEaseOut};
+      opacity: 0.56;
+      transition:
+        opacity 0.2s ${cssVar.motionEaseOut},
+        transform 0.2s ${cssVar.motionEaseOut};
 
       &:has([data-popup-open]) {
-        width: unset;
+        transform: translateX(0);
         opacity: 1;
       }
     }
 
-    &:hover {
+    &:hover,
+    &:focus-within {
       .${ACTION_CLASS_NAME} {
-        width: unset;
+        transform: translateX(0);
         opacity: 1;
       }
     }

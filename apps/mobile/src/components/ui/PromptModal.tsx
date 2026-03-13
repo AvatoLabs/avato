@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { semanticColors } from '../../constants/colors';
+import { useI18n } from '../../lib/i18n';
+
 interface PromptModalProps {
   defaultValue?: string;
   keyboardType?: 'default' | 'decimal-pad' | 'number-pad';
@@ -17,13 +20,15 @@ export default function PromptModal({
   title,
   placeholder,
   defaultValue = '',
-  submitLabel = 'OK',
+  submitLabel,
   keyboardType = 'default',
   onSubmit,
   onCancel,
 }: PromptModalProps) {
+  const { t } = useI18n();
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<TextInput>(null);
+  const finalSubmitLabel = submitLabel || t.confirm;
 
   useEffect(() => {
     if (visible) {
@@ -54,7 +59,7 @@ export default function PromptModal({
               className="bg-foreground/5 rounded-xl px-3.5 py-2.5 text-foreground text-[15px]"
               keyboardType={keyboardType}
               placeholder={placeholder}
-              placeholderTextColor="#999"
+              placeholderTextColor={semanticColors.muted}
               ref={inputRef}
               returnKeyType="done"
               value={value}
@@ -68,14 +73,14 @@ export default function PromptModal({
               className="flex-1 py-3.5 items-center border-r border-black/10"
               onPress={onCancel}
             >
-              <Text className="text-[16px] text-gray-500 font-medium">Cancel</Text>
+              <Text className="text-[16px] text-gray-500 font-medium">{t.cancel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.6}
               className="flex-1 py-3.5 items-center"
               onPress={handleSubmit}
             >
-              <Text className="text-[16px] text-primary font-semibold">{submitLabel}</Text>
+              <Text className="text-[16px] text-primary font-semibold">{finalSubmitLabel}</Text>
             </TouchableOpacity>
           </View>
         </Pressable>

@@ -16,6 +16,8 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
+import { getProviderIconUrl } from '../constants/cdn';
+import { semanticColors } from '../constants/colors';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -177,12 +179,9 @@ function providerInitials(id: string): string {
   return map[id] ?? id.slice(0, 2).toUpperCase();
 }
 
-/** CDN URL pattern for @lobehub/icons-static-png (same as web mock data) */
-const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
-
 function getProviderLogoUrl(providerId: string, logoUrl?: string): string {
   if (logoUrl) return logoUrl;
-  return `${ICON_CDN_BASE}/light/${providerId}.png`;
+  return getProviderIconUrl(providerId);
 }
 
 /** Renders a provider logo as a round Image with initials fallback */
@@ -389,7 +388,11 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                   )}
                 </View>
                 {selected === model.id && (
-                  <Check color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <Check
+                    color={semanticColors.primary}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 )}
               </PressableScale>
             );
@@ -417,7 +420,11 @@ export default function ModelPickerScreen({ navigation, route }: any) {
             {t.modelPickerOffline}
           </Text>
           <PressableScale onPress={fetchModels}>
-            <RefreshCw color="#007aff" size={14} strokeWidth={tokens.icon.strokeWidth} />
+            <RefreshCw
+              color={semanticColors.primary}
+              size={14}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           </PressableScale>
         </View>
         {groups.map(([provider, models], gi) => {
@@ -461,7 +468,11 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                       )}
                     </View>
                     {selected === model.id && (
-                      <Check color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                      <Check
+                        color={semanticColors.primary}
+                        size={20}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
                     )}
                   </PressableScale>
                 ))}
@@ -492,7 +503,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#007aff" size="large" />
+          <ActivityIndicator color={semanticColors.primary} size="large" />
           <Text className="text-secondary/50 text-[13px] mt-3 font-medium">{t.loading}</Text>
         </View>
       ) : (

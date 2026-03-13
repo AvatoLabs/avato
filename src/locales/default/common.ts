@@ -202,6 +202,8 @@ export default {
 
   'cmdk.newPage': 'Create New Page',
 
+  'newSession': 'New conversation',
+
   'cmdk.newTopic': 'New Topic in Current Agent',
 
   'cmdk.noResults': 'No Results found',

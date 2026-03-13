@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { semanticColors } from '../constants/colors';
 import { type MarketListItem, marketSkillApi, pluginApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -117,7 +118,7 @@ export default function SkillMarketScreen() {
         await marketSkillApi.install(item);
         setInstalledIds((prev) => new Set(prev).add(item.identifier));
       } catch {
-        Alert.alert(t.errorUnknown || 'Error', t.skillsImportFailed || 'Failed to install skill.');
+        Alert.alert(t.errorUnknown, t.skillsImportFailed);
       } finally {
         setInstalling(null);
       }
@@ -160,11 +161,15 @@ export default function SkillMarketScreen() {
               onPress={() => handleInstall(item)}
             >
               {isInstalling ? (
-                <ActivityIndicator color="#007aff" size="small" />
+                <ActivityIndicator color={semanticColors.primary} size="small" />
               ) : isInstalled ? (
                 <Check color="#22c55e" size={16} strokeWidth={tokens.icon.strokeWidth} />
               ) : (
-                <Download color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <Download
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               )}
             </TouchableOpacity>
           </View>
@@ -178,7 +183,7 @@ export default function SkillMarketScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         leftElement={<ChevronLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
-        title={t.skillsMarketTitle || 'Skill Store'}
+        title={t.skillsMarketTitle}
         onPressLeft={() => nav.goBack()}
       />
 
@@ -187,7 +192,7 @@ export default function SkillMarketScreen() {
         <Search color="#9ca3af" size={16} strokeWidth={1.5} />
         <TextInput
           className="flex-1 ml-2 text-sm text-foreground"
-          placeholder={t.skillsMarketSearch || 'Search skills...'}
+          placeholder={t.skillsMarketSearch}
           placeholderTextColor="#9ca3af"
           returnKeyType="search"
           value={search}
@@ -215,16 +220,13 @@ export default function SkillMarketScreen() {
         ListEmptyComponent={
           loading ? (
             <View className="items-center py-20">
-              <ActivityIndicator color="#007aff" size="large" />
+              <ActivityIndicator color={semanticColors.primary} size="large" />
             </View>
           ) : (
             <View className="items-center py-16 px-8">
               <Package color="#d1d5db" size={40} strokeWidth={1.2} />
               <Text className="text-secondary/40 text-[15px] font-medium mt-4 text-center">
-                {search
-                  ? t.skillsMarketEmpty || 'No skills found'
-                  : t.skillsMarketUnavailable ||
-                    'Skill marketplace is unavailable. Check server market configuration.'}
+                {search ? t.skillsMarketEmpty : t.skillsMarketUnavailable}
               </Text>
               {!search && (
                 <TouchableOpacity
@@ -232,16 +234,18 @@ export default function SkillMarketScreen() {
                   className="mt-4 px-5 py-2.5 rounded-full bg-primary/10"
                   onPress={onRefresh}
                 >
-                  <Text className="text-primary text-[14px] font-semibold">
-                    {t.retry || 'Retry'}
-                  </Text>
+                  <Text className="text-primary text-[14px] font-semibold">{t.retry}</Text>
                 </TouchableOpacity>
               )}
             </View>
           )
         }
         refreshControl={
-          <RefreshControl refreshing={refreshing} tintColor="#007aff" onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={semanticColors.primary}
+            onRefresh={onRefresh}
+          />
         }
       />
     </View>

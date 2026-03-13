@@ -49,6 +49,8 @@ import MessageBubble from '../components/ui/MessageBubble';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
 import { useToast } from '../components/ui/Toast';
+import { getProviderIconUrl } from '../constants/cdn';
+import { semanticColors } from '../constants/colors';
 import { messageApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -347,7 +349,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   {isReasoning ? t.chatThinking : t.chatGenerating}
                 </Text>
               ) : sessionModel ? (
-                <Text className="text-[12px] mt-0.5 font-medium text-[#8c8c8c]" numberOfLines={1}>
+                <Text
+                  className="text-[12px] mt-0.5 font-medium"
+                  numberOfLines={1}
+                  style={{ color: semanticColors.muted }}
+                >
                   {sessionModel}
                 </Text>
               ) : null}
@@ -364,7 +370,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.navigate('TopicList', { sessionId });
               }}
             >
-              <BookText color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              <BookText
+                color={semanticColors.muted}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
             </PressableScale>
             <PressableScale
               accessibilityLabel="Settings"
@@ -375,7 +385,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.navigate('ChatSettings', { sessionId });
               }}
             >
-              <Settings color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              <Settings
+                color={semanticColors.muted}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
             </PressableScale>
           </View>
         </View>
@@ -469,7 +483,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
                 editable={!generating}
                 placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                placeholderTextColor="#8c8c8c"
+                placeholderTextColor={semanticColors.muted}
                 style={{ textAlignVertical: 'top' }}
                 value={inputText}
                 onChangeText={setInputText}
@@ -488,12 +502,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   <RNImage
                     style={{ width: 20, height: 20, borderRadius: 4 }}
                     source={{
-                      uri: `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/light/${sessionProvider}.png`,
+                      uri: getProviderIconUrl(sessionProvider),
                     }}
                     onError={() => setProviderLogoError(true)}
                   />
                 ) : (
-                  <Cpu color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <Cpu
+                    color={semanticColors.muted}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 )}
               </TouchableOpacity>
               {/* Search */}
@@ -504,7 +522,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 onPress={handleToggleSearch}
               >
                 <Globe
-                  color={searchEnabled ? primaryColor : '#666'}
+                  color={searchEnabled ? primaryColor : semanticColors.muted}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -518,7 +536,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               >
                 <View className="relative items-center justify-center">
                   <Paperclip
-                    color={pendingFiles.length > 0 ? primaryColor : '#666'}
+                    color={pendingFiles.length > 0 ? primaryColor : semanticColors.muted}
                     size={20}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -545,7 +563,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 }}
               >
                 <Puzzle
-                  color={toolsEnabled ? primaryColor : '#666'}
+                  color={toolsEnabled ? primaryColor : semanticColors.muted}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -567,7 +585,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     strokeWidth={tokens.icon.strokeWidth}
                   />
                 ) : (
-                  <Brain color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <Brain
+                    color={semanticColors.muted}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 )}
               </TouchableOpacity>
               {/* Separator */}
@@ -579,7 +601,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="w-8 h-8 items-center justify-center rounded-full"
                 onPress={handleClear}
               >
-                <Eraser color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <Eraser
+                  color={semanticColors.muted}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               </TouchableOpacity>
               {/* Spacer */}
               <View className="flex-1" />

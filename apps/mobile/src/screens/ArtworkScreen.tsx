@@ -43,6 +43,7 @@ import Animated, {
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -170,11 +171,12 @@ function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useI18n();
   const map: Record<string, { bg: string; fg: string; label: string }> = {
-    Pending: { bg: '#f59e0b20', fg: '#f59e0b', label: 'Pending' },
-    Processing: { bg: '#3b82f620', fg: '#3b82f6', label: 'Processing' },
-    Success: { bg: '#10b98120', fg: '#10b981', label: 'Done' },
-    Error: { bg: '#ef444420', fg: '#ef4444', label: 'Failed' },
+    Pending: { bg: '#f59e0b20', fg: '#f59e0b', label: t.artworkPending },
+    Processing: { bg: '#3b82f620', fg: '#3b82f6', label: t.artworkProcessing },
+    Success: { bg: '#10b98120', fg: '#10b981', label: t.artworkSuccess },
+    Error: { bg: '#ef444420', fg: '#ef4444', label: t.artworkError },
   };
   const s = map[status] || map.Pending;
   return (
@@ -735,7 +737,7 @@ export default function ArtworkScreen({ navigation }: any) {
                                 width: 8,
                                 height: 8,
                                 borderRadius: 4,
-                                backgroundColor: '#007aff',
+                                backgroundColor: semanticColors.primary,
                               }}
                             />
                           )}
@@ -818,7 +820,7 @@ export default function ArtworkScreen({ navigation }: any) {
                         paddingVertical: 10,
                         alignItems: 'center',
                         borderRadius: 12,
-                        backgroundColor: active ? '#007aff' : 'transparent',
+                        backgroundColor: active ? semanticColors.primary : 'transparent',
                       }}
                       onPress={() => {
                         haptics.selection();
@@ -864,7 +866,7 @@ export default function ArtworkScreen({ navigation }: any) {
                         paddingVertical: 8,
                         alignItems: 'center',
                         borderRadius: 10,
-                        backgroundColor: active ? '#007aff' : '#f5f5f5',
+                        backgroundColor: active ? semanticColors.primary : '#f5f5f5',
                       }}
                       onPress={() => {
                         haptics.selection();
@@ -904,7 +906,7 @@ export default function ArtworkScreen({ navigation }: any) {
                         paddingVertical: 10,
                         alignItems: 'center',
                         borderRadius: 12,
-                        backgroundColor: active ? '#007aff' : 'transparent',
+                        backgroundColor: active ? semanticColors.primary : 'transparent',
                       }}
                       onPress={() => {
                         haptics.selection();
@@ -934,7 +936,7 @@ export default function ArtworkScreen({ navigation }: any) {
       <PromptModal
         defaultValue={String(imgCount)}
         keyboardType="number-pad"
-        submitLabel="OK"
+        submitLabel={t.confirm}
         title={t.artworkImageCountCustom}
         visible={customCountVisible}
         onCancel={() => setCustomCountVisible(false)}

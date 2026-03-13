@@ -21,6 +21,7 @@ const MOBILE_NAV_ROUTES = new Set([
   '/community/plugin',
   '/community/model',
   '/community/provider',
+  '/resource',
   '/me',
 ]);
 

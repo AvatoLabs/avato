@@ -169,6 +169,24 @@ export default {
 
   'groupAgents.tag': 'Group',
 
+  'groupAgents.status.archived.reasons.official':
+    'The platform removed this Group due to security, policy, or other concerns.',
+  'groupAgents.status.archived.reasons.owner': 'The creator archived or removed this Group.',
+  'groupAgents.status.archived.subtitle': 'This Group has been archived. Possible reasons:',
+  'groupAgents.status.archived.title': 'Group archived',
+  'groupAgents.status.backToMarket': 'Back to Group Community',
+  'groupAgents.status.deprecated.reasons.official':
+    'The platform removed this Group due to security, policy, or other concerns.',
+  'groupAgents.status.deprecated.reasons.owner': 'The creator rejected or removed this Group.',
+  'groupAgents.status.deprecated.subtitle':
+    'This Group is currently unavailable. Possible reasons:',
+  'groupAgents.status.deprecated.title': 'Group unavailable',
+  'groupAgents.status.support':
+    'For any questions, please copy the link and send it to <email>support@minkhub.com</email> for assistance.',
+  'groupAgents.status.unpublished.subtitle':
+    'This Group is under review. To confirm its status, copy the link and email <email>support@minkhub.com</email>.',
+  'groupAgents.status.unpublished.title': 'Group Under Review',
+
   'groupAgents.underReview': 'Under Review',
 
   'home.creatorReward.action': 'Apply Now',

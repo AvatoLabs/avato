@@ -30,6 +30,7 @@ import { uploadRouter } from '../lambda/upload';
 import { userRouter } from '../lambda/user';
 import { userMemoriesRouter } from '../lambda/userMemories';
 import { userMemoryRouter } from '../lambda/userMemory';
+import { mcpRouter } from '../tools/mcp';
 
 export const mobileRouter = router({
   agent: agentRouter,
@@ -50,6 +51,7 @@ export const mobileRouter = router({
   image: imageRouter,
   knowledgeBase: knowledgeBaseRouter,
   market: marketRouter,
+  mcp: mcpRouter,
   message: messageRouter,
   plugin: pluginRouter,
   session: sessionRouter,

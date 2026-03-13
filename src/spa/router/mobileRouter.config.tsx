@@ -218,6 +218,58 @@ export const mobileRoutes: RouteObject[] = [
         path: 'settings',
       },
 
+      // Resource routes (Files & Knowledge Base)
+      {
+        children: [
+          // Home routes (resource list)
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/(home)'),
+                  'Mobile > Resource > Home',
+                ),
+                index: true,
+              },
+            ],
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource/(home)/_layout'),
+              'Mobile > Resource > Home > Layout',
+            ),
+          },
+          // Library routes (knowledge base detail)
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library'),
+                  'Mobile > Resource > Library',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/[slug]'),
+                  'Mobile > Resource > Library > Slug',
+                ),
+                path: ':slug',
+              },
+            ],
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource/library/_layout'),
+              'Mobile > Resource > Library > Layout',
+            ),
+            path: 'library/:id',
+          },
+        ],
+        element: dynamicElement(
+          () => import('@/routes/(main)/resource/_layout'),
+          'Mobile > Resource > Layout',
+        ),
+        errorElement: <ErrorBoundary resetPath="/resource" />,
+        path: 'resource',
+      },
+
       ...BusinessMobileRoutesWithMainLayout,
 
       // Me routes (mobile personal center)

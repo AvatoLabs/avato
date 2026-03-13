@@ -2,7 +2,8 @@ import { LOBE_CHAT_CLOUD } from '@lobechat/business-const';
 import { t } from 'i18next';
 import { sha256 } from 'js-sha256';
 
-import { message, notification } from '@/components/AntdStaticMethods';
+import { message } from '@/components/AntdStaticMethods';
+import { uploadErrorNotification } from '@/components/Error/uploadErrorNotification';
 import { fileService } from '@/services/file';
 import { uploadService } from '@/services/upload';
 import { type StoreSetter } from '@/store/types';
@@ -182,9 +183,9 @@ export class FileUploadActionImpl {
       // Handle file storage plan limit error
       if ((error as any)?.message?.includes('beyond the plan limit')) {
         onStatusUpdate?.({ id: file.name, type: 'removeFile' });
-        notification.error({
+        uploadErrorNotification.error(error, {
           description: t('upload.storageLimitExceeded', { ns: 'error' }),
-          message: t('upload.uploadFailed', { ns: 'error' }),
+          message: t('upload.title', { ns: 'error' }),
         });
         return;
       }

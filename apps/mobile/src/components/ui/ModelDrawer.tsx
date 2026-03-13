@@ -12,12 +12,12 @@ import {
   View,
 } from 'react-native';
 
+import { getProviderIconUrl } from '../../constants/cdn';
+import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { useModelStore } from '../../store/model';
 import { tokens } from '../../theme/tokens';
 import type { RuntimeEnabledModel } from '../../types';
-
-const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
 
 function ProviderLogo({
   providerId,
@@ -29,7 +29,7 @@ function ProviderLogo({
   size?: number;
 }) {
   const [err, setErr] = useState(false);
-  const url = logo || `${ICON_CDN_BASE}/light/${providerId}.png`;
+  const url = logo || getProviderIconUrl(providerId);
 
   if (err) {
     return (
@@ -147,9 +147,13 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
               onPress={() => fetchModels(true)}
             >
               {loading ? (
-                <ActivityIndicator color="#007aff" size="small" />
+                <ActivityIndicator color={semanticColors.primary} size="small" />
               ) : (
-                <RefreshCw color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <RefreshCw
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               )}
             </TouchableOpacity>
           </View>
@@ -160,7 +164,7 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
               <TextInput
                 className="flex-1 text-foreground text-[14px]"
                 placeholder={t.modelPickerSearch}
-                placeholderTextColor="#8c8c8c"
+                placeholderTextColor={semanticColors.muted}
                 returnKeyType="search"
                 value={search}
                 onChangeText={setSearch}
@@ -176,7 +180,7 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
           >
             {!isLoaded && loading ? (
               <View className="items-center py-16">
-                <ActivityIndicator color="#007aff" size="large" />
+                <ActivityIndicator color={semanticColors.primary} size="large" />
               </View>
             ) : filtered.length === 0 ? (
               <View className="items-center py-16">
@@ -229,7 +233,7 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
                           </View>
                           {isSelected && (
                             <Check
-                              color="#007aff"
+                              color={semanticColors.primary}
                               size={18}
                               strokeWidth={tokens.icon.strokeWidth}
                             />

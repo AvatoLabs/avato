@@ -9,6 +9,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
+import { semanticColors } from '../constants/colors';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -83,38 +84,39 @@ export default function AboutScreen({ navigation }: any) {
           </View>
           <Text className="text-foreground text-[22px] font-bold tracking-tight">{APP_NAME}</Text>
           <Text className="text-secondary/60 text-[14px] font-medium mt-1">v{APP_VERSION}</Text>
-          <Text className="text-secondary/40 text-[13px] font-medium mt-0.5">Built on LobeHub</Text>
+          <Text className="text-secondary/40 text-[13px] font-medium mt-0.5">
+            {t.aboutBuiltOn.replace('{name}', 'LobeHub')}
+          </Text>
         </Animated.View>
 
         {/* Description */}
         <Animated.View className="px-8 mb-8" entering={FadeInDown.delay(100).duration(350)}>
           <Text className="text-center text-secondary/60 text-[14px] leading-5">
-            An open-source, modern-design AI Agent Workspace. Your personal AI companion, running on
-            your own server.
+            {t.aboutDescription}
           </Text>
         </Animated.View>
 
         {/* Links */}
         <Animated.View className="w-full px-5" entering={FadeInDown.delay(150).duration(350)}>
           <Text className="px-3 mb-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
-            Links
+            {t.aboutLinks}
           </Text>
           <LinkRow
             icon={Github}
             iconColor="#333"
-            label="GitHub Repository"
+            label={t.aboutGithubRepository}
             url="https://github.com/lobehub/lobe-chat"
           />
           <LinkRow
             icon={ExternalLink}
-            iconColor="#007aff"
-            label="Official Website"
+            iconColor={semanticColors.primary}
+            label={t.aboutOfficialWebsite}
             url="https://lobehub.com"
           />
           <LinkRow
             icon={Heart}
-            iconColor="#ff3b30"
-            label="Sponsor"
+            iconColor={semanticColors.danger}
+            label={t.aboutSponsor}
             url="https://opencollective.com/lobehub"
           />
         </Animated.View>
@@ -122,7 +124,7 @@ export default function AboutScreen({ navigation }: any) {
         {/* Footer */}
         <Animated.View className="mt-10" entering={FadeInDown.delay(200).duration(350)}>
           <Text className="text-secondary/30 text-[12px] font-medium text-center">
-            Made with ❤️ by LobeHub
+            {t.aboutMadeWith.replace('{name}', 'LobeHub')}
           </Text>
         </Animated.View>
       </ScrollView>

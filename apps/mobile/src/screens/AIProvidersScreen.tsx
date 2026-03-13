@@ -24,14 +24,13 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
+import { getProviderIconUrl } from '../constants/cdn';
+import { semanticColors } from '../constants/colors';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type { AiProviderListItem } from '../types';
-
-// ── Provider Logo ────────────────────────────────────────────────────
-const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
 
 function ProviderLogo({
   providerId,
@@ -43,7 +42,7 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = logo || `${ICON_CDN_BASE}/light/${providerId}.png`;
+  const url = logo || getProviderIconUrl(providerId);
 
   if (imgError) {
     return (
@@ -143,8 +142,8 @@ export default function AIProvidersScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t.aiProvidersTitle}
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.aiProvidersTitle}
         onPressLeft={() => navigation.goBack()}
       />
 
@@ -162,7 +161,7 @@ export default function AIProvidersScreen({ navigation }: any) {
 
       {loading ? (
         <View className="flex-1 items-center pt-20">
-          <ActivityIndicator color="#007aff" size="small" />
+          <ActivityIndicator color={semanticColors.primary} size="small" />
         </View>
       ) : (
         <ScrollView
@@ -171,9 +170,9 @@ export default function AIProvidersScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              colors={['#007aff']}
+              colors={[semanticColors.primary]}
               refreshing={refreshing}
-              tintColor="#007aff"
+              tintColor={semanticColors.primary}
               onRefresh={onRefresh}
             />
           }

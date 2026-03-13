@@ -6,6 +6,7 @@ import { Avatar, Icon, Tag } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import PluginAvatar from '@/components/Plugins/PluginAvatar';
 import { useIsDark } from '@/hooks/useIsDark';
@@ -63,6 +64,7 @@ export interface ToolTagProps {
 const ToolTag = memo<ToolTagProps>(({ identifier, variant = 'default' }) => {
   const isDarkMode = useIsDark();
   const isCompact = variant === 'compact';
+  const { t } = useTranslation('common');
 
   // Get local plugin lists
   const builtinList = useToolStore(builtinToolSelectors.metaList, isEqual);
@@ -130,7 +132,7 @@ const ToolTag = memo<ToolTagProps>(({ identifier, variant = 'default' }) => {
     type: 'plugin' as const,
   };
 
-  const displayTitle = isLoading ? 'Loading...' : meta.title;
+  const displayTitle = isLoading ? t('loading') : meta.title;
 
   // Render icon based on type
   const renderIcon = () => {

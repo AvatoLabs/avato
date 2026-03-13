@@ -51,6 +51,8 @@ import { SectionBlock } from '../components/ui/SectionBlock';
 import SessionGroupHeader from '../components/ui/SessionGroupHeader';
 import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
+import { getProviderIconUrl } from '../constants/cdn';
+import { semanticColors } from '../constants/colors';
 import { agentApi, pluginApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -63,19 +65,23 @@ import { useSessionGroupStore } from '../store/sessionGroup';
 import { tokens } from '../theme/tokens';
 import type { ChatSession, InstalledPlugin, MobileMemoryEffort } from '../types';
 
-function formatTimeAgo(dateStr: string): string {
+type RelativeTimeText = {
+  relativeTimeDays: string;
+  relativeTimeHours: string;
+  relativeTimeMinutes: string;
+  relativeTimeNow: string;
+};
+
+function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'now';
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1) return t.relativeTimeNow;
+  if (minutes < 60) return t.relativeTimeMinutes.replace('{count}', String(minutes));
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return t.relativeTimeHours.replace('{count}', String(hours));
   const days = Math.floor(hours / 24);
-  return `${days}d`;
+  return t.relativeTimeDays.replace('{count}', String(days));
 }
-
-// ── Provider Logo (CDN icon with initials fallback) ────────────────────
-const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
 
 function SessionLogo({
   provider,
@@ -90,7 +96,7 @@ function SessionLogo({
   const iconSize = size * 0.6;
 
   if (provider && !imgError) {
-    const url = `${ICON_CDN_BASE}/light/${provider}.png`;
+    const url = getProviderIconUrl(provider);
     return (
       <View
         className="rounded-full bg-foreground/5 items-center justify-center"
@@ -576,7 +582,7 @@ export default function ChatListScreen({ navigation }: any) {
           <View className="flex-row items-center mb-0.5">
             {item.pinned && (
               <Pin
-                color="#007aff"
+                color={semanticColors.primary}
                 size={11}
                 strokeWidth={tokens.icon.strokeWidth}
                 style={{ marginRight: 4 }}
@@ -594,7 +600,7 @@ export default function ChatListScreen({ navigation }: any) {
           </Text>
         </View>
         <Text className="text-gray-400 text-[10px] font-medium tracking-wide">
-          {formatTimeAgo(item.updatedAt)}
+          {formatTimeAgo(item.updatedAt, t)}
         </Text>
       </TouchableOpacity>
     </SwipeableRow>
@@ -605,7 +611,11 @@ export default function ChatListScreen({ navigation }: any) {
       <ScreenHeader
         title={greeting}
         rightElement={
-          <MessageSquarePlus color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <MessageSquarePlus
+            color={semanticColors.primary}
+            size={20}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         }
         subtitle={
           sessions.length > 0
@@ -621,9 +631,9 @@ export default function ChatListScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={['#007aff']}
+            colors={[semanticColors.primary]}
             refreshing={refreshing}
-            tintColor="#007aff"
+            tintColor={semanticColors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -665,12 +675,16 @@ export default function ChatListScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(75).duration(350)}>
           <View className="px-5 mt-2 mb-1">
             <View className="flex-row items-center bg-foreground/5 rounded-xl px-3.5 py-2.5">
-              <Search color="#8c8c8c" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <Search
+                color={semanticColors.muted}
+                size={16}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
               <TextInput
                 className="flex-1 ml-2.5 text-foreground text-[14.5px]"
                 clearButtonMode="while-editing"
                 placeholder={t.chatListSearch}
-                placeholderTextColor="#8c8c8c"
+                placeholderTextColor={semanticColors.muted}
                 returnKeyType="search"
                 value={searchText}
                 onChangeText={setSearchText}
@@ -756,7 +770,11 @@ export default function ChatListScreen({ navigation }: any) {
                   setActionSession(null);
                 }}
               >
-                <Pin color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Pin
+                  color={semanticColors.primary}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="ml-3 text-base text-neutral-800">
                   {actionSession?.pinned ? t.actionUnpin : t.actionPin}
                 </Text>
@@ -767,7 +785,11 @@ export default function ChatListScreen({ navigation }: any) {
                 className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                 onPress={() => actionSession && handleRename(actionSession)}
               >
-                <Pencil color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Pencil
+                  color={semanticColors.primary}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="ml-3 text-base text-neutral-800">{t.actionRename}</Text>
               </Pressable>
 
@@ -801,7 +823,11 @@ export default function ChatListScreen({ navigation }: any) {
                   }
                 }}
               >
-                <Trash2 color="#ff3b30" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Trash2
+                  color={semanticColors.danger}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
               </Pressable>
             </View>
@@ -891,7 +917,7 @@ export default function ChatListScreen({ navigation }: any) {
             <ScrollView className="px-5 pb-8" style={{ maxHeight: 400 }}>
               {loadingSkills ? (
                 <View className="items-center py-10">
-                  <ActivityIndicator color="#007aff" size="small" />
+                  <ActivityIndicator color={semanticColors.primary} size="small" />
                 </View>
               ) : installedPlugins.length === 0 ? (
                 <View className="items-center py-10">
@@ -920,7 +946,7 @@ export default function ChatListScreen({ navigation }: any) {
                       ) : null}
                     </View>
                     <Switch
-                      trackColor={{ false: '#e5e5e5', true: '#007aff' }}
+                      trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
                       value={enabledSkills.has(plugin.identifier)}
                       onValueChange={() => handleToggleSkill(plugin.identifier)}
                     />

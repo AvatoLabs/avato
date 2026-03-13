@@ -31,14 +31,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
+import { getProviderIconUrl } from '../constants/cdn';
+import { semanticColors } from '../constants/colors';
 import { aiModelApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type { AiProviderDetailItem, AiProviderModelItem } from '../types';
-
-// ── Provider Logo ────────────────────────────────────────────────────
-const ICON_CDN_BASE = 'https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files';
 
 function ProviderLogo({
   providerId,
@@ -50,7 +49,7 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = logo || `${ICON_CDN_BASE}/light/${providerId}.png`;
+  const url = logo || getProviderIconUrl(providerId);
 
   if (imgError) {
     return (
@@ -98,8 +97,8 @@ function SecureInputRow({
           autoCapitalize="none"
           autoCorrect={false}
           className="flex-1 ml-2 text-foreground text-[14px]"
-          placeholder={placeholder || '...'}
-          placeholderTextColor="#8c8c8c"
+          placeholder={placeholder}
+          placeholderTextColor={semanticColors.muted}
           secureTextEntry={!visible}
           value={value}
           onChangeText={onChangeText}
@@ -116,21 +115,96 @@ function SecureInputRow({
   );
 }
 
-// ── Known keyVault field metadata ────────────────────────────────────
-const VAULT_FIELD_META: Record<string, { label: string; placeholder: string; secure: boolean }> = {
-  apiKey: { label: 'API Key', placeholder: 'sk-...', secure: true },
-  accessKeyId: { label: 'Access Key ID', placeholder: 'AKIA...', secure: true },
-  secretAccessKey: { label: 'Secret Access Key', placeholder: '...', secure: true },
-  sessionToken: { label: 'Session Token', placeholder: '...', secure: true },
-  username: { label: 'Username', placeholder: '...', secure: false },
-  password: { label: 'Password', placeholder: '...', secure: true },
-  bearerToken: { label: 'Bearer Token', placeholder: '...', secure: true },
-  baseURL: { label: 'API Proxy URL', placeholder: 'https://api.example.com/v1', secure: false },
-  endpoint: { label: 'Endpoint', placeholder: 'https://...', secure: false },
-  baseURLOrAccountID: { label: 'Base URL / Account ID', placeholder: '...', secure: false },
-  region: { label: 'Region', placeholder: 'us-east-1', secure: false },
-  apiVersion: { label: 'API Version', placeholder: '2024-02-01', secure: false },
+type VaultFieldMeta = {
+  label: string;
+  placeholder: string;
+  secure: boolean;
 };
+
+type ProviderDetailText = {
+  providerDetailAccessKeyId: string;
+  providerDetailApiKey: string;
+  providerDetailApiProxyUrl: string;
+  providerDetailApiVersion: string;
+  providerDetailBaseUrlOrAccountId: string;
+  providerDetailBearerToken: string;
+  providerDetailEndpoint: string;
+  providerDetailPassword: string;
+  providerDetailPlaceholderAccessKeyId: string;
+  providerDetailPlaceholderApiKey: string;
+  providerDetailPlaceholderApiVersion: string;
+  providerDetailPlaceholderBaseUrl: string;
+  providerDetailPlaceholderEndpoint: string;
+  providerDetailPlaceholderGeneric: string;
+  providerDetailPlaceholderRegion: string;
+  providerDetailRegion: string;
+  providerDetailSecretAccessKey: string;
+  providerDetailSessionToken: string;
+  providerDetailUsername: string;
+};
+
+const createVaultFieldMeta = (t: ProviderDetailText): Record<string, VaultFieldMeta> => ({
+  apiKey: {
+    label: t.providerDetailApiKey,
+    placeholder: t.providerDetailPlaceholderApiKey,
+    secure: true,
+  },
+  accessKeyId: {
+    label: t.providerDetailAccessKeyId,
+    placeholder: t.providerDetailPlaceholderAccessKeyId,
+    secure: true,
+  },
+  secretAccessKey: {
+    label: t.providerDetailSecretAccessKey,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: true,
+  },
+  sessionToken: {
+    label: t.providerDetailSessionToken,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: true,
+  },
+  username: {
+    label: t.providerDetailUsername,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: false,
+  },
+  password: {
+    label: t.providerDetailPassword,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: true,
+  },
+  bearerToken: {
+    label: t.providerDetailBearerToken,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: true,
+  },
+  baseURL: {
+    label: t.providerDetailApiProxyUrl,
+    placeholder: t.providerDetailPlaceholderBaseUrl,
+    secure: false,
+  },
+  endpoint: {
+    label: t.providerDetailEndpoint,
+    placeholder: t.providerDetailPlaceholderEndpoint,
+    secure: false,
+  },
+  baseURLOrAccountID: {
+    label: t.providerDetailBaseUrlOrAccountId,
+    placeholder: t.providerDetailPlaceholderGeneric,
+    secure: false,
+  },
+  region: {
+    label: t.providerDetailRegion,
+    placeholder: t.providerDetailPlaceholderRegion,
+    secure: false,
+  },
+  apiVersion: {
+    label: t.providerDetailApiVersion,
+    placeholder: t.providerDetailPlaceholderApiVersion,
+    secure: false,
+  },
+});
 
 const FIELD_ORDER = [
   'apiKey',
@@ -316,6 +390,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
   // ── Derived display flags ────────────────────────────────────────
   const settings = detail?.settings;
+  const vaultFieldMeta = useMemo(() => createVaultFieldMeta(t), [t]);
   const enabledModelCount = models.filter((m) => m.enabled).length;
 
   // Compute visible vault fields dynamically from API response
@@ -376,7 +451,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           onPressLeft={() => navigation.goBack()}
         />
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#007aff" size="large" />
+          <ActivityIndicator color={semanticColors.primary} size="large" />
         </View>
       </View>
     );
@@ -397,9 +472,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={['#007aff']}
+            colors={[semanticColors.primary]}
             refreshing={refreshing}
-            tintColor="#007aff"
+            tintColor={semanticColors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -439,11 +514,11 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           <Animated.View entering={FadeInDown.delay(50).duration(250)}>
             <View className="mx-5 mb-4 bg-foreground/5 rounded-2xl p-4">
               {visibleFields.map((fieldKey) => {
-                const meta = VAULT_FIELD_META[fieldKey] || {
+                const meta = vaultFieldMeta[fieldKey] || {
                   label: fieldKey
                     .replaceAll(/([A-Z])/g, ' $1')
                     .replace(/^./, (s) => s.toUpperCase()),
-                  placeholder: '...',
+                  placeholder: t.providerDetailPlaceholderGeneric,
                   secure:
                     fieldKey.toLowerCase().includes('key') ||
                     fieldKey.toLowerCase().includes('secret') ||
@@ -474,7 +549,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                         autoCorrect={false}
                         className="flex-1 text-foreground text-[14px]"
                         placeholder={meta.placeholder}
-                        placeholderTextColor="#8c8c8c"
+                        placeholderTextColor={semanticColors.muted}
                         value={vaults[fieldKey] || ''}
                         onChangeText={(v) => setVaults((prev) => ({ ...prev, [fieldKey]: v }))}
                       />
@@ -525,7 +600,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                 </View>
                 <Switch
                   thumbColor="#fff"
-                  trackColor={{ false: '#e0e0e0', true: '#007aff' }}
+                  trackColor={{ false: '#e0e0e0', true: semanticColors.primary }}
                   value={fetchOnClient}
                   onValueChange={handleToggleFetchOnClient}
                 />
@@ -553,18 +628,22 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   </Text>
                 </View>
                 {checking ? (
-                  <ActivityIndicator color="#007aff" size="small" />
+                  <ActivityIndicator color={semanticColors.primary} size="small" />
                 ) : checkResult === 'success' ? (
                   <View className="w-7 h-7 rounded-full bg-green-500/15 items-center justify-center">
                     <Check color="#4caf50" size={16} strokeWidth={2.5} />
                   </View>
                 ) : checkResult === 'failed' ? (
                   <View className="w-7 h-7 rounded-full bg-red-500/15 items-center justify-center">
-                    <X color="#ff3b30" size={16} strokeWidth={2.5} />
+                    <X color={semanticColors.danger} size={16} strokeWidth={2.5} />
                   </View>
                 ) : (
                   <View className="w-7 h-7 rounded-full bg-blue-500/15 items-center justify-center">
-                    <Wifi color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                    <Wifi
+                      color={semanticColors.primary}
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
                   </View>
                 )}
               </TouchableOpacity>
@@ -618,7 +697,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   </View>
                   <Switch
                     thumbColor="#fff"
-                    trackColor={{ false: '#e0e0e0', true: '#007aff' }}
+                    trackColor={{ false: '#e0e0e0', true: semanticColors.primary }}
                     value={model.enabled}
                     onValueChange={() => handleToggleModel(model.id, model.enabled)}
                   />

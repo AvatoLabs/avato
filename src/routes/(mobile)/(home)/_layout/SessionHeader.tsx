@@ -4,6 +4,7 @@ import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { ChatHeader } from '@lobehub/ui/mobile';
 import { MessageSquarePlus } from 'lucide-react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ProductLogo } from '@/components/Branding';
@@ -15,6 +16,7 @@ import { mobileHeaderSticky } from '@/styles/mobileHeader';
 import { styles } from './SessionHeader/style';
 
 const Header = memo(() => {
+  const { t } = useTranslation('common');
   const [createSession] = useSessionStore((s) => [s.createSession]);
   const navigate = useNavigate();
 
@@ -29,8 +31,10 @@ const Header = memo(() => {
       }
       right={
         <ActionIcon
+          aria-label={t('newSession')}
           icon={MessageSquarePlus}
           size={MOBILE_HEADER_ICON_SIZE}
+          title={t('newSession')}
           onClick={() => createSession()}
         />
       }

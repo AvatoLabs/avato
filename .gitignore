@@ -88,6 +88,12 @@ src/app/spa/[variants]/[[...path]]/spaHtmlTemplates.ts
 public/*.js
 public/sitemap.xml
 public/sitemap-index.xml
+
+# Mobile source files (avoid accidental ignore by generic `lib/` rule)
+!apps/mobile/src/lib/
+apps/mobile/src/lib/*
+!apps/mobile/src/lib/api.ts
+!apps/mobile/src/lib/i18n.ts
 sitemap*.xml
 robots.txt
 

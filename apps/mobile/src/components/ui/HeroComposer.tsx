@@ -9,6 +9,8 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { getProviderIconUrl } from '../../constants/cdn';
+import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { themeColors } from '../../theme';
 import { tokens } from '../../theme/tokens';
@@ -114,7 +116,7 @@ export function HeroComposer({
               <RNImage
                 style={{ width: 20, height: 20, borderRadius: 4 }}
                 source={{
-                  uri: `https://registry.npmmirror.com/@lobehub/icons-static-png/latest/files/light/${modelProvider}.png`,
+                  uri: getProviderIconUrl(modelProvider!),
                 }}
                 onError={() => setProviderLogoError(true)}
               />
@@ -131,7 +133,7 @@ export function HeroComposer({
             onPress={onToggleSearch}
           >
             <Globe
-              color={searchEnabled ? colors.primary : '#666'}
+              color={searchEnabled ? colors.primary : semanticColors.muted}
               size={20}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -145,7 +147,7 @@ export function HeroComposer({
             onPress={onToggleMemory}
           >
             <MemoryIcon
-              color={memoryEnabled ? colors.primary : '#666'}
+              color={memoryEnabled ? colors.primary : semanticColors.muted}
               size={20}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -160,7 +162,7 @@ export function HeroComposer({
           >
             <View className="relative items-center justify-center">
               <Paperclip
-                color={hasAttachedFile ? colors.primary : '#666'}
+                color={hasAttachedFile ? colors.primary : semanticColors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -182,7 +184,7 @@ export function HeroComposer({
             className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
             onPress={onPluginsPress}
           >
-            <Puzzle color="#666" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <Puzzle color={semanticColors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
 
           {/* Spacer */}

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { fetchErrorNotification } from '@/components/Error/fetchErrorNotification';
 import UserAvatar from '@/features/User/UserAvatar';
+import { resolveAvatarUploadError } from '@/features/User/utils/resolveAvatarUploadError';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/selectors';
 import { imageToBase64 } from '@/utils/imageToBase64';
@@ -53,15 +54,17 @@ interface AvatarRowProps {
 }
 
 const AvatarRow = ({ mobile }: AvatarRowProps) => {
-  const { t } = useTranslation('auth');
+  const { t: tAuth } = useTranslation('auth');
+  const { t } = useTranslation();
   const isLogin = useUserStore(authSelectors.isLogin);
   const updateAvatar = useUserStore((s) => s.updateAvatar);
   const [uploading, setUploading] = useState(false);
 
   const handleUploadAvatar = useCallback(
     createUploadImageHandler(async (avatar) => {
+      setUploading(true);
+
       try {
-        setUploading(true);
         const img = new Image();
         img.src = avatar;
 
@@ -72,18 +75,14 @@ const AvatarRow = ({ mobile }: AvatarRowProps) => {
 
         const webpBase64 = imageToBase64({ img, size: 256 });
         await updateAvatar(webpBase64);
-        setUploading(false);
       } catch (error) {
         console.error('Failed to upload avatar:', error);
+        fetchErrorNotification.error(resolveAvatarUploadError(error, t));
+      } finally {
         setUploading(false);
-
-        fetchErrorNotification.error({
-          errorMessage: error instanceof Error ? error.message : String(error),
-          status: 500,
-        });
       }
     }),
-    [updateAvatar],
+    [t, updateAvatar],
   );
 
   const canUpload = isLogin;
@@ -106,7 +105,7 @@ const AvatarRow = ({ mobile }: AvatarRowProps) => {
   if (mobile) {
     return (
       <Flexbox horizontal align="center" gap={12} justify="space-between" style={rowStyle}>
-        <Text strong>{t('profile.avatar')}</Text>
+        <Text strong>{tAuth('profile.avatar')}</Text>
         {avatarContent}
       </Flexbox>
     );
@@ -114,7 +113,7 @@ const AvatarRow = ({ mobile }: AvatarRowProps) => {
 
   return (
     <Flexbox horizontal align="center" gap={24} style={rowStyle}>
-      <Text style={labelStyle}>{t('profile.avatar')}</Text>
+      <Text style={labelStyle}>{tAuth('profile.avatar')}</Text>
       <Flexbox align="flex-end" style={{ flex: 1 }}>
         {avatarContent}
       </Flexbox>

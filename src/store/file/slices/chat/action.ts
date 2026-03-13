@@ -1,11 +1,9 @@
 import { type ChatContextContent } from '@lobechat/types';
-import { t } from 'i18next';
 
-import { notification } from '@/components/AntdStaticMethods';
+import { uploadErrorNotification } from '@/components/Error/uploadErrorNotification';
 import { FILE_UPLOAD_BLACKLIST } from '@/const/file';
 import { fileService } from '@/services/file';
 import { ragService } from '@/services/rag';
-import { UPLOAD_NETWORK_ERROR } from '@/services/upload';
 import { type UploadFileListDispatch } from '@/store/file/reducers/uploadFileList';
 import { uploadFileListReducer } from '@/store/file/reducers/uploadFileList';
 import { type StoreSetter } from '@/store/types';
@@ -142,18 +140,7 @@ export class FileActionImpl {
         });
       } catch (error) {
         // skip `UNAUTHORIZED` error
-        if ((error as any)?.message !== 'UNAUTHORIZED')
-          notification.error({
-            description:
-              // it may be a network error or the cors error
-              error === UPLOAD_NETWORK_ERROR
-                ? t('upload.networkError', { ns: 'error' })
-                : // or the error from the server
-                  typeof error === 'string'
-                  ? error
-                  : t('upload.unknownError', { ns: 'error', reason: (error as Error).message }),
-            message: t('upload.uploadFailed', { ns: 'error' }),
-          });
+        if ((error as any)?.message !== 'UNAUTHORIZED') uploadErrorNotification.error(error);
 
         dispatchChatUploadFileList({ id: file.name, type: 'removeFile' });
       }
