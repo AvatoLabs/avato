@@ -323,16 +323,32 @@ function createSSEParser() {
         if (currentEvent === 'text' || currentEvent === '') {
           try {
             const parsed = JSON.parse(dataStr);
-            if (typeof parsed === 'string') text += parsed;
+            if (typeof parsed === 'string') {
+              text += parsed;
+            } else if (typeof parsed === 'object' && parsed !== null) {
+              // Sometimes search pre-flight or other tools send object data
+              // If it's a search_complete or similar, we might just ignore it
+              // Or if it has a text field, we could extract it, but usually text is sent as string
+            } else {
+              text += String(parsed);
+            }
           } catch {
-            text += dataStr;
+            // Fallback for unquoted text streams or malformed JSON
+            // We need to unescape newlines if they are literal \n in the string
+            text += dataStr.replaceAll('\\n', '\n');
           }
         } else if (currentEvent === 'reasoning') {
           try {
             const parsed = JSON.parse(dataStr);
-            if (typeof parsed === 'string') reasoning += parsed;
+            if (typeof parsed === 'string') {
+              reasoning += parsed;
+            } else if (typeof parsed === 'object' && parsed !== null) {
+              // Ignore
+            } else {
+              reasoning += String(parsed);
+            }
           } catch {
-            reasoning += dataStr;
+            reasoning += dataStr.replaceAll('\\n', '\n');
           }
         } else if (currentEvent === 'usage') {
           try { usage = JSON.parse(dataStr); } catch { /* ignore */ }

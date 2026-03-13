@@ -176,6 +176,10 @@ export default function SkillDetailScreen() {
     fetchSkill();
   }, [fetchSkill]);
 
+  const manifest = skill?.manifest || plugin?.manifest;
+  const manifestApis = (manifest as any)?.api;
+  const hasApis = Array.isArray(manifestApis) && manifestApis.length > 0;
+
   // Render action buttons based on skill type and status
   const renderActions = () => {
     if (skillType === 'plugin' && plugin) {
@@ -362,8 +366,33 @@ export default function SkillDetailScreen() {
             </View>
           )}
 
-          {/* Manifest JSON */}
-          {(skill?.manifest || plugin?.manifest) && (
+          {/* Manifest APIs */}
+          {hasApis ? (
+            <View className="mb-4">
+              <View className="flex-row items-center gap-2 mb-2">
+                <Code color="#666" size={14} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="text-foreground text-[14px] font-semibold">
+                  {t.skillsDetailManifest || 'Manifest'}
+                </Text>
+              </View>
+              <View className="gap-3">
+                {manifestApis.map((api: any, index: number) => (
+                  <View className="bg-foreground/[0.03] rounded-2xl p-4" key={index}>
+                    <View className="flex-row items-start mb-1.5">
+                      <View className="px-2 py-1 rounded-md bg-primary/10">
+                        <Text className="text-primary text-[13px] font-semibold">{api.name}</Text>
+                      </View>
+                    </View>
+                    {api.description && (
+                      <Text className="text-secondary/70 text-[13px] leading-5 mt-1">
+                        {api.description}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : manifest ? (
             <View className="mb-4">
               <View className="flex-row items-center gap-2 mb-2">
                 <Code color="#666" size={14} strokeWidth={tokens.icon.strokeWidth} />
@@ -385,12 +414,12 @@ export default function SkillDetailScreen() {
                       color: '#24292e',
                     }}
                   >
-                    {JSON.stringify(skill?.manifest || plugin?.manifest, null, 2)}
+                    {JSON.stringify(manifest, null, 2)}
                   </Text>
                 </ScrollView>
               </View>
             </View>
-          )}
+          ) : null}
         </ScrollView>
       )}
     </View>

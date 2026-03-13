@@ -3,15 +3,30 @@
 <cite>
 **本文档引用的文件**
 - [apps/mobile/App.tsx](file://apps/mobile/App.tsx)
+- [apps/mobile/package.json](file://apps/mobile/package.json)
 - [apps/mobile/src/lib/api.ts](file://apps/mobile/src/lib/api.ts)
+- [apps/mobile/src/lib/i18n.ts](file://apps/mobile/src/lib/i18n.ts)
+- [apps/mobile/src/lib/haptics.ts](file://apps/mobile/src/lib/haptics.ts)
 - [apps/mobile/src/store/chat.ts](file://apps/mobile/src/store/chat.ts)
 - [apps/mobile/src/store/session.ts](file://apps/mobile/src/store/session.ts)
+- [apps/mobile/src/components/ui/MessageBubble.tsx](file://apps/mobile/src/components/ui/MessageBubble.tsx)
+- [apps/mobile/src/screens/ChatDetailScreen.tsx](file://apps/mobile/src/screens/ChatDetailScreen.tsx)
+- [apps/mobile/src/types/react-native-syntax-highlighter.d.ts](file://apps/mobile/src/types/react-native-syntax-highlighter.d.ts)
 - [src/services/agent.ts](file://src/services/agent.ts)
 - [src/services/aiChat.ts](file://src/services/aiChat.ts)
 - [src/services/discover.ts](file://src/services/discover.ts)
 - [src/services/image.ts](file://src/services/image.ts)
 - [src/services/knowledgeBase.ts](file://src/services/knowledgeBase.ts)
 </cite>
+
+## 更新摘要
+
+**变更内容**
+
+- 新增 JSON 显示功能改进：替换 react-native-syntax-highlighter 为 react-syntax-highlighter
+- 增强错误处理机制：集成 classifyError 函数提供统一错误分类
+- 国际化支持扩展：完善多语言翻译键值和本地化支持
+- 优化用户体验：增强触觉反馈系统和状态管理
 
 ## 目录
 
@@ -29,6 +44,8 @@
 
 移动端 API 服务层是 LobeHub 移动应用与后端服务器交互的核心模块。该服务层采用 React Native 技术栈构建，通过 HTTP 协议与后端进行数据交换，实现了完整的聊天、会话管理、文件上传等核心功能。
 
+**更新** 本次更新重点改进了 JSON 显示功能、增强了错误处理机制，并扩展了国际化支持，为用户提供更加丰富和稳定的移动聊天体验。
+
 本服务层的主要特点包括：
 
 - 基于 tRPC 协议的 HTTP 封装
@@ -36,6 +53,8 @@
 - 完整的错误处理机制
 - 离线状态检测与恢复
 - 多种数据传输格式支持
+- 增强的 JSON 语法高亮显示
+- 扩展的国际化翻译支持
 
 ## 项目结构
 
@@ -45,14 +64,19 @@
 graph TB
 subgraph "移动端应用结构"
 A[App.tsx] --> B[lib/api.ts]
-A --> C[store/]
-C --> D[chat.ts]
-C --> E[session.ts]
-B --> F[API接口定义]
-F --> G[会话管理API]
-F --> H[消息管理API]
-F --> I[AI聊天API]
-F --> J[文件上传API]
+A --> C[lib/i18n.ts]
+A --> D[lib/haptics.ts]
+A --> E[store/]
+E --> F[chat.ts]
+E --> G[session.ts]
+B --> H[API接口定义]
+H --> I[会话管理API]
+H --> J[消息管理API]
+H --> K[AI聊天API]
+H --> L[文件上传API]
+M[components/ui/] --> N[MessageBubble.tsx]
+O[screens/] --> P[ChatDetailScreen.tsx]
+Q[types/] --> R[react-native-syntax-highlighter.d.ts]
 end
 ```
 
@@ -60,11 +84,13 @@ end
 
 - [apps/mobile/App.tsx:1-112](file://apps/mobile/App.tsx#L1-L112)
 - [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
 
 **章节来源**
 
 - [apps/mobile/App.tsx:1-112](file://apps/mobile/App.tsx#L1-L112)
 - [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
 
 ## 核心组件
 
@@ -83,8 +109,18 @@ end
 
 ### 3. 状态管理
 
-- **store/chat.ts**: 聊天状态管理，处理消息流式传输
+- **store/chat.ts**: 聊天状态管理，处理消息流式传输和错误处理
 - **store/session.ts**: 会话状态管理，维护会话列表与活动状态
+
+### 4. 国际化与本地化
+
+- **lib/i18n.ts**: 轻量级国际化系统，支持多语言切换
+- **lib/haptics.ts**: 触觉反馈统一管理
+
+### 5. 用户界面组件
+
+- **components/ui/MessageBubble.tsx**: 消息气泡组件，支持 JSON 语法高亮
+- **screens/ChatDetailScreen.tsx**: 聊天详情屏幕，集成完整聊天功能
 
 **章节来源**
 
@@ -92,6 +128,8 @@ end
 - [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
 - [apps/mobile/src/store/chat.ts:1-800](file://apps/mobile/src/store/chat.ts#L1-L800)
 - [apps/mobile/src/store/session.ts:1-254](file://apps/mobile/src/store/session.ts#L1-L254)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
+- [apps/mobile/src/lib/haptics.ts:1-25](file://apps/mobile/src/lib/haptics.ts#L1-L25)
 
 ## 架构概览
 
@@ -102,31 +140,47 @@ graph TD
 subgraph "表现层"
 A[UI组件]
 B[导航器]
+C[MessageBubble]
+D[ChatDetailScreen]
 end
 subgraph "状态管理层"
-C[ChatStore]
-D[SessionStore]
-E[ConnectionStore]
+E[ChatStore]
+F[SessionStore]
+G[ConnectionStore]
+H[FileStore]
+I[ModelStore]
 end
 subgraph "API服务层"
-F[lib/api.ts]
-G[认证服务]
-H[配置服务]
+J[lib/api.ts]
+K[认证服务]
+L[配置服务]
+M[错误处理]
+end
+subgraph "国际化层"
+N[lib/i18n.ts]
+O[触觉反馈]
+P[类型定义]
 end
 subgraph "后端服务层"
-I[tRPC服务器]
-J[数据库]
-K[外部服务]
+Q[tRPC服务器]
+R[数据库]
+S[外部服务]
 end
-A --> C
-B --> D
-C --> F
-D --> F
-F --> I
+A --> E
+B --> F
+C --> E
+D --> E
+E --> J
+F --> J
+G --> J
+H --> J
 I --> J
-I --> K
-style F fill:#e1f5fe
-style I fill:#f3e5f5
+J --> Q
+Q --> R
+Q --> S
+N --> A
+O --> A
+P --> C
 ```
 
 **图表来源**
@@ -134,6 +188,7 @@ style I fill:#f3e5f5
 - [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
 - [apps/mobile/src/store/chat.ts:183-538](file://apps/mobile/src/store/chat.ts#L183-L538)
 - [apps/mobile/src/store/session.ts:41-253](file://apps/mobile/src/store/session.ts#L41-L253)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
 
 ## 详细组件分析
 
@@ -245,6 +300,100 @@ Note over API,Server : 处理<think>标签嵌入
 - [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
 - [apps/mobile/src/store/chat.ts:1-800](file://apps/mobile/src/store/chat.ts#L1-L800)
 
+### 错误处理机制
+
+**更新** 新增了统一的错误分类和处理机制：
+
+```mermaid
+flowchart TD
+A[错误发生] --> B{错误类型分类}
+B --> |网络错误| C[网络错误处理]
+B --> |认证错误| D[认证错误处理]
+B --> |业务逻辑错误| E[业务逻辑错误处理]
+B --> |超时错误| F[超时错误处理]
+C --> G[显示友好提示]
+D --> H[清除认证信息]
+E --> I[显示具体错误]
+F --> J[自动重试机制]
+G --> K[用户重试]
+H --> L[重新登录]
+I --> K
+J --> K
+K --> M[错误日志记录]
+```
+
+**图表来源**
+
+- [apps/mobile/src/store/chat.ts:215-220](file://apps/mobile/src/store/chat.ts#L215-L220)
+- [apps/mobile/src/store/chat.ts:514-538](file://apps/mobile/src/store/chat.ts#L514-L538)
+
+#### 国际化支持扩展
+
+**更新** 国际化系统现已支持更多翻译键值和多语言切换：
+
+```mermaid
+classDiagram
+class I18nSystem {
++getLocale() Locale
++setLocale(locale) void
++t(key) string
++translate(key, params) string
+}
+class TranslationKeys {
++cancel : string
++confirm : string
++delete : string
++done : string
++save : string
++search : string
++tabChats : string
++tabArtwork : string
++tabDiscover : string
++tabMe : string
++chatListTitle : string
++chatListSearch : string
++chatListEmpty : string
++chatListEmptyDesc : string
++chatListNewConversation : string
++chatListTapToContinue : string
++chatTitle : string
++chatThinking : string
++chatThought : string
++chatThoughtWithDuration : string
++chatAskAnything : string
++chatGenerating : string
++chatEmptyTitle : string
++chatEmptyDesc : string
+}
+I18nSystem --> TranslationKeys
+```
+
+**图表来源**
+
+- [apps/mobile/src/lib/i18n.ts:15-690](file://apps/mobile/src/lib/i18n.ts#L15-L690)
+
+#### JSON 显示功能改进
+
+**更新** 替换 react-native-syntax-highlighter 为 react-syntax-highlighter，提供更好的 JSON 语法高亮：
+
+```mermaid
+flowchart LR
+A[JSON内容] --> B[react-syntax-highlighter]
+B --> C[语法高亮渲染]
+C --> D[MessageBubble组件]
+D --> E[用户界面展示]
+```
+
+**图表来源**
+
+- [apps/mobile/src/types/react-native-syntax-highlighter.d.ts:1-16](file://apps/mobile/src/types/react-native-syntax-highlighter.d.ts#L1-L16)
+
+**章节来源**
+
+- [apps/mobile/src/lib/api.ts:1-800](file://apps/mobile/src/lib/api.ts#L1-L800)
+- [apps/mobile/src/store/chat.ts:1-800](file://apps/mobile/src/store/chat.ts#L1-L800)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
+
 ### 状态管理架构
 
 移动端 API 服务层采用 Zustand 状态管理库，实现了高效的状态同步：
@@ -310,29 +459,44 @@ A[React Native]
 B[AsyncStorage]
 C[Zustand]
 D[Expo生态系统]
+E[react-syntax-highlighter]
+F[react-native-markdown-display]
+G[expo-haptics]
+H[expo-clipboard]
 end
 subgraph "内部模块"
-E[lib/api.ts]
-F[store/chat.ts]
-G[store/session.ts]
-H[components/]
+I[lib/api.ts]
+J[lib/i18n.ts]
+K[lib/haptics.ts]
+L[store/chat.ts]
+M[store/session.ts]
+N[components/ui/]
+O[screens/]
+P[types/]
 end
 subgraph "后端服务"
-I[tRPC服务器]
-J[数据库]
-K[文件存储]
+Q[tRPC服务器]
+R[数据库]
+S[文件存储]
 end
-A --> E
-B --> E
-C --> F
-C --> G
-D --> H
-E --> I
-F --> E
-G --> E
-H --> F
-I --> J
-I --> K
+A --> I
+B --> I
+C --> L
+C --> M
+D --> N
+D --> O
+I --> Q
+L --> I
+M --> I
+N --> L
+O --> L
+P --> N
+Q --> R
+Q --> S
+E --> N
+F --> N
+G --> N
+H --> N
 ```
 
 **图表来源**
@@ -340,6 +504,7 @@ I --> K
 - [apps/mobile/src/lib/api.ts:12-13](file://apps/mobile/src/lib/api.ts#L12-L13)
 - [apps/mobile/src/store/chat.ts:9-18](file://apps/mobile/src/store/chat.ts#L9-L18)
 - [apps/mobile/src/store/session.ts:9-16](file://apps/mobile/src/store/session.ts#L9-L16)
+- [apps/mobile/package.json:12-44](file://apps/mobile/package.json#L12-L44)
 
 ### 核心服务类
 
@@ -415,6 +580,18 @@ KnowledgeBaseService --> LambdaClient
 - 会话状态缓存避免重复请求
 - 离线模式支持数据同步
 
+### 4. **更新** 错误处理优化
+
+- 统一的错误分类和处理机制
+- 自动重试和降级策略
+- 友好的用户错误提示
+
+### 5. **更新** 国际化性能
+
+- 轻量级 i18n 实现，避免重型库依赖
+- 动态翻译键值加载
+- 本地化资源缓存
+
 ## 故障排除指南
 
 ### 常见问题及解决方案
@@ -443,14 +620,27 @@ KnowledgeBaseService --> LambdaClient
 - **原因**: 异步操作竞态条件
 - **解决**: 使用乐观更新和状态回滚
 
+#### 5. **更新** JSON 显示问题
+
+- **症状**: JSON 内容无法正确语法高亮
+- **原因**: react-syntax-highlighter 依赖缺失
+- **解决**: 检查 package.json 依赖，重新安装
+
+#### 6. **更新** 国际化显示问题
+
+- **症状**: 界面文字显示为键值而非翻译
+- **原因**: i18n 键值缺失或语言包未加载
+- **解决**: 检查翻译键值完整性，重新加载语言包
+
 **章节来源**
 
 - [apps/mobile/src/lib/api.ts:80-91](file://apps/mobile/src/lib/api.ts#L80-L91)
 - [apps/mobile/src/store/chat.ts:514-538](file://apps/mobile/src/store/chat.ts#L514-L538)
+- [apps/mobile/src/lib/i18n.ts:1-800](file://apps/mobile/src/lib/i18n.ts#L1-L800)
 
 ## 结论
 
-移动端 API 服务层展现了现代移动应用开发的最佳实践，通过精心设计的架构和完善的错误处理机制，为用户提供了稳定可靠的聊天体验。该服务层不仅满足了当前的功能需求，还为未来的功能扩展奠定了坚实的基础。
+移动端 API 服务层展现了现代移动应用开发的最佳实践，通过精心设计的架构和完善的错误处理机制，为用户提供了稳定可靠的聊天体验。本次更新进一步增强了 JSON 显示功能、错误处理能力和国际化支持，为用户提供了更加丰富和稳定的移动聊天服务体验。
 
 主要优势包括：
 
@@ -458,5 +648,8 @@ KnowledgeBaseService --> LambdaClient
 - 完善的错误处理机制提升稳定性
 - 高效的状态管理优化用户体验
 - 灵活的配置管理适应不同部署环境
+- **更新** 改进的 JSON 语法高亮显示
+- **更新** 扩展的国际化翻译支持
+- **更新** 统一的错误分类和处理机制
 
 通过持续的优化和改进，移动端 API 服务层将继续为用户提供优质的移动聊天服务体验。

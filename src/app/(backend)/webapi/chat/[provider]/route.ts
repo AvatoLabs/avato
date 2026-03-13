@@ -1,3 +1,4 @@
+import { WebBrowsingExecutionRuntime } from '@lobechat/builtin-tool-web-browsing/executionRuntime';
 import { type ChatCompletionErrorPayload, type ModelRuntime } from '@lobechat/model-runtime';
 import { AGENT_RUNTIME_ERROR_SET } from '@lobechat/model-runtime';
 import { ChatErrorType } from '@lobechat/types';
@@ -9,6 +10,7 @@ import { UserMemoryIdentityModel } from '@/database/models/userMemory/identity';
 import { type LobeChatDatabase } from '@/database/type';
 import { createTraceOptions, initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { mcpService } from '@/server/services/mcp';
+import { SearchService } from '@/server/services/search';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 import { createErrorResponse } from '@/utils/errorResponse';
 import { getTracePayload } from '@/utils/trace';
@@ -501,82 +503,52 @@ export const POST = checkAuth(
         delete data.tools;
       }
 
-      // ============  5. handle search via non-streaming pre-flight  ============ //
-      // Some providers (e.g. Moonshot) handle enabledSearch via builtin tools that
-      // produce tool_use stop reasons in streaming, which the mobile client can't
-      // handle. We do a non-streaming call first to let the provider resolve search
-      // server-side, then extract the text and convert it to SSE for the mobile.
+      // ============  5. handle search (application builtin web search)  ============ //
+      // For providers without builtin search (most providers like VLLM, OpenAI, etc.),
+      // we perform a real web search using the application's SearchService, inject the
+      // results into the conversation context, then let the model answer with real data.
+      // This mirrors the Web client's `useApplicationBuiltinSearchTool` path.
       if (data.enabledSearch) {
         try {
-          console.info('[webapi/chat] search pre-flight: non-streaming call with enabledSearch');
-          const searchResp = await modelRuntime.chat(
-            { ...data, responseMode: 'json', stream: false } as any,
-            runtimeOptions,
-          );
-          const searchResult = await searchResp.json();
+          const lastUserMsg = [...data.messages].reverse().find((m) => m.role === 'user');
+          const searchQuery =
+            typeof lastUserMsg?.content === 'string'
+              ? lastUserMsg.content
+              : Array.isArray(lastUserMsg?.content)
+                ? (lastUserMsg.content as any[])
+                    .filter((b: any) => b.type === 'text')
+                    .map((b: any) => b.text)
+                    .join(' ')
+                : '';
 
-          // Handle both OpenAI format (choices[].message) and Anthropic format (content[])
-          let textContent = '';
-          let reasoningContent = '';
+          if (searchQuery) {
+            console.info(`[webapi/chat] builtin web search: query="${searchQuery.slice(0, 80)}"`);
 
-          if (searchResult?.choices?.[0]?.message) {
-            // OpenAI format
-            textContent = searchResult.choices[0].message.content || '';
-            reasoningContent = searchResult.choices[0].message.reasoning_content || '';
-          } else if (Array.isArray(searchResult?.content)) {
-            // Anthropic format
-            for (const block of searchResult.content) {
-              if (block.type === 'thinking' && block.thinking) {
-                reasoningContent += block.thinking;
-              } else if (block.type === 'text' && block.text) {
-                textContent += block.text;
-              }
+            const webSearchRuntime = new WebBrowsingExecutionRuntime({
+              searchService: new SearchService(),
+            });
+            const searchResult = await webSearchRuntime.search({ query: searchQuery });
+
+            if (searchResult.success && searchResult.content) {
+              console.info(
+                `[webapi/chat] builtin web search succeeded: ${searchResult.content.length} chars`,
+              );
+
+              data.messages = [
+                ...data.messages,
+                {
+                  content: `<web_search_results>\n${searchResult.content}\n</web_search_results>\n\nPlease answer the user's question based on the above search results. Cite sources when possible.`,
+                  role: 'system',
+                } as any,
+              ];
+            } else {
+              console.warn('[webapi/chat] builtin web search returned no results');
             }
           }
-
-          if (textContent) {
-            console.info(
-              `[webapi/chat] search pre-flight succeeded: text=${textContent.length} chars, reasoning=${reasoningContent.length} chars`,
-            );
-
-            const encoder = new TextEncoder();
-            const sseStream = new ReadableStream({
-              start(controller) {
-                const emit = (event: string, payload: unknown) => {
-                  controller.enqueue(
-                    encoder.encode(
-                      `id: search\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
-                    ),
-                  );
-                };
-
-                if (reasoningContent) emit('reasoning', reasoningContent);
-                // Emit text in chunks to simulate streaming for better UX
-                const CHUNK_SIZE = 20;
-                for (let i = 0; i < textContent.length; i += CHUNK_SIZE) {
-                  emit('text', textContent.slice(i, i + CHUNK_SIZE));
-                }
-                emit('stop', 'search_complete');
-                controller.close();
-              },
-            });
-
-            return new Response(sseStream, {
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Content-Type': 'text/event-stream; charset=utf-8',
-              },
-            });
-          }
-
-          console.warn(
-            '[webapi/chat] search pre-flight returned no text, falling back to streaming',
-          );
         } catch (e) {
-          console.error('[webapi/chat] search pre-flight failed, falling back to streaming:', e);
+          console.error('[webapi/chat] builtin web search failed:', e);
         }
 
-        // If search pre-flight failed, strip enabledSearch to avoid empty streaming response
         delete (data as any).enabledSearch;
       }
 
