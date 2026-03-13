@@ -232,8 +232,8 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                     {t.chatSettingsMaxTokens}
                   </Text>
                   <SliderWithInput
-                    max={128000}
-                    min={1}
+                    max={32000}
+                    min={0}
                     step={100}
                     value={parseInt(maxTokens) || 0}
                     onChange={(val) => setMaxTokens(String(val))}

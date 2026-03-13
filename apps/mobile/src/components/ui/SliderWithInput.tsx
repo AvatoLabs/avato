@@ -31,6 +31,10 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
   const [inputValue, setInputValue] = useState(String(value));
   const [sliderWidth, setSliderWidth] = useState<number>(0);
 
+  // Calculate number of steps for tick marks
+  const tickCount = Math.round((max - min) / step) + 1;
+  const showTicks = tickCount <= 21; // Only show ticks if not too crowded
+
   // Calculate thumb position percentage (0-100%)
   const progress = ((value - min) / (max - min)) * 100;
 
@@ -114,6 +118,29 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
             />
           </View>
 
+          {/* Tick marks */}
+          {showTicks && !isDisabled && (
+            <View style={styles.ticksContainer}>
+              {Array.from({ length: tickCount }).map((_, index) => {
+                const tickPosition = (index / (tickCount - 1)) * 100;
+                const isMajorTick = index % Math.ceil(tickCount / 5) === 0;
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.tick,
+                      {
+                        left: `${tickPosition}%`,
+                        height: isMajorTick ? 8 : 4,
+                        width: isMajorTick ? 2 : 1,
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          )}
+
           {/* Thumb (draggable knob) */}
           <View
             style={[
@@ -128,8 +155,8 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
         <TextInput
           editable={!isDisabled}
           keyboardType="decimal-pad"
-          value={inputValue}
           style={[styles.input, isDisabled && styles.inputDisabled]}
+          value={inputValue}
           onChangeText={handleInputChange}
         />
       </View>
@@ -184,6 +211,19 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     overflow: 'hidden',
     width: '100%',
+  },
+  ticksContainer: {
+    position: 'absolute',
+    top: 14,
+    left: 0,
+    right: 0,
+    height: 8,
+  },
+  tick: {
+    position: 'absolute',
+    backgroundColor: '#999',
+    opacity: 0.5,
+    bottom: 0,
   },
   trackActive: {
     height: '100%',
