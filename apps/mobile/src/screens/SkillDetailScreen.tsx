@@ -16,10 +16,17 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import SyntaxHighlighter from 'react-native-syntax-highlighter';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -365,21 +372,22 @@ export default function SkillDetailScreen() {
                 </Text>
               </View>
               <View className="bg-foreground/[0.02] rounded-2xl overflow-hidden">
-                <SyntaxHighlighter
-                  wrapLines
-                  highlightLineNumbers={false}
-                  language="json"
-                  style={{}}
-                  customStyle={{
-                    padding: 16,
-                    fontSize: 11,
-                    lineHeight: 16,
-                    backgroundColor: 'rgba(0,0,0,0.02)',
-                    borderRadius: 8,
-                  }}
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={{ padding: 16 }}
+                  showsHorizontalScrollIndicator={false}
                 >
-                  {JSON.stringify(skill?.manifest || plugin?.manifest, null, 2)}
-                </SyntaxHighlighter>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      lineHeight: 16,
+                      fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+                      color: '#24292e',
+                    }}
+                  >
+                    {JSON.stringify(skill?.manifest || plugin?.manifest, null, 2)}
+                  </Text>
+                </ScrollView>
               </View>
             </View>
           )}
