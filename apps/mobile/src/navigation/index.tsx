@@ -23,6 +23,7 @@ import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
 import ModelListScreen from '../screens/ModelListScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
+import NotebookScreen from '../screens/NotebookScreen';
 import CompletionScreen from '../screens/onboarding/CompletionScreen';
 import ProviderSetupScreen from '../screens/onboarding/ProviderSetupScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -214,6 +215,11 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={TopicListScreen}
         name="TopicList"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={NotebookScreen}
+        name="Notebook"
         options={{ animation: 'slide_from_right' }}
       />
 

@@ -1,25 +1,15 @@
 /**
  * ChatSettingsScreen — Agent/chat settings for a specific session.
+ * Includes model parameters, system prompt, and danger zone actions.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useIsFocused } from '@react-navigation/native';
-import {
-  ArrowLeft,
-  Bot,
-  Brain,
-  ChevronRight,
-  MessageSquare,
-  Sliders,
-  Thermometer,
-  Trash2,
-} from 'lucide-react-native';
+import { ArrowLeft, Bot, MessageSquare, Sliders, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SliderWithInput } from '../components/ui/SliderWithInput';
 import { useToast } from '../components/ui/Toast';
 import { agentApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
@@ -27,6 +17,8 @@ import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
+
+// Remove ParamRow component, we'll use SliderWithInput instead
 
 export default function ChatSettingsScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId;
@@ -37,61 +29,61 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const removeSession = useSessionStore((s) => s.removeSession);
   const clearMessages = useChatStore((s) => s.clearMessages);
 
-  const [model, setModel] = useState('gpt-4o-mini');
-  const [temperature, setTemperature] = useState('0.7');
+  const [temperature, setTemperature] = useState('1.0');
+  const [topP, setTopP] = useState('1.0');
+  const [frequencyPenalty, setFrequencyPenalty] = useState('0.0');
+  const [presencePenalty, setPresencePenalty] = useState('0.0');
+  const [maxTokens, setMaxTokens] = useState('');
+  const [enableMaxTokens, setEnableMaxTokens] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [agentId, setAgentId] = useState<string | null>(null);
   const toast = useToast();
 
-  const settingsKey = `minkhub_chat_settings_${sessionId}`;
-  const isFocused = useIsFocused();
-
   const loadSettings = useCallback(async () => {
-    // Backend agent config is the source of truth
     try {
       const config = await agentApi.getConfigBySession(sessionId);
       if (config) {
         setAgentId(config.id);
-        if (config.model) setModel(config.model);
         if (config.params?.temperature != null) setTemperature(String(config.params.temperature));
+        if (config.params?.top_p != null) setTopP(String(config.params.top_p));
+        if (config.params?.frequency_penalty != null)
+          setFrequencyPenalty(String(config.params.frequency_penalty));
+        if (config.params?.presence_penalty != null)
+          setPresencePenalty(String(config.params.presence_penalty));
+        if (config.params?.max_tokens != null) {
+          setMaxTokens(String(config.params.max_tokens));
+          setEnableMaxTokens(true);
+        }
         if (config.systemRole) setSystemPrompt(config.systemRole);
-        return;
       }
     } catch {
-      /* fallback to AsyncStorage */
+      /* fallback silently */
     }
-    // Legacy fallback: per-session AsyncStorage
-    try {
-      const raw = await AsyncStorage.getItem(settingsKey);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved.model) setModel(saved.model);
-        if (saved.temperature) setTemperature(saved.temperature);
-        if (saved.systemPrompt) setSystemPrompt(saved.systemPrompt);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [sessionId, settingsKey]);
+  }, [sessionId]);
 
   useEffect(() => {
-    if (isFocused) loadSettings();
-  }, [isFocused, loadSettings]);
+    loadSettings();
+  }, [loadSettings]);
 
   const saveSettings = async () => {
-    if (agentId) {
-      try {
-        await agentApi.updateConfig(agentId, {
-          model,
-          systemRole: systemPrompt || undefined,
-          params: { temperature: parseFloat(temperature) || 0.7 },
-        });
-      } catch {
-        /* best-effort */
+    if (!agentId) return;
+    try {
+      const params: Record<string, number | undefined> = {
+        temperature: parseFloat(temperature) || 1,
+        top_p: parseFloat(topP) || 1,
+        frequency_penalty: parseFloat(frequencyPenalty) || 0,
+        presence_penalty: parseFloat(presencePenalty) || 0,
+      };
+      if (enableMaxTokens && maxTokens) {
+        params.max_tokens = parseInt(maxTokens, 10) || undefined;
       }
+      await agentApi.updateConfig(agentId, {
+        systemRole: systemPrompt || undefined,
+        params,
+      });
+    } catch {
+      /* best-effort */
     }
-    // Keep AsyncStorage as fallback for offline / model store reads
-    await AsyncStorage.setItem(settingsKey, JSON.stringify({ model, temperature, systemPrompt }));
   };
 
   const handleDeleteChat = () => {
@@ -139,7 +131,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         }}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
         {/* Session Info */}
         <Animated.View entering={FadeInDown.delay(50).duration(300)}>
           <View className="mx-5 mt-5 mb-6 rounded-[20px] bg-foreground/5 p-5 flex-row items-center">
@@ -157,68 +149,103 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
           </View>
         </Animated.View>
 
-        {/* Model Selection — tappable row to ModelPicker */}
+        {/* Model Parameters */}
         <Animated.View entering={FadeInDown.delay(100).duration(300)}>
           <View className="mx-5 mb-5">
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
-              {t.chatSettingsModel}
+              {t.chatSettingsModelParams}
             </Text>
-            <PressableScale
-              className="bg-foreground/5 rounded-2xl"
-              onPress={() => {
-                haptics.light();
-                navigation.navigate('ModelPicker', { sessionId });
-              }}
-            >
-              <View className="flex-row items-center px-4 py-4">
-                <Brain
-                  color="#007aff"
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 12 }}
+            <View className="bg-foreground/5 rounded-2xl px-4 gap-4 py-3">
+              {/* Frequency Penalty */}
+              <View>
+                <Text className="text-foreground text-[13px] font-medium mb-2">
+                  {t.chatSettingsFrequencyPenalty}
+                </Text>
+                <SliderWithInput
+                  max={2}
+                  min={-2}
+                  step={0.1}
+                  value={parseFloat(frequencyPenalty) || 0}
+                  onChange={(val) => setFrequencyPenalty(String(val))}
                 />
-                <View className="flex-1">
-                  <Text className="text-foreground text-[15px] font-medium">
-                    {model || 'gpt-4o-mini'}
-                  </Text>
-                  <Text className="text-secondary/50 text-[12px] mt-0.5">
-                    {t.chatSettingsModelHint}
-                  </Text>
-                </View>
-                <ChevronRight color="#8c8c8c" size={18} strokeWidth={tokens.icon.strokeWidth} />
               </View>
-            </PressableScale>
-          </View>
-        </Animated.View>
 
-        {/* Temperature */}
-        <Animated.View entering={FadeInDown.delay(150).duration(300)}>
-          <View className="mx-5 mb-5">
-            <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
-              {t.chatSettingsTemperature}
-            </Text>
-            <View className="bg-foreground/5 rounded-2xl px-4 py-4 flex-row items-center">
-              <Thermometer
-                color="#f5a623"
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginRight: 12 }}
-              />
-              <TextInput
-                className="flex-1 text-foreground text-[15px]"
-                keyboardType="decimal-pad"
-                placeholder="0.7"
-                placeholderTextColor="#8c8c8c"
-                value={temperature}
-                onChangeText={setTemperature}
-              />
-              <Text className="text-secondary/60 text-[13px] font-medium">0.0 – 2.0</Text>
+              {/* Presence Penalty */}
+              <View>
+                <Text className="text-foreground text-[13px] font-medium mb-2">
+                  {t.chatSettingsPresencePenalty}
+                </Text>
+                <SliderWithInput
+                  max={2}
+                  min={-2}
+                  step={0.1}
+                  value={parseFloat(presencePenalty) || 0}
+                  onChange={(val) => setPresencePenalty(String(val))}
+                />
+              </View>
+
+              {/* Temperature */}
+              <View>
+                <Text className="text-foreground text-[13px] font-medium mb-2">
+                  {t.chatSettingsTemperature}
+                </Text>
+                <SliderWithInput
+                  max={2}
+                  min={0}
+                  step={0.1}
+                  value={parseFloat(temperature) || 1}
+                  onChange={(val) => setTemperature(String(val))}
+                />
+              </View>
+
+              {/* Top P */}
+              <View>
+                <Text className="text-foreground text-[13px] font-medium mb-2">
+                  {t.chatSettingsTopP}
+                </Text>
+                <SliderWithInput
+                  max={1}
+                  min={0}
+                  step={0.1}
+                  value={parseFloat(topP) || 1}
+                  onChange={(val) => setTopP(String(val))}
+                />
+              </View>
+
+              {/* Max Tokens Toggle */}
+              <View className="flex-row items-center justify-between py-2 border-t border-foreground/[0.06] pt-3 mt-1">
+                <Text className="text-foreground text-[13px] font-medium">
+                  {t.chatSettingsEnableMaxTokens}
+                </Text>
+                <Switch
+                  style={{ transform: [{ scale: 0.8 }] }}
+                  trackColor={{ false: '#e0e0e0', true: '#007aff' }}
+                  value={enableMaxTokens}
+                  onValueChange={setEnableMaxTokens}
+                />
+              </View>
+
+              {/* Max Tokens Slider (conditional) */}
+              {enableMaxTokens && (
+                <View className="border-t border-foreground/[0.06] pt-3">
+                  <Text className="text-foreground text-[13px] font-medium mb-2">
+                    {t.chatSettingsMaxTokens}
+                  </Text>
+                  <SliderWithInput
+                    max={128000}
+                    min={1}
+                    step={100}
+                    value={parseInt(maxTokens) || 0}
+                    onChange={(val) => setMaxTokens(String(val))}
+                  />
+                </View>
+              )}
             </View>
           </View>
         </Animated.View>
 
         {/* System Prompt */}
-        <Animated.View entering={FadeInDown.delay(200).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(150).duration(300)}>
           <View className="mx-5 mb-5">
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
               {t.chatSettingsSystemPrompt}
@@ -249,7 +276,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         </Animated.View>
 
         {/* Danger Zone */}
-        <Animated.View entering={FadeInDown.delay(250).duration(300)}>
+        <Animated.View entering={FadeInDown.delay(200).duration(300)}>
           <View className="mx-5 mt-4">
             <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
               {t.chatSettingsDangerZone}

@@ -22,6 +22,7 @@ import { imageRouter } from '../lambda/image';
 import { knowledgeBaseRouter } from '../lambda/knowledgeBase';
 import { marketRouter } from '../lambda/market';
 import { messageRouter } from '../lambda/message';
+import { notebookRouter } from '../lambda/notebook';
 import { pluginRouter } from '../lambda/plugin';
 import { sessionRouter } from '../lambda/session';
 import { sessionGroupRouter } from '../lambda/sessionGroup';
@@ -53,6 +54,7 @@ export const mobileRouter = router({
   market: marketRouter,
   mcp: mcpRouter,
   message: messageRouter,
+  notebook: notebookRouter,
   plugin: pluginRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,

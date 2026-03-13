@@ -12,6 +12,7 @@ import {
   Cpu,
   Eraser,
   Globe,
+  NotebookPen,
   Paperclip,
   Puzzle,
   Send,
@@ -500,6 +501,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               }}
             >
               <BookText
+                color={semanticColors.muted}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel="Notebook"
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full ml-1"
+              onPress={() => {
+                haptics.light();
+                navigation.navigate('Notebook', { sessionId, topicId: activeTopic });
+              }}
+            >
+              <NotebookPen
                 color={semanticColors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}

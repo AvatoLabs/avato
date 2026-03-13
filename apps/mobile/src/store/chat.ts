@@ -33,6 +33,12 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
       if (config.model) opts.model = config.model;
       if (config.provider) opts.provider = config.provider;
       if (config.params?.temperature != null) opts.temperature = config.params.temperature;
+      if (config.params?.top_p != null) opts.top_p = config.params.top_p;
+      if (config.params?.frequency_penalty != null)
+        opts.frequency_penalty = config.params.frequency_penalty;
+      if (config.params?.presence_penalty != null)
+        opts.presence_penalty = config.params.presence_penalty;
+      if (config.params?.max_tokens != null) opts.max_tokens = config.params.max_tokens;
       if (config.systemRole) opts.systemPrompt = config.systemRole;
     }
   } catch {

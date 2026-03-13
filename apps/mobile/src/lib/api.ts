@@ -235,16 +235,20 @@ export const messageApi = {
 export interface ChatRequestOptions {
   enabledSearch?: boolean;
   enableSearch?: boolean;
+  frequency_penalty?: number;
+  max_tokens?: number;
   memory?: {
     effort?: MobileMemoryEffort;
     enabled?: boolean;
   };
   model?: string;
   plugins?: string[];
+  presence_penalty?: number;
   provider?: string;
   sessionId?: string;
   systemPrompt?: string;
   temperature?: number;
+  top_p?: number;
   topicId?: string;
 }
 
@@ -396,6 +400,12 @@ export const aiChatApi = {
           stream: true,
         };
         if (options?.temperature !== undefined) payload.temperature = options.temperature;
+        if (options?.top_p !== undefined) payload.top_p = options.top_p;
+        if (options?.frequency_penalty !== undefined)
+          payload.frequency_penalty = options.frequency_penalty;
+        if (options?.presence_penalty !== undefined)
+          payload.presence_penalty = options.presence_penalty;
+        if (options?.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
         if (options?.enabledSearch ?? options?.enableSearch) payload.enabledSearch = true;
         if (options?.memory) payload.memory = options.memory;
         if (options?.sessionId) payload.sessionId = options.sessionId;
@@ -1121,4 +1131,47 @@ export const artworkApi = {
     ),
   deleteGeneration: (generationId: string) =>
     trpcMutate('generation.deleteGeneration', { generationId }),
+};
+
+// ── Notebook API ────────────────────────────────────────────────────
+export interface NotebookDocument {
+  associatedAt?: string;
+  content?: string | null;
+  createdAt?: string;
+  description?: string | null;
+  fileType?: string | null;
+  id: string;
+  metadata?: Record<string, any> | null;
+  title?: string | null;
+  totalCharCount?: number | null;
+  totalLineCount?: number | null;
+  updatedAt?: string;
+}
+
+export const notebookApi = {
+  list: (topicId: string) =>
+    trpcQuery<{ data: NotebookDocument[]; total: number }>('notebook.listDocuments', { topicId }),
+
+  get: (id: string) => trpcQuery<NotebookDocument>('notebook.getDocument', { id }),
+
+  create: (params: {
+    content: string;
+    description: string;
+    title: string;
+    topicId: string;
+    type?: string;
+  }) => trpcMutate<NotebookDocument>('notebook.createDocument', {
+    ...params,
+    type: params.type || 'markdown',
+  }),
+
+  update: (params: {
+    append?: boolean;
+    content?: string;
+    description?: string;
+    id: string;
+    title?: string;
+  }) => trpcMutate<NotebookDocument>('notebook.updateDocument', params),
+
+  remove: (id: string) => trpcMutate('notebook.deleteDocument', { id }),
 };

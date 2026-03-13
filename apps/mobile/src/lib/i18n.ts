@@ -101,6 +101,12 @@ type TranslationKeys = {
   chatSettingsModel: string;
   chatSettingsModelHint: string;
   chatSettingsTemperature: string;
+  chatSettingsTopP: string;
+  chatSettingsFrequencyPenalty: string;
+  chatSettingsPresencePenalty: string;
+  chatSettingsMaxTokens: string;
+  chatSettingsEnableMaxTokens: string;
+  chatSettingsModelParams: string;
   chatSettingsSystemPrompt: string;
   chatSettingsCustomInstructions: string;
   chatSettingsSystemPromptPlaceholder: string;
@@ -111,6 +117,16 @@ type TranslationKeys = {
   chatSettingsDeleteDesc: string;
   chatSettingsClearConfirm: string;
   chatSettingsClearDesc: string;
+
+  // Notebook
+  notebookTitle: string;
+  notebookEmpty: string;
+  notebookNewDoc: string;
+  notebookDocTitle: string;
+  notebookDocTitlePlaceholder: string;
+  notebookDeleteConfirm: string;
+  notebookDeleteDesc: string;
+  notebookSaved: string;
 
   // Settings
   settingsTitle: string;
@@ -769,6 +785,12 @@ const en: TranslationKeys = {
   chatSettingsModel: 'Model',
   chatSettingsModelHint: 'Popular: gpt-4o, gpt-4o-mini, claude-3.5-sonnet, deepseek-chat',
   chatSettingsTemperature: 'Temperature',
+  chatSettingsTopP: 'Top P',
+  chatSettingsFrequencyPenalty: 'Frequency Penalty',
+  chatSettingsPresencePenalty: 'Presence Penalty',
+  chatSettingsMaxTokens: 'Max Tokens',
+  chatSettingsEnableMaxTokens: 'Enable Max Tokens',
+  chatSettingsModelParams: 'Model Parameters',
   chatSettingsSystemPrompt: 'System Prompt',
   chatSettingsCustomInstructions: 'Custom Instructions',
   chatSettingsSystemPromptPlaceholder: 'Enter a custom system prompt to define the assistant\'s behavior...',
@@ -779,6 +801,15 @@ const en: TranslationKeys = {
   chatSettingsDeleteDesc: 'Are you sure you want to delete this conversation? This action cannot be undone.',
   chatSettingsClearConfirm: 'Clear History',
   chatSettingsClearDesc: 'This will clear all messages in this conversation.',
+
+  notebookTitle: 'Notebook',
+  notebookEmpty: 'No documents yet',
+  notebookNewDoc: 'New Document',
+  notebookDocTitle: 'Title',
+  notebookDocTitlePlaceholder: 'Document title...',
+  notebookDeleteConfirm: 'Delete Document',
+  notebookDeleteDesc: 'Are you sure you want to delete this document?',
+  notebookSaved: 'Document saved',
 
   settingsTitle: 'Settings',
   settingsServer: 'Server',
@@ -1406,7 +1437,13 @@ const zh_tw: TranslationKeys = {
   chatSettingsTitle: '聊天設定',
   chatSettingsModel: '模型',
   chatSettingsModelHint: '常用：gpt-4o、gpt-4o-mini、claude-3.5-sonnet、deepseek-chat',
-  chatSettingsTemperature: '溫度',
+  chatSettingsTemperature: '創意活躍度',
+  chatSettingsTopP: '思維開放度',
+  chatSettingsFrequencyPenalty: '詞彙豐富度',
+  chatSettingsPresencePenalty: '表述發散度',
+  chatSettingsMaxTokens: '單次回覆限制',
+  chatSettingsEnableMaxTokens: '開啟單次回覆限制',
+  chatSettingsModelParams: '模型參數',
   chatSettingsSystemPrompt: '系統提示詞',
   chatSettingsCustomInstructions: '自訂指令',
   chatSettingsSystemPromptPlaceholder: '輸入自訂系統提示詞來定義助手的行為...',
@@ -1416,6 +1453,15 @@ const zh_tw: TranslationKeys = {
   chatSettingsDeleteConfirm: '刪除對話',
   chatSettingsDeleteDesc: '確定要刪除這個對話嗎？此操作無法復原。',
   chatSettingsClearConfirm: '清空記錄',
+
+  notebookTitle: '筆記本',
+  notebookEmpty: '暫無文檔',
+  notebookNewDoc: '新建文檔',
+  notebookDocTitle: '標題',
+  notebookDocTitlePlaceholder: '文檔標題...',
+  notebookDeleteConfirm: '刪除文檔',
+  notebookDeleteDesc: '確定要刪除此文檔嗎？',
+  notebookSaved: '文檔已儲存',
   chatSettingsClearDesc: '這將清空此對話中的所有訊息。',
 
   settingsTitle: '設定',
@@ -2043,7 +2089,13 @@ const zh: TranslationKeys = {
   chatSettingsTitle: '聊天设置',
   chatSettingsModel: '模型',
   chatSettingsModelHint: '常用：gpt-4o、gpt-4o-mini、claude-3.5-sonnet、deepseek-chat',
-  chatSettingsTemperature: '温度',
+  chatSettingsTemperature: '创意活跃度',
+  chatSettingsTopP: '思维开放度',
+  chatSettingsFrequencyPenalty: '词汇丰富度',
+  chatSettingsPresencePenalty: '表述发散度',
+  chatSettingsMaxTokens: '单次回复限制',
+  chatSettingsEnableMaxTokens: '开启单次回复限制',
+  chatSettingsModelParams: '模型参数',
   chatSettingsSystemPrompt: '系统提示词',
   chatSettingsCustomInstructions: '自定义指令',
   chatSettingsSystemPromptPlaceholder: '输入自定义系统提示词来定义助手的行为...',
@@ -2054,6 +2106,15 @@ const zh: TranslationKeys = {
   chatSettingsDeleteDesc: '确定要删除这个对话吗？此操作无法撤销。',
   chatSettingsClearConfirm: '清空记录',
   chatSettingsClearDesc: '这将清空此对话中的所有消息。',
+
+  notebookTitle: '笔记本',
+  notebookEmpty: '暂无文档',
+  notebookNewDoc: '新建文档',
+  notebookDocTitle: '标题',
+  notebookDocTitlePlaceholder: '文档标题...',
+  notebookDeleteConfirm: '删除文档',
+  notebookDeleteDesc: '确定要删除此文档吗？',
+  notebookSaved: '文档已保存',
 
   settingsTitle: '设置',
   settingsServer: '服务器',
