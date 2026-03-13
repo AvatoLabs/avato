@@ -1,6 +1,7 @@
 'use client';
 
-import { KLAVIS_SERVER_TYPES, LOBEHUB_SKILL_PROVIDERS } from '@lobechat/const';
+import type { LOBEHUB_SKILL_PROVIDERS } from '@lobechat/const';
+import { KLAVIS_SERVER_TYPES } from '@lobechat/const';
 import { type BuiltinSkill, type LobeToolMeta } from '@lobechat/types';
 import isEqual from 'fast-deep-equal';
 import { memo, useCallback, useMemo } from 'react';
@@ -12,6 +13,7 @@ import {
   createKlavisSkillDetailModal,
   createLobehubSkillDetailModal,
 } from '@/features/SkillStore/SkillDetail';
+import { useMarketLobehubSkills } from '@/hooks/useMarketLobehubSkills';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useToolStore } from '@/store/tool';
 import { type ToolStoreState } from '@/store/tool/initialState';
@@ -21,7 +23,7 @@ import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types'
 
 import BuiltinItem from '../Builtin/Item';
 import Empty from '../Empty';
-import { gridStyles } from '../style';
+import { gridStyles, itemStyles } from '../style';
 import WantMoreSkills from '../WantMoreSkills';
 import Item from './Item';
 
@@ -45,6 +47,12 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
   const { t } = useTranslation('setting');
   const isLobehubSkillEnabled = useServerConfigStore(serverConfigSelectors.enableLobehubSkill);
   const isKlavisEnabled = useServerConfigStore(serverConfigSelectors.enableKlavis);
+
+  // Fetch LobeHub skill providers from market dynamically
+  const { providers: lobehubProviders, loading: loadingMarket } = useMarketLobehubSkills({
+    enabled: isLobehubSkillEnabled,
+  });
+
   const allLobehubSkillServers = useToolStore(lobehubSkillStoreSelectors.getServers, isEqual);
   const allKlavisServers = useToolStore(klavisStoreSelectors.getServers, isEqual);
   // Use custom selector to get only actual builtin tools (not Klavis)
@@ -91,9 +99,9 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
       items.push({ tool, type: 'builtin' });
     }
 
-    // Add LobeHub skills
-    if (isLobehubSkillEnabled) {
-      for (const provider of LOBEHUB_SKILL_PROVIDERS) {
+    // Add LobeHub skills from market (dynamic)
+    if (isLobehubSkillEnabled && !loadingMarket) {
+      for (const provider of lobehubProviders) {
         items.push({ provider, type: 'lobehub' });
       }
     }
@@ -123,9 +131,31 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
       const label = item.type === 'lobehub' ? item.provider.label : item.serverType.label;
       return label.toLowerCase().includes(lowerKeywords);
     });
-  }, [keywords, isLobehubSkillEnabled, isKlavisEnabled, builtinTools, builtinSkills]);
+  }, [
+    keywords,
+    isLobehubSkillEnabled,
+    isKlavisEnabled,
+    lobehubProviders,
+    loadingMarket,
+    builtinTools,
+    builtinSkills,
+  ]);
 
   const hasSearchKeywords = Boolean(keywords && keywords.trim());
+
+  // Show loading state when fetching market skills
+  if (loadingMarket && isLobehubSkillEnabled) {
+    return (
+      <div className={gridStyles.grid}>
+        {/* Show skeleton or placeholder for LobeHub skills */}
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div className={itemStyles.container} key={i} style={{ opacity: 0.5 }}>
+            Loading...
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (filteredItems.length === 0) return <Empty search={hasSearchKeywords} />;
 

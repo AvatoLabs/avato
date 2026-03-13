@@ -17,10 +17,17 @@ export const RECOMMENDED_SKILLS: RecommendedSkillItem[] = [
   { id: 'lobe-gtd', type: RecommendedSkillType.Builtin },
   { id: 'lobe-notebook', type: RecommendedSkillType.Builtin },
   { id: 'lobe-calculator', type: RecommendedSkillType.Builtin },
+
   // Klavis skills
   { id: 'gmail', type: RecommendedSkillType.Klavis },
   { id: 'notion', type: RecommendedSkillType.Klavis },
   { id: 'google-drive', type: RecommendedSkillType.Klavis },
   { id: 'google-calendar', type: RecommendedSkillType.Klavis },
   { id: 'slack', type: RecommendedSkillType.Klavis },
+
+  // LobeHub Market Skills - dynamically fetched from market
+  // These providers are featured on https://lobehub.com/skills
+  { id: 'linear', type: RecommendedSkillType.Lobehub },
+  { id: 'microsoft', type: RecommendedSkillType.Lobehub },
+  { id: 'twitter', type: RecommendedSkillType.Lobehub },
 ];
