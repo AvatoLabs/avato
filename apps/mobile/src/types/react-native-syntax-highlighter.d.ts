@@ -13,8 +13,3 @@ declare module 'react-native-syntax-highlighter' {
   const SyntaxHighlighter: React.FC<SyntaxHighlighterProps>;
   export default SyntaxHighlighter;
 }
-
-declare module 'react-syntax-highlighter/dist/esm/styles/prism/prism' {
-  const prism: any;
-  export default prism;
-}
