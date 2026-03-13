@@ -14,6 +14,7 @@ declare module 'react-native-syntax-highlighter' {
   export default SyntaxHighlighter;
 }
 
-declare module 'react-syntax-highlighter/dist/esm/styles/prism' {
-  export const tomorrow: any;
+declare module 'react-syntax-highlighter/dist/esm/styles/prism/prism' {
+  const prism: any;
+  export default prism;
 }

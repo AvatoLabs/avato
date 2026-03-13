@@ -20,8 +20,8 @@ import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } fr
 import Markdown from 'react-native-markdown-display';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SyntaxHighlighter from 'react-native-syntax-highlighter';
-// @ts-ignore - react-native-syntax-highlighter doesn't have types
-import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// @ts-ignore - types not available for react-native-syntax-highlighter
+import prism from 'react-syntax-highlighter/dist/esm/styles/prism/prism';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -371,7 +371,7 @@ export default function SkillDetailScreen() {
                   wrapLines
                   highlightLineNumbers={false}
                   language="json"
-                  style={tomorrow}
+                  style={prism}
                   customStyle={{
                     padding: 16,
                     fontSize: 11,
