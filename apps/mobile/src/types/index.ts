@@ -6,6 +6,17 @@
 
 // ---- Session / Chat ----
 
+export interface CreateSessionConfig {
+  avatar?: string;
+  description?: string;
+  groupId?: string;
+  model?: string;
+  plugins?: string[];
+  provider?: string;
+  systemPrompt?: string;
+  title?: string;
+}
+
 export interface ChatSession {
   /** Agent identifier this session is talking to */
   agentId?: string;
@@ -105,6 +116,13 @@ export interface Agent {
 
 export interface MarketAgent {
   author: string;
+  config?: {
+    model?: string;
+    plugins?: string[];
+    provider?: string;
+    systemRole?: string;
+    [key: string]: any;
+  };
   createAt: string;
   identifier: string;
   meta: {

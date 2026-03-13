@@ -104,11 +104,17 @@ const resolveEffectiveMemoryPayload = async (params: {
  * Prefers reading tool definitions from the stored manifest (populated at install time).
  * Falls back to fetching from MCP server at runtime if manifest has no tools.
  */
+interface GatewayToolEntry {
+  identifier: string;
+  url: string;
+}
+
 const resolvePluginTools = async (
   pluginIds: string[],
   serverDB: LobeChatDatabase,
   userId: string,
 ): Promise<{
+  gatewayMap: Map<string, GatewayToolEntry>;
   mcpParamsMap: Map<string, { identifier: string; params: McpPluginConfig }>;
   tools: Array<{ function: { description?: string; name: string; parameters: any }; type: string }>;
 }> => {
@@ -117,6 +123,7 @@ const resolvePluginTools = async (
     type: string;
   }> = [];
   const mcpParamsMap = new Map<string, { identifier: string; params: McpPluginConfig }>();
+  const gatewayMap = new Map<string, GatewayToolEntry>();
 
   try {
     const pluginModel = new PluginModel(serverDB, userId);
@@ -135,20 +142,49 @@ const resolvePluginTools = async (
 
       const mcpConfig = plugin.customParams?.mcp as McpPluginConfig | undefined;
 
-      const manifestApi = (plugin.manifest as any)?.api as
-        | Array<{ description?: string; name: string; parameters: any }>
+      let manifestApi = (plugin.manifest as any)?.api as
+        | Array<{ description?: string; name: string; parameters: any; url?: string }>
         | undefined;
+
+      // If manifest is empty, try refetching from customParams.manifestUrl
+      if (!manifestApi?.length) {
+        const manifestUrl = (plugin.customParams as any)?.manifestUrl as string | undefined;
+        if (manifestUrl) {
+          try {
+            console.info(`[webapi/chat] refetching manifest for "${pluginId}" from ${manifestUrl}`);
+            const res = await fetch(manifestUrl, { signal: AbortSignal.timeout(5000) });
+            if (res.ok) {
+              const freshManifest = await res.json();
+              manifestApi = freshManifest?.api;
+              if (manifestApi?.length) {
+                // Persist the recovered manifest so future requests don't need to refetch
+                await pluginModel.update(pluginId, { manifest: freshManifest });
+                console.info(
+                  `[webapi/chat] recovered ${manifestApi.length} tools from manifestUrl for "${pluginId}"`,
+                );
+              }
+            }
+          } catch (e) {
+            console.warn(`[webapi/chat] failed to refetch manifest for "${pluginId}":`, e);
+          }
+        }
+      }
 
       if (manifestApi?.length) {
         for (const tool of manifestApi) {
+          const toolKey = `${plugin.identifier}${TOOL_SEPARATOR}${tool.name}`;
           tools.push({
             function: {
               description: tool.description,
-              name: `${plugin.identifier}${TOOL_SEPARATOR}${tool.name}`,
+              name: toolKey,
               parameters: tool.parameters,
             },
             type: 'function',
           });
+          // If the tool has a gateway URL, record it for HTTP execution
+          if (tool.url) {
+            gatewayMap.set(toolKey, { identifier: plugin.identifier, url: tool.url });
+          }
         }
         if (mcpConfig) {
           mcpParamsMap.set(plugin.identifier, {
@@ -157,7 +193,7 @@ const resolvePluginTools = async (
           });
         }
         console.info(
-          `[webapi/chat] loaded ${manifestApi.length} tools from stored manifest for "${pluginId}"`,
+          `[webapi/chat] loaded ${manifestApi.length} tools from manifest for "${pluginId}" (gateway=${gatewayMap.size > 0})`,
         );
         continue;
       }
@@ -206,16 +242,17 @@ const resolvePluginTools = async (
     console.error('[webapi/chat] failed to resolve plugin tools:', e);
   }
 
-  return { mcpParamsMap, tools };
+  return { gatewayMap, mcpParamsMap, tools };
 };
 
 /**
- * Execute a single tool call against the appropriate MCP server.
+ * Execute a single tool call against gateway HTTP or MCP server.
  */
-const executeMcpToolCall = async (
+const executeToolCall = async (
   toolCallName: string,
   args: string,
   mcpParamsMap: Map<string, { identifier: string; params: McpPluginConfig }>,
+  gatewayMap: Map<string, GatewayToolEntry>,
 ): Promise<string> => {
   const separatorIdx = toolCallName.indexOf(TOOL_SEPARATOR);
   if (separatorIdx < 0) return `Error: Unknown tool format "${toolCallName}"`;
@@ -223,8 +260,28 @@ const executeMcpToolCall = async (
   const pluginId = toolCallName.slice(0, separatorIdx);
   const toolName = toolCallName.slice(separatorIdx + TOOL_SEPARATOR.length);
 
+  // Gateway plugin execution (HTTP POST to tool URL)
+  const gateway = gatewayMap.get(toolCallName);
+  if (gateway) {
+    try {
+      const parsedArgs = args ? JSON.parse(args) : {};
+      const res = await fetch(gateway.url, {
+        body: JSON.stringify(parsedArgs),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: AbortSignal.timeout(30_000),
+      });
+      const text = await res.text();
+      if (!res.ok) return `Error: Gateway call to "${toolName}" returned ${res.status}: ${text}`;
+      return text;
+    } catch (e) {
+      return `Error executing gateway tool "${toolName}": ${(e as Error).message}`;
+    }
+  }
+
+  // MCP execution
   const entry = mcpParamsMap.get(pluginId);
-  if (!entry) return `Error: Plugin "${pluginId}" not found`;
+  if (!entry) return `Error: Plugin "${pluginId}" not found in MCP or gateway maps`;
 
   const clientParams: Record<string, any> = {
     name: entry.identifier,
@@ -407,10 +464,11 @@ export const POST = checkAuth(
 
             for (const tc of assistantMsg.tool_calls) {
               console.info(`[webapi/chat] executing tool: ${tc.function.name}`);
-              const content = await executeMcpToolCall(
+              const content = await executeToolCall(
                 tc.function.name,
                 tc.function.arguments,
                 mcpTools.mcpParamsMap,
+                mcpTools.gatewayMap,
               );
               messages.push({
                 content,

@@ -53,7 +53,7 @@ import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, pluginApi, sessionApi } from '../lib/api';
+import { agentApi, pluginApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getStreak, recordUsage } from '../lib/streak';
@@ -321,23 +321,25 @@ export default function ChatListScreen({ navigation }: any) {
       0,
       50,
     );
-    const newId = draftSessionId || (await createSession(sessionTitle));
+    const newId =
+      draftSessionId ||
+      (await createSession({
+        title: sessionTitle,
+        model: selectedModel || undefined,
+        provider: selectedProvider || undefined,
+        plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
+      }));
     setDraftSessionId(null);
 
     try {
-      await sessionApi.updateChatConfig(newId, {
-        memory: {
-          effort: memoryEffort,
-          enabled: memoryEnabled,
-        },
-        searchMode: searchEnabled ? 'on' : 'off',
-      });
-      // Persist enabled plugins to the new agent
-      if (enabledSkills.size > 0) {
-        const agentConfig = await agentApi.getConfigBySession(newId);
-        if (agentConfig?.id) {
-          await agentApi.updateConfig(agentConfig.id, { plugins: [...enabledSkills] });
-        }
+      const agentConfig = await agentApi.getConfigBySession(newId);
+      if (agentConfig?.id) {
+        await agentApi.updateConfig(agentConfig.id, {
+          chatConfig: {
+            memory: { effort: memoryEffort, enabled: memoryEnabled },
+            searchMode: searchEnabled ? 'on' : 'off',
+          },
+        });
       }
     } catch {
       /* best-effort */
@@ -498,20 +500,6 @@ export default function ChatListScreen({ navigation }: any) {
   }, []);
 
   const handleQuickAction = async (key: string) => {
-    if (key === 'agent') {
-      haptics.success();
-      try {
-        const result = await agentApi.create();
-        if (result?.sessionId) {
-          fetchSessions();
-          navigation.navigate('ChatDetail', { sessionId: result.sessionId });
-        }
-      } catch {
-        const newId = await createSession();
-        navigation.navigate('ChatDetail', { sessionId: newId });
-      }
-      return;
-    }
     if (key === 'group') {
       navigation.navigate('SessionGroup');
       return;
@@ -520,7 +508,8 @@ export default function ChatListScreen({ navigation }: any) {
       navigation.navigate('Artwork');
       return;
     }
-    // 'write' — default
+    // 'agent' and 'write' both create a session via unified path
+    haptics.success();
     const newId = await createSession();
     navigation.navigate('ChatDetail', { sessionId: newId });
   };

@@ -11,32 +11,52 @@ import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
 import type { ChatRequestOptions } from '../lib/api';
-import { aiChatApi, messageApi } from '../lib/api';
+import { agentApi, aiChatApi, messageApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { ChatMessage, MobileMemoryEffort } from '../types';
 import { useFileStore } from './file';
 
 /**
- * Reads per-session chat settings (model, temperature, systemPrompt, provider)
- * from AsyncStorage. Falls back to global default model/provider if no
- * per-session values are configured.
+ * Resolves per-session chat options with a 3-tier priority:
+ *   1. Backend agent config (source of truth)
+ *   2. Per-session AsyncStorage (legacy / offline fallback)
+ *   3. Global default model/provider
  */
 async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOptions> {
   const opts: ChatRequestOptions = {};
+
+  // 1. Backend agent config
   try {
-    const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
-    if (raw) {
-      const saved = JSON.parse(raw);
-      if (saved.model) opts.model = saved.model;
-      if (saved.provider) opts.provider = saved.provider;
-      if (saved.temperature) opts.temperature = parseFloat(saved.temperature);
-      if (saved.systemPrompt) opts.systemPrompt = saved.systemPrompt;
+    const config = await agentApi.getConfigBySession(sessionId);
+    if (config) {
+      if (config.model) opts.model = config.model;
+      if (config.provider) opts.provider = config.provider;
+      if (config.params?.temperature != null) opts.temperature = config.params.temperature;
+      if (config.systemRole) opts.systemPrompt = config.systemRole;
     }
   } catch {
-    /* ignore */
+    /* network error — fall through to AsyncStorage */
   }
-  // Fallback to global default model/provider if no per-session values
+
+  // 2. Per-session AsyncStorage (legacy / offline)
+  if (!opts.model || !opts.provider) {
+    try {
+      const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (!opts.model && saved.model) opts.model = saved.model;
+        if (!opts.provider && saved.provider) opts.provider = saved.provider;
+        if (opts.temperature == null && saved.temperature)
+          opts.temperature = parseFloat(saved.temperature);
+        if (!opts.systemPrompt && saved.systemPrompt) opts.systemPrompt = saved.systemPrompt;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 3. Global defaults
   if (!opts.model) {
     try {
       const globalModel = await AsyncStorage.getItem('minkhub_default_model');
@@ -123,6 +143,8 @@ const buildUserStreamContent = (
 };
 
 interface ChatState {
+  /** AbortController for the current streaming request */
+  abortController: AbortController | null;
   clearMessages: (sessionId: string) => void;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   /** Message currently being edited (id) */
@@ -152,6 +174,8 @@ interface ChatState {
     },
   ) => Promise<void>;
   setEditingMessage: (id: string | null) => void;
+  /** Stop the current generation */
+  stopGenerating: () => void;
   /** Streaming content buffer for the current generation */
   streamBuffer: string;
 }
@@ -163,6 +187,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reasoningStartedAt: null,
   streamBuffer: '',
   editingMessageId: null,
+  abortController: null,
+
+  stopGenerating: () => {
+    const controller = get().abortController;
+    if (controller) {
+      controller.abort();
+    }
+    set({
+      abortController: null,
+      generating: false,
+      isReasoning: false,
+      reasoningStartedAt: null,
+      streamBuffer: '',
+    });
+  },
 
   fetchMessages: async (sessionId: string, topicId?: string) => {
     try {
@@ -276,7 +315,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     };
 
+    const abortController = new AbortController();
     set((s) => ({
+      abortController,
       generating: true,
       isReasoning: false,
       reasoningStartedAt: null,
@@ -405,6 +446,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             scheduleFlush();
           },
         },
+        abortController.signal,
       );
 
       // Flush any remaining pending updates
@@ -482,7 +524,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     } finally {
-      set({ generating: false, isReasoning: false, reasoningStartedAt: null, streamBuffer: '' });
+      set({
+        abortController: null,
+        generating: false,
+        isReasoning: false,
+        reasoningStartedAt: null,
+        streamBuffer: '',
+      });
 
       // Refresh from server to sync IDs and ensure consistency
       setTimeout(() => get().fetchMessages(sessionId), 1500);
@@ -586,7 +634,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     };
 
+    const abortController = new AbortController();
     set((s) => ({
+      abortController,
       generating: true,
       isReasoning: false,
       reasoningStartedAt: null,
@@ -690,6 +740,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             scheduleFlush();
           },
         },
+        abortController.signal,
       );
 
       if (throttleTimer) {
@@ -763,7 +814,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
     } finally {
-      set({ generating: false, isReasoning: false, reasoningStartedAt: null, streamBuffer: '' });
+      set({
+        abortController: null,
+        generating: false,
+        isReasoning: false,
+        reasoningStartedAt: null,
+        streamBuffer: '',
+      });
       setTimeout(() => get().fetchMessages(sessionId), 1500);
     }
   },

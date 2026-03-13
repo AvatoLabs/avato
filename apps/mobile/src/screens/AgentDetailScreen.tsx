@@ -37,8 +37,15 @@ export default function AgentDetailScreen({ route, navigation }: any) {
 
   const handleUseAgent = async () => {
     haptics.success();
-    const title = agentDetail?.meta.title || t.chatListNewConversation;
-    const newId = await createSession(title);
+    const agentConfig = agentDetail?.config || {};
+    const newId = await createSession({
+      title: agentDetail?.meta.title || t.chatListNewConversation,
+      description: agentDetail?.meta.description,
+      avatar: agentDetail?.meta.avatar,
+      systemPrompt: agentConfig.systemRole,
+      model: agentConfig.model,
+      plugins: agentConfig.plugins,
+    });
     navigation.navigate('ChatDetail', { sessionId: newId });
   };
 

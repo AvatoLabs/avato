@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
+import { agentApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -39,32 +40,57 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const [model, setModel] = useState('gpt-4o-mini');
   const [temperature, setTemperature] = useState('0.7');
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [agentId, setAgentId] = useState<string | null>(null);
   const toast = useToast();
 
   const settingsKey = `minkhub_chat_settings_${sessionId}`;
   const isFocused = useIsFocused();
 
-  // Load/reload persisted chat settings (also on return from ModelPicker)
   const loadSettings = useCallback(async () => {
-    const raw = await AsyncStorage.getItem(settingsKey);
-    if (raw) {
-      try {
+    // Backend agent config is the source of truth
+    try {
+      const config = await agentApi.getConfigBySession(sessionId);
+      if (config) {
+        setAgentId(config.id);
+        if (config.model) setModel(config.model);
+        if (config.params?.temperature != null) setTemperature(String(config.params.temperature));
+        if (config.systemRole) setSystemPrompt(config.systemRole);
+        return;
+      }
+    } catch {
+      /* fallback to AsyncStorage */
+    }
+    // Legacy fallback: per-session AsyncStorage
+    try {
+      const raw = await AsyncStorage.getItem(settingsKey);
+      if (raw) {
         const saved = JSON.parse(raw);
         if (saved.model) setModel(saved.model);
         if (saved.temperature) setTemperature(saved.temperature);
         if (saved.systemPrompt) setSystemPrompt(saved.systemPrompt);
-      } catch {
-        /* ignore */
       }
+    } catch {
+      /* ignore */
     }
-  }, [settingsKey]);
+  }, [sessionId, settingsKey]);
 
   useEffect(() => {
     if (isFocused) loadSettings();
   }, [isFocused, loadSettings]);
 
-  // Auto-save on changes (debounced via unmount)
   const saveSettings = async () => {
+    if (agentId) {
+      try {
+        await agentApi.updateConfig(agentId, {
+          model,
+          systemRole: systemPrompt || undefined,
+          params: { temperature: parseFloat(temperature) || 0.7 },
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+    // Keep AsyncStorage as fallback for offline / model store reads
     await AsyncStorage.setItem(settingsKey, JSON.stringify({ model, temperature, systemPrompt }));
   };
 
@@ -99,9 +125,9 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         rightElement={<Text className="text-primary font-medium text-[15px]">{t.save}</Text>}
         title={t.chatSettingsTitle}
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         onPressLeft={() => {
           saveSettings();
           navigation.goBack();

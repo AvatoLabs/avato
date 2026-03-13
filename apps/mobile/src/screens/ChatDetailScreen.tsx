@@ -16,6 +16,7 @@ import {
   Puzzle,
   Send,
   Settings,
+  Square,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -80,6 +81,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const generating = useChatStore((s) => s.generating);
   const isReasoning = useChatStore((s) => s.isReasoning);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const stopGenerating = useChatStore((s) => s.stopGenerating);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
 
@@ -195,19 +197,24 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         } else {
           next.add(identifier);
         }
+        const pluginArr = [...next];
         if (agentId) {
-          const pluginArr = [...next];
-          console.info('[ChatDetail] persisting plugins:', pluginArr, 'agentId:', agentId);
-          agentApi.updateConfig(agentId, { plugins: pluginArr }).catch((err) => {
-            console.error('[ChatDetail] failed to persist plugins:', err);
-          });
+          agentApi.updateConfig(agentId, { plugins: pluginArr }).catch(console.error);
         } else {
-          console.warn('[ChatDetail] agentId is null, cannot persist plugin toggle');
+          agentApi
+            .getConfigBySession(sessionId)
+            .then((config) => {
+              if (config?.id) {
+                setAgentId(config.id);
+                agentApi.updateConfig(config.id, { plugins: pluginArr }).catch(console.error);
+              }
+            })
+            .catch(console.error);
         }
         return next;
       });
     },
-    [agentId],
+    [agentId, sessionId],
   );
 
   const selectedProviderLogo = useMemo(
@@ -225,6 +232,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
+
+  const handleStop = useCallback(() => {
+    haptics.light();
+    stopGenerating();
+  }, [stopGenerating]);
 
   const handleSend = useCallback(() => {
     if ((!inputText.trim() && pendingFiles.length === 0) || generating) return;
@@ -737,25 +749,31 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               </TouchableOpacity>
               {/* Spacer */}
               <View className="flex-1" />
-              {/* Send */}
-              {inputText.trim() || pendingFiles.length > 0 ? (
+              {/* Send / Stop */}
+              {generating ? (
+                <Animated.View style={sendAnimStyle}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="w-9 h-9 rounded-full items-center justify-center"
+                    style={{ backgroundColor: semanticColors.muted }}
+                    onPress={handleStop}
+                  >
+                    <Square color="#fff" fill="#fff" size={12} strokeWidth={0} />
+                  </TouchableOpacity>
+                </Animated.View>
+              ) : inputText.trim() || pendingFiles.length > 0 ? (
                 <Animated.View style={sendAnimStyle}>
                   <TouchableOpacity
                     activeOpacity={0.8}
                     className="w-9 h-9 bg-primary rounded-full items-center justify-center"
-                    disabled={generating}
                     onPress={handleSend}
                   >
-                    {generating ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Send
-                        color="#fff"
-                        size={16}
-                        strokeWidth={tokens.icon.strokeWidth}
-                        style={{ marginLeft: 1 }}
-                      />
-                    )}
+                    <Send
+                      color="#fff"
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginLeft: 1 }}
+                    />
                   </TouchableOpacity>
                 </Animated.View>
               ) : (

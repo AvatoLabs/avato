@@ -167,12 +167,13 @@ export const sessionApi = {
     // Server maps DB groupId → "group" field; normalize to our ChatSession.groupId
     return (result?.sessions ?? []).map((s) => ({
       ...s,
+      agentId: s.config?.id ?? undefined,
       groupId: s.groupId ?? s.group ?? undefined,
       title: s.meta?.title ?? s.title ?? '',
       description: s.meta?.description ?? s.description,
       avatar: s.meta?.avatar ?? s.avatar,
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
-      model: s.model || undefined,
+      model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
       type: s.type ?? 'agent',
     }));
@@ -910,13 +911,27 @@ export const marketSkillApi = {
     }
 
     let manifest = item.manifest;
-    if (!manifest && item.manifestUrl) {
-      const res = await fetch(item.manifestUrl);
-      if (!res.ok) throw new Error(`Failed to fetch manifest: ${res.status}`);
-      manifest = await res.json();
+    // Fetch manifest if missing or empty (no api/tools entries)
+    const hasTools = manifest && (
+      (Array.isArray(manifest.api) && manifest.api.length > 0) ||
+      (Array.isArray(manifest.tools) && manifest.tools.length > 0)
+    );
+    if (!hasTools && item.manifestUrl) {
+      try {
+        const res = await fetch(item.manifestUrl);
+        if (res.ok) {
+          manifest = await res.json();
+        }
+      } catch {
+        /* use whatever manifest we have */
+      }
     }
 
+    const customParams: Record<string, any> = {};
+    if (item.manifestUrl) customParams.manifestUrl = item.manifestUrl;
+
     await trpcMutate('plugin.createOrInstallPlugin', {
+      customParams,
       identifier: item.identifier,
       manifest: manifest || {},
       type: 'plugin' as const,

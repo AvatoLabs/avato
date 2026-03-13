@@ -15,7 +15,6 @@ import { SectionBlock } from '../components/ui/SectionBlock';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useDiscoverStore } from '../store/discover';
-import { useSessionStore } from '../store/session';
 
 type Tab = 'agents' | 'models' | 'providers';
 
@@ -32,7 +31,6 @@ export default function DiscoverScreen({ navigation }: any) {
   const fetchAgents = useDiscoverStore((s) => s.fetchAgents);
   const fetchModels = useDiscoverStore((s) => s.fetchModels);
   const fetchProviders = useDiscoverStore((s) => s.fetchProviders);
-  const createSession = useSessionStore((s) => s.createSession);
 
   useEffect(() => {
     fetchAgents();
@@ -48,11 +46,6 @@ export default function DiscoverScreen({ navigation }: any) {
 
   const handleAgentPress = (identifier: string) => {
     navigation.navigate('AgentDetail', { identifier });
-  };
-
-  const handleUseAgent = async () => {
-    const newId = await createSession();
-    navigation.navigate('ChatDetail', { sessionId: newId });
   };
 
   const tabs: { key: Tab; label: string }[] = [

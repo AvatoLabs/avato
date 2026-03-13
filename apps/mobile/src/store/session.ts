@@ -10,14 +10,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
-import { sessionApi } from '../lib/api';
+import { agentApi, sessionApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
-import type { ChatSession } from '../types';
+import type { ChatSession, CreateSessionConfig } from '../types';
 
 interface SessionState {
   activeSessionId: string | null;
-  createSession: (title?: string) => Promise<string>;
+  createSession: (titleOrConfig?: string | CreateSessionConfig) => Promise<string>;
   duplicateSession: (id: string) => Promise<string | null>;
   // Actions
   fetchSessions: () => Promise<void>;
@@ -51,7 +51,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const sessions = await sessionApi.list();
       const stored = await AsyncStorage.getItem('activeSessionId');
 
-      // Overlay per-session model/provider from AsyncStorage (local overrides server)
+      // Overlay per-session model/provider from AsyncStorage only when server has no value
       const settingsKeys = (sessions ?? []).map((s) => `minkhub_chat_settings_${s.id}`);
       if (settingsKeys.length > 0) {
         try {
@@ -63,8 +63,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
               const sid = key.replace('minkhub_chat_settings_', '');
               const sess = sessions?.find((s) => s.id === sid);
               if (sess) {
-                if (saved.model) sess.model = saved.model;
-                if (saved.provider) sess.provider = saved.provider;
+                if (!sess.model && saved.model) sess.model = saved.model;
+                if (!sess.provider && saved.provider) sess.provider = saved.provider;
               }
             } catch {
               /* ignore parse error */
@@ -92,15 +92,30 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  createSession: async (title = 'New Conversation') => {
-    try {
-      // sessionApi.create now returns the session ID string directly
-      const newId = (await sessionApi.create(title)) ?? `local-${Date.now()}`;
+  createSession: async (titleOrConfig) => {
+    const config: CreateSessionConfig =
+      typeof titleOrConfig === 'string' ? { title: titleOrConfig } : (titleOrConfig ?? {});
+    const title = config.title || 'New Conversation';
 
-      // Optimistic: add a placeholder locally then refresh
+    try {
+      const agentConfig: Record<string, unknown> = { title };
+      if (config.description) agentConfig.description = config.description;
+      if (config.avatar) agentConfig.avatar = config.avatar;
+      if (config.systemPrompt) agentConfig.systemRole = config.systemPrompt;
+      if (config.model) agentConfig.model = config.model;
+      if (config.provider) agentConfig.provider = config.provider;
+      if (config.plugins) agentConfig.plugins = config.plugins;
+
+      const result = await agentApi.create(agentConfig, config.groupId);
+      const newId = result?.sessionId ?? `local-${Date.now()}`;
+
       const placeholder: ChatSession = {
         id: newId,
         title,
+        agentId: result?.agentId,
+        avatar: config.avatar,
+        model: config.model,
+        provider: config.provider,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -112,7 +127,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       await AsyncStorage.setItem('activeSessionId', newId);
 
-      // Background refresh
       get().fetchSessions();
       return newId;
     } catch (err) {
@@ -120,7 +134,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t[messageKey]);
-      // Fallback to local-only session
       const localId = `local-${Date.now()}`;
       const fallback: ChatSession = {
         id: localId,
