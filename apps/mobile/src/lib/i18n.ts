@@ -502,6 +502,8 @@ type TranslationKeys = {
   skillsImportSuccess: string;
   skillsImportFailed: string;
   skillsImporting: string;
+  skillsInstallSuccess: string;
+  skillsInstallFailed: string;
   skillsAddCustomMcp: string;
   skillsCustomMcpName: string;
   skillsCustomMcpNamePlaceholder: string;
@@ -1141,6 +1143,8 @@ const en: TranslationKeys = {
   skillsImportSuccess: 'Skill imported successfully',
   skillsImportFailed: 'Failed to import skill',
   skillsImporting: 'Importing...',
+  skillsInstallSuccess: 'Skill installed successfully',
+  skillsInstallFailed: 'Failed to install skill',
   skillsAddCustomMcp: 'Add Custom MCP',
   skillsCustomMcpName: 'Name',
   skillsCustomMcpNamePlaceholder: 'Enter MCP server name',
@@ -1776,6 +1780,8 @@ const zh_tw: TranslationKeys = {
   skillsImportSuccess: '技能匯入成功',
   skillsImportFailed: '技能匯入失敗',
   skillsImporting: '匯入中...',
+  skillsInstallSuccess: '技能安裝成功',
+  skillsInstallFailed: '技能安裝失敗',
   skillsAddCustomMcp: '新增自訂 MCP',
   skillsCustomMcpName: '名稱',
   skillsCustomMcpNamePlaceholder: '輸入 MCP 伺服器名稱',
@@ -2412,6 +2418,8 @@ const zh: TranslationKeys = {
   skillsImportSuccess: '技能导入成功',
   skillsImportFailed: '技能导入失败',
   skillsImporting: '导入中...',
+  skillsInstallSuccess: '技能安装成功',
+  skillsInstallFailed: '技能安装失败',
   skillsAddCustomMcp: '添加自定义 MCP',
   skillsCustomMcpName: '名称',
   skillsCustomMcpNamePlaceholder: '输入 MCP 服务器名称',

@@ -336,7 +336,7 @@ function createSSEParser() {
           }
         } else if (currentEvent === 'usage') {
           try { usage = JSON.parse(dataStr); } catch { /* ignore */ }
-        } else if (currentEvent === 'performance') {
+        } else if (currentEvent === 'speed' || currentEvent === 'performance') {
           try { performance = JSON.parse(dataStr); } catch { /* ignore */ }
         }
       } else if (trimmed === '') {

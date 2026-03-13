@@ -157,9 +157,11 @@ function PluginRow({
   index,
   t,
   onUninstall,
+  onPress,
 }: {
   index: number;
   onUninstall: (identifier: string) => void;
+  onPress?: () => void;
   plugin: InstalledPlugin;
   t: any;
 }) {
@@ -184,23 +186,33 @@ function PluginRow({
               <Blocks color={tagColor} size={18} strokeWidth={tokens.icon.strokeWidth} />
             )}
           </View>
-          <View className="flex-1">
-            <View className="flex-row items-center gap-2">
-              <Text
-                className="text-foreground font-medium text-[15px] tracking-tight"
-                numberOfLines={1}
-              >
-                {title}
-              </Text>
-              <SourceTag color={tagColor} label={tagLabel} />
-              <SourceTag color={sourceColor} label={sourceLabel} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-1 flex-row items-center"
+            disabled={!onPress}
+            onPress={onPress}
+          >
+            <View className="flex-1">
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className="text-foreground font-medium text-[15px] tracking-tight"
+                  numberOfLines={1}
+                >
+                  {title}
+                </Text>
+                <SourceTag color={tagColor} label={tagLabel} />
+                <SourceTag color={sourceColor} label={sourceLabel} />
+              </View>
+              {plugin.manifest?.meta?.description ? (
+                <Text
+                  className="text-secondary/50 text-[11px] font-medium mt-0.5"
+                  numberOfLines={1}
+                >
+                  {plugin.manifest.meta.description}
+                </Text>
+              ) : null}
             </View>
-            {plugin.manifest?.meta?.description ? (
-              <Text className="text-secondary/50 text-[11px] font-medium mt-0.5" numberOfLines={1}>
-                {plugin.manifest.meta.description}
-              </Text>
-            ) : null}
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             hitSlop={12}
             onPress={() => {
@@ -1111,6 +1123,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
                         navigation.navigate('SkillDetail', {
                           skillId: skill.id,
                           skillName: skill.name,
+                          skillType: 'agent',
                         })
                       }
                     />
@@ -1129,6 +1142,13 @@ export default function SkillSettingsScreen({ navigation }: any) {
                       plugin={plugin}
                       t={t}
                       onUninstall={handleUninstallPlugin}
+                      onPress={() =>
+                        navigation.navigate('SkillDetail', {
+                          skillId: plugin.identifier,
+                          skillName: plugin.manifest?.meta?.title || plugin.identifier,
+                          skillType: 'plugin',
+                        })
+                      }
                     />
                   ))}
                 </>
@@ -1149,6 +1169,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
                         navigation.navigate('SkillDetail', {
                           skillId: skill.id,
                           skillName: skill.name,
+                          skillType: 'agent',
                         })
                       }
                     />
@@ -1160,6 +1181,13 @@ export default function SkillSettingsScreen({ navigation }: any) {
                       plugin={plugin}
                       t={t}
                       onUninstall={handleUninstallPlugin}
+                      onPress={() =>
+                        navigation.navigate('SkillDetail', {
+                          skillId: plugin.identifier,
+                          skillName: plugin.manifest?.meta?.title || plugin.identifier,
+                          skillType: 'plugin',
+                        })
+                      }
                     />
                   ))}
                 </>

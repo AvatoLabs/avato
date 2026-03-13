@@ -501,6 +501,85 @@ export const POST = checkAuth(
         delete data.tools;
       }
 
+      // ============  5. handle search via non-streaming pre-flight  ============ //
+      // Some providers (e.g. Moonshot) handle enabledSearch via builtin tools that
+      // produce tool_use stop reasons in streaming, which the mobile client can't
+      // handle. We do a non-streaming call first to let the provider resolve search
+      // server-side, then extract the text and convert it to SSE for the mobile.
+      if (data.enabledSearch) {
+        try {
+          console.info('[webapi/chat] search pre-flight: non-streaming call with enabledSearch');
+          const searchResp = await modelRuntime.chat(
+            { ...data, responseMode: 'json', stream: false } as any,
+            runtimeOptions,
+          );
+          const searchResult = await searchResp.json();
+
+          // Handle both OpenAI format (choices[].message) and Anthropic format (content[])
+          let textContent = '';
+          let reasoningContent = '';
+
+          if (searchResult?.choices?.[0]?.message) {
+            // OpenAI format
+            textContent = searchResult.choices[0].message.content || '';
+            reasoningContent = searchResult.choices[0].message.reasoning_content || '';
+          } else if (Array.isArray(searchResult?.content)) {
+            // Anthropic format
+            for (const block of searchResult.content) {
+              if (block.type === 'thinking' && block.thinking) {
+                reasoningContent += block.thinking;
+              } else if (block.type === 'text' && block.text) {
+                textContent += block.text;
+              }
+            }
+          }
+
+          if (textContent) {
+            console.info(
+              `[webapi/chat] search pre-flight succeeded: text=${textContent.length} chars, reasoning=${reasoningContent.length} chars`,
+            );
+
+            const encoder = new TextEncoder();
+            const sseStream = new ReadableStream({
+              start(controller) {
+                const emit = (event: string, payload: unknown) => {
+                  controller.enqueue(
+                    encoder.encode(
+                      `id: search\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
+                    ),
+                  );
+                };
+
+                if (reasoningContent) emit('reasoning', reasoningContent);
+                // Emit text in chunks to simulate streaming for better UX
+                const CHUNK_SIZE = 20;
+                for (let i = 0; i < textContent.length; i += CHUNK_SIZE) {
+                  emit('text', textContent.slice(i, i + CHUNK_SIZE));
+                }
+                emit('stop', 'search_complete');
+                controller.close();
+              },
+            });
+
+            return new Response(sseStream, {
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'text/event-stream; charset=utf-8',
+              },
+            });
+          }
+
+          console.warn(
+            '[webapi/chat] search pre-flight returned no text, falling back to streaming',
+          );
+        } catch (e) {
+          console.error('[webapi/chat] search pre-flight failed, falling back to streaming:', e);
+        }
+
+        // If search pre-flight failed, strip enabledSearch to avoid empty streaming response
+        delete (data as any).enabledSearch;
+      }
+
       console.info(
         `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages.length}`,
       );

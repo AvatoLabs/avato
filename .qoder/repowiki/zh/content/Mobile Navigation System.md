@@ -12,6 +12,7 @@
 - [apps/mobile/src/screens/ChatListScreen.tsx](file://apps/mobile/src/screens/ChatListScreen.tsx)
 - [apps/mobile/src/screens/ServerConfigScreen.tsx](file://apps/mobile/src/screens/ServerConfigScreen.tsx)
 - [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx)
+- [apps/mobile/src/screens/SkillSettingsScreen.tsx](file://apps/mobile/src/screens/SkillSettingsScreen.tsx)
 - [apps/mobile/src/store/session.ts](file://apps/mobile/src/store/session.ts)
 - [apps/mobile/src/store/connection.ts](file://apps/mobile/src/store/connection.ts)
 - [apps/mobile/src/lib/api.ts](file://apps/mobile/src/lib/api.ts)
@@ -25,9 +26,11 @@
 **所做更改**
 
 - 重构导航结构，新增 Artwork 标签页（带调色板图标）和 Resources 标签页
+- 新增 Skills 标签页，提供技能和 MCP 服务器管理功能
 - 将 Profile 标签页重命名为 Settings，创建更合理的创意工具、资源和技能管理导航流程
 - 新增 ResourceScreen 组件，提供文件资源管理功能
 - 新增 SettingsScreen 组件，提供完整设置管理界面
+- 新增 SkillSettingsScreen 组件，提供技能和 MCP 服务器管理功能
 - 更新底部标签导航器的标签配置，替换 Discover 标签为 Artwork 标签
 - 重新组织导航层级，优化用户体验流程
 
@@ -112,7 +115,7 @@ ConnectionStore --> NetworkService
 **章节来源**
 
 - [apps/mobile/App.tsx:1-112](file://apps/mobile/App.tsx#L1-L112)
-- [apps/mobile/src/navigation/index.tsx:1-274](file://apps/mobile/src/navigation/index.tsx#L1-L274)
+- [apps/mobile/src/navigation/index.tsx:1-318](file://apps/mobile/src/navigation/index.tsx#L1-L318)
 
 ## 核心组件
 
@@ -138,12 +141,12 @@ ConnectionStore --> NetworkService
 - 设置页面：独立的导航栈
 - 艺术作品功能：独立的导航栈
 
-**更新** 新增了 Artwork 和 Resources 标签，替换了原有的 Discover 标签
+**更新** 新增了 Artwork、Resources 和 Skills 标签，替换了原有的 Discover 标签
 
 **章节来源**
 
 - [apps/mobile/App.tsx:35-112](file://apps/mobile/App.tsx#L35-L112)
-- [apps/mobile/src/navigation/index.tsx:116-274](file://apps/mobile/src/navigation/index.tsx#L116-L274)
+- [apps/mobile/src/navigation/index.tsx:174-318](file://apps/mobile/src/navigation/index.tsx#L174-L318)
 
 ## 架构概览
 
@@ -180,7 +183,7 @@ Navigator-->>User : 显示更新内容
 **图表来源**
 
 - [apps/mobile/App.tsx:59-93](file://apps/mobile/App.tsx#L59-L93)
-- [apps/mobile/src/navigation/index.tsx:116-143](file://apps/mobile/src/navigation/index.tsx#L116-L143)
+- [apps/mobile/src/navigation/index.tsx:174-201](file://apps/mobile/src/navigation/index.tsx#L174-L201)
 
 ## 详细组件分析
 
@@ -284,7 +287,7 @@ Viewing --> Configuring : 修改配置
 
 **章节来源**
 
-- [apps/mobile/src/screens/ArtworkScreen.tsx:1-1032](file://apps/mobile/src/screens/ArtworkScreen.tsx#L1-L1032)
+- [apps/mobile/src/screens/ArtworkScreen.tsx:1-1073](file://apps/mobile/src/screens/ArtworkScreen.tsx#L1-L1073)
 
 ### 资源管理屏幕组件
 
@@ -376,6 +379,53 @@ Logout --> ServerConfig[返回服务器配置]
 **章节来源**
 
 - [apps/mobile/src/screens/ProfileScreen.tsx:1-346](file://apps/mobile/src/screens/ProfileScreen.tsx#L1-L346)
+
+### 技能设置屏幕组件
+
+**新增** 技能设置屏幕提供了完整的技能和 MCP 服务器管理功能，支持 Agent 技能、社区 MCP 和自定义 MCP 的管理。
+
+#### 功能分类
+
+1. **Agent 技能管理**：内置、市场和用户技能的安装、卸载和管理
+2. **社区 MCP 管理**：第三方 MCP 服务器的安装和管理
+3. **自定义 MCP 管理**：用户自定义 MCP 服务器的添加、测试和管理
+4. **技能导入功能**：支持从 URL、GitHub 和 JSON 导入技能
+
+#### 技能管理流程
+
+```mermaid
+flowchart TD
+Start[打开技能设置] --> LoadSkills[加载技能列表]
+LoadSkills --> DisplayAgentSkills[显示Agent技能]
+DisplayAgentSkills --> DisplayCommunityMCP[显示社区MCP]
+DisplayCommunityMCP --> DisplayCustomMCP[显示自定义MCP]
+DisplayCustomMCP --> UserAction[用户操作]
+UserAction --> InstallSkill[安装技能]
+UserAction --> UninstallSkill[卸载技能]
+UserAction --> ImportSkill[导入技能]
+UserAction --> AddCustomMCP[添加自定义MCP]
+InstallSkill --> LoadSkills
+UninstallSkill --> LoadSkills
+ImportSkill --> LoadSkills
+AddCustomMCP --> TestConnection[测试连接]
+TestConnection --> LoadSkills
+```
+
+**图表来源**
+
+- [apps/mobile/src/screens/SkillSettingsScreen.tsx:1-1277](file://apps/mobile/src/screens/SkillSettingsScreen.tsx#L1-L1277)
+
+#### 技术特性
+
+- **多源技能管理**：支持内置、市场和用户技能的统一管理
+- **MCP 服务器管理**：完整的 MCP 服务器生命周期管理
+- **技能导入功能**：支持多种导入方式和格式验证
+- **连接测试**：提供 MCP 服务器连接测试功能
+- **权限管理**：支持不同类型的认证方式
+
+**章节来源**
+
+- [apps/mobile/src/screens/SkillSettingsScreen.tsx:1-1277](file://apps/mobile/src/screens/SkillSettingsScreen.tsx#L1-L1277)
 
 ### 更多设置屏幕组件
 
@@ -489,6 +539,22 @@ App->>User : 显示应用功能
 **章节来源**
 
 - [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx:1-45](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx#L1-L45)
+
+### 发现屏幕组件
+
+**移除** Discover 标签页已被 Artwork、Resources 和 Skills 标签页替代，原有的发现功能整合到新的导航结构中。
+
+#### 发现功能迁移
+
+发现屏幕原本提供 Agent、Model 和 Provider 的发现功能，现已整合到以下新的导航结构中：
+
+- Agent 发现 → 通过技能市场和 Agent 详情页面
+- Model 发现 → 通过 AI 提供商和模型列表页面
+- Provider 发现 → 通过 AI 提供商详情页面
+
+**章节来源**
+
+- [apps/mobile/src/screens/DiscoverScreen.tsx:1-217](file://apps/mobile/src/screens/DiscoverScreen.tsx#L1-L217)
 
 ### 状态管理系统
 
@@ -654,6 +720,12 @@ Tailwind --> ReactNative
 - 验证文件 API 接口和网络连接
 - 确认用户权限和认证状态
 
+**问题**：Skills 标签显示空白或加载失败
+
+- 检查 SkillSettingsScreen 组件的导入和注册
+- 验证技能 API 接口和网络连接
+- 确认 MCP 服务器配置和认证状态
+
 **问题**：Settings 标签显示空白或加载失败
 
 - 检查 SettingsScreen 组件的导入和注册
@@ -710,6 +782,7 @@ Tailwind --> ReactNative
 
 **Artwork 标签**：为用户提供 AI 图像生成功能，支持多种模型和参数配置
 **Resources 标签**：提供完整的文件资源管理功能，支持多类型文件的上传、下载和管理
+**Skills 标签**：统一管理 Agent 技能和 MCP 服务器，提供完整的技能生态系统
 **Settings 标签**：统一管理应用设置，提供更合理的导航流程和用户体验
 
 该导航系统为 LobeHub 移动应用提供了坚实的技术基础，能够支持复杂的功能需求和良好的用户体验。
