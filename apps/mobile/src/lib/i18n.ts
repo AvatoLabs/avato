@@ -200,6 +200,14 @@ type TranslationKeys = {
   msgActionDelete: string;
   msgActionDeleteConfirm: string;
   msgActionCopied: string;
+  msgActionSaveToTopic: string;
+  msgStatTokens: string;
+  msgStatUncachedInput: string;
+  msgStatCachedInput: string;
+  msgStatOutput: string;
+  msgStatTotal: string;
+  msgStatTPS: string;
+  msgStatTTFT: string;
 
   // Topics
   topicTitle: string;
@@ -317,6 +325,7 @@ type TranslationKeys = {
   errorSendFailed: string;
   errorDeleteFailed: string;
   errorEditFailed: string;
+  errorSaveFailed: string;
 
   // Confirmation dialogs
   deleteSessionConfirm: string;
@@ -848,6 +857,14 @@ const en: TranslationKeys = {
   msgActionDelete: 'Delete',
   msgActionDeleteConfirm: 'Delete this message?',
   msgActionCopied: 'Copied',
+  msgActionSaveToTopic: 'Save to Topic',
+  msgStatTokens: 'tokens',
+  msgStatUncachedInput: 'Uncached Input',
+  msgStatCachedInput: 'Cached Input',
+  msgStatOutput: 'Output',
+  msgStatTotal: 'Total Consumption',
+  msgStatTPS: 'TPS',
+  msgStatTTFT: 'TTFT',
 
   topicTitle: 'Topics',
   topicCreate: 'New Topic',
@@ -956,6 +973,7 @@ const en: TranslationKeys = {
   errorSendFailed: 'Failed to send message',
   errorDeleteFailed: 'Failed to delete',
   errorEditFailed: 'Failed to save edit',
+  errorSaveFailed: 'Failed to save',
 
   deleteSessionConfirm: 'Delete Conversation',
   deleteSessionDesc: 'This conversation and all its messages will be permanently deleted.',
@@ -1475,6 +1493,14 @@ const zh_tw: TranslationKeys = {
   msgActionDelete: '刪除',
   msgActionDeleteConfirm: '確定刪除這則訊息嗎？',
   msgActionCopied: '已複製',
+  msgActionSaveToTopic: '儲存為話題',
+  msgStatTokens: 'tokens',
+  msgStatUncachedInput: '未快取輸入',
+  msgStatCachedInput: '快取輸入',
+  msgStatOutput: '輸出',
+  msgStatTotal: '總消耗',
+  msgStatTPS: 'TPS',
+  msgStatTTFT: 'TTFT',
 
   topicTitle: '話題',
   topicCreate: '新建話題',
@@ -1583,6 +1609,7 @@ const zh_tw: TranslationKeys = {
   errorSendFailed: '訊息傳送失敗',
   errorDeleteFailed: '刪除失敗',
   errorEditFailed: '編輯儲存失敗',
+  errorSaveFailed: '儲存失敗',
 
   deleteSessionConfirm: '刪除對話',
   deleteSessionDesc: '此對話及所有訊息將被永久刪除。',
@@ -2101,6 +2128,14 @@ const zh: TranslationKeys = {
   msgActionDelete: '删除',
   msgActionDeleteConfirm: '确定删除这条消息吗？',
   msgActionCopied: '已复制',
+  msgActionSaveToTopic: '存为话题',
+  msgStatTokens: 'tokens',
+  msgStatUncachedInput: '未缓存输入',
+  msgStatCachedInput: '缓存输入',
+  msgStatOutput: '输出',
+  msgStatTotal: '总消耗',
+  msgStatTPS: 'TPS',
+  msgStatTTFT: 'TTFT',
 
   topicTitle: '话题',
   topicCreate: '新建话题',
@@ -2209,6 +2244,7 @@ const zh: TranslationKeys = {
   errorSendFailed: '消息发送失败',
   errorDeleteFailed: '删除失败',
   errorEditFailed: '编辑保存失败',
+  errorSaveFailed: '保存失败',
 
   deleteSessionConfirm: '删除对话',
   deleteSessionDesc: '此对话及所有消息将被永久删除。',

@@ -39,6 +39,7 @@ import Animated, {
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -192,6 +193,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function ArtworkScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isConnected = useConnectionStore((s) => s.isConnected);
 
@@ -490,47 +492,59 @@ export default function ArtworkScreen({ navigation }: any) {
   );
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-white dark:bg-black">
       {/* ── Header ── */}
       <ScreenHeader title={t.artworkTitle} />
 
-      {/* ── Model & Config Bar ── */}
-      <View className="flex-row items-center px-4 py-2">
-        <TouchableOpacity
-          className="flex-row items-center bg-card rounded-full px-3 py-2 flex-1 mr-3"
-          onPress={() => {
-            haptics.selection();
-            setShowSidebar(true);
-          }}
-        >
-          <Sparkles color="#f5c542" size={16} strokeWidth={tokens.icon.strokeWidth} />
-          <Text
-            className="text-foreground text-[14px] font-semibold ml-2"
-            numberOfLines={1}
-            style={{ flex: 1 }}
+      {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
+      <View className="border-b border-gray-100 dark:border-gray-800">
+        <View className="flex-row items-center px-4 pt-1 pb-2">
+          <TouchableOpacity
+            className="flex-row items-center flex-1 mr-3"
+            onPress={() => {
+              haptics.selection();
+              setShowSidebar(true);
+            }}
           >
-            {modelName || t.artworkSelectModel}
-          </Text>
-          <Text className="text-foreground/40 text-[11px]">
-            {RESOLUTIONS[resIdx].label} · {ratio} · ×{imgCount}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className="bg-card rounded-full p-2.5"
-          onPress={() => {
-            haptics.selection();
-            setShowSidebar(true);
-          }}
-        >
-          <SlidersHorizontal color="#999" size={18} strokeWidth={tokens.icon.strokeWidth} />
-        </TouchableOpacity>
+            <Sparkles color="#f5c542" size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <Text
+              className="text-[14px] font-semibold ml-2 text-gray-900 dark:text-gray-100"
+              numberOfLines={1}
+              style={{ flex: 1 }}
+            >
+              {modelName || t.artworkSelectModel}
+            </Text>
+            <Text className="text-[11px] text-gray-400 dark:text-gray-500">
+              {RESOLUTIONS[resIdx].label} · {ratio} · ×{imgCount}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="items-center justify-center rounded-full p-2"
+            onPress={() => {
+              haptics.selection();
+              setShowSidebar(true);
+            }}
+          >
+            <SlidersHorizontal color="#6b7280" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Generation Feed ── */}
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: containerPad }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={
+          batches.length === 0
+            ? {
+                flexGrow: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingBottom: 120,
+                paddingHorizontal: containerPad,
+              }
+            : { paddingBottom: 120, paddingHorizontal: containerPad }
+        }
       >
         {batches.length > 0 ? (
           batches.map((batch) => (
@@ -559,12 +573,17 @@ export default function ArtworkScreen({ navigation }: any) {
             />
           ))
         ) : (
-          <View className="items-center pt-40">
-            <ImageIcon color="#333" size={48} strokeWidth={1.2} />
-            <Text className="text-foreground/30 text-[15px] font-medium mt-4">
+          <View className="items-center px-8">
+            <View
+              className="mb-4 items-center justify-center rounded-3xl bg-gray-100 dark:bg-gray-800"
+              style={{ width: 80, height: 80 }}
+            >
+              <ImageIcon color="#9ca3af" size={36} strokeWidth={1.5} />
+            </View>
+            <Text className="text-center text-[17px] font-semibold text-gray-700 dark:text-gray-300">
               {t.artworkEmpty}
             </Text>
-            <Text className="text-foreground/20 text-[12px] mt-1 text-center px-8">
+            <Text className="mt-2 text-center text-[14px] text-gray-400 dark:text-gray-500">
               {t.artworkEmptyDesc}
             </Text>
           </View>
@@ -573,22 +592,27 @@ export default function ArtworkScreen({ navigation }: any) {
 
       {/* ── Sticky Prompt Bar ── */}
       <View
-        className="absolute bottom-0 left-0 right-0 bg-background/95 border-t border-white/5"
-        style={{ paddingBottom: 34, paddingTop: 10, paddingHorizontal: containerPad }}
+        className="absolute bottom-0 left-0 right-0 border-t border-gray-100 dark:border-gray-800"
+        style={{
+          paddingBottom: insets.bottom + 12,
+          paddingTop: 10,
+          paddingHorizontal: containerPad,
+          backgroundColor: 'rgba(255,255,255,0.97)',
+        }}
       >
         <View className="flex-row items-end gap-2">
           <TextInput
             multiline
-            className="flex-1 bg-card rounded-2xl px-4 py-3 text-foreground text-[14px]"
+            className="flex-1 rounded-2xl px-4 py-3 text-[14px] text-gray-900 dark:text-gray-100"
             maxLength={2000}
             placeholder={t.artworkPromptPlaceholder}
-            placeholderTextColor="#666"
-            style={{ maxHeight: 100, minHeight: 44 }}
+            placeholderTextColor="#9ca3af"
+            style={{ maxHeight: 100, minHeight: 44, backgroundColor: '#f3f4f6' }}
             value={prompt}
             onChangeText={setPrompt}
           />
           <TouchableOpacity
-            className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? 'bg-blue-600' : 'bg-white/10'}`}
+            className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
             disabled={!prompt.trim() || !model || generating}
             style={{ width: 48, height: 48 }}
             onPress={handleGenerate}
@@ -597,7 +621,7 @@ export default function ArtworkScreen({ navigation }: any) {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Sparkles
-                color={prompt.trim() && model ? '#fff' : '#555'}
+                color={prompt.trim() && model ? '#fff' : '#9ca3af'}
                 size={20}
                 strokeWidth={2}
               />

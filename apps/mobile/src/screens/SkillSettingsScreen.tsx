@@ -41,7 +41,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
-import { agentSkillApi, pluginApi } from '../lib/api';
+import { agentSkillApi, mcpApi, pluginApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -178,7 +178,7 @@ function PluginRow({
       <View className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden">
         <View className="flex-row items-center px-4 py-3.5">
           <View className="w-9 h-9 rounded-full bg-foreground/10 items-center justify-center mr-3">
-            {avatar ? (
+            {avatar && /^\p{Emoji_Presentation}$/u.test(avatar) ? (
               <Text style={{ fontSize: 18 }}>{avatar}</Text>
             ) : (
               <Blocks color={tagColor} size={18} strokeWidth={tokens.icon.strokeWidth} />
@@ -992,27 +992,45 @@ export default function SkillSettingsScreen({ navigation }: any) {
         mcpConfig.headers = params.headers;
       }
 
-      await pluginApi.create({
-        customParams: {
-          avatar: params.avatar,
-          description: params.description,
-          mcp: mcpConfig,
-        },
-        identifier: params.identifier,
-        manifest: {
+      let manifest: Record<string, any>;
+      try {
+        manifest = await mcpApi.getStreamableMcpServerManifest({
+          auth: params.auth
+            ? { token: params.auth.token, type: params.auth.type as 'none' | 'bearer' }
+            : undefined,
+          headers: params.headers,
+          identifier: params.identifier.trim(),
+          metadata: {
+            avatar: params.avatar,
+            description: params.description,
+          },
+          url: params.url.trim(),
+        });
+      } catch {
+        manifest = {
           identifier: params.identifier,
           meta: {
             avatar: params.avatar,
             description: params.description || params.url,
             title: params.identifier,
           },
+        };
+      }
+
+      await pluginApi.createOrInstall({
+        customParams: {
+          avatar: params.avatar,
+          description: params.description,
+          mcp: mcpConfig,
         },
+        identifier: params.identifier,
+        manifest,
         type: 'customPlugin',
       });
       toast.show('success', t.skillsCustomMcpSaved);
       await fetchAll();
     } catch {
-      toast.show('error', t.errorNetwork);
+      toast.show('error', t.errorSaveFailed);
       throw new Error('save failed');
     }
   };

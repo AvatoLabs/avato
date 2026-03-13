@@ -134,10 +134,8 @@ export default function ProfileEditScreen({ navigation }: any) {
     setSavingAvatar(true);
     try {
       const mimeType = asset.mimeType || 'image/jpeg';
-      const avatarUrl = await userApi.uploadAvatar(asset.uri, mimeType);
-      await userApi.updateAvatar(avatarUrl);
+      await userApi.uploadAvatar(asset.uri, mimeType);
       setAvatarUri(asset.uri);
-      updateField({ avatar: avatarUrl });
       haptics.success();
       toast.show('success', t.profileSaved);
     } catch {

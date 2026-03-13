@@ -10,6 +10,7 @@
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
 import type {
   AgentSkillItem,
@@ -143,6 +144,17 @@ export const agentApi = {
       config,
       groupId,
     }),
+
+  /** Get agent config by session ID. Returns the agent config including plugins. */
+  getConfigBySession: (sessionId: string) =>
+    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+      'agent.getAgentConfig',
+      { sessionId },
+    ),
+
+  /** Update agent config (e.g. plugins). */
+  updateConfig: (agentId: string, value: Record<string, any>) =>
+    trpcMutate('agent.updateAgentConfig', { agentId, value }),
 };
 
 // ── Session API ─────────────────────────────────────────────────────
@@ -227,6 +239,7 @@ export interface ChatRequestOptions {
     enabled?: boolean;
   };
   model?: string;
+  plugins?: string[];
   provider?: string;
   sessionId?: string;
   systemPrompt?: string;
@@ -235,13 +248,17 @@ export interface ChatRequestOptions {
 }
 
 export interface StreamCallbacks {
+  onPerformance?: (perf: Record<string, any>) => void;
   onReasoning?: (accumulated: string) => void;
   onText?: (accumulated: string) => void;
+  onUsage?: (usage: Record<string, any>) => void;
 }
 
 export interface StreamResult {
+  performance?: Record<string, any>;
   reasoning: string;
   text: string;
+  usage?: Record<string, any>;
 }
 
 export interface MobileUserMessageContentPartText {
@@ -271,17 +288,26 @@ export interface MobileChatMessage {
  * (id, event, data) often arrive in SEPARATE XHR onprogress chunks in React
  * Native, so `currentEvent` must persist across calls.
  */
+interface SSEParseResult {
+  performance?: Record<string, any>;
+  reasoning: string;
+  text: string;
+  usage?: Record<string, any>;
+}
+
 function createSSEParser() {
   let lineBuffer = '';
   let currentEvent = '';
 
-  return function parse(raw: string): { reasoning: string; text: string } {
+  return function parse(raw: string): SSEParseResult {
     const combined = lineBuffer + raw;
     const lines = combined.split('\n');
     lineBuffer = lines.pop() ?? '';
 
     let text = '';
     let reasoning = '';
+    let usage: Record<string, any> | undefined;
+    let performance: Record<string, any> | undefined;
 
     for (const line of lines) {
       const trimmed = line.replace(/\r$/, '');
@@ -307,13 +333,17 @@ function createSSEParser() {
           } catch {
             reasoning += dataStr;
           }
+        } else if (currentEvent === 'usage') {
+          try { usage = JSON.parse(dataStr); } catch { /* ignore */ }
+        } else if (currentEvent === 'performance') {
+          try { performance = JSON.parse(dataStr); } catch { /* ignore */ }
         }
       } else if (trimmed === '') {
         currentEvent = '';
       }
     }
 
-    return { reasoning, text };
+    return { performance, reasoning, text, usage };
   };
 }
 
@@ -334,129 +364,151 @@ export const aiChatApi = {
     callbacks: StreamCallbacks,
     signal?: AbortSignal,
   ): Promise<StreamResult> => {
-    const run = async (): Promise<StreamResult> => {
+    const attempt = async (): Promise<StreamResult> => {
       const [base, headers] = await Promise.all([getBaseUrl(), getHeaders()]);
 
       return new Promise<StreamResult>((resolve, reject) => {
-
-      const allMessages = [...messages];
-      if (options?.systemPrompt) {
-        allMessages.unshift({ role: 'system', content: options.systemPrompt });
-      }
-
-      const payload: Record<string, unknown> = {
-        messages: allMessages,
-        model: options?.model || 'gpt-4o-mini',
-        stream: true,
-      };
-      if (options?.temperature !== undefined) payload.temperature = options.temperature;
-      if (options?.enabledSearch ?? options?.enableSearch) payload.enabledSearch = true;
-      if (options?.memory) payload.memory = options.memory;
-      if (options?.sessionId) payload.sessionId = options.sessionId;
-      if (options?.topicId) payload.topicId = options.topicId;
-
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${base}/webapi/chat/${provider}`);
-      xhr.responseType = 'text';
-
-      for (const [key, value] of Object.entries(headers)) {
-        xhr.setRequestHeader(key, value);
-      }
-      xhr.setRequestHeader('Content-Type', 'application/json');
-
-      let accText = '';
-      let accReasoning = '';
-      let processedLength = 0;
-      let thinkingInContent = false;
-      let rawTextBuffer = '';
-      const parseSSE = createSSEParser();
-
-      const processNewData = (newData: string) => {
-        const { text, reasoning } = parseSSE(newData);
-
-        if (reasoning) {
-          accReasoning += reasoning;
-          callbacks.onReasoning?.(accReasoning);
+        const allMessages = [...messages];
+        if (options?.systemPrompt) {
+          allMessages.unshift({ role: 'system', content: options.systemPrompt });
         }
 
-        if (text) {
-          rawTextBuffer += text;
+        const payload: Record<string, unknown> = {
+          messages: allMessages,
+          model: options?.model || 'gpt-4o-mini',
+          stream: true,
+        };
+        if (options?.temperature !== undefined) payload.temperature = options.temperature;
+        if (options?.enabledSearch ?? options?.enableSearch) payload.enabledSearch = true;
+        if (options?.memory) payload.memory = options.memory;
+        if (options?.sessionId) payload.sessionId = options.sessionId;
+        if (options?.topicId) payload.topicId = options.topicId;
+        if (options?.plugins?.length) payload.plugins = options.plugins;
 
-          if (rawTextBuffer.includes('<think>') || thinkingInContent) {
-            if (!thinkingInContent && rawTextBuffer.includes('<think>')) {
-              thinkingInContent = true;
-            }
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${base}/webapi/chat/${provider}`);
+        xhr.responseType = 'text';
+        xhr.timeout = 180_000;
 
-            if (rawTextBuffer.includes('</think>')) {
-              thinkingInContent = false;
-              const thinkStart = rawTextBuffer.indexOf('<think>');
-              const thinkEnd = rawTextBuffer.indexOf('</think>');
-              const before = rawTextBuffer.slice(0, thinkStart < 0 ? 0 : thinkStart);
-              const thinkContent = rawTextBuffer.slice(
-                (thinkStart < 0 ? 0 : thinkStart) + 7,
-                thinkEnd,
-              );
-              const after = rawTextBuffer.slice(thinkEnd + 8);
+        for (const [key, value] of Object.entries(headers)) {
+          xhr.setRequestHeader(key, value);
+        }
+        xhr.setRequestHeader('Content-Type', 'application/json');
 
-              if (thinkContent) {
-                accReasoning = thinkContent;
-                callbacks.onReasoning?.(accReasoning);
+        let accText = '';
+        let accReasoning = '';
+        let lastUsage: Record<string, any> | undefined;
+        let lastPerformance: Record<string, any> | undefined;
+        let processedLength = 0;
+        let thinkingInContent = false;
+        let rawTextBuffer = '';
+        const parseSSE = createSSEParser();
+
+        const processNewData = (newData: string) => {
+          const { text, reasoning, usage: parsedUsage, performance: parsedPerf } = parseSSE(newData);
+
+          if (parsedUsage) {
+            lastUsage = parsedUsage;
+            callbacks.onUsage?.(parsedUsage);
+          }
+          if (parsedPerf) {
+            lastPerformance = parsedPerf;
+            callbacks.onPerformance?.(parsedPerf);
+          }
+
+          if (reasoning) {
+            accReasoning += reasoning;
+            callbacks.onReasoning?.(accReasoning);
+          }
+
+          if (text) {
+            rawTextBuffer += text;
+
+            if (rawTextBuffer.includes('<think>') || thinkingInContent) {
+              if (!thinkingInContent && rawTextBuffer.includes('<think>')) {
+                thinkingInContent = true;
               }
-              const combined = before + after;
-              if (combined) {
-                accText = combined;
-                callbacks.onText?.(accText);
+
+              if (rawTextBuffer.includes('</think>')) {
+                thinkingInContent = false;
+                const thinkStart = rawTextBuffer.indexOf('<think>');
+                const thinkEnd = rawTextBuffer.indexOf('</think>');
+                const before = rawTextBuffer.slice(0, thinkStart < 0 ? 0 : thinkStart);
+                const thinkContent = rawTextBuffer.slice(
+                  (thinkStart < 0 ? 0 : thinkStart) + 7,
+                  thinkEnd,
+                );
+                const after = rawTextBuffer.slice(thinkEnd + 8);
+
+                if (thinkContent) {
+                  accReasoning = thinkContent;
+                  callbacks.onReasoning?.(accReasoning);
+                }
+                const combined = before + after;
+                if (combined) {
+                  accText = combined;
+                  callbacks.onText?.(accText);
+                }
+              } else {
+                const thinkStart = rawTextBuffer.indexOf('<think>');
+                const beforeThink = rawTextBuffer.slice(0, thinkStart < 0 ? 0 : thinkStart);
+                const thinkContent = rawTextBuffer
+                  .slice((thinkStart < 0 ? 0 : thinkStart) + 7)
+                  .replaceAll('<think>', '');
+
+                if (thinkContent) {
+                  accReasoning = thinkContent;
+                  callbacks.onReasoning?.(accReasoning);
+                }
+                if (beforeThink) {
+                  accText = beforeThink;
+                  callbacks.onText?.(accText);
+                }
               }
             } else {
-              const thinkStart = rawTextBuffer.indexOf('<think>');
-              const beforeThink = rawTextBuffer.slice(0, thinkStart < 0 ? 0 : thinkStart);
-              const thinkContent = rawTextBuffer
-                .slice((thinkStart < 0 ? 0 : thinkStart) + 7)
-                .replaceAll('<think>', '');
-
-              if (thinkContent) {
-                accReasoning = thinkContent;
-                callbacks.onReasoning?.(accReasoning);
-              }
-              if (beforeThink) {
-                accText = beforeThink;
-                callbacks.onText?.(accText);
-              }
+              accText = rawTextBuffer;
+              callbacks.onText?.(accText);
             }
-          } else {
-            accText = rawTextBuffer;
-            callbacks.onText?.(accText);
           }
+        };
+
+        xhr.onprogress = () => {
+          const newData = xhr.responseText.slice(processedLength);
+          processedLength = xhr.responseText.length;
+          processNewData(newData);
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 400) {
+            reject(new Error(`AI chat failed: ${xhr.status}`));
+            return;
+          }
+          const remaining = xhr.responseText.slice(processedLength);
+          if (remaining) processNewData(remaining);
+          processNewData('\n');
+          resolve({ performance: lastPerformance, reasoning: accReasoning, text: accText, usage: lastUsage });
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during AI chat'));
+        xhr.ontimeout = () => reject(new Error('AI chat request timed out'));
+
+        if (signal) {
+          signal.addEventListener('abort', () => xhr.abort());
         }
-      };
 
-      xhr.onprogress = () => {
-        const newData = xhr.responseText.slice(processedLength);
-        processedLength = xhr.responseText.length;
-        processNewData(newData);
-      };
-
-      xhr.onload = () => {
-        if (xhr.status >= 400) {
-          reject(new Error(`AI chat failed: ${xhr.status}`));
-          return;
-        }
-        const remaining = xhr.responseText.slice(processedLength);
-        if (remaining) processNewData(remaining);
-        // Flush any partial line still in the parser
-        processNewData('\n');
-        resolve({ reasoning: accReasoning, text: accText });
-      };
-
-      xhr.onerror = () => reject(new Error('Network error during AI chat'));
-      xhr.ontimeout = () => reject(new Error('AI chat request timed out'));
-
-      if (signal) {
-        signal.addEventListener('abort', () => xhr.abort());
-      }
-
-      xhr.send(JSON.stringify(payload));
+        xhr.send(JSON.stringify(payload));
       });
+    };
+
+    const run = async (): Promise<StreamResult> => {
+      try {
+        return await attempt();
+      } catch (firstError) {
+        if (signal?.aborted) throw firstError;
+        console.warn('[aiChatApi] first attempt failed, retrying once:', firstError);
+        await new Promise((r) => setTimeout(r, 800));
+        return attempt();
+      }
     };
 
     return run();
@@ -553,13 +605,6 @@ function generateUploadPathname(filename: string): {
   return { date, dirname, filename: uniqueName, pathname };
 }
 
-function generateAvatarPathname(mimeType: string): string {
-  const rawExt = mimeType.split('/').pop()?.toLowerCase() || 'jpg';
-  const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `user/avatar/${id}.${ext}`;
-}
-
 export const fileApi = {
   list: (params?: {
     category?: string;
@@ -577,32 +622,36 @@ export const fileApi = {
   /**
    * Upload a file using the same flow as web:
    * 1. Get S3 presigned URL via tRPC
-   * 2. PUT file to S3
+   * 2. PUT file to S3 via XHR (reliable binary upload in RN)
    * 3. Create file record via tRPC
    */
   upload: async (uri: string, name: string, type: string): Promise<{ id: string; url: string }> => {
     const { date, dirname, filename, pathname } = generateUploadPathname(name);
 
-    // Step 1: Get presigned URL
     const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', { pathname });
 
-    // Step 2: Read file and PUT to S3
-    const fileResponse = await fetch(uri);
-    const blob = await fileResponse.blob();
-
-    const putRes = await fetch(preSignUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': type },
-      body: blob,
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
-    if (!putRes.ok) throw new Error(`S3 upload failed: ${putRes.status}`);
+    const binary = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
-    // Step 3: Create file record in DB
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', preSignUrl);
+      xhr.setRequestHeader('Content-Type', type);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.responseText}`));
+      };
+      xhr.onerror = () => reject(new Error(`S3 upload XHR error: ${xhr.statusText}`));
+      xhr.send(binary.buffer);
+    });
+
     const result = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType: type,
       metadata: { date, dirname, filename, path: pathname },
       name,
-      size: blob.size,
+      size: binary.length,
       url: pathname,
     });
 
@@ -629,25 +678,16 @@ export const userApi = {
    */
   updateAvatar: (avatar: string) => trpcMutate('user.updateAvatar', avatar),
   /**
-   * Upload avatar file directly to storage via presigned URL.
-   * This avoids large base64 payloads in tRPC JSON body on mobile.
+   * Upload avatar using base64 data URI (same as web version).
+   * Server-side updateAvatar detects `data:image` prefix and handles S3 upload.
    */
   uploadAvatar: async (uri: string, mimeType = 'image/jpeg'): Promise<string> => {
-    const pathname = generateAvatarPathname(mimeType);
-    const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', { pathname });
-
-    const fileResponse = await fetch(uri);
-    const blob = await fileResponse.blob();
-
-    const putRes = await fetch(preSignUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': mimeType },
-      body: blob,
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
-
-    if (!putRes.ok) throw new Error(`Avatar upload failed: ${putRes.status}`);
-
-    return `/webapi/${pathname}`;
+    const dataUri = `data:${mimeType};base64,${base64}`;
+    await trpcMutate('user.updateAvatar', dataUri);
+    return dataUri;
   },
   updateFullName: (fullName: string) => trpcMutate('user.updateFullName', fullName),
   updateUsername: (username: string) => trpcMutate('user.updateUsername', username),
