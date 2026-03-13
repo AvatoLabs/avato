@@ -369,43 +369,13 @@ export default function SkillDetailScreen() {
                   wrapLines
                   highlightLineNumbers={false}
                   language="json"
+                  style={{}}
                   customStyle={{
                     padding: 16,
                     fontSize: 11,
                     lineHeight: 16,
                     backgroundColor: 'rgba(0,0,0,0.02)',
-                  }}
-                  style={{
-                    code: {
-                      color: '#d73a49',
-                      fontSize: 11,
-                      lineHeight: 16,
-                    },
-                    comment: {
-                      color: '#6a737d',
-                      fontStyle: 'italic',
-                    },
-                    keyword: {
-                      color: '#d73a49',
-                    },
-                    string: {
-                      color: '#032f62',
-                    },
-                    number: {
-                      color: '#005cc5',
-                    },
-                    boolean: {
-                      color: '#005cc5',
-                    },
-                    operator: {
-                      color: '#d73a49',
-                    },
-                    punctuation: {
-                      color: '#24292e',
-                    },
-                    property: {
-                      color: '#005cc5',
-                    },
+                    borderRadius: 8,
                   }}
                 >
                   {JSON.stringify(skill?.manifest || plugin?.manifest, null, 2)}
