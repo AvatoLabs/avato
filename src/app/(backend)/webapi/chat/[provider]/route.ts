@@ -8,8 +8,11 @@ import { AgentModel } from '@/database/models/agent';
 import { PluginModel } from '@/database/models/plugin';
 import { UserMemoryIdentityModel } from '@/database/models/userMemory/identity';
 import { type LobeChatDatabase } from '@/database/type';
+import { type ToolCallContent } from '@/libs/mcp';
 import { createTraceOptions, initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
+import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
+import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
 import { SearchService } from '@/server/services/search';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 import { createErrorResponse } from '@/utils/errorResponse';
@@ -249,12 +252,16 @@ const resolvePluginTools = async (
 
 /**
  * Execute a single tool call against gateway HTTP or MCP server.
+ * Aligned with web version's TRPC tools.mcp.callTool:
+ * - Supports processContentBlocks for image/audio handling
+ * - Retries on NoValidSessionId (stale Streamable HTTP sessions)
  */
 const executeToolCall = async (
   toolCallName: string,
   args: string,
   mcpParamsMap: Map<string, { identifier: string; params: McpPluginConfig }>,
   gatewayMap: Map<string, GatewayToolEntry>,
+  boundProcessContentBlocks?: (blocks: ToolCallContent[]) => Promise<ToolCallContent[]>,
 ): Promise<string> => {
   const separatorIdx = toolCallName.indexOf(TOOL_SEPARATOR);
   if (separatorIdx < 0) return `Error: Unknown tool format "${toolCallName}"`;
@@ -293,16 +300,29 @@ const executeToolCall = async (
   if (entry.params.auth) clientParams.auth = entry.params.auth;
   if (entry.params.headers) clientParams.headers = entry.params.headers;
 
-  try {
-    const result = await mcpService.callTool({
-      argsStr: args,
-      clientParams: clientParams as any,
-      toolName,
-    });
-    return typeof result.content === 'string' ? result.content : JSON.stringify(result.state);
-  } catch (e) {
-    return `Error executing tool "${toolName}": ${(e as Error).message}`;
+  const MAX_MCP_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_MCP_RETRIES; attempt++) {
+    try {
+      const result = await mcpService.callTool({
+        argsStr: args,
+        clientParams: clientParams as any,
+        processContentBlocks: boundProcessContentBlocks,
+        toolName,
+      });
+      return typeof result.content === 'string' ? result.content : JSON.stringify(result.state);
+    } catch (e) {
+      const errMsg = (e as Error).message;
+      if (errMsg.includes('NoValidSessionId') && attempt < MAX_MCP_RETRIES) {
+        console.warn(
+          `[webapi/chat] MCP tool "${toolName}" failed with NoValidSessionId (attempt ${attempt}/${MAX_MCP_RETRIES}), retrying...`,
+        );
+        continue;
+      }
+      console.error(`[webapi/chat] MCP tool "${toolName}" failed:`, errMsg);
+      return `Error executing tool "${toolName}": ${errMsg}`;
+    }
   }
+  return `Error executing tool "${toolName}": max retries exceeded`;
 };
 
 export const POST = checkAuth(
@@ -410,10 +430,19 @@ export const POST = checkAuth(
       };
 
       // ============  4. tool calling loop   ============ //
-      // Uses responseMode:'json' to get raw ChatCompletion JSON (same as web's non-streaming path).
-      // This avoids SSE parsing issues — the model-runtime returns the provider's JSON directly.
+      // Uses responseMode:'json' to get raw ChatCompletion JSON.
+      // Forces apiMode:'chatCompletion' to ensure consistent response format —
+      // Responses API returns a different structure (output[] vs choices[].message)
+      // that would break tool_calls detection. This aligns with the web client
+      // which also explicitly sets apiMode.
       const originalMessages = [...data.messages];
       let toolLoopSucceeded = false;
+
+      // Build processContentBlocks for image/audio handling (aligned with web's TRPC callTool)
+      const fileService = new FileService(serverDB, userId);
+      const boundProcessContentBlocks = async (blocks: ToolCallContent[]) => {
+        return processContentBlocks(blocks, fileService);
+      };
 
       if (mcpTools?.tools.length) {
         try {
@@ -426,7 +455,13 @@ export const POST = checkAuth(
             );
 
             const resp = await modelRuntime.chat(
-              { ...data, messages, responseMode: 'json', stream: false } as any,
+              {
+                ...data,
+                apiMode: 'chatCompletion',
+                messages,
+                responseMode: 'json',
+                stream: false,
+              } as any,
               runtimeOptions,
             );
 
@@ -438,6 +473,12 @@ export const POST = checkAuth(
               console.info(
                 `[webapi/chat] round ${round + 1}: no tool_calls (finish_reason=${choice?.finish_reason}), content preview: "${(assistantMsg?.content || '').slice(0, 150)}"`,
               );
+              // Log full response shape for debugging when tools were expected but not called
+              if (round === 0 && !choice) {
+                console.warn(
+                  `[webapi/chat] round 1: unexpected response shape, keys=${Object.keys(result || {}).join(',')}`,
+                );
+              }
               break;
             }
 
@@ -471,6 +512,10 @@ export const POST = checkAuth(
                 tc.function.arguments,
                 mcpTools.mcpParamsMap,
                 mcpTools.gatewayMap,
+                boundProcessContentBlocks,
+              );
+              console.info(
+                `[webapi/chat] tool ${tc.function.name} result: ${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`,
               );
               messages.push({
                 content,
