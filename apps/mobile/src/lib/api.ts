@@ -9,7 +9,6 @@
  *   GET  /trpc/mobile/<procedure>?input=<json>
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 
 import type {
@@ -43,62 +42,27 @@ import type {
   UserProfile,
   UserRegistrationDuration,
 } from '../types';
+import { clearStoredAuthSession, getAuthHeaders } from './auth';
+import {
+  getApiUrl,
+  hasConfiguredUrl,
+  setApiUrl,
+  testConnection,
+} from './server';
 
-// ── Config ──────────────────────────────────────────────────────────
-const STORAGE_KEY_API_URL = 'minkhub_api_url';
-const STORAGE_KEY_AUTH_TOKEN = 'minkhub_auth_token';
-
-const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
-const DEFAULT_API_URL =
-  ENV_API_URL && /^https?:\/\//.test(ENV_API_URL) ? ENV_API_URL : 'http://localhost:3010';
-
-export async function getApiUrl(): Promise<string> {
-  return (await AsyncStorage.getItem(STORAGE_KEY_API_URL)) || DEFAULT_API_URL;
-}
-
-export async function setApiUrl(url: string): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY_API_URL, url);
-}
-
-export async function hasConfiguredUrl(): Promise<boolean> {
-  return !!(await AsyncStorage.getItem(STORAGE_KEY_API_URL));
-}
-
-export async function getAuthToken(): Promise<string | null> {
-  return AsyncStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
-}
-
-export async function setAuthToken(token: string): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY_AUTH_TOKEN, token);
-}
-
-export async function clearAuth(): Promise<void> {
-  await AsyncStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
-  await AsyncStorage.removeItem(STORAGE_KEY_API_URL);
-}
-
-/** Test whether a given server URL is reachable */
-export async function testConnection(baseUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(
-      `${baseUrl.replace(/\/+$/, '')}/trpc/mobile/healthcheck`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
-    );
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
 
 async function getBaseUrl(): Promise<string> {
-  return (await AsyncStorage.getItem(STORAGE_KEY_API_URL)) || DEFAULT_API_URL;
+  return getApiUrl();
 }
 
 async function getHeaders(): Promise<Record<string, string>> {
-  const token = await AsyncStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
+  const baseUrl = await getBaseUrl();
+
+  return {
+    'Content-Type': 'application/json',
+    ...(await getAuthHeaders(baseUrl)),
+  };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -1056,7 +1020,7 @@ export const memoryApi = {
   deleteExperience: (id: string) => trpcMutate('userMemory.deleteExperience', { id }),
   updateExperience: (
     id: string,
-    data: { action?: string; keyLearning?: string; situation?: string },
+    data: { action?: string; keyLearning?: string; reasoning?: string; situation?: string },
   ) => trpcMutate('userMemory.updateExperience', { data, id }),
 
   // ── Preference CRUD ──

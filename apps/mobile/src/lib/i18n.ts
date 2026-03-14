@@ -342,6 +342,17 @@ type TranslationKeys = {
   errorDeleteFailed: string;
   errorEditFailed: string;
   errorSaveFailed: string;
+  loginChangeServer: string;
+  loginContinueWithEmail: string;
+  loginContinueWithProvider: string;
+  loginMissingProviders: string;
+  loginOpenInBrowser: string;
+  loginQrHint: string;
+  loginScanWithProvider: string;
+  loginSubtitle: string;
+  loginTitle: string;
+  loginUnsupportedDesc: string;
+  loginUnsupportedTitle: string;
 
   // Confirmation dialogs
   deleteSessionConfirm: string;
@@ -606,6 +617,7 @@ type TranslationKeys = {
   // Memory
   memoryTitle: string;
   memoryDesc: string;
+  memoryRoles: string;
   memoryToolOffTitle: string;
   memoryToolOffDesc: string;
   memoryToolOnTitle: string;
@@ -1007,6 +1019,18 @@ const en: TranslationKeys = {
   errorDeleteFailed: 'Failed to delete',
   errorEditFailed: 'Failed to save edit',
   errorSaveFailed: 'Failed to save',
+  loginChangeServer: 'Server',
+  loginContinueWithEmail: 'Continue with Email or Password',
+  loginContinueWithProvider: 'Continue with {provider}',
+  loginMissingProviders: 'This server requires SSO sign-in, but no providers are configured.',
+  loginOpenInBrowser: 'Authentication continues in your browser and then returns to the app.',
+  loginQrHint: 'Opens a QR code page in your browser.',
+  loginScanWithProvider: 'Scan with {provider}',
+  loginSubtitle: 'Continue with your server account',
+  loginTitle: 'Sign In',
+  loginUnsupportedDesc:
+    'This server has not enabled OIDC mobile login yet. Configure JWKS_KEY on the server or switch to another server.',
+  loginUnsupportedTitle: 'Mobile login is not enabled',
 
   deleteSessionConfirm: 'Delete Conversation',
   deleteSessionDesc: 'This conversation and all its messages will be permanently deleted.',
@@ -1260,6 +1284,7 @@ const en: TranslationKeys = {
 
   memoryTitle: 'Memory',
   memoryDesc: 'AI remembers your preferences, identity, and experiences',
+  memoryRoles: 'Roles',
   memoryToolOffTitle: 'Disable Memory Tool',
   memoryToolOffDesc: 'AI will not search, create, or update memories in this conversation.',
   memoryToolOnTitle: 'Enable Memory Tool',
@@ -1660,6 +1685,18 @@ const zh_tw: TranslationKeys = {
   errorDeleteFailed: '刪除失敗',
   errorEditFailed: '編輯儲存失敗',
   errorSaveFailed: '儲存失敗',
+  loginChangeServer: '伺服器',
+  loginContinueWithEmail: '使用郵箱或密碼繼續',
+  loginContinueWithProvider: '使用 {provider} 繼續',
+  loginMissingProviders: '此伺服器只允許 SSO 登入，但目前沒有設定任何提供商。',
+  loginOpenInBrowser: '登入會在瀏覽器中完成，之後會返回 App。',
+  loginQrHint: '會在瀏覽器中開啟二維碼頁面。',
+  loginScanWithProvider: '使用 {provider} 掃碼登入',
+  loginSubtitle: '使用你的伺服器帳號繼續',
+  loginTitle: '登入',
+  loginUnsupportedDesc:
+    '此伺服器尚未啟用 OIDC 行動端登入。請在伺服器上配置 JWKS_KEY，或切換到其他伺服器。',
+  loginUnsupportedTitle: '尚未啟用行動端登入',
 
   deleteSessionConfirm: '刪除對話',
   deleteSessionDesc: '此對話及所有訊息將被永久刪除。',
@@ -1912,6 +1949,7 @@ const zh_tw: TranslationKeys = {
 
   memoryTitle: '記憶',
   memoryDesc: 'AI 記住你的偏好、身分和經驗',
+  memoryRoles: '角色',
   memoryToolOffTitle: '關閉記憶工具',
   memoryToolOffDesc: 'AI 不會在此對話中搜尋、建立或更新記憶。',
   memoryToolOnTitle: '啟用記憶工具',
@@ -2312,6 +2350,18 @@ const zh: TranslationKeys = {
   errorDeleteFailed: '删除失败',
   errorEditFailed: '编辑保存失败',
   errorSaveFailed: '保存失败',
+  loginChangeServer: '服务器',
+  loginContinueWithEmail: '使用邮箱或密码继续',
+  loginContinueWithProvider: '使用 {provider} 继续',
+  loginMissingProviders: '该服务器只允许 SSO 登录，但目前没有配置任何提供商。',
+  loginOpenInBrowser: '登录会在浏览器中完成，随后返回 App。',
+  loginQrHint: '会在浏览器中打开二维码页面。',
+  loginScanWithProvider: '使用 {provider} 扫码登录',
+  loginSubtitle: '使用你的服务器账号继续',
+  loginTitle: '登录',
+  loginUnsupportedDesc:
+    '该服务器尚未启用 OIDC 移动端登录。请在服务器上配置 JWKS_KEY，或切换到其他服务器。',
+  loginUnsupportedTitle: '尚未启用移动端登录',
 
   deleteSessionConfirm: '删除对话',
   deleteSessionDesc: '此对话及所有消息将被永久删除。',
@@ -2565,6 +2615,7 @@ const zh: TranslationKeys = {
 
   memoryTitle: '记忆',
   memoryDesc: 'AI 记住你的偏好、身份和经验',
+  memoryRoles: '角色',
   memoryToolOffTitle: '关闭记忆工具',
   memoryToolOffDesc: 'AI 将不会在此对话中搜索、创建或更新记忆。',
   memoryToolOnTitle: '启用记忆工具',

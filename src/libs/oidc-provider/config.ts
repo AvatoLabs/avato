@@ -48,7 +48,7 @@ export const defaultClients: ClientMetadata[] = [
     // Mobile does not need post_logout_redirect_uris as logout is typically handled within the app
     post_logout_redirect_uris: [],
     // Mobile uses custom URL Scheme
-    redirect_uris: ['com.lobehub.app://auth/callback'],
+    redirect_uris: ['com.lobehub.app://auth/callback', 'com.minkhub.app://auth/callback'],
     response_types: ['code'],
     // Public client with no secret
     token_endpoint_auth_method: 'none',

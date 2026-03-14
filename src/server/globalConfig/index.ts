@@ -8,6 +8,7 @@ import { fileEnv } from '@/envs/file';
 import { imageEnv } from '@/envs/image';
 import { knowledgeEnv } from '@/envs/knowledge';
 import { langfuseEnv } from '@/envs/langfuse';
+import { getBetterAuthProviderMetadata } from '@/libs/better-auth/providerMetadata';
 import { parseSSOProviders } from '@/libs/better-auth/utils/server';
 import { parseSystemAgent } from '@/server/globalConfig/parseSystemAgent';
 import { type GlobalServerConfig } from '@/types/serverConfig';
@@ -28,6 +29,7 @@ const getBetterAuthSSOProviders = () => {
 
 export const getServerGlobalConfig = async () => {
   const { DEFAULT_AGENT_CONFIG } = getAppConfig();
+  const ssoProviders = getBetterAuthSSOProviders();
 
   const config: GlobalServerConfig = {
     aiProvider: await genServerAiProvidersConfig({
@@ -71,6 +73,7 @@ export const getServerGlobalConfig = async () => {
         withDeploymentName: true,
       },
     }),
+    authProviders: getBetterAuthProviderMetadata(ssoProviders),
     defaultAgent: {
       config: parseAgentConfig(DEFAULT_AGENT_CONFIG),
     },
@@ -83,6 +86,7 @@ export const getServerGlobalConfig = async () => {
     enableMarketTrustedClient: !!(
       appEnv.MARKET_TRUSTED_CLIENT_SECRET && appEnv.MARKET_TRUSTED_CLIENT_ID
     ),
+    enableOIDC: authEnv.ENABLE_OIDC,
     enableUploadFileToServer: !!fileEnv.S3_SECRET_ACCESS_KEY,
 
     image: cleanObject({
@@ -91,7 +95,7 @@ export const getServerGlobalConfig = async () => {
     memory: {
       userMemory: cleanObject(getPublicMemoryExtractionConfig()),
     },
-    oAuthSSOProviders: getBetterAuthSSOProviders(),
+    oAuthSSOProviders: ssoProviders,
     systemAgent: parseSystemAgent(appEnv.SYSTEM_AGENT),
     telemetry: {
       langfuse: langfuseEnv.ENABLE_LANGFUSE,

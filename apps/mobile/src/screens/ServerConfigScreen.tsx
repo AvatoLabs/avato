@@ -19,8 +19,10 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { getApiUrl, setApiUrl, testConnection } from '../lib/api';
+import { clearTransientAppState } from '../lib/appState';
+import { clearStoredAuthSession } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
+import { getApiUrl, normalizeApiUrl, setApiUrl, testConnection } from '../lib/server';
 import { useConnectionStore } from '../store/connection';
 import { tokens } from '../theme/tokens';
 
@@ -35,13 +37,17 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
   const { t } = useI18n();
 
   const [url, setUrl] = useState('');
+  const [initialUrl, setInitialUrl] = useState('');
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     getApiUrl().then((saved) => {
-      if (saved) setUrl(saved);
+      if (saved) {
+        setInitialUrl(saved);
+        setUrl(saved);
+      }
     });
   }, []);
 
@@ -79,18 +85,24 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
     }
 
     let normalized = url.trim().replace(/\/+$/, '');
-    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
-      normalized = `http://${normalized}`;
-    }
+    normalized = normalizeApiUrl(normalized);
+
+    const normalizedInitialUrl = normalizeApiUrl(initialUrl);
+    const urlChanged = normalized !== normalizedInitialUrl;
 
     await setApiUrl(normalized);
     setUrl(normalized);
 
+    if (urlChanged) {
+      await clearStoredAuthSession();
+      await clearTransientAppState();
+    }
+
     // Update global connection state so ProfileScreen reflects the change
     useConnectionStore.getState().checkConnection();
 
-    if (isFirstLaunch) {
-      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    if (isFirstLaunch || urlChanged) {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } else {
       navigation.goBack();
     }

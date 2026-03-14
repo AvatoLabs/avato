@@ -11,8 +11,9 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import SplashScreen from './src/components/splash/SplashScreen';
 import { ToastContainer, useToast } from './src/components/ui/Toast';
-import { hasConfiguredUrl } from './src/lib/api';
+import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
+import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
 import { useConnectionStore } from './src/store/connection';
 import { useSessionStore } from './src/store/session';
@@ -50,7 +51,7 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
   const [initialRoute, setInitialRoute] = useState<
-    'OnboardingWelcome' | 'ServerConfig' | 'MainTabs'
+    'Login' | 'MainTabs' | 'OnboardingWelcome' | 'ServerConfig'
   >('MainTabs');
   const loadLocale = useI18n((s) => s.loadLocale);
   const t = useI18n((s) => s.t);
@@ -91,9 +92,18 @@ export default function App() {
       }
 
       try {
-        await useSessionStore.getState().fetchSessions();
+        const baseUrl = await getApiUrl();
+        const authConfig = await fetchMobileAuthConfig(baseUrl);
+        const authSession = authConfig.enableOIDC ? await getValidAuthSession(baseUrl) : null;
+
+        if (authSession) {
+          await useSessionStore.getState().fetchSessions();
+          setInitialRoute('MainTabs');
+        } else {
+          setInitialRoute('Login');
+        }
       } catch {
-        // Offline
+        setInitialRoute('Login');
       }
 
       // Check server connectivity (non-blocking)

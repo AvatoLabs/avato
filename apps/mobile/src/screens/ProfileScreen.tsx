@@ -29,9 +29,12 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { aiProviderApi, clearAuth, statsApi } from '../lib/api';
+import { aiProviderApi, statsApi } from '../lib/api';
+import { clearTransientAppState } from '../lib/appState';
+import { signOutFromBrowser } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
+import { getApiUrl } from '../lib/server';
 import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
@@ -102,10 +105,12 @@ export default function ProfileScreen({ navigation }: any) {
         text: t.meSignOut,
         style: 'destructive',
         onPress: async () => {
-          await clearAuth();
+          const baseUrl = await getApiUrl();
+          await signOutFromBrowser(baseUrl);
+          await clearTransientAppState();
           navigation.reset({
             index: 0,
-            routes: [{ name: 'ServerConfig', params: { firstLaunch: true } }],
+            routes: [{ name: 'Login' }],
           });
         },
       },

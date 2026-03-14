@@ -5,6 +5,7 @@ import type { UserProfile } from '../types';
 
 interface UserState {
   avatar: string | null;
+  clearProfile: () => void;
   email: string | null;
   fetchUser: () => Promise<void>;
   fullName: string | null;
@@ -25,6 +26,18 @@ export const useUserStore = create<UserState>((set, get) => ({
   isLoaded: false,
   profile: null,
   username: null,
+
+  clearProfile: () => {
+    set({
+      avatar: null,
+      email: null,
+      fullName: null,
+      interests: [],
+      isLoaded: false,
+      profile: null,
+      username: null,
+    });
+  },
 
   fetchUser: async () => {
     try {

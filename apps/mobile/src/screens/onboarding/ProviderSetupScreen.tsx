@@ -7,8 +7,8 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'reac
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { setApiUrl, testConnection } from '../../lib/api';
 import { useI18n } from '../../lib/i18n';
+import { setApiUrl, testConnection } from '../../lib/server';
 import { tokens } from '../../theme/tokens';
 
 export default function ProviderSetupScreen({ navigation }: any) {

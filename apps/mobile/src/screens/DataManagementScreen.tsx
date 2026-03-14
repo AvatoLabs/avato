@@ -8,7 +8,8 @@ import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { clearAuth } from '../lib/api';
+import { clearTransientAppState } from '../lib/appState';
+import { clearStoredAuthSession } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
@@ -41,7 +42,8 @@ export default function DataManagementScreen({ navigation }: any) {
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.clear();
-          await clearAuth();
+          await clearStoredAuthSession();
+          await clearTransientAppState();
           navigation.reset({
             index: 0,
             routes: [{ name: 'ServerConfig', params: { firstLaunch: true } }],

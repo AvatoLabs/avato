@@ -19,6 +19,7 @@ import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
 import LanguagePickerScreen from '../screens/LanguagePickerScreen';
+import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
 import ModelListScreen from '../screens/ModelListScreen';
@@ -169,7 +170,7 @@ function BottomTabs() {
 }
 
 interface RootNavigatorProps {
-  initialRoute?: 'OnboardingWelcome' | 'ServerConfig' | 'MainTabs';
+  initialRoute?: 'Login' | 'MainTabs' | 'OnboardingWelcome' | 'ServerConfig';
 }
 
 export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigatorProps) {
@@ -199,6 +200,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         name="ServerConfig"
         options={{ animation: 'slide_from_bottom' }}
       />
+      <Stack.Screen component={LoginScreen} name="Login" options={{ animation: 'fade' }} />
       <Stack.Screen component={BottomTabs} name="MainTabs" />
 
       {/* Chat */}

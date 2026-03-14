@@ -3,6 +3,7 @@
     "name": "MinkHub",
     "slug": "minkhub",
     "entryPoint": "./index.ts",
+    "scheme": "com.minkhub.app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,6 +29,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-image"]
+    "plugins": ["expo-image", "expo-secure-store", "expo-web-browser"]
   }
 }

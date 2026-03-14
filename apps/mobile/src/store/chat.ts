@@ -168,6 +168,7 @@ interface ChatState {
   /** Timestamp when reasoning started (for computing duration) */
   reasoningStartedAt: number | null;
   regenerateMessage: (sessionId: string, messageId: string) => Promise<void>;
+  reset: () => void;
   sendMessage: (
     sessionId: string,
     content: string,
@@ -194,6 +195,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamBuffer: '',
   editingMessageId: null,
   abortController: null,
+
+  reset: () => {
+    get().abortController?.abort();
+    set({
+      abortController: null,
+      editingMessageId: null,
+      generating: false,
+      isReasoning: false,
+      messagesBySession: {},
+      reasoningStartedAt: null,
+      streamBuffer: '',
+    });
+  },
 
   stopGenerating: () => {
     const controller = get().abortController;

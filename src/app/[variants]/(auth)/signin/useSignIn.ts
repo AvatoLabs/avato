@@ -1,7 +1,7 @@
 import { ENABLE_BUSINESS_FEATURES } from '@minkchat/business-const';
 import { Form } from 'antd';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type CheckUserResponseData } from '@/app/(backend)/api/auth/check-user/route';
@@ -49,6 +49,7 @@ export const useSignIn = () => {
       return null;
     }
   });
+  const socialAutoRedirectedRef = useRef(false);
   const serverConfigInit = useAuthServerConfigStore((s) => s.serverConfigInit);
   const oAuthSSOProviders = useAuthServerConfigStore((s) => s.serverConfig.oAuthSSOProviders) || [];
   const { ssoProviders, preSocialSigninCheck, getAdditionalData } = useBusinessSignin();
@@ -266,6 +267,21 @@ export const useSignIn = () => {
         return 0;
       })
     : resolvedProviders;
+  const requestedSSOProvider = searchParams.get('sso');
+
+  useEffect(() => {
+    if (!serverConfigInit || !requestedSSOProvider || socialAutoRedirectedRef.current) return;
+
+    const normalizedRequestedProvider = normalizeProviderId(requestedSSOProvider);
+    const matchedProvider = resolvedProviders.find(
+      (provider) => normalizeProviderId(provider) === normalizedRequestedProvider,
+    );
+
+    if (!matchedProvider) return;
+
+    socialAutoRedirectedRef.current = true;
+    void handleSocialSignIn(matchedProvider);
+  }, [handleSocialSignIn, requestedSSOProvider, resolvedProviders, serverConfigInit]);
 
   return {
     disableEmailPassword,

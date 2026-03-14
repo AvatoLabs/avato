@@ -31,6 +31,7 @@ interface SessionState {
   pinSession: (id: string) => Promise<void>;
   removeSession: (id: string) => Promise<void>;
   renameSession: (id: string, title: string) => Promise<void>;
+  reset: () => void;
   sessions: ChatSession[];
   switchSession: (id: string) => void;
   unpinSession: (id: string) => Promise<void>;
@@ -44,6 +45,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   pendingDeletes: new Set<string>(),
+
+  reset: () => {
+    void AsyncStorage.removeItem('activeSessionId');
+    set({
+      activeSessionId: null,
+      initialized: false,
+      loading: false,
+      pendingDeletes: new Set<string>(),
+      sessions: [],
+    });
+  },
 
   fetchSessions: async () => {
     set({ loading: true });

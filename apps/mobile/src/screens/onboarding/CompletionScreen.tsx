@@ -9,6 +9,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '../../lib/i18n';
+import { hasConfiguredUrl } from '../../lib/server';
 
 const ONBOARDING_KEY = 'minkhub_onboarding_complete';
 
@@ -18,9 +19,12 @@ export default function CompletionScreen({ navigation }: any) {
 
   const handleStart = async () => {
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    const hasUrl = await hasConfiguredUrl();
     navigation.reset({
       index: 0,
-      routes: [{ name: 'MainTabs' }],
+      routes: [
+        hasUrl ? { name: 'Login' } : { name: 'ServerConfig', params: { firstLaunch: true } },
+      ],
     });
   };
 

@@ -30,14 +30,15 @@ export function ScreenHeader({
         {leftElement ? (
           <TouchableOpacity
             activeOpacity={0.6}
-            className="w-10 h-10 items-start justify-center -ml-2"
+            className="h-10 items-start justify-center px-1 -ml-2"
             disabled={!onPressLeft}
+            style={{ minWidth: 40 }}
             onPress={onPressLeft}
           >
             {leftElement}
           </TouchableOpacity>
         ) : (
-          <View className="w-8" />
+          <View style={{ minWidth: 40 }} />
         )}
 
         <View className="flex-1 items-center justify-center">
@@ -57,14 +58,15 @@ export function ScreenHeader({
         {rightElement ? (
           <TouchableOpacity
             activeOpacity={0.6}
-            className="w-10 h-10 items-end justify-center -mr-2"
+            className="h-10 items-end justify-center px-1 -mr-2"
             disabled={!onPressRight}
+            style={{ minWidth: 40 }}
             onPress={onPressRight}
           >
             {rightElement}
           </TouchableOpacity>
         ) : (
-          <View className="w-8" />
+          <View style={{ minWidth: 40 }} />
         )}
       </View>
     </BlurView>

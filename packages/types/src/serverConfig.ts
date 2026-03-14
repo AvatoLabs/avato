@@ -46,8 +46,16 @@ export interface ServerModelProviderConfig {
 
 export type ServerLanguageModel = Partial<Record<GlobalLLMProviderKey, ServerModelProviderConfig>>;
 
+export interface GlobalServerAuthProvider {
+  id: string;
+  label: string;
+  mode: 'qrcode' | 'redirect';
+  type: 'builtin' | 'generic';
+}
+
 export interface GlobalServerConfig {
   aiProvider: ServerLanguageModel;
+  authProviders?: GlobalServerAuthProvider[];
   defaultAgent?: PartialDeep<UserDefaultAgent>;
   disableEmailPassword?: boolean;
   enableBusinessFeatures?: boolean;
@@ -60,6 +68,7 @@ export interface GlobalServerConfig {
   enableLobehubSkill?: boolean;
   enableMagicLink?: boolean;
   enableMarketTrustedClient?: boolean;
+  enableOIDC?: boolean;
   enableUploadFileToServer?: boolean;
   image?: PartialDeep<UserImageConfig>;
   memory?: GlobalMemoryConfig;
