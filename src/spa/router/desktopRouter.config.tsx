@@ -434,6 +434,13 @@ export const desktopRoutes: RouteObject[] = [
         path: 'image',
       },
 
+      // Avato Studio route
+      {
+        element: dynamicElement(() => import('@/routes/(main)/studio'), 'Desktop > Avato Studio'),
+        errorElement: <ErrorBoundary resetPath="/studio" />,
+        path: 'studio',
+      },
+
       ...BusinessDesktopRoutesWithMainLayout,
 
       // Eval routes

@@ -63,6 +63,7 @@ import ResourceLibrarySlugPage from '@/routes/(main)/resource/library/[slug]';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
+import StudioPage from '@/routes/(main)/studio';
 import VideoPage from '@/routes/(main)/video';
 import DesktopVideoLayout from '@/routes/(main)/video/_layout';
 import ShareTopicPage from '@/routes/share/t/[id]';
@@ -336,6 +337,13 @@ export const desktopRoutes: RouteObject[] = [
         element: <DesktopImageLayout />,
         errorElement: <ErrorBoundary resetPath="/image" />,
         path: 'image',
+      },
+
+      // Avato Studio route
+      {
+        element: <StudioPage />,
+        errorElement: <ErrorBoundary resetPath="/studio" />,
+        path: 'studio',
       },
 
       ...BusinessDesktopRoutesWithMainLayout,

@@ -17,6 +17,7 @@ export enum SidebarTabKey {
   Pages = 'pages',
   Resource = 'resource',
   Setting = 'settings',
+  Studio = 'studio',
   Video = 'video',
 }
 
@@ -49,6 +50,7 @@ export enum SettingsTabs {
   Hotkey = 'hotkey',
   Image = 'image',
   LLM = 'llm',
+  MCPStudio = 'mcp-studio',
   Memory = 'memory',
   // business
   Plans = 'plans',

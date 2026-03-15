@@ -31,6 +31,7 @@ const memoryIcon = getRouteById('memory')?.icon;
 const imageIcon = getRouteById('image')?.icon;
 const pageIcon = getRouteById('page')?.icon;
 const settingsIcon = getRouteById('settings')?.icon;
+const studioIcon = getRouteById('studio')?.icon;
 
 /**
  * Route patterns ordered by specificity (most specific first)
@@ -145,6 +146,13 @@ const routePatterns: RoutePattern[] = [
     icon: imageIcon,
     test: (p) => p.startsWith('/image'),
     titleKey: 'navigation.image',
+  },
+
+  // Studio routes
+  {
+    icon: studioIcon,
+    test: (p) => p.startsWith('/studio'),
+    titleKey: 'navigation.avatoStudio',
   },
 
   // Page routes - use dynamic title for specific page names

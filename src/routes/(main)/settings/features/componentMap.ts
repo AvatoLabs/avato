@@ -22,6 +22,9 @@ export const componentMap = {
   [SettingsTabs.Image]: dynamic(() => import('../image'), {
     loading: loading('Settings > Image'),
   }),
+  [SettingsTabs.MCPStudio]: dynamic(() => import('../mcp-studio'), {
+    loading: loading('Settings > MCPStudio'),
+  }),
   [SettingsTabs.Memory]: dynamic(() => import('../memory'), {
     loading: loading('Settings > Memory'),
   }),

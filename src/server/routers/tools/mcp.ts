@@ -12,6 +12,10 @@ import { serverDatabase, telemetry } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
 import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
+import {
+  runWorkflowStudioPreview,
+  workflowStudioPreviewInputSchema,
+} from '@/server/services/mcp/workflowStudio';
 
 import { scheduleToolCallReport } from './_helpers';
 
@@ -27,6 +31,7 @@ const httpParamsSchema = z.object({
 const stdioParamsSchema = z.object({
   args: z.array(z.string()).optional().default([]),
   command: z.string().min(1),
+  env: z.record(z.string()).optional(),
   name: z.string().min(1),
   type: z.literal('stdio'),
 });
@@ -34,7 +39,7 @@ const stdioParamsSchema = z.object({
 // Union schema for MCPClientParams
 const mcpClientParamsSchema = z.union([httpParamsSchema, stdioParamsSchema]);
 
-const checkStdioEnvironment = (params: z.infer<typeof mcpClientParamsSchema>) => {
+const checkStdioEnvironment = (params: { type: 'http' | 'stdio' }) => {
   if (params.type === 'stdio' && !isDesktop) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -175,6 +180,58 @@ export const mcpRouter = router({
           success,
           telemetryEnabled: ctx.telemetryEnabled,
           toolName: input.toolName,
+        });
+      }
+    }),
+  runWorkflowPreview: mcpProcedure
+    .input(workflowStudioPreviewInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const toolNodes = input.workflow.nodes.filter(
+        (node): node is Extract<(typeof input.workflow.nodes)[number], { type: 'mcp-tool' }> =>
+          node.type === 'mcp-tool' && Boolean(node.data.connection),
+      );
+      const connection = toolNodes[0]?.data.connection;
+
+      for (const toolNode of toolNodes) {
+        if (toolNode.data.connection) checkStdioEnvironment(toolNode.data.connection);
+      }
+
+      const startTime = Date.now();
+      let success = true;
+      let errorCode: string | undefined;
+      let errorMessage: string | undefined;
+      let result: Awaited<ReturnType<typeof runWorkflowStudioPreview>> | undefined;
+
+      try {
+        const boundProcessContentBlocks = async (blocks: ToolCallContent[]) => {
+          return processContentBlocks(blocks, ctx.fileService);
+        };
+
+        result = await runWorkflowStudioPreview({
+          processContentBlocks: boundProcessContentBlocks,
+          workflow: input.workflow,
+        });
+
+        return result;
+      } catch (error) {
+        success = false;
+        const err = error as Error;
+        errorCode = 'WORKFLOW_PREVIEW_FAILED';
+        errorMessage = err.message;
+        throw error;
+      } finally {
+        scheduleToolCallReport({
+          errorCode,
+          errorMessage,
+          identifier: connection?.identifier || 'workflow-studio',
+          marketAccessToken: ctx.marketAccessToken,
+          mcpType: connection?.type || 'http',
+          requestPayload: input.workflow,
+          result,
+          startTime,
+          success,
+          telemetryEnabled: ctx.telemetryEnabled,
+          toolName: toolNodes[0]?.data.toolName || 'workflow-preview',
         });
       }
     }),

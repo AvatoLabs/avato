@@ -1,6 +1,7 @@
 'use client';
 
 import { Flexbox, Tag } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
 import { HomeIcon, SearchIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,9 +21,9 @@ import {
 import { isModifierClick } from '@/utils/navigation';
 
 interface Item {
+  badge?: 'beta' | 'new';
   hidden?: boolean | undefined;
   icon: NavItemProps['icon'];
-  isNew?: boolean;
   key: string;
   onClick?: () => void;
   title: NavItemProps['title'];
@@ -33,6 +34,7 @@ const Nav = memo(() => {
   const tab = useActiveTabKey();
   const navigate = useNavigate();
   const { t } = useTranslation('common');
+  const { t: tSetting } = useTranslation('setting');
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
   const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
@@ -52,6 +54,13 @@ const Nav = memo(() => {
         key: SidebarTabKey.Home,
         title: t('tab.home'),
         url: '/',
+      },
+      {
+        badge: 'beta',
+        icon: getRouteById('studio')!.icon,
+        key: SidebarTabKey.Studio,
+        title: t('tab.avatoStudio'),
+        url: '/studio',
       },
       {
         icon: getRouteById('page')!.icon,
@@ -81,7 +90,7 @@ const Nav = memo(() => {
         url: '/community',
       },
     ],
-    [t],
+    [enableBusinessFeatures, showAiImage, showMarket, t],
   );
 
   const newBadge = (
@@ -89,11 +98,26 @@ const Nav = memo(() => {
       {t('new')}
     </Tag>
   );
+  const betaBadge = (
+    <Tag
+      size="small"
+      variant={'filled'}
+      style={{
+        background: cssVar.colorText,
+        border: 'none',
+        color: cssVar.colorBgContainer,
+        marginInlineStart: 4,
+      }}
+    >
+      {tSetting('tab.beta')}
+    </Tag>
+  );
 
   return (
     <Flexbox gap={1} paddingInline={4}>
       {items.map((item) => {
-        const extra = item.isNew ? newBadge : undefined;
+        const extra =
+          item.badge === 'new' ? newBadge : item.badge === 'beta' ? betaBadge : undefined;
         const content = (
           <NavItem
             active={tab === item.key}
