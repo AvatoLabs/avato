@@ -1,4 +1,4 @@
-import { Block, Button, Flexbox, Text } from '@minkhub/ui';
+import { Block, Button, Flexbox, Text } from '@avatohub/ui';
 import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 

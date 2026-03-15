@@ -286,6 +286,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       sessionId,
       role: 'user',
       content: displayContent,
+      fileList: uploadedAttachments
+        .filter((f) => !isImageAttachment(f.type))
+        .map((f) => ({
+          fileType: f.type,
+          id: f.fileId,
+          name: f.name,
+          size: 0,
+          url: f.url,
+        })),
+      imageList: uploadedAttachments
+        .filter((f) => isImageAttachment(f.type))
+        .map((f) => ({
+          alt: f.name,
+          id: f.fileId,
+          url: f.url,
+        })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

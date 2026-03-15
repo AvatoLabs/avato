@@ -23,7 +23,7 @@ export const SkillStoreContent = () => {
   const [lobehubKeywords, setLobehubKeywords] = useState('');
 
   const options: SegmentedOptions = [
-    { label: t('skillStore.tabs.minkhub'), value: SkillStoreTab.LobeHub },
+    { label: t('skillStore.tabs.avatohub'), value: SkillStoreTab.LobeHub },
     { label: t('skillStore.tabs.community'), value: SkillStoreTab.Community },
     { label: t('skillStore.tabs.custom'), value: SkillStoreTab.Custom },
   ];

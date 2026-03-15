@@ -1,6 +1,6 @@
 'use client';
 
-import { Block, Button, Flexbox, Text } from '@minkhub/ui';
+import { Block, Button, Flexbox, Text } from '@avatohub/ui';
 import React, { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,7 +29,7 @@ function getScopeDescription(scope: string, t: any): string {
   return t(`consent.scope.${scope.replace(':', '-')}`, scope);
 }
 
-const BUILTIN_CLIENTS = new Set(['minkhub-desktop', 'minkhub-mobile', 'minkhub-market']);
+const BUILTIN_CLIENTS = new Set(['avatohub-desktop', 'avatohub-mobile', 'avatohub-market']);
 
 const ConsentClient = memo<ClientProps>(({ uid, clientId, scopes, clientMetadata }) => {
   const { t } = useTranslation('oauth');

@@ -50,7 +50,7 @@ export const defaultClients: ClientMetadata[] = [
     // Mobile uses custom URL Scheme
     redirect_uris: [
       'com.lobehub.app://auth/callback',
-      'com.minkhub.app://auth/callback',
+      'com.avatohub.app://auth/callback',
       'com.avato.app://auth/callback',
     ],
     response_types: ['code'],

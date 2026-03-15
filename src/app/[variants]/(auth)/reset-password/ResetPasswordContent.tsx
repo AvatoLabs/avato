@@ -1,4 +1,4 @@
-import { Block, Button, Icon, InputPassword, Text } from '@minkhub/ui';
+import { Block, Button, Icon, InputPassword, Text } from '@avatohub/ui';
 import { Form } from 'antd';
 import { Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

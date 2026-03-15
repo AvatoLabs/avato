@@ -37,6 +37,34 @@ const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   });
 });
 
+const AGENT_MIGRATION_DEDUP_TTL_MS = 5 * 60 * 1000;
+const MAX_AGENT_MIGRATION_KEYS = 2000;
+const recentAgentMigrationRuns = new Map<string, number>();
+
+const shouldScheduleAgentMigration = (key: string): boolean => {
+  const now = Date.now();
+  const lastRun = recentAgentMigrationRuns.get(key);
+  if (lastRun && now - lastRun < AGENT_MIGRATION_DEDUP_TTL_MS) return false;
+
+  recentAgentMigrationRuns.set(key, now);
+
+  if (recentAgentMigrationRuns.size > MAX_AGENT_MIGRATION_KEYS) {
+    for (const [cacheKey, ts] of recentAgentMigrationRuns) {
+      if (now - ts > AGENT_MIGRATION_DEDUP_TTL_MS) {
+        recentAgentMigrationRuns.delete(cacheKey);
+      }
+    }
+
+    while (recentAgentMigrationRuns.size > MAX_AGENT_MIGRATION_KEYS) {
+      const oldestKey = recentAgentMigrationRuns.keys().next().value;
+      if (!oldestKey) break;
+      recentAgentMigrationRuns.delete(oldestKey);
+    }
+  }
+
+  return true;
+};
+
 export const topicRouter = router({
   batchCreateTopics: topicProcedure
     .input(
@@ -246,8 +274,13 @@ export const topicRouter = router({
         }
       };
 
-      // Use Next.js after() for non-blocking execution
-      after(runMigration);
+      // Use Next.js after() for non-blocking execution and dedupe hot-path scheduling.
+      if (effectiveAgentId) {
+        const migrationKey = `${ctx.userId}:${effectiveAgentId}:${isInbox ? 'inbox' : 'default'}`;
+        if (shouldScheduleAgentMigration(migrationKey)) {
+          after(runMigration);
+        }
+      }
 
       return { items: result.items, total: result.total };
     }),

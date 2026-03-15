@@ -4,7 +4,6 @@ import { ChatGroupModel } from '@/database/models/chatGroup';
 import { SessionModel } from '@/database/models/session';
 import { SessionGroupModel } from '@/database/models/sessionGroup';
 import { insertAgentSchema, insertSessionSchema } from '@/database/schemas';
-import { getServerDB } from '@/database/server';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentChatConfigSchema } from '@/types/agent';
@@ -96,35 +95,36 @@ export const sessionRouter = router({
       return data.id;
     }),
 
-  getGroupedSessions: publicProcedure.query(async ({ ctx }): Promise<ChatSessionList> => {
-    const userId = ctx.userId;
-    if (!userId) return { sessionGroups: [], sessions: [] };
+  getGroupedSessions: publicProcedure
+    .use(serverDatabase)
+    .query(async ({ ctx }): Promise<ChatSessionList> => {
+      const userId = ctx.userId;
+      if (!userId) return { sessionGroups: [], sessions: [] };
 
-    const serverDB = await getServerDB();
-    const sessionModel = new SessionModel(serverDB, userId);
-    const chatGroupModel = new ChatGroupModel(serverDB, userId);
+      const sessionModel = new SessionModel(ctx.serverDB, userId);
+      const chatGroupModel = new ChatGroupModel(ctx.serverDB, userId);
 
-    const [{ sessions, sessionGroups }, chatGroups] = await Promise.all([
-      sessionModel.queryWithGroups(),
-      chatGroupModel.queryWithMemberDetails(),
-    ]);
+      const [{ sessions, sessionGroups }, chatGroups] = await Promise.all([
+        sessionModel.queryWithGroups(),
+        chatGroupModel.queryWithMemberDetails(),
+      ]);
 
-    const groupSessions: LobeGroupSession[] = chatGroups.map((group) => {
-      const { title, description, avatar, backgroundColor, groupId, ...rest } = group;
-      return {
-        ...rest,
-        group: groupId, // Map groupId to group for consistent API
-        meta: { avatar, backgroundColor, description, title },
-        type: 'group',
-      };
-    });
+      const groupSessions: LobeGroupSession[] = chatGroups.map((group) => {
+        const { title, description, avatar, backgroundColor, groupId, ...rest } = group;
+        return {
+          ...rest,
+          group: groupId, // Map groupId to group for consistent API
+          meta: { avatar, backgroundColor, description, title },
+          type: 'group',
+        };
+      });
 
-    const allSessions = [...sessions, ...groupSessions].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+      const allSessions = [...sessions, ...groupSessions].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
 
-    return { sessionGroups, sessions: allSessions };
-  }),
+      return { sessionGroups, sessions: allSessions };
+    }),
 
   getSessions: sessionProcedure
     .input(

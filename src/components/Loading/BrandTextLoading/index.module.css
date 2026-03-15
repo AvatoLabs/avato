@@ -32,6 +32,55 @@
   text-align: center;
 }
 
+.defaultBrand {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+
+  color: var(--brand-text-color);
+  text-align: center;
+}
+
+.defaultLogoWrapper {
+  position: relative;
+}
+
+.defaultLogoImg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  object-fit: cover;
+  animation: logo-breath 1.2s ease-in-out infinite alternate;
+}
+
+.defaultSpinner {
+  position: absolute;
+  z-index: 1;
+  inset: -12px;
+  border: 2px dashed currentColor;
+  border-radius: 24px;
+  opacity: 0.25;
+  animation: spin 6s linear infinite;
+}
+
+.defaultText {
+  position: relative;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.defaultText::after {
+  position: absolute;
+  content: '';
+  animation: dots 1.5s infinite;
+}
+
 .brandLogoWrapper {
   width: 104px;
   height: 104px;
@@ -153,5 +202,27 @@
   100% {
     transform: scale(1.04);
     opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dots {
+  0%,
+  20% {
+    content: '.';
+  }
+
+  40% {
+    content: '..';
+  }
+
+  60%,
+  100% {
+    content: '...';
   }
 }

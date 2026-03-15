@@ -356,10 +356,12 @@ describe('DocumentService', () => {
         })
         .mockResolvedValueOnce({ id: 'child-folder-2', fileType: 'custom/folder', fileId: null });
 
-      // First call: children of folder-1
+      // 1st call: root lookup by id (returns empty from query layer, fallback uses findById)
+      // 2nd call: children of folder-1
+      // 3rd call: children of child-folder-2 (empty)
       (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: 'child-doc-1' }, { id: 'child-folder-2' }])
-        // Second call: children of child-folder-2 (empty)
         .mockResolvedValueOnce([]);
 
       // Files in each folder

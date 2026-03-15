@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, Block, Button, Flexbox, Skeleton, Text } from '@minkhub/ui';
+import { Avatar, Block, Button, Flexbox, Skeleton, Text } from '@avatohub/ui';
 import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

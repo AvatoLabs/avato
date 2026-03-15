@@ -7,7 +7,7 @@ import { useGlobalStore } from '@/store/global';
 
 import { useHotkeyById } from './useHotkeyById';
 
-// Switch to chat tab (and focus on Mink AI)
+// Switch to chat tab (and focus on Avato)
 export const useNavigateToChatHotkey = () => {
   const navigateToAgent = useNavigateToAgent();
   const [, { unpinAgent }] = usePinnedAgentState();

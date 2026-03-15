@@ -35,7 +35,7 @@ const Item = memo<ItemProps>(
     });
 
     // Get localized description
-    const i18nPrefix = type === 'klavis' ? 'tools.klavis.servers' : 'tools.minkhubSkill.providers';
+    const i18nPrefix = type === 'klavis' ? 'tools.klavis.servers' : 'tools.avatohubSkill.providers';
     // @ts-ignore
     const localizedDescription = t(`${i18nPrefix}.${identifier}.description`, {
       defaultValue: description,
@@ -45,11 +45,11 @@ const Item = memo<ItemProps>(
       modal.confirm({
         cancelText: t('cancel', { ns: 'common' }),
         centered: true,
-        content: t('tools.minkhubSkill.disconnectConfirm.desc', { name: label }),
+        content: t('tools.avatohubSkill.disconnectConfirm.desc', { name: label }),
         okButtonProps: { danger: true },
-        okText: t('tools.minkhubSkill.disconnect'),
+        okText: t('tools.avatohubSkill.disconnect'),
         onOk: handleDisconnect,
-        title: t('tools.minkhubSkill.disconnectConfirm.title', { name: label }),
+        title: t('tools.avatohubSkill.disconnectConfirm.title', { name: label }),
       });
     };
 
@@ -75,7 +75,7 @@ const Item = memo<ItemProps>(
                 danger: true,
                 icon: <Icon icon={Unplug} />,
                 key: 'disconnect',
-                label: t('tools.minkhubSkill.disconnect'),
+                label: t('tools.avatohubSkill.disconnect'),
                 onClick: confirmDisconnect,
               },
             ]}
@@ -86,7 +86,7 @@ const Item = memo<ItemProps>(
       }
 
       return (
-        <ActionIcon icon={Plus} title={t('tools.minkhubSkill.connect')} onClick={handleConnect} />
+        <ActionIcon icon={Plus} title={t('tools.avatohubSkill.connect')} onClick={handleConnect} />
       );
     };
 

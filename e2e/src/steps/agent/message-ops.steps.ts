@@ -22,7 +22,7 @@ async function findAssistantMessage(page: CustomWorld['page']) {
   const wrapperCount = await messageWrappers.count();
   console.log(`   📍 Found ${wrapperCount} message wrappers`);
 
-  // Find the assistant message by looking for the one with "Mink AI" or "AI" in title
+  // Find the assistant message by looking for the one with "Avato" or "AI" in title
   for (let i = wrapperCount - 1; i >= 0; i--) {
     const wrapper = messageWrappers.nth(i);
     const titleText = await wrapper
@@ -30,7 +30,7 @@ async function findAssistantMessage(page: CustomWorld['page']) {
       .textContent()
       .catch(() => '');
 
-    if (titleText?.includes('Mink AI') || titleText?.includes('AI')) {
+    if (titleText?.includes('Avato') || titleText?.includes('AI')) {
       console.log(`   📍 Found assistant message at index ${i}`);
       return wrapper;
     }
@@ -305,7 +305,7 @@ When('用户选择折叠消息选项', async function (this: CustomWorld) {
   if (!collapseOption) {
     this.testContext.messageCollapseToggleAvailable = false;
     console.log('   ⚠️ 当前消息不支持折叠，跳过该操作');
-    await this.page.keyboard.press('Escape').catch(() => { });
+    await this.page.keyboard.press('Escape').catch(() => {});
     return;
   }
 
@@ -321,7 +321,7 @@ When('用户选择展开消息选项', async function (this: CustomWorld) {
 
   if (!this.testContext.messageCollapseToggleAvailable) {
     console.log('   ⚠️ 当前消息不支持展开，跳过该操作');
-    await this.page.keyboard.press('Escape').catch(() => { });
+    await this.page.keyboard.press('Escape').catch(() => {});
     return;
   }
 
@@ -336,7 +336,7 @@ When('用户选择展开消息选项', async function (this: CustomWorld) {
   if (!expandOption) {
     this.testContext.messageCollapseToggleAvailable = false;
     console.log('   ⚠️ 未找到展开选项，跳过该操作');
-    await this.page.keyboard.press('Escape').catch(() => { });
+    await this.page.keyboard.press('Escape').catch(() => {});
     return;
   }
 

@@ -77,7 +77,7 @@ export class SessionModel {
 
     const groups = await this.db.query.sessionGroups.findMany({
       orderBy: [asc(sessionGroups.sort), desc(sessionGroups.createdAt)],
-      where: eq(sessions.userId, this.userId),
+      where: eq(sessionGroups.userId, this.userId),
     });
 
     const mappedSessions = result.map((item) => this.mapSessionItem(item as any));

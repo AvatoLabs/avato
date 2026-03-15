@@ -1,4 +1,4 @@
-import { Button, Icon, InputPassword, Text } from '@minkhub/ui';
+import { Button, Icon, InputPassword, Text } from '@avatohub/ui';
 import { type FormInstance, type InputRef } from 'antd';
 import { Form } from 'antd';
 import { cssVar } from 'antd-style';

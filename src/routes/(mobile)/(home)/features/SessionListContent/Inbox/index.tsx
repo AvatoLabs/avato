@@ -20,7 +20,7 @@ const Inbox = memo(() => {
 
   return (
     <Link
-      aria-label={'Mink AI'}
+      aria-label={'Avato'}
       to={SESSION_CHAT_URL(inboxAgentId, mobile)}
       onClick={(e) => {
         e.preventDefault();
@@ -31,7 +31,7 @@ const Inbox = memo(() => {
         active={isInboxActive}
         avatar={DEFAULT_INBOX_AVATAR}
         key={'inbox'}
-        title={'Mink AI'}
+        title={'Avato'}
         styles={{
           container: {
             gap: 12,

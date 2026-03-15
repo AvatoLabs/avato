@@ -10,7 +10,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ProductLogo } from '@/components/Branding';
-import { CHANGELOG_URL, MANUAL_UPGRADE_URL, OFFICIAL_SITE } from '@/const/url';
+import { CHANGELOG_URL, GITHUB, MANUAL_UPGRADE_URL } from '@/const/url';
 import { CURRENT_VERSION } from '@/const/version';
 import { useNewVersion } from '@/features/User/UserPanel/useNewVersion';
 import { autoUpdateService } from '@/services/electron/autoUpdate';
@@ -118,7 +118,7 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
       width={'100%'}
     >
       <Flexbox horizontal align={'center'} flex={'none'} gap={16}>
-        <a href={OFFICIAL_SITE} rel="noreferrer" target="_blank">
+        <a href={GITHUB} rel="noreferrer" target="_blank">
           <Block
             clickable
             align={'center'}

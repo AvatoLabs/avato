@@ -1,6 +1,6 @@
 'use client';
 
-import { Text } from '@minkhub/ui';
+import { Text } from '@avatohub/ui';
 import { Result } from 'antd';
 import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

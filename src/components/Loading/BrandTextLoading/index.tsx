@@ -28,7 +28,7 @@ const BrandTextLoading = ({
   onStart,
 }: BrandTextLoadingProps) => {
   const isLaunchMode = mode === 'launch';
-  const showDebug = process.env.NODE_ENV === 'development' && debugId;
+  const showDebug = process.env.NODE_ENV === 'development' && debugId && isLaunchMode;
   const resolvedBrandName = brandName ?? BRANDING_NAME;
 
   const handleStart = () => {
@@ -40,86 +40,91 @@ const BrandTextLoading = ({
     window.location.assign('/');
   };
 
+  if (!isLaunchMode) {
+    return (
+      <div className={styles.container}>
+        <div
+          aria-label="Loading"
+          className={styles.defaultBrand}
+          data-debug-id={debugId}
+          role="status"
+        >
+          <div className={styles.defaultLogoWrapper}>
+            <div className={styles.defaultSpinner} />
+            <img
+              alt={resolvedBrandName}
+              className={styles.defaultLogoImg}
+              src="/avatars/lobe-ai.png"
+            />
+          </div>
+          <span className={styles.defaultText}>{resolvedBrandName}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <div aria-label="Loading" className={styles.brand} role="status">
         <motion.div
-          animate={isLaunchMode ? { y: 0, opacity: 1 } : false}
+          animate={{ y: 0, opacity: 1 }}
           className={styles.brandLogoWrapper}
-          initial={isLaunchMode ? { y: 42, opacity: 0 } : false}
-          transition={
-            isLaunchMode
-              ? {
-                  duration: 0.9,
-                  ease: [0.22, 1, 0.36, 1],
-                }
-              : undefined
-          }
+          initial={{ y: 42, opacity: 0 }}
+          transition={{
+            duration: 0.9,
+            ease: [0.22, 1, 0.36, 1],
+          }}
         >
           <img alt={resolvedBrandName} className={styles.brandLogoImg} src="/avatars/lobe-ai.png" />
         </motion.div>
 
         <motion.div
-          animate={isLaunchMode ? { opacity: 1 } : false}
+          animate={{ opacity: 1 }}
           className={styles.brandName}
-          initial={isLaunchMode ? { opacity: 0 } : false}
-          transition={
-            isLaunchMode
-              ? {
-                  delay: 0.45,
-                  duration: 0.35,
-                }
-              : undefined
-          }
+          initial={{ opacity: 0 }}
+          transition={{
+            delay: 0.45,
+            duration: 0.35,
+          }}
         >
           {resolvedBrandName}
         </motion.div>
 
         <motion.div
-          animate={isLaunchMode ? { opacity: 1 } : false}
+          animate={{ opacity: 1 }}
           className={styles.slogan}
-          initial={isLaunchMode ? { opacity: 0, y: 16 } : false}
-          transition={
-            isLaunchMode
-              ? {
-                  delay: 0.85,
-                  duration: 0.45,
-                }
-              : undefined
-          }
+          initial={{ opacity: 0, y: 16 }}
+          transition={{
+            delay: 0.85,
+            duration: 0.45,
+          }}
         >
           {slogan.split(' ').map((word, index) => (
             <motion.span
-              animate={isLaunchMode ? { opacity: 1, y: 0 } : false}
+              animate={{ opacity: 1, y: 0 }}
               className={styles.sloganWord}
-              initial={isLaunchMode ? { opacity: 0, y: 8 } : false}
+              initial={{ opacity: 0, y: 8 }}
               key={`${word}-${index}`}
-              transition={
-                isLaunchMode
-                  ? {
-                      delay: 0.9 + index * 0.08,
-                      duration: 0.35,
-                    }
-                  : undefined
-              }
+              transition={{
+                delay: 0.9 + index * 0.08,
+                duration: 0.35,
+              }}
             >
               {word}
             </motion.span>
           ))}
         </motion.div>
 
-        {isLaunchMode && (
-          <motion.button
-            animate={{ opacity: 1, y: 0 }}
-            className={styles.startButton}
-            initial={{ opacity: 0, y: 20 }}
-            transition={{ delay: 1.5, duration: 0.4 }}
-            type="button"
-            onClick={handleStart}
-          >
-            {startButtonText}
-          </motion.button>
-        )}
+        <motion.button
+          animate={{ opacity: 1, y: 0 }}
+          className={styles.startButton}
+          initial={{ opacity: 0, y: 20 }}
+          transition={{ delay: 1.5, duration: 0.4 }}
+          type="button"
+          onClick={handleStart}
+        >
+          {startButtonText}
+        </motion.button>
       </div>
 
       {showDebug && (

@@ -381,7 +381,7 @@ export const useControls = ({ setUpdating }: { setUpdating: (updating: boolean) 
           {
             children: lobehubGroupChildren,
             key: 'lobehub',
-            label: t('skillStore.tabs.minkhub'),
+            label: t('skillStore.tabs.avatohub'),
             type: 'group' as const,
           },
         ]
@@ -499,7 +499,7 @@ export const useControls = ({ setUpdating }: { setUpdating: (updating: boolean) 
       installedItems.push({
         children: allBuiltinItems,
         key: 'installed-lobehub',
-        label: t('skillStore.tabs.minkhub'),
+        label: t('skillStore.tabs.avatohub'),
         type: 'group',
       });
     }

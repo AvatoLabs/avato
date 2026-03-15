@@ -74,13 +74,30 @@ export interface ModelPerformance {
   ttft?: number;
 }
 
+export interface ChatImageItem {
+  alt: string;
+  id: string;
+  url: string;
+}
+
+export interface ChatFileItem {
+  content?: string;
+  fileType: string;
+  id: string;
+  name: string;
+  size: number;
+  url: string;
+}
+
 export interface ChatMessage {
   content: string;
   /** ISO timestamp */
   createdAt: string;
   /** Error info if the message failed */
   error?: { type: string; message: string } | null;
+  fileList?: ChatFileItem[];
   id: string;
+  imageList?: ChatImageItem[];
   /** Model that generated the response */
   model?: string;
   /** Parent message id (for branching) */

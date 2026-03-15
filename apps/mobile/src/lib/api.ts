@@ -15,6 +15,8 @@ import type {
   AiProviderListItem,
   AiProviderModelItem,
   AiProviderRuntimeState,
+  ChatFileItem,
+  ChatImageItem,
   ChatMessage,
   ChatSession,
   CreateSessionConfig,
@@ -51,6 +53,33 @@ import {
 } from './server';
 
 export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
+
+const toIsoString = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return new Date(value).toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return new Date().toISOString();
+};
+
+const normalizeMessage = (message: any): ChatMessage => ({
+  content: typeof message?.content === 'string' ? message.content : '',
+  createdAt: toIsoString(message?.createdAt),
+  error: message?.error ?? null,
+  fileList: Array.isArray(message?.fileList) ? (message.fileList as ChatFileItem[]) : undefined,
+  id: String(message?.id ?? ''),
+  imageList: Array.isArray(message?.imageList)
+    ? (message.imageList as ChatImageItem[])
+    : undefined,
+  model: message?.model ?? message?.extra?.model ?? undefined,
+  parentId: message?.parentId ?? undefined,
+  performance: message?.performance ?? null,
+  provider: message?.provider ?? message?.extra?.provider ?? undefined,
+  reasoning: message?.reasoning ?? null,
+  role: message?.role,
+  sessionId: String(message?.sessionId ?? ''),
+  updatedAt: toIsoString(message?.updatedAt),
+  usage: message?.usage ?? null,
+});
 
 async function getBaseUrl(): Promise<string> {
   return getApiUrl();
@@ -189,10 +218,15 @@ export interface CreateMessageParams {
 
 export const messageApi = {
   list: (sessionId: string, topicId?: string) =>
-    trpcQuery<ChatMessage[]>('message.getMessages', { sessionId, topicId }),
+    trpcQuery<any[]>('message.getMessages', { sessionId, topicId }).then((messages) =>
+      (messages ?? []).map(normalizeMessage),
+    ),
 
   create: (params: CreateMessageParams) =>
-    trpcMutate<{ id: string; messages: ChatMessage[] }>('message.createMessage', params),
+    trpcMutate<{ id: string; messages: any[] }>('message.createMessage', params).then((result) => ({
+      id: result.id,
+      messages: (result.messages ?? []).map(normalizeMessage),
+    })),
 
   remove: (id: string) => trpcMutate('message.removeMessage', { id }),
   /** Server procedure is `message.update`, NOT `message.updateMessage` */

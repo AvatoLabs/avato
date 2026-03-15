@@ -285,7 +285,7 @@ OPENCLAW_API_KEY="" OPENCLAW_PROXY_URL=""
 
 ### Phase 5: Mobile App 支持
 
-#### 3.11 MinkHub Mobile 集成
+#### 3.11 Avato Mobile 集成
 
 OpenClaw 支持将自动通过以下路径传递到 Mobile：
 
@@ -367,7 +367,7 @@ OpenClaw 的 `/v1/responses` 端点与 OpenAI Responses API 兼容。LobeHub 已
 | 流式响应      | 集成测试    | SSE 事件正确解析，`[DONE]` 正确终止                            |
 | 自定义 Agent  | 手动测试    | 设置 `model: "openclaw:beta"` 后路由到对应 Agent               |
 | 环境变量      | Docker 测试 | `OPENCLAW_API_KEY` 和 `OPENCLAW_PROXY_URL` 在容器中正确传递    |
-| Mobile 可见性 | 手动测试    | MinkHub 的 Discover → Providers 能显示 OpenClaw                |
+| Mobile 可见性 | 手动测试    | Avato 的 Discover → Providers 能显示 OpenClaw                  |
 
 ---
 

@@ -167,13 +167,13 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
     modal.confirm({
       cancelText: t('cancel', { ns: 'common' }),
       centered: true,
-      content: t('tools.minkhubSkill.disconnectConfirm.desc', { name: provider.label }),
+      content: t('tools.avatohubSkill.disconnectConfirm.desc', { name: provider.label }),
       okButtonProps: { danger: true },
-      okText: t('tools.minkhubSkill.disconnect'),
+      okText: t('tools.avatohubSkill.disconnect'),
       onOk: async () => {
         await revokeConnect(server.identifier);
       },
-      title: t('tools.minkhubSkill.disconnectConfirm.title', { name: provider.label }),
+      title: t('tools.avatohubSkill.disconnectConfirm.title', { name: provider.label }),
     });
   };
 
@@ -189,7 +189,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
     if (!server) {
       return (
         <span className={styles.disconnected}>
-          {t('tools.minkhubSkill.disconnected', { defaultValue: 'Disconnected' })}
+          {t('tools.avatohubSkill.disconnected', { defaultValue: 'Disconnected' })}
         </span>
       );
     }
@@ -198,17 +198,17 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
       case LobehubSkillStatus.CONNECTED: {
         return (
           <span className={styles.connected}>
-            {t('tools.minkhubSkill.connected', { defaultValue: 'Connected' })}
+            {t('tools.avatohubSkill.connected', { defaultValue: 'Connected' })}
           </span>
         );
       }
       case LobehubSkillStatus.ERROR: {
-        return <span className={styles.error}>{t('tools.minkhubSkill.error')}</span>;
+        return <span className={styles.error}>{t('tools.avatohubSkill.error')}</span>;
       }
       default: {
         return (
           <span className={styles.disconnected}>
-            {t('tools.minkhubSkill.disconnected', { defaultValue: 'Disconnected' })}
+            {t('tools.avatohubSkill.disconnected', { defaultValue: 'Disconnected' })}
           </span>
         );
       }
@@ -219,7 +219,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
     if (isConnecting || isWaitingAuth) {
       return (
         <Button disabled icon={<Icon spin icon={Loader2} />} type="default">
-          {t('tools.minkhubSkill.connect')}
+          {t('tools.avatohubSkill.connect')}
         </Button>
       );
     }
@@ -227,7 +227,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
     if (!server || server.status !== LobehubSkillStatus.CONNECTED) {
       return (
         <Button icon={<Icon icon={SquareArrowOutUpRight} />} type="default" onClick={handleConnect}>
-          {t('tools.minkhubSkill.connect')}
+          {t('tools.avatohubSkill.connect')}
         </Button>
       );
     }

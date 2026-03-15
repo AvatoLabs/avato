@@ -1,6 +1,6 @@
 'use client';
 
-import { Block, Button, Flexbox, Text } from '@minkhub/ui';
+import { Block, Button, Flexbox, Text } from '@avatohub/ui';
 import React, { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

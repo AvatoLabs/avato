@@ -1,14 +1,15 @@
 'use client';
 
+import { SOCIAL_URL } from '@avatochat/business-const';
+import { Button, Flexbox, Icon, Text } from '@avatohub/ui';
 import { SiDiscord } from '@icons-pack/react-simple-icons';
-import { SOCIAL_URL } from '@minkchat/business-const';
-import { Button, Flexbox, Icon, Text } from '@minkhub/ui';
 import { cssVar } from 'antd-style';
 import Link from 'next/link';
 import { parseAsString, useQueryState } from 'nuqs';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { GITHUB } from '@/const/url';
 import AuthCard from '@/features/AuthCard';
 
 const normalizeErrorCode = (code?: string | null) =>
@@ -37,7 +38,7 @@ const AuthErrorPage = memo(() => {
               {t('actions.home')}
             </Button>
           </Link>
-          <Link href={SOCIAL_URL.discord} rel="noopener noreferrer" target="_blank">
+          <Link href={SOCIAL_URL.discord || GITHUB} rel="noopener noreferrer" target="_blank">
             <Button block icon={<Icon fill={cssVar.colorText} icon={SiDiscord} />} type="text">
               {t('actions.discord')}
             </Button>

@@ -94,21 +94,14 @@ export class MessageService {
     // 1. Create the message (using agentId)
     const item = await this.messageModel.create(params);
 
-    // 2. Query all messages for this agent/topic
-    // Use agentId field for query
-    const messages = await this.messageModel.query(
-      {
-        agentId: params.agentId,
-        current: 0,
-        groupId: params.groupId,
-        pageSize: 9999,
-        threadId: params.threadId,
-        topicId: params.topicId,
-      },
-      {
-        postProcessUrl: this.postProcessUrl,
-      },
-    );
+    // 2. Query messages with standard options (avoid oversized fixed page size on hot path)
+    const { messages = [] } = await this.queryWithSuccess({
+      agentId: params.agentId,
+      groupId: params.groupId,
+      sessionId: params.sessionId,
+      threadId: params.threadId,
+      topicId: params.topicId,
+    });
 
     // 3. Return the result
     return {

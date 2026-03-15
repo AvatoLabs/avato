@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@minkhub/ui';
+import { Button } from '@avatohub/ui';
 import { ChevronLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';

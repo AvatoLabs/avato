@@ -27,32 +27,26 @@ const styles = createStaticStyles(({ css }) => {
 
 const Follow = memo(() => {
   const { t } = useTranslation('common');
+  const socialItems = [
+    { href: GITHUB, icon: SiGithub as any, name: 'GitHub' },
+    SOCIAL_URL.x ? { href: SOCIAL_URL.x, icon: SiX as any, name: 'X' } : null,
+    SOCIAL_URL.discord
+      ? { href: SOCIAL_URL.discord, icon: SiDiscord as any, name: 'Discord' }
+      : null,
+    SOCIAL_URL.medium ? { href: SOCIAL_URL.medium, icon: SiMedium as any, name: 'Medium' } : null,
+  ].filter(Boolean) as Array<{ href: string; icon: any; name: string }>;
+
   return (
     <Flexbox horizontal gap={8}>
-      <a href={GITHUB} rel="noreferrer" target="_blank">
-        <ActionIcon
-          className={styles.icon}
-          icon={SiGithub as any}
-          title={t('follow', { name: 'GitHub' })}
-        />
-      </a>
-      <a href={SOCIAL_URL.x} rel="noreferrer" target="_blank">
-        <ActionIcon className={styles.icon} icon={SiX as any} title={t('follow', { name: 'X' })} />
-      </a>
-      <a href={SOCIAL_URL.discord} rel="noreferrer" target="_blank">
-        <ActionIcon
-          className={styles.icon}
-          icon={SiDiscord as any}
-          title={t('follow', { name: 'Discord' })}
-        />
-      </a>
-      <a href={SOCIAL_URL.medium} rel="noreferrer" target="_blank">
-        <ActionIcon
-          className={styles.icon}
-          icon={SiMedium as any}
-          title={t('follow', { name: 'Medium' })}
-        />
-      </a>
+      {socialItems.map((item) => (
+        <a href={item.href} key={item.name} rel="noreferrer" target="_blank">
+          <ActionIcon
+            className={styles.icon}
+            icon={item.icon}
+            title={t('follow', { name: item.name })}
+          />
+        </a>
+      ))}
     </Flexbox>
   );
 });

@@ -127,9 +127,11 @@ const FeedbackModal = memo<FeedbackModalProps>(({ initialValues, onClose, open }
       }
       onCancel={handleCancel}
     >
-      <p style={{ color: 'var(--colorTextSecondary)', fontSize: 14, marginBottom: 16 }}>
-        {t('feedback.emailContact', { email: BRANDING_EMAIL.business })}
-      </p>
+      {BRANDING_EMAIL.business && (
+        <p style={{ color: 'var(--colorTextSecondary)', fontSize: 14, marginBottom: 16 }}>
+          {t('feedback.emailContact', { email: BRANDING_EMAIL.business })}
+        </p>
+      )}
 
       <Form form={form} initialValues={initialValues} layout="vertical">
         <Form.Item

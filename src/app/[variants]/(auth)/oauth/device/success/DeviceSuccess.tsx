@@ -1,6 +1,6 @@
 'use client';
 
-import { FluentEmoji, Text } from '@minkhub/ui';
+import { FluentEmoji, Text } from '@avatohub/ui';
 import { Result } from 'antd';
 import React, { memo } from 'react';
 import { useTranslation } from 'react-i18next';

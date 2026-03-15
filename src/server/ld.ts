@@ -1,4 +1,4 @@
-import { BRANDING_EMAIL, BRANDING_NAME, SOCIAL_URL } from '@minkchat/business-const';
+import { BRANDING_EMAIL, BRANDING_NAME, SOCIAL_URL } from '@avatochat/business-const';
 import { isString } from 'es-toolkit/compat';
 import qs from 'query-string';
 import urlJoin from 'url-join';
@@ -24,11 +24,11 @@ export const AUTHOR_LIST = {
     name: 'CanisMinor',
     url: 'https://github.com/canisminor1990',
   },
-  minkhub: {
+  avatohub: {
     avatar: 'https://avatars.githubusercontent.com/u/131470832?v=4',
     desc: 'Official Account',
-    name: 'MinkHub',
-    url: 'https://github.com/minkhub',
+    name: BRANDING_NAME,
+    url: SOCIAL_URL.github || 'https://github.com/AvatoLabs',
   },
 };
 
@@ -84,19 +84,27 @@ export class Ld {
   }
 
   genOrganization() {
+    const sameAs = [SOCIAL_URL.x, SOCIAL_URL.github, SOCIAL_URL.medium, SOCIAL_URL.youtube].filter(
+      Boolean,
+    );
+
     return {
       '@id': this.getId(OFFICIAL_URL, '#organization'),
       '@type': 'Organization',
-      'alternateName': 'MinkHub',
-      'contactPoint': {
-        '@type': 'ContactPoint',
-        'contactType': 'customer support',
-        'email': BRANDING_EMAIL.support,
-      },
+      'alternateName': BRANDING_NAME,
+      ...(BRANDING_EMAIL.support
+        ? {
+            contactPoint: {
+              '@type': 'ContactPoint',
+              'contactType': 'customer support',
+              'email': BRANDING_EMAIL.support,
+            },
+          }
+        : {}),
       'description':
         'Agent teammates that grow with you\n' +
-        'MinkHub is a work-and-lifestyle space to find, build, and collaborate with agent teams that grow with you.',
-      'email': BRANDING_EMAIL.business,
+        `${BRANDING_NAME} is a work-and-lifestyle space to find, build, and collaborate with agent teams that grow with you.`,
+      ...(BRANDING_EMAIL.business ? { email: BRANDING_EMAIL.business } : {}),
       'founders': [this.getAuthors(['arvinxx']), this.getAuthors(['canisminor'])],
       'image': urlJoin(OFFICIAL_SITE, '/icon-512x512.png'),
       'logo': {
@@ -105,8 +113,8 @@ export class Ld {
         'url': urlJoin(OFFICIAL_SITE, '/icon-512x512.png'),
         'width': 512,
       },
-      'name': 'MinkHub',
-      'sameAs': [SOCIAL_URL.x, SOCIAL_URL.github, SOCIAL_URL.medium, SOCIAL_URL.youtube],
+      'name': BRANDING_NAME,
+      'sameAs': sameAs,
       'url': OFFICIAL_SITE,
     };
   }
@@ -117,8 +125,8 @@ export class Ld {
       '@type': 'Organization',
     };
     if (!ids || ids.length === 0) return defaultAuthor;
-    if (ids.length === 1 && ids[0] === 'minkhub') return defaultAuthor;
-    const personId = ids.find((id) => id !== 'minkhub');
+    if (ids.length === 1 && ids[0] === 'avatohub') return defaultAuthor;
+    const personId = ids.find((id) => id !== 'avatohub');
     if (!personId) return defaultAuthor;
     const person = (AUTHOR_LIST as any)?.[personId];
     if (!person) return defaultAuthor;
@@ -256,7 +264,7 @@ export class Ld {
         '@id': this.getId(fixedUrl, '#primaryimage'),
       },
       'inLanguage': locale,
-      'keywords': tags?.join(' ') || 'MinkHub',
+      'keywords': tags?.join(' ') || BRANDING_NAME,
       'mainEntityOfPage': fixedUrl,
       'name': title,
       'publisher': {

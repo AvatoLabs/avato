@@ -8,9 +8,9 @@ export const OFFICIAL_DOMAIN = 'lobehub.com';
 
 export const OG_URL = '/og/og.webp?v=1';
 
-export const GITHUB = 'https://github.com/lobehub/lobe-chat';
+export const GITHUB = 'https://github.com/AvatoLabs/avatohub';
 export const GITHUB_ISSUES = urlJoin(GITHUB, 'issues/new/choose');
-export const CHANGELOG = 'https://lobehub.com/changelog';
+export const CHANGELOG = urlJoin(GITHUB, 'releases');
 
 export const DOCUMENTS = urlJoin(OFFICIAL_SITE, '/docs');
 export const USAGE_DOCUMENTS = urlJoin(DOCUMENTS, '/usage');
@@ -26,9 +26,9 @@ export const MANUAL_UPGRADE_URL = urlJoin(SELF_HOSTING_DOCUMENTS, '/advanced/ups
 export const BLOG = urlJoin(OFFICIAL_SITE, 'blog');
 
 export const ABOUT = OFFICIAL_SITE;
-export const FEEDBACK = 'https://github.com/lobehub/lobe-chat/issues/new/choose';
-export const PRIVACY_URL = urlJoin(OFFICIAL_SITE, '/privacy');
-export const TERMS_URL = urlJoin(OFFICIAL_SITE, '/terms');
+export const FEEDBACK = GITHUB_ISSUES;
+export const PRIVACY_URL = GITHUB;
+export const TERMS_URL = GITHUB;
 
 export const PLUGINS_INDEX_URL = 'https://chat-plugins.lobehub.com';
 
@@ -64,7 +64,7 @@ export const mailTo = (email: string) => `mailto:${email}`;
 export const AES_GCM_URL = 'https://datatracker.ietf.org/doc/html/draft-ietf-avt-srtp-aes-gcm-01';
 export const BASE_PROVIDER_DOC_URL = 'https://lobehub.com/docs/usage/providers';
 export const SITEMAP_BASE_URL = isDev ? '/sitemap.xml/' : 'sitemap';
-export const CHANGELOG_URL = urlJoin(OFFICIAL_SITE, 'changelog/versions');
+export const CHANGELOG_URL = urlJoin(GITHUB, 'releases');
 
 export const DOWNLOAD_URL = {
   android: 'https://play.google.com/store/apps/details?id=com.lobehub.app',

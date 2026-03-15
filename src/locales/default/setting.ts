@@ -358,7 +358,7 @@ export default {
   'memory.effort.medium': 'Medium — Balanced behavior',
   'memory.effort.title': 'Aggressiveness',
   'memory.enabled.desc':
-    'Allow MinkHub to extract preferences and info from conversations and use them later. You can view, edit, or clear memory anytime.',
+    'Allow Avatoo extract preferences and info from conversations and use them later. You can view, edit, or clear memory anytime.',
   'memory.enabled.title': 'Enable Memory',
   'memory.title': 'Memory Settings',
   'message.success': 'Update successful',
@@ -695,7 +695,7 @@ export default {
   'skillStore.search': 'Search skills by name or keyword, press Enter to search…',
   'skillStore.tabs.community': 'Community',
   'skillStore.tabs.custom': 'Custom',
-  'skillStore.tabs.minkhub': 'MinkHub',
+  'skillStore.tabs.avatohub': 'Avato',
   'skillStore.title': 'Skill Store',
   'skillStore.wantMore.action': 'Submit a request →',
   'skillStore.wantMore.feedback.message': `## Skill Name
@@ -1053,34 +1053,34 @@ When I am ___, I need ___
 
   'tools.klavis.verifyAuth': 'I have completed authentication',
 
-  'tools.minkhubSkill.authorize': 'Authorize',
+  'tools.avatohubSkill.authorize': 'Authorize',
 
-  'tools.minkhubSkill.connect': 'Connect',
+  'tools.avatohubSkill.connect': 'Connect',
 
-  'tools.minkhubSkill.connected': 'Connected',
+  'tools.avatohubSkill.connected': 'Connected',
 
-  'tools.minkhubSkill.disconnect': 'Disconnect',
+  'tools.avatohubSkill.disconnect': 'Disconnect',
 
-  'tools.minkhubSkill.disconnectConfirm.desc':
+  'tools.avatohubSkill.disconnectConfirm.desc':
     "You can still continue previous chats that reference {{name}} content. However, the assistant won't be able to access new content or perform new tasks.",
 
-  'tools.minkhubSkill.disconnectConfirm.title': 'Disconnect {{name}}?',
+  'tools.avatohubSkill.disconnectConfirm.title': 'Disconnect {{name}}?',
 
-  'tools.minkhubSkill.disconnected': 'Disconnected',
+  'tools.avatohubSkill.disconnected': 'Disconnected',
 
-  'tools.minkhubSkill.error': 'Error',
-  // MinkHub Skill Providers i18n
-  'tools.minkhubSkill.providers.linear.description':
+  'tools.avatohubSkill.error': 'Error',
+  // Avato Skill Providers i18n
+  'tools.avatohubSkill.providers.linear.description':
     'Linear is a modern issue tracking and project management tool designed for high-performance teams to build better software faster',
-  'tools.minkhubSkill.providers.linear.readme':
+  'tools.avatohubSkill.providers.linear.readme':
     'Bring the power of Linear directly into your AI assistant. Create and update issues, manage sprints, track project progress, and streamline your development workflow—all through natural conversation.',
-  'tools.minkhubSkill.providers.microsoft.description':
+  'tools.avatohubSkill.providers.microsoft.description':
     'Outlook Calendar is an integrated scheduling tool within Microsoft Outlook that enables users to create appointments, organize meetings with others, and manage their time and events effectively.',
-  'tools.minkhubSkill.providers.microsoft.readme':
+  'tools.avatohubSkill.providers.microsoft.readme':
     'Integrate with Outlook Calendar to view, create, and manage your events seamlessly. Schedule meetings, check availability, set reminders, and coordinate your time—all through natural language commands.',
-  'tools.minkhubSkill.providers.twitter.description':
+  'tools.avatohubSkill.providers.twitter.description':
     'X (Twitter) is a social media platform for sharing real-time updates, news, and engaging with your audience through posts, replies, and direct messages.',
-  'tools.minkhubSkill.providers.twitter.readme':
+  'tools.avatohubSkill.providers.twitter.readme':
     'Connect to X (Twitter) to post tweets, manage your timeline, and engage with your audience. Create content, schedule posts, monitor mentions, and build your social media presence through conversational AI.',
 
   'tools.notInstalled': 'Not Installed',

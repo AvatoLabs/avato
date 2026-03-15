@@ -288,15 +288,14 @@ describe('MessageService', () => {
 
       expect(mockMessageModel.create).toHaveBeenCalledWith(params);
       expect(mockMessageModel.query).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           agentId: 'agent-1',
-          current: 0,
           groupId: undefined,
-          pageSize: 9999,
           threadId: undefined,
           topicId: undefined,
-        },
+        }),
         expect.objectContaining({
+          groupAssistantMessages: false,
           postProcessUrl: expect.any(Function),
         }),
       );
@@ -323,15 +322,14 @@ describe('MessageService', () => {
       const result = await messageService.createMessage(params as any);
 
       expect(mockMessageModel.query).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           agentId: 'agent-1',
-          current: 0,
           groupId: 'group-1',
-          pageSize: 9999,
           threadId: undefined,
           topicId: 'topic-1',
-        },
+        }),
         expect.objectContaining({
+          groupAssistantMessages: false,
           postProcessUrl: expect.any(Function),
         }),
       );
@@ -358,15 +356,14 @@ describe('MessageService', () => {
 
       expect(mockMessageModel.create).toHaveBeenCalledWith(params);
       expect(mockMessageModel.query).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           agentId: 'agent-1',
-          current: 0,
           groupId: 'group-1',
-          pageSize: 9999,
           threadId: 'thread-1',
           topicId: 'topic-1',
-        },
+        }),
         expect.objectContaining({
+          groupAssistantMessages: false,
           postProcessUrl: expect.any(Function),
         }),
       );

@@ -1,6 +1,6 @@
 'use client';
 
-import { FluentEmoji, Text } from '@minkhub/ui';
+import { FluentEmoji, Text } from '@avatohub/ui';
 import { Result } from 'antd';
 import { useSearchParams } from 'next/navigation';
 import React, { memo, useEffect, useState } from 'react';
@@ -12,7 +12,7 @@ const SuccessPage = memo(() => {
   const [countdown, setCountdown] = useState(3);
 
   useEffect(() => {
-    // Check if this is a MinkHub Skill OAuth callback
+    // Check if this is a Avato Skill OAuth callback
     const provider = searchParams.get('provider');
 
     if (provider && window.opener) {

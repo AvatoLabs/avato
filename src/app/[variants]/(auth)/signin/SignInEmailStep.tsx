@@ -1,5 +1,5 @@
-import { BRANDING_NAME } from '@minkchat/business-const';
-import { Alert, Button, Flexbox, Icon, Input, Skeleton, Text } from '@minkhub/ui';
+import { BRANDING_NAME } from '@avatochat/business-const';
+import { Alert, Button, Flexbox, Icon, Input, Skeleton, Text } from '@avatohub/ui';
 import { type FormInstance, type InputRef } from 'antd';
 import { Badge, Divider, Form } from 'antd';
 import { createStaticStyles } from 'antd-style';

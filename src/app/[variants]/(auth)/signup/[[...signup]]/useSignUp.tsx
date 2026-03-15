@@ -1,4 +1,4 @@
-import { ENABLE_BUSINESS_FEATURES } from '@minkchat/business-const';
+import { ENABLE_BUSINESS_FEATURES } from '@avatochat/business-const';
 import { form } from 'motion/react-m';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';

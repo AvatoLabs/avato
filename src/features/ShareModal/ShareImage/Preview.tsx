@@ -27,7 +27,7 @@ const Preview = memo<FieldType & { title?: string }>(
       agentSelectors.currentAgentBackgroundColor(s),
     ]);
 
-    const displayTitle = isInbox ? 'Mink AI' : title;
+    const displayTitle = isInbox ? 'Avato' : title;
 
     return (
       <div

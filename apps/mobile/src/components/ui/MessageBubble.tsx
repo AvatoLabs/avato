@@ -35,6 +35,7 @@ import { useI18n } from '../../lib/i18n';
 import { useChatStore } from '../../store/chat';
 import { tokens } from '../../theme/tokens';
 import type { ChatMessage } from '../../types';
+import ImageViewer from './ImageViewer';
 import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
 
@@ -54,7 +55,9 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content);
     const [showActions, setShowActions] = useState(false);
+    const [showImageViewer, setShowImageViewer] = useState(false);
     const [showStats, setShowStats] = useState(false);
+    const [viewerUri, setViewerUri] = useState<string | null>(null);
 
     const deleteMessage = useChatStore((s) => s.deleteMessage);
     const editMessage = useChatStore((s) => s.editMessage);
@@ -261,6 +264,8 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const totalTokens = message.usage?.totalTokens ?? 0;
     const hasStats = !isUser && totalTokens > 0;
+    const hasAttachments =
+      (message.imageList?.length ?? 0) > 0 || (message.fileList?.length ?? 0) > 0;
 
     return (
       <Animated.View
@@ -356,6 +361,78 @@ const MessageBubble = memo<MessageBubbleProps>(
                 </View>
               ) : (
                 <>
+                  {hasAttachments && (
+                    <View className="mb-3 gap-2">
+                      {message.imageList?.length ? (
+                        <ScrollView
+                          horizontal
+                          contentContainerStyle={{ gap: 8 }}
+                          showsHorizontalScrollIndicator={false}
+                        >
+                          {message.imageList.map((image) => (
+                            <TouchableOpacity
+                              activeOpacity={0.9}
+                              key={image.id}
+                              onPress={() => {
+                                setViewerUri(image.url);
+                                setShowImageViewer(true);
+                              }}
+                            >
+                              <RNImage
+                                source={{ uri: image.url }}
+                                style={{
+                                  backgroundColor: isUser
+                                    ? 'rgba(255,255,255,0.14)'
+                                    : 'rgba(0,0,0,0.04)',
+                                  borderRadius: 14,
+                                  height: 120,
+                                  width: 120,
+                                }}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      ) : null}
+
+                      {message.fileList?.length ? (
+                        <View className="gap-2">
+                          {message.fileList.map((file) => (
+                            <View
+                              className="rounded-2xl px-3 py-2"
+                              key={file.id}
+                              style={{
+                                backgroundColor: isUser
+                                  ? 'rgba(255,255,255,0.14)'
+                                  : 'rgba(0,0,0,0.04)',
+                              }}
+                            >
+                              <Text
+                                numberOfLines={1}
+                                style={{
+                                  color: isUser ? '#ffffff' : mc.heading,
+                                  fontSize: 13,
+                                  fontWeight: '600',
+                                }}
+                              >
+                                {file.name}
+                              </Text>
+                              <Text
+                                numberOfLines={1}
+                                style={{
+                                  color: isUser ? 'rgba(255,255,255,0.7)' : mc.text + '88',
+                                  fontSize: 12,
+                                  marginTop: 2,
+                                }}
+                              >
+                                {file.fileType}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
+
                   {!isUser && (message.reasoning?.content || (generating && isReasoning)) && (
                     <ThinkingBlock
                       content={message.reasoning?.content}
@@ -468,6 +545,14 @@ const MessageBubble = memo<MessageBubbleProps>(
             onClose={() => setShowStats(false)}
           />
         )}
+        <ImageViewer
+          uri={viewerUri ?? ''}
+          visible={showImageViewer}
+          onClose={() => {
+            setShowImageViewer(false);
+            setViewerUri(null);
+          }}
+        />
       </Animated.View>
     );
   },

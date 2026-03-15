@@ -139,7 +139,7 @@ export default function SettingsScreen({ navigation }: any) {
             icon={Shield}
             iconColor="#34c759"
             label={t.settingsPrivacyPolicy}
-            onPress={() => Linking.openURL('https://lobehub.com/privacy')}
+            onPress={() => Linking.openURL('https://github.com/AvatoLabs/avatohub')}
           />
           <SettingsRow
             icon={Info}

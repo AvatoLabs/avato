@@ -14,8 +14,10 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
-const APP_NAME = Constants.expoConfig?.name ?? 'LobeHub';
+const APP_NAME = Constants.expoConfig?.name ?? 'Avato';
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+const PROJECT_URL = 'https://github.com/AvatoLabs/avatohub';
+const ORG_URL = 'https://github.com/AvatoLabs';
 
 function LinkRow({
   icon: IconComp,
@@ -88,7 +90,7 @@ export default function AboutScreen({ navigation }: any) {
           <Text className="text-foreground text-[22px] font-bold tracking-tight">{APP_NAME}</Text>
           <Text className="text-secondary/60 text-[14px] font-medium mt-1">v{APP_VERSION}</Text>
           <Text className="text-secondary/40 text-[13px] font-medium mt-0.5">
-            {t.aboutBuiltOn.replace('{name}', 'LobeHub')}
+            {t.aboutBuiltOn.replace('{name}', APP_NAME)}
           </Text>
         </Animated.View>
 
@@ -108,26 +110,26 @@ export default function AboutScreen({ navigation }: any) {
             icon={Github}
             iconColor="#333"
             label={t.aboutGithubRepository}
-            url="https://github.com/lobehub/lobe-chat"
+            url={PROJECT_URL}
           />
           <LinkRow
             icon={ExternalLink}
             iconColor={semanticColors.primary}
             label={t.aboutOfficialWebsite}
-            url="https://lobehub.com"
+            url={PROJECT_URL}
           />
           <LinkRow
             icon={Heart}
             iconColor={semanticColors.danger}
             label={t.aboutSponsor}
-            url="https://opencollective.com/lobehub"
+            url={ORG_URL}
           />
         </Animated.View>
 
         {/* Footer */}
         <Animated.View className="mt-10" entering={FadeInDown.delay(200).duration(350)}>
           <Text className="text-secondary/30 text-[12px] font-medium text-center">
-            {t.aboutMadeWith.replace('{name}', 'LobeHub')}
+            {t.aboutMadeWith.replace('{name}', APP_NAME)}
           </Text>
         </Animated.View>
       </ScrollView>

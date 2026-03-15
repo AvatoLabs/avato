@@ -3,7 +3,7 @@ import { type DocumentItem } from '@lobechat/database/schemas';
 import { documents, files } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
 import debug from 'debug';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
@@ -143,49 +143,152 @@ export class DocumentService {
     return this.documentModel.findById(id);
   }
 
+  private chunk<T>(items: T[], size = 200): T[][] {
+    if (items.length <= size) return [items];
+
+    const result: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+      result.push(items.slice(i, i + size));
+    }
+    return result;
+  }
+
+  private async collectDocumentsForDeletion(rootIds: string[]): Promise<{
+    documentIds: string[];
+    fileIds: string[];
+    folderIds: string[];
+  }> {
+    const dedupRootIds = [...new Set(rootIds)].filter(Boolean);
+    if (dedupRootIds.length === 0) return { documentIds: [], fileIds: [], folderIds: [] };
+
+    const rootDocuments = await this.db.query.documents.findMany({
+      columns: {
+        fileId: true,
+        fileType: true,
+        id: true,
+      },
+      where: and(eq(documents.userId, this.userId), inArray(documents.id, dedupRootIds)),
+    });
+
+    const rootMap = new Map(rootDocuments.map((doc) => [doc.id, doc] as const));
+    if (rootMap.size < dedupRootIds.length) {
+      const missingRootIds = dedupRootIds.filter((id) => !rootMap.has(id));
+      const fallbackRoots = await Promise.all(
+        missingRootIds.map((id) => this.documentModel.findById(id)),
+      );
+
+      for (const fallbackRoot of fallbackRoots) {
+        if (!fallbackRoot) continue;
+        rootMap.set(fallbackRoot.id, {
+          fileId: fallbackRoot.fileId,
+          fileType: fallbackRoot.fileType,
+          id: fallbackRoot.id,
+        });
+      }
+    }
+
+    const resolvedRootDocuments = [...rootMap.values()];
+    if (resolvedRootDocuments.length === 0) return { documentIds: [], fileIds: [], folderIds: [] };
+
+    const allDocuments = new Map(resolvedRootDocuments.map((doc) => [doc.id, doc] as const));
+    let folderQueue = resolvedRootDocuments
+      .filter((doc) => doc.fileType === 'custom/folder')
+      .map((doc) => doc.id);
+
+    while (folderQueue.length > 0) {
+      const nextFolderQueue: string[] = [];
+
+      for (const folderChunk of this.chunk(folderQueue)) {
+        const children = await this.db.query.documents.findMany({
+          columns: {
+            fileId: true,
+            fileType: true,
+            id: true,
+          },
+          where: and(eq(documents.userId, this.userId), inArray(documents.parentId, folderChunk)),
+        });
+
+        for (const child of children) {
+          let resolvedChild = child;
+          if (!resolvedChild.fileType) {
+            const fallbackChild = await this.documentModel.findById(child.id);
+            if (!fallbackChild) continue;
+            resolvedChild = {
+              fileId: fallbackChild.fileId,
+              fileType: fallbackChild.fileType,
+              id: fallbackChild.id,
+            };
+          }
+
+          if (allDocuments.has(resolvedChild.id)) continue;
+          allDocuments.set(resolvedChild.id, resolvedChild);
+          if (resolvedChild.fileType === 'custom/folder') {
+            nextFolderQueue.push(resolvedChild.id);
+          }
+        }
+      }
+
+      folderQueue = nextFolderQueue;
+    }
+
+    const allDocs = [...allDocuments.values()];
+    const folderIds = allDocs
+      .filter((doc) => doc.fileType === 'custom/folder')
+      .map((doc) => doc.id);
+
+    const fileIds = new Set(allDocs.map((doc) => doc.fileId).filter(Boolean) as string[]);
+
+    if (folderIds.length > 0) {
+      for (const folderChunk of this.chunk(folderIds)) {
+        const childFiles = await this.db.query.files.findMany({
+          columns: { id: true },
+          where: and(eq(files.userId, this.userId), inArray(files.parentId, folderChunk)),
+        });
+        for (const file of childFiles) {
+          fileIds.add(file.id);
+        }
+      }
+    }
+
+    return {
+      documentIds: allDocs.map((doc) => doc.id),
+      fileIds: [...fileIds],
+      folderIds,
+    };
+  }
+
   /**
    * Delete document (recursively deletes children if it's a folder)
    */
   async deleteDocument(id: string) {
-    const document = await this.documentModel.findById(id);
-    if (!document) return;
-
-    // If it's a folder, recursively delete all children first
-    if (document.fileType === 'custom/folder') {
-      const children = await this.db.query.documents.findMany({
-        where: eq(documents.parentId, id),
-      });
-
-      // Recursively delete all children
-      for (const child of children) {
-        await this.deleteDocument(child.id);
-      }
-
-      // Also delete all files in this folder
-      const childFiles = await this.db.query.files.findMany({
-        where: and(eq(files.parentId, id), eq(files.userId, this.userId)),
-      });
-
-      for (const file of childFiles) {
-        await this.fileModel.delete(file.id);
-      }
-    }
-
-    // Delete the associated file record if it exists
-    if (document.fileId) {
-      await this.fileModel.delete(document.fileId);
-    }
-
-    // Finally delete the document itself
-    return this.documentModel.delete(id);
+    return this.deleteDocuments([id]);
   }
 
   /**
    * Delete multiple documents in batch
    */
   async deleteDocuments(ids: string[]) {
-    // Delete each document (which handles recursive deletion for folders)
-    await Promise.all(ids.map((id) => this.deleteDocument(id)));
+    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(ids);
+    if (documentIds.length === 0) return;
+
+    if (fileIds.length > 0) {
+      if (typeof this.fileModel.deleteMany === 'function') {
+        await this.fileModel.deleteMany(fileIds);
+      } else {
+        await Promise.all(fileIds.map((fileId) => this.fileModel.delete(fileId)));
+      }
+    }
+
+    if (typeof (this.db as any).delete === 'function') {
+      for (const idChunk of this.chunk(documentIds)) {
+        await this.db
+          .delete(documents)
+          .where(and(eq(documents.userId, this.userId), inArray(documents.id, idChunk)));
+      }
+      return;
+    }
+
+    await Promise.all(documentIds.map((id) => this.documentModel.delete(id)));
   }
 
   /**

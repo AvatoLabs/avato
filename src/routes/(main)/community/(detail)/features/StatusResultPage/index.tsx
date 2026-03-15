@@ -8,7 +8,7 @@ import { memo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-const SUPPORT_EMAIL = 'support@minkhub.com';
+const SUPPORT_EMAIL = 'support@avatohub.com';
 
 const styles = createStaticStyles(({ css }) => ({
   container: css`

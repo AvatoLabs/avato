@@ -6,7 +6,7 @@ import {
   type DropdownMenuCheckboxItem,
   Flexbox,
   Text,
-} from '@minkhub/ui';
+} from '@avatohub/ui';
 import { Languages } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
