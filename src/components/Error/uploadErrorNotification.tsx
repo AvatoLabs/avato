@@ -28,7 +28,30 @@ const isNetworkUploadError = (error: unknown): boolean => {
   );
 };
 
+const isStorageSetupError = (error: unknown): boolean => {
+  const rawMessage =
+    typeof error === 'string'
+      ? error
+      : error instanceof Error
+        ? error.message
+        : String(error ?? '');
+
+  const message = rawMessage.toLowerCase();
+
+  return (
+    message.includes('s3 environment variables are not set') ||
+    message.includes('s3 bucket is not set') ||
+    message.includes('file storage is not configured') ||
+    message.includes('nosuchbucket') ||
+    message.includes('specified bucket does not exist')
+  );
+};
+
 const getUploadErrorDescription = (error: unknown): string => {
+  if (isStorageSetupError(error)) {
+    return t('upload.storageNotConfigured', { ns: 'error' });
+  }
+
   if (isNetworkUploadError(error)) {
     return t('upload.networkError', { ns: 'error' });
   }

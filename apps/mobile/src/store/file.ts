@@ -20,7 +20,7 @@ interface FileState {
   pendingFiles: FileAttachment[];
   removeFile: (id: string) => void;
   uploadAll: () => Promise<void>;
-  uploadFile: (id: string) => Promise<UploadedFileResult | null>;
+  uploadFile: (id: string, options?: { sessionId?: string }) => Promise<UploadedFileResult | null>;
 }
 
 export const useFileStore = create<FileState>((set, get) => ({
@@ -39,7 +39,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     set((s) => ({ pendingFiles: s.pendingFiles.filter((f) => f.id !== id) }));
   },
 
-  uploadFile: async (id: string) => {
+  uploadFile: async (id: string, options?: { sessionId?: string }) => {
     const file = get().pendingFiles.find((f) => f.id === id);
     if (!file) return null;
 
@@ -54,7 +54,9 @@ export const useFileStore = create<FileState>((set, get) => ({
     }));
 
     try {
-      const result = await fileApi.upload(file.uri, file.name, file.type);
+      const result = await fileApi.upload(file.uri, file.name, file.type, {
+        sessionId: options?.sessionId,
+      });
 
       set((s) => ({
         pendingFiles: s.pendingFiles.map((f) =>

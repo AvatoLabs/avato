@@ -9,7 +9,11 @@ import { useI18n } from '../../lib/i18n';
 import { useFileStore } from '../../store/file';
 import { tokens } from '../../theme/tokens';
 
-const FilePreview = memo(() => {
+interface FilePreviewProps {
+  sessionId?: string;
+}
+
+const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
   const { t } = useI18n();
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const removeFile = useFileStore((s) => s.removeFile);
@@ -57,7 +61,7 @@ const FilePreview = memo(() => {
               <TouchableOpacity
                 activeOpacity={0.8}
                 className="absolute inset-0 bg-red-500/45 items-center justify-center px-1"
-                onPress={() => void uploadFile(file.id)}
+                onPress={() => void uploadFile(file.id, { sessionId })}
               >
                 <Text className="text-white text-[10px] font-semibold">{t.retry}</Text>
               </TouchableOpacity>

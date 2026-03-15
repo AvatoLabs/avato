@@ -702,7 +702,7 @@ export default function ChatListScreen({ navigation }: any) {
             />
             {pendingFiles.length > 0 && (
               <View className="mx-4 -mt-2 mb-2 px-3 py-2 rounded-2xl bg-foreground/5">
-                <FilePreview />
+                <FilePreview sessionId={draftSessionId ?? undefined} />
               </View>
             )}
           </View>

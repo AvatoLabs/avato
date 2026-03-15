@@ -610,7 +610,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           >
             {pendingFiles.length > 0 && (
               <View className="px-3 pt-2">
-                <FilePreview />
+                <FilePreview sessionId={sessionId} />
               </View>
             )}
             {/* Text input — full width */}

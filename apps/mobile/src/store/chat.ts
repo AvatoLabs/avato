@@ -261,7 +261,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (attachments.length > 0) {
       const uploaded = await Promise.all(
         attachments.map(async (file) => {
-          const result = await useFileStore.getState().uploadFile(file.id);
+          const result = await useFileStore.getState().uploadFile(file.id, { sessionId });
           if (!result) return null;
 
           return {

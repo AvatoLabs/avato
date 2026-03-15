@@ -232,6 +232,8 @@ export default {
     'The current deployment mode does not support uploading non-image files. To upload files in {{ext}} format, please switch to server database deployment or use the {{cloud}} service.',
   'upload.networkError':
     "Please check your network connection and ensure that the file storage service's cross-origin configuration is correct.",
+  'upload.storageNotConfigured':
+    'File storage is not configured correctly. Set S3 storage credentials and bucket before uploading files.',
   'upload.storageLimitExceeded':
     'Your file storage has reached the plan limit. Please upgrade your plan or delete unused files to free up space.',
   'upload.title': 'File upload failed. Please check your network connection or try again later',

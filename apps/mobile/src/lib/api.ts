@@ -610,7 +610,19 @@ export const fileApi = {
    * endpoints from presigned URLs, so this path sends the file to the app
    * server and lets the server complete storage + record creation.
    */
-  upload: async (uri: string, name: string, type: string): Promise<{ id: string; url: string }> => {
+  upload: async (
+    uri: string,
+    name: string,
+    type: string,
+    options?: {
+      agentId?: string;
+      directory?: string;
+      knowledgeBaseId?: string;
+      sessionId?: string;
+      skipCheckFileType?: boolean;
+      skipDeduplication?: boolean;
+    },
+  ): Promise<{ id: string; url: string }> => {
     const base = await getBaseUrl();
     const formData = new FormData();
 
@@ -622,6 +634,12 @@ export const fileApi = {
         uri,
       } as any,
     );
+    if (options?.agentId) formData.append('agentId', options.agentId);
+    if (options?.directory) formData.append('directory', options.directory);
+    if (options?.knowledgeBaseId) formData.append('knowledgeBaseId', options.knowledgeBaseId);
+    if (options?.sessionId) formData.append('sessionId', options.sessionId);
+    if (options?.skipCheckFileType) formData.append('skipCheckFileType', 'true');
+    if (options?.skipDeduplication) formData.append('skipDeduplication', 'true');
 
     const res = await fetch(`${base}/api/v1/files`, {
       body: formData,
@@ -630,16 +648,19 @@ export const fileApi = {
     });
 
     const payload = await res.json().catch(() => undefined);
+    const data = payload?.data;
+    // OpenAPI /files response shape is usually `{ data: { file: { id, url, ... }}}`,
+    // while some legacy paths may return `{ data: { id, url } }`.
+    const fileData = data?.file ?? data;
+    const id = fileData?.id;
+    const url = fileData?.url;
 
-    if (!res.ok || !payload?.success || !payload?.data?.id || !payload?.data?.url) {
+    if (!res.ok || !payload?.success || !id || !url) {
       const reason = payload?.error || payload?.message || `upload failed: ${res.status}`;
       throw new Error(reason);
     }
 
-    return {
-      id: payload.data.id,
-      url: payload.data.url,
-    };
+    return { id, url };
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),

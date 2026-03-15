@@ -1,4 +1,6 @@
 import {
+  type BucketLocationConstraint,
+  CreateBucketCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -30,7 +32,13 @@ export class S3 {
 
   private readonly bucket: string;
 
+  private readonly region: string;
+
   private readonly setAcl: boolean;
+
+  private isBucketReady = false;
+
+  private ensureBucketPromise?: Promise<void>;
 
   constructor(
     accessKeyId: string | undefined,
@@ -48,6 +56,7 @@ export class S3 {
     if (!options?.bucket) throw new Error('S3 bucket is not set, please check your env');
 
     this.bucket = options?.bucket;
+    this.region = options?.region || DEFAULT_S3_REGION;
     this.setAcl = options?.setAcl || false;
 
     this.client = new S3Client({
@@ -57,11 +66,70 @@ export class S3 {
       },
       endpoint,
       forcePathStyle: options?.forcePathStyle,
-      region: options?.region || DEFAULT_S3_REGION,
+      region: this.region,
       // refs: https://github.com/lobehub/lobe-chat/pull/5479
       requestChecksumCalculation: 'WHEN_REQUIRED',
       responseChecksumValidation: 'WHEN_REQUIRED',
     });
+  }
+
+  private isBucketNotFoundError(error: unknown): boolean {
+    const code = (error as any)?.Code || (error as any)?.code || (error as any)?.name;
+    const httpStatusCode = (error as any)?.$metadata?.httpStatusCode;
+
+    return code === 'NoSuchBucket' || code === 'NotFound' || httpStatusCode === 404;
+  }
+
+  private isBucketAlreadyExistsError(error: unknown): boolean {
+    const code = (error as any)?.Code || (error as any)?.code || (error as any)?.name;
+    const httpStatusCode = (error as any)?.$metadata?.httpStatusCode;
+
+    return (
+      code === 'BucketAlreadyExists' || code === 'BucketAlreadyOwnedByYou' || httpStatusCode === 409
+    );
+  }
+
+  private async createBucketIfNeeded() {
+    const command = new CreateBucketCommand({
+      Bucket: this.bucket,
+      CreateBucketConfiguration:
+        this.region === DEFAULT_S3_REGION
+          ? undefined
+          : { LocationConstraint: this.region as BucketLocationConstraint },
+    });
+
+    try {
+      await this.client.send(command);
+    } catch (error) {
+      if (this.isBucketAlreadyExistsError(error)) return;
+      throw error;
+    }
+  }
+
+  private async ensureBucketExists() {
+    if (this.isBucketReady) return;
+
+    if (!this.ensureBucketPromise) {
+      this.ensureBucketPromise = (async () => {
+        await this.createBucketIfNeeded();
+        this.isBucketReady = true;
+      })().finally(() => {
+        this.ensureBucketPromise = undefined;
+      });
+    }
+
+    await this.ensureBucketPromise;
+  }
+
+  private async withBucketAutoCreateRetry<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!this.isBucketNotFoundError(error)) throw error;
+
+      await this.ensureBucketExists();
+      return operation();
+    }
   }
 
   public async deleteFile(key: string) {
@@ -162,44 +230,50 @@ export class S3 {
     contentType?: string,
     cacheControl?: string,
   ) {
-    const command = new PutObjectCommand({
-      ACL: this.setAcl ? 'public-read' : undefined,
-      Body: buffer,
-      Bucket: this.bucket,
-      CacheControl: cacheControl,
-      ContentType: contentType,
-      Key: path,
-    });
+    return this.withBucketAutoCreateRetry(async () => {
+      const command = new PutObjectCommand({
+        ACL: this.setAcl ? 'public-read' : undefined,
+        Body: buffer,
+        Bucket: this.bucket,
+        CacheControl: cacheControl,
+        ContentType: contentType,
+        Key: path,
+      });
 
-    return this.client.send(command);
+      return this.client.send(command);
+    });
   }
 
   public async uploadContent(path: string, content: string) {
-    const command = new PutObjectCommand({
-      ACL: this.setAcl ? 'public-read' : undefined,
-      Body: content,
-      Bucket: this.bucket,
-      Key: path,
-    });
+    return this.withBucketAutoCreateRetry(async () => {
+      const command = new PutObjectCommand({
+        ACL: this.setAcl ? 'public-read' : undefined,
+        Body: content,
+        Bucket: this.bucket,
+        Key: path,
+      });
 
-    return this.client.send(command);
+      return this.client.send(command);
+    });
   }
 
   /**
    * Upload media file (images only) with long-term cache
    */
   public async uploadMedia(key: string, buffer: Buffer) {
-    const contentType = mime.getType(key) || 'application/octet-stream';
-    const command = new PutObjectCommand({
-      ACL: this.setAcl ? 'public-read' : undefined,
-      Body: buffer,
-      Bucket: this.bucket,
-      CacheControl: `public, max-age=${YEAR}`,
-      ContentType: contentType,
-      Key: key,
-    });
+    await this.withBucketAutoCreateRetry(async () => {
+      const contentType = mime.getType(key) || 'application/octet-stream';
+      const command = new PutObjectCommand({
+        ACL: this.setAcl ? 'public-read' : undefined,
+        Body: buffer,
+        Bucket: this.bucket,
+        CacheControl: `public, max-age=${YEAR}`,
+        ContentType: contentType,
+        Key: key,
+      });
 
-    await this.client.send(command);
+      await this.client.send(command);
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -439,6 +440,51 @@ describe('FileS3', () => {
         ContentType: undefined,
         Key: 'test-file.bin',
       });
+    });
+
+    it('should create bucket when bucket does not exist', async () => {
+      const s3 = new FileS3();
+      mockS3ClientSend
+        .mockRejectedValueOnce({
+          $metadata: { httpStatusCode: 404 },
+          name: 'NoSuchBucket',
+        })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({});
+
+      const buffer = Buffer.from('test data');
+      await s3.uploadBuffer('test-file.bin', buffer, 'application/octet-stream');
+
+      expect(CreateBucketCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        CreateBucketConfiguration: undefined,
+      });
+      expect(PutObjectCommand).toHaveBeenCalledWith({
+        ACL: 'public-read',
+        Body: buffer,
+        Bucket: 'test-bucket',
+        ContentType: 'application/octet-stream',
+        Key: 'test-file.bin',
+      });
+    });
+
+    it('should only check bucket existence once after bucket is ready', async () => {
+      const s3 = new FileS3();
+      mockS3ClientSend
+        .mockRejectedValueOnce({
+          $metadata: { httpStatusCode: 404 },
+          name: 'NoSuchBucket',
+        })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({});
+
+      const buffer = Buffer.from('test data');
+      await s3.uploadBuffer('test-file-1.bin', buffer, 'application/octet-stream');
+      await s3.uploadBuffer('test-file-2.bin', buffer, 'application/octet-stream');
+
+      expect(CreateBucketCommand).toHaveBeenCalledTimes(1);
+      expect(PutObjectCommand).toHaveBeenCalledTimes(3);
     });
   });
 

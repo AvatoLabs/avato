@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { authedProcedure, router } from '@/libs/trpc/lambda';
@@ -7,9 +8,18 @@ export const uploadRouter = router({
   createS3PreSignedUrl: authedProcedure
     .input(z.object({ pathname: z.string() }))
     .mutation(async ({ input }) => {
-      const s3 = new FileS3();
+      try {
+        const s3 = new FileS3();
 
-      return await s3.createPreSignedUrl(input.pathname);
+        return await s3.createPreSignedUrl(input.pathname);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'File storage is not configured';
+
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message,
+        });
+      }
     }),
 });
 
