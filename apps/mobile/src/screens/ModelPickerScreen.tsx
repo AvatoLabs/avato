@@ -7,9 +7,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Check, RefreshCw, WifiOff } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image as RNImage, ScrollView, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image as RNImage, SectionList, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
@@ -110,6 +109,19 @@ function groupFallbackByProvider(models: FallbackModel[]) {
     (map[m.provider] ??= []).push(m);
   }
   return Object.entries(map);
+}
+
+interface ServerModelSection {
+  data: RuntimeEnabledModel[];
+  logo?: string;
+  providerId: string;
+  title: string;
+}
+
+interface FallbackModelSection {
+  data: FallbackModel[];
+  providerId: string;
+  title: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -320,164 +332,112 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   // ── Filter ───────────────────────────────────────────────────────
   const q = searchQuery.toLowerCase();
 
-  // ── Render: Server models (provider-grouped) ─────────────────────
-  const renderServerModels = () => {
-    if (!serverModels) return null;
-    const filtered = serverModels
+  const serverSections = useMemo<ServerModelSection[]>(() => {
+    if (!serverModels) return [];
+
+    return serverModels
       .map((p) => ({
-        ...p,
-        children: p.children.filter(
+        data: p.children.filter(
           (m) =>
             !q ||
             (m.displayName || m.id).toLowerCase().includes(q) ||
             m.id.toLowerCase().includes(q) ||
             p.name.toLowerCase().includes(q),
         ),
+        logo: p.logo,
+        providerId: p.id,
+        title: p.name,
       }))
-      .filter((p) => p.children.length > 0);
+      .filter((section) => section.data.length > 0);
+  }, [q, serverModels]);
 
-    if (filtered.length === 0) {
-      return (
-        <View className="items-center py-16">
-          <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-        </View>
-      );
-    }
-
-    return filtered.map((provider, gi) => (
-      <Animated.View entering={FadeInDown.delay(gi * 50).duration(250)} key={provider.id}>
-        <View className="flex-row items-center px-5 mt-4 mb-2">
-          <ProviderLogo logo={provider.logo} providerId={provider.id} size={18} />
-          <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
-            {provider.name}
-          </Text>
-        </View>
-        <View className="mx-4 bg-foreground/5 rounded-2xl overflow-hidden">
-          {provider.children.map((model) => {
-            const tags = getAbilityTags(model);
-            return (
-              <PressableScale
-                accessibilityLabel={model.displayName || model.id}
-                accessibilityRole="button"
-                className="flex-row items-center px-4 py-3.5"
-                key={model.id}
-                onPress={() => handleSelect(model.id, provider.id)}
-              >
-                <View className="mr-3">
-                  <ProviderLogo logo={provider.logo} providerId={provider.id} size={28} />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className={`text-[15px] font-medium tracking-tight ${selected === model.id ? 'text-primary' : 'text-foreground'}`}
-                  >
-                    {model.displayName || model.id}
-                  </Text>
-                  {tags.length > 0 && (
-                    <View className="flex-row flex-wrap gap-1 mt-1">
-                      {tags.map((tag) => (
-                        <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
-                          <Text className="text-secondary/60 text-[10px] font-medium">{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-                {selected === model.id && (
-                  <Check
-                    color={semanticColors.primary}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                )}
-              </PressableScale>
-            );
-          })}
-        </View>
-      </Animated.View>
-    ));
-  };
-
-  // ── Render: Fallback static models ───────────────────────────────
-  const renderFallbackModels = () => {
-    const groups = groupFallbackByProvider(
+  const fallbackSections = useMemo<FallbackModelSection[]>(() => {
+    return groupFallbackByProvider(
       FALLBACK_MODELS.filter(
         (m) =>
           !q || m.displayName.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q),
       ),
-    );
+    ).map(([provider, models]) => ({
+      data: models,
+      providerId: provider.toLowerCase().replaceAll(/\s+/g, ''),
+      title: provider,
+    }));
+  }, [q]);
 
-    return (
-      <>
-        {/* Offline banner */}
-        <View className="mx-5 mb-3 flex-row items-center bg-foreground/5 rounded-xl px-4 py-3">
-          <WifiOff color="#999" size={14} strokeWidth={tokens.icon.strokeWidth} />
-          <Text className="ml-2 text-secondary/60 text-[12px] font-medium flex-1">
-            {t.modelPickerOffline}
-          </Text>
-          <PressableScale onPress={fetchModels}>
-            <RefreshCw
-              color={semanticColors.primary}
-              size={14}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          </PressableScale>
-        </View>
-        {groups.map(([provider, models], gi) => {
-          const pid = provider.toLowerCase().replaceAll(/\s+/g, '');
-          return (
-            <Animated.View entering={FadeInDown.delay(gi * 50).duration(250)} key={provider}>
-              <View className="flex-row items-center px-5 mt-4 mb-2">
-                <ProviderLogo providerId={pid} size={18} />
-                <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
-                  {provider}
-                </Text>
-              </View>
-              <View className="mx-4 bg-foreground/5 rounded-2xl overflow-hidden">
-                {models.map((model) => (
-                  <PressableScale
-                    accessibilityLabel={model.displayName}
-                    accessibilityRole="button"
-                    className="flex-row items-center px-4 py-3.5"
-                    key={model.id}
-                    onPress={() => handleSelect(model.id, model.providerId)}
-                  >
-                    <View className="mr-3">
-                      <ProviderLogo providerId={pid} size={28} />
-                    </View>
-                    <View className="flex-1">
-                      <Text
-                        className={`text-[15px] font-medium tracking-tight ${selected === model.id ? 'text-primary' : 'text-foreground'}`}
-                      >
-                        {model.displayName}
-                      </Text>
-                      {model.tags && model.tags.length > 0 && (
-                        <View className="flex-row flex-wrap gap-1 mt-1">
-                          {model.tags.map((tag) => (
-                            <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
-                              <Text className="text-secondary/60 text-[10px] font-medium">
-                                {tag}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                    {selected === model.id && (
-                      <Check
-                        color={semanticColors.primary}
-                        size={20}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
-                    )}
-                  </PressableScale>
+  const renderServerItem = useCallback(
+    ({ item, section }: { item: RuntimeEnabledModel; section: ServerModelSection }) => {
+      const tags = getAbilityTags(item);
+      return (
+        <PressableScale
+          accessibilityLabel={item.displayName || item.id}
+          accessibilityRole="button"
+          className="mx-4 mb-px bg-foreground/5 flex-row items-center px-4 py-3.5"
+          style={{ borderRadius: 16 }}
+          onPress={() => handleSelect(item.id, section.providerId)}
+        >
+          <View className="mr-3">
+            <ProviderLogo logo={section.logo} providerId={section.providerId} size={28} />
+          </View>
+          <View className="flex-1">
+            <Text
+              className={`text-[15px] font-medium tracking-tight ${selected === item.id ? 'text-primary' : 'text-foreground'}`}
+            >
+              {item.displayName || item.id}
+            </Text>
+            {tags.length > 0 && (
+              <View className="flex-row flex-wrap gap-1 mt-1">
+                {tags.map((tag) => (
+                  <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
+                    <Text className="text-secondary/60 text-[10px] font-medium">{tag}</Text>
+                  </View>
                 ))}
               </View>
-            </Animated.View>
-          );
-        })}
-      </>
-    );
-  };
+            )}
+          </View>
+          {selected === item.id && (
+            <Check color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          )}
+        </PressableScale>
+      );
+    },
+    [handleSelect, selected],
+  );
+
+  const renderFallbackItem = useCallback(
+    ({ item, section }: { item: FallbackModel; section: FallbackModelSection }) => (
+      <PressableScale
+        accessibilityLabel={item.displayName}
+        accessibilityRole="button"
+        className="mx-4 mb-px bg-foreground/5 flex-row items-center px-4 py-3.5"
+        style={{ borderRadius: 16 }}
+        onPress={() => handleSelect(item.id, item.providerId)}
+      >
+        <View className="mr-3">
+          <ProviderLogo providerId={section.providerId} size={28} />
+        </View>
+        <View className="flex-1">
+          <Text
+            className={`text-[15px] font-medium tracking-tight ${selected === item.id ? 'text-primary' : 'text-foreground'}`}
+          >
+            {item.displayName}
+          </Text>
+          {item.tags && item.tags.length > 0 && (
+            <View className="flex-row flex-wrap gap-1 mt-1">
+              {item.tags.map((tag) => (
+                <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
+                  <Text className="text-secondary/60 text-[10px] font-medium">{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+        {selected === item.id && (
+          <Check color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        )}
+      </PressableScale>
+    ),
+    [handleSelect, selected],
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -501,10 +461,71 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           <ActivityIndicator color={semanticColors.primary} size="large" />
           <Text className="text-secondary/50 text-[13px] mt-3 font-medium">{t.loading}</Text>
         </View>
+      ) : serverModels ? (
+        <SectionList
+          className="flex-1"
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderServerItem}
+          sections={serverSections}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          windowSize={8}
+          ListEmptyComponent={
+            <View className="items-center py-16">
+              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
+            </View>
+          }
+          renderSectionHeader={({ section }) => (
+            <View className="flex-row items-center px-5 mt-4 mb-2">
+              <ProviderLogo logo={section.logo} providerId={section.providerId} size={18} />
+              <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+                {section.title}
+              </Text>
+            </View>
+          )}
+        />
       ) : (
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}>
-          {serverModels ? renderServerModels() : renderFallbackModels()}
-        </ScrollView>
+        <SectionList
+          className="flex-1"
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderFallbackItem}
+          sections={fallbackSections}
+          showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
+          windowSize={8}
+          ListEmptyComponent={
+            <View className="items-center py-16">
+              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
+            </View>
+          }
+          ListHeaderComponent={
+            <View className="mx-5 mb-3 flex-row items-center bg-foreground/5 rounded-xl px-4 py-3">
+              <WifiOff color="#999" size={14} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-2 text-secondary/60 text-[12px] font-medium flex-1">
+                {t.modelPickerOffline}
+              </Text>
+              <PressableScale onPress={fetchModels}>
+                <RefreshCw
+                  color={semanticColors.primary}
+                  size={14}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </PressableScale>
+            </View>
+          }
+          renderSectionHeader={({ section }) => (
+            <View className="flex-row items-center px-5 mt-4 mb-2">
+              <ProviderLogo providerId={section.providerId} size={18} />
+              <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+                {section.title}
+              </Text>
+            </View>
+          )}
+        />
       )}
     </View>
   );

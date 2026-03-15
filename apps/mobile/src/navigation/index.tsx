@@ -5,8 +5,17 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FolderOpen, MessageSquare, Palette, Puzzle } from 'lucide-react-native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image as RNImage, Platform, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -46,22 +55,66 @@ import { tokens } from '../theme/tokens';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-function MeTabIcon({ color, focused, size }: { color: string; focused: boolean; size: number }) {
+function MeTabIcon({
+  color,
+  focused,
+  size,
+  trigger,
+}: {
+  color: string;
+  focused: boolean;
+  size: number;
+  trigger: number;
+}) {
   const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
+  const rotation = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (trigger === 0) return;
+
+    rotation.value = 0;
+    scale.value = 1;
+
+    rotation.value = withTiming(360, {
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+    });
+    scale.value = withDelay(
+      700,
+      withSequence(
+        withTiming(1.12, {
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+        }),
+        withSpring(1, {
+          damping: 10,
+          stiffness: 220,
+        }),
+      ),
+    );
+  }, [rotation, scale, trigger]);
+
+  useEffect(() => {
+    if (!focused) {
+      rotation.value = 0;
+      scale.value = 1;
+    }
+  }, [focused, rotation, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }, { scale: scale.value }],
+  }));
+
   return (
-    <View
-      style={{
-        borderColor: focused ? '#007aff' : 'transparent',
-        borderRadius: 10,
-        borderWidth: focused ? 1.5 : 0,
-        padding: focused ? 1 : 0,
-      }}
-    >
-      <RNImage
-        resizeMode="contain"
-        source={require('../../assets/avato-logo.png')}
-        style={{ height: logoSize, width: logoSize }}
-      />
+    <View>
+      <Animated.View style={animatedStyle}>
+        <RNImage
+          resizeMode="contain"
+          source={require('../../assets/avato-logo.png')}
+          style={{ height: logoSize, width: logoSize }}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -69,6 +122,7 @@ function MeTabIcon({ color, focused, size }: { color: string; focused: boolean; 
 function BottomTabs() {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const [meIconTrigger, setMeIconTrigger] = useState(0);
 
   return (
     <Tab.Navigator
@@ -145,9 +199,14 @@ function BottomTabs() {
       <Tab.Screen
         component={ProfileScreen}
         name="Me"
+        listeners={{
+          tabPress: () => {
+            setMeIconTrigger((value) => value + 1);
+          },
+        }}
         options={{
           tabBarIcon: ({ color, focused, size }) => (
-            <MeTabIcon color={color} focused={focused} size={size} />
+            <MeTabIcon color={color} focused={focused} size={size} trigger={meIconTrigger} />
           ),
           tabBarLabel: 'Me',
           tabBarAccessibilityLabel: 'Me tab',

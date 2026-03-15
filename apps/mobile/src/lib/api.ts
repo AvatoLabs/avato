@@ -19,11 +19,12 @@ import type {
   AiProviderRuntimeState,
   ChatMessage,
   ChatSession,
-  DiscoverModel,
-  FileListItem,
-  GenerationBatch,
-  GenerationTopic,
-  HeatmapDay,
+    DiscoverModel,
+    FileListItem,
+    GenerationBatch,
+    GenerationTopic,
+    HeatmapDay,
+    ImageGenerationParams,
   InstalledPlugin,
   MarketAgent,
   MemoryActivityItem,
@@ -620,29 +621,23 @@ export const fileApi = {
     const { date, dirname, filename, pathname } = generateUploadPathname(name);
 
     const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', { pathname });
-
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
+    const uploadResult = await FileSystem.uploadAsync(preSignUrl, uri, {
+      headers: { 'Content-Type': type },
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
     });
-    const binary = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    if (uploadResult.status < 200 || uploadResult.status >= 300) {
+      throw new Error(`S3 upload failed: ${uploadResult.status} ${uploadResult.body}`);
+    }
 
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', preSignUrl);
-      xhr.setRequestHeader('Content-Type', type);
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve();
-        else reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.responseText}`));
-      };
-      xhr.onerror = () => reject(new Error(`S3 upload XHR error: ${xhr.statusText}`));
-      xhr.send(binary.buffer);
-    });
+    const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+    const fileSize = fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0;
 
     const result = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType: type,
       metadata: { date, dirname, filename, path: pathname },
       name,
-      size: binary.length,
+      size: fileSize,
       url: pathname,
     });
 
@@ -673,10 +668,9 @@ export const userApi = {
    * Server-side updateAvatar detects `data:image` prefix and handles S3 upload.
    */
   uploadAvatar: async (uri: string, mimeType = 'image/jpeg'): Promise<string> => {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const dataUri = `data:${mimeType};base64,${base64}`;
+    const avatarName = `avatar.${mimeType.split('/')[1] || 'jpg'}`;
+    const uploaded = await fileApi.upload(uri, avatarName, mimeType);
+    const dataUri = uploaded.url;
     await trpcMutate('user.updateAvatar', dataUri);
     return dataUri;
   },
@@ -1074,15 +1068,7 @@ export const artworkApi = {
     generationTopicId: string;
     imageNum: number;
     model: string;
-    params: {
-      cfg?: number;
-      height?: number;
-      imageUrls?: string[];
-      prompt: string;
-      seed?: number;
-      steps?: number;
-      width?: number;
-    };
+    params: ImageGenerationParams;
     provider: string;
   }) => trpcMutate<{ data: { batch: GenerationBatch; generations: any[] }; success: boolean }>(
     'image.createImage', params,

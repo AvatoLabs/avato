@@ -259,12 +259,57 @@ export interface RuntimeModelAbilities {
   vision?: boolean;
 }
 
+export interface ImageParamSchemaItem {
+  default?: unknown;
+  description?: string;
+  enum?: Array<number | string>;
+  max?: number;
+  maxCount?: number;
+  maxFileSize?: number;
+  min?: number;
+  step?: number;
+  type?: string | string[];
+}
+
+export interface ImageModelParamsSchema {
+  [key: string]: ImageParamSchemaItem | undefined;
+  aspectRatio?: ImageParamSchemaItem;
+  cfg?: ImageParamSchemaItem;
+  height?: ImageParamSchemaItem;
+  imageUrl?: ImageParamSchemaItem;
+  imageUrls?: ImageParamSchemaItem;
+  prompt?: ImageParamSchemaItem;
+  quality?: ImageParamSchemaItem;
+  resolution?: ImageParamSchemaItem;
+  seed?: ImageParamSchemaItem;
+  size?: ImageParamSchemaItem;
+  steps?: ImageParamSchemaItem;
+  width?: ImageParamSchemaItem;
+}
+
+export interface ImageGenerationParams {
+  [key: string]: unknown;
+  aspectRatio?: string;
+  cfg?: number;
+  height?: number;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  prompt?: string;
+  quality?: string;
+  resolution?: string;
+  seed?: number | null;
+  size?: string;
+  steps?: number;
+  width?: number;
+}
+
 export interface RuntimeEnabledModel {
   abilities: RuntimeModelAbilities;
   contextWindowTokens?: number;
   displayName?: string;
   enabled?: boolean;
   id: string;
+  parameters?: ImageModelParamsSchema;
   providerId: string;
   releasedAt?: string;
   type: string;
@@ -281,6 +326,9 @@ export interface AiProviderRuntimeState {
   enabledAiModels: RuntimeEnabledModel[];
   enabledAiProviders: RuntimeEnabledProvider[];
   enabledChatAiProviders: RuntimeEnabledProvider[];
+  enabledImageAiProviders: RuntimeEnabledProvider[];
+  enabledVideoAiProviders: RuntimeEnabledProvider[];
+  runtimeConfig: Record<string, unknown>;
 }
 
 /** Provider + its chat models, built client-side from runtime state */
@@ -616,7 +664,7 @@ export interface GenerationTopic {
 export interface ImageModelItem {
   displayName?: string;
   id: string;
-  parameters?: Record<string, any>;
+  parameters?: ImageModelParamsSchema;
   pricing?: Record<string, any>;
   resolutions?: string[];
   type: string;

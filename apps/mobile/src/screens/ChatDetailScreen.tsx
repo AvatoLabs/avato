@@ -21,7 +21,6 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   FlatList,
@@ -49,6 +48,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AttachmentSheet from '../components/ui/AttachmentSheet';
 import FilePreview from '../components/ui/FilePreview';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble from '../components/ui/MessageBubble';
@@ -98,9 +98,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
   const [memorySheetVisible, setMemorySheetVisible] = useState(false);
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const isScrolledToBottom = useRef(true);
+  const lastAutoScrollAt = useRef(0);
 
   // Skills drawer
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
@@ -234,6 +236,19 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     transform: [{ scale: sendScale.value }],
   }));
 
+  const autoScrollToEnd = useCallback(() => {
+    if (!isScrolledToBottom.current && !generating) return;
+
+    const now = Date.now();
+    const minInterval = generating ? 120 : 0;
+    if (now - lastAutoScrollAt.current < minInterval) return;
+
+    lastAutoScrollAt.current = now;
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd({ animated: !generating });
+    });
+  }, [generating]);
+
   const handleStop = useCallback(() => {
     haptics.light();
     stopGenerating();
@@ -266,8 +281,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     sendScale,
   ]);
 
-  const handleAttach = useCallback(() => {
-    const pickImage = async (source: 'camera' | 'gallery') => {
+  const pickImage = useCallback(
+    async (source: 'camera' | 'gallery') => {
       try {
         if (source === 'camera') {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -299,68 +314,39 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           toast.show('success', t.toastFilePicked);
         }
       } catch {
-        // user cancelled permission/system prompt, ignore to avoid unhandled rejection
+        /* ignore */
       }
-    };
+    },
+    [addFile, t, toast],
+  );
 
-    const pickDocument = async () => {
-      try {
-        const result = await DocumentPicker.getDocumentAsync({
-          multiple: true,
-          copyToCacheDirectory: true,
-        });
-        if (!result.canceled) {
-          for (const asset of result.assets) {
-            addFile({
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name: asset.name,
-              type: asset.mimeType || 'application/octet-stream',
-              size: asset.size || 0,
-              uri: asset.uri,
-            });
-          }
-          toast.show('success', t.toastFilePicked);
+  const pickDocument = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            size: asset.size || 0,
+            uri: asset.uri,
+          });
         }
-      } catch {
-        // ignore
+        toast.show('success', t.toastFilePicked);
       }
-    };
-
-    haptics.selection();
-    if (Platform.OS === 'ios') {
-      // Build options based on model vision capability
-      const options = modelSupportsVision
-        ? [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument]
-        : [t.cancel, t.fileDocument];
-
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: 0, title: t.fileAttach },
-        (index) => {
-          if (modelSupportsVision) {
-            if (index === 1) void pickImage('camera');
-            else if (index === 2) void pickImage('gallery');
-            else if (index === 3) void pickDocument();
-          } else {
-            if (index === 1) void pickDocument();
-          }
-        },
-      );
-    } else {
-      if (modelSupportsVision) {
-        Alert.alert(t.fileAttach, undefined, [
-          { text: t.fileCamera, onPress: () => void pickImage('camera') },
-          { text: t.fileGallery, onPress: () => void pickImage('gallery') },
-          { text: t.fileDocument, onPress: () => void pickDocument() },
-          { text: t.cancel, style: 'cancel' },
-        ]);
-      } else {
-        Alert.alert(t.fileAttach, undefined, [
-          { text: t.fileDocument, onPress: () => void pickDocument() },
-          { text: t.cancel, style: 'cancel' },
-        ]);
-      }
+    } catch {
+      /* ignore */
     }
-  }, [addFile, t, toast, modelSupportsVision]);
+  }, [addFile, t, toast]);
+
+  const handleAttach = useCallback(() => {
+    haptics.selection();
+    setAttachmentSheetVisible(true);
+  }, []);
 
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {
@@ -596,16 +582,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             paddingBottom: 12,
             paddingTop: 12,
           }}
-          onContentSizeChange={() => {
-            if (isScrolledToBottom.current || generating) {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }
-          }}
-          onLayout={() => {
-            if (isScrolledToBottom.current || generating) {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }
-          }}
+          onContentSizeChange={autoScrollToEnd}
+          onLayout={autoScrollToEnd}
           onScroll={(e) => {
             const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
             isScrolledToBottom.current =
@@ -805,6 +783,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         visible={modelDrawerVisible}
         onClose={() => setModelDrawerVisible(false)}
         onSelect={() => setProviderLogoError(false)}
+      />
+      <AttachmentSheet
+        visible={attachmentSheetVisible}
+        onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
+        onClose={() => setAttachmentSheetVisible(false)}
+        onDocument={() => void pickDocument()}
+        onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
       />
       <MemoryToolSheet
         effort={memoryEffort}

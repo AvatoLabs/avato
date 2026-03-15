@@ -25,12 +25,10 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   Text,
   TextInput,
@@ -39,6 +37,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { fileApi, getApiUrl } from '../lib/api';
@@ -183,6 +182,7 @@ export default function ResourceScreen() {
   const [searchText, setSearchText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [apiBase, setApiBase] = useState('');
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const searchRef = useRef<TextInput>(null);
 
   // ── Data ─────────────────────────────────────────────────────────
@@ -265,25 +265,8 @@ export default function ResourceScreen() {
 
   const handleUpload = useCallback(() => {
     haptics.light();
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [t.cancel, t.resourceUploadPhoto, t.resourceUploadFile],
-          cancelButtonIndex: 0,
-        },
-        (idx) => {
-          if (idx === 1) handlePickPhoto();
-          else if (idx === 2) handlePickFile();
-        },
-      );
-    } else {
-      Alert.alert(t.resourceUpload, undefined, [
-        { text: t.resourceUploadPhoto, onPress: handlePickPhoto },
-        { text: t.resourceUploadFile, onPress: handlePickFile },
-        { text: t.cancel, style: 'cancel' },
-      ]);
-    }
-  }, [t, handlePickPhoto, handlePickFile]);
+    setAttachmentSheetVisible(true);
+  }, []);
 
   // ── Delete ────────────────────────────────────────────────────────
 
@@ -463,6 +446,13 @@ export default function ResourceScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <AttachmentSheet
+        visible={attachmentSheetVisible}
+        onClose={() => setAttachmentSheetVisible(false)}
+        onDocument={() => void handlePickFile()}
+        onGallery={() => void handlePickPhoto()}
+      />
     </View>
   );
 }

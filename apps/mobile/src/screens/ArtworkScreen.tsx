@@ -13,11 +13,9 @@ import {
   ChevronDown,
   Copy,
   Image as ImageIcon,
-  Lock,
   SlidersHorizontal,
   Sparkles,
   Trash2,
-  Unlock,
   X,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,57 +48,82 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
 import { tokens } from '../theme/tokens';
-import type { GenerationBatch, GenerationItem, ImageProviderWithModels } from '../types';
+import type {
+  GenerationBatch,
+  GenerationItem,
+  ImageGenerationParams,
+  ImageModelItem,
+  ImageModelParamsSchema,
+  ImageParamSchemaItem,
+  ImageProviderWithModels,
+} from '../types';
 
 // ── Constants ────────────────────────────────────────────────────────
-const ASPECT_RATIOS = [
-  'auto',
-  '1:1',
-  '2:3',
-  '3:2',
-  '3:4',
-  '4:3',
-  '4:5',
-  '5:4',
-  '9:16',
-  '16:9',
-  '21:9',
-  '1:4',
-  '4:1',
-  '1:8',
-  '8:1',
-];
-
-const RESOLUTIONS = [
-  { label: '0.5K', w: 512, h: 512 },
-  { label: '1K', w: 1024, h: 1024 },
-  { label: '2K', w: 2048, h: 2048 },
-  { label: '4K', w: 4096, h: 4096 },
-];
-
 const IMAGE_COUNTS = [1, 2, 4, 8];
 const STORAGE_KEY = 'avato_artwork_config';
+const EDITABLE_NUMERIC_PARAM_KEYS = ['width', 'height', 'steps', 'cfg', 'seed'] as const;
+const PRESET_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);
   return { rw: a || 1, rh: b || 1 };
 }
 
-function computeDims(base: { w: number; h: number }, ratio: string) {
-  if (ratio === 'auto') return { width: base.w, height: base.h };
-  const { rw, rh } = parseRatio(ratio);
-  const area = base.w * base.h;
-  const w = Math.round(Math.sqrt(area * (rw / rh)));
-  const h = Math.round(w * (rh / rw));
-  return { width: w, height: h };
+function getParamDefinition(
+  schema: ImageModelParamsSchema | undefined,
+  key: keyof ImageGenerationParams,
+) {
+  return schema?.[key as string];
 }
 
-function getRatioIcon(r: string) {
-  if (r === 'auto') return '⊡';
-  const { rw, rh } = parseRatio(r);
-  if (rw === rh) return '□';
-  if (rw > rh) return '▬';
-  return '▮';
+function getParamEnumOptions(
+  schema: ImageModelParamsSchema | undefined,
+  key: keyof ImageGenerationParams,
+): string[] {
+  const item = getParamDefinition(schema, key);
+  return Array.isArray(item?.enum) ? item.enum.map(String) : [];
+}
+
+function getDefaultParams(schema?: ImageModelParamsSchema): ImageGenerationParams {
+  if (!schema) return { prompt: '' };
+  return Object.fromEntries(
+    Object.entries(schema).map(([key, value]) => [key, value?.default]),
+  ) as ImageGenerationParams;
+}
+
+function clampNumericValue(value: number, item?: ImageParamSchemaItem) {
+  if (typeof item?.min === 'number' && value < item.min) return item.min;
+  if (typeof item?.max === 'number' && value > item.max) return item.max;
+  return value;
+}
+
+function formatParamLabel(key: string) {
+  const labels: Record<string, string> = {
+    aspectRatio: 'Aspect Ratio',
+    cfg: 'CFG',
+    imageUrl: 'Reference Image',
+    imageUrls: 'Reference Images',
+    quality: 'Quality',
+    resolution: 'Resolution',
+    seed: 'Seed',
+    size: 'Size',
+    steps: 'Steps',
+    width: 'Width',
+    height: 'Height',
+  };
+
+  return (
+    labels[key] || key.replaceAll(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
+  );
+}
+
+function sanitizeParams(params: ImageGenerationParams) {
+  return Object.fromEntries(
+    Object.entries(params).filter(
+      ([, value]) =>
+        value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0),
+    ),
+  ) as ImageGenerationParams;
 }
 
 // Proper aspect ratio preview matching web version
@@ -202,11 +225,11 @@ export default function ArtworkScreen({ navigation }: any) {
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
   const [modelName, setModelName] = useState('');
-  const [resIdx, setResIdx] = useState(1);
-  const [ratio, setRatio] = useState('auto');
-  const [locked, setLocked] = useState(false);
+  const [paramsSchema, setParamsSchema] = useState<ImageModelParamsSchema>();
+  const [generationParams, setGenerationParams] = useState<ImageGenerationParams>({ prompt: '' });
   const [imgCount, setImgCount] = useState(2);
   const [customCountVisible, setCustomCountVisible] = useState(false);
+  const [editingParamKey, setEditingParamKey] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [refImages, setRefImages] = useState<{ uri: string; url?: string }[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -219,63 +242,105 @@ export default function ArtworkScreen({ navigation }: any) {
   const [baseUrl, setBaseUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const applyModelSelection = useCallback(
+    (
+      modelItem: ImageModelItem,
+      providerId: string,
+      providerName?: string,
+      overrides?: ImageGenerationParams,
+    ) => {
+      const schema = modelItem.parameters;
+      const nextParams = sanitizeParams({
+        ...getDefaultParams(schema),
+        ...overrides,
+      });
+
+      setProvider(providerId);
+      setModel(modelItem.id);
+      setModelName(modelItem.displayName || modelItem.id);
+      setParamsSchema(schema);
+      setGenerationParams(nextParams);
+
+      if (providerName) {
+        void providerName;
+      }
+    },
+    [],
+  );
+
   // ── Load image models ──
-  const loadModels = useCallback(async () => {
-    if (!isConnected) return;
-    try {
-      const state = await aiProviderApi.getRuntimeState();
-      const enabledModels = state?.enabledAiModels ?? [];
-      const enabledProviders = state?.enabledAiProviders ?? [];
+  const loadModels = useCallback(
+    async (restoredConfig?: {
+      generationParams?: ImageGenerationParams;
+      model?: string;
+      provider?: string;
+    }) => {
+      if (!isConnected) return;
+      try {
+        const state = await aiProviderApi.getRuntimeState();
+        const enabledModels = state?.enabledAiModels ?? [];
+        const enabledProviders = state?.enabledAiProviders ?? [];
 
-      // Filter image models and group by provider
-      const imgModels = enabledModels.filter((m: any) => m.type === 'image');
-      const providerMap = new Map<string, ImageProviderWithModels>();
+        // Filter image models and group by provider
+        const imgModels = enabledModels.filter((m: any) => m.type === 'image');
+        const providerMap = new Map<string, ImageProviderWithModels>();
 
-      for (const m of imgModels) {
-        const pid = m.providerId;
-        if (!providerMap.has(pid)) {
-          const pInfo = enabledProviders.find((p: any) => p.id === pid);
-          providerMap.set(pid, {
-            id: pid,
-            name: pInfo?.name || pid,
-            logo: pInfo?.logo,
-            children: [],
+        for (const m of imgModels) {
+          const pid = m.providerId;
+          if (!providerMap.has(pid)) {
+            const pInfo = enabledProviders.find((p: any) => p.id === pid);
+            providerMap.set(pid, {
+              id: pid,
+              name: pInfo?.name || pid,
+              logo: pInfo?.logo,
+              children: [],
+            });
+          }
+          providerMap.get(pid)!.children.push({
+            id: m.id,
+            displayName: m.displayName || m.id,
+            parameters: m.parameters,
+            type: 'image',
           });
         }
-        providerMap.get(pid)!.children.push({
-          id: m.id,
-          displayName: m.displayName || m.id,
-          type: 'image',
-        });
-      }
 
-      const imgProviders = Array.from(providerMap.values());
-      setImageProviders(imgProviders);
+        const imgProviders = Array.from(providerMap.values());
+        setImageProviders(imgProviders);
 
-      // Auto-select first model if none selected
-      if (!model && imgProviders.length > 0 && imgProviders[0].children.length > 0) {
-        const firstP = imgProviders[0];
-        const firstM = firstP.children[0];
-        setProvider(firstP.id);
-        setModel(firstM.id);
-        setModelName(firstM.displayName || firstM.id);
+        const preferredProvider = restoredConfig?.provider || provider;
+        const preferredModel = restoredConfig?.model || model;
+        const matchedProvider =
+          imgProviders.find((item) => item.id === preferredProvider) || imgProviders[0];
+        const matchedModel =
+          matchedProvider?.children.find((item) => item.id === preferredModel) ||
+          matchedProvider?.children[0];
+
+        if (matchedProvider && matchedModel) {
+          applyModelSelection(
+            matchedModel,
+            matchedProvider.id,
+            matchedProvider.name,
+            restoredConfig?.generationParams || generationParams,
+          );
+        }
+      } catch {
+        /* silent */
       }
-    } catch {
-      /* silent */
-    }
-  }, [isConnected, model]);
+    },
+    [applyModelSelection, generationParams, isConnected, model, provider],
+  );
 
   // ── Persist/restore config ──
   const saveConfig = useCallback(async () => {
     try {
       await AsyncStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ provider, model, modelName, resIdx, ratio, locked, imgCount }),
+        JSON.stringify({ provider, model, modelName, imgCount, generationParams }),
       );
     } catch {
       /* */
     }
-  }, [provider, model, modelName, resIdx, ratio, locked, imgCount]);
+  }, [generationParams, imgCount, model, modelName, provider]);
 
   const restoreConfig = useCallback(async () => {
     try {
@@ -285,21 +350,29 @@ export default function ArtworkScreen({ navigation }: any) {
         if (c.provider) setProvider(c.provider);
         if (c.model) setModel(c.model);
         if (c.modelName) setModelName(c.modelName);
-        if (c.resIdx !== undefined) setResIdx(c.resIdx);
-        if (c.ratio) setRatio(c.ratio);
-        if (c.locked !== undefined) setLocked(c.locked);
         if (c.imgCount) setImgCount(c.imgCount);
+        if (c.generationParams && typeof c.generationParams === 'object') {
+          setGenerationParams(c.generationParams);
+        }
+        return c as {
+          generationParams?: ImageGenerationParams;
+          imgCount?: number;
+          model?: string;
+          modelName?: string;
+          provider?: string;
+        };
       }
     } catch {
       /* */
     }
+    return undefined;
   }, []);
 
   // ── Init ──
   useFocusEffect(
     useCallback(() => {
       getApiUrl().then(setBaseUrl);
-      restoreConfig().then(() => loadModels());
+      restoreConfig().then((restoredConfig) => loadModels(restoredConfig));
     }, [restoreConfig, loadModels]),
   );
 
@@ -316,54 +389,63 @@ export default function ArtworkScreen({ navigation }: any) {
 
   // ── Pick reference images ──
   const handlePickRef = useCallback(async () => {
+    const allowMultiple = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
+    const maxCount = getParamDefinition(paramsSchema, 'imageUrls')?.maxCount;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images',
       quality: 0.8,
-      allowsMultipleSelection: true,
+      allowsMultipleSelection: allowMultiple,
     });
     if (!result.canceled) {
       const newImgs = result.assets.map((a) => ({ uri: a.uri }));
-      setRefImages((prev) => [...prev, ...newImgs]);
+      setRefImages((prev) => {
+        if (!allowMultiple) return newImgs.slice(0, 1);
+        const merged = [...prev, ...newImgs];
+        return typeof maxCount === 'number' ? merged.slice(0, maxCount) : merged;
+      });
       toast.show('success', t.toastFilePicked);
     }
-  }, [t, toast]);
+  }, [paramsSchema, t, toast]);
 
   // ── Load batches for topic ──
   const loadBatches = useCallback(async (tid: string) => {
     try {
       const data = await artworkApi.getBatches(tid);
       if (data) setBatches(data);
+      return data;
     } catch {
       /* */
     }
+    return undefined;
   }, []);
 
   // ── Poll generation status ──
   const startPolling = useCallback(
     (tid: string, batchGenerations: GenerationItem[]) => {
       if (pollRef.current) clearInterval(pollRef.current);
-      const pending = batchGenerations.filter(
-        (g) => g.asyncTaskId && g.task.status !== 'Success' && g.task.status !== 'Error',
+      const pendingGenerationIds = new Set(
+        batchGenerations
+          .filter((g) => g.asyncTaskId && g.task.status !== 'Success' && g.task.status !== 'Error')
+          .map((g) => g.id),
       );
-      if (pending.length === 0) return;
+      if (pendingGenerationIds.size === 0) return;
 
       let count = 0;
       pollRef.current = setInterval(
         async () => {
           count++;
           try {
-            let allDone = true;
-            for (const g of pending) {
-              if (!g.asyncTaskId) continue;
-              const result = await artworkApi.getGenerationStatus(g.id, g.asyncTaskId);
-              if (result?.status === 'Success' || result?.status === 'Error') {
-                // done
-              } else {
-                allDone = false;
-              }
-            }
-            // Refresh batches
-            await loadBatches(tid);
+            const latestBatches = await loadBatches(tid);
+            const latestPending = (latestBatches || [])
+              .flatMap((batch) => batch.generations)
+              .filter(
+                (generation) =>
+                  pendingGenerationIds.has(generation.id) &&
+                  generation.task.status !== 'Success' &&
+                  generation.task.status !== 'Error',
+              );
+
+            const allDone = latestPending.length === 0;
             if (allDone || count > 60) {
               if (pollRef.current) clearInterval(pollRef.current);
               pollRef.current = null;
@@ -389,7 +471,11 @@ export default function ArtworkScreen({ navigation }: any) {
       // Upload reference images if any
       const uploadedUrls: string[] = [];
       let failedUploadCount = 0;
-      for (const img of refImages) {
+      const supportsImageUrl = Boolean(getParamDefinition(paramsSchema, 'imageUrl'));
+      const supportsImageUrls = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
+      const imagesToUpload = supportsImageUrls ? refImages : refImages.slice(0, 1);
+
+      for (const img of imagesToUpload) {
         if (img.url) {
           uploadedUrls.push(img.url);
         } else {
@@ -422,9 +508,12 @@ export default function ArtworkScreen({ navigation }: any) {
       }
       if (!tid) throw new Error('Failed to create topic');
 
-      // Compute dimensions
-      const base = RESOLUTIONS[resIdx];
-      const { width, height } = computeDims(base, ratio);
+      const nextParams = sanitizeParams({
+        ...generationParams,
+        prompt: prompt.trim(),
+        ...(supportsImageUrls && uploadedUrls.length > 0 ? { imageUrls: uploadedUrls } : {}),
+        ...(supportsImageUrl && uploadedUrls.length > 0 ? { imageUrl: uploadedUrls[0] } : {}),
+      });
 
       // Create image
       const result = await artworkApi.createImage({
@@ -432,12 +521,7 @@ export default function ArtworkScreen({ navigation }: any) {
         imageNum: imgCount,
         model,
         provider,
-        params: {
-          prompt: prompt.trim(),
-          width,
-          height,
-          ...(uploadedUrls.length > 0 ? { imageUrls: uploadedUrls } : {}),
-        },
+        params: nextParams,
       });
 
       if (result?.data?.generations) {
@@ -453,14 +537,14 @@ export default function ArtworkScreen({ navigation }: any) {
       setGenerating(false);
     }
   }, [
+    generationParams,
+    paramsSchema,
     prompt,
     model,
     provider,
     generating,
     refImages,
     topicId,
-    resIdx,
-    ratio,
     imgCount,
     loadBatches,
     startPolling,
@@ -487,9 +571,40 @@ export default function ArtworkScreen({ navigation }: any) {
   const ratioCellW = Math.floor(
     (sidebarWidth - sidebarPad * 2 - ratioCellGap * (ratioColCount - 1)) / ratioColCount,
   );
+  const currentModel = imageProviders
+    .find((item) => item.id === provider)
+    ?.children.find((item) => item.id === model);
   const allModels = imageProviders.flatMap((p) =>
     p.children.map((m) => ({ ...m, providerId: p.id, providerName: p.name })),
   );
+  const resolutionOptions = getParamEnumOptions(paramsSchema, 'resolution');
+  const sizeOptions = getParamEnumOptions(paramsSchema, 'size');
+  const qualityOptions = getParamEnumOptions(paramsSchema, 'quality');
+  const aspectRatioOptions = getParamEnumOptions(paramsSchema, 'aspectRatio');
+  const supportsImageUrl = Boolean(getParamDefinition(paramsSchema, 'imageUrl'));
+  const supportsImageUrls = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
+  const referenceEnabled = supportsImageUrl || supportsImageUrls;
+  const effectiveAspectRatioOptions =
+    aspectRatioOptions.length > 0
+      ? aspectRatioOptions
+      : getParamDefinition(paramsSchema, 'width') && getParamDefinition(paramsSchema, 'height')
+        ? PRESET_ASPECT_RATIOS
+        : [];
+  const summaryParts = [
+    generationParams.resolution ? String(generationParams.resolution) : undefined,
+    generationParams.size ? String(generationParams.size) : undefined,
+    generationParams.quality ? String(generationParams.quality) : undefined,
+    generationParams.aspectRatio ? String(generationParams.aspectRatio) : undefined,
+    typeof generationParams.width === 'number' && typeof generationParams.height === 'number'
+      ? `${generationParams.width}×${generationParams.height}`
+      : undefined,
+    `×${imgCount}`,
+  ].filter(Boolean);
+  const numericEditorTitle = editingParamKey ? formatParamLabel(editingParamKey) : '';
+  const numericEditorDefaultValue =
+    editingParamKey && generationParams[editingParamKey] !== undefined
+      ? String(generationParams[editingParamKey])
+      : '';
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
@@ -515,7 +630,7 @@ export default function ArtworkScreen({ navigation }: any) {
               {modelName || t.artworkSelectModel}
             </Text>
             <Text className="text-[11px] text-gray-400 dark:text-gray-500">
-              {RESOLUTIONS[resIdx].label} · {ratio} · ×{imgCount}
+              {summaryParts.join(' · ')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -569,6 +684,26 @@ export default function ArtworkScreen({ navigation }: any) {
                     },
                   },
                 ]);
+              }}
+              onReuseSettings={() => {
+                const nextProvider = imageProviders.find((item) => item.id === batch.provider);
+                const nextModel = nextProvider?.children.find((item) => item.id === batch.model);
+                if (!nextProvider || !nextModel) return;
+
+                const { seed, ...configWithoutSeed } = (batch.config ||
+                  {}) as ImageGenerationParams;
+                void seed;
+
+                applyModelSelection(
+                  nextModel,
+                  nextProvider.id,
+                  nextProvider.name,
+                  configWithoutSeed,
+                );
+                setPrompt(batch.prompt);
+                setRefImages([]);
+                setImgCount(batch.generations.length);
+                setShowSidebar(true);
               }}
             />
           ))
@@ -743,9 +878,7 @@ export default function ArtworkScreen({ navigation }: any) {
                           }}
                           onPress={() => {
                             haptics.selection();
-                            setProvider(m.providerId);
-                            setModel(m.id);
-                            setModelName(m.displayName || m.id);
+                            applyModelSelection(m, m.providerId, m.providerName);
                             setShowPicker(false);
                           }}
                         >
@@ -772,143 +905,250 @@ export default function ArtworkScreen({ navigation }: any) {
                 </Animated.View>
               )}
 
-              {/* Reference Images */}
-              <SidebarLabel text={t.artworkReferenceImages} />
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 20,
-                }}
-                onPress={handlePickRef}
-              >
-                {refImages.length > 0 ? (
-                  <ScrollView
-                    horizontal
-                    contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
-                    showsHorizontalScrollIndicator={false}
-                  >
-                    {refImages.map((img, i) => (
-                      <View key={i} style={{ position: 'relative' }}>
-                        <RNImage
-                          source={{ uri: img.uri }}
-                          style={{ width: 64, height: 64, borderRadius: 10 }}
-                        />
-                        <TouchableOpacity
-                          style={{
-                            position: 'absolute',
-                            top: -5,
-                            right: -5,
-                            backgroundColor: '#e0e0e0',
-                            borderRadius: 10,
-                            padding: 2,
-                          }}
-                          onPress={() => setRefImages((p) => p.filter((_, idx) => idx !== i))}
-                        >
-                          <X color="#666" size={10} />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <>
-                    <ImageIcon color="#bbb" size={28} strokeWidth={1.5} />
-                    <Text
-                      style={{ color: '#999', fontSize: 12, marginTop: 6, textAlign: 'center' }}
-                    >
-                      {t.artworkReferenceImagesDesc}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Resolution */}
-              <SidebarLabel text={t.artworkResolution} />
-              <View
-                style={{
-                  flexDirection: 'row',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                }}
-              >
-                {RESOLUTIONS.map((r, i) => {
-                  const active = i === resIdx;
-                  return (
-                    <TouchableOpacity
-                      key={r.label}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 10,
-                        alignItems: 'center',
-                        borderRadius: 12,
-                        backgroundColor: active ? semanticColors.primary : 'transparent',
-                      }}
-                      onPress={() => {
-                        haptics.selection();
-                        setResIdx(i);
-                      }}
-                    >
-                      <Text
-                        style={{ fontSize: 13, fontWeight: '500', color: active ? '#fff' : '#555' }}
-                      >
-                        {r.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Aspect Ratio */}
-              <SidebarLabel
-                text={t.artworkAspectRatio}
-                right={
+              {referenceEnabled && (
+                <>
+                  <SidebarLabel
+                    text={formatParamLabel(supportsImageUrls ? 'imageUrls' : 'imageUrl')}
+                  />
                   <TouchableOpacity
-                    onPress={() => {
-                      haptics.selection();
-                      setLocked(!locked);
+                    style={{
+                      backgroundColor: '#f5f5f5',
+                      borderRadius: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 20,
                     }}
+                    onPress={handlePickRef}
                   >
-                    {locked ? (
-                      <Lock color="#666" size={15} strokeWidth={tokens.icon.strokeWidth} />
+                    {refImages.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+                        showsHorizontalScrollIndicator={false}
+                      >
+                        {refImages.map((img, i) => (
+                          <View key={i} style={{ position: 'relative' }}>
+                            <RNImage
+                              source={{ uri: img.uri }}
+                              style={{ width: 64, height: 64, borderRadius: 10 }}
+                            />
+                            <TouchableOpacity
+                              style={{
+                                position: 'absolute',
+                                top: -5,
+                                right: -5,
+                                backgroundColor: '#e0e0e0',
+                                borderRadius: 10,
+                                padding: 2,
+                              }}
+                              onPress={() => setRefImages((p) => p.filter((_, idx) => idx !== i))}
+                            >
+                              <X color="#666" size={10} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </ScrollView>
                     ) : (
-                      <Unlock color="#bbb" size={15} strokeWidth={tokens.icon.strokeWidth} />
+                      <>
+                        <ImageIcon color="#bbb" size={28} strokeWidth={1.5} />
+                        <Text
+                          style={{ color: '#999', fontSize: 12, marginTop: 6, textAlign: 'center' }}
+                        >
+                          {t.artworkReferenceImagesDesc}
+                        </Text>
+                      </>
                     )}
                   </TouchableOpacity>
-                }
-              />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
-                {ASPECT_RATIOS.map((r) => {
-                  const active = r === ratio;
-                  return (
-                    <TouchableOpacity
-                      key={r}
-                      style={{
-                        width: ratioCellW,
-                        paddingVertical: 8,
-                        alignItems: 'center',
-                        borderRadius: 10,
-                        backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-                      }}
-                      onPress={() => {
-                        haptics.selection();
-                        setRatio(r);
-                      }}
-                    >
-                      <View style={{ marginBottom: 2 }}>
-                        <RatioIcon active={active} ratio={r} />
-                      </View>
-                      <Text
-                        style={{ color: active ? '#fff' : '#555', fontSize: 10, fontWeight: '500' }}
-                      >
-                        {r}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                </>
+              )}
+
+              {resolutionOptions.length > 0 && (
+                <>
+                  <SidebarLabel text={formatParamLabel('resolution')} />
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      backgroundColor: '#f5f5f5',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {resolutionOptions.map((option) => {
+                      const active = generationParams.resolution === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 10,
+                            alignItems: 'center',
+                            borderRadius: 12,
+                            backgroundColor: active ? semanticColors.primary : 'transparent',
+                          }}
+                          onPress={() => {
+                            haptics.selection();
+                            setGenerationParams((state) => ({ ...state, resolution: option }));
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '500',
+                              color: active ? '#fff' : '#555',
+                            }}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {sizeOptions.length > 0 && (
+                <>
+                  <SidebarLabel text={formatParamLabel('size')} />
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
+                    {sizeOptions.map((option) => {
+                      const active = generationParams.size === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
+                          }}
+                          onPress={() => {
+                            haptics.selection();
+                            setGenerationParams((state) => ({ ...state, size: option }));
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: active ? '#fff' : '#555',
+                              fontSize: 12,
+                              fontWeight: '500',
+                            }}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {qualityOptions.length > 0 && (
+                <>
+                  <SidebarLabel text={formatParamLabel('quality')} />
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
+                    {qualityOptions.map((option) => {
+                      const active = generationParams.quality === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
+                          }}
+                          onPress={() => {
+                            haptics.selection();
+                            setGenerationParams((state) => ({ ...state, quality: option }));
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: active ? '#fff' : '#555',
+                              fontSize: 12,
+                              fontWeight: '500',
+                            }}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {effectiveAspectRatioOptions.length > 0 && (
+                <>
+                  <SidebarLabel text={formatParamLabel('aspectRatio')} />
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
+                    {effectiveAspectRatioOptions.map((option) => {
+                      const active = generationParams.aspectRatio === option;
+                      return (
+                        <TouchableOpacity
+                          key={option}
+                          style={{
+                            width: ratioCellW,
+                            paddingVertical: 8,
+                            alignItems: 'center',
+                            borderRadius: 10,
+                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
+                          }}
+                          onPress={() => {
+                            haptics.selection();
+                            setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                          }}
+                        >
+                          <View style={{ marginBottom: 2 }}>
+                            <RatioIcon active={active} ratio={option} />
+                          </View>
+                          <Text
+                            style={{
+                              color: active ? '#fff' : '#555',
+                              fontSize: 10,
+                              fontWeight: '500',
+                            }}
+                          >
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {EDITABLE_NUMERIC_PARAM_KEYS.filter((key) =>
+                getParamDefinition(paramsSchema, key),
+              ).map((key) => (
+                <View key={key}>
+                  <SidebarLabel text={formatParamLabel(key)} />
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#f5f5f5',
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                    }}
+                    onPress={() => setEditingParamKey(key)}
+                  >
+                    <Text style={{ color: '#1a1a1a', fontSize: 14, fontWeight: '600' }}>
+                      {generationParams[key] === null || generationParams[key] === undefined
+                        ? 'Auto'
+                        : String(generationParams[key])}
+                    </Text>
+                    <Text style={{ color: '#999', fontSize: 12 }}>
+                      {typeof getParamDefinition(paramsSchema, key)?.min === 'number' &&
+                      typeof getParamDefinition(paramsSchema, key)?.max === 'number'
+                        ? `${getParamDefinition(paramsSchema, key)?.min}-${getParamDefinition(paramsSchema, key)?.max}`
+                        : ''}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
 
               {/* Number of Images */}
               <SidebarLabel text={t.artworkImageCount} />
@@ -970,6 +1210,35 @@ export default function ArtworkScreen({ navigation }: any) {
           if (n > 0 && n <= 16) setImgCount(n);
         }}
       />
+      <PromptModal
+        defaultValue={numericEditorDefaultValue}
+        keyboardType={editingParamKey === 'cfg' ? 'decimal-pad' : 'number-pad'}
+        submitLabel={t.confirm}
+        title={numericEditorTitle}
+        visible={Boolean(editingParamKey)}
+        onCancel={() => setEditingParamKey(null)}
+        onSubmit={(value) => {
+          if (!editingParamKey) return;
+
+          const parsed = Number(value);
+          if (Number.isNaN(parsed)) {
+            setEditingParamKey(null);
+            return;
+          }
+
+          const schemaItem = getParamDefinition(
+            paramsSchema,
+            editingParamKey as keyof ImageGenerationParams,
+          );
+          const nextValue = clampNumericValue(parsed, schemaItem);
+
+          setGenerationParams((state) => ({
+            ...state,
+            [editingParamKey]: editingParamKey === 'seed' && value.trim() === '' ? null : nextValue,
+          }));
+          setEditingParamKey(null);
+        }}
+      />
     </View>
   );
 }
@@ -981,10 +1250,12 @@ function BatchCard({
   screenWidth,
   onCopyPrompt,
   onDelete,
+  onReuseSettings,
 }: {
   batch: GenerationBatch;
   onCopyPrompt: () => void;
   onDelete: () => void;
+  onReuseSettings: () => void;
   resolveUrl: (url?: string) => string | undefined;
   screenWidth: number;
 }) {
@@ -1060,6 +1331,9 @@ function BatchCard({
 
       {/* Actions */}
       <View className="flex-row items-center justify-end mt-2 gap-3">
+        <TouchableOpacity hitSlop={8} onPress={onReuseSettings}>
+          <Sparkles color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
+        </TouchableOpacity>
         <TouchableOpacity hitSlop={8} onPress={onCopyPrompt}>
           <Copy color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>

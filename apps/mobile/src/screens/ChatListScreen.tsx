@@ -22,12 +22,10 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Image as RNImage,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -40,6 +38,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useShallow } from 'zustand/shallow';
 
+import AttachmentSheet from '../components/ui/AttachmentSheet';
 import FilePreview from '../components/ui/FilePreview';
 import { HeroComposer } from '../components/ui/HeroComposer';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
@@ -210,6 +209,7 @@ export default function ChatListScreen({ navigation }: any) {
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
   const [memorySheetVisible, setMemorySheetVisible] = useState(false);
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
@@ -371,8 +371,8 @@ export default function ChatListScreen({ navigation }: any) {
 
   const addFile = useFileStore((s) => s.addFile);
 
-  const handleAttach = useCallback(() => {
-    const pickImage = async (source: 'camera' | 'gallery') => {
+  const pickImage = useCallback(
+    async (source: 'camera' | 'gallery') => {
       try {
         if (source === 'camera') {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -404,66 +404,39 @@ export default function ChatListScreen({ navigation }: any) {
           toast.show('success', t.toastFilePicked);
         }
       } catch {
-        // user cancelled permission/system prompt, ignore to avoid unhandled rejection
+        /* ignore */
       }
-    };
+    },
+    [addFile, t, toast],
+  );
 
-    const pickDocument = async () => {
-      try {
-        const result = await DocumentPicker.getDocumentAsync({
-          multiple: true,
-          copyToCacheDirectory: true,
-        });
-        if (!result.canceled) {
-          for (const asset of result.assets) {
-            addFile({
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name: asset.name,
-              type: asset.mimeType || 'application/octet-stream',
-              size: asset.size || 0,
-              uri: asset.uri,
-            });
-          }
-          toast.show('success', t.toastFilePicked);
+  const pickDocument = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled) {
+        for (const asset of result.assets) {
+          addFile({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            size: asset.size || 0,
+            uri: asset.uri,
+          });
         }
-      } catch {
-        // ignore
+        toast.show('success', t.toastFilePicked);
       }
-    };
-
-    haptics.selection();
-    if (Platform.OS === 'ios') {
-      const options = modelSupportsVision
-        ? [t.cancel, t.fileCamera, t.fileGallery, t.fileDocument]
-        : [t.cancel, t.fileDocument];
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: 0, title: t.fileAttach },
-        (index) => {
-          if (modelSupportsVision) {
-            if (index === 1) void pickImage('camera');
-            else if (index === 2) void pickImage('gallery');
-            else if (index === 3) void pickDocument();
-          } else if (index === 1) {
-            void pickDocument();
-          }
-        },
-      );
-    } else {
-      if (modelSupportsVision) {
-        Alert.alert(t.fileAttach, undefined, [
-          { text: t.fileCamera, onPress: () => void pickImage('camera') },
-          { text: t.fileGallery, onPress: () => void pickImage('gallery') },
-          { text: t.fileDocument, onPress: () => void pickDocument() },
-          { text: t.cancel, style: 'cancel' },
-        ]);
-      } else {
-        Alert.alert(t.fileAttach, undefined, [
-          { text: t.fileDocument, onPress: () => void pickDocument() },
-          { text: t.cancel, style: 'cancel' },
-        ]);
-      }
+    } catch {
+      /* ignore */
     }
-  }, [addFile, modelSupportsVision, t, toast]);
+  }, [addFile, t, toast]);
+
+  const handleAttach = useCallback(() => {
+    haptics.selection();
+    setAttachmentSheetVisible(true);
+  }, []);
 
   // ── Skills drawer ─────────────────────────────────────────────────
   const [skillsVisible, setSkillsVisible] = useState(false);
@@ -929,6 +902,14 @@ export default function ChatListScreen({ navigation }: any) {
         sessionId={draftSessionId ?? undefined}
         visible={modelDrawerVisible}
         onClose={() => setModelDrawerVisible(false)}
+      />
+
+      <AttachmentSheet
+        visible={attachmentSheetVisible}
+        onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
+        onClose={() => setAttachmentSheetVisible(false)}
+        onDocument={() => void pickDocument()}
+        onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
       />
 
       <MemoryToolSheet

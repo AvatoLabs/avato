@@ -3,10 +3,12 @@ import { Brain, BrainCircuit, Cpu, Globe, Paperclip, Puzzle, Send } from 'lucide
 import React, { useCallback, useEffect, useState } from 'react';
 import { Image as RNImage, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
@@ -58,6 +60,8 @@ export function HeroComposer({
   hasAttachment = false,
 }: HeroComposerProps) {
   const colors = themeColors.light;
+  const [isFocused, setIsFocused] = useState(false);
+  const focusProgress = useSharedValue(0);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const providerIconUrl =
     modelProviderLogo || (modelProvider ? getProviderIconUrl(modelProvider) : undefined);
@@ -70,12 +74,24 @@ export function HeroComposer({
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(focusProgress.value, [0, 1], ['rgba(0,122,255,0.16)', '#4DA3FF']),
+    borderWidth: 1.5 + focusProgress.value,
+  }));
 
   const handleSend = useCallback(() => {
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     onSubmit?.();
   }, [onSubmit, sendScale]);
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+    focusProgress.value = withTiming(0, { duration: 180 });
+  }, [focusProgress]);
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+    focusProgress.value = withTiming(1, { duration: 180 });
+  }, [focusProgress]);
 
   const hasText = value.trim().length > 0;
   const effectiveAttachmentCount =
@@ -88,13 +104,9 @@ export function HeroComposer({
   const MemoryIcon = memoryEnabled ? BrainCircuit : Brain;
 
   return (
-    <View
+    <Animated.View
       className="mx-4 mb-4 rounded-[26px]"
-      style={{
-        borderWidth: 1.5,
-        borderColor: 'rgba(0,122,255,0.24)',
-        backgroundColor: 'rgba(255,255,255,0.85)',
-      }}
+      style={[{ backgroundColor: 'rgba(255,255,255,0.85)' }, containerAnimStyle]}
     >
       <BlurView className="rounded-[25px] overflow-hidden" intensity={80} tint="light">
         {/* Text input area */}
@@ -106,7 +118,9 @@ export function HeroComposer({
             placeholderTextColor={colors.secondary}
             style={{ textAlignVertical: 'top' }}
             value={value}
+            onBlur={handleBlur}
             onChangeText={onChangeText}
+            onFocus={handleFocus}
           />
         </View>
 
@@ -217,6 +231,6 @@ export function HeroComposer({
           )}
         </View>
       </BlurView>
-    </View>
+    </Animated.View>
   );
 }
