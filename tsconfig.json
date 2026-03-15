@@ -45,7 +45,6 @@
     "e2e/**",
     "knip.ts"
   ],
-  "extends": "expo/tsconfig.base",
   "include": [
     "src/**/*.d.ts",
     "src/**/*.ts",

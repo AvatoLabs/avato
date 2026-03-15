@@ -5,13 +5,11 @@
 import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
-import * as dotenv from 'dotenv';
-import dotenvExpand from 'dotenv-expand';
-
+import { loadEnv } from './_shared/loadEnv.mjs';
 const require = createRequire(import.meta.url);
 const { checkDeprecatedAuth } = require('./_shared/checkDeprecatedAuth.js');
 
-dotenvExpand.expand(dotenv.config());
+loadEnv();
 
 const isDesktop = process.env.NEXT_PUBLIC_IS_DESKTOP_APP === '1';
 const isServerDB = !!process.env.DATABASE_URL;

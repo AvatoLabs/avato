@@ -54,7 +54,7 @@ const BrandTextLoading = ({
             <img
               alt={resolvedBrandName}
               className={styles.defaultLogoImg}
-              src="/avatars/lobe-ai.png"
+              src="/icon-192x192.png"
             />
           </div>
           <span className={styles.defaultText}>{resolvedBrandName}</span>
@@ -75,7 +75,7 @@ const BrandTextLoading = ({
             ease: [0.22, 1, 0.36, 1],
           }}
         >
-          <img alt={resolvedBrandName} className={styles.brandLogoImg} src="/avatars/lobe-ai.png" />
+          <img alt={resolvedBrandName} className={styles.brandLogoImg} src="/icon-192x192.png" />
         </motion.div>
 
         <motion.div

@@ -39,9 +39,11 @@ ARG NEXT_PUBLIC_ANALYTICS_UMAMI
 ARG NEXT_PUBLIC_UMAMI_SCRIPT_URL
 ARG NEXT_PUBLIC_UMAMI_WEBSITE_ID
 ARG FEATURE_FLAGS
+ARG BUILD_ENV_FILE=".env.prod"
 
 ENV NEXT_PUBLIC_BASE_PATH="${NEXT_PUBLIC_BASE_PATH}" \
-    FEATURE_FLAGS="${FEATURE_FLAGS}"
+    FEATURE_FLAGS="${FEATURE_FLAGS}" \
+    LOBE_ENV_FILE=".env.production"
 
 ENV APP_URL="http://app.com" \
     DATABASE_DRIVER="node" \
@@ -86,7 +88,7 @@ RUN set -e && \
     npm i -g corepack@latest && \
     corepack enable && \
     corepack use $(sed -n 's/.*"packageManager": "\(.*\)".*/\1/p' package.json) && \
-    pnpm i && \
+    pnpm i --node-linker=hoisted && \
     mkdir -p /deps && \
     cd /deps && \
     pnpm init && \
@@ -94,12 +96,28 @@ RUN set -e && \
 
 COPY . .
 
+RUN if [ -f "${BUILD_ENV_FILE}" ]; then cp "${BUILD_ENV_FILE}" .env.production; fi
+
 # Prebuild: env checks (checkDeprecatedAuth, checkRequiredEnvVars, printEnvInfo) then remove desktop-only code
 RUN pnpm exec tsx scripts/dockerPrebuild.mts
 RUN rm -rf src/app/desktop "src/app/(backend)/trpc/desktop"
 
-# run build standalone for docker version
-RUN npm run build:docker
+# Run the Docker build with larger heaps than the default package scripts.
+# The monorepo's SPA bundles can exceed the 7-8GB caps baked into package.json.
+RUN rm -rf public/spa && \
+    NODE_OPTIONS=--max-old-space-size=12288 pnpm exec vite build && \
+    NODE_OPTIONS=--max-old-space-size=12288 MOBILE=true pnpm exec vite build && \
+    pnpm exec tsx scripts/copySpaBuild.mts && \
+    pnpm exec tsx scripts/generateSpaTemplates.mts && \
+    NODE_OPTIONS=--max-old-space-size=12288 DOCKER=true pnpm exec next build && \
+    pnpm exec tsx ./scripts/buildSitemapIndex/index.ts
+
+## Linux runtime sharp package for the final image
+FROM node:${NODEJS_VERSION}-slim AS sharp-runtime
+
+WORKDIR /sharp-runtime
+
+RUN npm install --include=optional --os=linux --cpu=x64 sharp
 
 ## Application image, copy all the files for production
 FROM busybox:latest AS app
@@ -121,6 +139,8 @@ COPY --from=builder /app/scripts/migrateServerDB/errorHint.js /app/errorHint.js
 COPY --from=builder /deps/node_modules/.pnpm /app/node_modules/.pnpm
 COPY --from=builder /deps/node_modules/pg /app/node_modules/pg
 COPY --from=builder /deps/node_modules/drizzle-orm /app/node_modules/drizzle-orm
+COPY --from=sharp-runtime /sharp-runtime/node_modules/sharp /app/node_modules/sharp
+COPY --from=sharp-runtime /sharp-runtime/node_modules/@img /app/node_modules/@img
 
 # Copy server launcher and shared scripts
 COPY --from=builder /app/scripts/serverLauncher/startServer.js /app/startServer.js

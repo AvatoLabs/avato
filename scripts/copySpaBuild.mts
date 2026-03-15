@@ -4,7 +4,18 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const spaDir = path.resolve(root, 'public/spa');
 const distDirs = ['desktop', 'mobile'] as const;
-const copyDirs = ['assets', 'i18n', 'vendor'] as const;
+const copyDirs = [
+  '.well-known',
+  'assets',
+  'avatars',
+  'i18n',
+  'icons',
+  'images',
+  'og',
+  'screenshots',
+  'vendor',
+  'videos',
+] as const;
 
 mkdirSync(spaDir, { recursive: true });
 

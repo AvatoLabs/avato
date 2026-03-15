@@ -2,7 +2,6 @@ import { BRANDING_NAME, ORG_NAME } from '@lobechat/business-const';
 import { OG_URL } from '@lobechat/const';
 
 import { getServerFeatureFlagsValue } from '@/config/featureFlags';
-import { OFFICIAL_URL } from '@/const/url';
 import { isCustomORG, isDesktop } from '@/const/version';
 import { analyticsEnv } from '@/envs/analytics';
 import { appEnv } from '@/envs/app';
@@ -164,7 +163,7 @@ function buildClientEnv(): SPAClientEnv {
   };
 }
 
-async function buildSeoMeta(locale: string): Promise<string> {
+async function buildSeoMeta(locale: string, canonicalUrl: string): Promise<string> {
   const { t } = await translation('metadata', locale);
   const title = t('chat.title', { appName: BRANDING_NAME });
   const description = t('chat.description', { appName: BRANDING_NAME });
@@ -175,7 +174,7 @@ async function buildSeoMeta(locale: string): Promise<string> {
     `<meta property="og:title" content="${title}" />`,
     `<meta property="og:description" content="${description}" />`,
     `<meta property="og:type" content="website" />`,
-    `<meta property="og:url" content="${OFFICIAL_URL}" />`,
+    `<meta property="og:url" content="${canonicalUrl}" />`,
     `<meta property="og:image" content="${OG_URL}" />`,
     `<meta property="og:site_name" content="${BRANDING_NAME}" />`,
     `<meta property="og:locale" content="${locale}" />`,
@@ -188,11 +187,12 @@ async function buildSeoMeta(locale: string): Promise<string> {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ path?: string[]; variants: string }> },
 ) {
   const { variants } = await params;
   const { locale, isMobile } = RouteVariants.deserializeVariants(variants);
+  const canonicalUrl = new URL(request.url).origin;
 
   const serverConfig = await getServerGlobalConfig();
   const featureFlags = getServerFeatureFlagsValue();
@@ -214,7 +214,7 @@ export async function GET(
     `window.__SERVER_CONFIG__ = ${serializeForHtml(spaConfig)};`,
   );
 
-  const seoMeta = await buildSeoMeta(locale);
+  const seoMeta = await buildSeoMeta(locale, canonicalUrl);
   html = html.replace('<!--SEO_META-->', seoMeta);
   html = html.replace('<!--ANALYTICS_SCRIPTS-->', '');
 

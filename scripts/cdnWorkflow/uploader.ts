@@ -1,11 +1,11 @@
 import { consola } from 'consola';
-import dotenv from 'dotenv';
 
+import { loadEnv } from '../_shared/loadEnv.mjs';
 import s3 from './s3';
 import type { ImgInfo, S3UserConfig, UploadResult } from './s3/types';
 import { formatPath } from './s3/utils';
 
-dotenv.config();
+loadEnv();
 
 if (!process.env.DOC_S3_ACCESS_KEY_ID) {
   consola.error('请配置 Doc S3 存储的环境变量: DOC_S3_ACCESS_KEY_ID');
@@ -60,7 +60,7 @@ export const uploader = async (
       acl: 'public-read',
       bucketName: userConfig.bucketName,
       client,
-      item: item,
+      item,
       path: formatPath(item, userConfig.uploadPath),
       urlPrefix: userConfig.pathPrefix,
     });

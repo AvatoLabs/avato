@@ -2,12 +2,11 @@ import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import dotenv from 'dotenv';
-
+import { loadEnv } from '../_shared/loadEnv.mjs';
 import { generateMobileTemplate } from './template';
 import { uploadAssets } from './upload';
 
-dotenv.config();
+loadEnv();
 
 const root = resolve(__dirname, '../..');
 const distDir = resolve(root, 'dist/mobile');

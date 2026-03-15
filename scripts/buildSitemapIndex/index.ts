@@ -1,11 +1,11 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import dotenv from 'dotenv';
-
 import { Sitemap } from '@/server/sitemap';
 
-dotenv.config();
+import { loadEnv } from '../_shared/loadEnv.mjs';
+
+loadEnv();
 
 const genSitemap = async () => {
   const sitemapModule = new Sitemap();
