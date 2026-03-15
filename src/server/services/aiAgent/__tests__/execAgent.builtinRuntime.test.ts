@@ -145,8 +145,28 @@ describe('AiAgentService.execAgent - builtin agent runtime config', () => {
     // Verify createOperation was called with agentConfig containing the runtime systemRole
     expect(mockCreateOperation).toHaveBeenCalledTimes(1);
     const callArgs = mockCreateOperation.mock.calls[0][0];
-    expect(callArgs.agentConfig.systemRole).toContain('You are Lobe');
+    expect(callArgs.agentConfig.systemRole).toContain('You are Avato');
     expect(callArgs.agentConfig.systemRole).toContain('{{model}}');
+  });
+
+  it('should upgrade legacy inbox systemRole branding to runtime systemRole', async () => {
+    mockGetAgentConfig.mockResolvedValue({
+      chatConfig: {},
+      id: 'agent-inbox',
+      model: 'gpt-4',
+      plugins: [],
+      provider: 'openai',
+      slug: 'inbox',
+      systemRole: 'You are Lobe, an AI Agent will help users.',
+    });
+
+    await service.execAgent({
+      agentId: 'agent-inbox',
+      prompt: 'Hello',
+    });
+
+    const callArgs = mockCreateOperation.mock.calls[0][0];
+    expect(callArgs.agentConfig.systemRole).toContain('You are Avato');
   });
 
   it('should NOT override user-customized systemRole for inbox agent', async () => {

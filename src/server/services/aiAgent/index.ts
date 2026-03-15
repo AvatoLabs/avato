@@ -48,6 +48,21 @@ import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
 
 const log = debug('lobe-server:ai-agent-service');
 
+const LEGACY_BUILTIN_ROLE_PATTERNS: Partial<Record<string, RegExp>> = {
+  [BUILTIN_AGENT_SLUGS.agentBuilder]: /You are Lobe,\s+an Agent Builder integrated into LobeHub\./,
+  [BUILTIN_AGENT_SLUGS.groupSupervisor]:
+    /You are LobeAI,\s+an intelligent team coordinator developed by LobeHub,/,
+  [BUILTIN_AGENT_SLUGS.inbox]: /You are Lobe,\s+an AI Agent will help users\./,
+};
+
+const isLegacyBuiltinSystemRole = (slug: string, systemRole?: string | null) => {
+  if (!systemRole) return false;
+
+  const pattern = LEGACY_BUILTIN_ROLE_PATTERNS[slug];
+
+  return pattern ? pattern.test(systemRole) : false;
+};
+
 /**
  * Format error for storage in thread metadata
  * Handles Error objects which don't serialize properly with JSON.stringify
@@ -247,8 +262,12 @@ export class AiAgentService {
         plugins: agentConfig.plugins ?? [],
       });
       if (runtimeConfig) {
-        // Runtime systemRole takes effect only if DB has no user-customized systemRole
-        if (!agentConfig.systemRole && runtimeConfig.systemRole) {
+        // Runtime systemRole takes effect when DB has no custom systemRole.
+        // Also auto-upgrade known legacy builtin prompts (Lobe/LobeAI branding) to Avato.
+        const shouldApplyRuntimeSystemRole =
+          !agentConfig.systemRole || isLegacyBuiltinSystemRole(agentSlug, agentConfig.systemRole);
+
+        if (shouldApplyRuntimeSystemRole && runtimeConfig.systemRole) {
           agentConfig.systemRole = runtimeConfig.systemRole;
           log('execAgent: merged builtin agent runtime systemRole for slug=%s', agentSlug);
         }
