@@ -144,8 +144,8 @@ export default function SettingsScreen({ navigation }: any) {
           <SettingsRow
             icon={Info}
             iconColor="#8c8c8c"
-            label={t.settingsAboutMinkhub}
-            subtitle={t.settingsAboutMinkhubDesc}
+            label={t.settingsAboutAvato}
+            subtitle={t.settingsAboutAvatoDesc}
             onPress={() => navigation.navigate('About')}
           />
         </SettingsSection>

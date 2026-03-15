@@ -80,7 +80,10 @@ export default function AboutScreen({ navigation }: any) {
           entering={FadeInDown.delay(50).duration(350)}
         >
           <View className="w-20 h-20 rounded-3xl bg-foreground/5 items-center justify-center mb-4 overflow-hidden">
-            <RNImage className="w-16 h-16 rounded-2xl" source={require('../../assets/icon.png')} />
+            <RNImage
+              className="w-16 h-16 rounded-2xl"
+              source={require('../../assets/avato-icon.png')}
+            />
           </View>
           <Text className="text-foreground text-[22px] font-bold tracking-tight">{APP_NAME}</Text>
           <Text className="text-secondary/60 text-[14px] font-medium mt-1">v{APP_VERSION}</Text>

@@ -64,7 +64,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const stored = await AsyncStorage.getItem('activeSessionId');
 
       // Overlay per-session model/provider from AsyncStorage only when server has no value
-      const settingsKeys = (sessions ?? []).map((s) => `minkhub_chat_settings_${s.id}`);
+      const settingsKeys = (sessions ?? []).map((s) => `avato_chat_settings_${s.id}`);
       if (settingsKeys.length > 0) {
         try {
           const pairs = await AsyncStorage.multiGet(settingsKeys);
@@ -72,7 +72,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
             if (!raw) continue;
             try {
               const saved = JSON.parse(raw);
-              const sid = key.replace('minkhub_chat_settings_', '');
+              const sid = key.replace('avato_chat_settings_', '');
               const sess = sessions?.find((s) => s.id === sid);
               if (sess) {
                 if (!sess.model && saved.model) sess.model = saved.model;

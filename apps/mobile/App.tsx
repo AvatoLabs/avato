@@ -3,13 +3,13 @@ import './global.css';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { NavigationContainer } from '@react-navigation/native';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import SplashScreen from './src/components/splash/SplashScreen';
 import { ToastContainer, useToast } from './src/components/ui/Toast';
 import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
@@ -17,9 +17,12 @@ import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
 import { useConnectionStore } from './src/store/connection';
 import { useSessionStore } from './src/store/session';
-import { MinkLightTheme } from './src/theme';
+import { useUserStore } from './src/store/user';
+import { AvatoLightTheme } from './src/theme';
 
-const ONBOARDING_KEY = 'minkhub_onboarding_complete';
+const ONBOARDING_KEY = 'avato_onboarding_complete';
+
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Suppress known harmless errors in development
 if (__DEV__) {
@@ -47,7 +50,7 @@ function OfflineBanner() {
 }
 
 export default function App() {
-  const [isAppReady, setIsAppReady] = useState(false);
+  const [isBootReady, setIsBootReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
   const [initialRoute, setInitialRoute] = useState<
@@ -71,58 +74,96 @@ export default function App() {
   }, [t]);
 
   useEffect(() => {
+    let isCancelled = false;
+
     const init = async () => {
-      // Load persisted locale
-      await loadLocale();
-
-      // Check onboarding
-      const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
-      const hasUrl = await hasConfiguredUrl();
-
-      if (!onboardingDone && !hasUrl) {
-        setInitialRoute('OnboardingWelcome');
-        setIsAppReady(true);
-        return;
-      }
-
-      if (!hasUrl) {
-        setInitialRoute('ServerConfig');
-        setIsAppReady(true);
-        return;
-      }
-
+      let shouldCheckConnection = false;
       try {
+        await loadLocale();
+
+        const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
+        const hasUrl = await hasConfiguredUrl();
+
+        if (!onboardingDone && !hasUrl) {
+          if (!isCancelled) {
+            setInitialRoute('OnboardingWelcome');
+          }
+          return;
+        }
+
+        if (!hasUrl) {
+          if (!isCancelled) {
+            setInitialRoute('ServerConfig');
+          }
+          return;
+        }
+
+        shouldCheckConnection = true;
+
         const baseUrl = await getApiUrl();
         const authConfig = await fetchMobileAuthConfig(baseUrl);
+
+        if (authConfig.enableNoAuth) {
+          await Promise.all([
+            useSessionStore.getState().fetchSessions(),
+            useUserStore.getState().fetchUser(),
+          ]);
+          if (!isCancelled) {
+            setInitialRoute('MainTabs');
+          }
+          return;
+        }
+
         const authSession = authConfig.enableOIDC ? await getValidAuthSession(baseUrl) : null;
 
         if (authSession) {
-          await useSessionStore.getState().fetchSessions();
-          setInitialRoute('MainTabs');
-        } else {
+          await Promise.all([
+            useSessionStore.getState().fetchSessions(),
+            useUserStore.getState().fetchUser(),
+          ]);
+          if (!isCancelled) {
+            setInitialRoute('MainTabs');
+          }
+          return;
+        }
+
+        if (!isCancelled) {
           setInitialRoute('Login');
         }
       } catch {
-        setInitialRoute('Login');
+        if (!isCancelled) {
+          setInitialRoute('Login');
+        }
+      } finally {
+        if (shouldCheckConnection) {
+          useConnectionStore.getState().checkConnection();
+        }
+
+        if (!isCancelled) {
+          setIsBootReady(true);
+        }
       }
-
-      // Check server connectivity (non-blocking)
-      useConnectionStore.getState().checkConnection();
-
-      const timer = setTimeout(() => setIsAppReady(true), 2000);
-      return () => clearTimeout(timer);
     };
-    init();
-  }, []);
 
-  if (!isAppReady) {
-    return <SplashScreen />;
-  }
+    void init();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [loadLocale]);
+
+  useEffect(() => {
+    if (!isBootReady) return;
+
+    ExpoSplashScreen.hideAsync().catch(() => {});
+  }, [isBootReady]);
+
+  if (!isBootReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer theme={MinkLightTheme}>
+        <NavigationContainer theme={AvatoLightTheme}>
           <RootNavigator initialRoute={initialRoute} />
           {isOffline && <OfflineBanner />}
           <ToastContainer />

@@ -13,6 +13,7 @@ import {
 } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
+import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
 
@@ -37,6 +38,19 @@ export default function LoginScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
 
+  const continueInNoAuthMode = async () => {
+    await clearTransientAppState();
+    await Promise.all([
+      useSessionStore.getState().fetchSessions(),
+      useUserStore.getState().fetchUser(),
+    ]);
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainTabs' }],
+    });
+  };
+
   const loadAuthConfig = async () => {
     setLoading(true);
     setError('');
@@ -46,6 +60,10 @@ export default function LoginScreen({ navigation }: any) {
       const nextConfig = await fetchMobileAuthConfig(baseUrl);
       setServerUrl(baseUrl);
       setAuthConfig(nextConfig);
+
+      if (nextConfig.enableNoAuth) {
+        await continueInNoAuthMode();
+      }
     } catch (caughtError) {
       setAuthConfig(null);
       setError(
@@ -73,7 +91,10 @@ export default function LoginScreen({ navigation }: any) {
       if (!session) return;
 
       await clearTransientAppState();
-      await useUserStore.getState().fetchUser();
+      await Promise.all([
+        useSessionStore.getState().fetchSessions(),
+        useUserStore.getState().fetchUser(),
+      ]);
 
       navigation.reset({
         index: 0,

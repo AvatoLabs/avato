@@ -23,6 +23,7 @@ export const getServerAuthConfig = (): GlobalServerConfig => {
     enableMarketTrustedClient: !!(
       appEnv.MARKET_TRUSTED_CLIENT_SECRET && appEnv.MARKET_TRUSTED_CLIENT_ID
     ),
+    enableNoAuth: process.env.NOAUTH_MODE === '1',
     enableOIDC: authEnv.ENABLE_OIDC,
     oAuthSSOProviders: ssoProviders,
     telemetry: {},

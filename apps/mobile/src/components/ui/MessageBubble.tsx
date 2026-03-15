@@ -279,14 +279,14 @@ const MessageBubble = memo<MessageBubbleProps>(
               {message.provider ? (
                 <RNImage
                   className="w-5 h-5"
-                  defaultSource={require('../../../assets/icon.png')}
+                  defaultSource={require('../../../assets/avato-icon.png')}
                   resizeMode="contain"
                   source={{ uri: getProviderIconUrl(message.provider) }}
                 />
               ) : (
                 <RNImage
                   className="w-7 h-7 rounded-lg"
-                  source={require('../../../assets/icon.png')}
+                  source={require('../../../assets/avato-icon.png')}
                 />
               )}
             </View>

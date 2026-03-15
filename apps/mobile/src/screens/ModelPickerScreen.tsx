@@ -25,8 +25,8 @@ import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
-const STORAGE_KEY_MODEL = 'minkhub_default_model';
-const STORAGE_KEY_PROVIDER = 'minkhub_default_provider';
+const STORAGE_KEY_MODEL = 'avato_default_model';
+const STORAGE_KEY_PROVIDER = 'avato_default_provider';
 
 // ── Fallback static list (used when server is unreachable) ─────────
 interface FallbackModel {
@@ -231,7 +231,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   useEffect(() => {
     (async () => {
       if (sessionId) {
-        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
         if (raw) {
           try {
             const saved = JSON.parse(raw);
@@ -290,7 +290,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
     if (sessionId) {
       let existing: Record<string, unknown> = {};
       try {
-        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
         if (raw) existing = JSON.parse(raw);
       } catch {
         /* ignore */
@@ -298,7 +298,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       existing.model = modelId;
       existing.provider = providerId;
       existing.vision = supportsVision;
-      await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
+      await AsyncStorage.setItem(`avato_chat_settings_${sessionId}`, JSON.stringify(existing));
 
       // Immediately reflect in session store so recent-list logo updates instantly
       useSessionStore

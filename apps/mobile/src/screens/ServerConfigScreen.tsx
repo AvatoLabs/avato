@@ -134,7 +134,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             <View className="mx-5 mt-6 mb-6 rounded-[20px] bg-foreground/5 p-5">
               <View className="flex-row items-center mb-3">
                 <View className="w-10 h-10 rounded-full items-center justify-center mr-3 overflow-hidden">
-                  <RNImage className="w-10 h-10" source={require('../../assets/icon.png')} />
+                  <RNImage className="w-10 h-10" source={require('../../assets/avato-icon.png')} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-[16px] font-semibold text-foreground tracking-tight">

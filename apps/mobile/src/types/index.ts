@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for the MinkHub mobile app.
+ * Shared type definitions for the Avato mobile app.
  * These mirror the server-side models (session, message, agent, etc.)
  * without importing any server code.
  */

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY_API_URL = 'minkhub_api_url';
+const STORAGE_KEY_API_URL = 'avato_api_url';
 
 const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL?.trim();
 const DEFAULT_API_URL =

@@ -83,7 +83,7 @@ export default function SpotlightLogo() {
       <Animated.View style={[{ zIndex: 10 }, logoStyle]}>
         <Image
           resizeMode="contain"
-          source={require('../../../assets/mink-logo.png')}
+          source={require('../../../assets/avato-logo.png')}
           style={{ height: 72, width: 72 }}
         />
       </Animated.View>

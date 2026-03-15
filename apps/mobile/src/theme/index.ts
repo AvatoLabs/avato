@@ -9,7 +9,7 @@ export const themeColors = {
   },
 };
 
-export const MinkLightTheme = {
+export const AvatoLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,

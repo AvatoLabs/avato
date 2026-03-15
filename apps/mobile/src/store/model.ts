@@ -4,10 +4,10 @@ import { create } from 'zustand';
 import { agentApi, aiProviderApi } from '../lib/api';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
-const CACHE_KEY = 'minkhub_model_cache';
+const CACHE_KEY = 'avato_model_cache';
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const SELECTED_MODEL_KEY = 'minkhub_default_model';
-const SELECTED_PROVIDER_KEY = 'minkhub_default_provider';
+const SELECTED_MODEL_KEY = 'avato_default_model';
+const SELECTED_PROVIDER_KEY = 'avato_default_provider';
 
 interface CachedData {
   providers: ProviderWithModels[];
@@ -115,7 +115,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
 
     if (sessionId) {
       try {
-        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
         if (raw) {
           const saved = JSON.parse(raw);
           if (saved.model) model = saved.model;
@@ -150,7 +150,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     if (sessionId) {
       let existing: Record<string, unknown> = {};
       try {
-        const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
         if (raw) existing = JSON.parse(raw);
       } catch {
         /* ignore */
@@ -169,7 +169,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
       existing.model = modelId;
       existing.provider = providerId;
       existing.vision = supportsVision;
-      await AsyncStorage.setItem(`minkhub_chat_settings_${sessionId}`, JSON.stringify(existing));
+      await AsyncStorage.setItem(`avato_chat_settings_${sessionId}`, JSON.stringify(existing));
 
       // Also update backend agent config so model/provider persists server-side
       try {

@@ -1,34 +1,47 @@
 {
   "expo": {
-    "name": "MinkHub",
-    "slug": "minkhub",
+    "name": "Avato",
+    "slug": "avato",
     "entryPoint": "./index.ts",
-    "scheme": "com.minkhub.app",
+    "scheme": "com.avato.app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/avato-icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/avato-splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "icon": "./assets/avato-icon.png",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.minkhub.app",
+      "package": "com.avato.app",
+      "icon": "./assets/avato-icon.png",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/avato-android-foreground.png",
+        "monochromeImage": "./assets/avato-android-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/avato-favicon.png"
     },
-    "plugins": ["expo-image", "expo-secure-store", "expo-web-browser"]
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/avato-splash.png",
+          "imageWidth": 180
+        }
+      ],
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser"
+    ]
   }
 }

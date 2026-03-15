@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../lib/i18n';
 import { hasConfiguredUrl } from '../../lib/server';
 
-const ONBOARDING_KEY = 'minkhub_onboarding_complete';
+const ONBOARDING_KEY = 'avato_onboarding_complete';
 
 export default function CompletionScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();

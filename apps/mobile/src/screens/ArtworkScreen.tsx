@@ -79,7 +79,7 @@ const RESOLUTIONS = [
 ];
 
 const IMAGE_COUNTS = [1, 2, 4, 8];
-const STORAGE_KEY = 'minkhub_artwork_config';
+const STORAGE_KEY = 'avato_artwork_config';
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);

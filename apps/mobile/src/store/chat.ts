@@ -48,7 +48,7 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   // 2. Per-session AsyncStorage (legacy / offline)
   if (!opts.model || !opts.provider) {
     try {
-      const raw = await AsyncStorage.getItem(`minkhub_chat_settings_${sessionId}`);
+      const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
       if (raw) {
         const saved = JSON.parse(raw);
         if (!opts.model && saved.model) opts.model = saved.model;
@@ -65,7 +65,7 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   // 3. Global defaults
   if (!opts.model) {
     try {
-      const globalModel = await AsyncStorage.getItem('minkhub_default_model');
+      const globalModel = await AsyncStorage.getItem('avato_default_model');
       if (globalModel) opts.model = globalModel;
     } catch {
       /* ignore */
@@ -73,7 +73,7 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   }
   if (!opts.provider) {
     try {
-      const globalProvider = await AsyncStorage.getItem('minkhub_default_provider');
+      const globalProvider = await AsyncStorage.getItem('avato_default_provider');
       if (globalProvider) opts.provider = globalProvider;
     } catch {
       /* ignore */

@@ -40,7 +40,7 @@ import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
 
-const APP_NAME = Constants.expoConfig?.name ?? 'LobeHub';
+const APP_NAME = Constants.expoConfig?.name ?? 'Avato';
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 export default function ProfileScreen({ navigation }: any) {
@@ -79,7 +79,7 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     loadStats();
     if (!isUserLoaded) fetchUser();
-    AsyncStorage.getItem('minkhub_default_model').then((v) => {
+    AsyncStorage.getItem('avato_default_model').then((v) => {
       if (v) setDefaultModel(v);
     });
   }, [loadStats, isUserLoaded, fetchUser]);

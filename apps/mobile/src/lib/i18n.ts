@@ -9,7 +9,7 @@ import { create } from 'zustand';
 
 export type Locale = 'en-US' | 'zh-CN' | 'zh-TW';
 
-const STORAGE_KEY = 'minkhub_locale';
+const STORAGE_KEY = 'avato_locale';
 
 // ── Translation keys ────────────────────────────────────────────────
 type TranslationKeys = {
@@ -151,8 +151,8 @@ type TranslationKeys = {
   settingsTts: string;
   settingsAbout: string;
   settingsPrivacyPolicy: string;
-  settingsAboutMinkhub: string;
-  settingsAboutMinkhubDesc: string;
+  settingsAboutAvato: string;
+  settingsAboutAvatoDesc: string;
 
   // AI Providers
   aiProvidersTitle: string;
@@ -729,10 +729,10 @@ const en: TranslationKeys = {
   tabDiscover: 'Discover',
   tabMe: 'Me',
 
-  chatListTitle: 'MinkHub',
+  chatListTitle: 'Avato',
   chatListSearch: 'Search conversations...',
   chatListEmpty: 'Start a conversation',
-  chatListEmptyDesc: 'Tap the + button above to create your first chat with MinkHub AI.',
+  chatListEmptyDesc: 'Tap the + button above to create your first chat with Avato AI.',
   chatListNewConversation: 'New Conversation',
   chatListTapToContinue: 'Tap to continue the conversation',
 
@@ -742,7 +742,7 @@ const en: TranslationKeys = {
   chatThoughtWithDuration: 'Thought for',
   chatAskAnything: 'Ask anything...',
   chatGenerating: 'Generating...',
-  chatEmptyTitle: 'MinkHub Assistant',
+  chatEmptyTitle: 'Avato Assistant',
   chatEmptyDesc: 'Ready to brainstorm, debug, or chat. Send a message to begin.',
 
   discoverTitle: 'Discover',
@@ -759,7 +759,7 @@ const en: TranslationKeys = {
   discoverPopular: 'Popular',
 
   meTitle: 'Me',
-  meUser: 'MinkHub User',
+  meUser: 'Avato User',
   meTapToSettings: 'Tap to view settings',
   meQuickSettings: 'Quick Settings',
   meDarkMode: 'Dark Mode',
@@ -779,9 +779,9 @@ const en: TranslationKeys = {
   meSignOutDesc: 'Are you sure you want to sign out? This will clear your server configuration.',
 
   serverTitle: 'Server Configuration',
-  serverConnect: 'Connect to MinkHub',
+  serverConnect: 'Connect to Avato',
   serverSubtitle: 'Enter your self-hosted server address',
-  serverDesc: 'MinkHub runs on your own server. Enter the URL where your LobeHub instance is running (e.g., http://192.168.1.100:3010).',
+  serverDesc: 'Avato runs on your own server. Enter the URL where your LobeHub instance is running (e.g., http://192.168.1.100:3010).',
   serverUrlLabel: 'Server URL',
   serverUrlPlaceholder: 'http://192.168.1.100:3010',
   serverQuickFill: 'Quick Fill',
@@ -826,7 +826,7 @@ const en: TranslationKeys = {
   settingsTitle: 'Settings',
   settingsServer: 'Server',
   settingsServerConfig: 'Server Configuration',
-  settingsServerConfigDesc: 'Configure your MinkHub server URL',
+  settingsServerConfigDesc: 'Configure your Avato server URL',
   settingsAiConfig: 'AI Configuration',
   settingsAiProviders: 'AI Providers',
   settingsAiProvidersDesc: 'Manage API keys & provider settings',
@@ -845,8 +845,8 @@ const en: TranslationKeys = {
   settingsTts: 'Text-to-Speech',
   settingsAbout: 'About',
   settingsPrivacyPolicy: 'Privacy Policy',
-  settingsAboutMinkhub: 'About MinkHub',
-  settingsAboutMinkhubDesc: 'v1.0.0 • Built on LobeHub',
+  settingsAboutAvato: 'About Avato',
+  settingsAboutAvatoDesc: 'v1.0.0 • Built on LobeHub',
 
   aiProvidersTitle: 'AI Providers',
   aiProvidersDesc: 'Configure your AI service providers and API keys.',
@@ -945,8 +945,8 @@ const en: TranslationKeys = {
   fileUploading: 'Uploading...',
   fileUploadFailed: 'Upload failed',
 
-  onboardingWelcome: 'Welcome to MinkHub',
-  onboardingWelcomeDesc: 'Your AI workspace, powered by LobeHub.',
+  onboardingWelcome: 'Welcome to Avato',
+  onboardingWelcomeDesc: 'Pilot your AI flow.',
   onboardingGetStarted: 'Get Started',
   onboardingSetupProvider: 'Connect Your Server',
   onboardingSetupProviderDesc: 'Enter the URL of your self-hosted LobeHub instance.',
@@ -1266,7 +1266,7 @@ const en: TranslationKeys = {
   statsTotalTopics: 'Topics',
   statsTotalWords: 'Words',
   statsVsPrevMonth: 'vs last month',
-  statsWelcome: 'You have been using MinkHub for {days} days',
+  statsWelcome: 'You have been using Avato for {days} days',
   statsRegisteredDays: '{days} days',
   statsCreatedAt: 'Account created',
   statsUpdatedAt: 'Last active',
@@ -1395,10 +1395,10 @@ const zh_tw: TranslationKeys = {
   tabDiscover: '發現',
   tabMe: '我的',
 
-  chatListTitle: 'MinkHub',
+  chatListTitle: 'Avato',
   chatListSearch: '搜尋對話...',
   chatListEmpty: '開始一段對話',
-  chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 MinkHub AI 對話。',
+  chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 對話。',
   chatListNewConversation: '新對話',
   chatListTapToContinue: '點擊繼續對話',
 
@@ -1408,7 +1408,7 @@ const zh_tw: TranslationKeys = {
   chatThoughtWithDuration: '已深度思考',
   chatAskAnything: '有什麼可以幫助你的嗎？',
   chatGenerating: '產生中...',
-  chatEmptyTitle: 'MinkHub 助手',
+  chatEmptyTitle: 'Avato 助手',
   chatEmptyDesc: '準備好幫你腦力激盪、除錯或聊天。傳送訊息開始吧。',
 
   discoverTitle: '發現',
@@ -1425,7 +1425,7 @@ const zh_tw: TranslationKeys = {
   discoverPopular: '熱門',
 
   meTitle: '我的',
-  meUser: 'MinkHub 使用者',
+  meUser: 'Avato 使用者',
   meTapToSettings: '點擊檢視設定',
   meQuickSettings: '快速設定',
   meDarkMode: '深色模式',
@@ -1445,9 +1445,9 @@ const zh_tw: TranslationKeys = {
   meSignOutDesc: '確定要登出嗎？這將清除你的伺服器設定。',
 
   serverTitle: '伺服器設定',
-  serverConnect: '連線到 MinkHub',
+  serverConnect: '連線到 Avato',
   serverSubtitle: '輸入你的自架伺服器位址',
-  serverDesc: 'MinkHub 執行在你自己的伺服器上。輸入你的 LobeHub 實例位址（例如 http://192.168.1.100:3010）。',
+  serverDesc: 'Avato 執行在你自己的伺服器上。輸入你的 LobeHub 實例位址（例如 http://192.168.1.100:3010）。',
   serverUrlLabel: '伺服器 URL',
   serverUrlPlaceholder: 'http://192.168.1.100:3010',
   serverQuickFill: '快速填入',
@@ -1492,7 +1492,7 @@ const zh_tw: TranslationKeys = {
   settingsTitle: '設定',
   settingsServer: '伺服器',
   settingsServerConfig: '伺服器設定',
-  settingsServerConfigDesc: '設定你的 MinkHub 伺服器 URL',
+  settingsServerConfigDesc: '設定你的 Avato 伺服器 URL',
   settingsAiConfig: 'AI 設定',
   settingsAiProviders: 'AI 服務商',
   settingsAiProvidersDesc: '管理 API 金鑰和服務商設定',
@@ -1511,8 +1511,8 @@ const zh_tw: TranslationKeys = {
   settingsTts: '文字轉語音',
   settingsAbout: '關於',
   settingsPrivacyPolicy: '隱私權政策',
-  settingsAboutMinkhub: '關於 MinkHub',
-  settingsAboutMinkhubDesc: 'v1.0.0 • 基於 LobeHub 建構',
+  settingsAboutAvato: '關於 Avato',
+  settingsAboutAvatoDesc: 'v1.0.0 • 基於 LobeHub 建構',
 
   aiProvidersTitle: 'AI 服務商',
   aiProvidersDesc: '設定你的 AI 服務商和 API 金鑰。',
@@ -1611,8 +1611,8 @@ const zh_tw: TranslationKeys = {
   fileUploading: '上傳中...',
   fileUploadFailed: '上傳失敗',
 
-  onboardingWelcome: '歡迎來到 MinkHub',
-  onboardingWelcomeDesc: '你的 AI 工作區，由 LobeHub 驅動。',
+  onboardingWelcome: '歡迎來到 Avato',
+  onboardingWelcomeDesc: '掌控你的 AI 工作流。',
   onboardingGetStarted: '開始使用',
   onboardingSetupProvider: '連線伺服器',
   onboardingSetupProviderDesc: '輸入你的自架 LobeHub 實例位址。',
@@ -1931,7 +1931,7 @@ const zh_tw: TranslationKeys = {
   statsTotalTopics: '話題',
   statsTotalWords: '詞彙量',
   statsVsPrevMonth: '較上月',
-  statsWelcome: '你已使用 MinkHub {days} 天',
+  statsWelcome: '你已使用 Avato {days} 天',
   statsRegisteredDays: '{days} 天',
   statsCreatedAt: '帳戶建立',
   statsUpdatedAt: '最後活躍',
@@ -2060,10 +2060,10 @@ const zh: TranslationKeys = {
   tabDiscover: '发现',
   tabMe: '我的',
 
-  chatListTitle: 'MinkHub',
+  chatListTitle: 'Avato',
   chatListSearch: '搜索对话...',
   chatListEmpty: '开始一段对话',
-  chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 MinkHub AI 对话。',
+  chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 对话。',
   chatListNewConversation: '新对话',
   chatListTapToContinue: '点击继续对话',
 
@@ -2073,7 +2073,7 @@ const zh: TranslationKeys = {
   chatThoughtWithDuration: '已深度思考',
   chatAskAnything: '问我任何问题...',
   chatGenerating: '生成中...',
-  chatEmptyTitle: 'MinkHub 助手',
+  chatEmptyTitle: 'Avato 助手',
   chatEmptyDesc: '准备好帮你头脑风暴、调试代码或聊天。发送消息开始吧。',
 
   discoverTitle: '发现',
@@ -2090,7 +2090,7 @@ const zh: TranslationKeys = {
   discoverPopular: '热门',
 
   meTitle: '我的',
-  meUser: 'MinkHub 用户',
+  meUser: 'Avato 用户',
   meTapToSettings: '点击查看设置',
   meQuickSettings: '快捷设置',
   meDarkMode: '深色模式',
@@ -2110,9 +2110,9 @@ const zh: TranslationKeys = {
   meSignOutDesc: '确定要退出登录吗？这将清除你的服务器配置。',
 
   serverTitle: '服务器配置',
-  serverConnect: '连接到 MinkHub',
+  serverConnect: '连接到 Avato',
   serverSubtitle: '输入你的自托管服务器地址',
-  serverDesc: 'MinkHub 运行在你自己的服务器上。输入你的 LobeHub 实例地址（例如 http://192.168.1.100:3010）。',
+  serverDesc: 'Avato 运行在你自己的服务器上。输入你的 LobeHub 实例地址（例如 http://192.168.1.100:3010）。',
   serverUrlLabel: '服务器 URL',
   serverUrlPlaceholder: 'http://192.168.1.100:3010',
   serverQuickFill: '快捷填入',
@@ -2157,7 +2157,7 @@ const zh: TranslationKeys = {
   settingsTitle: '设置',
   settingsServer: '服务器',
   settingsServerConfig: '服务器配置',
-  settingsServerConfigDesc: '配置你的 MinkHub 服务器 URL',
+  settingsServerConfigDesc: '配置你的 Avato 服务器 URL',
   settingsAiConfig: 'AI 配置',
   settingsAiProviders: 'AI 服务商',
   settingsAiProvidersDesc: '管理 API 密钥和服务商设置',
@@ -2176,8 +2176,8 @@ const zh: TranslationKeys = {
   settingsTts: '文字转语音',
   settingsAbout: '关于',
   settingsPrivacyPolicy: '隐私政策',
-  settingsAboutMinkhub: '关于 MinkHub',
-  settingsAboutMinkhubDesc: 'v1.0.0 • 基于 LobeHub 构建',
+  settingsAboutAvato: '关于 Avato',
+  settingsAboutAvatoDesc: 'v1.0.0 • 基于 LobeHub 构建',
 
   aiProvidersTitle: 'AI 服务商',
   aiProvidersDesc: '配置你的 AI 服务商和 API 密钥。',
@@ -2276,8 +2276,8 @@ const zh: TranslationKeys = {
   fileUploading: '上传中...',
   fileUploadFailed: '上传失败',
 
-  onboardingWelcome: '欢迎来到 MinkHub',
-  onboardingWelcomeDesc: '你的 AI 工作区，由 LobeHub 驱动。',
+  onboardingWelcome: '欢迎来到 Avato',
+  onboardingWelcomeDesc: '掌控你的 AI 工作流。',
   onboardingGetStarted: '开始使用',
   onboardingSetupProvider: '连接服务器',
   onboardingSetupProviderDesc: '输入你的自托管 LobeHub 实例地址。',
@@ -2597,7 +2597,7 @@ const zh: TranslationKeys = {
   statsTotalTopics: '话题',
   statsTotalWords: '词汇量',
   statsVsPrevMonth: '较上月',
-  statsWelcome: '你已使用 MinkHub {days} 天',
+  statsWelcome: '你已使用 Avato {days} 天',
   statsRegisteredDays: '{days} 天',
   statsCreatedAt: '账户创建',
   statsUpdatedAt: '最后活跃',

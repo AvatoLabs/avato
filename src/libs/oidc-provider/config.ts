@@ -41,14 +41,18 @@ export const defaultClients: ClientMetadata[] = [
   {
     application_type: 'native', // Mobile uses native type
     client_id: 'lobehub-mobile',
-    client_name: 'LobeHub Mobile',
+    client_name: 'Avato Mobile',
     // Supports authorization code flow and refresh token
     grant_types: ['authorization_code', 'refresh_token'],
     logo_uri: 'https://hub-apac-1.lobeobjects.space/docs/73f69adfa1b802a0e250f6ff9d62f70b.png',
     // Mobile does not need post_logout_redirect_uris as logout is typically handled within the app
     post_logout_redirect_uris: [],
     // Mobile uses custom URL Scheme
-    redirect_uris: ['com.lobehub.app://auth/callback', 'com.minkhub.app://auth/callback'],
+    redirect_uris: [
+      'com.lobehub.app://auth/callback',
+      'com.minkhub.app://auth/callback',
+      'com.avato.app://auth/callback',
+    ],
     response_types: ['code'],
     // Public client with no secret
     token_endpoint_auth_method: 'none',

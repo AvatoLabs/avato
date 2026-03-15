@@ -1,5 +1,5 @@
 /**
- * API service layer for MinkHub mobile.
+ * API service layer for Avato mobile.
  *
  * Wraps raw HTTP calls to the backend. We use plain fetch (not tRPC client)
  * because the server-side tRPC types are not directly importable in RN

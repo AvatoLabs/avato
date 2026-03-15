@@ -28,7 +28,7 @@ interface WorkspaceOverviewCardProps {
  *  - Providers sub-card → onPressProviders (AIProviders)
  */
 export function WorkspaceOverviewCard({
-  userName = 'MinkHub User',
+  userName = 'Avato User',
   defaultModel = 'GPT-4o Mini',
   isConnected = false,
   providerCount = 0,

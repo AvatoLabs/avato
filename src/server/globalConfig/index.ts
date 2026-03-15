@@ -86,6 +86,7 @@ export const getServerGlobalConfig = async () => {
     enableMarketTrustedClient: !!(
       appEnv.MARKET_TRUSTED_CLIENT_SECRET && appEnv.MARKET_TRUSTED_CLIENT_ID
     ),
+    enableNoAuth: process.env.NOAUTH_MODE === '1',
     enableOIDC: authEnv.ENABLE_OIDC,
     enableUploadFileToServer: !!fileEnv.S3_SECRET_ACCESS_KEY,
 

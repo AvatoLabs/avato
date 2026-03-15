@@ -254,7 +254,7 @@ export default function ChatListScreen({ navigation }: any) {
 
   // Load persisted expand/collapse state
   useEffect(() => {
-    AsyncStorage.getItem('minkhub_expanded_groups').then((val) => {
+    AsyncStorage.getItem('avato_expanded_groups').then((val) => {
       if (val) {
         try {
           setExpandedGroups(JSON.parse(val));
@@ -517,7 +517,7 @@ export default function ChatListScreen({ navigation }: any) {
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) => {
       const next = { ...prev, [id]: !prev[id] };
-      AsyncStorage.setItem('minkhub_expanded_groups', JSON.stringify(next)).catch(() => {});
+      AsyncStorage.setItem('avato_expanded_groups', JSON.stringify(next)).catch(() => {});
       return next;
     });
   };

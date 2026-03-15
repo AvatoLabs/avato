@@ -557,7 +557,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
                 <RNImage
                   className="w-20 h-20 rounded-3xl mb-6"
-                  source={require('../../assets/mink-logo.png')}
+                  source={require('../../assets/avato-logo.png')}
                 />
               </Animated.View>
               <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>

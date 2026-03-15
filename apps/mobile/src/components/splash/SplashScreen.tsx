@@ -6,11 +6,11 @@
  *   0.2s  Phase 1: Aurora background fades in
  *   0.5s  Phase 2: Floating particles begin
  *   0.8s  Phase 3: Logo spotlight enters
- *   1.2s  Phase 4: DecryptedText decodes "MinkHub"
- *   1.8s  Phase 5: BlurTagline reveals "Your AI Workspace"
- *   2.5s  Phase 6: Exit — whole view scales up + fades out
+ *   1.2s  Phase 4: DecryptedText decodes "Avato"
+ *   1.8s  Phase 5: BlurTagline reveals the brand line
+ *   2.5s+ Phase 6: Exit waits for app bootstrap, then fades out
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
@@ -27,10 +27,13 @@ import SpotlightLogo from './SpotlightLogo';
 
 interface SplashScreenProps {
   onFinish?: () => void;
+  readyToExit?: boolean;
 }
 
-export default function SplashScreen({ onFinish }: SplashScreenProps) {
+export default function SplashScreen({ onFinish, readyToExit = true }: SplashScreenProps) {
   const [phase, setPhase] = useState(0);
+  const [isIntroComplete, setIsIntroComplete] = useState(false);
+  const hasExitedRef = useRef(false);
 
   // Exit animation values
   const exitOpacity = useSharedValue(1);
@@ -43,18 +46,25 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       setTimeout(() => setPhase(3), 800), // Logo Spotlight
       setTimeout(() => setPhase(4), 1200), // DecryptedText
       setTimeout(() => setPhase(5), 1800), // BlurTagline
-      setTimeout(() => {
-        // Phase 6: exit animation
-        setPhase(6);
-        exitOpacity.value = withTiming(0, { duration: 400, easing: Easing.in(Easing.cubic) });
-        exitScale.value = withTiming(1.08, { duration: 400, easing: Easing.in(Easing.cubic) });
-      }, 2400),
-      setTimeout(() => {
-        onFinish?.();
-      }, 2800),
+      setTimeout(() => setIsIntroComplete(true), 2200),
     ];
     return () => timers.forEach(clearTimeout);
-  }, [exitOpacity, exitScale, onFinish]);
+  }, []);
+
+  useEffect(() => {
+    if (!isIntroComplete || !readyToExit || hasExitedRef.current) return;
+
+    hasExitedRef.current = true;
+    setPhase(6);
+    exitOpacity.value = withTiming(0, { duration: 420, easing: Easing.in(Easing.cubic) });
+    exitScale.value = withTiming(1.08, { duration: 420, easing: Easing.in(Easing.cubic) });
+
+    const timer = setTimeout(() => {
+      onFinish?.();
+    }, 440);
+
+    return () => clearTimeout(timer);
+  }, [exitOpacity, exitScale, isIntroComplete, onFinish, readyToExit]);
 
   const exitStyle = useAnimatedStyle(() => ({
     opacity: exitOpacity.value,
@@ -70,8 +80,8 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       {/* Center content */}
       <View style={{ alignItems: 'center', flex: 1, justifyContent: 'center' }}>
         {phase >= 3 && <SpotlightLogo />}
-        {phase >= 4 && <DecryptedText text="MinkHub" />}
-        {phase >= 5 && <BlurTagline text="Your AI Workspace" />}
+        {phase >= 4 && <DecryptedText text="Avato" />}
+        {phase >= 5 && <BlurTagline text="Orchestrate the next AI workflow." />}
       </View>
     </Animated.View>
   );

@@ -6,9 +6,9 @@ import { normalizeApiUrl } from './server';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const AUTH_SESSION_STORAGE_KEY = 'minkhub_oidc_session';
+const AUTH_SESSION_STORAGE_KEY = 'avato_oidc_session';
 const MOBILE_CLIENT_ID = 'lobehub-mobile';
-const MOBILE_AUTH_SCHEME = 'com.minkhub.app';
+const MOBILE_AUTH_SCHEME = 'com.avato.app';
 const MOBILE_AUTH_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/callback`;
 const MOBILE_LOGOUT_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/logout`;
 const MOBILE_AUTH_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
@@ -26,6 +26,7 @@ export interface MobileAuthProvider {
 export interface MobileAuthConfig {
   authProviders: MobileAuthProvider[];
   disableEmailPassword: boolean;
+  enableNoAuth: boolean;
   enableOIDC: boolean;
   oAuthSSOProviders: string[];
 }
@@ -162,6 +163,7 @@ export async function fetchMobileAuthConfig(baseUrl: string): Promise<MobileAuth
   return {
     authProviders,
     disableEmailPassword: !!serverConfig.disableEmailPassword,
+    enableNoAuth: !!serverConfig.enableNoAuth,
     enableOIDC: !!serverConfig.enableOIDC,
     oAuthSSOProviders: serverConfig.oAuthSSOProviders || authProviders.map((provider) => provider.id),
   };
