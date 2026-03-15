@@ -24,7 +24,15 @@ const OnboardingPage = memo(() => {
   ]);
 
   if (!isUserStateInit) {
-    return <Loading debugId="Onboarding" />;
+    return (
+      <Loading
+        brandName="Avato"
+        debugId="Onboarding"
+        mode="launch"
+        slogan="Your AI workspace, designed for tomorrow."
+        startButtonText="Start with Avato"
+      />
+    );
   }
 
   const renderStep = () => {
