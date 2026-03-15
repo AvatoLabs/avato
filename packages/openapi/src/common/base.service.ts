@@ -321,6 +321,13 @@ export abstract class BaseService implements IBaseService {
     isPermitted: boolean;
     message?: string;
   }> {
+    if (process.env.NOAUTH_MODE === '1') {
+      return {
+        condition: this.userId ? { userId: this.userId } : undefined,
+        isPermitted: true,
+      };
+    }
+
     // 检查是否有对应动作的 ALL 权限
     const hasGlobalAccess = await this.hasGlobalPermission(permissionKey);
 

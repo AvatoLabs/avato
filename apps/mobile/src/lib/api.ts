@@ -9,8 +9,6 @@
  *   GET  /trpc/mobile/<procedure>?input=<json>
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
-import * as FileSystem from 'expo-file-system';
-
 import type {
   AgentSkillItem,
   AiProviderDetailItem,
@@ -582,21 +580,6 @@ export const aiProviderApi = {
 
 // ── File / Upload API ──────────────────────────────────────────────
 
-function generateUploadPathname(filename: string): {
-  date: string;
-  dirname: string;
-  filename: string;
-  pathname: string;
-} {
-  const ext = filename.split('.').pop() || 'bin';
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const uniqueName = `${id}.${ext}`;
-  const date = (Date.now() / 1000 / 60 / 60).toFixed(0);
-  const dirname = `files/${date}`;
-  const pathname = `${dirname}/${uniqueName}`;
-  return { date, dirname, filename: uniqueName, pathname };
-}
-
 export const fileApi = {
   list: (params?: {
     category?: string;
@@ -612,36 +595,42 @@ export const fileApi = {
     }),
 
   /**
-   * Upload a file using the same flow as web:
-   * 1. Get S3 presigned URL via tRPC
-   * 2. PUT file to S3 via XHR (reliable binary upload in RN)
-   * 3. Create file record via tRPC
+   * Upload a file through the server-side file API.
+   *
+   * Mobile clients cannot reliably access self-hosted localhost/private S3
+   * endpoints from presigned URLs, so this path sends the file to the app
+   * server and lets the server complete storage + record creation.
    */
   upload: async (uri: string, name: string, type: string): Promise<{ id: string; url: string }> => {
-    const { date, dirname, filename, pathname } = generateUploadPathname(name);
+    const base = await getBaseUrl();
+    const formData = new FormData();
 
-    const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', { pathname });
-    const uploadResult = await FileSystem.uploadAsync(preSignUrl, uri, {
-      headers: { 'Content-Type': type },
-      httpMethod: 'PUT',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    formData.append(
+      'file',
+      {
+        name,
+        type,
+        uri,
+      } as any,
+    );
+
+    const res = await fetch(`${base}/api/v1/files`, {
+      body: formData,
+      headers: await getAuthHeaders(base),
+      method: 'POST',
     });
-    if (uploadResult.status < 200 || uploadResult.status >= 300) {
-      throw new Error(`S3 upload failed: ${uploadResult.status} ${uploadResult.body}`);
+
+    const payload = await res.json().catch(() => undefined);
+
+    if (!res.ok || !payload?.success || !payload?.data?.id || !payload?.data?.url) {
+      const reason = payload?.error || payload?.message || `upload failed: ${res.status}`;
+      throw new Error(reason);
     }
 
-    const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
-    const fileSize = fileInfo.exists && 'size' in fileInfo ? fileInfo.size : 0;
-
-    const result = await trpcMutate<{ id: string; url: string }>('file.createFile', {
-      fileType: type,
-      metadata: { date, dirname, filename, path: pathname },
-      name,
-      size: fileSize,
-      url: pathname,
-    });
-
-    return result;
+    return {
+      id: payload.data.id,
+      url: payload.data.url,
+    };
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),

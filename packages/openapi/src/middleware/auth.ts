@@ -47,6 +47,14 @@ setInterval(cleanupApiKeyCache, 10 * 60 * 1000);
  * Supports both OIDC tokens and API keys via Bearer token
  */
 export const userAuthMiddleware = async (c: Context, next: Next) => {
+  if (process.env.NOAUTH_MODE === '1') {
+    const fixedUserId = process.env.NOAUTH_USER_ID || 'local-user';
+    log('NOAUTH_MODE enabled, using fixed user ID: %s', fixedUserId);
+    c.set('userId', fixedUserId);
+    c.set('authType', 'noauth');
+    return next();
+  }
+
   // Development mode debug bypass
   const isDebugApi = c.req.header('lobe-auth-dev-backend-api') === '1';
   if (process.env.NODE_ENV === 'development' && isDebugApi) {

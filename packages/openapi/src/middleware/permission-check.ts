@@ -42,6 +42,11 @@ export interface PermissionCheckOptions {
  */
 const requirePermission = (options: PermissionCheckOptions) => {
   return async (c: Context, next: Next) => {
+    if (process.env.NOAUTH_MODE === '1') {
+      log('NOAUTH_MODE enabled: skipping permission check');
+      return next();
+    }
+
     // Development mode bypass if enabled
     if (options.skipInDev && process.env.NODE_ENV === 'development') {
       log('Development mode: skipping permission check');
