@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
-import { agentApi, sessionApi } from '../lib/api';
+import { sessionApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { ChatSession, CreateSessionConfig } from '../types';
@@ -110,21 +110,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const title = config.title || 'New Conversation';
 
     try {
-      const agentConfig: Record<string, unknown> = { title };
-      if (config.description) agentConfig.description = config.description;
-      if (config.avatar) agentConfig.avatar = config.avatar;
-      if (config.systemPrompt) agentConfig.systemRole = config.systemPrompt;
-      if (config.model) agentConfig.model = config.model;
-      if (config.provider) agentConfig.provider = config.provider;
-      if (config.plugins) agentConfig.plugins = config.plugins;
-
-      const result = await agentApi.create(agentConfig, config.groupId);
-      const newId = result?.sessionId ?? `local-${Date.now()}`;
+      const newId = await sessionApi.create(config);
 
       const placeholder: ChatSession = {
         id: newId,
         title,
-        agentId: result?.agentId,
         avatar: config.avatar,
         model: config.model,
         provider: config.provider,

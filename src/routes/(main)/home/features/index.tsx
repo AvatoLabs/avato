@@ -2,15 +2,9 @@
 
 import { GROUP_CHAT_URL, SESSION_CHAT_URL } from '@lobechat/const';
 import { type RecentTopic, type SidebarAgentItem } from '@lobechat/types';
-import { Avatar, Block, Button, Flexbox, Tabs, Tag, Text } from '@lobehub/ui';
+import { Avatar, Block, Flexbox, Tabs, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
-import {
-  BotMessageSquareIcon,
-  ChevronRightIcon,
-  CompassIcon,
-  FileTextIcon,
-  WrenchIcon,
-} from 'lucide-react';
+import { BotMessageSquareIcon, ChevronRightIcon } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -21,15 +15,10 @@ import { useInitRecentPage } from '@/hooks/useInitRecentPage';
 import { useInitRecentResource } from '@/hooks/useInitRecentResource';
 import { useInitRecentTopic } from '@/hooks/useInitRecentTopic';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
-import { useAgentStore } from '@/store/agent';
-import { agentByIdSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
 import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors, homeRecentSelectors } from '@/store/home/selectors';
-import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/slices/auth/selectors';
-import { FilesTabs } from '@/types/files';
 
 import CommunityAgents from './CommunityAgents';
 import GroupSkeleton from './components/GroupSkeleton';
@@ -40,9 +29,6 @@ import RecentPage from './RecentPage';
 import RecentResource from './RecentResource';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
-  actionButton: css`
-    justify-content: flex-start;
-  `,
   listItem: css`
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: 12px;
@@ -242,23 +228,10 @@ const Home = memo(() => {
   const isLogin = useUserStore(authSelectors.isLogin);
   const isMobile = useIsMobile();
   const inputActiveMode = useHomeStore((s) => s.inputActiveMode);
-  const [setInputActiveMode, navigate] = useHomeStore((s) => [s.setInputActiveMode, s.navigate]);
-  const setCategory = useResourceManagerStore((s) => s.setCategory);
-  const recentTopics = useHomeStore(homeRecentSelectors.recentTopics);
-  const recentPages = useHomeStore(homeRecentSelectors.recentPages);
 
   useInitRecentPage();
   useInitRecentResource();
   const { isRevalidating: isTopicRevalidating } = useInitRecentTopic();
-
-  const inboxAgentId = useAgentStore(builtinAgentSelectors.inboxAgentId);
-  const model = useAgentStore((s) => agentByIdSelectors.getAgentModelById(inboxAgentId)(s));
-  const provider = useAgentStore((s) =>
-    agentByIdSelectors.getAgentModelProviderById(inboxAgentId)(s),
-  );
-
-  const isLobehubSkillEnabled = useServerConfigStore(serverConfigSelectors.enableLobehubSkill);
-  const isKlavisEnabled = useServerConfigStore(serverConfigSelectors.enableKlavis);
 
   const [activeTab, setActiveTab] = useState<'assistants' | 'community' | 'documents'>('documents');
 
@@ -284,121 +257,6 @@ const Home = memo(() => {
         style={{ display: hideOtherModules ? 'none' : undefined }}
       >
         {isLogin && <ResumeWorkPanel isRevalidating={isTopicRevalidating} />}
-
-        <Block
-          flex={isMobile ? 1 : 'none'}
-          padding={16}
-          variant={'outlined'}
-          style={{
-            borderRadius: 16,
-            minWidth: isMobile ? 'auto' : 320,
-            width: isMobile ? '100%' : 320,
-          }}
-        >
-          <Flexbox gap={16}>
-            <Flexbox gap={8}>
-              <Text color={cssVar.colorTextSecondary} fontSize={14}>
-                {t('workspace.quickActions.title')}
-              </Text>
-              <Button
-                className={styles.actionButton}
-                icon={BotMessageSquareIcon}
-                shape={'round'}
-                variant={'outlined'}
-                onClick={() => setInputActiveMode('agent')}
-              >
-                {t('starter.createAgent')}
-              </Button>
-              <Button
-                className={styles.actionButton}
-                icon={FileTextIcon}
-                shape={'round'}
-                variant={'outlined'}
-                onClick={() => {
-                  setCategory(FilesTabs.Pages);
-                  navigate?.('/resource');
-                }}
-              >
-                {t('workspace.quickActions.newDoc')}
-              </Button>
-              <Button
-                className={styles.actionButton}
-                icon={CompassIcon}
-                shape={'round'}
-                variant={'outlined'}
-                onClick={() => navigate?.('/community/agent')}
-              >
-                {t('workspace.quickActions.openCommunity')}
-              </Button>
-            </Flexbox>
-
-            <Flexbox gap={8}>
-              <Text color={cssVar.colorTextSecondary} fontSize={14}>
-                {t('workspace.status.title')}
-              </Text>
-              <Block
-                padding={'8px 10px'}
-                style={{ borderRadius: 10, background: cssVar.colorFillQuaternary }}
-              >
-                <Flexbox horizontal align={'center'} justify={'space-between'}>
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('workspace.status.model')}
-                  </Text>
-                  <Text ellipsis fontSize={12} style={{ maxWidth: 180 }} weight={500}>
-                    {(provider && model && `${provider} / ${model}`) || '-'}
-                  </Text>
-                </Flexbox>
-              </Block>
-              <Block
-                padding={'8px 10px'}
-                style={{ borderRadius: 10, background: cssVar.colorFillQuaternary }}
-              >
-                <Flexbox horizontal align={'center'} justify={'space-between'}>
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('workspace.status.mcp')}
-                  </Text>
-                  <Tag color={isKlavisEnabled ? 'success' : undefined}>
-                    {isKlavisEnabled ? t('workspace.status.on') : t('workspace.status.off')}
-                  </Tag>
-                </Flexbox>
-              </Block>
-              <Block
-                padding={'8px 10px'}
-                style={{ borderRadius: 10, background: cssVar.colorFillQuaternary }}
-              >
-                <Flexbox horizontal align={'center'} justify={'space-between'}>
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('workspace.status.skills')}
-                  </Text>
-                  <Tag color={isLobehubSkillEnabled ? 'success' : undefined}>
-                    {isLobehubSkillEnabled ? t('workspace.status.on') : t('workspace.status.off')}
-                  </Tag>
-                </Flexbox>
-              </Block>
-              <Block
-                padding={'8px 10px'}
-                style={{ borderRadius: 10, background: cssVar.colorFillQuaternary }}
-              >
-                <Flexbox horizontal align={'center'} justify={'space-between'}>
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('workspace.status.recent')}
-                  </Text>
-                  <Text fontSize={12} weight={500}>
-                    {recentTopics.length} / {recentPages.length}
-                  </Text>
-                </Flexbox>
-              </Block>
-              {isTopicRevalidating && (
-                <Flexbox horizontal align={'center'} gap={6}>
-                  <WrenchIcon color={cssVar.colorTextTertiary} size={14} />
-                  <Text fontSize={12} type={'secondary'}>
-                    {t('workspace.status.syncing')}
-                  </Text>
-                </Flexbox>
-              )}
-            </Flexbox>
-          </Flexbox>
-        </Block>
       </Flexbox>
 
       <Block

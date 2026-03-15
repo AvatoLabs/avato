@@ -17,6 +17,7 @@ import type {
   AiProviderRuntimeState,
   ChatMessage,
   ChatSession,
+  CreateSessionConfig,
     DiscoverModel,
     FileListItem,
     GenerationBatch,
@@ -141,11 +142,19 @@ export const sessionApi = {
       type: s.type ?? 'agent',
     }));
   },
-  /** Create a new agent session. Returns the new session ID string. */
-  create: (title = 'New Conversation') =>
+  /** Create a new session (same semantic path as web). Returns the new session ID string. */
+  create: (config?: CreateSessionConfig) =>
     trpcMutate<string>('session.createSession', {
-      config: { title },
-      session: {},
+      config: {
+        avatar: config?.avatar,
+        description: config?.description,
+        model: config?.model,
+        plugins: config?.plugins,
+        provider: config?.provider,
+        systemRole: config?.systemPrompt,
+        title: config?.title || 'New Conversation',
+      },
+      session: { groupId: config?.groupId },
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),
