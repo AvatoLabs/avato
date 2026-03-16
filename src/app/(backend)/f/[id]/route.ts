@@ -20,6 +20,22 @@ interface CachedFileData {
   redirectUrl: string;
 }
 
+const shouldProxyFileResponse = (redirectUrl: string) => {
+  try {
+    return new URL(redirectUrl).protocol === 'http:' && _reqAppProtocol() === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+const _reqAppProtocol = () => {
+  try {
+    return new URL(process.env.APP_URL || '').protocol;
+  } catch {
+    return 'http:';
+  }
+};
+
 /**
  * File proxy service
  * GET /f/:id
@@ -71,6 +87,20 @@ export const GET = async (_req: Request, segmentData: { params: Params }) => {
     // Web: Generate S3 presigned URL (5 minutes expiry)
     const redirectUrl = await fileService.createPreSignedUrlForPreview(file.url, 300);
     log('Web S3 presigned URL generated (expires in 5 min)');
+
+    if (shouldProxyFileResponse(redirectUrl)) {
+      log('Proxying file content to avoid mixed content: %s', id);
+      const byteArray = await fileService.getFileByteArray(file.url);
+
+      return new Response(byteArray, {
+        headers: {
+          'Cache-Control': 'private, max-age=60',
+          'Content-Disposition': `inline; filename="${encodeURIComponent(file.name || id)}"`,
+          'Content-Type': file.fileType || 'application/octet-stream',
+        },
+        status: 200,
+      });
+    }
 
     // Cache the presigned URL in Redis
     if (redisClient) {

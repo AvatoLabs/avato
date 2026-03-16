@@ -4,20 +4,28 @@
  */
 import * as Clipboard from 'expo-clipboard';
 import {
+  Ban,
   Bookmark,
+  Check,
   ChevronDown,
   ChevronRight,
   Copy,
+  Globe,
+  Hand,
+  Pause,
   Pencil,
   RefreshCw,
   Trash2,
   User,
+  Wrench,
+  X,
 } from 'lucide-react-native';
 import React, { memo, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image as RNImage,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -30,11 +38,19 @@ import Markdown from 'react-native-markdown-display';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
+import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useChatStore } from '../../store/chat';
 import { tokens } from '../../theme/tokens';
-import type { ChatMessage } from '../../types';
+import type {
+  ChatMessage,
+  ChatToolPayload,
+  CitationItem,
+  GroundingSearch,
+  ImageCitationItem,
+  MessageContentPart,
+} from '../../types';
 import ImageViewer from './ImageViewer';
 import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
@@ -46,9 +62,23 @@ interface MessageBubbleProps {
   sessionId: string;
 }
 
+const chatAccent = {
+  badgeBg: 'rgba(0,122,255,0.12)',
+  badgeText: '#1d4ed8',
+  bubbleBg: 'rgba(0,122,255,0.065)',
+  bubbleBorder: 'rgba(0,122,255,0.11)',
+  chipBg: 'rgba(0,122,255,0.08)',
+  chipBorder: 'rgba(0,122,255,0.12)',
+  elevatedBg: 'rgba(255,255,255,0.9)',
+  sectionBg: 'rgba(0,122,255,0.055)',
+  sectionBorder: 'rgba(0,122,255,0.11)',
+  subtleBg: 'rgba(0,122,255,0.045)',
+} as const;
+
 const MessageBubble = memo<MessageBubbleProps>(
   ({ message, sessionId, generating, onSaveToTopic }) => {
     const isUser = message.role === 'user';
+    const isToolMessage = message.role === 'tool';
     const { t } = useI18n();
     const toast = useToast();
 
@@ -116,6 +146,19 @@ const MessageBubble = memo<MessageBubbleProps>(
       haptics.light();
       onSaveToTopic?.();
     }, [onSaveToTopic]);
+
+    const handleOpenLink = useCallback(
+      async (url?: string) => {
+        if (!url) return;
+
+        try {
+          await Linking.openURL(url);
+        } catch {
+          toast.show('error', t.errorNetwork);
+        }
+      },
+      [t, toast],
+    );
 
     const mc = tokens.markdownColors;
 
@@ -263,9 +306,41 @@ const MessageBubble = memo<MessageBubbleProps>(
     };
 
     const totalTokens = message.usage?.totalTokens ?? 0;
-    const hasStats = !isUser && totalTokens > 0;
+    const hasStats = !isUser && !isToolMessage && totalTokens > 0;
     const hasAttachments =
       (message.imageList?.length ?? 0) > 0 || (message.fileList?.length ?? 0) > 0;
+    const hasSearch =
+      !isUser &&
+      !!message.search &&
+      !!(
+        message.search.citations?.length ||
+        message.search.searchQueries?.length ||
+        message.search.imageResults?.length ||
+        message.search.imageSearchQueries?.length
+      );
+    const hasTools = !isUser && (message.tools?.length ?? 0) > 0;
+    const multimodalContentParts =
+      !isToolMessage && message.metadata?.isMultimodal
+        ? parseMessageContentParts(message.metadata?.tempDisplayContent)
+        : null;
+    const multimodalReasoningParts = message.reasoning?.isMultimodal
+      ? parseMessageContentParts(
+          message.reasoning?.tempDisplayContent || message.reasoning?.content,
+        )
+      : null;
+    const renderedContent = injectCitationLinks(message.content, message.search?.citations);
+    const renderedReasoning = injectCitationLinks(
+      message.reasoning?.content,
+      message.search?.citations,
+    );
+    const assistantContentWidth = { maxWidth: '100%' as const, width: '100%' as const };
+    const userContentWidth = { maxWidth: '84%' as const };
+    const showStandaloneUserAttachments = isUser && hasAttachments;
+    const showMessageBubble =
+      !showStandaloneUserAttachments ||
+      !!renderedContent ||
+      !!multimodalContentParts?.length ||
+      isToolMessage;
 
     return (
       <Animated.View
@@ -278,40 +353,60 @@ const MessageBubble = memo<MessageBubbleProps>(
           className={`flex-row w-full mb-5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
           onPress={handlePress}
         >
-          {/* Avatar: model icon for assistant, user icon for user */}
-          {!isUser && (
-            <View className="w-9 h-9 mt-0.5 rounded-full bg-foreground/5 items-center justify-center mr-3 overflow-hidden">
-              {message.provider ? (
-                <RNImage
-                  className="w-5 h-5"
-                  defaultSource={require('../../../assets/avato-icon.png')}
-                  resizeMode="contain"
-                  source={{ uri: getProviderIconUrl(message.provider) }}
-                />
-              ) : (
-                <RNImage
-                  className="w-7 h-7 rounded-lg"
-                  source={require('../../../assets/avato-icon.png')}
-                />
-              )}
-            </View>
-          )}
-
-          <View className="max-w-[78%]">
-            {/* Model name label */}
-            {!isUser && message.model && (
-              <Text className="text-[11px] text-foreground/40 mb-1 ml-1" numberOfLines={1}>
-                {message.model}
-              </Text>
+          <View className={isUser ? 'items-end' : 'flex-1 min-w-0'}>
+            {!isUser && (
+              <View className="flex-row items-center mb-1.5">
+                <View className="w-9 h-9 rounded-full bg-foreground/5 items-center justify-center mr-3 overflow-hidden">
+                  {message.provider ? (
+                    <RNImage
+                      className="w-5 h-5"
+                      defaultSource={require('../../../assets/avato-icon.png')}
+                      resizeMode="contain"
+                      source={{ uri: getProviderIconUrl(message.provider) }}
+                    />
+                  ) : (
+                    <RNImage
+                      className="w-7 h-7 rounded-lg"
+                      source={require('../../../assets/avato-icon.png')}
+                    />
+                  )}
+                </View>
+                {message.model ? (
+                  <Text className="text-[11px] text-foreground/40 flex-1" numberOfLines={1}>
+                    {message.model}
+                  </Text>
+                ) : null}
+              </View>
             )}
 
-            <View
-              className={`px-4 py-3 ${
-                isUser
-                  ? 'bg-primary rounded-3xl rounded-tr-[6px]'
-                  : 'bg-foreground/5 rounded-3xl rounded-tl-[6px]'
-              }`}
-            >
+            <View style={isUser ? userContentWidth : assistantContentWidth}>
+              {showStandaloneUserAttachments ? (
+                <View className="mb-2">
+                  <AttachmentBlock
+                    fileList={message.fileList}
+                    imageList={message.imageList}
+                    isUser={isUser}
+                    onOpenImage={(url) => {
+                      setViewerUri(url);
+                      setShowImageViewer(true);
+                    }}
+                  />
+                </View>
+              ) : null}
+              {showMessageBubble ? (
+                <View
+                  className={`px-4 py-3 rounded-3xl ${
+                    isUser ? 'bg-primary rounded-tr-[6px]' : 'rounded-tl-[6px] border'
+                  }`}
+                  style={
+                    isUser
+                      ? undefined
+                      : {
+                          backgroundColor: chatAccent.bubbleBg,
+                          borderColor: chatAccent.bubbleBorder,
+                        }
+                  }
+                >
               {isEditing ? (
                 <View>
                   <TextInput
@@ -361,172 +456,143 @@ const MessageBubble = memo<MessageBubbleProps>(
                 </View>
               ) : (
                 <>
-                  {hasAttachments && (
-                    <View className="mb-3 gap-2">
-                      {message.imageList?.length ? (
-                        <ScrollView
-                          horizontal
-                          contentContainerStyle={{ gap: 8 }}
-                          showsHorizontalScrollIndicator={false}
-                        >
-                          {message.imageList.map((image) => (
-                            <TouchableOpacity
-                              activeOpacity={0.9}
-                              key={image.id}
-                              onPress={() => {
-                                setViewerUri(image.url);
-                                setShowImageViewer(true);
-                              }}
-                            >
-                              <RNImage
-                                source={{ uri: image.url }}
-                                style={{
-                                  backgroundColor: isUser
-                                    ? 'rgba(255,255,255,0.14)'
-                                    : 'rgba(0,0,0,0.04)',
-                                  borderRadius: 14,
-                                  height: 120,
-                                  width: 120,
-                                }}
-                              />
-                            </TouchableOpacity>
-                          ))}
-                        </ScrollView>
-                      ) : null}
-
-                      {message.fileList?.length ? (
-                        <View className="gap-2">
-                          {message.fileList.map((file) => (
-                            <View
-                              className="rounded-2xl px-3 py-2"
-                              key={file.id}
-                              style={{
-                                backgroundColor: isUser
-                                  ? 'rgba(255,255,255,0.14)'
-                                  : 'rgba(0,0,0,0.04)',
-                              }}
-                            >
-                              <Text
-                                numberOfLines={1}
-                                style={{
-                                  color: isUser ? '#ffffff' : mc.heading,
-                                  fontSize: 13,
-                                  fontWeight: '600',
-                                }}
-                              >
-                                {file.name}
-                              </Text>
-                              <Text
-                                numberOfLines={1}
-                                style={{
-                                  color: isUser ? 'rgba(255,255,255,0.7)' : mc.text + '88',
-                                  fontSize: 12,
-                                  marginTop: 2,
-                                }}
-                              >
-                                {file.fileType}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : null}
+                  {!showStandaloneUserAttachments && hasAttachments ? (
+                    <View className="mb-3">
+                      <AttachmentBlock
+                        fileList={message.fileList}
+                        imageList={message.imageList}
+                        isUser={isUser}
+                        onOpenImage={(url) => {
+                          setViewerUri(url);
+                          setShowImageViewer(true);
+                        }}
+                      />
                     </View>
-                  )}
+                  ) : null}
 
-                  {!isUser && (message.reasoning?.content || (generating && isReasoning)) && (
+                {hasSearch && message.search && <SearchGroundingBlock search={message.search} />}
+
+                {hasTools && message.tools && <ToolCallsBlock tools={message.tools} />}
+
+                {!isUser &&
+                  !isToolMessage &&
+                  (renderedReasoning || (generating && isReasoning)) && (
                     <ThinkingBlock
-                      content={message.reasoning?.content}
+                      content={renderedReasoning}
                       duration={message.reasoning?.duration}
+                      isMultimodal={message.reasoning?.isMultimodal}
                       markdownStyles={reasoningMarkdownStyles}
+                      tempDisplayContent={multimodalReasoningParts || undefined}
                       thinking={generating && isReasoning && message.id.startsWith('assistant-')}
                     />
                   )}
-                  {!message.content && generating ? (
-                    isReasoning ? null : (
-                      <TypingIndicator color="#636366" />
-                    )
-                  ) : message.content ? (
-                    <Markdown
-                      rules={markdownRules}
-                      style={isUser ? userMarkdownStyles : markdownStyles}
-                    >
-                      {message.content}
-                    </Markdown>
+                {isToolMessage ? (
+                  <ToolResultBlock message={message} />
+                ) : !message.content && !multimodalContentParts && generating ? (
+                  isReasoning ? null : (
+                    <TypingIndicator color="#636366" />
+                  )
+                ) : multimodalContentParts?.length ? (
+                  <RichContentPartsBlock
+                    citations={message.search?.citations}
+                    markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
+                    parts={multimodalContentParts}
+                    onOpenLink={handleOpenLink}
+                  />
+                ) : renderedContent ? (
+                  <Markdown
+                    rules={markdownRules}
+                    style={isUser ? userMarkdownStyles : markdownStyles}
+                    onLinkPress={(url) => {
+                      handleOpenLink(url);
+                      return false;
+                    }}
+                  >
+                    {renderedContent}
+                  </Markdown>
+                ) : null}
+                  {!isUser && message.search?.citations?.length ? (
+                    <CitationFootnotesBlock
+                      citations={message.search.citations}
+                      onOpenLink={handleOpenLink}
+                    />
                   ) : null}
                 </>
               )}
+                </View>
+              ) : null}
+
+              {/* Token stats badge (clickable) */}
+              {hasStats && !generating && (
+                <TouchableOpacity
+                  className="flex-row items-center mt-1 ml-1"
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  onPress={() => {
+                    haptics.light();
+                    setShowStats(true);
+                  }}
+                >
+                  <Text className="text-[11px] text-foreground/35">
+                    {totalTokens.toLocaleString()} {t.msgStatTokens}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Action Bar */}
+              {!generating && !isEditing && (showActions || !isUser) && (
+                <Animated.View
+                  className={`flex-row items-center mt-1.5 px-1 gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
+                  entering={FadeInUp.duration(200)}
+                >
+                  {!isUser && !isToolMessage && (
+                    <TouchableOpacity
+                      accessibilityLabel={t.msgActionRegenerate}
+                      activeOpacity={0.6}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={handleRegenerate}
+                    >
+                      <RefreshCw color={mc.text + '66'} size={14} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                  {isUser && (
+                    <TouchableOpacity
+                      accessibilityLabel={t.msgActionEdit}
+                      activeOpacity={0.6}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={handleEdit}
+                    >
+                      <Pencil color={mc.text + '66'} size={14} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    accessibilityLabel={t.msgActionCopy}
+                    activeOpacity={0.6}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={handleCopy}
+                  >
+                    <Copy color={mc.text + '66'} size={14} strokeWidth={2} />
+                  </TouchableOpacity>
+                  {!isUser && onSaveToTopic && (
+                    <TouchableOpacity
+                      accessibilityLabel={t.msgActionSaveToTopic}
+                      activeOpacity={0.6}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={handleSaveToTopic}
+                    >
+                      <Bookmark color={mc.text + '66'} size={14} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    accessibilityLabel={t.msgActionDelete}
+                    activeOpacity={0.6}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={handleDelete}
+                  >
+                    <Trash2 color={mc.text + '66'} size={14} strokeWidth={2} />
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
             </View>
-
-            {/* Token stats badge (clickable) */}
-            {hasStats && !generating && (
-              <TouchableOpacity
-                className="flex-row items-center mt-1 ml-1"
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={() => {
-                  haptics.light();
-                  setShowStats(true);
-                }}
-              >
-                <Text className="text-[11px] text-foreground/35">
-                  {totalTokens.toLocaleString()} {t.msgStatTokens}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Action Bar */}
-            {!generating && !isEditing && (showActions || !isUser) && (
-              <Animated.View
-                className={`flex-row items-center mt-1.5 px-1 gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
-                entering={FadeInUp.duration(200)}
-              >
-                {!isUser && (
-                  <TouchableOpacity
-                    accessibilityLabel={t.msgActionRegenerate}
-                    activeOpacity={0.6}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={handleRegenerate}
-                  >
-                    <RefreshCw color={mc.text + '66'} size={14} strokeWidth={2} />
-                  </TouchableOpacity>
-                )}
-                {isUser && (
-                  <TouchableOpacity
-                    accessibilityLabel={t.msgActionEdit}
-                    activeOpacity={0.6}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={handleEdit}
-                  >
-                    <Pencil color={mc.text + '66'} size={14} strokeWidth={2} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  accessibilityLabel={t.msgActionCopy}
-                  activeOpacity={0.6}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  onPress={handleCopy}
-                >
-                  <Copy color={mc.text + '66'} size={14} strokeWidth={2} />
-                </TouchableOpacity>
-                {!isUser && onSaveToTopic && (
-                  <TouchableOpacity
-                    accessibilityLabel={t.msgActionSaveToTopic}
-                    activeOpacity={0.6}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={handleSaveToTopic}
-                  >
-                    <Bookmark color={mc.text + '66'} size={14} strokeWidth={2} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  accessibilityLabel={t.msgActionDelete}
-                  activeOpacity={0.6}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  onPress={handleDelete}
-                >
-                  <Trash2 color={mc.text + '66'} size={14} strokeWidth={2} />
-                </TouchableOpacity>
-              </Animated.View>
-            )}
           </View>
 
           {isUser && (
@@ -559,6 +625,781 @@ const MessageBubble = memo<MessageBubbleProps>(
 );
 
 MessageBubble.displayName = 'MessageBubble';
+
+const formatToolArguments = (argumentsString: string) => {
+  if (!argumentsString) return '';
+
+  try {
+    return JSON.stringify(JSON.parse(argumentsString), null, 2);
+  } catch {
+    return argumentsString;
+  }
+};
+
+const stripHtml = (html: string) =>
+  html
+    .replaceAll(/<[^>]*>/g, '')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&nbsp;', ' ');
+
+const getUrlHost = (value?: string) => {
+  if (!value) return undefined;
+
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
+};
+
+const getCitationFavicon = (citation: CitationItem) => {
+  const host = citation.favicon || getUrlHost(citation.url);
+  return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
+};
+
+const getImageResultFavicon = (item: ImageCitationItem) => {
+  const host = item.domain || getUrlHost(item.sourceUri);
+  return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
+};
+
+const formatToolDisplayTitle = (tool: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'>) => {
+  const titleSegments = [tool.identifier, tool.apiName].filter(Boolean);
+  const args = safeParseJsonRecord(tool.arguments);
+
+  const params = Object.entries(args)
+    .slice(0, 1)
+    .map(([key, value]) => `${key}: ${formatToolArgumentValue(value)}`);
+
+  return {
+    params,
+    title: titleSegments.join(' > '),
+  };
+};
+
+const formatToolArgumentValue = (value: unknown) => {
+  if (typeof value === 'string') return value.length > 40 ? `${value.slice(0, 40)}...` : value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+    const serialized = JSON.stringify(value);
+    return serialized.length > 40 ? `${serialized.slice(0, 40)}...` : serialized;
+  }
+
+  return String(value);
+};
+
+const safeParseJsonRecord = (value?: string) => {
+  if (!value) return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const escapeMarkdownLinkLabel = (label: string) =>
+  label.replaceAll('[', '\\[').replaceAll(']', '\\]');
+
+const injectCitationLinks = (content: string | undefined, citations?: CitationItem[] | null) => {
+  if (!content || !citations?.length) return content ?? '';
+
+  return content.replaceAll(/\[(\d+)\]/g, (token, rawIndex) => {
+    const citation = citations[Number(rawIndex) - 1];
+
+    if (!citation?.url) return token;
+
+    return `[${escapeMarkdownLinkLabel(token)}](${citation.url})`;
+  });
+};
+
+const parseMessageContentParts = (
+  raw: MessageContentPart[] | string | null | undefined,
+): MessageContentPart[] | null => {
+  if (!raw) return null;
+
+  if (Array.isArray(raw)) {
+    return raw.filter((part): part is MessageContentPart => !!part?.type);
+  }
+
+  if (typeof raw !== 'string') return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((part): part is MessageContentPart => !!part?.type);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const RichContentPartsBlock = memo<{
+  citations?: CitationItem[] | null;
+  markdownStyles: Record<string, any>;
+  onOpenLink: (url?: string) => void;
+  parts: MessageContentPart[];
+}>(({ parts, markdownStyles, onOpenLink, citations }) => (
+  <View className="gap-2">
+    {parts.map((part, index) => {
+      if (part.type === 'image' && part.image) {
+        return (
+          <RNImage
+            key={`${part.image}-${index}`}
+            resizeMode="cover"
+            source={{ uri: part.image }}
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.04)',
+              borderRadius: 16,
+              height: 180,
+              width: '100%',
+            }}
+          />
+        );
+      }
+
+      if (part.type === 'text' && part.text) {
+        return (
+          <Markdown
+            key={`${part.text.slice(0, 24)}-${index}`}
+            style={markdownStyles}
+            onLinkPress={(url) => {
+              onOpenLink(url);
+              return false;
+            }}
+          >
+            {injectCitationLinks(part.text, citations)}
+          </Markdown>
+        );
+      }
+
+      return null;
+    })}
+  </View>
+));
+
+RichContentPartsBlock.displayName = 'RichContentPartsBlock';
+
+const AttachmentBlock = memo<{
+  fileList?: ChatMessage['fileList'];
+  imageList?: ChatMessage['imageList'];
+  isUser: boolean;
+  onOpenImage: (url: string) => void;
+}>(({ imageList, fileList, isUser, onOpenImage }) => (
+  <View className="gap-2">
+    {imageList?.length ? (
+      <ScrollView
+        horizontal
+        contentContainerStyle={{ gap: 8 }}
+        showsHorizontalScrollIndicator={false}
+      >
+        {imageList.map((image) => (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            key={image.id}
+            onPress={() => onOpenImage(image.url)}
+          >
+            <RNImage
+              source={{ uri: image.url }}
+              style={{
+                backgroundColor: isUser ? 'rgba(255,255,255,0.14)' : chatAccent.subtleBg,
+                borderRadius: 14,
+                height: 120,
+                width: 120,
+              }}
+            />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    ) : null}
+
+    {fileList?.length ? (
+      <View className="gap-2">
+        {fileList.map((file) => (
+          <View
+            className="rounded-2xl px-3 py-2"
+            key={file.id}
+            style={{
+              backgroundColor: isUser ? 'rgba(255,255,255,0.14)' : chatAccent.subtleBg,
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                color: isUser ? '#ffffff' : tokens.markdownColors.heading,
+                fontSize: 13,
+                fontWeight: '600',
+              }}
+            >
+              {file.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: isUser ? 'rgba(255,255,255,0.7)' : tokens.markdownColors.text + '88',
+                fontSize: 12,
+                marginTop: 2,
+              }}
+            >
+              {file.fileType}
+            </Text>
+          </View>
+        ))}
+      </View>
+    ) : null}
+  </View>
+));
+
+AttachmentBlock.displayName = 'AttachmentBlock';
+
+const CitationFootnotesBlock = memo<{
+  citations: CitationItem[];
+  onOpenLink: (url?: string) => void;
+}>(({ citations, onOpenLink }) => {
+  const { t } = useI18n();
+  const visibleCitations = citations.filter((item) => !!item.url);
+
+  if (visibleCitations.length === 0) return null;
+
+  return (
+    <View className="mt-3 gap-2">
+      <Text className="text-[11px] font-semibold text-foreground/45">{t.chatSearchSources}</Text>
+      {visibleCitations.map((citation, index) => {
+        const favicon = getCitationFavicon(citation);
+        const host = citation.favicon || getUrlHost(citation.url);
+
+        return (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="flex-row items-start rounded-2xl border border-black/5 px-3 py-2"
+            key={`${citation.url}-${index}`}
+            style={{
+              backgroundColor: chatAccent.sectionBg,
+              borderColor: chatAccent.sectionBorder,
+            }}
+            onPress={() => onOpenLink(citation.url)}
+          >
+            <View
+              className="items-center justify-center mr-3 mt-0.5 rounded-full"
+              style={{ backgroundColor: chatAccent.badgeBg, height: 22, width: 22 }}
+            >
+              <Text
+                className="text-[11px] font-semibold"
+                style={{ color: chatAccent.badgeText }}
+              >
+                {index + 1}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-[12px] font-semibold text-foreground/80" numberOfLines={2}>
+                {citation.title || citation.url}
+              </Text>
+              {!!host && (
+                <View className="mt-1 flex-row items-center">
+                  {favicon ? (
+                    <RNImage
+                      source={{ uri: favicon }}
+                      style={{ borderRadius: 6, height: 12, marginRight: 6, width: 12 }}
+                    />
+                  ) : null}
+                  <Text className="text-[11px] text-foreground/45" numberOfLines={1}>
+                    {host}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+});
+
+CitationFootnotesBlock.displayName = 'CitationFootnotesBlock';
+
+const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
+  const { t } = useI18n();
+  const toast = useToast();
+  const [expanded, setExpanded] = useState(true);
+
+  const webCount = search.citations?.length ?? 0;
+  const imageCount = search.imageResults?.length ?? 0;
+  const title = webCount > 0 ? t.chatSearchSources : t.chatSearchImages;
+  const count = webCount || imageCount;
+  const previewFavicons =
+    webCount > 0
+      ? (search.citations || []).slice(0, 5).map(getCitationFavicon).filter(Boolean)
+      : (search.imageResults || []).slice(0, 5).map(getImageResultFavicon).filter(Boolean);
+  const summaryText =
+    search.searchQueries?.[0] || search.imageSearchQueries?.[0] || search.citations?.[0]?.title;
+
+  const handleOpenLink = useCallback(
+    async (url?: string) => {
+      if (!url) return;
+
+      try {
+        await Linking.openURL(url);
+      } catch {
+        toast.show('error', t.errorNetwork);
+      }
+    },
+    [t, toast],
+  );
+
+  return (
+    <View
+      className="mb-2 rounded-2xl border border-black/5 px-3 py-2"
+      style={{
+        backgroundColor: chatAccent.sectionBg,
+        borderColor: chatAccent.sectionBorder,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.7}
+        className="flex-row items-center justify-between"
+        onPress={() => setExpanded((value) => !value)}
+      >
+        <View className="flex-row items-center flex-1">
+          <Globe color={semanticColors.primary} size={14} strokeWidth={2} />
+          <Text className="ml-2 text-[12px] font-medium text-foreground/65">
+            {title} {count > 0 ? `(${count})` : ''}
+          </Text>
+          {previewFavicons.length ? (
+            <View className="ml-2 flex-row items-center">
+              {previewFavicons.map((uri, index) => (
+                <RNImage
+                  key={`${uri}-${index}`}
+                  source={{ uri }}
+                  style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 8,
+                    height: 16,
+                    marginLeft: index === 0 ? 0 : -4,
+                    width: 16,
+                    zIndex: 20 - index,
+                  }}
+                />
+              ))}
+            </View>
+          ) : null}
+        </View>
+        {expanded ? (
+          <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+        ) : (
+          <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+        )}
+      </TouchableOpacity>
+
+      {expanded ? (
+        <View className="mt-3 gap-3">
+          {summaryText ? (
+            <View
+              className="rounded-xl px-3 py-2"
+              style={{ backgroundColor: chatAccent.elevatedBg }}
+            >
+              <Text className="text-[12px] font-medium text-foreground/75" numberOfLines={2}>
+                {summaryText}
+              </Text>
+            </View>
+          ) : null}
+
+          {search.searchQueries?.length ? (
+            <View>
+              <Text className="text-[11px] font-semibold text-foreground/45 mb-1">
+                {t.chatSearchQueries}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {search.searchQueries.map((query, index) => (
+                  <View
+                    className="rounded-full px-2.5 py-1"
+                    key={`${query}-${index}`}
+                    style={{ backgroundColor: chatAccent.chipBg }}
+                  >
+                    <Text className="text-[11px]" style={{ color: chatAccent.badgeText }}>
+                      {query}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {search.citations?.length ? (
+            <ScrollView
+              horizontal
+              contentContainerStyle={{ gap: 10 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              {search.citations.slice(0, 8).map((citation, index) => {
+                const host = citation.favicon || getUrlHost(citation.url);
+                const favicon = getCitationFavicon(citation);
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.82}
+                    className="rounded-2xl px-3 py-3"
+                    key={`${citation.url}-${index}`}
+                    style={{
+                      backgroundColor: chatAccent.elevatedBg,
+                      borderColor: chatAccent.sectionBorder,
+                      borderWidth: 1,
+                      width: 220,
+                    }}
+                    onPress={() => handleOpenLink(citation.url)}
+                  >
+                    <Text className="text-[13px] font-semibold text-foreground/80" numberOfLines={3}>
+                      {citation.title || citation.url}
+                    </Text>
+                    <View className="mt-3 flex-row items-center">
+                      {favicon ? (
+                        <RNImage
+                          source={{ uri: favicon }}
+                          style={{ borderRadius: 8, height: 16, marginRight: 8, width: 16 }}
+                        />
+                      ) : null}
+                      <Text className="flex-1 text-[11px] text-foreground/45" numberOfLines={1}>
+                        {host || citation.url}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {search.citations.length > 8 ? (
+                <View
+                  className="items-center justify-center rounded-2xl px-3 py-3"
+                  style={{
+                    backgroundColor: chatAccent.elevatedBg,
+                    borderColor: chatAccent.sectionBorder,
+                    borderWidth: 1,
+                    width: 180,
+                  }}
+                >
+                  <Text className="text-[13px] font-semibold text-foreground/75">
+                    +{search.citations.length - 8}
+                  </Text>
+                  <Text className="mt-1 text-[11px] text-foreground/45">{t.chatSearchSources}</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+          ) : null}
+
+          {search.imageSearchQueries?.length ? (
+            <View>
+              <Text className="text-[11px] font-semibold text-foreground/45 mb-1">
+                {t.chatImageSearchQueries}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {search.imageSearchQueries.map((query, index) => (
+                  <View
+                    className="rounded-full px-2.5 py-1"
+                    key={`${query}-${index}`}
+                    style={{ backgroundColor: chatAccent.chipBg }}
+                  >
+                    <Text className="text-[11px]" style={{ color: chatAccent.badgeText }}>
+                      {query}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {search.imageResults?.length ? (
+            <ScrollView
+              horizontal
+              contentContainerStyle={{ gap: 8 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              {search.imageResults.map((item, index) => (
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  className="rounded-xl overflow-hidden"
+                  key={`${item.imageUri || item.sourceUri || index}-${index}`}
+                  style={{
+                    backgroundColor: chatAccent.elevatedBg,
+                    borderColor: chatAccent.sectionBorder,
+                    borderWidth: 1,
+                    width: 124,
+                  }}
+                  onPress={() => handleOpenLink(item.sourceUri || item.imageUri)}
+                >
+                  {item.imageUri ? (
+                    <RNImage
+                      source={{ uri: item.imageUri }}
+                      style={{ height: 72, width: 124 }}
+                    />
+                  ) : null}
+                  <View className="px-2 py-2">
+                    <Text className="text-[11px] font-medium text-foreground/75" numberOfLines={2}>
+                      {item.title ? stripHtml(item.title) : item.domain || item.sourceUri || 'Image'}
+                    </Text>
+                    {item.domain || item.sourceUri ? (
+                      <View className="mt-2 flex-row items-center">
+                        {getImageResultFavicon(item) ? (
+                          <RNImage
+                            source={{ uri: getImageResultFavicon(item) }}
+                            style={{ borderRadius: 6, height: 12, marginRight: 6, width: 12 }}
+                          />
+                        ) : null}
+                        <Text className="flex-1 text-[10px] text-foreground/45" numberOfLines={1}>
+                          {item.domain || getUrlHost(item.sourceUri) || item.sourceUri}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+SearchGroundingBlock.displayName = 'SearchGroundingBlock';
+
+const ToolStatusIcon = memo<{
+  error?: unknown;
+  resultReady?: boolean;
+  status?: 'aborted' | 'pending' | 'rejected' | string | null;
+}>(({ status, resultReady, error }) => {
+  if (status === 'aborted') {
+    return <Pause color="#8E8E93" size={12} strokeWidth={2.25} />;
+  }
+
+  if (status === 'rejected') {
+    return <Ban color="#8E8E93" size={12} strokeWidth={2.25} />;
+  }
+
+  if (status === 'pending') {
+    return <Hand color="#0A84FF" size={12} strokeWidth={2.1} />;
+  }
+
+  if (error) {
+    return <X color="#FF3B30" size={12} strokeWidth={2.4} />;
+  }
+
+  if (resultReady) {
+    return <Check color="#34C759" size={12} strokeWidth={2.4} />;
+  }
+
+  return <ActivityIndicator color="#666" size="small" />;
+});
+
+ToolStatusIcon.displayName = 'ToolStatusIcon';
+
+const ToolStatusLabel = memo<{
+  error?: unknown;
+  resultReady?: boolean;
+  status?: 'aborted' | 'pending' | 'rejected' | string | null;
+}>(({ status, resultReady, error }) => {
+  const { t } = useI18n();
+
+  if (status === 'aborted') return t.chatToolAborted;
+  if (status === 'rejected') return t.chatToolRejected;
+  if (status === 'pending') return t.chatToolPending;
+  if (error) return t.chatToolFailed;
+  if (resultReady) return t.chatToolDone;
+  return t.chatToolRunning;
+});
+
+ToolStatusLabel.displayName = 'ToolStatusLabel';
+
+const ToolCard = memo<{
+  collapsible?: boolean;
+  argumentsText?: string;
+  content?: string;
+  error?: unknown;
+  resultReady?: boolean;
+  status?: 'aborted' | 'pending' | 'rejected' | string | null;
+  title: string;
+}>(({ title, argumentsText, status, resultReady, error, content, collapsible = false }) => {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(!collapsible);
+  const showDetail = expanded || !collapsible;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={collapsible ? 0.82 : 1}
+      className="rounded-2xl border border-black/5 px-3 py-3"
+      disabled={!collapsible}
+      style={{
+        backgroundColor: chatAccent.elevatedBg,
+        borderColor: chatAccent.sectionBorder,
+      }}
+      onPress={() => {
+        if (collapsible) setExpanded((value) => !value);
+      }}
+    >
+      <View className="flex-row items-start">
+        <View
+          className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg border border-black/5"
+          style={{
+            backgroundColor: chatAccent.badgeBg,
+            borderColor: chatAccent.chipBorder,
+          }}
+        >
+          <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
+        </View>
+        <View className="flex-1">
+          <View className="flex-row items-center">
+            <Text className="flex-1 text-[12px] font-semibold text-foreground/80" numberOfLines={1}>
+              {title}
+            </Text>
+            {collapsible ? (
+              expanded ? (
+                <ChevronDown color="#999" size={14} strokeWidth={2.3} />
+              ) : (
+                <ChevronRight color="#999" size={14} strokeWidth={2.3} />
+              )
+            ) : null}
+          </View>
+          <Text className="mt-0.5 text-[10px] uppercase tracking-[0.5px] text-foreground/38">
+            <ToolStatusLabel error={error} resultReady={resultReady} status={status} />
+          </Text>
+          {showDetail && argumentsText ? (
+            <>
+              <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                {t.chatToolArguments}
+              </Text>
+              <Text
+                className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/60"
+                style={{
+                  backgroundColor: chatAccent.subtleBg,
+                  fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                }}
+              >
+                {argumentsText}
+              </Text>
+            </>
+          ) : null}
+          {showDetail && content ? (
+            <>
+              <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                {t.chatToolResponse}
+              </Text>
+              <Text
+                className="mt-1 rounded-xl px-3 py-2 text-[12px] leading-5 text-foreground/72"
+                style={{ backgroundColor: chatAccent.subtleBg }}
+              >
+                {content}
+              </Text>
+            </>
+          ) : null}
+          {showDetail && error ? (
+            <Text className="mt-2 text-[11px] leading-4 text-[#FF3B30]">
+              {typeof error === 'string' ? error : t.chatToolFailed}
+            </Text>
+          ) : null}
+          {!showDetail && argumentsText ? (
+            <Text className="mt-2 text-[11px] leading-4 text-foreground/55" numberOfLines={2}>
+              {argumentsText}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+ToolCard.displayName = 'ToolCard';
+
+const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <View
+      className="mb-2 rounded-2xl border border-black/5 px-3 py-2"
+      style={{
+        backgroundColor: chatAccent.sectionBg,
+        borderColor: chatAccent.sectionBorder,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.7}
+        className="flex-row items-center justify-between"
+        onPress={() => setExpanded((value) => !value)}
+      >
+        <View className="flex-row items-center flex-1">
+          <Wrench color="#666" size={14} strokeWidth={2} />
+          <Text className="ml-2 text-[12px] font-medium text-foreground/65">
+            {t.chatToolsTitle} ({tools.length})
+          </Text>
+        </View>
+        {expanded ? (
+          <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+        ) : (
+          <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+        )}
+      </TouchableOpacity>
+
+      {expanded ? (
+        <View className="mt-3 gap-2">
+          {tools.map((tool) => {
+            const { params, title } = formatToolDisplayTitle(tool);
+            const argumentsText = [
+              params.length ? `(${params.join(', ')})` : '',
+              tool.arguments ? formatToolArguments(tool.arguments) : '',
+            ]
+              .filter(Boolean)
+              .join('\n');
+
+            return (
+              <ToolCard
+                collapsible
+                argumentsText={argumentsText || undefined}
+                key={tool.id}
+                resultReady={!!tool.result_msg_id}
+                status={tool.intervention?.status ?? null}
+                title={title || tool.apiName || tool.identifier}
+              />
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+ToolCallsBlock.displayName = 'ToolCallsBlock';
+
+const ToolResultBlock = memo<{ message: ChatMessage }>(({ message }) => {
+  const toolName = message.plugin?.apiName || message.plugin?.identifier || 'Tool';
+  const { params, title } = formatToolDisplayTitle({
+    apiName: message.plugin?.apiName || '',
+    arguments: message.plugin?.arguments || '',
+    identifier: message.plugin?.identifier || toolName,
+  });
+  const toolArguments = [
+    params.length ? `(${params.join(', ')})` : '',
+    message.plugin?.arguments ? formatToolArguments(message.plugin.arguments) : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const hasResult =
+    !!message.content || !!message.pluginState || !!message.metadata?.tempDisplayContent?.length;
+
+  return (
+    <ToolCard
+      argumentsText={toolArguments || undefined}
+      content={message.content || undefined}
+      error={message.pluginError}
+      resultReady={hasResult && !message.pluginError}
+      status={message.pluginIntervention?.status ?? null}
+      title={title || toolName}
+    />
+  );
+});
+
+ToolResultBlock.displayName = 'ToolResultBlock';
 
 // ── UsageStatsModal ──
 
@@ -672,12 +1513,14 @@ UsageStatsModal.displayName = 'UsageStatsModal';
 interface ThinkingBlockProps {
   content?: string;
   duration?: number;
+  isMultimodal?: boolean;
   markdownStyles: Record<string, any>;
+  tempDisplayContent?: MessageContentPart[];
   thinking?: boolean;
 }
 
 const ThinkingBlock = memo<ThinkingBlockProps>(
-  ({ content, duration, thinking, markdownStyles }) => {
+  ({ content, duration, isMultimodal, markdownStyles, tempDisplayContent, thinking }) => {
     const { t } = useI18n();
     const [expanded, setExpanded] = useState(false);
 
@@ -704,18 +1547,45 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
           {thinking ? (
             <Text className="text-primary text-[12px] font-medium ml-1">{t.chatThinking}</Text>
           ) : (
-            <Text className="text-secondary/50 text-[12px] font-medium ml-1">{durationLabel}</Text>
+            <Text className="text-[12px] font-medium ml-1" style={{ color: chatAccent.badgeText }}>
+              {durationLabel}
+            </Text>
           )}
         </TouchableOpacity>
 
         {showContent ? (
-          <View className="ml-4 mt-1">
+          <View
+            className="ml-4 mt-1 rounded-2xl border px-3 py-2"
+            style={{
+              backgroundColor: chatAccent.sectionBg,
+              borderColor: chatAccent.sectionBorder,
+            }}
+          >
             <ScrollView
               nestedScrollEnabled
               showsVerticalScrollIndicator={false}
               style={{ maxHeight: 240 }}
             >
-              <Markdown style={markdownStyles}>{content}</Markdown>
+              {isMultimodal && tempDisplayContent?.length ? (
+                <RichContentPartsBlock
+                  markdownStyles={markdownStyles}
+                  parts={tempDisplayContent}
+                  onOpenLink={(url) => {
+                    if (!url) return;
+                    Linking.openURL(url).catch(() => undefined);
+                  }}
+                />
+              ) : (
+                <Markdown
+                  style={markdownStyles}
+                  onLinkPress={(url) => {
+                    Linking.openURL(url).catch(() => undefined);
+                    return false;
+                  }}
+                >
+                  {content}
+                </Markdown>
+              )}
             </ScrollView>
           </View>
         ) : null}

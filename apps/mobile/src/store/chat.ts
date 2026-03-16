@@ -10,7 +10,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
-import type { ChatRequestOptions } from '../lib/api';
+import type {
+  ChatRequestOptions,
+  MobileChatMessage,
+  MobileMessageToolCall,
+  StreamContentState,
+  StreamReasoningState,
+} from '../lib/api';
 import { agentApi, aiChatApi, messageApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
@@ -83,38 +89,95 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
 }
 
 interface UploadedAttachment {
+  content?: string;
   fileId: string;
   name: string;
   type: string;
   url: string;
 }
 
-interface MobileUserMessageContentPartText {
-  text: string;
-  type: 'text';
-}
+const buildAssistantMessageMetadata = (
+  performance?: Record<string, any>,
+  usage?: Record<string, any>,
+  contentMetadata?: ChatMessage['metadata'],
+) =>
+  performance || usage || contentMetadata
+    ? {
+        ...contentMetadata,
+        ...(performance ? { performance: performance as any } : {}),
+        ...(usage ? { usage: usage as any } : {}),
+      }
+    : undefined;
 
-interface MobileUserMessageContentPartImage {
-  image_url: {
-    detail?: 'auto' | 'high' | 'low';
-    url: string;
+const mergeMessageMetadata = (
+  existing: ChatMessage['metadata'],
+  contentState?: Pick<StreamContentState, 'isMultimodal' | 'tempDisplayContent'>,
+) => {
+  if (!contentState?.isMultimodal && !contentState?.tempDisplayContent) return existing;
+
+  return {
+    ...existing,
+    ...(contentState.isMultimodal ? { isMultimodal: true } : {}),
+    ...(contentState.tempDisplayContent
+      ? { tempDisplayContent: contentState.tempDisplayContent }
+      : {}),
   };
-  type: 'image_url';
-}
+};
 
-type MobileUserMessageContentPart =
-  | MobileUserMessageContentPartImage
-  | MobileUserMessageContentPartText;
+const buildReasoningState = (
+  reasoning: StreamReasoningState,
+  duration?: number,
+): NonNullable<ChatMessage['reasoning']> => ({
+  ...(reasoning.content ? { content: reasoning.content } : {}),
+  ...(duration !== undefined ? { duration } : {}),
+  ...(reasoning.isMultimodal ? { isMultimodal: true } : {}),
+  ...(reasoning.tempDisplayContent ? { tempDisplayContent: reasoning.tempDisplayContent } : {}),
+});
 
-interface MobileChatMessage {
-  content: string | MobileUserMessageContentPart[];
-  role: string;
-}
+const buildPersistedReasoning = (
+  reasoning: ChatMessage['reasoning'],
+): NonNullable<ChatMessage['reasoning']> | undefined => {
+  if (!reasoning) return undefined;
+
+  if (reasoning.isMultimodal && reasoning.tempDisplayContent?.length) {
+    return {
+      content:
+        reasoning.content || JSON.stringify(reasoning.tempDisplayContent),
+      ...(reasoning.duration !== undefined ? { duration: reasoning.duration } : {}),
+      isMultimodal: true,
+      ...(reasoning.signature ? { signature: reasoning.signature } : {}),
+    };
+  }
+
+  if (!reasoning.content && reasoning.duration === undefined && !reasoning.signature) return undefined;
+
+  return {
+    ...(reasoning.content ? { content: reasoning.content } : {}),
+    ...(reasoning.duration !== undefined ? { duration: reasoning.duration } : {}),
+    ...(reasoning.signature ? { signature: reasoning.signature } : {}),
+  };
+};
 
 const isImageAttachment = (mimeType: string) => mimeType.startsWith('image/');
+const FILE_CONTENT_PREVIEW_LIMIT = 6000;
 
 const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
   attachments.map((f) => `[${f.name}]`).join('\n');
+
+const buildAttachmentContextLine = (attachment: UploadedAttachment) => {
+  const extractedContent = attachment.content?.trim();
+
+  if (extractedContent) {
+    const preview =
+      extractedContent.length > FILE_CONTENT_PREVIEW_LIMIT
+        ? `${extractedContent.slice(0, FILE_CONTENT_PREVIEW_LIMIT)}…`
+        : extractedContent;
+
+    return `- ${attachment.name}:\n${preview}`;
+  }
+
+  return `- ${attachment.name}: ${attachment.url}`;
+};
 
 const buildUserStreamContent = (
   text: string,
@@ -127,11 +190,23 @@ const buildUserStreamContent = (
   if (text) textBlocks.push(text);
 
   if (nonImageAttachments.length > 0) {
-    const fileLines = nonImageAttachments.map((f) => `- ${f.name}: ${f.url}`);
+    const fileLines = nonImageAttachments.map(buildAttachmentContextLine);
     textBlocks.push(`Attached files:\n${fileLines.join('\n')}`);
   }
 
-  const parts: MobileUserMessageContentPart[] = [];
+  const parts: Array<
+    | {
+        text: string;
+        type: 'text';
+      }
+    | {
+        image_url: {
+          detail?: 'auto' | 'high' | 'low';
+          url: string;
+        };
+        type: 'image_url';
+      }
+  > = [];
   if (textBlocks.length > 0) {
     parts.push({ text: textBlocks.join('\n\n'), type: 'text' });
   }
@@ -148,9 +223,74 @@ const buildUserStreamContent = (
   return parts;
 };
 
+const toUploadedAttachment = (message: ChatMessage): UploadedAttachment[] => [
+  ...(message.fileList || []).map((file) => ({
+    content: file.content,
+    fileId: file.id,
+    name: file.name,
+    type: file.fileType,
+    url: file.url,
+  })),
+  ...(message.imageList || []).map((image) => ({
+    fileId: image.id,
+    name: image.alt || image.id,
+    type: 'image/*',
+    url: image.url,
+  })),
+];
+
+const toToolCalls = (message: ChatMessage): MobileMessageToolCall[] | undefined => {
+  if (!message.tools?.length) return undefined;
+
+  return message.tools.map((tool) => ({
+    function: {
+      arguments: tool.arguments,
+      name: tool.apiName || tool.identifier,
+    },
+    id: tool.id,
+    ...(tool.thoughtSignature ? { thoughtSignature: tool.thoughtSignature } : {}),
+    type: tool.type,
+  }));
+};
+
+const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => {
+  if (message.role === 'user') {
+    const attachments = toUploadedAttachment(message);
+
+    return {
+      content:
+        attachments.length > 0
+          ? buildUserStreamContent(message.content, attachments)
+          : message.content,
+      role: 'user',
+    };
+  }
+
+  if (message.role === 'assistant') {
+    return {
+      content: message.content,
+      ...(message.reasoning ? { reasoning: message.reasoning } : {}),
+      role: 'assistant',
+      ...(message.tools?.length ? { tool_calls: toToolCalls(message) } : {}),
+    };
+  }
+
+  if (message.role === 'tool' && message.toolCallId) {
+    return {
+      content: message.content,
+      role: 'tool',
+      tool_call_id: message.toolCallId,
+    };
+  }
+
+  return null;
+};
+
 interface ChatState {
   /** AbortController for the current streaming request */
   abortController: AbortController | null;
+  activeStreamingMessageId: string | null;
+  activeStreamingSessionId: string | null;
   clearMessages: (sessionId: string) => void;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   /** Message currently being edited (id) */
@@ -188,6 +328,8 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
+  activeStreamingMessageId: null,
+  activeStreamingSessionId: null,
   messagesBySession: {},
   generating: false,
   isReasoning: false,
@@ -199,6 +341,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset: () => {
     get().abortController?.abort();
     set({
+      activeStreamingMessageId: null,
+      activeStreamingSessionId: null,
       abortController: null,
       editingMessageId: null,
       generating: false,
@@ -215,6 +359,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       controller.abort();
     }
     set({
+      activeStreamingMessageId: null,
+      activeStreamingSessionId: null,
       abortController: null,
       generating: false,
       isReasoning: false,
@@ -226,10 +372,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
   fetchMessages: async (sessionId: string, topicId?: string) => {
     try {
       const messages = await messageApi.list(sessionId, topicId);
+      const {
+        activeStreamingMessageId,
+        activeStreamingSessionId,
+        generating,
+        messagesBySession,
+      } = get();
+
+      const shouldKeepLocalStreamingMessage =
+        generating &&
+        activeStreamingSessionId === sessionId &&
+        !!activeStreamingMessageId &&
+        !messages.some((message) => message.id === activeStreamingMessageId);
+
+      const localStreamingMessage = shouldKeepLocalStreamingMessage
+        ? (messagesBySession[sessionId] || []).find((message) => message.id === activeStreamingMessageId)
+        : undefined;
+
       set((s) => ({
         messagesBySession: {
           ...s.messagesBySession,
-          [sessionId]: messages ?? [],
+          [sessionId]:
+            localStreamingMessage && !messages.some((message) => message.id === localStreamingMessage.id)
+              ? [...messages, localStreamingMessage]
+              : (messages ?? []),
         },
       }));
     } catch (err) {
@@ -314,17 +480,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    // Capture context messages synchronously before any await to prevent race conditions
-    // (e.g. fetchMessages overwriting the state while we wait for messageApi.create)
-    const capturedMessages = get().messagesBySession[sessionId] || [];
-    const contextMessages = capturedMessages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map<MobileChatMessage>((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
     // Persist user message on backend
+    let persistedMessagesAfterUser: ChatMessage[] | undefined;
     let userMessageServerId: string | undefined;
     try {
       const result = await messageApi.create({
@@ -335,10 +492,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         topicId,
       } as any);
       userMessageServerId = result?.id;
-    } catch (err) {
+      persistedMessagesAfterUser = result?.messages;
+
+      if (result?.messages?.length) {
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: result.messages,
+          },
+        }));
+      }
+    } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorSendFailed);
     }
+
+    const contextMessages = (persistedMessagesAfterUser || get().messagesBySession[sessionId] || [])
+      .map(buildContextMessage)
+      .filter(Boolean) as MobileChatMessage[];
 
     // Create a placeholder for the assistant response
     const assistantMsgId = `assistant-${Date.now()}`;
@@ -353,6 +524,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const abortController = new AbortController();
     set((s) => ({
+      activeStreamingMessageId: assistantMsgId,
+      activeStreamingSessionId: sessionId,
       abortController,
       generating: true,
       isReasoning: false,
@@ -360,7 +533,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamBuffer: '',
       messagesBySession: {
         ...s.messagesBySession,
-        [sessionId]: [...(s.messagesBySession[sessionId] || []), assistantMsg],
+        [sessionId]: [
+          ...(persistedMessagesAfterUser || s.messagesBySession[sessionId] || []),
+          assistantMsg,
+        ],
       },
     }));
     if (uploadedAttachments.length > 0) {
@@ -369,13 +545,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)
     try {
-      if (uploadedAttachments.length > 0 && contextMessages.length > 0) {
-        const latest = contextMessages.at(-1);
-        if (latest?.role === 'user') {
-          latest.content = buildUserStreamContent(textContent, uploadedAttachments);
-        }
-      }
-
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
       chatOptions.sessionId = sessionId;
@@ -404,42 +573,53 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Throttle store updates to avoid per-token re-renders
       const THROTTLE_MS = 100;
-      let pendingReasoning: string | null = null;
-      let pendingText: string | null = null;
+      let pendingReasoning: StreamReasoningState | null = null;
+      let pendingContent: StreamContentState | null = null;
       let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 
       const flushPending = () => {
         throttleTimer = null;
         const reasoning = pendingReasoning;
-        const text = pendingText;
+        const contentState = pendingContent;
         pendingReasoning = null;
-        pendingText = null;
+        pendingContent = null;
 
-        if (reasoning !== null && text === null) {
+        if (reasoning !== null && contentState === null) {
           set((s) => ({
             messagesBySession: {
               ...s.messagesBySession,
               [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: { content: reasoning } } : m,
+                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
               ),
             },
           }));
-        } else if (text !== null) {
+        } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
           if (wasReasoning) {
             const startedAt = get().reasoningStartedAt;
             const duration = startedAt ? Date.now() - startedAt : undefined;
             set((s) => ({
               isReasoning: false,
-              streamBuffer: text,
+              streamBuffer: contentState.content,
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
                   m.id === assistantMsgId
                     ? {
                         ...m,
-                        content: text,
-                        reasoning: m.reasoning ? { ...m.reasoning, duration } : m.reasoning,
+                        content: contentState.content,
+                        ...(mergeMessageMetadata(m.metadata, contentState)
+                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
+                          : {}),
+                        reasoning: m.reasoning
+                          ? {
+                              ...m.reasoning,
+                              ...(m.reasoning.isMultimodal
+                                ? {}
+                                : { content: m.reasoning.content }),
+                              ...(duration !== undefined ? { duration } : {}),
+                            }
+                          : m.reasoning,
                       }
                     : m,
                 ),
@@ -447,11 +627,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }));
           } else {
             set((s) => ({
-              streamBuffer: text,
+              streamBuffer: contentState.content,
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, content: text } : m,
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: contentState.content,
+                        ...(mergeMessageMetadata(m.metadata, contentState)
+                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
+                          : {}),
+                      }
+                    : m,
                 ),
               },
             }));
@@ -470,6 +658,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         contextMessages as any,
         chatOptions,
         {
+          onImages: (images) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
+                ),
+              },
+            }));
+          },
           onReasoning: (accReasoning) => {
             if (!get().reasoningStartedAt) {
               set({ isReasoning: true, reasoningStartedAt: Date.now() });
@@ -477,9 +675,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
             pendingReasoning = accReasoning;
             scheduleFlush();
           },
-          onText: (accText) => {
-            pendingText = accText;
+          onContent: (contentState) => {
+            pendingContent = contentState;
             scheduleFlush();
+          },
+          onSearch: (search) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, search } : m,
+                ),
+              },
+            }));
+          },
+          onTools: (tools) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, tools } : m,
+                ),
+              },
+            }));
           },
         },
         abortController.signal,
@@ -490,7 +708,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         clearTimeout(throttleTimer);
         throttleTimer = null;
       }
-      pendingText = result.text;
+      pendingContent = {
+        content: result.text,
+        ...result.contentMetadata,
+      };
       flushPending();
 
       // Finalize reasoning duration if it was still reasoning when stream ended
@@ -503,15 +724,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...s.messagesBySession,
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
               m.id === assistantMsgId && m.reasoning
-                ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                ? {
+                    ...m,
+                    content: result.text,
+                    reasoning: {
+                      ...m.reasoning,
+                      ...(duration !== undefined ? { duration } : {}),
+                    },
+                  }
                 : m,
             ),
           },
         }));
       }
 
-      // Store usage/performance on the assistant message
-      if (result.usage || result.performance) {
+      if (
+        result.images ||
+        result.search ||
+        result.tools ||
+        result.usage ||
+        result.performance
+      ) {
         set((s) => ({
           messagesBySession: {
             ...s.messagesBySession,
@@ -519,8 +752,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
               m.id === assistantMsgId
                 ? {
                     ...m,
+                    ...(result.images ? { imageList: result.images } : {}),
+                    ...(result.search ? { search: result.search } : {}),
+                    ...(result.tools ? { tools: result.tools } : {}),
                     ...(result.usage ? { usage: result.usage as any } : {}),
                     ...(result.performance ? { performance: result.performance as any } : {}),
+                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
+                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
+                      : {}),
                     provider,
                   }
                 : m,
@@ -534,16 +773,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
         (m) => m.id === assistantMsgId,
       );
       try {
-        await messageApi.create({
+        const persistedAssistant = await messageApi.create({
           sessionId,
           content: result.text,
           role: 'assistant',
           model: chatOptions.model,
+          ...(result.images ? { imageList: result.images } : {}),
+          metadata: buildAssistantMessageMetadata(
+            result.performance,
+            result.usage,
+            localMsg?.metadata,
+          ),
+          ...(result.search ? { search: result.search } : {}),
+          ...(result.tools ? { tools: result.tools } : {}),
           provider,
           parentId: userMessageServerId,
           topicId,
-          reasoning: localMsg?.reasoning || undefined,
+          reasoning: buildPersistedReasoning(localMsg?.reasoning),
         });
+
+        if (persistedAssistant?.messages?.length) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: persistedAssistant.messages,
+            },
+          }));
+        }
       } catch (err) {
         console.warn('[ChatStore] Failed to persist assistant message:', err);
       }
@@ -561,15 +817,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     } finally {
       set({
+        activeStreamingMessageId: null,
+        activeStreamingSessionId: null,
         abortController: null,
         generating: false,
         isReasoning: false,
         reasoningStartedAt: null,
         streamBuffer: '',
       });
-
-      // Refresh from server to sync IDs and ensure consistency
-      setTimeout(() => get().fetchMessages(sessionId), 1500);
     }
   },
 
@@ -592,7 +847,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
     try {
       await messageApi.remove(messageId);
-    } catch (err) {
+    } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorDeleteFailed);
       // Refresh from server on failure
@@ -613,7 +868,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
     try {
       await messageApi.update(messageId, content);
-    } catch (err) {
+    } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorEditFailed);
       get().fetchMessages(sessionId);
@@ -629,7 +884,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // If it's an assistant message, remove it and resend from previous user message
     // If it's a user message, remove subsequent assistant and regenerate
-    let contextMessages: { role: string; content: string }[];
+    let contextMessages: MobileChatMessage[];
     if (target.role === 'assistant') {
       // Remove this assistant message
       set((s) => ({
@@ -638,10 +893,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           [sessionId]: (s.messagesBySession[sessionId] || []).filter((m) => m.id !== messageId),
         },
       }));
+      void messageApi.remove(messageId).catch((error) => {
+        console.warn('[ChatStore] Failed to remove assistant during regeneration:', error);
+      });
       contextMessages = messages
         .slice(0, targetIdx)
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map(buildContextMessage)
+        .filter(Boolean) as MobileChatMessage[];
     } else {
       // User message: remove all after it, then regenerate
       const afterIds = messages.slice(targetIdx + 1).map((m) => m.id);
@@ -653,10 +911,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ),
         },
       }));
+      if (afterIds.length > 0) {
+        void messageApi.removeAll(afterIds).catch((error) => {
+          console.warn('[ChatStore] Failed to remove trailing messages during regeneration:', error);
+        });
+      }
       contextMessages = messages
         .slice(0, targetIdx + 1)
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map(buildContextMessage)
+        .filter(Boolean) as MobileChatMessage[];
     }
 
     // Create a new assistant placeholder and stream
@@ -672,6 +935,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const abortController = new AbortController();
     set((s) => ({
+      activeStreamingMessageId: assistantMsgId,
+      activeStreamingSessionId: sessionId,
       abortController,
       generating: true,
       isReasoning: false,
@@ -698,42 +963,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
 
       const THROTTLE_MS = 100;
-      let pendingReasoning: string | null = null;
-      let pendingText: string | null = null;
+      let pendingReasoning: StreamReasoningState | null = null;
+      let pendingContent: StreamContentState | null = null;
       let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 
       const flushPending = () => {
         throttleTimer = null;
         const reasoning = pendingReasoning;
-        const text = pendingText;
+        const contentState = pendingContent;
         pendingReasoning = null;
-        pendingText = null;
+        pendingContent = null;
 
-        if (reasoning !== null && text === null) {
+        if (reasoning !== null && contentState === null) {
           set((s) => ({
             messagesBySession: {
               ...s.messagesBySession,
               [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                m.id === assistantMsgId ? { ...m, reasoning: { content: reasoning } } : m,
+                m.id === assistantMsgId ? { ...m, reasoning: buildReasoningState(reasoning) } : m,
               ),
             },
           }));
-        } else if (text !== null) {
+        } else if (contentState !== null) {
           const wasReasoning = get().isReasoning;
           if (wasReasoning) {
             const startedAt = get().reasoningStartedAt;
             const duration = startedAt ? Date.now() - startedAt : undefined;
             set((s) => ({
               isReasoning: false,
-              streamBuffer: text,
+              streamBuffer: contentState.content,
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
                   m.id === assistantMsgId
                     ? {
                         ...m,
-                        content: text,
-                        reasoning: m.reasoning ? { ...m.reasoning, duration } : m.reasoning,
+                        content: contentState.content,
+                        ...(mergeMessageMetadata(m.metadata, contentState)
+                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
+                          : {}),
+                        reasoning: m.reasoning
+                          ? {
+                              ...m.reasoning,
+                              ...(duration !== undefined ? { duration } : {}),
+                            }
+                          : m.reasoning,
                       }
                     : m,
                 ),
@@ -741,11 +1014,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }));
           } else {
             set((s) => ({
-              streamBuffer: text,
+              streamBuffer: contentState.content,
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, content: text } : m,
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: contentState.content,
+                        ...(mergeMessageMetadata(m.metadata, contentState)
+                          ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
+                          : {}),
+                      }
+                    : m,
                 ),
               },
             }));
@@ -764,6 +1045,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         contextMessages,
         chatOptions,
         {
+          onImages: (images) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, imageList: images } : m,
+                ),
+              },
+            }));
+          },
           onReasoning: (accReasoning) => {
             if (!get().reasoningStartedAt) {
               set({ isReasoning: true, reasoningStartedAt: Date.now() });
@@ -771,9 +1062,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
             pendingReasoning = accReasoning;
             scheduleFlush();
           },
-          onText: (accText) => {
-            pendingText = accText;
+          onContent: (contentState) => {
+            pendingContent = contentState;
             scheduleFlush();
+          },
+          onSearch: (search) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, search } : m,
+                ),
+              },
+            }));
+          },
+          onTools: (tools) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, tools } : m,
+                ),
+              },
+            }));
           },
         },
         abortController.signal,
@@ -783,7 +1094,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         clearTimeout(throttleTimer);
         throttleTimer = null;
       }
-      pendingText = result.text;
+      pendingContent = {
+        content: result.text,
+        ...result.contentMetadata,
+      };
       flushPending();
 
       if (get().isReasoning) {
@@ -795,15 +1109,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...s.messagesBySession,
             [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
               m.id === assistantMsgId && m.reasoning
-                ? { ...m, content: result.text, reasoning: { ...m.reasoning, duration } }
+                ? {
+                    ...m,
+                    content: result.text,
+                    reasoning: {
+                      ...m.reasoning,
+                      ...(duration !== undefined ? { duration } : {}),
+                    },
+                  }
                 : m,
             ),
           },
         }));
       }
 
-      // Store usage/performance on the regenerated assistant message
-      if (result.usage || result.performance) {
+      if (
+        result.images ||
+        result.search ||
+        result.tools ||
+        result.usage ||
+        result.performance
+      ) {
         set((s) => ({
           messagesBySession: {
             ...s.messagesBySession,
@@ -811,8 +1137,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
               m.id === assistantMsgId
                 ? {
                     ...m,
+                    ...(result.images ? { imageList: result.images } : {}),
+                    ...(result.search ? { search: result.search } : {}),
+                    ...(result.tools ? { tools: result.tools } : {}),
                     ...(result.usage ? { usage: result.usage as any } : {}),
                     ...(result.performance ? { performance: result.performance as any } : {}),
+                    ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
+                      ? { metadata: mergeMessageMetadata(m.metadata, result.contentMetadata) }
+                      : {}),
                     provider,
                   }
                 : m,
@@ -826,14 +1158,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
         (m) => m.id === assistantMsgId,
       );
       try {
-        await messageApi.create({
+        const persistedAssistant = await messageApi.create({
           sessionId,
           content: result.text,
+          ...(result.images ? { imageList: result.images } : {}),
           role: 'assistant',
           model: chatOptions.model,
+          metadata: buildAssistantMessageMetadata(
+            result.performance,
+            result.usage,
+            localMsg?.metadata,
+          ),
+          ...(result.search ? { search: result.search } : {}),
           provider,
-          reasoning: localMsg?.reasoning || undefined,
+          ...(result.tools ? { tools: result.tools } : {}),
+          reasoning: buildPersistedReasoning(localMsg?.reasoning),
         });
+
+        if (persistedAssistant?.messages?.length) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: persistedAssistant.messages,
+            },
+          }));
+        }
       } catch (err) {
         console.warn('[ChatStore] Failed to persist regenerated assistant message:', err);
       }
@@ -851,13 +1200,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     } finally {
       set({
+        activeStreamingMessageId: null,
+        activeStreamingSessionId: null,
         abortController: null,
         generating: false,
         isReasoning: false,
         reasoningStartedAt: null,
         streamBuffer: '',
       });
-      setTimeout(() => get().fetchMessages(sessionId), 1500);
     }
   },
 

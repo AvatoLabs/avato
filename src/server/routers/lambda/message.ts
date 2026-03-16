@@ -14,6 +14,7 @@ import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
 import { MessageService } from '@/server/services/message';
+import { normalizeMessageFileUrlsForClient } from '@/server/services/message/normalizeMessageFileUrls';
 
 import { resolveAgentIdFromSession, resolveContext } from './_helpers/resolveContext';
 import { basicContextSchema } from './_schema/context';
@@ -198,12 +199,14 @@ finalizeCompression: messageProcedure
         const messageModel = new MessageModel(ctx.serverDB, share.ownerId);
         const fileService = new FileService(ctx.serverDB, share.ownerId);
 
-        return messageModel.query(
+        const messages = await messageModel.query(
           { ...queryParams, topicId: share.topicId },
           {
             postProcessUrl: (path) => fileService.getFullFileUrl(path),
           },
         );
+
+        return normalizeMessageFileUrlsForClient(messages);
       }
 
       // Authenticated access - require userId
@@ -214,9 +217,11 @@ finalizeCompression: messageProcedure
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const fileService = new FileService(ctx.serverDB, ctx.userId);
 
-      return messageModel.query(queryParams, {
+      const messages = await messageModel.query(queryParams, {
         postProcessUrl: (path) => fileService.getFullFileUrl(path),
       });
+
+      return normalizeMessageFileUrlsForClient(messages);
     }),
 
   rankModels: messageProcedure.query(async ({ ctx }) => {

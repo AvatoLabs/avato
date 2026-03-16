@@ -43,6 +43,19 @@ type TranslationKeys = {
   chatThinking: string;
   chatThought: string;
   chatThoughtWithDuration: string;
+  chatSearchImages: string;
+  chatSearchQueries: string;
+  chatSearchSources: string;
+  chatImageSearchQueries: string;
+  chatToolsTitle: string;
+  chatToolRunning: string;
+  chatToolDone: string;
+  chatToolFailed: string;
+  chatToolArguments: string;
+  chatToolPending: string;
+  chatToolRejected: string;
+  chatToolResponse: string;
+  chatToolAborted: string;
   chatAskAnything: string;
   chatGenerating: string;
   chatEmptyTitle: string;
@@ -559,6 +572,9 @@ type TranslationKeys = {
   skillsMarketSearch: string;
   skillsMarketEmpty: string;
   skillsMarketUnavailable: string;
+  skillsMarketFeatured: string;
+  skillsMarketConnect: string;
+  skillsMarketConnected: string;
   retry: string;
   skillsMarketInstalled: string;
   skillsMarketInstalledDesc: string;
@@ -690,6 +706,15 @@ type TranslationKeys = {
   memoryCreateSave: string;
   memoryExtractTitle: string;
   memoryExtractDesc: string;
+  memoryExtractAction: string;
+  memoryExtractQueued: string;
+  memoryExtractRunning: string;
+  memoryExtractReady: string;
+  memoryExtractRetry: string;
+  memoryExtractProgress: string;
+  memoryExtractProgressUnknown: string;
+  memoryExtractFailed: string;
+  memoryExtractSuccess: string;
 
   // Artwork / Image Generation
   artworkTitle: string;
@@ -751,6 +776,19 @@ const en: TranslationKeys = {
   chatThinking: 'Thinking...',
   chatThought: 'Thought',
   chatThoughtWithDuration: 'Thought for',
+  chatSearchImages: 'Image results',
+  chatSearchQueries: 'Search queries',
+  chatSearchSources: 'Web sources',
+  chatImageSearchQueries: 'Image search queries',
+  chatToolsTitle: 'Tools',
+  chatToolRunning: 'Running',
+  chatToolDone: 'Completed',
+  chatToolFailed: 'Failed',
+  chatToolArguments: 'Arguments',
+  chatToolPending: 'Pending approval',
+  chatToolRejected: 'Rejected',
+  chatToolResponse: 'Response',
+  chatToolAborted: 'Aborted',
   chatAskAnything: 'Ask anything...',
   chatGenerating: 'Generating...',
   chatEmptyTitle: 'Avato Assistant',
@@ -886,7 +924,7 @@ const en: TranslationKeys = {
   homeQuickWrite: 'Write',
   homeQuickCode: 'Create Agent',
   homeQuickAnalyze: 'Create Group',
-  homeQuickCreate: 'Nano Banana 2',
+  homeQuickCreate: 'Create Art',
   homeRecents: 'Recent',
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
@@ -1239,6 +1277,9 @@ const en: TranslationKeys = {
   skillsMarketSearch: 'Search skills...',
   skillsMarketEmpty: 'No skills found',
   skillsMarketUnavailable: 'Skill marketplace is currently unavailable. Please check your server configuration.',
+  skillsMarketFeatured: 'Official skills',
+  skillsMarketConnect: 'Connect',
+  skillsMarketConnected: 'Connected',
   retry: 'Retry',
   skillsMarketInstalled: 'Installed',
   skillsMarketInstalledDesc: 'Skill has been installed successfully.',
@@ -1368,6 +1409,15 @@ const en: TranslationKeys = {
   memoryCreateSave: 'Save',
   memoryExtractTitle: 'Extract Memories',
   memoryExtractDesc: 'Memories are extracted from your chat conversations. Start a conversation and use the extraction feature in chat to build your memory profile.',
+  memoryExtractAction: 'Run extraction',
+  memoryExtractQueued: 'Queued and waiting to start.',
+  memoryExtractRunning: 'Extraction is in progress.',
+  memoryExtractReady: 'Your latest extraction has completed.',
+  memoryExtractRetry: 'Run again',
+  memoryExtractProgress: '{completed} of {total} topics processed',
+  memoryExtractProgressUnknown: '{completed} topics processed',
+  memoryExtractFailed: 'Extraction failed',
+  memoryExtractSuccess: 'Memory extraction started',
 
   artworkTitle: 'Artwork',
   artworkEmpty: 'Create your first artwork',
@@ -1428,6 +1478,19 @@ const zh_tw: TranslationKeys = {
   chatThinking: '思考中...',
   chatThought: '已深度思考',
   chatThoughtWithDuration: '已深度思考',
+  chatSearchImages: '圖片結果',
+  chatSearchQueries: '搜尋查詢',
+  chatSearchSources: '網頁來源',
+  chatImageSearchQueries: '圖片搜尋查詢',
+  chatToolsTitle: '工具調用',
+  chatToolRunning: '進行中',
+  chatToolDone: '已完成',
+  chatToolFailed: '失敗',
+  chatToolArguments: '參數',
+  chatToolPending: '等待確認',
+  chatToolRejected: '已拒絕',
+  chatToolResponse: '響應',
+  chatToolAborted: '已中止',
   chatAskAnything: '有什麼可以幫助你的嗎？',
   chatGenerating: '產生中...',
   chatEmptyTitle: 'Avato 助手',
@@ -1561,7 +1624,7 @@ const zh_tw: TranslationKeys = {
   homeQuickWrite: '寫作',
   homeQuickCode: '創建助理',
   homeQuickAnalyze: '創建群組',
-  homeQuickCreate: 'Nano Banana 2',
+  homeQuickCreate: '作圖',
   homeRecents: '最近',
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
@@ -1913,6 +1976,9 @@ const zh_tw: TranslationKeys = {
   skillsMarketSearch: '搜尋技能...',
   skillsMarketEmpty: '未找到技能',
   skillsMarketUnavailable: '技能市場暫時不可用，請檢查伺服器配置。',
+  skillsMarketFeatured: '官方技能',
+  skillsMarketConnect: '連接',
+  skillsMarketConnected: '已連接',
   retry: '重試',
   skillsMarketInstalled: '已安裝',
   skillsMarketInstalledDesc: '技能已成功安裝。',
@@ -2042,6 +2108,15 @@ const zh_tw: TranslationKeys = {
   memoryCreateSave: '儲存',
   memoryExtractTitle: '擷取記憶',
   memoryExtractDesc: '記憶會從你的聊天對話中擷取。開始對話並在聊天中使用擷取功能來建構你的記憶檔案。',
+  memoryExtractAction: '開始擷取',
+  memoryExtractQueued: '已排入佇列，等待開始。',
+  memoryExtractRunning: '正在擷取記憶。',
+  memoryExtractReady: '最近一次擷取已完成。',
+  memoryExtractRetry: '重新執行',
+  memoryExtractProgress: '已處理 {completed} / {total} 個話題',
+  memoryExtractProgressUnknown: '已處理 {completed} 個話題',
+  memoryExtractFailed: '記憶擷取失敗',
+  memoryExtractSuccess: '已開始擷取記憶',
 
   artworkTitle: '畫作',
   artworkEmpty: '建立你的第一幅畫作',
@@ -2102,6 +2177,19 @@ const zh: TranslationKeys = {
   chatThinking: '思考中...',
   chatThought: '已深度思考',
   chatThoughtWithDuration: '已深度思考',
+  chatSearchImages: '图片结果',
+  chatSearchQueries: '搜索查询',
+  chatSearchSources: '网页来源',
+  chatImageSearchQueries: '图片搜索查询',
+  chatToolsTitle: '工具调用',
+  chatToolRunning: '进行中',
+  chatToolDone: '已完成',
+  chatToolFailed: '失败',
+  chatToolArguments: '参数',
+  chatToolPending: '等待确认',
+  chatToolRejected: '已拒绝',
+  chatToolResponse: '响应',
+  chatToolAborted: '已中止',
   chatAskAnything: '问我任何问题...',
   chatGenerating: '生成中...',
   chatEmptyTitle: 'Avato 助手',
@@ -2235,7 +2323,7 @@ const zh: TranslationKeys = {
   homeQuickWrite: '写作',
   homeQuickCode: '创建助理',
   homeQuickAnalyze: '创建群组',
-  homeQuickCreate: 'Nano Banana 2',
+  homeQuickCreate: '作图',
   homeRecents: '最近',
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
@@ -2588,6 +2676,9 @@ const zh: TranslationKeys = {
   skillsMarketSearch: '搜索技能...',
   skillsMarketEmpty: '未找到技能',
   skillsMarketUnavailable: '技能市场暂时不可用，请检查服务器配置。',
+  skillsMarketFeatured: '官方技能',
+  skillsMarketConnect: '连接',
+  skillsMarketConnected: '已连接',
   retry: '重试',
   skillsMarketInstalled: '已安装',
   skillsMarketInstalledDesc: '技能已成功安装。',
@@ -2717,6 +2808,15 @@ const zh: TranslationKeys = {
   memoryCreateSave: '保存',
   memoryExtractTitle: '提取记忆',
   memoryExtractDesc: '记忆会从你的聊天对话中提取。开始对话并在聊天中使用提取功能来构建你的记忆档案。',
+  memoryExtractAction: '开始提取',
+  memoryExtractQueued: '已进入队列，等待开始。',
+  memoryExtractRunning: '正在提取记忆。',
+  memoryExtractReady: '最近一次提取已经完成。',
+  memoryExtractRetry: '重新执行',
+  memoryExtractProgress: '已处理 {completed} / {total} 个话题',
+  memoryExtractProgressUnknown: '已处理 {completed} 个话题',
+  memoryExtractFailed: '记忆提取失败',
+  memoryExtractSuccess: '已开始提取记忆',
 
   artworkTitle: '画作',
   artworkEmpty: '创建你的第一幅画作',

@@ -1,0 +1,33 @@
+import type { ChatFileItem, ChatImageItem, ChatVideoItem, UIChatMessage } from '@lobechat/types';
+
+import { appEnv } from '@/envs/app';
+
+const shouldUseProxyUrl = (url?: string) => {
+  if (!url) return false;
+
+  return appEnv.APP_URL.startsWith('https://') && url.startsWith('http://');
+};
+
+const withProxyUrl = <T extends { id: string; url: string }>(items?: T[]): T[] | undefined => {
+  if (!items || items.length === 0) return items;
+
+  return items.map((item) => {
+    if (!shouldUseProxyUrl(item.url)) return item;
+
+    return {
+      ...item,
+      url: `${appEnv.APP_URL}/f/${item.id}`,
+    };
+  });
+};
+
+export const normalizeMessageFileUrlsForClient = (messages: UIChatMessage[]): UIChatMessage[] => {
+  if (!messages || messages.length === 0) return messages;
+
+  return messages.map((message) => ({
+    ...message,
+    fileList: withProxyUrl(message.fileList as ChatFileItem[] | undefined),
+    imageList: withProxyUrl(message.imageList as ChatImageItem[] | undefined),
+    videoList: withProxyUrl(message.videoList as ChatVideoItem[] | undefined),
+  }));
+};

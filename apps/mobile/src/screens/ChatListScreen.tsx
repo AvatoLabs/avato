@@ -52,7 +52,14 @@ import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, messageApi, type MessageSearchResult,pluginApi, topicApi } from '../lib/api';
+import {
+  agentApi,
+  messageApi,
+  type MessageSearchResult,
+  pluginApi,
+  sessionApi,
+  topicApi,
+} from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getStreak, recordUsage } from '../lib/streak';
@@ -72,9 +79,13 @@ type RelativeTimeText = {
 };
 
 interface SearchSessionResult {
-  matchType: 'message' | 'topic';
+  id: string;
+  matchedAt?: string;
+  matchType: 'message' | 'session' | 'topic';
+  messageId?: string;
   session: ChatSession;
   summary: string;
+  topicId?: string;
 }
 
 const trimSearchSnippet = (value: string, maxLength = 88) => {
@@ -203,6 +214,7 @@ export default function ChatListScreen({ navigation }: any) {
   );
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const createSession = useSessionStore((s) => s.createSession);
+  const getOrCreateHomeSession = useSessionStore((s) => s.getOrCreateHomeSession);
   const removeSession = useSessionStore((s) => s.removeSession);
   const pinSession = useSessionStore((s) => s.pinSession);
   const unpinSession = useSessionStore((s) => s.unpinSession);
@@ -324,38 +336,62 @@ export default function ChatListScreen({ navigation }: any) {
       setSearching(true);
 
       Promise.all([
+        sessionApi.search(keywords).catch(() => []),
         topicApi.search(keywords).catch(() => []),
         messageApi.search(keywords).catch(() => []),
       ])
-        .then(([topics, messages]) => {
+        .then(([matchedSessions, topics, messages]) => {
           if (isCancelled) return;
 
           const sessionMap = new Map(sessions.map((session) => [session.id, session]));
-          const matches = new Map<string, SearchSessionResult>();
+          const matches: SearchSessionResult[] = [];
+
+          for (const session of matchedSessions) {
+            matches.push({
+              id: `session-${session.id}`,
+              matchedAt: session.updatedAt,
+              matchType: 'session',
+              session,
+              summary: trimSearchSnippet(session.title || t.chatListNewConversation),
+            });
+          }
 
           for (const topic of topics) {
             const session = sessionMap.get(topic.sessionId);
             if (!session) continue;
 
-            matches.set(session.id, {
+            matches.push({
+              id: `topic-${topic.id}`,
+              matchedAt: topic.updatedAt || topic.createdAt,
               matchType: 'topic',
               session,
               summary: trimSearchSnippet(topic.title),
+              topicId: topic.id,
             });
           }
 
           for (const message of messages as MessageSearchResult[]) {
             const session = sessionMap.get(message.sessionId);
-            if (!session || matches.has(session.id)) continue;
+            if (!session) continue;
 
-            matches.set(session.id, {
+            matches.push({
+              id: `message-${message.id}`,
+              matchedAt: message.createdAt,
               matchType: 'message',
+              messageId: message.id,
               session,
               summary: trimSearchSnippet(message.content),
+              topicId: message.topicId,
             });
           }
 
-          setSearchResults([...matches.values()]);
+          matches.sort((left, right) => {
+            const leftTs = left.matchedAt ? new Date(left.matchedAt).getTime() : 0;
+            const rightTs = right.matchedAt ? new Date(right.matchedAt).getTime() : 0;
+            return rightTs - leftTs;
+          });
+
+          setSearchResults(matches);
         })
         .catch(() => {
           if (!isCancelled) {
@@ -373,7 +409,7 @@ export default function ChatListScreen({ navigation }: any) {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [searchText, sessions, t.errorNetwork, toast]);
+  }, [searchText, sessions, t.chatListNewConversation, t.errorNetwork, toast]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -398,14 +434,9 @@ export default function ChatListScreen({ navigation }: any) {
     const hasAttachment = pendingFiles.length > 0;
     if (!prompt && !hasAttachment) return;
 
-    const sessionTitle = (prompt || pendingFiles[0]?.name || t.chatListNewConversation).slice(
-      0,
-      50,
-    );
     const newId =
       draftSessionId ||
-      (await createSession({
-        title: sessionTitle,
+      (await getOrCreateHomeSession({
         model: selectedModel || undefined,
         provider: selectedProvider || undefined,
         plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
@@ -426,13 +457,13 @@ export default function ChatListScreen({ navigation }: any) {
       /* best-effort */
     }
 
-    navigation.navigate('ChatDetail', { sessionId: newId });
     void sendMessage(newId, prompt, undefined, {
       memoryEffort,
       memoryEnabled,
       searchEnabled,
     });
     setHeroText('');
+    navigation.navigate('ChatDetail', { sessionId: newId });
   };
 
   const handleModelPress = () => {
@@ -562,7 +593,14 @@ export default function ChatListScreen({ navigation }: any) {
       navigation.navigate('Artwork');
       return;
     }
-    // 'agent' and 'write' both create a session via unified path
+    if (key === 'agent') {
+      haptics.success();
+      const homeSessionId = await getOrCreateHomeSession();
+      navigation.navigate('ChatDetail', { sessionId: homeSessionId });
+      return;
+    }
+
+    // 'write' still uses a dedicated session path for now
     haptics.success();
     const newId = await createSession();
     navigation.navigate('ChatDetail', { sessionId: newId });
@@ -714,7 +752,14 @@ export default function ChatListScreen({ navigation }: any) {
     );
   };
 
-  const renderSearchResultRow = ({ matchType, session, summary }: SearchSessionResult) => {
+  const renderSearchResultRow = ({
+    id,
+    matchType,
+    messageId,
+    session,
+    summary,
+    topicId,
+  }: SearchSessionResult) => {
     const providerId = session.provider || (session.model ? modelToProvider[session.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
 
@@ -722,8 +767,14 @@ export default function ChatListScreen({ navigation }: any) {
       <TouchableOpacity
         activeOpacity={0.65}
         className="flex-row items-start px-5 py-3"
-        key={session.id}
-        onPress={() => navigation.navigate('ChatDetail', { sessionId: session.id })}
+        key={id}
+        onPress={() =>
+          navigation.navigate('ChatDetail', {
+            messageId,
+            sessionId: session.id,
+            ...(topicId ? { topicId } : {}),
+          })
+        }
       >
         <View className="mr-3.5 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
           <SessionLogo

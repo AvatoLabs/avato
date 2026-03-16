@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { publicProcedure, router } from '@/libs/trpc/lambda';
 import { marketUserInfo, serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { communityMarketCacheService } from '@/server/services/community/marketCache';
 import { MarketService } from '@/server/services/market';
 import { SkillSorts } from '@/types/discover';
 
@@ -38,7 +39,9 @@ export const skillRouter = router({
       log('getSkillCategories input: %O', input);
 
       try {
-        return await ctx.marketService.getSkillCategories();
+        return await communityMarketCacheService.getCached('skill-categories', input, () =>
+          ctx.marketService.getSkillCategories(),
+        );
       } catch (error) {
         log('Error fetching skill categories: %O', error);
         throw new TRPCError({
@@ -60,10 +63,12 @@ export const skillRouter = router({
       log('getSkillDetail input: %O', input);
 
       try {
-        return await ctx.marketService.getSkillDetail(input.identifier, {
-          locale: input.locale,
-          version: input.version,
-        });
+        return await communityMarketCacheService.getCached('skill-detail', input, () =>
+          ctx.marketService.getSkillDetail(input.identifier, {
+            locale: input.locale,
+            version: input.version,
+          }),
+        );
       } catch (error) {
         log('Error fetching skill detail: %O', error);
         throw new TRPCError({
@@ -91,7 +96,9 @@ export const skillRouter = router({
       log('getSkillList input: %O', input);
 
       try {
-        return await ctx.marketService.searchSkill(input ?? {});
+        return await communityMarketCacheService.getCached('skill-list', input, () =>
+          ctx.marketService.searchSkill(input ?? {}),
+        );
       } catch (error) {
         log('Error fetching skill list: %O', error);
         throw new TRPCError({

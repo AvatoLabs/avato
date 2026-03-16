@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { publicProcedure, router } from '@/libs/trpc/lambda';
 import { marketUserInfo, serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { communityMarketCacheService } from '@/server/services/community/marketCache';
 import { DiscoverService } from '@/server/services/discover';
 import { MarketService } from '@/server/services/market';
 import {
@@ -96,7 +97,11 @@ getAssistantCategories: marketProcedure
       log('  getAssistantCategories: marketProcedure\n input: %O', input);
 
       try {
-        return await ctx.discoverService.getAssistantCategories(input);
+        return await communityMarketCacheService.getCached(
+          'assistant-categories',
+          input,
+          () => ctx.discoverService.getAssistantCategories(input),
+        );
       } catch (error) {
         log('Error fetching assistant categories: %O', error);
         throw new TRPCError({
@@ -119,7 +124,9 @@ getAssistantCategories: marketProcedure
       log('getAssistantDetail input: %O', input);
 
       try {
-        return await ctx.discoverService.getAssistantDetail(input);
+        return await communityMarketCacheService.getCached('assistant-detail', input, () =>
+          ctx.discoverService.getAssistantDetail(input),
+        );
       } catch (error) {
         log('Error fetching assistants detail: %O', error);
         throw new TRPCError({
@@ -141,7 +148,11 @@ getAssistantCategories: marketProcedure
       log('getAssistantIdentifiers called with input: %O', input);
 
       try {
-        return await ctx.discoverService.getAssistantIdentifiers(input);
+        return await communityMarketCacheService.getCached(
+          'assistant-identifiers',
+          input,
+          () => ctx.discoverService.getAssistantIdentifiers(input),
+        );
       } catch (error) {
         log('Error fetching assistant identifiers: %O', error);
         throw new TRPCError({
@@ -173,7 +184,9 @@ getAssistantCategories: marketProcedure
       log('getAssistantList input: %O', input);
 
       try {
-        return await ctx.discoverService.getAssistantList(input);
+        return await communityMarketCacheService.getCached('assistant-list', input, () =>
+          ctx.discoverService.getAssistantList(input),
+        );
       } catch (error) {
         log('Error fetching assistant list: %O', error);
         throw new TRPCError({
@@ -197,7 +210,11 @@ getAssistantCategories: marketProcedure
       log('getGroupAgentCategories input: %O', input);
 
       try {
-        return await ctx.discoverService.getGroupAgentCategories(input);
+        return await communityMarketCacheService.getCached(
+          'group-agent-categories',
+          input,
+          () => ctx.discoverService.getGroupAgentCategories(input),
+        );
       } catch (error) {
         log('Error fetching group agent categories: %O', error);
         throw new TRPCError({
@@ -219,7 +236,9 @@ getAssistantCategories: marketProcedure
       log('getGroupAgentDetail input: %O', input);
 
       try {
-        return await ctx.discoverService.getGroupAgentDetail(input);
+        return await communityMarketCacheService.getCached('group-agent-detail', input, () =>
+          ctx.discoverService.getGroupAgentDetail(input),
+        );
       } catch (error) {
         log('Error fetching group agent detail: %O', error);
         throw new TRPCError({
@@ -233,7 +252,9 @@ getAssistantCategories: marketProcedure
     log('getGroupAgentIdentifiers called');
 
     try {
-      return await ctx.discoverService.getGroupAgentIdentifiers();
+      return await communityMarketCacheService.getCached('group-agent-identifiers', undefined, () =>
+        ctx.discoverService.getGroupAgentIdentifiers(),
+      );
     } catch (error) {
       log('Error fetching group agent identifiers: %O', error);
       throw new TRPCError({
@@ -262,7 +283,9 @@ getAssistantCategories: marketProcedure
       log('getGroupAgentList input: %O', input);
 
       try {
-        return await ctx.discoverService.getGroupAgentList(input);
+        return await communityMarketCacheService.getCached('group-agent-list', input, () =>
+          ctx.discoverService.getGroupAgentList(input),
+        );
       } catch (error) {
         log('Error fetching group agent list: %O', error);
         throw new TRPCError({
@@ -307,7 +330,9 @@ getAssistantCategories: marketProcedure
       log('getMcpCategories input: %O', input);
 
       try {
-        return await ctx.discoverService.getMcpCategories(input);
+        return await communityMarketCacheService.getCached('mcp-categories', input, () =>
+          ctx.discoverService.getMcpCategories(input),
+        );
       } catch (error) {
         log('Error fetching mcp categories: %O', error);
         throw new TRPCError({
@@ -329,7 +354,9 @@ getAssistantCategories: marketProcedure
       log('getMcpDetail input: %O', input);
 
       try {
-        return await ctx.discoverService.getMcpDetail(input);
+        return await communityMarketCacheService.getCached('mcp-detail', input, () =>
+          ctx.discoverService.getMcpDetail(input),
+        );
       } catch (error) {
         console.error('Error fetching mcp detail: %O', error);
         throw new TRPCError({
@@ -358,7 +385,9 @@ getAssistantCategories: marketProcedure
       log('getMcpList input: %O', input);
 
       try {
-        return await ctx.discoverService.getMcpList(input);
+        return await communityMarketCacheService.getCached('mcp-list', input, () =>
+          ctx.discoverService.getMcpList(input),
+        );
       } catch (error) {
         log('Error fetching mcp list: %O', error);
         throw new TRPCError({
@@ -381,7 +410,9 @@ getAssistantCategories: marketProcedure
       log('getMcpManifest input: %O', input);
 
       try {
-        return await ctx.discoverService.getMcpManifest(input);
+        return await communityMarketCacheService.getCached('mcp-manifest', input, () =>
+          ctx.discoverService.getMcpManifest(input),
+        );
       } catch (error) {
         log('Error fetching mcp manifest: %O', error);
         throw new TRPCError({

@@ -54,9 +54,19 @@ export interface MobileChatConfig {
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
+export interface MessageContentPart {
+  image?: string;
+  text?: string;
+  thoughtSignature?: string;
+  type: 'image' | 'text';
+}
+
 export interface ModelReasoning {
   content?: string;
   duration?: number;
+  isMultimodal?: boolean;
+  signature?: string;
+  tempDisplayContent?: MessageContentPart[];
 }
 
 export interface ModelTokenUsage {
@@ -72,6 +82,61 @@ export interface ModelPerformance {
   latency?: number;
   tps?: number;
   ttft?: number;
+}
+
+export interface CitationItem {
+  favicon?: string;
+  id?: string;
+  title?: string;
+  url: string;
+}
+
+export interface ImageCitationItem {
+  domain?: string;
+  imageUri?: string;
+  sourceUri?: string;
+  title?: string;
+}
+
+export interface GroundingSearch {
+  citations?: CitationItem[];
+  imageResults?: ImageCitationItem[];
+  imageSearchQueries?: string[];
+  searchQueries?: string[];
+}
+
+export interface ToolIntervention {
+  rejectedReason?: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'aborted' | 'none';
+}
+
+export interface ChatPluginPayload {
+  apiName: string;
+  arguments: string;
+  identifier: string;
+  intervention?: ToolIntervention;
+  type: string;
+}
+
+export interface ChatToolPayload {
+  apiName: string;
+  arguments: string;
+  id: string;
+  identifier: string;
+  intervention?: ToolIntervention;
+  result_msg_id?: string;
+  source?: 'builtin' | 'plugin' | 'mcp' | 'klavis' | 'lobehubSkill';
+  thoughtSignature?: string;
+  type: string;
+}
+
+export interface ChatMessageMetadata {
+  [key: string]: unknown;
+  finishType?: string;
+  isMultimodal?: boolean;
+  performance?: ModelPerformance | null;
+  tempDisplayContent?: string;
+  usage?: ModelTokenUsage | null;
 }
 
 export interface ChatImageItem {
@@ -98,18 +163,28 @@ export interface ChatMessage {
   fileList?: ChatFileItem[];
   id: string;
   imageList?: ChatImageItem[];
+  metadata?: ChatMessageMetadata | null;
   /** Model that generated the response */
   model?: string;
+  observationId?: string | null;
   /** Parent message id (for branching) */
   parentId?: string;
   /** Performance metrics (TPS, TTFT) */
   performance?: ModelPerformance | null;
+  plugin?: ChatPluginPayload | null;
+  pluginError?: unknown;
+  pluginIntervention?: ToolIntervention | null;
+  pluginState?: unknown;
   /** Provider that generated the response */
   provider?: string;
   /** Reasoning / thinking content from the model */
   reasoning?: ModelReasoning | null;
   role: MessageRole;
+  search?: GroundingSearch | null;
   sessionId: string;
+  toolCallId?: string | null;
+  tools?: ChatToolPayload[] | null;
+  traceId?: string | null;
   updatedAt: string;
   /** Token usage stats */
   usage?: ModelTokenUsage | null;

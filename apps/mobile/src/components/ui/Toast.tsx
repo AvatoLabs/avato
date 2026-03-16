@@ -26,14 +26,19 @@ interface ToastItem {
 interface ToastStore {
   current: ToastItem | null;
   dismiss: () => void;
+  mute: (durationMs: number) => void;
+  mutedUntil: number;
   show: (type: ToastType, message: string) => void;
 }
 
 let _toastId = 0;
 
-export const useToast = create<ToastStore>((set) => ({
+export const useToast = create<ToastStore>((set, get) => ({
   current: null,
+  mutedUntil: 0,
+  mute: (durationMs) => set({ mutedUntil: Date.now() + Math.max(durationMs, 0) }),
   show: (type, message) => {
+    if (get().mutedUntil > Date.now()) return;
     _toastId += 1;
     set({ current: { id: _toastId, type, message } });
   },

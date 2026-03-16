@@ -23,6 +23,8 @@ import {
   ActivityIndicator,
   Alert,
   Image as RNImage,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -119,13 +121,56 @@ function formatParamLabel(key: string) {
   );
 }
 
-function sanitizeParams(params: ImageGenerationParams) {
-  return Object.fromEntries(
-    Object.entries(params).filter(
-      ([, value]) =>
-        value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0),
-    ),
+function normalizeParamsForSchema(
+  schema: ImageModelParamsSchema | undefined,
+  raw: ImageGenerationParams,
+) {
+  const allowed = new Set<string>(['prompt', ...(schema ? Object.keys(schema) : [])]);
+  const normalized = Object.fromEntries(
+    Object.entries(raw).filter(([key, value]) => {
+      if (!allowed.has(key)) return false;
+      if (value === undefined || value === null || value === '') return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      return true;
+    }),
   ) as ImageGenerationParams;
+
+  if (Array.isArray(normalized.imageUrls) && normalized.imageUrls.length > 0) {
+    delete normalized.imageUrl;
+  } else if (normalized.imageUrl) {
+    delete normalized.imageUrls;
+  }
+
+  return normalized;
+}
+
+function applyRatioToDimensions(ratio: string, base = 1024) {
+  const { rw, rh } = parseRatio(ratio);
+
+  if (!rw || !rh) return { width: base, height: base };
+
+  if (rw >= rh) {
+    return { width: base, height: Math.round((base * rh) / rw) };
+  }
+
+  return { width: Math.round((base * rw) / rh), height: base };
+}
+
+function getAspectRatioSelection(
+  params: ImageGenerationParams,
+  schema: ImageModelParamsSchema | undefined,
+) {
+  if (getParamDefinition(schema, 'aspectRatio')) {
+    return typeof params.aspectRatio === 'string' ? params.aspectRatio : undefined;
+  }
+
+  if (typeof params.width !== 'number' || typeof params.height !== 'number') return undefined;
+
+  const ratio = params.width / params.height;
+  return PRESET_ASPECT_RATIOS.find((option) => {
+    const { rw, rh } = parseRatio(option);
+    return Math.abs(ratio - rw / rh) < 0.02;
+  });
 }
 
 // Proper aspect ratio preview matching web version
@@ -246,6 +291,58 @@ function SidebarOptionGrid<T extends string | number>({
   );
 }
 
+interface SidebarOptionStripProps<T extends string | number> {
+  getKey: (item: T) => string;
+  items: T[];
+  itemWidth: number;
+  onSelect?: (item: T) => void;
+  renderContent: (item: T, active: boolean) => React.ReactNode;
+  selectedValue?: T;
+}
+
+function SidebarOptionStrip<T extends string | number>({
+  getKey,
+  itemWidth,
+  items,
+  onSelect,
+  renderContent,
+  selectedValue,
+}: SidebarOptionStripProps<T>) {
+  return (
+    <ScrollView
+      horizontal
+      contentContainerStyle={{ paddingBottom: 4, paddingRight: 4 }}
+      showsHorizontalScrollIndicator={false}
+    >
+      {items.map((item, index) => {
+        const active = selectedValue === item;
+
+        return (
+          <TouchableOpacity
+            key={getKey(item)}
+            style={{
+              alignItems: 'center',
+              backgroundColor: active ? semanticColors.primary : '#f5f5f5',
+              borderColor: active ? semanticColors.primary : '#e7e7e7',
+              borderRadius: 12,
+              borderWidth: 1,
+              justifyContent: 'center',
+              marginRight: index === items.length - 1 ? 0 : 8,
+              minHeight: 46,
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              width: itemWidth,
+            }}
+            onPress={() => onSelect?.(item)}
+          >
+            {renderContent(item, active)}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
   const map: Record<string, { bg: string; fg: string; label: string }> = {
@@ -292,8 +389,10 @@ export default function ArtworkScreen() {
   const [topicId, setTopicId] = useState<string | null>(null);
   const [batches, setBatches] = useState<GenerationBatch[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollSessionRef = useRef(0);
   const hasHydratedRef = useRef(false);
+  const hasRestoredConfigRef = useRef(false);
   const configRef = useRef({
     generationParams: { prompt: '' } as ImageGenerationParams,
     imgCount: 2,
@@ -310,7 +409,7 @@ export default function ArtworkScreen() {
       overrides?: ImageGenerationParams,
     ) => {
       const schema = modelItem.parameters;
-      const nextParams = sanitizeParams({
+      const nextParams = normalizeParamsForSchema(schema, {
         ...getDefaultParams(schema),
         ...overrides,
       });
@@ -430,25 +529,48 @@ export default function ArtworkScreen() {
     };
   }, [generationParams, imgCount, model, modelName, provider]);
 
-  const hydrateScreen = useCallback(async () => {
-    hasHydratedRef.current = false;
-
-    const nextBaseUrl = await getApiUrl();
-    setBaseUrl(nextBaseUrl);
-
-    const restoredConfig = await restoreConfig();
-
-    if (restoredConfig?.imgCount) setImgCount(restoredConfig.imgCount);
-
-    await loadModels(restoredConfig);
-    hasHydratedRef.current = true;
-  }, [loadModels, restoreConfig]);
-
   // ── Init ──
   useFocusEffect(
     useCallback(() => {
-      void hydrateScreen();
-    }, [hydrateScreen]),
+      let alive = true;
+      hasHydratedRef.current = false;
+
+      void (async () => {
+        const nextBaseUrl = await getApiUrl();
+        if (!alive) return;
+        setBaseUrl(nextBaseUrl);
+
+        let restoredConfig:
+          | {
+              generationParams?: ImageGenerationParams;
+              imgCount?: number;
+              model?: string;
+              modelName?: string;
+              provider?: string;
+            }
+          | undefined;
+
+        if (!hasRestoredConfigRef.current) {
+          restoredConfig = await restoreConfig();
+          if (!alive) return;
+
+          if (typeof restoredConfig?.imgCount === 'number') {
+            setImgCount(restoredConfig.imgCount);
+          }
+
+          hasRestoredConfigRef.current = true;
+        }
+
+        await loadModels(restoredConfig);
+        if (!alive) return;
+
+        hasHydratedRef.current = true;
+      })();
+
+      return () => {
+        alive = false;
+      };
+    }, [loadModels, restoreConfig]),
   );
 
   useEffect(() => {
@@ -457,11 +579,15 @@ export default function ArtworkScreen() {
   }, [saveConfig]);
 
   // ── Cleanup polling ──
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+  const stopPolling = useCallback(() => {
+    pollSessionRef.current += 1;
+    if (pollRef.current) {
+      clearTimeout(pollRef.current);
+      pollRef.current = null;
+    }
   }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
 
   // ── Pick reference images ──
   const handlePickRef = useCallback(async () => {
@@ -498,7 +624,7 @@ export default function ArtworkScreen() {
   // ── Poll generation status ──
   const startPolling = useCallback(
     (tid: string, batchGenerations: GenerationItem[]) => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPolling();
       const pendingGenerationIds = new Set(
         batchGenerations
           .filter((g) => g.asyncTaskId && g.task.status !== 'Success' && g.task.status !== 'Error')
@@ -506,35 +632,51 @@ export default function ArtworkScreen() {
       );
       if (pendingGenerationIds.size === 0) return;
 
-      let count = 0;
-      pollRef.current = setInterval(
-        async () => {
-          count++;
-          try {
-            const latestBatches = await loadBatches(tid);
-            const latestPending = (latestBatches || [])
-              .flatMap((batch) => batch.generations)
-              .filter(
-                (generation) =>
-                  pendingGenerationIds.has(generation.id) &&
-                  generation.task.status !== 'Success' &&
-                  generation.task.status !== 'Error',
-              );
+      const sessionId = pollSessionRef.current;
+      let attempt = 0;
+      let inFlight = false;
 
-            const allDone = latestPending.length === 0;
-            if (allDone || count > 60) {
-              if (pollRef.current) clearInterval(pollRef.current);
-              pollRef.current = null;
+      const tick = async () => {
+        if (sessionId !== pollSessionRef.current || inFlight) return;
+        inFlight = true;
+
+        try {
+          attempt += 1;
+
+          const latestBatches = await loadBatches(tid);
+          if (sessionId !== pollSessionRef.current) return;
+
+          const latestPending = (latestBatches || [])
+            .flatMap((batch) => batch.generations)
+            .filter(
+              (generation) =>
+                pendingGenerationIds.has(generation.id) &&
+                generation.task.status !== 'Success' &&
+                generation.task.status !== 'Error',
+            );
+
+          const allDone = latestPending.length === 0;
+          if (allDone || attempt >= 60) {
+            if (sessionId === pollSessionRef.current) {
+              stopPolling();
             }
-          } catch {
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
+            return;
           }
-        },
-        Math.min(2000 * Math.pow(1.5, Math.floor(count / 5)), 15000),
-      );
+
+          const delay = Math.min(2000 * 1.5 ** Math.floor(attempt / 5), 15000);
+          pollRef.current = setTimeout(tick, delay);
+        } catch {
+          if (sessionId === pollSessionRef.current) {
+            stopPolling();
+          }
+        } finally {
+          inFlight = false;
+        }
+      };
+
+      pollRef.current = setTimeout(tick, 0);
     },
-    [loadBatches],
+    [loadBatches, stopPolling],
   );
 
   // ── Generate ──
@@ -549,16 +691,22 @@ export default function ArtworkScreen() {
       let failedUploadCount = 0;
       const supportsImageUrl = Boolean(getParamDefinition(paramsSchema, 'imageUrl'));
       const supportsImageUrls = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
-      const imagesToUpload = supportsImageUrls ? refImages : refImages.slice(0, 1);
+      const imagesToUpload = refImages
+        .map((image, index) => ({ image, index }))
+        .slice(0, supportsImageUrls ? refImages.length : 1);
 
-      for (const img of imagesToUpload) {
+      for (const { image: img, index } of imagesToUpload) {
         if (img.url) {
           uploadedUrls.push(img.url);
         } else {
           try {
             const uploaded = await fileApi.upload(img.uri, 'reference.jpg', 'image/jpeg');
             uploadedUrls.push(uploaded.url);
-            img.url = uploaded.url;
+            setRefImages((prev) =>
+              prev.map((item, itemIndex) =>
+                itemIndex === index ? { ...item, url: uploaded.url } : item,
+              ),
+            );
           } catch {
             failedUploadCount += 1;
           }
@@ -584,12 +732,18 @@ export default function ArtworkScreen() {
       }
       if (!tid) throw new Error('Failed to create topic');
 
-      const nextParams = sanitizeParams({
+      const rawParams: ImageGenerationParams = {
         ...generationParams,
         prompt: prompt.trim(),
-        ...(supportsImageUrls && uploadedUrls.length > 0 ? { imageUrls: uploadedUrls } : {}),
-        ...(supportsImageUrl && uploadedUrls.length > 0 ? { imageUrl: uploadedUrls[0] } : {}),
-      });
+      };
+
+      if (supportsImageUrls && uploadedUrls.length > 0) {
+        rawParams.imageUrls = uploadedUrls;
+      } else if (supportsImageUrl && uploadedUrls.length > 0) {
+        rawParams.imageUrl = uploadedUrls[0];
+      }
+
+      const nextParams = normalizeParamsForSchema(paramsSchema, rawParams);
 
       // Create image
       const result = await artworkApi.createImage({
@@ -651,18 +805,24 @@ export default function ArtworkScreen() {
   const aspectRatioOptions = getParamEnumOptions(paramsSchema, 'aspectRatio');
   const supportsImageUrl = Boolean(getParamDefinition(paramsSchema, 'imageUrl'));
   const supportsImageUrls = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
+  const supportsNativeAspectRatio = Boolean(getParamDefinition(paramsSchema, 'aspectRatio'));
+  const supportsWidthHeight =
+    Boolean(getParamDefinition(paramsSchema, 'width')) &&
+    Boolean(getParamDefinition(paramsSchema, 'height'));
   const referenceEnabled = supportsImageUrl || supportsImageUrls;
   const effectiveAspectRatioOptions =
     aspectRatioOptions.length > 0
       ? aspectRatioOptions
-      : getParamDefinition(paramsSchema, 'width') && getParamDefinition(paramsSchema, 'height')
+      : supportsWidthHeight
         ? PRESET_ASPECT_RATIOS
         : [];
+  const currentAspectRatio = getAspectRatioSelection(generationParams, paramsSchema);
+  const imageCountSelection: number | string = IMAGE_COUNTS.includes(imgCount) ? imgCount : 'custom';
   const summaryParts = [
     generationParams.resolution ? String(generationParams.resolution) : undefined,
     generationParams.size ? String(generationParams.size) : undefined,
     generationParams.quality ? String(generationParams.quality) : undefined,
-    generationParams.aspectRatio ? String(generationParams.aspectRatio) : undefined,
+    currentAspectRatio ? String(currentAspectRatio) : undefined,
     typeof generationParams.width === 'number' && typeof generationParams.height === 'number'
       ? `${generationParams.width}×${generationParams.height}`
       : undefined,
@@ -670,12 +830,16 @@ export default function ArtworkScreen() {
   ].filter(Boolean);
   const numericEditorTitle = editingParamKey ? formatParamLabel(editingParamKey) : '';
   const numericEditorDefaultValue =
-    editingParamKey && generationParams[editingParamKey] !== undefined
+    editingParamKey && generationParams[editingParamKey] != null
       ? String(generationParams[editingParamKey])
       : '';
 
   return (
-    <View className="flex-1 bg-white dark:bg-black">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-white dark:bg-black"
+      keyboardVerticalOffset={0}
+    >
       {/* ── Header ── */}
       <ScreenHeader title={t.artworkTitle} />
 
@@ -747,10 +911,10 @@ export default function ArtworkScreen() {
         {batches.length > 0 ? (
           batches.map((batch) => (
             <BatchCard
+              availableWidth={screenWidth - containerPad * 2}
               batch={batch}
               key={batch.id}
               resolveUrl={resolveUrl}
-              screenWidth={screenWidth}
               onCopyPrompt={async () => {
                 await Clipboard.setStringAsync(batch.prompt);
                 toast.show('success', t.artworkPromptCopied);
@@ -1048,10 +1212,9 @@ export default function ArtworkScreen() {
               {resolutionOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('resolution')} />
-                  <SidebarOptionGrid
-                    columns={2}
-                    containerWidth={sidebarWidth - sidebarPad * 2}
+                  <SidebarOptionStrip
                     getKey={(option) => String(option)}
+                    itemWidth={116}
                     items={resolutionOptions}
                     selectedValue={generationParams.resolution as string | undefined}
                     renderContent={(option, active) => (
@@ -1132,12 +1295,11 @@ export default function ArtworkScreen() {
               {effectiveAspectRatioOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('aspectRatio')} />
-                  <SidebarOptionGrid
-                    columns={3}
-                    containerWidth={sidebarWidth - sidebarPad * 2}
+                  <SidebarOptionStrip
                     getKey={(option) => String(option)}
+                    itemWidth={86}
                     items={effectiveAspectRatioOptions}
-                    selectedValue={generationParams.aspectRatio as string | undefined}
+                    selectedValue={currentAspectRatio}
                     renderContent={(option, active) => (
                       <View style={{ alignItems: 'center', justifyContent: 'center' }}>
                         <View style={{ marginBottom: 2 }}>
@@ -1156,7 +1318,28 @@ export default function ArtworkScreen() {
                     )}
                     onSelect={(option) => {
                       haptics.selection();
-                      setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                      if (supportsNativeAspectRatio) {
+                        setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                        return;
+                      }
+
+                      if (supportsWidthHeight) {
+                        const widthItem = getParamDefinition(paramsSchema, 'width');
+                        const heightItem = getParamDefinition(paramsSchema, 'height');
+                        const base =
+                          Number(generationParams.width) || Number(generationParams.height) || 1024;
+                        const dims = applyRatioToDimensions(option, base);
+
+                        setGenerationParams((state) => {
+                          const next = {
+                            ...state,
+                            width: clampNumericValue(dims.width, widthItem),
+                            height: clampNumericValue(dims.height, heightItem),
+                          };
+                          delete next.aspectRatio;
+                          return next;
+                        });
+                      }
                     }}
                   />
                 </>
@@ -1196,12 +1379,20 @@ export default function ArtworkScreen() {
 
               {/* Number of Images */}
               <SidebarLabel text={t.artworkImageCount} />
-              <SidebarOptionGrid
-                columns={5}
-                containerWidth={sidebarWidth - sidebarPad * 2}
+              <SidebarOptionStrip
                 getKey={(item) => String(item)}
+                itemWidth={58}
                 items={[...IMAGE_COUNTS, 'custom']}
-                selectedValue={imgCount}
+                selectedValue={imageCountSelection}
+                onSelect={(item) => {
+                  haptics.selection();
+                  if (item === 'custom') {
+                    setCustomCountVisible(true);
+                    return;
+                  }
+
+                  setImgCount(Number(item));
+                }}
                 renderContent={(item, active) => (
                   <Text
                     style={{
@@ -1213,15 +1404,6 @@ export default function ArtworkScreen() {
                     {item === 'custom' ? '+' : item}
                   </Text>
                 )}
-                onSelect={(item) => {
-                  haptics.selection();
-                  if (item === 'custom') {
-                    setCustomCountVisible(true);
-                    return;
-                  }
-
-                  setImgCount(item);
-                }}
               />
             </ScrollView>
           </Animated.View>
@@ -1251,6 +1433,16 @@ export default function ArtworkScreen() {
         onSubmit={(value) => {
           if (!editingParamKey) return;
 
+          if (value.trim() === '') {
+            setGenerationParams((state) => {
+              const next = { ...state };
+              delete next[editingParamKey];
+              return next;
+            });
+            setEditingParamKey(null);
+            return;
+          }
+
           const parsed = Number(value);
           if (Number.isNaN(parsed)) {
             setEditingParamKey(null);
@@ -1265,36 +1457,43 @@ export default function ArtworkScreen() {
 
           setGenerationParams((state) => ({
             ...state,
-            [editingParamKey]: editingParamKey === 'seed' && value.trim() === '' ? null : nextValue,
+            [editingParamKey]: nextValue,
           }));
           setEditingParamKey(null);
         }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 // ── BatchCard ────────────────────────────────────────────────────────
 function BatchCard({
   batch,
+  availableWidth,
   resolveUrl,
-  screenWidth,
   onCopyPrompt,
   onDelete,
   onReuseSettings,
 }: {
+  availableWidth: number;
   batch: GenerationBatch;
   onCopyPrompt: () => void;
   onDelete: () => void;
   onReuseSettings: () => void;
   resolveUrl: (url?: string) => string | undefined;
-  screenWidth: number;
 }) {
   const { t } = useI18n();
-  const imgPad = 40;
   const gap = 6;
   const cols = batch.generations.length === 1 ? 1 : 2;
-  const imgW = Math.floor((screenWidth - imgPad - gap * (cols - 1)) / cols);
+  const cardInnerPadding = 24;
+  const gridWidth = Math.max(availableWidth - cardInnerPadding, 0);
+  const imgW = Math.floor((gridWidth - gap * (cols - 1)) / cols);
+  const previewWidth = batch.width || batch.generations[0]?.asset?.width;
+  const previewHeight = batch.height || batch.generations[0]?.asset?.height;
+  const imgH =
+    cols === 1 && previewWidth && previewHeight
+      ? Math.max(Math.round((imgW * previewHeight) / previewWidth), 1)
+      : imgW;
 
   return (
     <Animated.View className="bg-card rounded-2xl p-3 mb-3" entering={FadeInDown.duration(300)}>
@@ -1331,7 +1530,7 @@ function BatchCard({
               key={gen.id}
               style={{
                 width: imgW,
-                height: imgW,
+                height: imgH,
                 borderRadius: 12,
                 backgroundColor: 'rgba(255,255,255,0.05)',
                 overflow: 'hidden',
@@ -1341,9 +1540,9 @@ function BatchCard({
             >
               {isDone ? (
                 <RNImage
-                  resizeMode="cover"
+                  resizeMode={cols === 1 ? 'contain' : 'cover'}
                   source={{ uri: url }}
-                  style={{ width: imgW, height: imgW }}
+                  style={{ width: imgW, height: imgH }}
                 />
               ) : isErr ? (
                 <View className="items-center p-2">

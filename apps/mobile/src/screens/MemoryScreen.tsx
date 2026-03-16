@@ -39,7 +39,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { memoryApi } from '../lib/api';
+import { useToast } from '../components/ui/Toast';
+import { memoryApi, type MemoryExtractionTask } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import type {
   MemoryActivityItem,
@@ -148,29 +149,156 @@ function formatDate(dateStr?: string): string {
 // ── Home Tab Component ──────────────────────────────────────────────
 function HomeTab() {
   const { t } = useI18n();
+  const toast = useToast();
   const [persona, setPersona] = useState<MemoryPersona | null>(null);
   const [roles, setRoles] = useState<Array<{ count: number; role: string }>>([]);
+  const [extractionTask, setExtractionTask] = useState<MemoryExtractionTask | null>(null);
+  const [requestingExtraction, setRequestingExtraction] = useState(false);
   const [loading, setLoading] = useState(true);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleTaskPoll = useCallback(
+    (taskId?: string) => {
+      stopPolling();
+      pollTimerRef.current = setTimeout(async () => {
+        pollTimerRef.current = null;
+        try {
+          const nextTask = await memoryApi.getMemoryExtractionTask(
+            taskId ? { taskId } : undefined,
+          );
+          setExtractionTask(nextTask);
+
+          if (
+            nextTask &&
+            (nextTask.status === 'Pending' || nextTask.status === 'Processing')
+          ) {
+            scheduleTaskPoll(nextTask.id);
+          } else if (nextTask?.status === 'Success') {
+            const [nextPersona, nextRoles] = await Promise.all([
+              memoryApi.getPersona().catch(() => null),
+              memoryApi
+                .queryIdentityRoles({ page: 0, pageSize: 50 })
+                .catch(() => ({ items: [], total: 0 })),
+            ]);
+            setPersona(nextPersona);
+            setRoles((nextRoles as any)?.items || []);
+          }
+        } catch {
+          // Keep the last known task state if polling fails transiently.
+        }
+      }, 2500);
+    },
+    [stopPolling],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, r] = await Promise.all([
+      const [p, r, task] = await Promise.all([
         memoryApi.getPersona().catch(() => null),
         memoryApi
           .queryIdentityRoles({ page: 0, pageSize: 50 })
           .catch(() => ({ items: [], total: 0 })),
+        memoryApi.getMemoryExtractionTask().catch(() => null),
       ]);
       setPersona(p);
       setRoles((r as any)?.items || []);
+
+      setExtractionTask(task);
+      if (task && (task.status === 'Pending' || task.status === 'Processing')) {
+        scheduleTaskPoll(task.id);
+      } else {
+        stopPolling();
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scheduleTaskPoll, stopPolling]);
 
   useEffect(() => {
     load();
-  }, [load]);
+    return stopPolling;
+  }, [load, stopPolling]);
+
+  const handleRunExtraction = useCallback(async () => {
+    if (requestingExtraction) return;
+
+    setRequestingExtraction(true);
+    try {
+      const task = await memoryApi.requestMemoryFromChatTopic();
+      setExtractionTask(task);
+      toast.show('success', task.deduped ? t.memoryExtractQueued : t.memoryExtractSuccess);
+
+      if (task.status === 'Pending' || task.status === 'Processing') {
+        scheduleTaskPoll(task.id);
+      }
+    } catch {
+      toast.show('error', t.memoryExtractFailed);
+    } finally {
+      setRequestingExtraction(false);
+    }
+  }, [
+    requestingExtraction,
+    scheduleTaskPoll,
+    t.memoryExtractFailed,
+    t.memoryExtractQueued,
+    t.memoryExtractSuccess,
+    toast,
+  ]);
+
+  const extractionStatusText = useMemo(() => {
+    if (!extractionTask) return t.memoryExtractDesc;
+
+    if (extractionTask.status === 'Pending') return t.memoryExtractQueued;
+    if (extractionTask.status === 'Processing') return t.memoryExtractRunning;
+    if (extractionTask.status === 'Success') return t.memoryExtractReady;
+
+    return (
+      extractionTask.error?.body?.detail ||
+      extractionTask.error?.body?.message ||
+      extractionTask.error?.message ||
+      t.memoryExtractFailed
+    );
+  }, [
+    extractionTask,
+    t.memoryExtractDesc,
+    t.memoryExtractFailed,
+    t.memoryExtractQueued,
+    t.memoryExtractReady,
+    t.memoryExtractRunning,
+  ]);
+
+  const extractionProgressText = useMemo(() => {
+    const progress = extractionTask?.metadata?.progress;
+    if (!progress) return null;
+
+    const completed = progress.completedTopics ?? 0;
+    const total = progress.totalTopics;
+
+    if (typeof total === 'number' && total > 0) {
+      return t.memoryExtractProgress
+        .replace('{completed}', String(completed))
+        .replace('{total}', String(total));
+    }
+
+    if (completed > 0) {
+      return t.memoryExtractProgressUnknown.replace('{completed}', String(completed));
+    }
+
+    return null;
+  }, [extractionTask, t.memoryExtractProgress, t.memoryExtractProgressUnknown]);
+
+  const extractionButtonLabel =
+    extractionTask?.status === 'Success' || extractionTask?.status === 'Error'
+      ? t.memoryExtractRetry
+      : t.memoryExtractAction;
 
   if (loading) {
     return (
@@ -249,7 +377,36 @@ function HomeTab() {
           }}
         >
           <Text className="text-base font-semibold text-gray-800 mb-2">{t.memoryExtractTitle}</Text>
-          <Text className="text-sm text-gray-500 leading-5">{t.memoryExtractDesc}</Text>
+          <Text className="text-sm text-gray-500 leading-5">{extractionStatusText}</Text>
+          {extractionProgressText ? (
+            <Text className="text-xs text-gray-400 mt-2">{extractionProgressText}</Text>
+          ) : null}
+          <TouchableOpacity
+            className="mt-4 rounded-xl items-center justify-center"
+            disabled={
+              requestingExtraction ||
+              extractionTask?.status === 'Pending' ||
+              extractionTask?.status === 'Processing'
+            }
+            style={{
+              backgroundColor:
+                requestingExtraction ||
+                extractionTask?.status === 'Pending' ||
+                extractionTask?.status === 'Processing'
+                  ? '#d1d5db'
+                  : '#111827',
+              minHeight: 44,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+            }}
+            onPress={handleRunExtraction}
+          >
+            {requestingExtraction ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text className="text-sm font-semibold text-white">{extractionButtonLabel}</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 

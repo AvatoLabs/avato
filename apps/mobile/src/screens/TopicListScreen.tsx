@@ -39,15 +39,28 @@ export default function TopicListScreen({ route, navigation }: any) {
   const [createPromptVisible, setCreatePromptVisible] = useState(false);
 
   useEffect(() => {
-    if (sessionId) fetchTopics(sessionId);
-  }, [sessionId, fetchTopics]);
+    if (!sessionId) {
+      toast.show('error', t.errorUnknown);
+      navigation.goBack();
+      return;
+    }
+
+    fetchTopics(sessionId).catch(() => {
+      toast.show('error', t.errorNetwork);
+    });
+  }, [fetchTopics, navigation, sessionId, t.errorNetwork, t.errorUnknown, toast]);
 
   const onRefresh = useCallback(async () => {
+    if (!sessionId) return;
     setRefreshing(true);
     haptics.light();
-    await fetchTopics(sessionId);
+    try {
+      await fetchTopics(sessionId);
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
     setRefreshing(false);
-  }, [fetchTopics, sessionId]);
+  }, [fetchTopics, sessionId, t.errorNetwork, toast]);
 
   const handleCreateTopic = useCallback(() => {
     setCreatePromptVisible(true);
@@ -55,15 +68,21 @@ export default function TopicListScreen({ route, navigation }: any) {
 
   const handleSwitchTopic = useCallback(
     (topicId: string | null) => {
-      switchTopic(topicId);
-      fetchMessages(sessionId, topicId ?? undefined);
-      navigation.goBack();
+      if (!sessionId) return;
+
+      try {
+        switchTopic(topicId);
+        void fetchMessages(sessionId, topicId ?? undefined);
+        navigation.goBack();
+      } catch {
+        toast.show('error', t.errorUnknown);
+      }
     },
-    [switchTopic, fetchMessages, sessionId, navigation],
+    [fetchMessages, navigation, sessionId, switchTopic, t.errorUnknown, toast],
   );
 
   const filteredTopics = searchQuery
-    ? topics.filter((tp) => tp.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? topics.filter((tp) => (tp.title || '').toLowerCase().includes(searchQuery.toLowerCase()))
     : topics;
 
   const sortedTopics = [...filteredTopics].sort((a, b) => {
@@ -171,7 +190,13 @@ export default function TopicListScreen({ route, navigation }: any) {
         onSubmit={async (title) => {
           setCreatePromptVisible(false);
           haptics.success();
-          await createTopic(sessionId, title);
+          if (!sessionId) return;
+
+          try {
+            await createTopic(sessionId, title);
+          } catch {
+            toast.show('error', t.errorNetwork);
+          }
         }}
       />
     </View>

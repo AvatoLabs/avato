@@ -90,7 +90,7 @@ const Nav = memo(() => {
         url: '/community',
       },
     ],
-    [enableBusinessFeatures, showAiImage, showMarket, t],
+    [enableBusinessFeatures, showAiImage, showMarket, t, toggleCommandMenu],
   );
 
   const newBadge = (
@@ -103,9 +103,9 @@ const Nav = memo(() => {
       size="small"
       variant={'filled'}
       style={{
-        background: cssVar.colorText,
-        border: 'none',
-        color: cssVar.colorBgContainer,
+        background: cssVar.colorFillSecondary,
+        border: `1px solid ${cssVar.colorFillTertiary}`,
+        color: cssVar.colorTextDescription,
         marginInlineStart: 4,
       }}
     >

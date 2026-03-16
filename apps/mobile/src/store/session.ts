@@ -21,6 +21,7 @@ interface SessionState {
   duplicateSession: (id: string) => Promise<string | null>;
   // Actions
   fetchSessions: () => Promise<void>;
+  getOrCreateHomeSession: (config?: CreateSessionConfig) => Promise<string>;
 
   /** Whether the initial fetch has completed */
   initialized: boolean;
@@ -39,6 +40,8 @@ interface SessionState {
   updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => void;
 }
 
+const HOME_SESSION_ID_KEY = 'avato_home_session_id';
+
 export const useSessionStore = create<SessionState>((set, get) => ({
   initialized: false,
   loading: false,
@@ -48,6 +51,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   reset: () => {
     void AsyncStorage.removeItem('activeSessionId');
+    void AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
     set({
       activeSessionId: null,
       initialized: false,
@@ -151,6 +155,36 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
+  getOrCreateHomeSession: async (config) => {
+    if (!get().initialized) {
+      await get().fetchSessions();
+    }
+
+    const storedHomeSessionId = await AsyncStorage.getItem(HOME_SESSION_ID_KEY);
+
+    if (storedHomeSessionId) {
+      const existingHomeSession = get().sessions.find(
+        (session) => session.id === storedHomeSessionId && session.type !== 'group',
+      );
+
+      if (existingHomeSession) {
+        set({ activeSessionId: storedHomeSessionId });
+        await AsyncStorage.setItem('activeSessionId', storedHomeSessionId);
+        return storedHomeSessionId;
+      }
+
+      await AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
+    }
+
+    const newSessionId = await get().createSession({
+      ...config,
+      title: config?.title || 'Avato',
+    });
+
+    await AsyncStorage.setItem(HOME_SESSION_ID_KEY, newSessionId);
+    return newSessionId;
+  },
+
   removeSession: async (id: string) => {
     const target = get().sessions.find((s) => s.id === id);
     const isChatGroup = target?.type === 'group';
@@ -164,6 +198,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }));
 
     try {
+      const homeSessionId = await AsyncStorage.getItem(HOME_SESSION_ID_KEY);
+      if (homeSessionId === id) {
+        await AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
+      }
+
       if (isChatGroup) {
         await sessionApi.removeChatGroup(id);
       } else {

@@ -34,6 +34,8 @@ const PlanTag = memo<PlanTagProps>(({ type = PlanType.Preview }) => {
 
   const isFree = type === Plans.Free;
 
+  if (isFree) return null;
+
   return (
     <Link
       style={{ cursor: 'pointer' }}

@@ -3,6 +3,7 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { MessageModel } from '@/database/models/message';
 import { TopicModel } from '@/database/models/topic';
 import { FileService } from '@/server/services/file';
+import { normalizeMessageFileUrlsForClient } from '@/server/services/message/normalizeMessageFileUrls';
 
 export class AiChatService {
   private userId: string;
@@ -37,6 +38,6 @@ export class AiChatService {
         : undefined,
     ]);
 
-    return { messages, topics };
+    return { messages: normalizeMessageFileUrlsForClient(messages), topics };
   }
 }

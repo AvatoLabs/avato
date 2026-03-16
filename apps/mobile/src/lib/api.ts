@@ -21,12 +21,16 @@ import type {
   ChatFileItem,
   ChatImageItem,
   ChatMessage,
+  ChatMessageMetadata,
+  ChatPluginPayload,
   ChatSession,
+  ChatToolPayload,
   CreateSessionConfig,
   DiscoverModel,
   FileListItem,
   GenerationBatch,
   GenerationTopic,
+  GroundingSearch,
   HeatmapDay,
   ImageGenerationParams,
   InstalledPlugin,
@@ -38,6 +42,7 @@ import type {
   MemoryPagedResult,
   MemoryPersona,
   MemoryPreferenceItem,
+  MessageContentPart,
   MobileMemoryEffort,
   ModelRankItem,
   SessionGroup,
@@ -184,16 +189,153 @@ const normalizeMessage = (message: any): ChatMessage => ({
   imageList: Array.isArray(message?.imageList)
     ? (message.imageList as ChatImageItem[])
     : undefined,
+  metadata: (message?.metadata as ChatMessageMetadata | null | undefined) ?? null,
   model: message?.model ?? message?.extra?.model ?? undefined,
+  observationId: message?.observationId ?? message?.observation_id ?? undefined,
   parentId: message?.parentId ?? undefined,
-  performance: message?.performance ?? null,
+  performance: message?.performance ?? message?.metadata?.performance ?? null,
+  plugin: (message?.plugin as ChatPluginPayload | null | undefined) ?? null,
+  pluginError: message?.pluginError ?? message?.plugin_error ?? undefined,
+  pluginIntervention: message?.pluginIntervention ?? message?.plugin?.intervention ?? null,
+  pluginState: message?.pluginState ?? message?.plugin_state ?? undefined,
   provider: message?.provider ?? message?.extra?.provider ?? undefined,
   reasoning: message?.reasoning ?? null,
   role: message?.role,
+  search: (message?.search as GroundingSearch | null | undefined) ?? null,
   sessionId: String(message?.sessionId ?? ''),
+  toolCallId: message?.tool_call_id ?? undefined,
+  tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
+  traceId: message?.traceId ?? message?.trace_id ?? undefined,
   updatedAt: toIsoString(message?.updatedAt),
-  usage: message?.usage ?? null,
+  usage: message?.usage ?? message?.metadata?.usage ?? null,
 });
+
+interface MobileToolFunction {
+  arguments?: string;
+  name?: string;
+}
+
+export interface MobileMessageToolCall {
+  function: {
+    arguments: string;
+    name: string;
+  };
+  id: string;
+  thoughtSignature?: string;
+  type: string;
+}
+
+interface MobileToolCallChunk {
+  function?: MobileToolFunction;
+  id?: string;
+  index?: number;
+  thoughtSignature?: string;
+  type?: string;
+}
+
+interface ParsedSSEChunk {
+  data: any;
+  event: string;
+  id?: string;
+}
+
+const mergeToolCallChunks = (origin: MobileToolCallChunk[], value: MobileToolCallChunk[]) => {
+  const next = [...origin];
+
+  if (next.length === 0) {
+    return value.map((item) => ({
+      ...item,
+      function: {
+        arguments: item.function?.arguments || '',
+        name: item.function?.name || '',
+      },
+      id: item.id || `${item.index || 0}`,
+      type: item.type || 'function',
+    }));
+  }
+
+  for (const incoming of value) {
+    const index = incoming.index ?? 0;
+    const incomingId = incoming.id;
+    const existingByIdIndex = incomingId ? next.findIndex((item) => item.id === incomingId) : -1;
+
+    if (existingByIdIndex !== -1) {
+      const existing = next[existingByIdIndex];
+      next[existingByIdIndex] = {
+        ...existing,
+        ...incoming,
+        function: {
+          arguments:
+            (existing.function?.arguments || '') + (incoming.function?.arguments || ''),
+          name: incoming.function?.name || existing.function?.name || '',
+        },
+      };
+      continue;
+    }
+
+    if (!next[index]) {
+      next.splice(index, 0, {
+        ...incoming,
+        function: {
+          arguments: incoming.function?.arguments || '',
+          name: incoming.function?.name || '',
+        },
+        id: incomingId || `${index}`,
+        type: incoming.type || 'function',
+      });
+      continue;
+    }
+
+    const existingAtIndex = next[index];
+    if (incomingId && existingAtIndex?.id !== incomingId) {
+      next.push({
+        ...incoming,
+        function: {
+          arguments: incoming.function?.arguments || '',
+          name: incoming.function?.name || '',
+        },
+        id: incomingId,
+        type: incoming.type || 'function',
+      });
+      continue;
+    }
+
+    next[index] = {
+      ...existingAtIndex,
+      ...incoming,
+      function: {
+        arguments:
+          (existingAtIndex.function?.arguments || '') + (incoming.function?.arguments || ''),
+        name: incoming.function?.name || existingAtIndex.function?.name || '',
+      },
+    };
+  }
+
+  return next;
+};
+
+const transformToolCalls = (toolCalls: MobileToolCallChunk[]): ChatToolPayload[] =>
+  toolCalls.map((toolCall, index) => {
+    const fullName = toolCall.function?.name || `tool_${index + 1}`;
+    const slashSegments = fullName.split('/');
+    const slashApiName = slashSegments.pop() || fullName;
+    const slashIdentifier = slashSegments.join('/');
+    const [underscoreIdentifier, underscoreApiName] = fullName.split('____');
+    const identifier = underscoreApiName
+      ? underscoreIdentifier
+      : slashIdentifier || fullName;
+    const apiName = underscoreApiName || slashApiName;
+
+    return {
+      apiName,
+      arguments: toolCall.function?.arguments || '{}',
+      id: toolCall.id || `${index}`,
+      identifier,
+      source: identifier.startsWith('lobe-') ? 'builtin' : undefined,
+      thoughtSignature: toolCall.thoughtSignature,
+      type: 'default',
+    };
+  });
 
 async function getBaseUrl(): Promise<string> {
   return getApiUrl();
@@ -312,6 +454,22 @@ export const sessionApi = {
     trpcMutate<string | undefined>('session.cloneSession', { id, newTitle: title }),
   rename: (id: string, title: string) =>
     trpcMutate('session.updateSession', { id, value: { title } }),
+  search: async (keywords: string): Promise<ChatSession[]> => {
+    const result = await trpcQuery<any[]>('session.searchSessions', { keywords });
+
+    return (result ?? []).map((s) => ({
+      ...s,
+      agentId: s.config?.id ?? undefined,
+      groupId: s.groupId ?? s.group ?? undefined,
+      title: s.meta?.title ?? s.title ?? '',
+      description: s.meta?.description ?? s.description,
+      avatar: s.meta?.avatar ?? s.avatar,
+      chatConfig: s.config?.chatConfig ?? s.chatConfig,
+      model: s.model || s.config?.model || undefined,
+      provider: s.config?.provider || undefined,
+      type: s.type ?? 'agent',
+    }));
+  },
   /** Update agent chat config (e.g. searchMode) for a session */
   updateChatConfig: (id: string, config: Record<string, unknown>) =>
     trpcMutate('session.updateSessionChatConfig', { id, value: config }),
@@ -321,13 +479,24 @@ export const sessionApi = {
 export interface CreateMessageParams {
   content: string;
   files?: string[];
+  imageList?: ChatImageItem[];
+  metadata?: ChatMessageMetadata | null;
   model?: string;
+  observationId?: string;
   parentId?: string;
   provider?: string;
-  reasoning?: { content?: string; duration?: number } | null;
+  reasoning?: {
+    content?: string;
+    duration?: number;
+    isMultimodal?: boolean;
+    signature?: string;
+  } | null;
   role: 'user' | 'assistant';
+  search?: GroundingSearch | null;
   sessionId: string;
+  tools?: ChatToolPayload[] | null;
   topicId?: string;
+  traceId?: string;
 }
 
 export interface MessageSearchResult {
@@ -383,16 +552,35 @@ export interface ChatRequestOptions {
 }
 
 export interface StreamCallbacks {
+  onContent?: (state: StreamContentState) => void;
+  onImages?: (images: ChatImageItem[]) => void;
   onPerformance?: (perf: Record<string, any>) => void;
-  onReasoning?: (accumulated: string) => void;
-  onText?: (accumulated: string) => void;
+  onReasoning?: (state: StreamReasoningState) => void;
+  onSearch?: (search: GroundingSearch) => void;
+  onTools?: (tools: ChatToolPayload[]) => void;
   onUsage?: (usage: Record<string, any>) => void;
 }
 
+export interface StreamContentState {
+  content: string;
+  isMultimodal?: boolean;
+  tempDisplayContent?: string;
+}
+
+export interface StreamReasoningState {
+  content?: string;
+  isMultimodal?: boolean;
+  tempDisplayContent?: MessageContentPart[];
+}
+
 export interface StreamResult {
+  contentMetadata?: Pick<ChatMessageMetadata, 'isMultimodal' | 'tempDisplayContent'>;
+  images?: ChatImageItem[];
   performance?: Record<string, any>;
-  reasoning: string;
+  reasoning?: StreamReasoningState;
+  search?: GroundingSearch;
   text: string;
+  tools?: ChatToolPayload[];
   usage?: Record<string, any>;
 }
 
@@ -415,7 +603,14 @@ export type MobileUserMessageContentPart =
 
 export interface MobileChatMessage {
   content: string | MobileUserMessageContentPart[];
+  name?: string;
+  reasoning?: {
+    content?: string;
+    duration?: number;
+  };
   role: string;
+  tool_call_id?: string;
+  tool_calls?: MobileMessageToolCall[];
 }
 
 /**
@@ -423,80 +618,67 @@ export interface MobileChatMessage {
  * (id, event, data) often arrive in SEPARATE XHR onprogress chunks in React
  * Native, so `currentEvent` must persist across calls.
  */
-interface SSEParseResult {
-  performance?: Record<string, any>;
-  reasoning: string;
-  text: string;
-  usage?: Record<string, any>;
-}
-
 function createSSEParser() {
   let lineBuffer = '';
   let currentEvent = '';
+  let currentId = '';
 
-  return function parse(raw: string): SSEParseResult {
+  return function parse(raw: string): ParsedSSEChunk[] {
     const combined = lineBuffer + raw;
     const lines = combined.split('\n');
     lineBuffer = lines.pop() ?? '';
 
-    let text = '';
-    let reasoning = '';
-    let usage: Record<string, any> | undefined;
-    let performance: Record<string, any> | undefined;
+    const chunks: ParsedSSEChunk[] = [];
 
     for (const line of lines) {
       const trimmed = line.replace(/\r$/, '');
       if (trimmed.startsWith('id:')) {
-        // SSE id field — ignore
+        currentId = trimmed.slice(3).trim();
       } else if (trimmed.startsWith('event:')) {
         currentEvent = trimmed.slice(6).trim();
       } else if (trimmed.startsWith('data:')) {
         const dataStr = trimmed.slice(5).trim();
         if (!dataStr) continue;
 
-        if (currentEvent === 'text' || currentEvent === '') {
-          try {
-            const parsed = JSON.parse(dataStr);
-            if (typeof parsed === 'string') {
-              text += parsed;
-            } else if (typeof parsed === 'object' && parsed !== null) {
-              // Sometimes search pre-flight or other tools send object data
-              // If it's a search_complete or similar, we might just ignore it
-              // Or if it has a text field, we could extract it, but usually text is sent as string
-            } else {
-              text += String(parsed);
-            }
-          } catch {
-            // Fallback for unquoted text streams or malformed JSON
-            // We need to unescape newlines if they are literal \n in the string
-            text += dataStr.replaceAll('\\n', '\n');
-          }
-        } else if (currentEvent === 'reasoning') {
-          try {
-            const parsed = JSON.parse(dataStr);
-            if (typeof parsed === 'string') {
-              reasoning += parsed;
-            } else if (typeof parsed === 'object' && parsed !== null) {
-              // Ignore
-            } else {
-              reasoning += String(parsed);
-            }
-          } catch {
-            reasoning += dataStr.replaceAll('\\n', '\n');
-          }
-        } else if (currentEvent === 'usage') {
-          try { usage = JSON.parse(dataStr); } catch { /* ignore */ }
-        } else if (currentEvent === 'speed' || currentEvent === 'performance') {
-          try { performance = JSON.parse(dataStr); } catch { /* ignore */ }
+        let parsed: any;
+        try {
+          parsed = JSON.parse(dataStr);
+        } catch {
+          parsed = dataStr.replaceAll('\\n', '\n');
         }
+
+        chunks.push({
+          data: parsed,
+          event: currentEvent || 'text',
+          id: currentId || undefined,
+        });
       } else if (trimmed === '') {
         currentEvent = '';
+        currentId = '';
       }
     }
 
-    return { performance, reasoning, text, usage };
+    return chunks;
   };
 }
+
+const appendTextPart = (parts: MessageContentPart[], text: string): MessageContentPart[] => {
+  if (!text) return parts;
+
+  const lastPart = parts.at(-1);
+  if (lastPart?.type === 'text') {
+    return [...parts.slice(0, -1), { text: lastPart.text + text, type: 'text' }];
+  }
+
+  return [...parts, { text, type: 'text' }];
+};
+
+const appendImagePart = (parts: MessageContentPart[], image: string): MessageContentPart[] => [
+  ...parts,
+  { image, type: 'image' },
+];
+
+const serializeContentParts = (parts: MessageContentPart[]) => JSON.stringify(parts);
 
 export const aiChatApi = {
   /**
@@ -554,33 +736,164 @@ export const aiChatApi = {
 
         let accText = '';
         let accReasoning = '';
+        let accImages: ChatImageItem[] = [];
+        let accSearch: GroundingSearch | undefined;
+        let accTools: ChatToolPayload[] | undefined;
+        let contentMetadata: StreamResult['contentMetadata'];
         let lastUsage: Record<string, any> | undefined;
         let lastPerformance: Record<string, any> | undefined;
         let processedLength = 0;
         let thinkingInContent = false;
+        let contentParts: MessageContentPart[] = [];
+        let reasoningParts: MessageContentPart[] = [];
+        let rawToolCalls: MobileToolCallChunk[] = [];
         let rawTextBuffer = '';
         const parseSSE = createSSEParser();
 
+        const emitReasoningUpdate = () => {
+          const hasReasoningImages = reasoningParts.some((part) => part.type === 'image');
+
+          callbacks.onReasoning?.(
+            hasReasoningImages
+              ? {
+                  content: accReasoning,
+                  isMultimodal: true,
+                  tempDisplayContent: reasoningParts,
+                }
+              : { content: accReasoning },
+          );
+        };
+
+        const emitContentUpdate = () => {
+          const hasContentImages = contentParts.some((part) => part.type === 'image');
+
+          contentMetadata = hasContentImages
+            ? {
+                isMultimodal: true,
+                tempDisplayContent: serializeContentParts(contentParts),
+              }
+            : undefined;
+
+          callbacks.onContent?.({
+            content: accText,
+            ...contentMetadata,
+          });
+        };
+
         const processNewData = (newData: string) => {
-          const { text, reasoning, usage: parsedUsage, performance: parsedPerf } = parseSSE(newData);
+          const parsedChunks = parseSSE(newData);
 
-          if (parsedUsage) {
-            lastUsage = parsedUsage;
-            callbacks.onUsage?.(parsedUsage);
+          for (const chunk of parsedChunks) {
+            switch (chunk.event) {
+              case 'usage': {
+                if (chunk.data && typeof chunk.data === 'object') {
+                  lastUsage = chunk.data;
+                  callbacks.onUsage?.(chunk.data);
+                }
+                break;
+              }
+              case 'speed':
+              case 'performance': {
+                if (chunk.data && typeof chunk.data === 'object') {
+                  lastPerformance = chunk.data;
+                  callbacks.onPerformance?.(chunk.data);
+                }
+                break;
+              }
+              case 'grounding': {
+                if (chunk.data && typeof chunk.data === 'object') {
+                  accSearch = chunk.data as GroundingSearch;
+                  callbacks.onSearch?.(accSearch);
+                }
+                break;
+              }
+              case 'reasoning_signature': {
+                break;
+              }
+              case 'tool_calls': {
+                const payload = Array.isArray(chunk.data) ? chunk.data : [];
+                rawToolCalls = mergeToolCallChunks(rawToolCalls, payload as MobileToolCallChunk[]);
+                accTools = transformToolCalls(rawToolCalls);
+                callbacks.onTools?.(accTools);
+                break;
+              }
+              case 'reasoning': {
+                if (typeof chunk.data === 'string') {
+                  accReasoning += chunk.data;
+                  emitReasoningUpdate();
+                }
+                break;
+              }
+              case 'reasoning_part': {
+                if (chunk.data?.partType === 'text' && typeof chunk.data?.content === 'string') {
+                  reasoningParts = appendTextPart(reasoningParts, chunk.data.content);
+                  accReasoning += chunk.data.content;
+                  emitReasoningUpdate();
+                } else if (
+                  chunk.data?.partType === 'image' &&
+                  typeof chunk.data?.content === 'string'
+                ) {
+                  const mimeType =
+                    typeof chunk.data?.mimeType === 'string'
+                      ? chunk.data.mimeType
+                      : 'image/png';
+                  reasoningParts = appendImagePart(
+                    reasoningParts,
+                    `data:${mimeType};base64,${chunk.data.content}`,
+                  );
+                  emitReasoningUpdate();
+                }
+                break;
+              }
+              case 'content_part': {
+                if (chunk.data?.partType === 'text' && typeof chunk.data?.content === 'string') {
+                  contentParts = appendTextPart(contentParts, chunk.data.content);
+                  rawTextBuffer += chunk.data.content;
+                } else if (
+                  chunk.data?.partType === 'image' &&
+                  typeof chunk.data?.content === 'string'
+                ) {
+                  const mimeType =
+                    typeof chunk.data?.mimeType === 'string'
+                      ? chunk.data.mimeType
+                      : 'image/png';
+                  contentParts = appendImagePart(
+                    contentParts,
+                    `data:${mimeType};base64,${chunk.data.content}`,
+                  );
+                  emitContentUpdate();
+                }
+                break;
+              }
+              case 'base64_image': {
+                if (typeof chunk.data === 'string') {
+                  const imageId = chunk.id || `tmp_img_${Date.now()}_${accImages.length}`;
+                  accImages = [
+                    ...accImages,
+                    {
+                      alt: 'Generated image',
+                      id: imageId,
+                      url: `data:image/png;base64,${chunk.data}`,
+                    },
+                  ];
+                  callbacks.onImages?.(accImages);
+                }
+                break;
+              }
+              default: {
+                if (typeof chunk.data === 'string') {
+                  rawTextBuffer += chunk.data;
+                } else if (typeof chunk.data === 'number') {
+                  rawTextBuffer += String(chunk.data);
+                } else if (chunk.data && typeof chunk.data === 'object' && 'text' in chunk.data) {
+                  rawTextBuffer += String(chunk.data.text ?? '');
+                }
+                break;
+              }
+            }
           }
-          if (parsedPerf) {
-            lastPerformance = parsedPerf;
-            callbacks.onPerformance?.(parsedPerf);
-          }
 
-          if (reasoning) {
-            accReasoning += reasoning;
-            callbacks.onReasoning?.(accReasoning);
-          }
-
-          if (text) {
-            rawTextBuffer += text;
-
+          if (rawTextBuffer) {
             if (rawTextBuffer.includes('<think>') || thinkingInContent) {
               if (!thinkingInContent && rawTextBuffer.includes('<think>')) {
                 thinkingInContent = true;
@@ -599,12 +912,12 @@ export const aiChatApi = {
 
                 if (thinkContent) {
                   accReasoning = thinkContent;
-                  callbacks.onReasoning?.(accReasoning);
+                  emitReasoningUpdate();
                 }
                 const combined = before + after;
                 if (combined) {
                   accText = combined;
-                  callbacks.onText?.(accText);
+                  emitContentUpdate();
                 }
               } else {
                 const thinkStart = rawTextBuffer.indexOf('<think>');
@@ -615,16 +928,16 @@ export const aiChatApi = {
 
                 if (thinkContent) {
                   accReasoning = thinkContent;
-                  callbacks.onReasoning?.(accReasoning);
+                  emitReasoningUpdate();
                 }
                 if (beforeThink) {
                   accText = beforeThink;
-                  callbacks.onText?.(accText);
+                  emitContentUpdate();
                 }
               }
             } else {
               accText = rawTextBuffer;
-              callbacks.onText?.(accText);
+              emitContentUpdate();
             }
           }
         };
@@ -643,7 +956,27 @@ export const aiChatApi = {
           const remaining = xhr.responseText.slice(processedLength);
           if (remaining) processNewData(remaining);
           processNewData('\n');
-          resolve({ performance: lastPerformance, reasoning: accReasoning, text: accText, usage: lastUsage });
+          resolve({
+            contentMetadata,
+            images: accImages.length > 0 ? accImages : undefined,
+            performance: lastPerformance,
+            reasoning:
+              reasoningParts.length > 0
+                ? {
+                    content: accReasoning,
+                    isMultimodal: reasoningParts.some((part) => part.type === 'image'),
+                    ...(reasoningParts.some((part) => part.type === 'image')
+                      ? { tempDisplayContent: reasoningParts }
+                      : {}),
+                  }
+                : accReasoning
+                  ? { content: accReasoning }
+                  : undefined,
+            search: accSearch,
+            text: accText,
+            tools: accTools,
+            usage: lastUsage,
+          });
         };
 
         xhr.onerror = () => reject(new Error('Network error during AI chat'));
@@ -1098,6 +1431,36 @@ export const marketSkillApi = {
     trpcQuery<string[]>('market.skill.getSkillCategories'),
 };
 
+export const lobehubSkillApi = {
+  getAuthorizeUrl: async (provider: string, options?: { redirectUri?: string; scopes?: string[] }) =>
+    trpcQuery<any>('tools.market.connectGetAuthorizeUrl', {
+      provider,
+      redirectUri: options?.redirectUri,
+      scopes: options?.scopes,
+    }),
+
+  getConnections: async (): Promise<
+    Array<{
+      providerId: string;
+      providerUsername?: string;
+      scopes?: string[];
+      tokenExpiresAt?: string;
+    }>
+  > => {
+    const response = await trpcQuery<any>('tools.market.connectListConnections', {});
+    return response?.connections || [];
+  },
+
+  getStatus: async (provider: string) =>
+    trpcQuery<any>('tools.market.connectGetStatus', {
+      provider,
+    }),
+
+  revoke: async (provider: string): Promise<void> => {
+    await trpcMutate('tools.market.connectRevoke', { provider });
+  },
+};
+
 // ── Stats API ─────────────────────────────────────────────────────
 export const statsApi = {
   /** Count all messages (server-side, accurate) */
@@ -1134,6 +1497,37 @@ export const statsApi = {
 };
 
 // ── Memory API ──────────────────────────────────────────────────────
+export interface MemoryExtractionTaskMetadata {
+  progress?: {
+    completedTopics?: number;
+    totalTopics?: number;
+  };
+  range?: {
+    from?: string;
+    to?: string;
+  };
+  source?: string;
+}
+
+export interface MemoryExtractionTask {
+  error?: {
+    body?: {
+      detail?: string;
+      message?: string;
+    };
+    message?: string;
+    name?: string;
+  } | null;
+  id: string;
+  metadata?: MemoryExtractionTaskMetadata;
+  status: string;
+}
+
+export interface RequestMemoryExtractionParams {
+  fromDate?: Date | string;
+  toDate?: Date | string;
+}
+
 export const memoryApi = {
   // ── Persona & Tags ──
   /** Get user persona (summary + content) */
@@ -1202,11 +1596,15 @@ export const memoryApi = {
     trpcMutate<MemoryIdentityItem>('userMemory.createIdentity', data),
 
   // ── Memory Extraction ──
-  requestMemoryFromChatTopic: (params: { topicId: string }) =>
-    trpcMutate('userMemory.requestMemoryFromChatTopic', params),
+  requestMemoryFromChatTopic: (params?: RequestMemoryExtractionParams) =>
+    trpcMutate<
+      MemoryExtractionTask & {
+        deduped: boolean;
+      }
+    >('userMemory.requestMemoryFromChatTopic', params),
 
-  getMemoryExtractionTask: (params: { topicId: string }) =>
-    trpcQuery<{ status: string; progress?: number; error?: string }>('userMemory.getMemoryExtractionTask', params),
+  getMemoryExtractionTask: (params?: { taskId?: string }) =>
+    trpcQuery<MemoryExtractionTask | null>('userMemory.getMemoryExtractionTask', params),
 
   // ── Chat Memory Injection ──
   queryIdentitiesForInjection: () =>

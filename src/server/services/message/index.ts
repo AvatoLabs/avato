@@ -9,6 +9,7 @@ import {
 import { MessageModel } from '@/database/models/message';
 
 import { FileService } from '../file';
+import { normalizeMessageFileUrlsForClient } from './normalizeMessageFileUrls';
 
 interface QueryOptions {
   agentId?: string | null;
@@ -80,7 +81,7 @@ export class MessageService {
       this.getQueryOptions(),
     );
 
-    return { messages, success: true };
+    return { messages: normalizeMessageFileUrlsForClient(messages), success: true };
   }
 
   /**

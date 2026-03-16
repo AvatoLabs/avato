@@ -73,6 +73,8 @@ const EMPTY_MESSAGES: ChatMessage[] = [];
 
 export default function ChatDetailScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId || 'default';
+  const initialTopicId = route.params?.topicId ?? null;
+  const focusMessageId = route.params?.messageId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
@@ -88,6 +90,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const activeTopic = useTopicStore((s) => s.activeTopic);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
+  const switchTopic = useTopicStore((s) => s.switchTopic);
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const addFile = useFileStore((s) => s.addFile);
@@ -108,7 +111,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
-  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(new Set());
+  const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
   const [agentId, setAgentId] = useState<string | null>(null);
 
   const sessionModel = useModelStore((s) => s.selectedModel);
@@ -130,6 +133,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     loadSelection(sessionId);
   }, [fetchModels, loadSelection, sessionId]);
 
+  useEffect(() => {
+    switchTopic(initialTopicId);
+  }, [initialTopicId, sessionId, switchTopic]);
+
   // Rotating placeholder hints
   const hints = useMemo(
     () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
@@ -145,6 +152,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     fetchMessages(sessionId, activeTopic ?? undefined);
     fetchTopics(sessionId);
   }, [sessionId, fetchMessages, fetchTopics, activeTopic]);
+
+  useEffect(() => {
+    if (!focusMessageId || messages.length === 0) return;
+
+    const messageIndex = messages.findIndex((message) => message.id === focusMessageId);
+    if (messageIndex === -1) return;
+
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToIndex({
+        animated: true,
+        index: messageIndex,
+        viewPosition: 0.5,
+      });
+    });
+  }, [focusMessageId, messages]);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -175,7 +197,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     setSearchEnabled(sessionSearchMode ? sessionSearchMode !== 'off' : false);
     setMemoryEnabled(sessionMemoryEnabled !== false);
     setMemoryEffort(sessionMemoryEffort || 'medium');
-  }, [session?.id, sessionSearchMode, sessionMemoryEnabled, sessionMemoryEffort]);
+  }, [session?.chatConfig, session?.id, sessionSearchMode, sessionMemoryEnabled, sessionMemoryEffort]);
 
   const handlePluginsPress = useCallback(() => {
     haptics.light();
@@ -483,6 +505,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               className="w-9 h-9 items-center justify-center rounded-full"
               onPress={() => {
                 haptics.light();
+                if (!sessionId) {
+                  toast.show('error', t.errorUnknown);
+                  return;
+                }
                 navigation.navigate('TopicList', { sessionId });
               }}
             >
@@ -498,6 +524,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               className="w-9 h-9 items-center justify-center rounded-full ml-1"
               onPress={() => {
                 haptics.light();
+                if (!sessionId) {
+                  toast.show('error', t.errorUnknown);
+                  return;
+                }
                 navigation.navigate('Notebook', { sessionId, topicId: activeTopic });
               }}
             >
@@ -588,6 +618,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
             isScrolledToBottom.current =
               layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+          }}
+          onScrollToIndexFailed={({ index }) => {
+            requestAnimationFrame(() => {
+              flatListRef.current?.scrollToOffset({
+                animated: true,
+                offset: Math.max(index, 0) * 120,
+              });
+            });
           }}
         />
 

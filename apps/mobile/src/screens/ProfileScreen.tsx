@@ -28,6 +28,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { useToast } from '../components/ui/Toast';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
 import { aiProviderApi, statsApi } from '../lib/api';
 import { clearTransientAppState } from '../lib/appState';
@@ -45,6 +46,7 @@ const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 export default function ProfileScreen({ navigation }: any) {
   const { t, locale } = useI18n();
+  const toast = useToast();
   const sessionCount = useSessionStore((s) => s.sessions.length);
   const isConnected = useConnectionStore((s) => s.isConnected);
   const checkConnection = useConnectionStore((s) => s.checkConnection);
@@ -105,13 +107,18 @@ export default function ProfileScreen({ navigation }: any) {
         text: t.meSignOut,
         style: 'destructive',
         onPress: async () => {
-          const baseUrl = await getApiUrl();
-          await signOutFromBrowser(baseUrl);
-          await clearTransientAppState();
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          });
+          toast.mute(4000);
+          try {
+            const baseUrl = await getApiUrl();
+            await signOutFromBrowser(baseUrl);
+            await clearTransientAppState();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          } catch {
+            // Logging out should stay quiet even if the browser handoff closes early.
+          }
         },
       },
     ]);
