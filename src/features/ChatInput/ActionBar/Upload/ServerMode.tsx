@@ -2,7 +2,6 @@ import { validateVideoFileSize } from '@lobechat/utils/client';
 import { type ItemType } from '@lobehub/ui';
 import { Icon, Tooltip } from '@lobehub/ui';
 import { Upload } from 'antd';
-import { css, cx } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig, Paperclip } from 'lucide-react';
 import { memo, Suspense, useState } from 'react';
@@ -24,15 +23,6 @@ import { useAgentId } from '../../hooks/useAgentId';
 import Action from '../components/Action';
 import { type ActionDropdownMenuItems } from '../components/ActionDropdown';
 import CheckboxItem from '../components/CheckboxWithLoading';
-
-const hotArea = css`
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-color: transparent;
-  }
-`;
 
 const FileUpload = memo(() => {
   const { t } = useTranslation('chat');
@@ -82,11 +72,11 @@ const FileUpload = memo(() => {
             return false;
           }}
         >
-          <div className={cx(hotArea)}>{t('upload.action.imageUpload')}</div>
+          <div>{t('upload.action.imageUpload')}</div>
         </Upload>
       ) : (
         <Tooltip placement={'right'} title={t('upload.action.imageDisabled')}>
-          <div className={cx(hotArea)}>{t('upload.action.imageUpload')}</div>
+          <div>{t('upload.action.imageUpload')}</div>
         </Tooltip>
       ),
     },
@@ -119,7 +109,7 @@ const FileUpload = memo(() => {
             return false;
           }}
         >
-          <div className={cx(hotArea)}>{t('upload.action.fileUpload')}</div>
+          <div>{t('upload.action.fileUpload')}</div>
         </Upload>
       ),
     },
@@ -153,7 +143,7 @@ const FileUpload = memo(() => {
             return false;
           }}
         >
-          <div className={cx(hotArea)}>{t('upload.action.folderUpload')}</div>
+          <div>{t('upload.action.folderUpload')}</div>
         </Upload>
       ),
     },

@@ -3,6 +3,8 @@ import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
+import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
+import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
 import { FileS3 } from '@/server/modules/S3';
 
 export const dynamic = 'force-dynamic';
@@ -12,12 +14,25 @@ const log = debug('lobe-server:file-upload');
 
 export async function POST(request: NextRequest) {
   try {
-    const session =
-      process.env.NOAUTH_MODE === '1'
-        ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
-        : await auth.api.getSession({ headers: request.headers });
+    let userId: string | undefined;
 
-    if (!session?.user?.id) {
+    if (process.env.NOAUTH_MODE === '1') {
+      userId = process.env.NOAUTH_USER_ID || 'local-user';
+    } else {
+      const session = await auth.api.getSession({ headers: request.headers });
+      userId = session?.user?.id;
+
+      if (!userId) {
+        const oidcAuthorization = request.headers.get(LOBE_CHAT_OIDC_AUTH_HEADER);
+
+        if (oidcAuthorization) {
+          const oidc = await validateOIDCJWT(oidcAuthorization);
+          userId = oidc.userId;
+        }
+      }
+    }
+
+    if (!userId) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     }
 

@@ -64,6 +64,7 @@ const STORAGE_KEY = 'avato_artwork_config';
 const EDITABLE_NUMERIC_PARAM_KEYS = ['width', 'height', 'steps', 'cfg', 'seed'] as const;
 const PRESET_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 const SECONDARY_BAR_HEIGHT = 48;
+const SIDEBAR_OPTION_GAP = 8;
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);
@@ -185,6 +186,66 @@ function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }
   );
 }
 
+interface SidebarOptionGridProps<T extends string | number> {
+  columns: number;
+  containerWidth: number;
+  getKey: (item: T) => string;
+  items: T[];
+  onSelect?: (item: T) => void;
+  renderContent: (item: T, active: boolean) => React.ReactNode;
+  selectedValue?: T;
+}
+
+function SidebarOptionGrid<T extends string | number>({
+  columns,
+  containerWidth,
+  getKey,
+  items,
+  onSelect,
+  renderContent,
+  selectedValue,
+}: SidebarOptionGridProps<T>) {
+  const itemWidth = (containerWidth - SIDEBAR_OPTION_GAP * (columns - 1)) / columns;
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+      {items.map((item, index) => {
+        const active = selectedValue === item;
+        const isRowEnd = (index + 1) % columns === 0;
+
+        return (
+          <View
+            key={getKey(item)}
+            style={{
+              marginBottom: SIDEBAR_OPTION_GAP,
+              marginRight: isRowEnd ? 0 : SIDEBAR_OPTION_GAP,
+              width: itemWidth,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                alignItems: 'center',
+                backgroundColor: active ? semanticColors.primary : '#f5f5f5',
+                borderColor: active ? semanticColors.primary : '#e7e7e7',
+                borderRadius: 12,
+                borderWidth: 1,
+                justifyContent: 'center',
+                minHeight: 46,
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                width: '100%',
+              }}
+              onPress={() => onSelect?.(item)}
+            >
+              {renderContent(item, active)}
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
   const map: Record<string, { bg: string; fg: string; label: string }> = {
@@ -232,6 +293,14 @@ export default function ArtworkScreen() {
   const [batches, setBatches] = useState<GenerationBatch[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasHydratedRef = useRef(false);
+  const configRef = useRef({
+    generationParams: { prompt: '' } as ImageGenerationParams,
+    imgCount: 2,
+    model: '',
+    modelName: '',
+    provider: '',
+  });
 
   const applyModelSelection = useCallback(
     (
@@ -298,8 +367,8 @@ export default function ArtworkScreen() {
         const imgProviders = Array.from(providerMap.values());
         setImageProviders(imgProviders);
 
-        const preferredProvider = restoredConfig?.provider || provider;
-        const preferredModel = restoredConfig?.model || model;
+        const preferredProvider = restoredConfig?.provider || configRef.current.provider;
+        const preferredModel = restoredConfig?.model || configRef.current.model;
         const matchedProvider =
           imgProviders.find((item) => item.id === preferredProvider) || imgProviders[0];
         const matchedModel =
@@ -311,14 +380,14 @@ export default function ArtworkScreen() {
             matchedModel,
             matchedProvider.id,
             matchedProvider.name,
-            restoredConfig?.generationParams || generationParams,
+            restoredConfig?.generationParams || configRef.current.generationParams,
           );
         }
       } catch {
         /* silent */
       }
     },
-    [applyModelSelection, generationParams, isConnected, model, provider],
+    [applyModelSelection, isConnected],
   );
 
   // ── Persist/restore config ──
@@ -337,15 +406,7 @@ export default function ArtworkScreen() {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const c = JSON.parse(raw);
-        if (c.provider) setProvider(c.provider);
-        if (c.model) setModel(c.model);
-        if (c.modelName) setModelName(c.modelName);
-        if (c.imgCount) setImgCount(c.imgCount);
-        if (c.generationParams && typeof c.generationParams === 'object') {
-          setGenerationParams(c.generationParams);
-        }
-        return c as {
+        return JSON.parse(raw) as {
           generationParams?: ImageGenerationParams;
           imgCount?: number;
           model?: string;
@@ -359,16 +420,40 @@ export default function ArtworkScreen() {
     return undefined;
   }, []);
 
+  useEffect(() => {
+    configRef.current = {
+      generationParams,
+      imgCount,
+      model,
+      modelName,
+      provider,
+    };
+  }, [generationParams, imgCount, model, modelName, provider]);
+
+  const hydrateScreen = useCallback(async () => {
+    hasHydratedRef.current = false;
+
+    const nextBaseUrl = await getApiUrl();
+    setBaseUrl(nextBaseUrl);
+
+    const restoredConfig = await restoreConfig();
+
+    if (restoredConfig?.imgCount) setImgCount(restoredConfig.imgCount);
+
+    await loadModels(restoredConfig);
+    hasHydratedRef.current = true;
+  }, [loadModels, restoreConfig]);
+
   // ── Init ──
   useFocusEffect(
     useCallback(() => {
-      getApiUrl().then(setBaseUrl);
-      restoreConfig().then((restoredConfig) => loadModels(restoredConfig));
-    }, [restoreConfig, loadModels]),
+      void hydrateScreen();
+    }, [hydrateScreen]),
   );
 
   useEffect(() => {
-    saveConfig();
+    if (!hasHydratedRef.current) return;
+    void saveConfig();
   }, [saveConfig]);
 
   // ── Cleanup polling ──
@@ -557,15 +642,6 @@ export default function ArtworkScreen() {
   const containerPad = 20;
   const sidebarWidth = Math.round(screenWidth * 0.85);
   const sidebarPad = 20;
-  const ratioColCount = 5;
-  const ratioCellGap = 6;
-  const optionColCount = 3;
-  const ratioCellW = Math.floor(
-    (sidebarWidth - sidebarPad * 2 - ratioCellGap * (ratioColCount - 1)) / ratioColCount,
-  );
-  const optionCellW = Math.floor(
-    (sidebarWidth - sidebarPad * 2 - ratioCellGap * (optionColCount - 1)) / optionColCount,
-  );
   const allModels = imageProviders.flatMap((p) =>
     p.children.map((m) => ({ ...m, providerId: p.id, providerName: p.name })),
   );
@@ -972,158 +1048,117 @@ export default function ArtworkScreen() {
               {resolutionOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('resolution')} />
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      backgroundColor: '#f5f5f5',
-                      borderRadius: 12,
-                      overflow: 'hidden',
+                  <SidebarOptionGrid
+                    columns={2}
+                    containerWidth={sidebarWidth - sidebarPad * 2}
+                    getKey={(option) => String(option)}
+                    items={resolutionOptions}
+                    selectedValue={generationParams.resolution as string | undefined}
+                    renderContent={(option, active) => (
+                      <Text
+                        style={{
+                          color: active ? '#fff' : '#555',
+                          fontSize: 12,
+                          fontWeight: '500',
+                        }}
+                      >
+                        {option}
+                      </Text>
+                    )}
+                    onSelect={(option) => {
+                      haptics.selection();
+                      setGenerationParams((state) => ({ ...state, resolution: option }));
                     }}
-                  >
-                    {resolutionOptions.map((option) => {
-                      const active = generationParams.resolution === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          style={{
-                            flex: 1,
-                            paddingVertical: 10,
-                            alignItems: 'center',
-                            borderRadius: 12,
-                            backgroundColor: active ? semanticColors.primary : 'transparent',
-                          }}
-                          onPress={() => {
-                            haptics.selection();
-                            setGenerationParams((state) => ({ ...state, resolution: option }));
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: '500',
-                              color: active ? '#fff' : '#555',
-                            }}
-                          >
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  />
                 </>
               )}
 
               {sizeOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('size')} />
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
-                    {sizeOptions.map((option) => {
-                      const active = generationParams.size === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          style={{
-                            width: optionCellW,
-                            paddingVertical: 8,
-                            borderRadius: 10,
-                            alignItems: 'center',
-                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-                          }}
-                          onPress={() => {
-                            haptics.selection();
-                            setGenerationParams((state) => ({ ...state, size: option }));
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: active ? '#fff' : '#555',
-                              fontSize: 12,
-                              fontWeight: '500',
-                            }}
-                          >
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  <SidebarOptionGrid
+                    columns={2}
+                    containerWidth={sidebarWidth - sidebarPad * 2}
+                    getKey={(option) => String(option)}
+                    items={sizeOptions}
+                    selectedValue={generationParams.size as string | undefined}
+                    renderContent={(option, active) => (
+                      <Text
+                        style={{
+                          color: active ? '#fff' : '#555',
+                          fontSize: 12,
+                          fontWeight: '500',
+                        }}
+                      >
+                        {option}
+                      </Text>
+                    )}
+                    onSelect={(option) => {
+                      haptics.selection();
+                      setGenerationParams((state) => ({ ...state, size: option }));
+                    }}
+                  />
                 </>
               )}
 
               {qualityOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('quality')} />
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
-                    {qualityOptions.map((option) => {
-                      const active = generationParams.quality === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
-                          style={{
-                            width: optionCellW,
-                            paddingVertical: 8,
-                            borderRadius: 10,
-                            alignItems: 'center',
-                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-                          }}
-                          onPress={() => {
-                            haptics.selection();
-                            setGenerationParams((state) => ({ ...state, quality: option }));
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: active ? '#fff' : '#555',
-                              fontSize: 12,
-                              fontWeight: '500',
-                            }}
-                          >
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  <SidebarOptionGrid
+                    columns={2}
+                    containerWidth={sidebarWidth - sidebarPad * 2}
+                    getKey={(option) => String(option)}
+                    items={qualityOptions}
+                    selectedValue={generationParams.quality as string | undefined}
+                    renderContent={(option, active) => (
+                      <Text
+                        style={{
+                          color: active ? '#fff' : '#555',
+                          fontSize: 12,
+                          fontWeight: '500',
+                        }}
+                      >
+                        {option}
+                      </Text>
+                    )}
+                    onSelect={(option) => {
+                      haptics.selection();
+                      setGenerationParams((state) => ({ ...state, quality: option }));
+                    }}
+                  />
                 </>
               )}
 
               {effectiveAspectRatioOptions.length > 0 && (
                 <>
                   <SidebarLabel text={formatParamLabel('aspectRatio')} />
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: ratioCellGap }}>
-                    {effectiveAspectRatioOptions.map((option) => {
-                      const active = generationParams.aspectRatio === option;
-                      return (
-                        <TouchableOpacity
-                          key={option}
+                  <SidebarOptionGrid
+                    columns={3}
+                    containerWidth={sidebarWidth - sidebarPad * 2}
+                    getKey={(option) => String(option)}
+                    items={effectiveAspectRatioOptions}
+                    selectedValue={generationParams.aspectRatio as string | undefined}
+                    renderContent={(option, active) => (
+                      <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ marginBottom: 2 }}>
+                          <RatioIcon active={active} ratio={option} />
+                        </View>
+                        <Text
                           style={{
-                            width: ratioCellW,
-                            paddingVertical: 8,
-                            alignItems: 'center',
-                            borderRadius: 10,
-                            backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-                          }}
-                          onPress={() => {
-                            haptics.selection();
-                            setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                            color: active ? '#fff' : '#555',
+                            fontSize: 10,
+                            fontWeight: '500',
                           }}
                         >
-                          <View style={{ marginBottom: 2 }}>
-                            <RatioIcon active={active} ratio={option} />
-                          </View>
-                          <Text
-                            style={{
-                              color: active ? '#fff' : '#555',
-                              fontSize: 10,
-                              fontWeight: '500',
-                            }}
-                          >
-                            {option}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                          {option}
+                        </Text>
+                      </View>
+                    )}
+                    onSelect={(option) => {
+                      haptics.selection();
+                      setGenerationParams((state) => ({ ...state, aspectRatio: option }));
+                    }}
+                  />
                 </>
               )}
 
@@ -1161,46 +1196,33 @@ export default function ArtworkScreen() {
 
               {/* Number of Images */}
               <SidebarLabel text={t.artworkImageCount} />
-              <View
-                style={{
-                  flexDirection: 'row',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: 12,
-                  overflow: 'hidden',
+              <SidebarOptionGrid
+                columns={5}
+                containerWidth={sidebarWidth - sidebarPad * 2}
+                getKey={(item) => String(item)}
+                items={[...IMAGE_COUNTS, 'custom']}
+                selectedValue={imgCount}
+                renderContent={(item, active) => (
+                  <Text
+                    style={{
+                      color: active ? '#fff' : '#555',
+                      fontSize: 12,
+                      fontWeight: '500',
+                    }}
+                  >
+                    {item === 'custom' ? '+' : item}
+                  </Text>
+                )}
+                onSelect={(item) => {
+                  haptics.selection();
+                  if (item === 'custom') {
+                    setCustomCountVisible(true);
+                    return;
+                  }
+
+                  setImgCount(item);
                 }}
-              >
-                {IMAGE_COUNTS.map((n) => {
-                  const active = n === imgCount;
-                  return (
-                    <TouchableOpacity
-                      key={n}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 10,
-                        alignItems: 'center',
-                        borderRadius: 12,
-                        backgroundColor: active ? semanticColors.primary : 'transparent',
-                      }}
-                      onPress={() => {
-                        haptics.selection();
-                        setImgCount(n);
-                      }}
-                    >
-                      <Text
-                        style={{ fontSize: 13, fontWeight: '500', color: active ? '#fff' : '#555' }}
-                      >
-                        {n}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 }}
-                  onPress={() => setCustomCountVisible(true)}
-                >
-                  <Text style={{ color: '#555', fontSize: 13, fontWeight: '500' }}>+</Text>
-                </TouchableOpacity>
-              </View>
+              />
             </ScrollView>
           </Animated.View>
         </>

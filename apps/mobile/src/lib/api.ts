@@ -10,6 +10,8 @@
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
 
+import * as FileSystem from 'expo-file-system/legacy';
+
 import type {
   AgentSkillItem,
   AiProviderDetailItem,
@@ -56,17 +58,17 @@ import {
 export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
 
 const DEFAULT_UPLOAD_DIRECTORY = 'files';
+const MOBILE_UPLOAD_CACHE_DIR = `${FileSystem.cacheDirectory || ''}upload-cache/`;
 
-const computeFileHash = (buffer: ArrayBuffer) => {
-  const bytes = new Uint8Array(buffer);
+const computeStringHash = (value: string) => {
   let hash = 2166136261;
 
-  for (const byte of bytes) {
-    hash ^= byte;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
 
-  return `mobile-${bytes.byteLength.toString(16)}-${(hash >>> 0).toString(16)}`;
+  return `mobile-${value.length.toString(16)}-${(hash >>> 0).toString(16)}`;
 };
 
 const toIsoString = (value: unknown): string => {
@@ -92,16 +94,85 @@ const buildUploadMetadata = (name: string, directory?: string, pathname?: string
   };
 };
 
-const uploadBlobToSignedUrl = async (preSignUrl: string, blob: Blob, type: string) => {
-  const response = await fetch(preSignUrl, {
-    body: blob,
-    headers: { 'Content-Type': type },
-    method: 'PUT',
+const sanitizeFilename = (name: string) => name.replaceAll(/[^\w.-]+/g, '_');
+
+const ensureUploadableUri = async (uri: string, name: string) => {
+  if (uri.startsWith('file://')) return uri;
+
+  if (!FileSystem.cacheDirectory) {
+    throw new Error('upload cache directory unavailable');
+  }
+
+  await FileSystem.makeDirectoryAsync(MOBILE_UPLOAD_CACHE_DIR, { intermediates: true });
+
+  const filename = `${Date.now()}-${sanitizeFilename(name || 'upload.bin')}`;
+  const targetUri = `${MOBILE_UPLOAD_CACHE_DIR}${filename}`;
+
+  await FileSystem.copyAsync({
+    from: uri,
+    to: targetUri,
   });
 
-  if (!response.ok) {
-    throw new Error(`upload failed: ${response.status}`);
+  return targetUri;
+};
+
+const uploadFileToSameOrigin = async (
+  baseUrl: string,
+  uri: string,
+  name: string,
+  pathname: string,
+  type: string,
+) => {
+  const response = await FileSystem.uploadAsync(
+    new URL('/api/file/upload', `${baseUrl}/`).toString(),
+    uri,
+    {
+      fieldName: 'file',
+      headers: await getAuthHeaders(baseUrl),
+      httpMethod: 'POST',
+      mimeType: type,
+      parameters: { pathname },
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    },
+  );
+
+  if (response.status < 200 || response.status >= 300) {
+    let payload: { error?: string } | null;
+
+    try {
+      payload = response.body ? JSON.parse(response.body) : null;
+    } catch {
+      payload = null;
+    }
+
+    throw new Error(payload?.error || `upload failed: ${response.status}`);
   }
+};
+
+const getLocalFileDescriptor = async (uri: string) => {
+  const info = await FileSystem.getInfoAsync(uri, { md5: true });
+
+  if (!info.exists) {
+    throw new Error('local file not found');
+  }
+
+  if (info.md5) {
+    return {
+      hash: info.md5,
+      size: info.size || 0,
+    };
+  }
+
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  const approxSize = info.size || Math.floor((base64.length * 3) / 4);
+
+  return {
+    hash: computeStringHash(base64),
+    size: approxSize,
+  };
 };
 
 const normalizeMessage = (message: any): ChatMessage => ({
@@ -707,16 +778,11 @@ export const fileApi = {
       skipDeduplication?: boolean;
     },
   ): Promise<{ id: string; url: string }> => {
-    const fileResponse = await fetch(uri);
-
-    if (!fileResponse.ok) {
-      throw new Error(`read file failed: ${fileResponse.status}`);
-    }
-
-    const blob = await fileResponse.blob();
-    const fileType = type || blob.type || 'application/octet-stream';
-    const fileBuffer = await blob.arrayBuffer();
-    const hash = computeFileHash(fileBuffer);
+    const baseUrl = await getBaseUrl();
+    const uploadUri = await ensureUploadableUri(uri, name);
+    const fileInfo = await getLocalFileDescriptor(uploadUri);
+    const fileType = type || 'application/octet-stream';
+    const hash = fileInfo.hash;
     const metadata = buildUploadMetadata(name, options?.directory);
     const hashCheck = await trpcMutate<{
       isExist: boolean;
@@ -727,11 +793,7 @@ export const fileApi = {
     let storagePath = hashCheck.metadata?.path || hashCheck.url;
 
     if (!hashCheck.isExist || !storagePath) {
-      const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', {
-        pathname: metadata.path,
-      });
-
-      await uploadBlobToSignedUrl(preSignUrl, blob, fileType);
+      await uploadFileToSameOrigin(baseUrl, uploadUri, name, metadata.path, fileType);
       storagePath = metadata.path;
     }
 
@@ -745,7 +807,7 @@ export const fileApi = {
       knowledgeBaseId: options?.knowledgeBaseId,
       metadata,
       name,
-      size: blob.size,
+      size: fileInfo.size,
       url: storagePath,
     });
   },

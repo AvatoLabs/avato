@@ -16,6 +16,8 @@ const MOBILE_AUTH_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 const FEISHU_NATIVE_SCOPES = ['contact:user.base:readonly', 'contact:user.email:readonly'];
 const FEISHU_NATIVE_REFRESH_ROUTE = '/api/mobile-auth/feishu/native/refresh';
 const FEISHU_NATIVE_EXCHANGE_ROUTE = '/api/mobile-auth/feishu/native/exchange';
+const LOBE_CHAT_AUTH_HEADER = 'X-lobe-chat-auth';
+const SECRET_XOR_KEY = 'LobeHub · LobeHub';
 
 let authSessionCache: MobileAuthSession | null | undefined;
 const oidcDiscoveryCache = new Map<string, AuthSession.DiscoveryDocument>();
@@ -199,6 +201,43 @@ const requestNativeFeishuSession = async (
   };
 };
 
+const base64UrlToBase64 = (input: string) => {
+  const normalized = input.replaceAll('-', '+').replaceAll('_', '/');
+  const remainder = normalized.length % 4;
+
+  if (remainder === 0) return normalized;
+
+  return `${normalized}${'='.repeat(4 - remainder)}`;
+};
+
+const parseMobileJwtUserId = (token: string) => {
+  const [, payload] = token.split('.');
+
+  if (!payload) return undefined;
+
+  try {
+    const decodedPayload = atob(base64UrlToBase64(payload));
+    const parsed = JSON.parse(decodedPayload) as { sub?: string };
+
+    return parsed.sub;
+  } catch {
+    return undefined;
+  }
+};
+
+const obfuscatePayloadWithXor = (payload: Record<string, unknown>, secretKey: string) => {
+  const json = JSON.stringify(payload);
+  const dataBytes = new TextEncoder().encode(json);
+  const keyBytes = new TextEncoder().encode(secretKey);
+  const result = new Uint8Array(dataBytes.length);
+
+  for (const [index, value] of dataBytes.entries()) {
+    result[index] = value ^ keyBytes[index % keyBytes.length];
+  }
+
+  return btoa(String.fromCharCode(...result));
+};
+
 export async function loadStoredAuthSession(): Promise<MobileAuthSession | null> {
   if (authSessionCache !== undefined) {
     return authSessionCache;
@@ -344,10 +383,16 @@ export async function getAuthHeaders(baseUrl: string): Promise<Record<string, st
 
   const tokenType = session.tokenType || 'bearer';
   const authorizationValue = `${tokenType[0]?.toUpperCase() || 'B'}${tokenType.slice(1)} ${session.accessToken}`;
+  const userId = parseMobileJwtUserId(session.accessToken);
 
   return {
     Authorization: authorizationValue,
     'Oidc-Auth': session.accessToken,
+    ...(userId
+      ? {
+          [LOBE_CHAT_AUTH_HEADER]: obfuscatePayloadWithXor({ userId }, SECRET_XOR_KEY),
+        }
+      : {}),
   };
 }
 

@@ -87,6 +87,9 @@ export default function ProfileEditScreen({ navigation }: any) {
   const [savingName, setSavingName] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingInterests, setSavingInterests] = useState(false);
+  const trimmedFullName = fullName.trim();
+  const isNameDirty = trimmedFullName !== (storeProfile?.fullName || '').trim();
+  const canSaveProfile = Boolean(trimmedFullName) && isNameDirty && !savingName;
 
   useEffect(() => {
     if (!isLoaded) {
@@ -130,21 +133,27 @@ export default function ProfileEditScreen({ navigation }: any) {
     }
   };
 
-  // ── Save full name (on blur) ───────────────────────────────────
-  const handleSaveName = async () => {
-    const trimmed = fullName.trim();
-    if (!trimmed || trimmed === (storeProfile?.fullName || '')) return;
+  // ── Save full name ───────────────────────────────────────────────
+  const handleSaveName = useCallback(async () => {
+    if (!trimmedFullName || !isNameDirty) return false;
 
     setSavingName(true);
     try {
-      await userApi.updateFullName(trimmed);
-      updateField({ fullName: trimmed });
+      await userApi.updateFullName(trimmedFullName);
+      updateField({ fullName: trimmedFullName });
+      toast.show('success', t.profileSaved);
+      return true;
     } catch {
-      toast.show('error', t.errorNetwork);
+      toast.show('error', t.profileSaveFailed || t.errorNetwork);
+      return false;
     } finally {
       setSavingName(false);
     }
-  };
+  }, [isNameDirty, t, toast, trimmedFullName, updateField]);
+
+  const handleSaveProfile = useCallback(async () => {
+    await handleSaveName();
+  }, [handleSaveName]);
 
   // ── Toggle interest ─────────────────────────────────────────────
   const handleToggleInterest = async (label: string) => {
@@ -204,7 +213,16 @@ export default function ProfileEditScreen({ navigation }: any) {
         <ScreenHeader
           leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
           title={t.profileTitle}
+          rightElement={
+            <Text
+              className="text-[15px] font-medium"
+              style={{ color: canSaveProfile ? '#007aff' : 'rgba(0,122,255,0.35)' }}
+            >
+              {t.save}
+            </Text>
+          }
           onPressLeft={() => navigation.goBack()}
+          onPressRight={canSaveProfile ? handleSaveProfile : undefined}
         />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#007aff" size="large" />
@@ -218,7 +236,16 @@ export default function ProfileEditScreen({ navigation }: any) {
       <ScreenHeader
         leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.profileTitle}
+        rightElement={
+          <Text
+            className="text-[15px] font-medium"
+            style={{ color: canSaveProfile ? '#007aff' : 'rgba(0,122,255,0.35)' }}
+          >
+            {t.save}
+          </Text>
+        }
         onPressLeft={() => navigation.goBack()}
+        onPressRight={canSaveProfile ? handleSaveProfile : undefined}
       />
 
       <ScrollView
@@ -281,9 +308,8 @@ export default function ProfileEditScreen({ navigation }: any) {
                   placeholderTextColor="#8c8c8c"
                   returnKeyType="done"
                   value={fullName}
-                  onBlur={handleSaveName}
                   onChangeText={setFullName}
-                  onSubmitEditing={handleSaveName}
+                  onSubmitEditing={handleSaveProfile}
                 />
               </View>
             </View>
