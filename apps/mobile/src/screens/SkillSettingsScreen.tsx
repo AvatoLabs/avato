@@ -12,14 +12,20 @@ import * as DocumentPicker from 'expo-document-picker';
 import {
   ArrowLeft,
   Blocks,
+  BrainCircuit,
+  Calculator,
   ChevronRight,
+  Cloud,
   FileArchive,
   Github,
   Link as LinkIcon,
+  ListTodo,
+  NotebookPen,
   Plus,
   Puzzle,
   RefreshCw,
   ShoppingBag,
+  Sparkles,
   Trash2,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -42,14 +48,19 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
-import { agentSkillApi, fileApi, mcpApi, pluginApi } from '../lib/api';
+import {
+  MOBILE_RECOMMENDED_BUILTIN_IDS,
+  MOBILE_RECOMMENDED_BUILTIN_SKILLS,
+  type MobileRecommendedBuiltinIcon,
+} from '../constants/recommendedBuiltins';
+import { agentSkillApi, fileApi, mcpApi, pluginApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
 
 // ── Source Tag ─────────────────────────────────────────────────────
-function SourceTag({ label, color = '#007aff' }: { color?: string; label: string }) {
+function SourceTag({ label, color = semanticColors.primary }: { color?: string; label: string }) {
   return (
     <View
       style={{
@@ -67,10 +78,94 @@ function SourceTag({ label, color = '#007aff' }: { color?: string; label: string
 // ── Section Header ────────────────────────────────────────────────
 function SectionHeader({ title, delay = 0 }: { delay?: number; title: string }) {
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
-      <Text className="px-7 mb-2 mt-4 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+    <Animated.View entering={FadeInDown.delay(delay).duration(350)}>
+      <Text className="px-7 mb-2 mt-4 text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
         {title}
       </Text>
+    </Animated.View>
+  );
+}
+
+function BuiltinSkillIcon({ icon }: { icon: MobileRecommendedBuiltinIcon }) {
+  switch (icon) {
+    case 'artifacts': {
+      return <Sparkles color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'cloud': {
+      return <Cloud color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'gtd': {
+      return <ListTodo color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'notebook': {
+      return <NotebookPen color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'calculator': {
+      return <Calculator color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'memory': {
+      return <BrainCircuit color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+  }
+}
+
+function BuiltinIntegrationRow({
+  description,
+  icon,
+  index,
+  installed,
+  onToggle,
+  title,
+}: {
+  description: string;
+  icon: MobileRecommendedBuiltinIcon;
+  index: number;
+  installed: boolean;
+  onToggle: () => void;
+  title: string;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 30).duration(350)}>
+      <View className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden">
+        <View className="flex-row items-center px-4 py-3.5">
+          <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3">
+            <BuiltinSkillIcon icon={icon} />
+          </View>
+          <View className="flex-1 mr-3">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-foreground font-medium text-[15px] tracking-tight" numberOfLines={1}>
+                {title}
+              </Text>
+              <SourceTag color={semanticColors.primary} label={t.skillsBuiltin} />
+            </View>
+            <Text className="text-secondary/50 text-[11px] font-medium mt-0.5" numberOfLines={2}>
+              {description}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onToggle}
+            style={{
+              backgroundColor: installed ? 'rgba(239, 68, 68, 0.12)' : 'rgba(37, 99, 235, 0.1)',
+              borderRadius: 999,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+            }}
+          >
+            <Text
+              style={{
+                color: installed ? semanticColors.danger : semanticColors.primary,
+                fontSize: 12,
+                fontWeight: '700',
+              }}
+            >
+              {installed ? t.skillsUninstall : t.skillsInstall}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </Animated.View>
   );
 }
@@ -99,7 +194,7 @@ function AgentSkillRow({
     skill.source === 'builtin' ? '#4caf50' : skill.source === 'market' ? '#9c27b0' : '#007aff';
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 25).duration(200)}>
+    <Animated.View entering={FadeInDown.delay(index * 30).duration(350)}>
       <View className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden">
         <View className="flex-row items-center px-4 py-3.5">
           <TouchableOpacity
@@ -109,7 +204,7 @@ function AgentSkillRow({
             onPress={onPress}
           >
             <View className="w-9 h-9 rounded-full bg-foreground/10 items-center justify-center mr-3">
-              <Puzzle color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Puzzle color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="flex-1">
               <View className="flex-row items-center gap-2">
@@ -144,7 +239,7 @@ function AgentSkillRow({
               ]);
             }}
           >
-            <Trash2 color="#ff3b30" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <Trash2 color={semanticColors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </View>
       </View>
@@ -177,7 +272,7 @@ function PluginRow({
   const sourceColor = isCustom ? '#007aff' : '#9c27b0';
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 25).duration(200)}>
+    <Animated.View entering={FadeInDown.delay(index * 30).duration(350)}>
       <View className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden">
         <View className="flex-row items-center px-4 py-3.5">
           <View className="w-9 h-9 rounded-full bg-foreground/10 items-center justify-center mr-3">
@@ -227,7 +322,7 @@ function PluginRow({
               ]);
             }}
           >
-            <Trash2 color="#ff3b30" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <Trash2 color={semanticColors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </View>
       </View>
@@ -273,18 +368,17 @@ function SimpleImportModal({
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <Pressable
-        className="flex-1 justify-end"
-        style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        className="flex-1 justify-end bg-black/40"
         onPress={onClose}
       >
         <Pressable
-          className="bg-white rounded-t-3xl"
+          className="bg-white rounded-t-2xl"
           style={{ paddingBottom: insets.bottom + 16 }}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Handle */}
           <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1 rounded-full bg-black/10" />
+            <View className="w-9 h-1 rounded-full bg-foreground/10" />
           </View>
 
           <View className="px-5 pb-4 pt-2">
@@ -298,7 +392,7 @@ function SimpleImportModal({
               className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-4"
               editable={!importing}
               placeholder={placeholder}
-              placeholderTextColor="#999"
+              placeholderTextColor={semanticColors.muted}
               value={value}
               onChangeText={setValue}
             />
@@ -517,18 +611,17 @@ function AddCustomMcpModal({
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={handleClose}>
       <Pressable
-        className="flex-1 justify-end"
-        style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        className="flex-1 justify-end bg-black/40"
         onPress={handleClose}
       >
         <Pressable
-          className="bg-white rounded-t-3xl"
+          className="bg-white rounded-t-2xl"
           style={{ maxHeight: '90%', paddingBottom: insets.bottom + 16 }}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Handle */}
           <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1 rounded-full bg-black/10" />
+            <View className="w-9 h-1 rounded-full bg-foreground/10" />
           </View>
 
           <ScrollView
@@ -560,11 +653,9 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[13px] mb-2"
                     numberOfLines={8}
                     placeholder={t.skillsCustomMcpQuickImportPlaceholder}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={semanticColors.muted}
                     value={quickImportText}
                     style={{
-                      borderColor: 'rgba(0,0,0,0.08)',
-                      borderWidth: 1,
                       minHeight: 160,
                       textAlignVertical: 'top',
                     }}
@@ -576,7 +667,7 @@ function AddCustomMcpModal({
                   <View className="flex-row gap-2">
                     <Pressable
                       className="flex-1 py-2.5 px-4 rounded-lg items-center"
-                      style={{ borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1 }}
+                      style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
                       onPress={() => setShowQuickImport(false)}
                     >
                       <Text className="text-secondary/60 text-[13px] font-semibold">
@@ -627,7 +718,7 @@ function AddCustomMcpModal({
                 className={`bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-1 ${errors.identifier ? 'border border-red-500' : ''}`}
                 editable={!saving}
                 placeholder={t.skillsCustomMcpIdentifierPlaceholder}
-                placeholderTextColor="#999"
+                placeholderTextColor={semanticColors.muted}
                 value={identifier}
                 onChangeText={(v) => {
                   setIdentifier(v);
@@ -652,7 +743,7 @@ function AddCustomMcpModal({
                 editable={!saving}
                 keyboardType="url"
                 placeholder={t.skillsCustomMcpUrlPlaceholder}
-                placeholderTextColor="#999"
+                placeholderTextColor={semanticColors.muted}
                 value={url}
                 onChangeText={(v) => {
                   setUrl(v);
@@ -672,11 +763,10 @@ function AddCustomMcpModal({
               </Text>
               <View
                 className="flex-row mb-3 bg-foreground/5 rounded-xl p-1"
-                style={{ borderColor: 'rgba(0,0,0,0.06)', borderWidth: 1 }}
               >
                 <Pressable
-                  className={`flex-1 py-2.5 rounded-lg items-center border ${
-                    authType === 'none' ? 'bg-primary/10 border-primary/20' : 'border-transparent'
+                  className={`flex-1 py-2.5 rounded-lg items-center ${
+                    authType === 'none' ? 'bg-primary/10' : ''
                   }`}
                   onPress={() => setAuthType('none')}
                 >
@@ -687,8 +777,8 @@ function AddCustomMcpModal({
                   </Text>
                 </Pressable>
                 <Pressable
-                  className={`flex-1 py-2.5 rounded-lg items-center border ${
-                    authType === 'bearer' ? 'bg-primary/10 border-primary/20' : 'border-transparent'
+                  className={`flex-1 py-2.5 rounded-lg items-center ${
+                    authType === 'bearer' ? 'bg-primary/10' : ''
                   }`}
                   onPress={() => setAuthType('bearer')}
                 >
@@ -712,7 +802,7 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
                     editable={!saving}
                     placeholder={t.skillsCustomMcpTokenPlaceholder}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={semanticColors.muted}
                     value={token}
                     onChangeText={setToken}
                   />
@@ -723,7 +813,6 @@ function AddCustomMcpModal({
               <View className="mb-3">
                 <Pressable
                   disabled={!isConnectionReady || testing}
-                  style={{ borderColor: 'rgba(0,0,0,0.08)', borderWidth: 1 }}
                   className={`rounded-xl py-3 items-center active:opacity-80 ${
                     isConnectionReady ? 'bg-primary' : 'bg-foreground/5'
                   }`}
@@ -760,8 +849,6 @@ function AddCustomMcpModal({
                 className="flex-row items-center justify-between px-3 py-3 rounded-xl mb-2 active:opacity-80"
                 style={{
                   backgroundColor: 'rgba(0,0,0,0.03)',
-                  borderColor: 'rgba(0,0,0,0.06)',
-                  borderWidth: 1,
                 }}
                 onPress={() => setShowAdvanced(!showAdvanced)}
               >
@@ -771,7 +858,7 @@ function AddCustomMcpModal({
                   {t.skillsCustomMcpAdvanced}
                 </Text>
                 <ChevronRight
-                  color={showAdvanced ? semanticColors.primary : '#999'}
+                  color={showAdvanced ? semanticColors.primary : semanticColors.muted}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ transform: [{ rotate: showAdvanced ? '90deg' : '0deg' }] }}
@@ -791,7 +878,7 @@ function AddCustomMcpModal({
                         autoCorrect={false}
                         className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
                         placeholder={t.skillsCustomMcpHeaderKey}
-                        placeholderTextColor="#999"
+                        placeholderTextColor={semanticColors.muted}
                         value={h.key}
                         onChangeText={(v) => {
                           const newH = [...headers];
@@ -804,7 +891,7 @@ function AddCustomMcpModal({
                         autoCorrect={false}
                         className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
                         placeholder={t.skillsCustomMcpHeaderValue}
-                        placeholderTextColor="#999"
+                        placeholderTextColor={semanticColors.muted}
                         value={h.value}
                         onChangeText={(v) => {
                           const newH = [...headers];
@@ -816,7 +903,7 @@ function AddCustomMcpModal({
                         className="justify-center px-1 active:opacity-60"
                         onPress={() => setHeaders(headers.filter((_, idx) => idx !== i))}
                       >
-                        <Trash2 color="#ff3b30" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                        <Trash2 color={semanticColors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
                       </Pressable>
                     </View>
                   ))}
@@ -839,7 +926,7 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
                     editable={!saving}
                     placeholder={t.skillsCustomMcpDescPlaceholder}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={semanticColors.muted}
                     value={description}
                     onChangeText={setDescription}
                   />
@@ -855,7 +942,7 @@ function AddCustomMcpModal({
                     editable={!saving}
                     keyboardType="url"
                     placeholder={t.skillsCustomMcpAvatarPlaceholder}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={semanticColors.muted}
                     value={avatar}
                     onChangeText={setAvatar}
                   />
@@ -866,7 +953,6 @@ function AddCustomMcpModal({
               <Pressable
                 className={`rounded-xl py-3.5 items-center mt-2 active:opacity-80 ${isConnectionReady ? 'bg-primary' : 'bg-foreground/5'}`}
                 disabled={!isConnectionReady || saving}
-                style={{ borderColor: 'rgba(0,0,0,0.08)', borderWidth: 1 }}
                 onPress={handleSave}
               >
                 {saving ? (
@@ -891,10 +977,12 @@ function AddCustomMcpModal({
 export default function SkillSettingsScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const canGoBack = navigation.canGoBack() && navigation.getState()?.type !== 'tab';
 
   const [agentSkills, setAgentSkills] = useState<AgentSkillItem[]>([]);
   const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
+  const [uninstalledBuiltinTools, setUninstalledBuiltinTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [importUrlVisible, setImportUrlVisible] = useState(false);
@@ -904,12 +992,14 @@ export default function SkillSettingsScreen({ navigation }: any) {
   // ── Fetch data ────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
-      const [skills, installedPlugins] = await Promise.all([
+      const [skills, installedPlugins, userState] = await Promise.all([
         agentSkillApi.list(),
         pluginApi.list(),
+        userApi.getState(),
       ]);
       setAgentSkills(Array.isArray(skills) ? skills : []);
       setPlugins(Array.isArray(installedPlugins) ? installedPlugins : []);
+      setUninstalledBuiltinTools(userState?.settings?.tool?.uninstalledBuiltinTools ?? []);
     } catch {
       toast.show('error', t.errorNetwork);
     }
@@ -941,7 +1031,39 @@ export default function SkillSettingsScreen({ navigation }: any) {
     return { builtinSkills: builtin, marketSkills: market, userSkills: user };
   }, [agentSkills]);
 
-  const hasAny = agentSkills.length > 0 || communityPlugins.length > 0 || customPlugins.length > 0;
+  const recommendedBuiltinSkills = useMemo(() => {
+    const builtinSkillMap = new Map(
+      builtinSkills.map((skill) => [skill.identifier || skill.id, skill]),
+    );
+
+    return MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((builtin) => {
+      const serverSkill = builtinSkillMap.get(builtin.identifier);
+
+      return {
+        description: t[builtin.descriptionKey as keyof typeof t] as string,
+        icon: builtin.icon,
+        identifier: builtin.identifier,
+        installed: !uninstalledBuiltinTools.includes(builtin.identifier),
+        skillId: serverSkill?.id,
+        title: (t[builtin.titleKey as keyof typeof t] as string) || serverSkill?.name || builtin.identifier,
+        type: builtin.type,
+      };
+    });
+  }, [builtinSkills, t, uninstalledBuiltinTools]);
+
+  const remainingBuiltinSkills = useMemo(
+    () =>
+      builtinSkills.filter(
+        (skill) => !MOBILE_RECOMMENDED_BUILTIN_IDS.includes(skill.identifier || skill.id),
+      ),
+    [builtinSkills],
+  );
+
+  const hasAny =
+    recommendedBuiltinSkills.length > 0 ||
+    agentSkills.length > 0 ||
+    communityPlugins.length > 0 ||
+    customPlugins.length > 0;
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleDeleteSkill = async (id: string) => {
@@ -1083,6 +1205,26 @@ export default function SkillSettingsScreen({ navigation }: any) {
     }
   };
 
+  const handleToggleBuiltin = async (identifier: string, installed: boolean) => {
+    haptics.selection();
+    const next = installed
+      ? [...new Set([...uninstalledBuiltinTools, identifier])]
+      : uninstalledBuiltinTools.filter((id) => id !== identifier);
+
+    setUninstalledBuiltinTools(next);
+    try {
+      await userApi.updateSettings({
+        tool: {
+          uninstalledBuiltinTools: next,
+        },
+      });
+      toast.show('success', t.toastSaved);
+    } catch {
+      setUninstalledBuiltinTools(uninstalledBuiltinTools);
+      toast.show('error', t.errorSaveFailed);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <View className="flex-1 bg-background">
@@ -1090,7 +1232,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
         title={t.skillsTitle}
         leftElement={
           canGoBack ? (
-            <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
+            <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
           ) : undefined
         }
         rightElement={
@@ -1100,14 +1242,14 @@ export default function SkillSettingsScreen({ navigation }: any) {
               className="w-10 h-10 items-center justify-center"
               onPress={() => navigation.navigate('SkillMarket')}
             >
-              <ShoppingBag color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              <ShoppingBag color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.6}
               className="w-10 h-10 items-center justify-center"
               onPress={onRefresh}
             >
-              <RefreshCw color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+              <RefreshCw color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
             </TouchableOpacity>
           </View>
         }
@@ -1115,42 +1257,67 @@ export default function SkillSettingsScreen({ navigation }: any) {
       />
 
       {loading ? (
-        <View className="flex-1 items-center pt-20">
-          <ActivityIndicator color="#007aff" size="small" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={semanticColors.primary} size="small" />
         </View>
       ) : (
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={
+            !hasAny
+              ? { flexGrow: 1, justifyContent: 'center', alignItems: 'center' }
+              : { paddingBottom: insets.bottom + 80 }
+          }
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              colors={['#007aff']}
+              colors={[semanticColors.primary]}
               refreshing={refreshing}
-              tintColor="#007aff"
+              tintColor={semanticColors.primary}
               onRefresh={onRefresh}
             />
           }
         >
           {!hasAny ? (
-            <View className="items-center pt-20 px-8">
-              <Blocks color="#ccc" size={48} strokeWidth={1} />
-              <Text className="text-secondary/50 text-[16px] mt-4 font-medium text-center">
+            <View
+              className="items-center justify-center px-8"
+              style={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+            >
+              <View
+                className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
+                style={{ width: 80, height: 80 }}
+              >
+                <Blocks color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
+              </View>
+              <Text className="text-center text-[17px] font-semibold text-foreground">
                 {t.skillsEmpty}
               </Text>
-              <Text className="text-secondary/40 text-[13px] mt-2 text-center">
+              <Text className="mt-2 text-center text-[14px] text-secondary/40">
                 {t.skillsEmptyDesc}
               </Text>
             </View>
           ) : (
             <>
               {/* Agent Skills — Integrations */}
-              {agentSkills.length > 0 && (
+              {(recommendedBuiltinSkills.length > 0 ||
+                remainingBuiltinSkills.length > 0 ||
+                marketSkills.length > 0) && (
                 <>
                   <SectionHeader delay={50} title={t.skillsIntegrations} />
-                  {[...builtinSkills, ...marketSkills].map((skill, i) => (
-                    <AgentSkillRow
+                  {recommendedBuiltinSkills.map((skill, i) => (
+                    <BuiltinIntegrationRow
+                      description={skill.description}
+                      icon={skill.icon}
                       index={i}
+                      installed={skill.installed}
+                      key={skill.identifier}
+                      onToggle={() => void handleToggleBuiltin(skill.identifier, skill.installed)}
+                      title={skill.title}
+                    />
+                  ))}
+                  {[...remainingBuiltinSkills, ...marketSkills].map((skill, i) => (
+                    <AgentSkillRow
+                      index={i + recommendedBuiltinSkills.length}
                       key={skill.id}
                       skill={skill}
                       t={t}
@@ -1233,24 +1400,24 @@ export default function SkillSettingsScreen({ navigation }: any) {
 
           {/* Action Buttons — aligned with web AddSkillButton dropdown */}
           <View className="px-5 mt-6 gap-2">
-            <Animated.View entering={FadeInDown.delay(200).duration(300)}>
+            <Animated.View entering={FadeInDown.delay(200).duration(350)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
                 onPress={() => setImportUrlVisible(true)}
               >
                 <View className="flex-row items-center px-4 py-3.5">
                   <View className="w-8 h-8 rounded-full bg-blue-500/10 items-center justify-center mr-3">
-                    <LinkIcon color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                    <LinkIcon color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                   </View>
                   <Text className="flex-1 text-foreground font-medium text-[15px]">
                     {t.skillsImportUrl}
                   </Text>
-                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
               </PressableScale>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(225).duration(300)}>
+            <Animated.View entering={FadeInDown.delay(225).duration(350)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
                 onPress={() => setImportGithubVisible(true)}
@@ -1262,12 +1429,12 @@ export default function SkillSettingsScreen({ navigation }: any) {
                   <Text className="flex-1 text-foreground font-medium text-[15px]">
                     {t.skillsImportGithub}
                   </Text>
-                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
               </PressableScale>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.delay(250).duration(300)}>
+            <Animated.View entering={FadeInDown.delay(250).duration(350)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
                 onPress={() => void handleImportZip()}
@@ -1279,7 +1446,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
                   <Text className="flex-1 text-foreground font-medium text-[15px]">
                     {t.skillsUploadZip}
                   </Text>
-                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
               </PressableScale>
             </Animated.View>
@@ -1287,7 +1454,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
             {/* Divider */}
             <View className="h-px bg-foreground/10 mx-2 my-1" />
 
-            <Animated.View entering={FadeInDown.delay(275).duration(300)}>
+            <Animated.View entering={FadeInDown.delay(275).duration(350)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
                 onPress={() => setAddMcpVisible(true)}
@@ -1299,7 +1466,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
                   <Text className="flex-1 text-foreground font-medium text-[15px]">
                     {t.skillsAddCustomMcp}
                   </Text>
-                  <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
               </PressableScale>
             </Animated.View>

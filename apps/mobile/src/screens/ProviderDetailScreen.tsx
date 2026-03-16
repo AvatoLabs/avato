@@ -12,7 +12,7 @@
  * - Connection Checker (when settings.showChecker !== false)
  * - Model list with individual enable/disable toggles
  */
-import { ArrowLeft, Check, Eye, EyeOff, Key, Save, Wifi, X } from 'lucide-react-native';
+import { ArrowLeft, Check, Eye, EyeOff, Key, Save, Search, Wifi, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,7 +29,6 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
@@ -92,8 +91,8 @@ function SecureInputRow({
       <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
         {label}
       </Text>
-      <View className="flex-row items-center bg-background rounded-xl px-3 h-11 mb-3">
-        <Key color="#999" size={14} strokeWidth={tokens.icon.strokeWidth} />
+      <View className="flex-row items-center bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3">
+        <Key color={semanticColors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
@@ -106,9 +105,9 @@ function SecureInputRow({
         />
         <TouchableOpacity onPress={() => setVisible(!visible)}>
           {visible ? (
-            <EyeOff color="#999" size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <EyeOff color={semanticColors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
           ) : (
-            <Eye color="#999" size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <Eye color={semanticColors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
           )}
         </TouchableOpacity>
       </View>
@@ -450,7 +449,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
           title={t.providerDetailTitle}
           onPressLeft={() => navigation.goBack()}
         />
@@ -464,7 +463,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={detail?.name || providerId}
         onPressLeft={() => navigation.goBack()}
       />
@@ -516,7 +515,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Configuration Section — dynamic fields */}
         {visibleFields.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/5 rounded-2xl p-4">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl p-4">
               {visibleFields.map((fieldKey) => {
                 const meta = vaultFieldMeta[fieldKey] || {
                   label: fieldKey
@@ -547,7 +546,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                     <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
                       {meta.label}
                     </Text>
-                    <View className="bg-background rounded-xl px-3 h-11 mb-3 justify-center">
+                    <View className="bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3 justify-center">
                       <TextInput
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -592,7 +591,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Client-side Fetch Toggle */}
         {showFetchOnClient && (
           <Animated.View entering={FadeInDown.delay(75).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/5 rounded-2xl overflow-hidden">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl overflow-hidden">
               <View className="flex-row items-center px-4 py-3.5">
                 <View className="flex-1">
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
@@ -616,7 +615,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Connection Checker */}
         {showChecker && (
           <Animated.View entering={FadeInDown.delay(100).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/5 rounded-2xl overflow-hidden">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl overflow-hidden">
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="flex-row items-center px-4 py-3.5"
@@ -669,11 +668,17 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           {/* Model Search */}
           {models.length > 5 && (
             <View className="px-5 mb-3">
-              <SearchField
-                placeholder={t.search}
-                value={modelSearch}
-                onChangeText={setModelSearch}
-              />
+              <View className="flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
+                <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+                <TextInput
+                  className="flex-1 text-foreground text-[14px] ml-2.5"
+                  placeholder={t.search}
+                  placeholderTextColor={semanticColors.muted}
+                  returnKeyType="search"
+                  value={modelSearch}
+                  onChangeText={setModelSearch}
+                />
+              </View>
             </View>
           )}
 
@@ -682,7 +687,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               <Text className="text-secondary/50 text-[14px]">{t.providerDetailNoModels}</Text>
             </View>
           ) : (
-            <View className="mx-5 bg-foreground/5 rounded-2xl overflow-hidden">
+            <View className="mx-5 bg-foreground/[0.02] rounded-2xl overflow-hidden">
               {filteredModels.map((model) => (
                 <View
                   className="flex-row items-center px-4 py-3 border-b border-black/[0.03]"

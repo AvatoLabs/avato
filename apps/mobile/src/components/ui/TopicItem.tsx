@@ -5,6 +5,7 @@ import { Heart, MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
 import React, { memo, useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
+import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
@@ -43,11 +44,10 @@ const TopicItem = memo<TopicItemProps>(
           onPress: () => {
             haptics.warning();
             onDelete();
-            toast.show('info', t.toastTopicDeleted);
           },
         },
       ]);
-    }, [t, onDelete, toast]);
+    }, [t, onDelete]);
 
     const formatDate = (dateStr: string) => {
       const d = new Date(dateStr);
@@ -75,7 +75,7 @@ const TopicItem = memo<TopicItemProps>(
           <View className="flex-1 mr-3">
             <View className="flex-row items-center">
               {topic.favorite && (
-                <Heart color="#ff3b30" fill="#ff3b30" size={12} style={{ marginRight: 4 }} />
+                <Heart color={semanticColors.danger} fill={semanticColors.danger} size={12} style={{ marginRight: 4 }} />
               )}
               <Text
                 numberOfLines={1}
@@ -98,7 +98,7 @@ const TopicItem = memo<TopicItemProps>(
               setMenuVisible(true);
             }}
           >
-            <MoreHorizontal color="#666" size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <MoreHorizontal color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </TouchableOpacity>
 
@@ -115,9 +115,9 @@ const TopicItem = memo<TopicItemProps>(
           >
             <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
               <View className="items-center pt-3 pb-2">
-                <View className="w-9 h-1 rounded-full bg-neutral-300" />
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
               </View>
-              <View className="px-4">
+              <View className="px-5">
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => {
@@ -127,12 +127,12 @@ const TopicItem = memo<TopicItemProps>(
                   }}
                 >
                   <Heart
-                    color={topic.favorite ? '#ff3b30' : '#333'}
-                    fill={topic.favorite ? '#ff3b30' : 'none'}
+                    color={topic.favorite ? semanticColors.danger : semanticColors.muted}
+                    fill={topic.favorite ? semanticColors.danger : 'none'}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
-                  <Text className="ml-3 text-base text-neutral-800">
+                  <Text className="ml-3 text-base text-foreground">
                     {topic.favorite ? t.actionUnfavorite : t.actionFavorite}
                   </Text>
                 </Pressable>
@@ -141,24 +141,24 @@ const TopicItem = memo<TopicItemProps>(
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                     onPress={handleRename}
                   >
-                    <Pencil color="#333" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-neutral-800">{t.actionRename}</Text>
+                    <Pencil color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                   </Pressable>
                 )}
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={handleDelete}
                 >
-                  <Trash2 color="#ff3b30" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Trash2 color={semanticColors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
                 </Pressable>
               </View>
-              <View className="px-4 mt-2">
+              <View className="px-5 mt-2">
                 <Pressable
-                  className="items-center py-3.5 rounded-xl bg-neutral-100"
+                  className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
                   onPress={() => setMenuVisible(false)}
                 >
-                  <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>
+                  <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
                 </Pressable>
               </View>
             </Pressable>

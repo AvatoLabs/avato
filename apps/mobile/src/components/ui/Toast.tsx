@@ -1,23 +1,23 @@
 /**
- * Toast — lightweight notification system with Zustand store.
+ * Toast — minimal pill-style notification.
  *
  * Usage:
  *   import { useToast, ToastContainer } from '../components/ui/Toast';
  *   const toast = useToast();
- *   toast.show('success', 'Saved!');
+ *   toast.show('success', 'Saved');
  *
  * Mount <ToastContainer /> once in App.tsx.
  */
-import { CheckCircle, Info, XCircle } from 'lucide-react-native';
+import { AlertCircle, Check, Info } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { Animated, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
-// ── Types ────────────────────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'info';
 
 interface ToastItem {
+  duration?: number;
   id: number;
   message: string;
   type: ToastType;
@@ -28,7 +28,7 @@ interface ToastStore {
   dismiss: () => void;
   mute: (durationMs: number) => void;
   mutedUntil: number;
-  show: (type: ToastType, message: string) => void;
+  show: (type: ToastType, message: string, options?: { duration?: number }) => void;
 }
 
 let _toastId = 0;
@@ -37,101 +37,96 @@ export const useToast = create<ToastStore>((set, get) => ({
   current: null,
   mutedUntil: 0,
   mute: (durationMs) => set({ mutedUntil: Date.now() + Math.max(durationMs, 0) }),
-  show: (type, message) => {
+  show: (type, message, options) => {
     if (get().mutedUntil > Date.now()) return;
     _toastId += 1;
-    set({ current: { id: _toastId, type, message } });
+    const duration =
+      options?.duration ?? (type === 'error' ? Math.max(4000, Math.min(message.length * 60, 8000)) : DURATION);
+    set({ current: { id: _toastId, type, message, duration } });
   },
   dismiss: () => set({ current: null }),
 }));
 
-// ── Colors ───────────────────────────────────────────────────────────
-const COLORS: Record<ToastType, { bg: string; border: string; icon: string }> = {
-  success: { bg: '#15803d', border: '#166534', icon: '#fff' },
-  error: { bg: '#b42318', border: '#912018', icon: '#fff' },
-  info: { bg: '#1d4ed8', border: '#1e40af', icon: '#fff' },
-};
-
-const ICONS: Record<ToastType, React.ComponentType<any>> = {
-  success: CheckCircle,
-  error: XCircle,
+const ICON_MAP: Record<ToastType, React.ComponentType<any>> = {
+  error: AlertCircle,
   info: Info,
+  success: Check,
 };
 
-// ── Toast UI ─────────────────────────────────────────────────────────
-const DURATION = 2800;
+const DURATION = 2200;
 
 const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDone }) => {
-  const translateY = useRef(new Animated.Value(-80)).current;
+  const translateY = useRef(new Animated.Value(-24)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.92)).current;
+
+  const displayDuration = item.duration ?? DURATION;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 18, bounciness: 4 }),
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 3 }),
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 3 }),
     ]).start();
 
     const timer = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: -80, duration: 250, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: -16, duration: 220, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0.95, duration: 220, useNativeDriver: true }),
       ]).start(() => onDone());
-    }, DURATION);
+    }, displayDuration);
 
     return () => clearTimeout(timer);
   }, [item.id]);
 
-  const colors = COLORS[item.type];
-  const Icon = ICONS[item.type];
+  const isError = item.type === 'error';
+  const Icon = ICON_MAP[item.type];
 
   return (
     <Animated.View
       style={{
-        transform: [{ translateY }],
-        opacity,
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        borderRadius: 12,
-        borderWidth: 1,
-        marginHorizontal: 16,
-        maxWidth: 680,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        width: '92%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 10,
-        elevation: 5,
         alignSelf: 'center',
+        opacity,
+        transform: [{ translateY }, { scale }],
       }}
     >
       <View
         style={{
-          alignItems: 'center',
-          backgroundColor: 'rgba(255,255,255,0.18)',
-          borderRadius: 999,
-          height: 22,
-          justifyContent: 'center',
-          width: 22,
+          alignItems: isError ? 'flex-start' : 'center',
+          backgroundColor: isError ? 'rgba(220,38,38,0.92)' : 'rgba(28,28,30,0.92)',
+          borderRadius: isError ? 14 : 50,
+          flexDirection: 'row',
+          paddingHorizontal: 16,
+          paddingVertical: isError ? 12 : 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 12,
+          elevation: 6,
         }}
       >
-        <Icon color={colors.icon} size={14} strokeWidth={2.4} />
+        <Icon color="#fff" size={15} strokeWidth={2.5} style={isError ? { marginTop: 2 } : undefined} />
+        <Text
+          numberOfLines={isError ? 6 : 1}
+          style={{
+            color: '#fff',
+            fontSize: isError ? 13 : 14,
+            fontWeight: '600',
+            letterSpacing: -0.2,
+            lineHeight: isError ? 18 : undefined,
+            marginLeft: 7,
+            maxWidth: 300,
+          }}
+        >
+          {item.message}
+        </Text>
       </View>
-      <Text
-        numberOfLines={2}
-        style={{ color: '#fff', fontSize: 13.5, fontWeight: '600', marginLeft: 8, flex: 1 }}
-      >
-        {item.message}
-      </Text>
     </Animated.View>
   );
 });
 ToastBubble.displayName = 'ToastBubble';
 
-// ── Container (mount once in App.tsx) ────────────────────────────────
 export const ToastContainer = memo(() => {
   const insets = useSafeAreaInsets();
   const current = useToast((s) => s.current);
@@ -146,10 +141,11 @@ export const ToastContainer = memo(() => {
       pointerEvents="none"
       style={{
         position: 'absolute',
-        top: insets.top + 8,
+        top: insets.top + 10,
         left: 0,
         right: 0,
         zIndex: 9999,
+        alignItems: 'center',
       }}
     >
       <ToastBubble item={current} onDone={handleDone} />

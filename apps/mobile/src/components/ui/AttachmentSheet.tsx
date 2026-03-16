@@ -3,6 +3,7 @@ import React, { memo } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
@@ -26,10 +27,10 @@ interface AttachmentOptionProps {
 const AttachmentOption = memo<AttachmentOptionProps>(
   ({ description, icon, isLast, onPress, title }) => (
     <Pressable
-      className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'border-b border-black/[0.06]' : ''}`}
+      className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'mb-px' : ''}`}
       onPress={onPress}
     >
-      <View className="w-9 h-9 rounded-xl border border-black/5 bg-white items-center justify-center mr-3">
+      <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
         {icon}
       </View>
       <View className="flex-1">
@@ -51,7 +52,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
       onCamera
         ? {
             description: 'Capture a new photo and attach it instantly.',
-            icon: <Camera color="#111" size={18} strokeWidth={tokens.icon.strokeWidth} />,
+            icon: <Camera color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
             key: 'camera',
             title: t.fileCamera,
             onPress: () => {
@@ -64,7 +65,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
       onGallery
         ? {
             description: 'Choose one or more images from your library.',
-            icon: <ImageIcon color="#111" size={18} strokeWidth={tokens.icon.strokeWidth} />,
+            icon: <ImageIcon color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
             key: 'gallery',
             title: t.fileGallery,
             onPress: () => {
@@ -76,7 +77,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         : null,
       {
         description: 'Attach files, notes, PDFs, or other supporting material.',
-        icon: <FileText color="#111" size={18} strokeWidth={tokens.icon.strokeWidth} />,
+        icon: <FileText color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
         key: 'document',
         title: t.fileDocument,
         onPress: () => {
@@ -96,21 +97,20 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
     return (
       <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
         <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          className="flex-1 justify-end bg-black/40"
           onPress={onClose}
         >
           <Pressable
-            className="bg-white rounded-t-3xl"
+            className="bg-white rounded-t-2xl"
             style={{ paddingBottom: Math.max(insets.bottom, 16), maxHeight: '72%' }}
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-black/10" />
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
 
             <View className="px-5 pb-2 pt-2">
-              <Text className="text-foreground text-[22px] font-bold tracking-tight">
+              <Text className="text-foreground text-[18px] font-bold tracking-tight">
                 {t.fileAttach}
               </Text>
               <Text className="text-secondary/60 text-[13px] leading-5 mt-1">

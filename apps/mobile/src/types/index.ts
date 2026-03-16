@@ -7,6 +7,7 @@
 // ---- Session / Chat ----
 
 export interface CreateSessionConfig {
+  agentId?: string;
   avatar?: string;
   description?: string;
   groupId?: string;
@@ -38,6 +39,20 @@ export interface ChatSession {
   /** 'agent' for regular sessions, 'group' for multi-agent chat groups */
   type?: 'agent' | 'group';
   /** ISO timestamp */
+  updatedAt: string;
+}
+
+export interface AgentTemplate {
+  avatar?: string;
+  createdAt: string;
+  id: string;
+  model?: string;
+  params?: Record<string, unknown>;
+  plugins?: string[];
+  provider?: string;
+  sessionIds: string[];
+  systemRole?: string;
+  title: string;
   updatedAt: string;
 }
 
@@ -124,6 +139,7 @@ export interface ChatToolPayload {
   id: string;
   identifier: string;
   intervention?: ToolIntervention;
+  result_content?: string;
   result_msg_id?: string;
   source?: 'builtin' | 'plugin' | 'mcp' | 'klavis' | 'lobehubSkill';
   thoughtSignature?: string;
@@ -159,7 +175,7 @@ export interface ChatMessage {
   /** ISO timestamp */
   createdAt: string;
   /** Error info if the message failed */
-  error?: { type: string; message: string } | null;
+  error?: { body?: unknown; message: string; type: string } | null;
   fileList?: ChatFileItem[];
   id: string;
   imageList?: ChatImageItem[];
@@ -339,6 +355,14 @@ export interface UserProfile {
   id: string;
   interests?: string[];
   username?: string;
+}
+
+export interface MobileUserState extends UserProfile {
+  settings?: {
+    tool?: {
+      uninstalledBuiltinTools?: string[];
+    };
+  };
 }
 
 // ---- AI Provider Runtime State (mirrors server AiProviderRuntimeState) ----

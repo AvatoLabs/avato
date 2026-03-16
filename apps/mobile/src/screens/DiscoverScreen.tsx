@@ -94,7 +94,7 @@ export default function DiscoverScreen({ navigation }: any) {
           <PressableScale
             key={tab.key}
             className={`px-4 py-2 rounded-full mr-2 ${
-              activeTab === tab.key ? 'bg-primary' : 'border border-black/5'
+              activeTab === tab.key ? 'bg-primary' : 'bg-foreground/[0.04]'
             }`}
             onPress={() => {
               haptics.selection();

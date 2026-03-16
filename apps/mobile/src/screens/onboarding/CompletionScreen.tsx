@@ -34,8 +34,11 @@ export default function CompletionScreen({ navigation }: any) {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
     >
       <Animated.View className="items-center" entering={FadeInUp.delay(100).duration(500)}>
-        <View className="w-20 h-20 rounded-full bg-green-500/10 items-center justify-center mb-6">
-          <CheckCircle color="#4caf50" size={48} strokeWidth={1.5} />
+        <View
+          className="w-20 h-20 rounded-full items-center justify-center mb-6"
+          style={{ backgroundColor: 'rgba(0,122,255,0.08)' }}
+        >
+          <CheckCircle color="#007aff" size={48} strokeWidth={1.5} />
         </View>
         <Text className="text-foreground text-2xl font-bold tracking-tight text-center">
           {t.onboardingComplete}

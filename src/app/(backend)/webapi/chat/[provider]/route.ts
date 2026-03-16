@@ -601,7 +601,67 @@ export const POST = checkAuth(
         `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages.length}`,
       );
 
-      return await modelRuntime.chat(data, runtimeOptions);
+      const streamResponse = await modelRuntime.chat(data, runtimeOptions);
+
+      if (!toolLoopSucceeded || !streamResponse.body) return streamResponse;
+
+      const toolExecutions: Array<{
+        apiName: string;
+        arguments: string;
+        id: string;
+        identifier: string;
+        result: string;
+      }> = [];
+
+      for (const msg of data.messages) {
+        if ((msg as any).role !== 'assistant' || !(msg as any).tool_calls?.length) continue;
+        for (const tc of (msg as any).tool_calls) {
+          const fullName: string = tc.function?.name || '';
+          const sepIdx = fullName.indexOf(TOOL_SEPARATOR);
+          const identifier = sepIdx >= 0 ? fullName.slice(0, sepIdx) : fullName;
+          const apiName = sepIdx >= 0 ? fullName.slice(sepIdx + TOOL_SEPARATOR.length) : fullName;
+
+          const resultMsg = data.messages.find(
+            (m: any) => m.role === 'tool' && m.tool_call_id === tc.id,
+          );
+
+          toolExecutions.push({
+            apiName,
+            arguments: tc.function?.arguments || '{}',
+            id: tc.id,
+            identifier,
+            result: (resultMsg as any)?.content || '',
+          });
+        }
+      }
+
+      if (toolExecutions.length === 0) return streamResponse;
+
+      const toolEventChunk = `event: tool_executions\ndata: ${JSON.stringify(toolExecutions)}\n\n`;
+      const encoder = new TextEncoder();
+      const toolChunkBytes = encoder.encode(toolEventChunk);
+
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+
+      (async () => {
+        try {
+          await writer.write(toolChunkBytes);
+          const reader = streamResponse.body!.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            await writer.write(value);
+          }
+        } finally {
+          await writer.close();
+        }
+      })();
+
+      return new Response(readable, {
+        headers: streamResponse.headers,
+        status: streamResponse.status,
+      });
     } catch (e) {
       const {
         errorType = ChatErrorType.InternalServerError,

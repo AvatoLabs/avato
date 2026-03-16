@@ -122,18 +122,17 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <Pressable
-        className="flex-1 justify-end"
-        style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+        className="flex-1 justify-end bg-black/40"
         onPress={onClose}
       >
         <Pressable
-          className="bg-white rounded-t-3xl"
+          className="bg-white rounded-t-2xl"
           style={{ maxHeight: '75%' }}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Handle */}
           <View className="items-center pt-3 pb-1">
-            <View className="w-10 h-1 rounded-full bg-black/10" />
+            <View className="w-9 h-1 rounded-full bg-foreground/10" />
           </View>
 
           {/* Header */}

@@ -7,9 +7,17 @@ import { FeishuNativeMobileAuthService } from '@/server/services/mobileAuth/feis
 
 export const dynamic = 'force-dynamic';
 
+const optionalNonEmptyString = z.preprocess((value) => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().min(1).optional());
+
 const exchangeBodySchema = z.object({
-  code: z.string().min(1),
-  codeVerifier: z.string().min(1).optional(),
+  code: z.string().trim().min(1),
+  codeVerifier: optionalNonEmptyString,
 });
 
 export async function POST(request: NextRequest) {

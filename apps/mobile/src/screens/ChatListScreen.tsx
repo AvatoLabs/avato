@@ -66,6 +66,7 @@ import { getStreak, recordUsage } from '../lib/streak';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
+import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { useSessionGroupStore } from '../store/sessionGroup';
 import { tokens } from '../theme/tokens';
@@ -214,12 +215,14 @@ export default function ChatListScreen({ navigation }: any) {
   );
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const createSession = useSessionStore((s) => s.createSession);
-  const getOrCreateHomeSession = useSessionStore((s) => s.getOrCreateHomeSession);
   const removeSession = useSessionStore((s) => s.removeSession);
   const pinSession = useSessionStore((s) => s.pinSession);
   const unpinSession = useSessionStore((s) => s.unpinSession);
   const moveToGroup = useSessionStore((s) => s.moveToGroup);
   const renameSession = useSessionStore((s) => s.renameSession);
+  const agents = useAgentStore((s) => s.agents);
+  const agentInitialized = useAgentStore((s) => s.initialized);
+  const loadAgents = useAgentStore((s) => s.loadAgents);
 
   const groups = useSessionGroupStore((s) => s.groups);
   const fetchGroups = useSessionGroupStore((s) => s.fetchGroups);
@@ -295,6 +298,7 @@ export default function ChatListScreen({ navigation }: any) {
 
   useEffect(() => {
     if (!initialized) fetchSessions();
+    if (!agentInitialized) loadAgents();
     fetchGroups();
     // Record usage for streak tracking + milestone celebration
     recordUsage().then(() =>
@@ -307,7 +311,7 @@ export default function ChatListScreen({ navigation }: any) {
         }
       }),
     );
-  }, [initialized, fetchSessions, fetchGroups, t.streakCelebrate, toast]);
+  }, [initialized, agentInitialized, fetchSessions, loadAgents, fetchGroups, t.streakCelebrate, toast]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
@@ -436,7 +440,7 @@ export default function ChatListScreen({ navigation }: any) {
 
     const newId =
       draftSessionId ||
-      (await getOrCreateHomeSession({
+      (await createSession({
         model: selectedModel || undefined,
         provider: selectedProvider || undefined,
         plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
@@ -513,13 +517,12 @@ export default function ChatListScreen({ navigation }: any) {
               uri: asset.uri,
             });
           }
-          toast.show('success', t.toastFilePicked);
         }
       } catch {
         /* ignore */
       }
     },
-    [addFile, t, toast],
+    [addFile],
   );
 
   const pickDocument = useCallback(async () => {
@@ -538,7 +541,6 @@ export default function ChatListScreen({ navigation }: any) {
             uri: asset.uri,
           });
         }
-        toast.show('success', t.toastFilePicked);
       }
     } catch {
       /* ignore */
@@ -595,8 +597,8 @@ export default function ChatListScreen({ navigation }: any) {
     }
     if (key === 'agent') {
       haptics.success();
-      const homeSessionId = await getOrCreateHomeSession();
-      navigation.navigate('ChatDetail', { sessionId: homeSessionId });
+      const newId = await createSession();
+      navigation.navigate('ChatDetail', { sessionId: newId });
       return;
     }
 
@@ -691,7 +693,6 @@ export default function ChatListScreen({ navigation }: any) {
               onPress: () => {
                 haptics.warning();
                 removeSession(item.id);
-                toast.show('info', t.toastSessionDeleted);
               },
             },
           ]);
@@ -700,10 +701,8 @@ export default function ChatListScreen({ navigation }: any) {
           haptics.light();
           if (item.pinned) {
             unpinSession(item.id);
-            toast.show('success', t.toastUnpinned);
           } else {
             pinSession(item.id);
-            toast.show('success', t.toastPinned);
           }
         }}
       >
@@ -744,7 +743,7 @@ export default function ChatListScreen({ navigation }: any) {
               {item.description}
             </Text>
           </View>
-          <Text className="text-gray-400 text-[10px] font-medium tracking-wide">
+          <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
             {formatTimeAgo(item.updatedAt, t)}
           </Text>
         </TouchableOpacity>
@@ -822,9 +821,10 @@ export default function ChatListScreen({ navigation }: any) {
         onPressRight={handleCreateChat}
       />
 
+
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 30 }}
+        contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -879,7 +879,7 @@ export default function ChatListScreen({ navigation }: any) {
                 strokeWidth={tokens.icon.strokeWidth}
               />
               <TextInput
-                className="flex-1 ml-2.5 text-foreground text-[14.5px]"
+                className="flex-1 ml-2.5 text-foreground text-[14px]"
                 clearButtonMode="while-editing"
                 placeholder={t.chatListSearch}
                 placeholderTextColor={semanticColors.muted}
@@ -916,6 +916,47 @@ export default function ChatListScreen({ navigation }: any) {
             {/* Quick Actions */}
             <Animated.View entering={FadeInDown.delay(100).duration(350)}>
               <QuickActionRow actions={quickActions} onPress={handleQuickAction} />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(125).duration(350)}>
+              <SectionBlock title={t.settingsDefaultAgent}>
+                <ScrollView
+                  horizontal
+                  className="px-5"
+                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-2xl bg-primary/10 px-4 py-3 items-center justify-center min-w-[88px]"
+                    onPress={() => navigation.navigate('AgentConfig')}
+                  >
+                    <Text className="text-primary text-[20px] leading-5">+</Text>
+                  </TouchableOpacity>
+
+                  {agents.slice(0, 5).map((agent) => (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="rounded-2xl bg-foreground/[0.02] px-4 py-3 min-w-[120px]"
+                      key={agent.id}
+                      onPress={() => navigation.navigate('AgentConfig', { agentId: agent.id })}
+                    >
+                      <Text className="text-[18px] mb-1">{agent.avatar || '🤖'}</Text>
+                      <Text className="text-foreground text-[13px] font-semibold" numberOfLines={1}>
+                        {agent.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-2xl bg-foreground/[0.02] px-4 py-3 items-center justify-center min-w-[92px]"
+                    onPress={() => navigation.navigate('AgentList')}
+                  >
+                    <Text className="text-primary text-[12px] font-semibold">{t.profileViewAll}</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </SectionBlock>
             </Animated.View>
 
             {/* Pinned Sessions */}
@@ -969,9 +1010,9 @@ export default function ChatListScreen({ navigation }: any) {
         >
           <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
             <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-neutral-300" />
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-            <View className="px-4">
+            <View className="px-5">
               {/* Pin/Unpin */}
               <Pressable
                 className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
@@ -980,21 +1021,19 @@ export default function ChatListScreen({ navigation }: any) {
                     haptics.light();
                     if (actionSession.pinned) {
                       unpinSession(actionSession.id);
-                      toast.show('success', t.toastUnpinned);
                     } else {
                       pinSession(actionSession.id);
-                      toast.show('success', t.toastPinned);
                     }
                   }
                   setActionSession(null);
                 }}
               >
                 <Pin
-                  color={semanticColors.primary}
+                  color={semanticColors.muted}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
-                <Text className="ml-3 text-base text-neutral-800">
+                <Text className="ml-3 text-base text-foreground">
                   {actionSession?.pinned ? t.actionUnpin : t.actionPin}
                 </Text>
               </Pressable>
@@ -1005,11 +1044,11 @@ export default function ChatListScreen({ navigation }: any) {
                 onPress={() => actionSession && handleRename(actionSession)}
               >
                 <Pencil
-                  color={semanticColors.primary}
+                  color={semanticColors.muted}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
-                <Text className="ml-3 text-base text-neutral-800">{t.actionRename}</Text>
+                <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
               </Pressable>
 
               {/* Move to Group */}
@@ -1017,8 +1056,8 @@ export default function ChatListScreen({ navigation }: any) {
                 className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                 onPress={() => actionSession && handleMoveToGroup(actionSession)}
               >
-                <FolderOpen color="#f5a623" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-neutral-800">{t.groupMoveSession}</Text>
+                <FolderOpen color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-3 text-base text-foreground">{t.groupMoveSession}</Text>
               </Pressable>
 
               {/* Delete */}
@@ -1035,7 +1074,6 @@ export default function ChatListScreen({ navigation }: any) {
                         onPress: () => {
                           haptics.warning();
                           removeSession(actionSession.id);
-                          toast.show('info', t.toastSessionDeleted);
                         },
                       },
                     ]);
@@ -1051,12 +1089,12 @@ export default function ChatListScreen({ navigation }: any) {
               </Pressable>
             </View>
 
-            <View className="px-4 mt-2">
+            <View className="px-5 mt-2">
               <Pressable
-                className="items-center py-3.5 rounded-xl bg-neutral-100"
+                className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
                 onPress={() => setActionSession(null)}
               >
-                <Text className="text-base font-medium text-neutral-500">{t.cancel}</Text>
+                <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -1074,7 +1112,6 @@ export default function ChatListScreen({ navigation }: any) {
           if (renameTarget) {
             haptics.success();
             renameSession(renameTarget.id, newName);
-            toast.show('success', t.sessionRenamed);
           }
         }}
       />
@@ -1116,16 +1153,15 @@ export default function ChatListScreen({ navigation }: any) {
         onRequestClose={() => setSkillsVisible(false)}
       >
         <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          className="flex-1 justify-end bg-black/40"
           onPress={() => setSkillsVisible(false)}
         >
           <Pressable
-            className="bg-white rounded-t-3xl max-h-[70%]"
+            className="bg-white rounded-t-2xl max-h-[70%]"
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-black/10" />
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
             <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
               <Text className="text-foreground text-[18px] font-bold tracking-tight">
@@ -1156,7 +1192,7 @@ export default function ChatListScreen({ navigation }: any) {
               ) : (
                 installedPlugins.map((plugin) => (
                   <View
-                    className="flex-row items-center py-3.5 border-b border-black/[0.04]"
+                    className="flex-row items-center py-3.5"
                     key={plugin.identifier}
                   >
                     <View className="flex-1 mr-3">

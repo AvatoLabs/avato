@@ -44,6 +44,7 @@ import type {
   MemoryPreferenceItem,
   MessageContentPart,
   MobileMemoryEffort,
+  MobileUserState,
   ModelRankItem,
   SessionGroup,
   SessionRankItem,
@@ -180,35 +181,118 @@ const getLocalFileDescriptor = async (uri: string) => {
   };
 };
 
-const normalizeMessage = (message: any): ChatMessage => ({
-  content: typeof message?.content === 'string' ? message.content : '',
-  createdAt: toIsoString(message?.createdAt),
-  error: message?.error ?? null,
-  fileList: Array.isArray(message?.fileList) ? (message.fileList as ChatFileItem[]) : undefined,
-  id: String(message?.id ?? ''),
-  imageList: Array.isArray(message?.imageList)
-    ? (message.imageList as ChatImageItem[])
-    : undefined,
-  metadata: (message?.metadata as ChatMessageMetadata | null | undefined) ?? null,
-  model: message?.model ?? message?.extra?.model ?? undefined,
-  observationId: message?.observationId ?? message?.observation_id ?? undefined,
-  parentId: message?.parentId ?? undefined,
-  performance: message?.performance ?? message?.metadata?.performance ?? null,
-  plugin: (message?.plugin as ChatPluginPayload | null | undefined) ?? null,
-  pluginError: message?.pluginError ?? message?.plugin_error ?? undefined,
-  pluginIntervention: message?.pluginIntervention ?? message?.plugin?.intervention ?? null,
-  pluginState: message?.pluginState ?? message?.plugin_state ?? undefined,
-  provider: message?.provider ?? message?.extra?.provider ?? undefined,
-  reasoning: message?.reasoning ?? null,
-  role: message?.role,
-  search: (message?.search as GroundingSearch | null | undefined) ?? null,
-  sessionId: String(message?.sessionId ?? ''),
-  toolCallId: message?.tool_call_id ?? undefined,
-  tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
-  traceId: message?.traceId ?? message?.trace_id ?? undefined,
-  updatedAt: toIsoString(message?.updatedAt),
-  usage: message?.usage ?? message?.metadata?.usage ?? null,
-});
+interface MobileServerMessageTextPart {
+  text?: string;
+  type: 'text';
+}
+
+interface MobileServerMessageImagePart {
+  image?: string;
+  image_url?: {
+    url?: string;
+  };
+  type: 'image' | 'image_url';
+}
+
+type MobileServerMessagePart = MobileServerMessageImagePart | MobileServerMessageTextPart;
+
+const normalizeMessageContent = (content: unknown) => {
+  if (typeof content === 'string') {
+    return { content, imageList: undefined as ChatImageItem[] | undefined, metadata: undefined };
+  }
+
+  if (!Array.isArray(content)) {
+    return { content: '', imageList: undefined as ChatImageItem[] | undefined, metadata: undefined };
+  }
+
+  const parts = content as MobileServerMessagePart[];
+  const textParts: string[] = [];
+  const normalizedParts: MessageContentPart[] = [];
+  const inlineImages: ChatImageItem[] = [];
+
+  for (const part of parts) {
+    if (part?.type === 'text' && typeof part.text === 'string') {
+      textParts.push(part.text);
+      normalizedParts.push({ text: part.text, type: 'text' });
+      continue;
+    }
+
+    if (part?.type === 'image' || part?.type === 'image_url') {
+      const url =
+        typeof part.image === 'string'
+          ? part.image
+          : typeof part.image_url?.url === 'string'
+            ? part.image_url.url
+            : undefined;
+
+      if (!url) continue;
+
+      inlineImages.push({
+        alt: `image-${inlineImages.length + 1}`,
+        id: `inline-image-${inlineImages.length + 1}`,
+        url,
+      });
+      normalizedParts.push({ image: url, type: 'image' });
+    }
+  }
+
+  const hasImages = inlineImages.length > 0;
+
+  return {
+    content: textParts.join('\n\n'),
+    imageList: hasImages ? inlineImages : undefined,
+    metadata:
+      hasImages && normalizedParts.length > 0
+        ? ({
+            isMultimodal: true,
+            tempDisplayContent: JSON.stringify(normalizedParts),
+          } satisfies Partial<ChatMessageMetadata>)
+        : undefined,
+  };
+};
+
+const normalizeMessage = (message: any): ChatMessage => {
+  const normalizedContent = normalizeMessageContent(message?.content);
+  const baseMetadata = message?.metadata as ChatMessageMetadata | undefined;
+  const derivedMetadata = normalizedContent.metadata as ChatMessageMetadata | undefined;
+  const metadata =
+    baseMetadata || derivedMetadata
+      ? ({
+          ...baseMetadata,
+          ...derivedMetadata,
+        } as ChatMessageMetadata)
+      : null;
+
+  return {
+    content: normalizedContent.content,
+    createdAt: toIsoString(message?.createdAt),
+    error: message?.error ?? null,
+    fileList: Array.isArray(message?.fileList) ? (message.fileList as ChatFileItem[]) : undefined,
+    id: String(message?.id ?? ''),
+    imageList: Array.isArray(message?.imageList)
+      ? (message.imageList as ChatImageItem[])
+      : normalizedContent.imageList,
+    metadata,
+    model: message?.model ?? message?.extra?.model ?? undefined,
+    observationId: message?.observationId ?? message?.observation_id ?? undefined,
+    parentId: message?.parentId ?? undefined,
+    performance: message?.performance ?? message?.metadata?.performance ?? null,
+    plugin: (message?.plugin as ChatPluginPayload | null | undefined) ?? null,
+    pluginError: message?.pluginError ?? message?.plugin_error ?? undefined,
+    pluginIntervention: message?.pluginIntervention ?? message?.plugin?.intervention ?? null,
+    pluginState: message?.pluginState ?? message?.plugin_state ?? undefined,
+    provider: message?.provider ?? message?.extra?.provider ?? undefined,
+    reasoning: message?.reasoning ?? null,
+    role: message?.role,
+    search: (message?.search as GroundingSearch | null | undefined) ?? null,
+    sessionId: String(message?.sessionId ?? ''),
+    toolCallId: message?.tool_call_id ?? undefined,
+    tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
+    traceId: message?.traceId ?? message?.trace_id ?? undefined,
+    updatedAt: toIsoString(message?.updatedAt),
+    usage: message?.usage ?? message?.metadata?.usage ?? null,
+  };
+};
 
 interface MobileToolFunction {
   arguments?: string;
@@ -551,12 +635,21 @@ export interface ChatRequestOptions {
   topicId?: string;
 }
 
+export interface ToolExecutionItem {
+  apiName: string;
+  arguments: string;
+  id: string;
+  identifier: string;
+  result: string;
+}
+
 export interface StreamCallbacks {
   onContent?: (state: StreamContentState) => void;
   onImages?: (images: ChatImageItem[]) => void;
   onPerformance?: (perf: Record<string, any>) => void;
   onReasoning?: (state: StreamReasoningState) => void;
   onSearch?: (search: GroundingSearch) => void;
+  onToolExecutions?: (executions: ToolExecutionItem[]) => void;
   onTools?: (tools: ChatToolPayload[]) => void;
   onUsage?: (usage: Record<string, any>) => void;
 }
@@ -580,6 +673,7 @@ export interface StreamResult {
   reasoning?: StreamReasoningState;
   search?: GroundingSearch;
   text: string;
+  toolExecutions?: ToolExecutionItem[];
   tools?: ChatToolPayload[];
   usage?: Record<string, any>;
 }
@@ -700,6 +794,10 @@ export const aiChatApi = {
     const attempt = async (): Promise<StreamResult> => {
       const [base, headers] = await Promise.all([getBaseUrl(), getHeaders()]);
 
+      if (!headers['X-lobe-chat-auth'] && !headers['Oidc-Auth']) {
+        throw new Error('Auth session expired — please sign in again');
+      }
+
       return new Promise<StreamResult>((resolve, reject) => {
         const allMessages = [...messages];
         if (options?.systemPrompt) {
@@ -707,6 +805,7 @@ export const aiChatApi = {
         }
 
         const payload: Record<string, unknown> = {
+          apiMode: 'chatCompletion',
           messages: allMessages,
           model: options?.model || 'gpt-4o-mini',
           stream: true,
@@ -724,21 +823,38 @@ export const aiChatApi = {
         if (options?.topicId) payload.topicId = options.topicId;
         if (options?.plugins?.length) payload.plugins = options.plugins;
 
+        const url = `${base}/webapi/chat/${provider}`;
+        const imageUrls: string[] = [];
+        for (const m of allMessages) {
+          if (Array.isArray(m.content)) {
+            for (const p of m.content as any[]) {
+              if (p?.type === 'image_url') imageUrls.push(p.image_url?.url ?? '(missing)');
+            }
+          }
+        }
+        const hasAuth = !!headers['X-lobe-chat-auth'] || !!headers['Oidc-Auth'];
+        console.info(
+          `[aiChatApi] POST ${url} model=${payload.model} msgs=${allMessages.length} images=${imageUrls.length} auth=${hasAuth}`,
+        );
+        if (imageUrls.length > 0) {
+          console.info('[aiChatApi] image URLs:', imageUrls.map((u) => u.slice(0, 120)));
+        }
+
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${base}/webapi/chat/${provider}`);
+        xhr.open('POST', url);
         xhr.responseType = 'text';
         xhr.timeout = 180_000;
 
         for (const [key, value] of Object.entries(headers)) {
           xhr.setRequestHeader(key, value);
         }
-        xhr.setRequestHeader('Content-Type', 'application/json');
 
         let accText = '';
         let accReasoning = '';
         let accImages: ChatImageItem[] = [];
         let accSearch: GroundingSearch | undefined;
         let accTools: ChatToolPayload[] | undefined;
+        let accToolExecutions: ToolExecutionItem[] | undefined;
         let contentMetadata: StreamResult['contentMetadata'];
         let lastUsage: Record<string, any> | undefined;
         let lastPerformance: Record<string, any> | undefined;
@@ -815,6 +931,14 @@ export const aiChatApi = {
                 rawToolCalls = mergeToolCallChunks(rawToolCalls, payload as MobileToolCallChunk[]);
                 accTools = transformToolCalls(rawToolCalls);
                 callbacks.onTools?.(accTools);
+                break;
+              }
+              case 'tool_executions': {
+                const payload = Array.isArray(chunk.data) ? (chunk.data as ToolExecutionItem[]) : [];
+                if (payload.length > 0) {
+                  accToolExecutions = payload;
+                  callbacks.onToolExecutions?.(accToolExecutions);
+                }
                 break;
               }
               case 'reasoning': {
@@ -943,14 +1067,42 @@ export const aiChatApi = {
         };
 
         xhr.onprogress = () => {
-          const newData = xhr.responseText.slice(processedLength);
-          processedLength = xhr.responseText.length;
-          processNewData(newData);
+          try {
+            const newData = xhr.responseText.slice(processedLength);
+            processedLength = xhr.responseText.length;
+            processNewData(newData);
+          } catch (e) {
+            console.error('[aiChatApi] SSE parse error in onprogress:', e);
+          }
         };
 
         xhr.onload = () => {
           if (xhr.status >= 400) {
-            reject(new Error(`AI chat failed: ${xhr.status}`));
+            let detail = '';
+            try {
+              const raw = xhr.responseText;
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                const providerHint = parsed?.body?.provider ? `[${parsed.body.provider}] ` : '';
+                const innerMsg =
+                  parsed?.body?.error?.message ||
+                  parsed?.body?.message ||
+                  parsed?.body?.error?.errorMessage ||
+                  '';
+                const errorType = parsed?.errorType || '';
+                detail = innerMsg
+                  ? `${providerHint}${innerMsg}`
+                  : `${providerHint}${errorType}`;
+              }
+            } catch {
+              detail = (xhr.responseText || '').slice(0, 200);
+            }
+            const msg = detail
+              ? `AI chat failed: ${xhr.status} — ${detail}`
+              : `AI chat failed: ${xhr.status}`;
+            console.error('[aiChatApi]', msg);
+            console.error('[aiChatApi] Full response body:', (xhr.responseText || '').slice(0, 1500));
+            reject(new Error(msg));
             return;
           }
           const remaining = xhr.responseText.slice(processedLength);
@@ -974,13 +1126,18 @@ export const aiChatApi = {
                   : undefined,
             search: accSearch,
             text: accText,
+            toolExecutions: accToolExecutions,
             tools: accTools,
             usage: lastUsage,
           });
         };
 
-        xhr.onerror = () => reject(new Error('Network error during AI chat'));
-        xhr.ontimeout = () => reject(new Error('AI chat request timed out'));
+        xhr.onerror = () => {
+          const info = `status=${xhr.status} readyState=${xhr.readyState}`;
+          console.error(`[aiChatApi] XHR onerror: ${info}`);
+          reject(new Error(`Network error (${info})`));
+        };
+        xhr.ontimeout = () => reject(new Error(`AI chat timed out (${xhr.timeout}ms)`));
 
         if (signal) {
           signal.addEventListener('abort', () => xhr.abort());
@@ -995,7 +1152,10 @@ export const aiChatApi = {
         return await attempt();
       } catch (firstError) {
         if (signal?.aborted) throw firstError;
-        console.warn('[aiChatApi] first attempt failed, retrying once:', firstError);
+        const isHttpError =
+          firstError instanceof Error && /AI chat failed: \d+/.test(firstError.message);
+        if (isHttpError) throw firstError;
+        console.warn('[aiChatApi] first attempt failed (network), retrying once:', firstError);
         await new Promise((r) => setTimeout(r, 800));
         return attempt();
       }
@@ -1134,7 +1294,7 @@ export const fileApi = {
       throw new Error('upload path missing');
     }
 
-    return trpcMutate<{ id: string; url: string }>('file.createFile', {
+    const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType,
       hash,
       knowledgeBaseId: options?.knowledgeBaseId,
@@ -1143,9 +1303,22 @@ export const fileApi = {
       size: fileInfo.size,
       url: storagePath,
     });
+
+    const resolvedUrl =
+      created.url && !created.url.startsWith('http')
+        ? `${baseUrl}/f/${created.id}`
+        : created.url;
+
+    return { id: created.id, url: resolvedUrl };
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),
+
+  getFileContents: (fileIds: string[]) =>
+    trpcMutate<Array<{ content: string; fileId: string; filename: string }>>(
+      'chunk.getFileContents',
+      { fileIds },
+    ),
 };
 
 // ── Config / User API ───────────────────────────────────────────────
@@ -1154,6 +1327,7 @@ export const configApi = {
 };
 
 export const userApi = {
+  getState: () => trpcQuery<MobileUserState>('user.getUserState'),
   getUser: () => trpcQuery<UserProfile>('user.getUserState'),
   /**
    * Server has NO single `updateUser` procedure.
@@ -1178,6 +1352,7 @@ export const userApi = {
   updateFullName: (fullName: string) => trpcMutate('user.updateFullName', fullName),
   updateUsername: (username: string) => trpcMutate('user.updateUsername', username),
   updateInterests: (interests: string[]) => trpcMutate('user.updateInterests', interests),
+  updateSettings: (settings: Record<string, any>) => trpcMutate('user.updateSettings', settings),
   /** Convenience: update multiple profile fields in sequence */
   updateProfile: async (data: Partial<Pick<UserProfile, 'username' | 'avatar' | 'fullName'>>) => {
     const promises: Promise<unknown>[] = [];
@@ -1316,7 +1491,7 @@ export interface MarketListItem {
 }
 
 export const marketSkillApi = {
-  getList: async (params?: {
+  getMcpList: async (params?: {
     category?: string;
     page?: number;
     pageSize?: number;
@@ -1324,27 +1499,13 @@ export const marketSkillApi = {
   }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
     const input = {
       category: params?.category,
+      locale: 'en-US',
       page: params?.page ?? 1,
       pageSize: params?.pageSize ?? 50,
       q: params?.q,
+      sort: 'recommended',
     };
 
-    // Try skill list first (requires market auth)
-    try {
-      const result = await trpcQuery<any>('market.skill.getSkillList', input);
-      if (result?.items?.length > 0) {
-        return {
-          items: result.items.map((s: any) => ({
-            ...s,
-            _source: 'skill' as const,
-            avatar: s.icon || s.logo,
-          })),
-          totalCount: result.totalCount || result.items.length,
-        };
-      }
-    } catch { /* skill API unavailable */ }
-
-    // Fallback: MCP list (also via market but more commonly available)
     try {
       const mcpResult = await trpcQuery<any>('market.getMcpList', input);
       if (mcpResult?.items?.length > 0) {
@@ -1352,41 +1513,111 @@ export const marketSkillApi = {
           items: mcpResult.items.map((m: any) => ({
             ...m,
             _source: 'mcp' as const,
-            name: m.name || m.title || m.identifier,
+            avatar: m.meta?.avatar || m.avatar,
+            description: m.meta?.description || m.description || '',
+            identifier: m.identifier,
+            manifestUrl: m.manifestUrl,
+            name: m.meta?.title || m.name || m.title || m.identifier,
           })),
           totalCount: mcpResult.totalCount || mcpResult.items.length,
         };
       }
     } catch { /* MCP API unavailable */ }
 
-    // Fallback: legacy plugin list (from npm registry, no market auth needed)
+    return { items: [], totalCount: 0 };
+  },
+
+  getSkillList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+  }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
+    const input = {
+      category: params?.category,
+      locale: 'en-US',
+      page: params?.page ?? 1,
+      pageSize: params?.pageSize ?? 50,
+      q: params?.q,
+      sort: 'recommended',
+    };
+
     try {
-      const legacyResult = await trpcQuery<any[]>('market.getLegacyPluginList', {});
-      if (Array.isArray(legacyResult) && legacyResult.length > 0) {
-        let items: MarketListItem[] = legacyResult.map((p: any) => ({
-          _source: 'legacy' as const,
-          identifier: p.identifier,
-          name: p.meta?.title || p.identifier,
-          description: p.meta?.description || '',
-          author: p.author,
-          avatar: p.meta?.avatar,
-          manifestUrl: typeof p.manifest === 'string' ? p.manifest : undefined,
-          manifest: typeof p.manifest === 'object' ? p.manifest : undefined,
-        }));
-        if (params?.q) {
-          const q = params.q.toLowerCase();
-          items = items.filter(
-            (i) =>
-              i.name?.toLowerCase().includes(q) ||
-              i.identifier.toLowerCase().includes(q) ||
-              i.description?.toLowerCase().includes(q),
-          );
-        }
-        return { items, totalCount: items.length };
+      const result = await trpcQuery<any>('market.skill.getSkillList', input);
+      if (result?.items?.length > 0) {
+        return {
+          items: result.items.map((s: any) => ({
+            ...s,
+            _source: 'skill' as const,
+            avatar: s.icon || s.logo || s.avatar,
+          })),
+          totalCount: result.totalCount || result.items.length,
+        };
       }
-    } catch { /* legacy API unavailable */ }
+    } catch { /* skill API unavailable */ }
 
     return { items: [], totalCount: 0 };
+  },
+
+  getList: async (params?: {
+    category?: string;
+    page?: number;
+    pageSize?: number;
+    q?: string;
+    source?: 'all' | 'mcp' | 'skill';
+  }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
+    const source = params?.source ?? 'all';
+    const baseParams = {
+      category: params?.category,
+      page: params?.page,
+      pageSize: params?.pageSize,
+      q: params?.q,
+    };
+
+    if (source === 'mcp') {
+      return marketSkillApi.getMcpList(baseParams);
+    }
+
+    if (source === 'skill') {
+      const skillResult = await marketSkillApi.getSkillList(baseParams);
+      if (skillResult.items.length > 0) return skillResult;
+
+      try {
+        const legacyResult = await trpcQuery<any[]>('market.getLegacyPluginList', {});
+        if (Array.isArray(legacyResult) && legacyResult.length > 0) {
+          let items: MarketListItem[] = legacyResult.map((p: any) => ({
+            _source: 'legacy' as const,
+            author: p.author,
+            avatar: p.meta?.avatar,
+            description: p.meta?.description || '',
+            identifier: p.identifier,
+            manifest: typeof p.manifest === 'object' ? p.manifest : undefined,
+            manifestUrl: typeof p.manifest === 'string' ? p.manifest : undefined,
+            name: p.meta?.title || p.identifier,
+          }));
+          if (params?.q) {
+            const q = params.q.toLowerCase();
+            items = items.filter(
+              (i) =>
+                i.name?.toLowerCase().includes(q) ||
+                i.identifier.toLowerCase().includes(q) ||
+                i.description?.toLowerCase().includes(q),
+            );
+          }
+          return { items, totalCount: items.length };
+        }
+      } catch { /* legacy unavailable */ }
+
+      return { items: [], totalCount: 0 };
+    }
+
+    const [mcpResult, skillResult] = await Promise.all([
+      marketSkillApi.getMcpList(baseParams),
+      marketSkillApi.getSkillList(baseParams),
+    ]);
+
+    const items = [...mcpResult.items, ...skillResult.items];
+    return { items, totalCount: items.length };
   },
 
   install: async (item: MarketListItem): Promise<void> => {

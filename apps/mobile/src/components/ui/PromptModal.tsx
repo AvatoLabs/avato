@@ -67,13 +67,13 @@ export default function PromptModal({
               onSubmitEditing={handleSubmit}
             />
           </View>
-          <View className="flex-row border-t border-black/10">
+          <View className="flex-row mt-px bg-foreground/[0.04]" style={{ borderTopWidth: 0 }}>
             <TouchableOpacity
               activeOpacity={0.6}
-              className="flex-1 py-3.5 items-center border-r border-black/10"
+              className="flex-1 py-3.5 items-center"
               onPress={onCancel}
             >
-              <Text className="text-[16px] text-gray-500 font-medium">{t.cancel}</Text>
+              <Text className="text-[16px] text-foreground/50 font-medium">{t.cancel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.6}

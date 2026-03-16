@@ -2,7 +2,19 @@
  * SkillMarketScreen — Browse and install skills from the marketplace.
  */
 import { useNavigation } from '@react-navigation/native';
-import { Check, ChevronLeft, Download, Package, Search, X } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Calculator,
+  Check,
+  Cloud,
+  Download,
+  ListTodo,
+  NotebookPen,
+  Package,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,11 +33,16 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { semanticColors } from '../constants/colors';
 import { MOBILE_LOBEHUB_SKILL_PROVIDERS } from '../constants/lobehubSkills';
 import {
+  MOBILE_RECOMMENDED_BUILTIN_SKILLS,
+  type MobileRecommendedBuiltinIcon,
+} from '../constants/recommendedBuiltins';
+import {
   agentSkillApi,
   lobehubSkillApi,
   type MarketListItem,
   marketSkillApi,
   pluginApi,
+  userApi,
 } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -64,6 +81,26 @@ function PluginAvatar({ avatar, name }: { avatar?: string; name: string }) {
   );
 }
 
+function BuiltinMarketIcon({ icon }: { icon: MobileRecommendedBuiltinIcon }) {
+  switch (icon) {
+    case 'artifacts': {
+      return <Sparkles color="#2563eb" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'cloud': {
+      return <Cloud color="#2563eb" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'gtd': {
+      return <ListTodo color="#2563eb" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'notebook': {
+      return <NotebookPen color="#2563eb" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+    case 'calculator': {
+      return <Calculator color="#2563eb" size={18} strokeWidth={tokens.icon.strokeWidth} />;
+    }
+  }
+}
+
 export default function SkillMarketScreen() {
   const { t } = useI18n();
   const nav = useNavigation<any>();
@@ -92,8 +129,13 @@ export default function SkillMarketScreen() {
 
   const fetchInstalledSkills = useCallback(async () => {
     try {
-      const [plugins, agentSkills] = await Promise.all([pluginApi.list(), agentSkillApi.list()]);
+      const [plugins, agentSkills, userState] = await Promise.all([
+        pluginApi.list(),
+        agentSkillApi.list(),
+        userApi.getState(),
+      ]);
       const nextInstalled = new Set<string>();
+      const uninstalledBuiltinTools = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
 
       if (Array.isArray(plugins)) {
         for (const plugin of plugins) {
@@ -104,6 +146,12 @@ export default function SkillMarketScreen() {
       if (Array.isArray(agentSkills)) {
         for (const skill of agentSkills) {
           if (skill.identifier) nextInstalled.add(skill.identifier);
+        }
+      }
+
+      for (const builtin of MOBILE_RECOMMENDED_BUILTIN_SKILLS) {
+        if (!uninstalledBuiltinTools.includes(builtin.identifier)) {
+          nextInstalled.add(builtin.identifier);
         }
       }
 
@@ -191,6 +239,46 @@ export default function SkillMarketScreen() {
     () => (
       <View className="mb-5">
         <Text className="mb-3 text-[13px] font-semibold text-foreground/55">
+          {t.skillsRecommendedBuiltins}
+        </Text>
+        <View className="gap-3 mb-5">
+          {MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((builtin) => {
+            const installed = installedIds.has(builtin.identifier);
+            const title = t[builtin.titleKey as keyof typeof t] as string;
+            const description = t[builtin.descriptionKey as keyof typeof t] as string;
+
+            return (
+              <View
+                className="flex-row items-center rounded-2xl px-4 py-3"
+                key={builtin.identifier}
+                style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}
+              >
+                <View className="w-9 h-9 rounded-[10px] bg-primary/10 items-center justify-center mr-3">
+                  <BuiltinMarketIcon icon={builtin.icon} />
+                </View>
+                <View className="flex-1 mr-3">
+                  <Text className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
+                    {title}
+                  </Text>
+                  <Text className="mt-1 text-[12px] leading-5 text-secondary/60" numberOfLines={2}>
+                    {description}
+                  </Text>
+                </View>
+                <View
+                  className={`rounded-full px-4 py-2 ${installed ? 'bg-primary/10' : 'bg-foreground/[0.06]'}`}
+                >
+                  <Text
+                    className={`text-[12px] font-semibold ${installed ? 'text-primary' : 'text-secondary/50'}`}
+                  >
+                    {installed ? t.skillsInstalled : t.skillsNotInstalled}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        <Text className="mb-3 text-[13px] font-semibold text-foreground/55">
           {t.skillsMarketFeatured}
         </Text>
         <View className="gap-3">
@@ -200,7 +288,7 @@ export default function SkillMarketScreen() {
 
             return (
               <View
-                className="flex-row items-center rounded-2xl border border-black/5 px-4 py-3"
+                className="flex-row items-center rounded-2xl px-4 py-3"
                 key={provider.id}
                 style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}
               >
@@ -237,7 +325,7 @@ export default function SkillMarketScreen() {
         </View>
       </View>
     ),
-    [connectedProviderIds, connectingProviderId, handleConnectFeaturedProvider, t],
+    [connectedProviderIds, connectingProviderId, handleConnectFeaturedProvider, installedIds, t],
   );
 
   const renderItem = useCallback(
@@ -296,18 +384,18 @@ export default function SkillMarketScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ChevronLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.skillsMarketTitle}
         onPressLeft={() => nav.goBack()}
       />
 
       {/* Search */}
       <View className="flex-row items-center mx-5 mb-3 bg-foreground/[0.03] rounded-xl px-3 py-2">
-        <Search color="#9ca3af" size={16} strokeWidth={1.5} />
+        <Search color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
         <TextInput
           className="flex-1 ml-2 text-sm text-foreground"
           placeholder={t.skillsMarketSearch}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={semanticColors.secondaryText}
           returnKeyType="search"
           value={search}
           onChangeText={setSearch}
@@ -320,7 +408,7 @@ export default function SkillMarketScreen() {
               fetchSkills();
             }}
           >
-            <X color="#9ca3af" size={16} strokeWidth={1.5} />
+            <X color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -339,8 +427,13 @@ export default function SkillMarketScreen() {
             </View>
           ) : (
             <View className="items-center py-16 px-8">
-              <Package color="#d1d5db" size={40} strokeWidth={1.2} />
-              <Text className="text-secondary/40 text-[15px] font-medium mt-4 text-center">
+              <View
+                className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
+                style={{ width: 80, height: 80 }}
+              >
+                <Package color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
+              </View>
+              <Text className="text-center text-[17px] font-semibold text-foreground">
                 {search ? t.skillsMarketEmpty : t.skillsMarketUnavailable}
               </Text>
               {!search && (

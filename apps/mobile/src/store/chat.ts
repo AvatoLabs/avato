@@ -7,6 +7,7 @@
  *   - Handle streaming responses
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
@@ -16,12 +17,25 @@ import type {
   MobileMessageToolCall,
   StreamContentState,
   StreamReasoningState,
+  ToolExecutionItem,
 } from '../lib/api';
-import { agentApi, aiChatApi, messageApi } from '../lib/api';
+import { agentApi, aiChatApi, fileApi, messageApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
-import type { ChatMessage, MobileMemoryEffort } from '../types';
+import type { ChatMessage, ChatToolPayload, MobileMemoryEffort } from '../types';
 import { useFileStore } from './file';
+import { useTopicStore } from './topic';
+
+const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayload[] =>
+  executions.map((exec) => ({
+    apiName: exec.apiName,
+    arguments: exec.arguments,
+    id: exec.id,
+    identifier: exec.identifier,
+    result_content: exec.result,
+    source: exec.identifier.startsWith('lobe-') ? 'builtin' : ('plugin' as const),
+    type: 'function',
+  }));
 
 /**
  * Resolves per-session chat options with a 3-tier priority:
@@ -92,6 +106,8 @@ interface UploadedAttachment {
   content?: string;
   fileId: string;
   name: string;
+  /** base64 data URI for streaming to LLM (avoids SSRF blocks) */
+  streamUrl?: string;
   type: string;
   url: string;
 }
@@ -159,6 +175,19 @@ const buildPersistedReasoning = (
 };
 
 const isImageAttachment = (mimeType: string) => mimeType.startsWith('image/');
+
+const toBase64DataUri = async (uri: string, mimeType: string): Promise<string | null> => {
+  try {
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const mime = mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
+    return `data:${mime};base64,${base64}`;
+  } catch (e) {
+    console.warn('[ChatStore] Failed to convert image to base64:', e);
+    return null;
+  }
+};
 const FILE_CONTENT_PREVIEW_LIMIT = 6000;
 
 const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
@@ -213,7 +242,7 @@ const buildUserStreamContent = (
 
   for (const attachment of imageAttachments) {
     parts.push({
-      image_url: { detail: 'auto', url: attachment.url },
+      image_url: { detail: 'auto', url: attachment.streamUrl || attachment.url },
       type: 'image_url',
     });
   }
@@ -301,6 +330,8 @@ interface ChatState {
   fetchMessages: (sessionId: string, topicId?: string) => Promise<void>;
   /** Whether a message is currently being generated */
   generating: boolean;
+  /** Timestamp when generating started, for watchdog timeout */
+  generatingStartedAt: number | null;
   /** Whether the model is currently in reasoning/thinking phase */
   isReasoning: boolean;
   /** Messages keyed by sessionId */
@@ -319,7 +350,7 @@ interface ChatState {
       plugins?: string[];
       searchEnabled?: boolean;
     },
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   setEditingMessage: (id: string | null) => void;
   /** Stop the current generation */
   stopGenerating: () => void;
@@ -332,6 +363,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeStreamingSessionId: null,
   messagesBySession: {},
   generating: false,
+  generatingStartedAt: null,
   isReasoning: false,
   reasoningStartedAt: null,
   streamBuffer: '',
@@ -346,6 +378,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       abortController: null,
       editingMessageId: null,
       generating: false,
+      generatingStartedAt: null,
       isReasoning: false,
       messagesBySession: {},
       reasoningStartedAt: null,
@@ -363,6 +396,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeStreamingSessionId: null,
       abortController: null,
       generating: false,
+      generatingStartedAt: null,
       isReasoning: false,
       reasoningStartedAt: null,
       streamBuffer: '',
@@ -416,12 +450,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       searchEnabled?: boolean;
     },
   ) => {
+    if (get().generating) return false;
+
     const textContent = content.trim();
     const fileState = useFileStore.getState();
     const attachments = fileState.pendingFiles.filter((f) => f.status !== 'error');
-    if (attachments.some((f) => f.status === 'uploading')) return;
+    if (attachments.some((f) => f.status === 'uploading')) {
+      return false;
+    }
 
-    if (!textContent && attachments.length === 0) return;
+    if (!textContent && attachments.length === 0) return false;
 
     const uploadedAttachments: UploadedAttachment[] = [];
     if (attachments.length > 0) {
@@ -430,9 +468,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const result = await useFileStore.getState().uploadFile(file.id, { sessionId });
           if (!result) return null;
 
+          let streamUrl = result.url;
+          if (isImageAttachment(file.type)) {
+            const dataUri = await toBase64DataUri(file.uri, file.type);
+            if (dataUri) streamUrl = dataUri;
+          }
+
           return {
             fileId: result.fileId,
             name: file.name,
+            streamUrl,
             type: file.type,
             url: result.url,
           } satisfies UploadedAttachment;
@@ -440,8 +485,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       );
 
       const successful = uploaded.filter(Boolean) as UploadedAttachment[];
-      if (successful.length !== attachments.length) return;
+      if (successful.length !== attachments.length) {
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t.errorSendFailed);
+        return false;
+      }
       uploadedAttachments.push(...successful);
+
+      const nonImageFileIds = successful
+        .filter((f) => !isImageAttachment(f.type))
+        .map((f) => f.fileId);
+      if (nonImageFileIds.length > 0) {
+        try {
+          const contents = await fileApi.getFileContents(nonImageFileIds);
+          for (const item of contents) {
+            const attachment = uploadedAttachments.find((a) => a.fileId === item.fileId);
+            if (attachment && item.content) {
+              attachment.content = item.content;
+            }
+          }
+        } catch {
+          // File content extraction is best-effort; continue without it
+        }
+      }
     }
 
     const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
@@ -492,24 +558,54 @@ export const useChatStore = create<ChatState>((set, get) => ({
         topicId,
       } as any);
       userMessageServerId = result?.id;
-      persistedMessagesAfterUser = result?.messages;
+      persistedMessagesAfterUser = result?.messages?.map((message) =>
+        message.id === result?.id
+          ? {
+              ...message,
+              content: message.content || displayContent,
+              ...(message.fileList?.length ? {} : { fileList: userMsg.fileList }),
+              ...(message.imageList?.length ? {} : { imageList: userMsg.imageList }),
+            }
+          : message,
+      );
 
-      if (result?.messages?.length) {
+      if (persistedMessagesAfterUser?.length) {
         set((s) => ({
           messagesBySession: {
             ...s.messagesBySession,
-            [sessionId]: result.messages,
+            [sessionId]: persistedMessagesAfterUser!,
           },
         }));
       }
     } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorSendFailed);
+      return false;
     }
 
-    const contextMessages = (persistedMessagesAfterUser || get().messagesBySession[sessionId] || [])
+    const messagesForContext =
+      persistedMessagesAfterUser && persistedMessagesAfterUser.length > 0
+        ? persistedMessagesAfterUser
+        : get().messagesBySession[sessionId] || [];
+    const contextMessages = messagesForContext
       .map(buildContextMessage)
       .filter(Boolean) as MobileChatMessage[];
+
+    // Ensure the latest user message uses freshly uploaded attachments.
+    // This keeps local image data-URIs (when available) so model providers
+    // don't need to fetch internal `/f/:id` URLs and trigger SSRF-safe fetch.
+    if (uploadedAttachments.length > 0 && contextMessages.length > 0) {
+      const lastCtx = contextMessages[contextMessages.length - 1];
+      if (lastCtx.role === 'user') {
+        const lastTextContent =
+          typeof lastCtx.content === 'string' ? lastCtx.content : textContent || displayContent;
+        const multimodalContent = buildUserStreamContent(lastTextContent, uploadedAttachments);
+        contextMessages[contextMessages.length - 1] = {
+          ...lastCtx,
+          content: multimodalContent,
+        };
+      }
+    }
 
     // Create a placeholder for the assistant response
     const assistantMsgId = `assistant-${Date.now()}`;
@@ -528,6 +624,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeStreamingSessionId: sessionId,
       abortController,
       generating: true,
+      generatingStartedAt: Date.now(),
       isReasoning: false,
       reasoningStartedAt: null,
       streamBuffer: '',
@@ -571,8 +668,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chatOptions.plugins = options.plugins;
       }
 
-      // Throttle store updates to avoid per-token re-renders
-      const THROTTLE_MS = 100;
+      // Throttle store updates to smooth streaming text rendering
+      const THROTTLE_MS = 180;
       let pendingReasoning: StreamReasoningState | null = null;
       let pendingContent: StreamContentState | null = null;
       let throttleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -598,6 +695,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (wasReasoning) {
             const startedAt = get().reasoningStartedAt;
             const duration = startedAt ? Date.now() - startedAt : undefined;
+            const finalReasoning = reasoning ?? undefined;
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
@@ -611,15 +709,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         ...(mergeMessageMetadata(m.metadata, contentState)
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
-                        reasoning: m.reasoning
-                          ? {
-                              ...m.reasoning,
-                              ...(m.reasoning.isMultimodal
-                                ? {}
-                                : { content: m.reasoning.content }),
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning,
+                        reasoning: finalReasoning
+                          ? { ...buildReasoningState(finalReasoning), ...(duration !== undefined ? { duration } : {}) }
+                          : m.reasoning
+                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                            : m.reasoning,
                       }
                     : m,
                 ),
@@ -638,6 +732,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         ...(mergeMessageMetadata(m.metadata, contentState)
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
+                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
                       }
                     : m,
                 ),
@@ -685,6 +780,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
                   m.id === assistantMsgId ? { ...m, search } : m,
+                ),
+              },
+            }));
+          },
+          onToolExecutions: (executions) => {
+            const toolPayloads = toolExecutionsToPayloads(executions);
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, tools: toolPayloads } : m,
                 ),
               },
             }));
@@ -738,10 +844,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }));
       }
 
+      const resolvedTools =
+        result.tools ||
+        (result.toolExecutions ? toolExecutionsToPayloads(result.toolExecutions) : undefined);
+
       if (
         result.images ||
         result.search ||
-        result.tools ||
+        resolvedTools ||
         result.usage ||
         result.performance
       ) {
@@ -754,7 +864,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...m,
                     ...(result.images ? { imageList: result.images } : {}),
                     ...(result.search ? { search: result.search } : {}),
-                    ...(result.tools ? { tools: result.tools } : {}),
+                    ...(resolvedTools ? { tools: resolvedTools } : {}),
                     ...(result.usage ? { usage: result.usage as any } : {}),
                     ...(result.performance ? { performance: result.performance as any } : {}),
                     ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
@@ -785,7 +895,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             localMsg?.metadata,
           ),
           ...(result.search ? { search: result.search } : {}),
-          ...(result.tools ? { tools: result.tools } : {}),
+          ...(resolvedTools ? { tools: resolvedTools } : {}),
           provider,
           parentId: userMessageServerId,
           topicId,
@@ -804,14 +914,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         console.warn('[ChatStore] Failed to persist assistant message:', err);
       }
     } catch (err) {
+      if (abortController.signal.aborted) return true;
       console.warn('[ChatStore] AI streaming error:', err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t.errorNetwork);
+      const rawMessage = err instanceof Error ? err.message : '';
+      const errorMessage = rawMessage || t.errorNetwork;
+      useToast.getState().show('error', errorMessage);
       set((s) => ({
         messagesBySession: {
           ...s.messagesBySession,
           [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, content: useI18n.getState().t.errorNetwork } : m,
+            m.id === assistantMsgId
+              ? {
+                  ...m,
+                  error: {
+                    body: err instanceof Error ? err.stack : undefined,
+                    message: errorMessage,
+                    type: 'StreamError',
+                  },
+                }
+              : m,
           ),
         },
       }));
@@ -821,11 +943,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeStreamingSessionId: null,
         abortController: null,
         generating: false,
+        generatingStartedAt: null,
         isReasoning: false,
         reasoningStartedAt: null,
         streamBuffer: '',
       });
     }
+    return true;
   },
 
   clearMessages: (sessionId: string) => {
@@ -838,6 +962,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   deleteMessage: async (sessionId: string, messageId: string) => {
+    if (get().activeStreamingMessageId === messageId) {
+      get().stopGenerating();
+    }
+
     // Optimistic removal
     set((s) => ({
       messagesBySession: {
@@ -850,8 +978,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorDeleteFailed);
-      // Refresh from server on failure
-      get().fetchMessages(sessionId);
+      await get().fetchMessages(sessionId);
     }
   },
 
@@ -871,16 +998,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorEditFailed);
-      get().fetchMessages(sessionId);
+      await get().fetchMessages(sessionId);
     }
   },
 
   regenerateMessage: async (sessionId: string, messageId: string) => {
+    if (get().generating) return;
+
     const messages = get().messagesBySession[sessionId] || [];
     const targetIdx = messages.findIndex((m) => m.id === messageId);
     if (targetIdx < 0) return;
 
     const target = messages[targetIdx];
+    const topicId = useTopicStore.getState().activeTopic ?? undefined;
 
     // If it's an assistant message, remove it and resend from previous user message
     // If it's a user message, remove subsequent assistant and regenerate
@@ -939,6 +1069,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeStreamingSessionId: sessionId,
       abortController,
       generating: true,
+      generatingStartedAt: Date.now(),
       isReasoning: false,
       reasoningStartedAt: null,
       streamBuffer: '',
@@ -948,9 +1079,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
+    const parentMessageId = target.role === 'assistant'
+      ? messages[targetIdx - 1]?.id
+      : target.id;
+
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
+      chatOptions.sessionId = sessionId;
+      chatOptions.topicId = topicId;
 
       // Set model/provider on the assistant message for immediate display
       set((s) => ({
@@ -988,6 +1125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (wasReasoning) {
             const startedAt = get().reasoningStartedAt;
             const duration = startedAt ? Date.now() - startedAt : undefined;
+            const finalReasoning = reasoning ?? undefined;
             set((s) => ({
               isReasoning: false,
               streamBuffer: contentState.content,
@@ -1001,12 +1139,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         ...(mergeMessageMetadata(m.metadata, contentState)
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
-                        reasoning: m.reasoning
-                          ? {
-                              ...m.reasoning,
-                              ...(duration !== undefined ? { duration } : {}),
-                            }
-                          : m.reasoning,
+                        reasoning: finalReasoning
+                          ? { ...buildReasoningState(finalReasoning), ...(duration !== undefined ? { duration } : {}) }
+                          : m.reasoning
+                            ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
+                            : m.reasoning,
                       }
                     : m,
                 ),
@@ -1025,6 +1162,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         ...(mergeMessageMetadata(m.metadata, contentState)
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
+                        ...(reasoning ? { reasoning: buildReasoningState(reasoning) } : {}),
                       }
                     : m,
                 ),
@@ -1076,6 +1214,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
               },
             }));
           },
+          onToolExecutions: (executions) => {
+            const toolPayloads = toolExecutionsToPayloads(executions);
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMsgId ? { ...m, tools: toolPayloads } : m,
+                ),
+              },
+            }));
+          },
           onTools: (tools) => {
             set((s) => ({
               messagesBySession: {
@@ -1123,10 +1272,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }));
       }
 
+      const resolvedToolsRegen =
+        result.tools ||
+        (result.toolExecutions ? toolExecutionsToPayloads(result.toolExecutions) : undefined);
+
       if (
         result.images ||
         result.search ||
-        result.tools ||
+        resolvedToolsRegen ||
         result.usage ||
         result.performance
       ) {
@@ -1139,7 +1292,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...m,
                     ...(result.images ? { imageList: result.images } : {}),
                     ...(result.search ? { search: result.search } : {}),
-                    ...(result.tools ? { tools: result.tools } : {}),
+                    ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
                     ...(result.usage ? { usage: result.usage as any } : {}),
                     ...(result.performance ? { performance: result.performance as any } : {}),
                     ...(mergeMessageMetadata(m.metadata, result.contentMetadata)
@@ -1171,7 +1324,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ),
           ...(result.search ? { search: result.search } : {}),
           provider,
-          ...(result.tools ? { tools: result.tools } : {}),
+          ...(resolvedToolsRegen ? { tools: resolvedToolsRegen } : {}),
+          parentId: parentMessageId,
+          topicId,
           reasoning: buildPersistedReasoning(localMsg?.reasoning),
         });
 
@@ -1187,14 +1342,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         console.warn('[ChatStore] Failed to persist regenerated assistant message:', err);
       }
     } catch (err) {
+      if (abortController.signal.aborted) return;
       console.warn('[ChatStore] regenerate streaming error:', err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t.errorNetwork);
+      const rawMessage = err instanceof Error ? err.message : '';
+      const errorMessage = rawMessage || t.errorNetwork;
+      useToast.getState().show('error', errorMessage);
       set((s) => ({
         messagesBySession: {
           ...s.messagesBySession,
           [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-            m.id === assistantMsgId ? { ...m, content: useI18n.getState().t.errorNetwork } : m,
+            m.id === assistantMsgId
+              ? {
+                  ...m,
+                  error: {
+                    body: err instanceof Error ? err.stack : undefined,
+                    message: errorMessage,
+                    type: 'StreamError',
+                  },
+                }
+              : m,
           ),
         },
       }));
@@ -1204,6 +1371,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeStreamingSessionId: null,
         abortController: null,
         generating: false,
+        generatingStartedAt: null,
         isReasoning: false,
         reasoningStartedAt: null,
         streamBuffer: '',

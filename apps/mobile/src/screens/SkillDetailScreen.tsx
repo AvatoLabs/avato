@@ -8,7 +8,7 @@
  */
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
-  ChevronLeft,
+  ArrowLeft,
   Code,
   FileText,
   Link as LinkIcon,
@@ -27,6 +27,8 @@ import {
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { semanticColors } from '../constants/colors';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -230,7 +232,7 @@ export default function SkillDetailScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ChevronLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={skillName}
         onPressLeft={() => nav.goBack()}
       />
@@ -343,8 +345,8 @@ export default function SkillDetailScreen() {
                       lineHeight: 20,
                       color: '#666',
                     },
-                    heading1: { fontSize: 18, fontWeight: '600', color: '#111' },
-                    heading2: { fontSize: 16, fontWeight: '600', color: '#111' },
+                    heading1: { fontSize: 18, fontWeight: '600', color: semanticColors.foreground },
+                    heading2: { fontSize: 16, fontWeight: '600', color: semanticColors.foreground },
                     code_inline: {
                       backgroundColor: 'rgba(0,0,0,0.05)',
                       paddingHorizontal: 4,

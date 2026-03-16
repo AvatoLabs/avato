@@ -2,7 +2,7 @@
  * ChatSettingsScreen — Agent/chat settings for a specific session.
  * Includes model parameters, system prompt, and danger zone actions.
  */
-import { ArrowLeft, Bot, MessageSquare, Sliders, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Bot, MessageSquare, Pencil, Sliders, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SliderWithInput } from '../components/ui/SliderWithInput';
-import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { agentApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -37,7 +37,9 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const [enableMaxTokens, setEnableMaxTokens] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('');
   const [agentId, setAgentId] = useState<string | null>(null);
-  const toast = useToast();
+  const [title, setTitle] = useState(session?.title || '');
+  const [description, setDescription] = useState(session?.description || '');
+  const renameSession = useSessionStore((s) => s.renameSession);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -84,6 +86,15 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     } catch {
       /* best-effort */
     }
+
+    const newTitle = title.trim();
+    if (newTitle && newTitle !== session?.title) {
+      try {
+        await renameSession(sessionId, newTitle);
+      } catch {
+        /* best-effort */
+      }
+    }
   };
 
   const handleDeleteChat = () => {
@@ -117,7 +128,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         rightElement={<Text className="text-primary font-medium text-[15px]">{t.save}</Text>}
         title={t.chatSettingsTitle}
         onPressLeft={() => {
@@ -127,24 +138,43 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         onPressRight={async () => {
           await saveSettings();
           haptics.success();
-          toast.show('success', t.settingsSavedChat);
         }}
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
-        {/* Session Info */}
+        {/* Agent Profile */}
         <Animated.View entering={FadeInDown.delay(50).duration(300)}>
-          <View className="mx-5 mt-5 mb-6 rounded-[20px] bg-foreground/5 p-5 flex-row items-center">
-            <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-4">
-              <Bot color="#007aff" size={22} strokeWidth={tokens.icon.strokeWidth} />
-            </View>
-            <View className="flex-1">
-              <Text className="text-[16px] font-semibold text-foreground tracking-tight">
-                {session?.title || 'Chat'}
-              </Text>
-              <Text className="text-secondary/70 text-[13px] mt-0.5 font-medium">
-                Session ID: {sessionId?.slice(0, 8)}...
-              </Text>
+          <View className="mx-5 mt-5 mb-5">
+            <Text className="text-secondary/60 text-[12px] font-medium mb-2 ml-1 uppercase tracking-wider">
+              {t.chatSettingsAgentProfile || 'Agent Profile'}
+            </Text>
+            <View className="bg-foreground/5 rounded-2xl px-4 py-3">
+              <View className="flex-row items-center mb-3">
+                <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-4">
+                  <Bot color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <TextInput
+                    className="text-[16px] font-semibold text-foreground tracking-tight"
+                    placeholder={t.chatSettingsAgentTitlePlaceholder || 'Agent name'}
+                    placeholderTextColor={semanticColors.secondaryText}
+                    value={title}
+                    onChangeText={setTitle}
+                  />
+                </View>
+                <Pencil color={semanticColors.secondaryText} size={14} strokeWidth={1.5} />
+              </View>
+              <View className="pt-3">
+                <TextInput
+                  multiline
+                  className="text-foreground text-[14px] leading-5"
+                  placeholder={t.chatSettingsAgentDescPlaceholder || 'Add a description...'}
+                  placeholderTextColor={semanticColors.secondaryText}
+                  style={{ minHeight: 40, textAlignVertical: 'top' }}
+                  value={description}
+                  onChangeText={setDescription}
+                />
+              </View>
             </View>
           </View>
         </Animated.View>
@@ -213,13 +243,13 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
               </View>
 
               {/* Max Tokens Toggle */}
-              <View className="flex-row items-center justify-between py-2 border-t border-foreground/[0.06] pt-3 mt-1">
+              <View className="flex-row items-center justify-between py-2 pt-3 mt-1">
                 <Text className="text-foreground text-[13px] font-medium">
                   {t.chatSettingsEnableMaxTokens}
                 </Text>
                 <Switch
                   style={{ transform: [{ scale: 0.8 }] }}
-                  trackColor={{ false: '#e0e0e0', true: '#007aff' }}
+                  trackColor={{ false: '#e0e0e0', true: semanticColors.primary }}
                   value={enableMaxTokens}
                   onValueChange={setEnableMaxTokens}
                 />
@@ -227,7 +257,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
 
               {/* Max Tokens Slider (conditional) */}
               {enableMaxTokens && (
-                <View className="border-t border-foreground/[0.06] pt-3">
+                <View className="pt-3">
                   <Text className="text-foreground text-[13px] font-medium mb-2">
                     {t.chatSettingsMaxTokens}
                   </Text>
@@ -253,7 +283,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
             <View className="bg-foreground/5 rounded-2xl px-4 py-3">
               <View className="flex-row items-center mb-2">
                 <Sliders
-                  color="#666"
+                  color={semanticColors.muted}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 8 }}
@@ -266,7 +296,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 multiline
                 className="text-foreground text-[14px] leading-5 min-h-[100px]"
                 placeholder={t.chatSettingsSystemPromptPlaceholder}
-                placeholderTextColor="#8c8c8c"
+                placeholderTextColor={semanticColors.muted}
                 style={{ textAlignVertical: 'top' }}
                 value={systemPrompt}
                 onChangeText={setSystemPrompt}
@@ -303,12 +333,12 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 onPress={handleDeleteChat}
               >
                 <Trash2
-                  color="#ff3b30"
+                  color={semanticColors.danger}
                   size={17}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 12 }}
                 />
-                <Text className="text-[#ff3b30] text-[15px] flex-1 font-medium">
+                <Text className="text-[15px] flex-1 font-medium" style={{ color: semanticColors.danger }}>
                   {t.chatSettingsDeleteConversation}
                 </Text>
               </TouchableOpacity>

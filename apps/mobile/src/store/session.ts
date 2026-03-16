@@ -15,13 +15,14 @@ import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { ChatSession, CreateSessionConfig } from '../types';
 
+const SESSION_AGENT_MAP_KEY = 'avato_mobile_session_agent_map_v1';
+
 interface SessionState {
   activeSessionId: string | null;
   createSession: (titleOrConfig?: string | CreateSessionConfig) => Promise<string>;
   duplicateSession: (id: string) => Promise<string | null>;
   // Actions
   fetchSessions: () => Promise<void>;
-  getOrCreateHomeSession: (config?: CreateSessionConfig) => Promise<string>;
 
   /** Whether the initial fetch has completed */
   initialized: boolean;
@@ -40,8 +41,6 @@ interface SessionState {
   updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => void;
 }
 
-const HOME_SESSION_ID_KEY = 'avato_home_session_id';
-
 export const useSessionStore = create<SessionState>((set, get) => ({
   initialized: false,
   loading: false,
@@ -51,7 +50,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   reset: () => {
     void AsyncStorage.removeItem('activeSessionId');
-    void AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
     set({
       activeSessionId: null,
       initialized: false,
@@ -66,6 +64,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     try {
       const sessions = await sessionApi.list();
       const stored = await AsyncStorage.getItem('activeSessionId');
+      const sessionAgentMapRaw = await AsyncStorage.getItem(SESSION_AGENT_MAP_KEY);
+      const sessionAgentMap = sessionAgentMapRaw ? (JSON.parse(sessionAgentMapRaw) as Record<string, string>) : {};
 
       // Overlay per-session model/provider from AsyncStorage only when server has no value
       const settingsKeys = (sessions ?? []).map((s) => `avato_chat_settings_${s.id}`);
@@ -81,6 +81,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
               if (sess) {
                 if (!sess.model && saved.model) sess.model = saved.model;
                 if (!sess.provider && saved.provider) sess.provider = saved.provider;
+                if (!sess.agentId && sessionAgentMap[sid]) sess.agentId = sessionAgentMap[sid];
               }
             } catch {
               /* ignore parse error */
@@ -112,11 +113,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const config: CreateSessionConfig =
       typeof titleOrConfig === 'string' ? { title: titleOrConfig } : (titleOrConfig ?? {});
     const title = config.title || 'New Conversation';
+    const { agentId, ...requestConfig } = config;
 
     try {
-      const newId = await sessionApi.create(config);
+      const newId = await sessionApi.create(requestConfig);
 
       const placeholder: ChatSession = {
+        agentId,
         id: newId,
         title,
         avatar: config.avatar,
@@ -132,6 +135,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }));
 
       await AsyncStorage.setItem('activeSessionId', newId);
+      if (agentId) {
+        const mapRaw = await AsyncStorage.getItem(SESSION_AGENT_MAP_KEY);
+        const mapObj = mapRaw ? (JSON.parse(mapRaw) as Record<string, string>) : {};
+        mapObj[newId] = agentId;
+        await AsyncStorage.setItem(SESSION_AGENT_MAP_KEY, JSON.stringify(mapObj));
+      }
 
       get().fetchSessions();
       return newId;
@@ -155,36 +164,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  getOrCreateHomeSession: async (config) => {
-    if (!get().initialized) {
-      await get().fetchSessions();
-    }
-
-    const storedHomeSessionId = await AsyncStorage.getItem(HOME_SESSION_ID_KEY);
-
-    if (storedHomeSessionId) {
-      const existingHomeSession = get().sessions.find(
-        (session) => session.id === storedHomeSessionId && session.type !== 'group',
-      );
-
-      if (existingHomeSession) {
-        set({ activeSessionId: storedHomeSessionId });
-        await AsyncStorage.setItem('activeSessionId', storedHomeSessionId);
-        return storedHomeSessionId;
-      }
-
-      await AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
-    }
-
-    const newSessionId = await get().createSession({
-      ...config,
-      title: config?.title || 'Avato',
-    });
-
-    await AsyncStorage.setItem(HOME_SESSION_ID_KEY, newSessionId);
-    return newSessionId;
-  },
-
   removeSession: async (id: string) => {
     const target = get().sessions.find((s) => s.id === id);
     const isChatGroup = target?.type === 'group';
@@ -198,11 +177,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }));
 
     try {
-      const homeSessionId = await AsyncStorage.getItem(HOME_SESSION_ID_KEY);
-      if (homeSessionId === id) {
-        await AsyncStorage.removeItem(HOME_SESSION_ID_KEY);
-      }
-
       if (isChatGroup) {
         await sessionApi.removeChatGroup(id);
       } else {

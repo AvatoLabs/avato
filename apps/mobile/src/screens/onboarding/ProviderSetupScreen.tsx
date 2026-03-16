@@ -7,6 +7,7 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'reac
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { setApiUrl, testConnection } from '../../lib/server';
 import { tokens } from '../../theme/tokens';
@@ -51,7 +52,7 @@ export default function ProviderSetupScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
       </View>
 
@@ -94,8 +95,8 @@ export default function ProviderSetupScreen({ navigation }: any) {
             <ActivityIndicator color="#007aff" size="small" />
           ) : success ? (
             <View className="flex-row items-center">
-              <Check color="#4caf50" size={18} strokeWidth={tokens.icon.strokeWidth} />
-              <Text className="text-green-600 text-[14px] font-medium ml-2">{t.serverSuccess}</Text>
+              <Check color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="text-primary text-[14px] font-medium ml-2">{t.serverSuccess}</Text>
             </View>
           ) : (
             <Text className="text-primary text-[14px] font-medium">{t.serverTestConnection}</Text>

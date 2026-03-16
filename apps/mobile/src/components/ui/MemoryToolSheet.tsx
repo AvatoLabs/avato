@@ -2,6 +2,7 @@ import { BrainCircuit, CircleOff } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
+import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
@@ -30,11 +31,11 @@ const ToggleOption = memo<ToggleOptionProps>(
     return (
       <Pressable
         className={`flex-row items-start px-3.5 py-3 ${
-          !isLast ? 'border-b border-black/[0.06]' : ''
+          !isLast ? 'mb-px' : ''
         } ${active ? 'bg-primary/5' : ''}`}
         onPress={onPress}
       >
-        <View className="w-9 h-9 rounded-xl border border-black/5 bg-white items-center justify-center mr-3">
+        <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
           {icon}
         </View>
         <View className="flex-1">
@@ -61,17 +62,16 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
     return (
       <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
         <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          className="flex-1 justify-end bg-black/40"
           onPress={onClose}
         >
           <Pressable
-            className="bg-white rounded-t-3xl"
+            className="bg-white rounded-t-2xl"
             style={{ maxHeight: '72%' }}
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-black/10" />
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
 
             <View className="px-5 pb-6 pt-2">
@@ -79,7 +79,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                 <ToggleOption
                   active={!enabled}
                   description={t.memoryToolOffDesc}
-                  icon={<CircleOff color="#111" size={18} strokeWidth={tokens.icon.strokeWidth} />}
+                  icon={<CircleOff color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />}
                   title={t.memoryToolOffTitle}
                   onPress={() => {
                     haptics.light();
@@ -92,7 +92,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                   active={enabled}
                   description={t.memoryToolOnDesc}
                   icon={
-                    <BrainCircuit color="#111" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <BrainCircuit color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   }
                   title={t.memoryToolOnTitle}
                   onPress={() => {
@@ -117,8 +117,8 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                       return (
                         <Pressable
                           key={item.value}
-                          className={`flex-1 items-center py-2.5 rounded-xl border ${
-                            active ? 'border-primary bg-primary/10' : 'border-black/5 bg-white'
+                          className={`flex-1 items-center py-2.5 rounded-xl ${
+                            active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
                           }`}
                           onPress={() => {
                             haptics.selection();

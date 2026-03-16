@@ -5,6 +5,8 @@
 import React, { useCallback, useState } from 'react';
 import { PanResponder, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { semanticColors } from '../../constants/colors';
+
 interface SliderWithInputProps {
   disabled?: boolean;
   enableCheckbox?: boolean;
@@ -257,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.05)',
     textAlign: 'center',
     fontSize: 14,
-    color: '#111',
+    color: semanticColors.foreground,
     fontWeight: '500',
   },
   inputDisabled: {

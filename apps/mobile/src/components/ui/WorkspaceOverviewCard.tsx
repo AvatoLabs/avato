@@ -44,9 +44,12 @@ export function WorkspaceOverviewCard({
     <View
       className="mx-5 mb-6 rounded-[26px]"
       style={{
-        backgroundColor: 'rgba(255,255,255,0.85)',
-        borderColor: 'rgba(99,102,241,0.5)',
-        borderWidth: 1.5,
+        backgroundColor: 'rgba(255,255,255,0.92)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
       }}
     >
       <BlurView className="rounded-[25px] overflow-hidden p-5" intensity={80} tint="light">
@@ -83,7 +86,7 @@ export function WorkspaceOverviewCard({
         {/* Sub-cards — each independently tappable */}
         <View className="flex-row gap-3">
           <PressableScale
-            className="flex-1 rounded-xl px-3.5 py-3 border border-black/5"
+            className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
             onPress={onPressModel}
           >
             <Text className="text-secondary/60 text-[10px] font-semibold uppercase tracking-widest mb-1">
@@ -97,7 +100,7 @@ export function WorkspaceOverviewCard({
             </Text>
           </PressableScale>
           <PressableScale
-            className="flex-1 rounded-xl px-3.5 py-3 border border-black/5"
+            className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
             onPress={onPressProviders}
           >
             <Text className="text-secondary/60 text-[10px] font-semibold uppercase tracking-widest mb-1">

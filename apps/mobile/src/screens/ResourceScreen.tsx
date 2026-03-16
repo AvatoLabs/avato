@@ -12,6 +12,9 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  ArrowLeft,
+  Download,
+  Eye,
   File,
   FileAudio,
   FileImage,
@@ -20,26 +23,37 @@ import {
   FolderOpen,
   Plus,
   Search,
-  Trash2,
+  Share2,
   X,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
+  Linking,
+  Modal,
+  Platform,
   RefreshControl,
+  ScrollView,
+  Share,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -48,7 +62,6 @@ import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
-const SECONDARY_BAR_HEIGHT = 48;
 
 type FileCategory = 'all' | 'images' | 'documents' | 'others';
 
@@ -110,60 +123,267 @@ function formatDate(isoString: string): string {
   }
 }
 
+// ── File Preview Modal ────────────────────────────────────────────────
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
+function canPreviewInline(fileType: string): boolean {
+  return (
+    isImage(fileType) ||
+    fileType === 'application/pdf' ||
+    fileType.startsWith('text/') ||
+    fileType === 'application/json'
+  );
+}
+
+const FilePreviewModal = memo(
+  ({
+    apiBaseUrl,
+    item,
+    visible,
+    onClose,
+  }: {
+    apiBaseUrl: string;
+    item: FileListItem | null;
+    visible: boolean;
+    onClose: () => void;
+  }) => {
+    const insets = useSafeAreaInsets();
+    const { t } = useI18n();
+    const [imgLoading, setImgLoading] = useState(true);
+
+    if (!item) return null;
+
+    const fileUrl = `${apiBaseUrl}/f/${item.id}`;
+    const imageFile = isImage(item.fileType);
+    const textFile = item.fileType.startsWith('text/') || item.fileType === 'application/json';
+    const pdfFile = item.fileType === 'application/pdf';
+
+    const handleShare = () => {
+      Share.share({
+        title: item.name,
+        url: Platform.OS === 'ios' ? fileUrl : undefined,
+        message: Platform.OS === 'android' ? fileUrl : undefined,
+      });
+    };
+
+    const handleOpen = () => {
+      Linking.openURL(fileUrl);
+    };
+
+    return (
+      <Modal
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        visible={visible}
+        onRequestClose={onClose}
+      >
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={{ flex: 1, backgroundColor: imageFile ? '#000' : '#f8f8fa' }}
+        >
+          <StatusBar barStyle={imageFile ? 'light-content' : 'dark-content'} />
+
+          {/* Header */}
+          <View
+            className="flex-row items-center justify-between px-4"
+            style={{
+              paddingTop: insets.top + 8,
+              paddingBottom: 10,
+              backgroundColor: imageFile ? 'rgba(0,0,0,0.6)' : '#fff',
+              ...(imageFile
+                ? {}
+                : {
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.03,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }),
+            }}
+          >
+            <TouchableOpacity
+              className="flex-row items-center"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={onClose}
+            >
+              <ArrowLeft
+                color={imageFile ? '#fff' : semanticColors.foreground}
+                size={22}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+              <View style={{ flex: 1, marginLeft: 8, marginRight: 50 }}>
+                <Text
+                  className="text-[15px] font-semibold"
+                  numberOfLines={1}
+                  style={{ color: imageFile ? '#fff' : semanticColors.foreground }}
+                >
+                  {item.name}
+                </Text>
+                <Text
+                  className="text-[11px] mt-0.5"
+                  style={{ color: imageFile ? 'rgba(255,255,255,0.6)' : semanticColors.secondaryText }}
+                >
+                  {formatBytes(item.size)}
+                  {'  ·  '}
+                  {formatDate(item.createdAt)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={handleShare}
+              >
+                <Share2
+                  color={imageFile ? '#fff' : semanticColors.primary}
+                  size={20}
+                  strokeWidth={1.8}
+                />
+              </TouchableOpacity>
+              {!imageFile && (
+                <TouchableOpacity
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={handleOpen}
+                >
+                  <Download color={semanticColors.primary} size={20} strokeWidth={1.8} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Content */}
+          <View style={{ flex: 1 }}>
+            {imageFile ? (
+              <View className="flex-1 items-center justify-center">
+                {imgLoading && (
+                  <ActivityIndicator
+                    color="#fff"
+                    size="large"
+                    style={{ position: 'absolute', zIndex: 1 }}
+                  />
+                )}
+                <Image
+                  resizeMode="contain"
+                  source={{ uri: fileUrl }}
+                  style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
+                  onLoad={() => setImgLoading(false)}
+                  onError={() => setImgLoading(false)}
+                />
+              </View>
+            ) : textFile || pdfFile ? (
+              <WebView
+                source={{ uri: fileUrl }}
+                startInLoadingState
+                renderLoading={() => (
+                  <View
+                    className="items-center justify-center"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: '#f8f8fa',
+                    }}
+                  >
+                    <ActivityIndicator color={semanticColors.primary} size="large" />
+                  </View>
+                )}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center px-8">
+                <View
+                  className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
+                  style={{ width: 96, height: 96 }}
+                >
+                  <FileTypeIcon color={semanticColors.secondaryText} fileType={item.fileType} size={44} />
+                </View>
+                <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
+                  {item.name}
+                </Text>
+                <Text className="text-secondary/40 text-[14px] text-center mb-1">
+                  {item.fileType}
+                </Text>
+                <Text className="text-secondary/40 text-[14px] text-center mb-8">
+                  {formatBytes(item.size)}
+                  {'  ·  '}
+                  {formatDate(item.createdAt)}
+                </Text>
+                <TouchableOpacity
+                  className="flex-row items-center rounded-2xl px-8 py-3.5"
+                  style={{ backgroundColor: semanticColors.primary }}
+                  onPress={handleOpen}
+                >
+                  <Eye color="#fff" size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                  <Text className="text-white text-[15px] font-semibold">
+                    {t.resourceOpenExternal || 'Open in Browser'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      </Modal>
+    );
+  },
+);
+
+FilePreviewModal.displayName = 'FilePreviewModal';
+
 // ── File Row ─────────────────────────────────────────────────────────
 
 interface FileRowProps {
   apiBaseUrl: string;
   item: FileListItem;
   onDelete: (id: string, name: string) => void;
+  onPress: (item: FileListItem) => void;
 }
 
-function FileRow({ item, onDelete, apiBaseUrl }: FileRowProps) {
-  const iconColor = '#6b7280';
+function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
+  const iconColor = semanticColors.secondaryText;
   const thumbnailUrl = isImage(item.fileType) ? `${apiBaseUrl}/f/${item.id}` : null;
 
   return (
-    <View className="flex-row items-center px-4 py-3">
-      {/* Thumbnail or icon */}
-      <View
-        className="items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800"
-        style={{ width: 48, height: 48, marginRight: 12 }}
-      >
-        {thumbnailUrl ? (
-          <Image
-            resizeMode="cover"
-            source={{ uri: thumbnailUrl }}
-            style={{ width: 48, height: 48, borderRadius: 12 }}
-          />
-        ) : (
-          <FileTypeIcon color={iconColor} fileType={item.fileType} size={26} />
-        )}
-      </View>
-
-      {/* Name + meta */}
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          className="text-[15px] font-medium text-gray-900 dark:text-gray-100"
-          numberOfLines={1}
-        >
-          {item.name}
-        </Text>
-        <Text className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-          {formatBytes(item.size)}
-          {'  ·  '}
-          {formatDate(item.createdAt)}
-        </Text>
-      </View>
-
-      {/* Delete */}
+    <SwipeableRow onDelete={() => onDelete(item.id, item.name)}>
       <TouchableOpacity
-        className="ml-3 items-center justify-center rounded-full p-2 active:bg-red-50"
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={() => onDelete(item.id, item.name)}
+        activeOpacity={0.6}
+        className="flex-row items-center px-5 py-3 bg-background"
+        onPress={() => onPress(item)}
       >
-        <Trash2 color="#ef4444" size={18} strokeWidth={tokens.icon.strokeWidth} />
+        <View
+          className="items-center justify-center rounded-xl bg-foreground/5"
+          style={{ width: 48, height: 48, marginRight: 12 }}
+        >
+          {thumbnailUrl ? (
+            <Image
+              resizeMode="cover"
+              source={{ uri: thumbnailUrl }}
+              style={{ width: 48, height: 48, borderRadius: 12 }}
+            />
+          ) : (
+            <FileTypeIcon color={iconColor} fileType={item.fileType} size={26} />
+          )}
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text className="mt-0.5 text-[12px] text-secondary/40">
+            {formatBytes(item.size)}
+            {'  ·  '}
+            {formatDate(item.createdAt)}
+          </Text>
+        </View>
+
+        <Eye color={semanticColors.secondaryText} size={16} strokeWidth={1.5} style={{ marginLeft: 8 }} />
       </TouchableOpacity>
-    </View>
+    </SwipeableRow>
   );
 }
 
@@ -181,10 +401,17 @@ export default function ResourceScreen() {
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState<FileCategory>('all');
   const [searchText, setSearchText] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
   const [apiBase, setApiBase] = useState('');
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const [previewItem, setPreviewItem] = useState<FileListItem | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const searchRef = useRef<TextInput>(null);
+
+  const handlePreview = useCallback((item: FileListItem) => {
+    haptics.light();
+    setPreviewItem(item);
+    setPreviewVisible(true);
+  }, []);
 
   // ── Data ─────────────────────────────────────────────────────────
 
@@ -310,34 +537,22 @@ export default function ResourceScreen() {
   // ── Render ────────────────────────────────────────────────────────
 
   return (
-    <View className="flex-1 bg-white dark:bg-black">
+    <View className="flex-1 bg-background">
       {/* Header */}
       <ScreenHeader
         title={t.resourceTitle}
         rightElement={
-          <View className="flex-row items-center gap-2">
-            <TouchableOpacity
-              className="items-center justify-center rounded-full p-2"
-              onPress={() => {
-                setShowSearch((v) => !v);
-                if (!showSearch) setTimeout(() => searchRef.current?.focus(), 100);
-                else setSearchText('');
-              }}
-            >
-              <Search color="#6b7280" size={20} strokeWidth={tokens.icon.strokeWidth} />
-            </TouchableOpacity>
-          </View>
+          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
-      />
-
-      {/* Search bar */}
-      {showSearch && (
-        <View className="mx-4 mb-2 flex-row items-center rounded-xl bg-gray-100 px-3 dark:bg-gray-800">
-          <Search color="#9ca3af" size={16} strokeWidth={tokens.icon.strokeWidth} />
+        onPressRight={() => setAttachmentSheetVisible(true)}
+      >
+        {/* Search */}
+        <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
+          <Search color={semanticColors.muted} size={16} strokeWidth={2} />
           <TextInput
-            className="ml-2 flex-1 py-2.5 text-[15px] text-gray-900 dark:text-gray-100"
+            className="ml-2.5 flex-1 text-[14px] text-foreground"
             placeholder={t.search}
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={semanticColors.muted}
             ref={searchRef}
             returnKeyType="search"
             value={searchText}
@@ -345,76 +560,79 @@ export default function ResourceScreen() {
             onSubmitEditing={() => loadFiles()}
           />
           {searchText.length > 0 && (
-            <TouchableOpacity
-              onPress={() => {
-                setSearchText('');
-              }}
-            >
-              <X color="#9ca3af" size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <TouchableOpacity hitSlop={8} onPress={() => setSearchText('')}>
+              <X color={semanticColors.muted} size={16} strokeWidth={2} />
             </TouchableOpacity>
           )}
         </View>
-      )}
 
-      {/* Category tabs */}
-      <View className="border-b border-gray-100 dark:border-gray-800">
-        <View
-          className="flex-row items-end px-4"
-          style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingBottom: 8, paddingTop: 6 }}
+        {/* Category pills */}
+        <ScrollView
+          horizontal
+          className="mx-4 mb-2"
+          contentContainerStyle={{ gap: 4 }}
+          showsHorizontalScrollIndicator={false}
         >
           {TABS.map((tab) => {
             const active = category === tab.key;
             return (
               <TouchableOpacity
-                className="mr-6"
+                activeOpacity={0.7}
+                className="rounded-full px-4 py-1.5"
                 key={tab.key}
+                style={{
+                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                }}
                 onPress={() => {
                   haptics.selection();
                   setCategory(tab.key);
                 }}
               >
                 <Text
-                  className={
-                    active
-                      ? 'text-[14px] font-semibold text-blue-500'
-                      : 'text-[14px] text-gray-500 dark:text-gray-400'
-                  }
+                  className="text-[13px] font-semibold"
+                  style={{ color: active ? '#fff' : semanticColors.muted }}
                 >
                   {tab.label}
                 </Text>
-                {active && <View className="mt-1 h-0.5 rounded-full bg-blue-500" />}
               </TouchableOpacity>
             );
           })}
-        </View>
-      </View>
+        </ScrollView>
+      </ScreenHeader>
 
       {/* Content */}
       {loading && files.length === 0 ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#6b7280" size="large" />
+          <ActivityIndicator color={semanticColors.primary} size="large" />
         </View>
       ) : (
         <FlatList
-          ItemSeparatorComponent={() => <View className="mx-4 h-px bg-gray-100 dark:bg-gray-800" />}
+          ItemSeparatorComponent={() => <View className="mx-4 h-px bg-foreground/5" />}
           data={filtered}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl
+              colors={[semanticColors.primary]}
+              refreshing={refreshing}
+              tintColor={semanticColors.primary}
+              onRefresh={onRefresh}
+            />
+          }
           ListEmptyComponent={
-            <View className="items-center px-8">
+            <Animated.View className="items-center px-8" entering={FadeInDown.duration(350)}>
               <View
-                className="mb-4 items-center justify-center rounded-3xl bg-gray-100 dark:bg-gray-800"
+                className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
                 style={{ width: 80, height: 80 }}
               >
-                <FolderOpen color="#9ca3af" size={36} strokeWidth={1.5} />
+                <FolderOpen color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
               </View>
-              <Text className="text-center text-[17px] font-semibold text-gray-700 dark:text-gray-300">
+              <Text className="text-center text-[17px] font-semibold text-foreground">
                 {t.resourceEmpty}
               </Text>
-              <Text className="mt-2 text-center text-[14px] text-gray-400 dark:text-gray-500">
+              <Text className="mt-2 text-center text-[14px] text-secondary/40">
                 {t.resourceEmptyDesc}
               </Text>
-            </View>
+            </Animated.View>
           }
           contentContainerStyle={
             filtered.length === 0
@@ -427,7 +645,7 @@ export default function ResourceScreen() {
               : { paddingBottom: insets.bottom + 80 }
           }
           renderItem={({ item }) => (
-            <FileRow apiBaseUrl={apiBase} item={item} onDelete={handleDelete} />
+            <FileRow apiBaseUrl={apiBase} item={item} onDelete={handleDelete} onPress={handlePreview} />
           )}
         />
       )}
@@ -439,8 +657,8 @@ export default function ResourceScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.8}
-          className="items-center justify-center rounded-full bg-blue-500 shadow-lg"
-          style={{ width: 56, height: 56, elevation: 6 }}
+          className="items-center justify-center rounded-full shadow-lg"
+          style={{ width: 56, height: 56, elevation: 6, backgroundColor: semanticColors.primary }}
           onPress={uploading ? undefined : handleUpload}
         >
           {uploading ? (
@@ -456,6 +674,13 @@ export default function ResourceScreen() {
         onClose={() => setAttachmentSheetVisible(false)}
         onDocument={() => void handlePickFile()}
         onGallery={() => void handlePickPhoto()}
+      />
+
+      <FilePreviewModal
+        apiBaseUrl={apiBase}
+        item={previewItem}
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
       />
     </View>
   );

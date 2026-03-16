@@ -175,7 +175,7 @@ function getAspectRatioSelection(
 
 // Proper aspect ratio preview matching web version
 function RatioIcon({ ratio, active }: { ratio: string; active: boolean }) {
-  const borderColor = active ? '#fff' : '#555';
+  const borderColor = active ? '#fff' : semanticColors.muted;
 
   if (ratio === 'auto' || !ratio.includes(':')) {
     return (
@@ -223,7 +223,7 @@ function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }
         marginTop: 16,
       }}
     >
-      <Text style={{ color: '#333', fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }}>
+      <Text style={{ color: semanticColors.foreground, fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }}>
         {text}
       </Text>
       {right}
@@ -270,10 +270,10 @@ function SidebarOptionGrid<T extends string | number>({
             <TouchableOpacity
               style={{
                 alignItems: 'center',
-                backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-                borderColor: active ? semanticColors.primary : '#e7e7e7',
+                backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                borderColor: active ? semanticColors.primary : 'transparent',
                 borderRadius: 12,
-                borderWidth: 1,
+                borderWidth: active ? 1 : 0,
                 justifyContent: 'center',
                 minHeight: 46,
                 paddingHorizontal: 10,
@@ -322,10 +322,10 @@ function SidebarOptionStrip<T extends string | number>({
             key={getKey(item)}
             style={{
               alignItems: 'center',
-              backgroundColor: active ? semanticColors.primary : '#f5f5f5',
-              borderColor: active ? semanticColors.primary : '#e7e7e7',
+              backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+              borderColor: active ? semanticColors.primary : 'transparent',
               borderRadius: 12,
-              borderWidth: 1,
+              borderWidth: active ? 1 : 0,
               justifyContent: 'center',
               marginRight: index === items.length - 1 ? 0 : 8,
               minHeight: 46,
@@ -605,9 +605,8 @@ export default function ArtworkScreen() {
         const merged = [...prev, ...newImgs];
         return typeof maxCount === 'number' ? merged.slice(0, maxCount) : merged;
       });
-      toast.show('success', t.toastFilePicked);
     }
-  }, [paramsSchema, t, toast]);
+  }, [paramsSchema, t]);
 
   // ── Load batches for topic ──
   const loadBatches = useCallback(async (tid: string) => {
@@ -837,14 +836,14 @@ export default function ArtworkScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-white dark:bg-black"
+      className="flex-1 bg-background"
       keyboardVerticalOffset={0}
     >
       {/* ── Header ── */}
       <ScreenHeader title={t.artworkTitle} />
 
       {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
-      <View className="border-b border-gray-100 dark:border-gray-800">
+      <View>
         <View
           className="flex-row items-center px-4"
           style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingVertical: 6 }}
@@ -857,23 +856,23 @@ export default function ArtworkScreen() {
             }}
           >
             <View className="flex-row items-center">
-              <Sparkles color="#f5c542" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <Sparkles color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
               <View className="ml-2 flex-1">
                 <Text
-                  className="text-[14px] font-semibold text-gray-900 dark:text-gray-100"
+                  className="text-[14px] font-semibold text-foreground"
                   numberOfLines={1}
                 >
                   {modelName || t.artworkSelectModel}
                 </Text>
                 <Text
-                  className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500"
+                  className="mt-0.5 text-[11px] text-secondary/40"
                   numberOfLines={1}
                 >
                   {summaryParts.join(' · ')}
                 </Text>
               </View>
               <ChevronDown
-                color="#9ca3af"
+                color={semanticColors.secondaryText}
                 size={16}
                 strokeWidth={tokens.icon.strokeWidth}
                 style={{ marginLeft: 10 }}
@@ -887,7 +886,7 @@ export default function ArtworkScreen() {
               setShowSidebar(true);
             }}
           >
-            <SlidersHorizontal color="#6b7280" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <SlidersHorizontal color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </View>
       </View>
@@ -902,10 +901,10 @@ export default function ArtworkScreen() {
                 flexGrow: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                paddingBottom: 120,
+                paddingBottom: insets.bottom + 80,
                 paddingHorizontal: containerPad,
               }
-            : { paddingBottom: 120, paddingHorizontal: containerPad }
+            : { paddingBottom: insets.bottom + 80, paddingHorizontal: containerPad }
         }
       >
         {batches.length > 0 ? (
@@ -957,15 +956,15 @@ export default function ArtworkScreen() {
         ) : (
           <View className="items-center px-8">
             <View
-              className="mb-4 items-center justify-center rounded-3xl bg-gray-100 dark:bg-gray-800"
+              className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
               style={{ width: 80, height: 80 }}
             >
-              <ImageIcon color="#9ca3af" size={36} strokeWidth={1.5} />
+              <ImageIcon color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
             </View>
-            <Text className="text-center text-[17px] font-semibold text-gray-700 dark:text-gray-300">
+            <Text className="text-center text-[17px] font-semibold text-foreground">
               {t.artworkEmpty}
             </Text>
-            <Text className="mt-2 text-center text-[14px] text-gray-400 dark:text-gray-500">
+            <Text className="mt-2 text-center text-[14px] text-secondary/40">
               {t.artworkEmptyDesc}
             </Text>
           </View>
@@ -974,36 +973,41 @@ export default function ArtworkScreen() {
 
       {/* ── Sticky Prompt Bar ── */}
       <View
-        className="absolute bottom-0 left-0 right-0 border-t border-gray-100 dark:border-gray-800"
+        className="absolute bottom-0 left-0 right-0"
         style={{
           paddingBottom: insets.bottom + 12,
           paddingTop: 10,
           paddingHorizontal: containerPad,
-          backgroundColor: 'rgba(255,255,255,0.97)',
+          backgroundColor: 'rgba(255,255,255,0.96)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -1 },
+          shadowOpacity: 0.04,
+          shadowRadius: 6,
+          elevation: 2,
         }}
       >
         <View className="flex-row items-end gap-2">
           <TextInput
             multiline
-            className="flex-1 rounded-2xl px-4 py-3 text-[14px] text-gray-900 dark:text-gray-100"
+            className="flex-1 rounded-2xl bg-foreground/5 px-4 py-3 text-[14px] text-foreground"
             maxLength={2000}
             placeholder={t.artworkPromptPlaceholder}
-            placeholderTextColor="#9ca3af"
-            style={{ maxHeight: 100, minHeight: 44, backgroundColor: '#f3f4f6' }}
+            placeholderTextColor={semanticColors.secondaryText}
+            style={{ maxHeight: 100, minHeight: 44 }}
             value={prompt}
             onChangeText={setPrompt}
           />
           <TouchableOpacity
-            className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+            className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? '' : 'bg-foreground/10'}`}
             disabled={!prompt.trim() || !model || generating}
-            style={{ width: 48, height: 48 }}
+            style={{ width: 48, height: 48, ...(prompt.trim() && model ? { backgroundColor: '#007aff' } : {}) }}
             onPress={handleGenerate}
           >
             {generating ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Sparkles
-                color={prompt.trim() && model ? '#fff' : '#9ca3af'}
+                color={prompt.trim() && model ? '#fff' : semanticColors.secondaryText}
                 size={20}
                 strokeWidth={2}
               />
@@ -1016,8 +1020,8 @@ export default function ArtworkScreen() {
       {showSidebar && (
         <>
           <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(200)}
+            entering={FadeIn.duration(250)}
+            exiting={FadeOut.duration(250)}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           >
             <TouchableOpacity
@@ -1028,14 +1032,14 @@ export default function ArtworkScreen() {
           </Animated.View>
           <Animated.View
             entering={SlideInRight.duration(300)}
-            exiting={SlideOutRight.duration(250)}
+            exiting={SlideOutRight.duration(300)}
             style={{
               position: 'absolute',
               top: 0,
               right: 0,
               bottom: 0,
               width: sidebarWidth,
-              backgroundColor: '#ffffff',
+              backgroundColor: semanticColors.surface,
               borderTopLeftRadius: 20,
               borderBottomLeftRadius: 20,
               shadowColor: '#000',
@@ -1071,14 +1075,14 @@ export default function ArtworkScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: '#f5f5f5',
+                  backgroundColor: 'semanticColors.fillTertiary',
                   borderRadius: 16,
                   paddingHorizontal: 16,
                   paddingVertical: 12,
                 }}
                 onPress={() => setShowPicker(!showPicker)}
               >
-                <Sparkles color="#f5c542" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Sparkles color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
                 <Text
                   numberOfLines={1}
                   style={{
@@ -1095,9 +1099,9 @@ export default function ArtworkScreen() {
               </TouchableOpacity>
               {showPicker && (
                 <Animated.View
-                  entering={FadeInDown.duration(200)}
+                  entering={FadeInDown.duration(350)}
                   style={{
-                    backgroundColor: '#f5f5f5',
+                    backgroundColor: 'semanticColors.fillTertiary',
                     borderRadius: 12,
                     marginTop: 8,
                     maxHeight: 208,
@@ -1159,7 +1163,7 @@ export default function ArtworkScreen() {
                   />
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#f5f5f5',
+                      backgroundColor: 'semanticColors.fillTertiary',
                       borderRadius: 16,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1220,7 +1224,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : '#555',
+                          color: active ? '#fff' : semanticColors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1248,7 +1252,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : '#555',
+                          color: active ? '#fff' : semanticColors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1276,7 +1280,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : '#555',
+                          color: active ? '#fff' : semanticColors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1307,7 +1311,7 @@ export default function ArtworkScreen() {
                         </View>
                         <Text
                           style={{
-                            color: active ? '#fff' : '#555',
+                            color: active ? '#fff' : semanticColors.muted,
                             fontSize: 10,
                             fontWeight: '500',
                           }}
@@ -1355,7 +1359,7 @@ export default function ArtworkScreen() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: '#f5f5f5',
+                      backgroundColor: 'semanticColors.fillTertiary',
                       borderRadius: 14,
                       paddingHorizontal: 14,
                       paddingVertical: 12,
@@ -1396,7 +1400,7 @@ export default function ArtworkScreen() {
                 renderContent={(item, active) => (
                   <Text
                     style={{
-                      color: active ? '#fff' : '#555',
+                      color: active ? '#fff' : semanticColors.muted,
                       fontSize: 12,
                       fontWeight: '500',
                     }}
@@ -1496,7 +1500,7 @@ function BatchCard({
       : imgW;
 
   return (
-    <Animated.View className="bg-card rounded-2xl p-3 mb-3" entering={FadeInDown.duration(300)}>
+    <Animated.View className="bg-card rounded-2xl p-3 mb-3" entering={FadeInDown.duration(350)}>
       {/* Prompt */}
       <Text className="text-foreground text-[13px] mb-2" numberOfLines={3}>
         {batch.prompt}

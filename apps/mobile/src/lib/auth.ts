@@ -1,7 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules } from 'react-native';
 
 import { normalizeApiUrl } from './server';
 
@@ -150,7 +150,6 @@ const getFeishuNativeAppId = (config?: MobileAuthConfig | null) => {
 
 const shouldUseFeishuNativeSignIn = (providerId?: string, config?: MobileAuthConfig | null) => {
   return (
-    Platform.OS === 'android' &&
     providerId === 'feishu' &&
     !!feishuNativeModule &&
     !!getFeishuNativeAppId(config)
@@ -174,8 +173,16 @@ const requestNativeFeishuSession = async (
   body: Record<string, unknown>,
 ): Promise<MobileAuthSession> => {
   const normalizedBaseUrl = normalizeApiUrl(baseUrl);
+  const sanitizedBody = Object.fromEntries(
+    Object.entries(body).filter(([, value]) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.trim().length > 0;
+
+      return true;
+    }),
+  );
   const response = await fetch(new URL(path, `${normalizedBaseUrl}/`).toString(), {
-    body: JSON.stringify(body),
+    body: JSON.stringify(sanitizedBody),
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',
   });
@@ -433,7 +440,7 @@ export async function signInWithProvider(options: {
 
     const session = await requestNativeFeishuSession(normalizedBaseUrl, FEISHU_NATIVE_EXCHANGE_ROUTE, {
       code: nativeResult.code,
-      codeVerifier: nativeResult.codeVerifier,
+      codeVerifier: nativeResult.codeVerifier?.trim(),
     });
 
     await saveStoredAuthSession(session);

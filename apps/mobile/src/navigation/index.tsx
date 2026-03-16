@@ -4,7 +4,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { FolderOpen, MessageSquare, Palette, Puzzle } from 'lucide-react-native';
+import { FolderOpen, MessageSquare, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Image as RNImage, Platform, View } from 'react-native';
 import Animated, {
@@ -20,7 +20,9 @@ import Animated, {
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import AboutScreen from '../screens/AboutScreen';
+import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentDetailScreen from '../screens/AgentDetailScreen';
+import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
 import ArtworkScreen from '../screens/ArtworkScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
@@ -48,6 +50,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import SkillDetailScreen from '../screens/SkillDetailScreen';
 import SkillMarketScreen from '../screens/SkillMarketScreen';
 import SkillSettingsScreen from '../screens/SkillSettingsScreen';
+import StoreScreen from '../screens/StoreScreen';
 import StatsScreen from '../screens/StatsScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { tokens } from '../theme/tokens';
@@ -240,16 +243,16 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen
-        component={SkillSettingsScreen}
-        name="Skills"
+        component={StoreScreen}
+        name="Store"
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Puzzle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            <Store color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
           tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.skillsTitle} />
+            <AnimatedTabLabel color={color} focused={focused} label={t.tabStore} />
           ),
-          tabBarAccessibilityLabel: 'Skills tab',
+          tabBarAccessibilityLabel: 'Store tab',
         }}
       />
       <Tab.Screen
@@ -408,6 +411,16 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={AgentDetailScreen}
         name="AgentDetail"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={AgentListScreen}
+        name="AgentList"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        component={AgentConfigScreen}
+        name="AgentConfig"
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen

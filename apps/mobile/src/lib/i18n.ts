@@ -52,10 +52,18 @@ type TranslationKeys = {
   chatToolDone: string;
   chatToolFailed: string;
   chatToolArguments: string;
+  chatToolCompleted: string;
   chatToolPending: string;
   chatToolRejected: string;
   chatToolResponse: string;
   chatToolAborted: string;
+  chatToolApprove: string;
+  chatToolReject: string;
+  chatToolAbortedDesc: string;
+  chatToolRejectedDesc: string;
+  chatToolPendingDesc: string;
+  chatShowMore: string;
+  chatShowLess: string;
   chatAskAnything: string;
   chatGenerating: string;
   chatEmptyTitle: string;
@@ -123,6 +131,9 @@ type TranslationKeys = {
   chatSettingsMaxTokens: string;
   chatSettingsEnableMaxTokens: string;
   chatSettingsModelParams: string;
+  chatSettingsAgentProfile: string;
+  chatSettingsAgentTitlePlaceholder: string;
+  chatSettingsAgentDescPlaceholder: string;
   chatSettingsSystemPrompt: string;
   chatSettingsCustomInstructions: string;
   chatSettingsSystemPromptPlaceholder: string;
@@ -136,13 +147,20 @@ type TranslationKeys = {
 
   // Notebook
   notebookTitle: string;
+  notebookDesc: string;
   notebookEmpty: string;
   notebookNewDoc: string;
   notebookDocTitle: string;
   notebookDocTitlePlaceholder: string;
+  notebookDocContentPlaceholder: string;
   notebookDeleteConfirm: string;
   notebookDeleteDesc: string;
   notebookSaved: string;
+  notebookUnsavedTitle: string;
+  notebookUnsavedDesc: string;
+  notebookDiscard: string;
+  notebookPreview: string;
+  notebookEdit: string;
 
   // Settings
   settingsTitle: string;
@@ -229,6 +247,7 @@ type TranslationKeys = {
   msgActionCopy: string;
   msgActionEdit: string;
   msgActionRegenerate: string;
+  msgActionShare: string;
   msgActionDelete: string;
   msgActionDeleteConfirm: string;
   msgActionCopied: string;
@@ -521,11 +540,24 @@ type TranslationKeys = {
   resourceDeleteConfirm: string;
   resourceDeleteDesc: string;
   resourceUploadFailed: string;
+  resourceOpenExternal: string;
   resourceDeleteFailed: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
   resourceGB: string;
+
+  // Store
+  tabStore: string;
+  storeSearch: string;
+  storeExplore: string;
+  storeMcp: string;
+  storeSkills: string;
+  storeInstalled: string;
+  storeEmpty: string;
+  storeInstall: string;
+  storeManage: string;
+  storeFeatured: string;
 
   // Skills
   skillsTitle: string;
@@ -578,6 +610,19 @@ type TranslationKeys = {
   retry: string;
   skillsMarketInstalled: string;
   skillsMarketInstalledDesc: string;
+  skillsRecommendedBuiltins: string;
+  skillsBuiltinArtifactsTitle: string;
+  skillsBuiltinArtifactsDesc: string;
+  skillsBuiltinMemoryTitle: string;
+  skillsBuiltinMemoryDesc: string;
+  skillsBuiltinCloudSandboxTitle: string;
+  skillsBuiltinCloudSandboxDesc: string;
+  skillsBuiltinGtdTitle: string;
+  skillsBuiltinGtdDesc: string;
+  skillsBuiltinNotebookTitle: string;
+  skillsBuiltinNotebookDesc: string;
+  skillsBuiltinCalculatorTitle: string;
+  skillsBuiltinCalculatorDesc: string;
   skillsDetailContent: string;
   skillsDetailManifest: string;
   skillsDetailNotFound: string;
@@ -785,10 +830,18 @@ const en: TranslationKeys = {
   chatToolDone: 'Completed',
   chatToolFailed: 'Failed',
   chatToolArguments: 'Arguments',
+  chatToolCompleted: 'Done',
   chatToolPending: 'Pending approval',
   chatToolRejected: 'Rejected',
   chatToolResponse: 'Response',
   chatToolAborted: 'Aborted',
+  chatToolApprove: 'Approve',
+  chatToolReject: 'Reject',
+  chatToolAbortedDesc: 'This tool call was aborted.',
+  chatToolRejectedDesc: 'This tool call was rejected.',
+  chatToolPendingDesc: 'This tool needs your approval to run.',
+  chatShowMore: 'Show more',
+  chatShowLess: 'Show less',
   chatAskAnything: 'Ask anything...',
   chatGenerating: 'Generating...',
   chatEmptyTitle: 'Avato Assistant',
@@ -854,6 +907,9 @@ const en: TranslationKeys = {
   chatSettingsMaxTokens: 'Max Tokens',
   chatSettingsEnableMaxTokens: 'Enable Max Tokens',
   chatSettingsModelParams: 'Model Parameters',
+  chatSettingsAgentProfile: 'Agent Profile',
+  chatSettingsAgentTitlePlaceholder: 'Agent name',
+  chatSettingsAgentDescPlaceholder: 'Add a description...',
   chatSettingsSystemPrompt: 'System Prompt',
   chatSettingsCustomInstructions: 'Custom Instructions',
   chatSettingsSystemPromptPlaceholder: 'Enter a custom system prompt to define the assistant\'s behavior...',
@@ -866,13 +922,20 @@ const en: TranslationKeys = {
   chatSettingsClearDesc: 'This will clear all messages in this conversation.',
 
   notebookTitle: 'Notebook',
+  notebookDesc: 'Your personal notes and documents',
   notebookEmpty: 'No documents yet',
   notebookNewDoc: 'New Document',
   notebookDocTitle: 'Title',
   notebookDocTitlePlaceholder: 'Document title...',
+  notebookDocContentPlaceholder: 'Start writing in Markdown...',
   notebookDeleteConfirm: 'Delete Document',
   notebookDeleteDesc: 'Are you sure you want to delete this document?',
   notebookSaved: 'Document saved',
+  notebookUnsavedTitle: 'Unsaved Changes',
+  notebookUnsavedDesc: 'You have unsaved changes. Discard them?',
+  notebookDiscard: 'Discard',
+  notebookPreview: 'Preview',
+  notebookEdit: 'Edit',
 
   settingsTitle: 'Settings',
   settingsServer: 'Server',
@@ -950,6 +1013,7 @@ const en: TranslationKeys = {
   msgActionCopy: 'Copy',
   msgActionEdit: 'Edit',
   msgActionRegenerate: 'Regenerate',
+  msgActionShare: 'Share',
   msgActionDelete: 'Delete',
   msgActionDeleteConfirm: 'Delete this message?',
   msgActionCopied: 'Copied',
@@ -1227,11 +1291,23 @@ const en: TranslationKeys = {
   resourceDeleteConfirm: 'Delete File',
   resourceDeleteDesc: 'This file will be permanently deleted.',
   resourceUploadFailed: 'Upload failed',
+  resourceOpenExternal: 'Open in Browser',
   resourceDeleteFailed: 'Delete failed',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+
+  tabStore: 'Store',
+  storeSearch: 'Search tools & skills...',
+  storeExplore: 'Explore',
+  storeMcp: 'MCP',
+  storeSkills: 'Skills',
+  storeInstalled: 'Installed',
+  storeEmpty: 'No items found',
+  storeInstall: 'Install',
+  storeManage: 'Manage',
+  storeFeatured: 'Featured',
 
   skillsTitle: 'Skills',
   skillsDesc: 'Manage installed skills and plugins',
@@ -1283,6 +1359,21 @@ const en: TranslationKeys = {
   retry: 'Retry',
   skillsMarketInstalled: 'Installed',
   skillsMarketInstalledDesc: 'Skill has been installed successfully.',
+  skillsRecommendedBuiltins: 'Built-in defaults',
+  skillsBuiltinArtifactsTitle: 'Artifacts',
+  skillsBuiltinArtifactsDesc: 'Generate and preview interactive UI components and visualizations',
+  skillsBuiltinMemoryTitle: 'User Memory',
+  skillsBuiltinMemoryDesc: 'Remember user preferences, facts and context across conversations',
+  skillsBuiltinCloudSandboxTitle: 'Cloud Sandbox',
+  skillsBuiltinCloudSandboxDesc:
+    'Execute code, run commands, and manage files in a secure cloud environment',
+  skillsBuiltinGtdTitle: 'GTD Tools',
+  skillsBuiltinGtdDesc: 'Plan goals and track progress with GTD methodology',
+  skillsBuiltinNotebookTitle: 'Notebook',
+  skillsBuiltinNotebookDesc: 'Create and manage documents in the topic notebook',
+  skillsBuiltinCalculatorTitle: 'Calculator',
+  skillsBuiltinCalculatorDesc:
+    'Perform mathematical calculations, solve equations, and work with symbolic expressions',
   skillsDetailContent: 'Content',
   skillsDetailManifest: 'Manifest',
   skillsDetailNotFound: 'Skill not found',
@@ -1487,10 +1578,18 @@ const zh_tw: TranslationKeys = {
   chatToolDone: '已完成',
   chatToolFailed: '失敗',
   chatToolArguments: '參數',
+  chatToolCompleted: '已完成',
   chatToolPending: '等待確認',
   chatToolRejected: '已拒絕',
   chatToolResponse: '響應',
   chatToolAborted: '已中止',
+  chatToolApprove: '允許',
+  chatToolReject: '拒絕',
+  chatToolAbortedDesc: '此工具調用已中止。',
+  chatToolRejectedDesc: '此工具調用已被拒絕。',
+  chatToolPendingDesc: '此工具需要您的批准才能運行。',
+  chatShowMore: '展開更多',
+  chatShowLess: '收起',
   chatAskAnything: '有什麼可以幫助你的嗎？',
   chatGenerating: '產生中...',
   chatEmptyTitle: 'Avato 助手',
@@ -1554,6 +1653,9 @@ const zh_tw: TranslationKeys = {
   chatSettingsMaxTokens: '單次回覆限制',
   chatSettingsEnableMaxTokens: '開啟單次回覆限制',
   chatSettingsModelParams: '模型參數',
+  chatSettingsAgentProfile: '智能體設定',
+  chatSettingsAgentTitlePlaceholder: '智能體名稱',
+  chatSettingsAgentDescPlaceholder: '添加描述...',
   chatSettingsSystemPrompt: '系統提示詞',
   chatSettingsCustomInstructions: '自訂指令',
   chatSettingsSystemPromptPlaceholder: '輸入自訂系統提示詞來定義助手的行為...',
@@ -1565,13 +1667,20 @@ const zh_tw: TranslationKeys = {
   chatSettingsClearConfirm: '清空記錄',
 
   notebookTitle: '筆記本',
+  notebookDesc: '你的個人筆記和文檔',
   notebookEmpty: '暫無文檔',
   notebookNewDoc: '新建文檔',
   notebookDocTitle: '標題',
   notebookDocTitlePlaceholder: '文檔標題...',
+  notebookDocContentPlaceholder: '開始用 Markdown 撰寫...',
   notebookDeleteConfirm: '刪除文檔',
   notebookDeleteDesc: '確定要刪除此文檔嗎？',
   notebookSaved: '文檔已儲存',
+  notebookUnsavedTitle: '未儲存的變更',
+  notebookUnsavedDesc: '你有未儲存的變更。確定要捨棄嗎？',
+  notebookDiscard: '捨棄',
+  notebookPreview: '預覽',
+  notebookEdit: '編輯',
   chatSettingsClearDesc: '這將清空此對話中的所有訊息。',
 
   settingsTitle: '設定',
@@ -1650,6 +1759,7 @@ const zh_tw: TranslationKeys = {
   msgActionCopy: '複製',
   msgActionEdit: '編輯',
   msgActionRegenerate: '重新產生',
+  msgActionShare: '分享',
   msgActionDelete: '刪除',
   msgActionDeleteConfirm: '確定刪除這則訊息嗎？',
   msgActionCopied: '已複製',
@@ -1926,11 +2036,23 @@ const zh_tw: TranslationKeys = {
   resourceDeleteConfirm: '刪除檔案',
   resourceDeleteDesc: '該檔案將被永久刪除。',
   resourceUploadFailed: '上傳失敗',
+  resourceOpenExternal: '在瀏覽器中打開',
   resourceDeleteFailed: '刪除失敗',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+
+  tabStore: '商店',
+  storeSearch: '搜尋工具和技能...',
+  storeExplore: '探索',
+  storeMcp: 'MCP',
+  storeSkills: '技能',
+  storeInstalled: '已安裝',
+  storeEmpty: '未找到項目',
+  storeInstall: '安裝',
+  storeManage: '管理',
+  storeFeatured: '精選',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安裝的技能和外掛程式',
@@ -1982,6 +2104,19 @@ const zh_tw: TranslationKeys = {
   retry: '重試',
   skillsMarketInstalled: '已安裝',
   skillsMarketInstalledDesc: '技能已成功安裝。',
+  skillsRecommendedBuiltins: '預設內建技能',
+  skillsBuiltinArtifactsTitle: 'Artifacts',
+  skillsBuiltinArtifactsDesc: '生成並預覽互動式 UI 元件與視覺化內容',
+  skillsBuiltinMemoryTitle: '使用者記憶',
+  skillsBuiltinMemoryDesc: '跨對話記住使用者偏好、事實與上下文',
+  skillsBuiltinCloudSandboxTitle: '雲沙盒',
+  skillsBuiltinCloudSandboxDesc: '在安全的雲端環境中執行程式碼、命令與檔案操作',
+  skillsBuiltinGtdTitle: 'GTD 工具',
+  skillsBuiltinGtdDesc: '使用 GTD 方法規劃目標並追蹤進度',
+  skillsBuiltinNotebookTitle: '筆記本',
+  skillsBuiltinNotebookDesc: '在話題筆記本中建立與管理文件',
+  skillsBuiltinCalculatorTitle: '計算器',
+  skillsBuiltinCalculatorDesc: '進行數學計算、方程求解與符號運算',
   skillsDetailContent: '內容',
   skillsDetailManifest: '清單',
   skillsDetailNotFound: '找不到技能',
@@ -2186,10 +2321,18 @@ const zh: TranslationKeys = {
   chatToolDone: '已完成',
   chatToolFailed: '失败',
   chatToolArguments: '参数',
+  chatToolCompleted: '已完成',
   chatToolPending: '等待确认',
   chatToolRejected: '已拒绝',
   chatToolResponse: '响应',
   chatToolAborted: '已中止',
+  chatToolApprove: '允许',
+  chatToolReject: '拒绝',
+  chatToolAbortedDesc: '此工具调用已中止。',
+  chatToolRejectedDesc: '此工具调用已被拒绝。',
+  chatToolPendingDesc: '此工具需要您的批准才能运行。',
+  chatShowMore: '展开更多',
+  chatShowLess: '收起',
   chatAskAnything: '问我任何问题...',
   chatGenerating: '生成中...',
   chatEmptyTitle: 'Avato 助手',
@@ -2253,6 +2396,9 @@ const zh: TranslationKeys = {
   chatSettingsMaxTokens: '单次回复限制',
   chatSettingsEnableMaxTokens: '开启单次回复限制',
   chatSettingsModelParams: '模型参数',
+  chatSettingsAgentProfile: '智能体设置',
+  chatSettingsAgentTitlePlaceholder: '智能体名称',
+  chatSettingsAgentDescPlaceholder: '添加描述...',
   chatSettingsSystemPrompt: '系统提示词',
   chatSettingsCustomInstructions: '自定义指令',
   chatSettingsSystemPromptPlaceholder: '输入自定义系统提示词来定义助手的行为...',
@@ -2265,13 +2411,20 @@ const zh: TranslationKeys = {
   chatSettingsClearDesc: '这将清空此对话中的所有消息。',
 
   notebookTitle: '笔记本',
+  notebookDesc: '你的个人笔记和文档',
   notebookEmpty: '暂无文档',
   notebookNewDoc: '新建文档',
   notebookDocTitle: '标题',
   notebookDocTitlePlaceholder: '文档标题...',
+  notebookDocContentPlaceholder: '开始用 Markdown 撰写...',
   notebookDeleteConfirm: '删除文档',
   notebookDeleteDesc: '确定要删除此文档吗？',
   notebookSaved: '文档已保存',
+  notebookUnsavedTitle: '未保存的更改',
+  notebookUnsavedDesc: '你有未保存的更改。确定要丢弃吗？',
+  notebookDiscard: '丢弃',
+  notebookPreview: '预览',
+  notebookEdit: '编辑',
 
   settingsTitle: '设置',
   settingsServer: '服务器',
@@ -2349,6 +2502,7 @@ const zh: TranslationKeys = {
   msgActionCopy: '复制',
   msgActionEdit: '编辑',
   msgActionRegenerate: '重新生成',
+  msgActionShare: '分享',
   msgActionDelete: '删除',
   msgActionDeleteConfirm: '确定删除这条消息吗？',
   msgActionCopied: '已复制',
@@ -2626,11 +2780,23 @@ const zh: TranslationKeys = {
   resourceDeleteConfirm: '删除文件',
   resourceDeleteDesc: '该文件将被永久删除。',
   resourceUploadFailed: '上传失败',
+  resourceOpenExternal: '在浏览器中打开',
   resourceDeleteFailed: '删除失败',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+
+  tabStore: '商店',
+  storeSearch: '搜索工具和技能...',
+  storeExplore: '探索',
+  storeMcp: 'MCP',
+  storeSkills: '技能',
+  storeInstalled: '已安装',
+  storeEmpty: '未找到项目',
+  storeInstall: '安装',
+  storeManage: '管理',
+  storeFeatured: '精选',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安装的技能和插件',
@@ -2682,6 +2848,19 @@ const zh: TranslationKeys = {
   retry: '重试',
   skillsMarketInstalled: '已安装',
   skillsMarketInstalledDesc: '技能已成功安装。',
+  skillsRecommendedBuiltins: '默认内置技能',
+  skillsBuiltinArtifactsTitle: 'Artifacts',
+  skillsBuiltinArtifactsDesc: '生成并预览交互式 UI 组件和可视化内容',
+  skillsBuiltinMemoryTitle: '用户记忆',
+  skillsBuiltinMemoryDesc: '跨对话记住用户偏好、事实和上下文',
+  skillsBuiltinCloudSandboxTitle: '云沙盒',
+  skillsBuiltinCloudSandboxDesc: '在安全的云端环境中执行代码、命令并管理文件',
+  skillsBuiltinGtdTitle: 'GTD 工具',
+  skillsBuiltinGtdDesc: '使用 GTD 方法规划目标并跟踪进度',
+  skillsBuiltinNotebookTitle: '笔记本',
+  skillsBuiltinNotebookDesc: '在话题笔记本中创建和管理文档',
+  skillsBuiltinCalculatorTitle: '计算器',
+  skillsBuiltinCalculatorDesc: '执行数学计算、解方程并处理符号表达式',
   skillsDetailContent: '内容',
   skillsDetailManifest: '清单',
   skillsDetailNotFound: '技能未找到',

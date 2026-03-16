@@ -6,13 +6,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
-  BookText,
   Brain,
   BrainCircuit,
   Cpu,
   Eraser,
   Globe,
-  NotebookPen,
   Paperclip,
   Puzzle,
   Send,
@@ -57,7 +55,10 @@ import PressableScale from '../components/ui/PressableScale';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, messageApi, pluginApi, sessionApi, topicApi } from '../lib/api';
+import { agentApi, agentSkillApi, messageApi, pluginApi, sessionApi, topicApi, userApi } from '../lib/api';
+import {
+  MOBILE_RECOMMENDED_BUILTIN_SKILLS,
+} from '../constants/recommendedBuiltins';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -67,7 +68,7 @@ import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { themeColors } from '../theme';
 import { tokens } from '../theme/tokens';
-import type { ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
+import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -81,7 +82,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const primaryColor = themeColors.light.primary;
 
   const messages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
-  const generating = useChatStore((s) => s.generating);
+  const generating = useChatStore(
+    (s) => s.generating && s.activeStreamingSessionId === sessionId,
+  );
   const isReasoning = useChatStore((s) => s.isReasoning);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGenerating = useChatStore((s) => s.stopGenerating);
@@ -110,6 +113,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   // Skills drawer
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  const [builtinSkillItems, setBuiltinSkillItems] = useState<
+    { description: string; identifier: string; title: string }[]
+  >([]);
+  const [agentSkillItems, setAgentSkillItems] = useState<AgentSkillItem[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -152,6 +159,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     fetchMessages(sessionId, activeTopic ?? undefined);
     fetchTopics(sessionId);
   }, [sessionId, fetchMessages, fetchTopics, activeTopic]);
+
+  useEffect(() => {
+    if (!generating) return;
+    const WATCHDOG_MS = 180_000;
+    const startedAt = useChatStore.getState().generatingStartedAt;
+    const elapsed = startedAt ? Date.now() - startedAt : 0;
+    const remaining = Math.max(WATCHDOG_MS - elapsed, 0);
+    const timer = setTimeout(() => {
+      if (useChatStore.getState().generating) {
+        console.warn('[ChatDetail] generating watchdog triggered, force-stopping');
+        stopGenerating();
+      }
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [generating, stopGenerating]);
 
   useEffect(() => {
     if (!focusMessageId || messages.length === 0) return;
@@ -203,14 +225,33 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     haptics.light();
     setSkillsSheetVisible(true);
     setLoadingSkills(true);
-    pluginApi
-      .list()
-      .then((list) => {
-        setInstalledPlugins(list ?? []);
+    Promise.all([pluginApi.list(), agentSkillApi.list(), userApi.getState()])
+      .then(([plugins, skills, userState]) => {
+        const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
+        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS
+          .filter((b) => !uninstalled.includes(b.identifier))
+          .map((b) => ({
+            description: (t as any)[b.descriptionKey] ?? '',
+            identifier: b.identifier,
+            title: (t as any)[b.titleKey] ?? b.identifier,
+          }));
+        setBuiltinSkillItems(builtins);
+
+        const builtinIds = new Set(builtins.map((b) => b.identifier));
+        const filteredSkills = (skills ?? []).filter(
+          (s) => s.identifier && !builtinIds.has(s.identifier),
+        );
+        setAgentSkillItems(filteredSkills);
+
+        const skillIds = new Set(filteredSkills.map((s) => s.identifier).filter(Boolean));
+        const filteredPlugins = (plugins ?? []).filter(
+          (p) => !builtinIds.has(p.identifier) && !skillIds.has(p.identifier),
+        );
+        setInstalledPlugins(filteredPlugins);
       })
       .catch(() => {})
       .finally(() => setLoadingSkills(false));
-  }, []);
+  }, [t]);
 
   const handleTogglePlugin = useCallback(
     (identifier: string) => {
@@ -276,19 +317,23 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     stopGenerating();
   }, [stopGenerating]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if ((!inputText.trim() && pendingFiles.length === 0) || generating) return;
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    sendMessage(sessionId, inputText.trim(), activeTopic ?? undefined, {
+    const textToSend = inputText.trim();
+    setInputText('');
+    Keyboard.dismiss();
+    const success = await sendMessage(sessionId, textToSend, activeTopic ?? undefined, {
       memoryEffort,
       memoryEnabled,
       plugins: enabledPlugins.size > 0 ? [...enabledPlugins] : undefined,
       searchEnabled,
     });
-    setInputText('');
-    Keyboard.dismiss();
+    if (!success) {
+      setInputText(textToSend);
+    }
   }, [
     inputText,
     generating,
@@ -333,10 +378,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               uri: asset.uri,
             });
           }
-          toast.show('success', t.toastFilePicked);
         }
-      } catch {
-        /* ignore */
+      } catch (err) {
+        if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_CANCELED') return;
+        toast.show('error', t.fileUploadError);
       }
     },
     [addFile, t, toast],
@@ -358,10 +403,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             uri: asset.uri,
           });
         }
-        toast.show('success', t.toastFilePicked);
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'ERR_CANCELED') return;
+      toast.show('error', t.fileUploadError);
     }
   }, [addFile, t, toast]);
 
@@ -431,14 +476,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const handleSaveToTopic = useCallback(async () => {
     if (activeTopic) {
-      toast.show('info', t.topicTitle);
       return;
     }
     try {
       const topicId = await topicApi.create(sessionId, t.topicTitle);
       if (topicId) {
         haptics.success();
-        toast.show('success', t.topicTitle);
         fetchTopics(sessionId);
       }
     } catch {
@@ -473,7 +516,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.goBack();
               }}
             >
-              <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
+              <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
             <View className="flex-1">
               <Text
@@ -500,47 +543,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
           <View className="flex-row items-center">
             <PressableScale
-              accessibilityLabel="Topics"
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full"
-              onPress={() => {
-                haptics.light();
-                if (!sessionId) {
-                  toast.show('error', t.errorUnknown);
-                  return;
-                }
-                navigation.navigate('TopicList', { sessionId });
-              }}
-            >
-              <BookText
-                color={semanticColors.muted}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel="Notebook"
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full ml-1"
-              onPress={() => {
-                haptics.light();
-                if (!sessionId) {
-                  toast.show('error', t.errorUnknown);
-                  return;
-                }
-                navigation.navigate('Notebook', { sessionId, topicId: activeTopic });
-              }}
-            >
-              <NotebookPen
-                color={semanticColors.muted}
-                size={20}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            </PressableScale>
-            <PressableScale
               accessibilityLabel="Settings"
               accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full ml-1"
+              className="w-9 h-9 items-center justify-center rounded-full"
               onPress={() => {
                 haptics.light();
                 navigation.navigate('ChatSettings', { sessionId });
@@ -594,7 +599,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 {[t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4].map((label) => (
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    className="px-4 py-2.5 rounded-full border border-black/5"
+                    className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
                     key={label}
                     onPress={() => {
                       haptics.light();
@@ -642,8 +647,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             intensity={80}
             tint="light"
             style={{
-              borderWidth: 0.5,
-              borderColor: 'rgba(0,0,0,0.06)',
+              backgroundColor: 'rgba(255,255,255,0.72)',
+              borderColor: 'rgba(15,23,42,0.08)',
+              borderWidth: 1,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04,
+              shadowRadius: 6,
+              elevation: 1,
             }}
           >
             {pendingFiles.length > 0 && (
@@ -659,7 +670,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 editable={!generating}
                 placeholder={generating ? t.chatGenerating : hints[hintIndex]}
                 placeholderTextColor={semanticColors.muted}
-                style={{ textAlignVertical: 'top' }}
+                style={{ paddingVertical: 0, textAlignVertical: 'top' }}
+                underlineColorAndroid="transparent"
                 value={inputText}
                 onChangeText={setInputText}
               />
@@ -850,16 +862,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         onRequestClose={() => setSkillsSheetVisible(false)}
       >
         <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+          className="flex-1 justify-end bg-black/40"
           onPress={() => setSkillsSheetVisible(false)}
         >
           <Pressable
-            className="bg-white rounded-t-3xl max-h-[70%]"
+            className="bg-white rounded-t-2xl max-h-[70%]"
             onPress={(e) => e.stopPropagation()}
           >
             <View className="items-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-black/10" />
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
             <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
               <Text className="text-foreground text-[18px] font-bold tracking-tight">
@@ -871,7 +882,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 <View className="items-center py-10">
                   <ActivityIndicator color={semanticColors.primary} size="small" />
                 </View>
-              ) : installedPlugins.length === 0 ? (
+              ) : builtinSkillItems.length === 0 &&
+                agentSkillItems.length === 0 &&
+                installedPlugins.length === 0 ? (
                 <View className="items-center py-10">
                   <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
                   <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
@@ -879,31 +892,83 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   </Text>
                 </View>
               ) : (
-                installedPlugins.map((plugin) => (
-                  <View
-                    className="flex-row items-center py-3.5 border-b border-black/[0.04]"
-                    key={plugin.identifier}
-                  >
-                    <View className="flex-1 mr-3">
-                      <Text
-                        className="text-foreground text-[15px] font-medium tracking-tight"
-                        numberOfLines={1}
-                      >
-                        {plugin.manifest?.meta?.title || plugin.identifier}
-                      </Text>
-                      {plugin.manifest?.meta?.description ? (
-                        <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
-                          {plugin.manifest.meta.description}
+                <>
+                  {builtinSkillItems.map((item) => (
+                    <View
+                      className="flex-row items-center py-3.5"
+                      key={`builtin-${item.identifier}`}
+                    >
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {item.title}
                         </Text>
-                      ) : null}
+                        {item.description ? (
+                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                            {item.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Switch
+                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                        value={enabledPlugins.has(item.identifier)}
+                        onValueChange={() => handleTogglePlugin(item.identifier)}
+                      />
                     </View>
-                    <Switch
-                      trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
-                      value={enabledPlugins.has(plugin.identifier)}
-                      onValueChange={() => handleTogglePlugin(plugin.identifier)}
-                    />
-                  </View>
-                ))
+                  ))}
+                  {agentSkillItems.map((skill) => (
+                    <View
+                      className="flex-row items-center py-3.5"
+                      key={`skill-${skill.id}`}
+                    >
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {skill.name || skill.identifier || skill.id}
+                        </Text>
+                        {skill.description ? (
+                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                            {skill.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Switch
+                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                        value={enabledPlugins.has(skill.identifier ?? skill.id)}
+                        onValueChange={() => handleTogglePlugin(skill.identifier ?? skill.id)}
+                      />
+                    </View>
+                  ))}
+                  {installedPlugins.map((plugin) => (
+                    <View
+                      className="flex-row items-center py-3.5"
+                      key={plugin.identifier}
+                    >
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {plugin.manifest?.meta?.title || plugin.identifier}
+                        </Text>
+                        {plugin.manifest?.meta?.description ? (
+                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                            {plugin.manifest.meta.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Switch
+                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                        value={enabledPlugins.has(plugin.identifier)}
+                        onValueChange={() => handleTogglePlugin(plugin.identifier)}
+                      />
+                    </View>
+                  ))}
+                </>
               )}
             </ScrollView>
           </Pressable>

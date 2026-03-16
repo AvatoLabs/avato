@@ -7,22 +7,21 @@
  *
  * Aligned with web: /settings/provider/all
  */
-import { ArrowLeft, ChevronRight, Server } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Search, Server } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
   RefreshControl,
   ScrollView,
-  Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
@@ -145,14 +144,24 @@ export default function AIProvidersScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.aiProvidersTitle}
         onPressLeft={() => navigation.goBack()}
       />
 
       {/* Search */}
       <View className="px-5 py-2 bg-background z-10">
-        <SearchField placeholder={t.search} value={searchQuery} onChangeText={setSearchQuery} />
+        <View className="flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
+          <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+          <TextInput
+            className="flex-1 text-foreground text-[14px] ml-2.5"
+            placeholder={t.search}
+            placeholderTextColor={semanticColors.muted}
+            returnKeyType="search"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
       </View>
 
       {/* Summary */}
@@ -192,7 +201,7 @@ export default function AIProvidersScreen({ navigation }: any) {
                 key={provider.id}
               >
                 <PressableScale
-                  className="mx-5 mb-2 bg-foreground/5 rounded-2xl overflow-hidden"
+                  className="mx-5 mb-2 bg-foreground/[0.02] rounded-2xl overflow-hidden"
                   onPress={() => navigation.navigate('ProviderDetail', { providerId: provider.id })}
                 >
                   <View className="flex-row items-center px-4 py-3.5">
@@ -205,14 +214,12 @@ export default function AIProvidersScreen({ navigation }: any) {
                         {provider.source === 'custom' ? 'Custom' : 'Built-in'}
                       </Text>
                     </View>
-                    <Switch
-                      thumbColor="#fff"
-                      trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
-                      value={provider.enabled}
-                      onValueChange={() => handleToggle(provider.id, provider.enabled)}
+                    <View
+                      className="w-2 h-2 rounded-full mr-1"
+                      style={{ backgroundColor: provider.enabled ? '#34c759' : '#d1d5db' }}
                     />
                     <ChevronRight
-                      color="#c0c0c0"
+                      color={semanticColors.secondaryText}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginLeft: 8 }}

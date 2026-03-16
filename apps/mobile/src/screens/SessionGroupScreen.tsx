@@ -17,6 +17,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PromptModal from '../components/ui/PromptModal';
+import { semanticColors } from '../constants/colors';
 import { useI18n } from '../lib/i18n';
 import { useSessionStore } from '../store/session';
 import { useSessionGroupStore } from '../store/sessionGroup';
@@ -118,7 +119,7 @@ export default function SessionGroupScreen({ navigation }: any) {
 
     return (
       <Animated.View entering={FadeInDown.delay(index * 50).duration(250)}>
-        <View className="flex-row items-center px-5 py-4 mx-3 mb-2 rounded-xl border border-black/5">
+        <View className="flex-row items-center px-5 py-4 mx-3 mb-2 rounded-xl bg-foreground/[0.03]">
           <View className="w-9 h-9 rounded-full bg-primary/10 items-center justify-center mr-3">
             <Folder color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
           </View>
@@ -167,7 +168,7 @@ export default function SessionGroupScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <Text className="text-[17px] font-semibold text-foreground">{t.groupTitle}</Text>
         <View className="flex-row items-center">

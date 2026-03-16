@@ -20,6 +20,7 @@ import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { semanticColors } from '../constants/colors';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
@@ -34,8 +35,8 @@ interface SettingsRowProps {
 
 function SettingsRow({
   icon: IconComp,
-  iconBg = 'bg-foreground/5',
-  iconColor = '#007aff',
+  iconBg = 'bg-primary/10',
+  iconColor = semanticColors.primary,
   label,
   onPress,
   subtitle,
@@ -43,7 +44,7 @@ function SettingsRow({
   return (
     <TouchableOpacity
       activeOpacity={0.6}
-      className="flex-row items-center px-4 py-3.5 mb-1 rounded-2xl active:bg-foreground/5"
+      className="flex-row items-center px-4 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
       onPress={onPress}
     >
       <View className={`w-8 h-8 rounded-full ${iconBg} items-center justify-center mr-4`}>
@@ -55,7 +56,7 @@ function SettingsRow({
           <Text className="text-secondary/70 text-[12.5px] mt-0.5 font-medium">{subtitle}</Text>
         )}
       </View>
-      <ChevronRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
+      <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
     </TouchableOpacity>
   );
 }
@@ -72,7 +73,7 @@ function SettingsSection({
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mb-5 px-3">
-        <Text className="px-2 mb-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+        <Text className="px-2 mb-2 text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
           {title}
         </Text>
         <View>{children}</View>
@@ -87,7 +88,7 @@ export default function SettingsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.meMoreSettings}
         onPressLeft={() => navigation.goBack()}
       />
@@ -99,7 +100,7 @@ export default function SettingsScreen({ navigation }: any) {
             iconColor="#007aff"
             label={t.settingsDefaultAgent}
             subtitle={t.settingsNotConfigured}
-            onPress={() => navigation.navigate('AgentDetail', { identifier: 'default' })}
+            onPress={() => navigation.navigate('AgentList')}
           />
         </SettingsSection>
 
