@@ -63,6 +63,7 @@ const IMAGE_COUNTS = [1, 2, 4, 8];
 const STORAGE_KEY = 'avato_artwork_config';
 const EDITABLE_NUMERIC_PARAM_KEYS = ['width', 'height', 'steps', 'cfg', 'seed'] as const;
 const PRESET_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
+const SECONDARY_BAR_HEIGHT = 48;
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);
@@ -165,16 +166,6 @@ function RatioIcon({ ratio, active }: { ratio: string; active: boolean }) {
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────────
-function SectionLabel({ text, right }: { right?: React.ReactNode; text: string }) {
-  return (
-    <View className="flex-row items-center justify-between mb-2 mt-4">
-      <Text className="text-foreground text-[15px] font-semibold tracking-tight">{text}</Text>
-      {right}
-    </View>
-  );
-}
-
 function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }) {
   return (
     <View
@@ -213,7 +204,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── Main Screen ──────────────────────────────────────────────────────
-export default function ArtworkScreen({ navigation }: any) {
+export default function ArtworkScreen() {
   const { t } = useI18n();
   const toast = useToast();
   const insets = useSafeAreaInsets();
@@ -531,7 +522,7 @@ export default function ArtworkScreen({ navigation }: any) {
       }
 
       setPrompt('');
-    } catch (err: any) {
+    } catch {
       toast.show('error', t.artworkErrorDesc);
     } finally {
       setGenerating(false);
@@ -568,12 +559,13 @@ export default function ArtworkScreen({ navigation }: any) {
   const sidebarPad = 20;
   const ratioColCount = 5;
   const ratioCellGap = 6;
+  const optionColCount = 3;
   const ratioCellW = Math.floor(
     (sidebarWidth - sidebarPad * 2 - ratioCellGap * (ratioColCount - 1)) / ratioColCount,
   );
-  const currentModel = imageProviders
-    .find((item) => item.id === provider)
-    ?.children.find((item) => item.id === model);
+  const optionCellW = Math.floor(
+    (sidebarWidth - sidebarPad * 2 - ratioCellGap * (optionColCount - 1)) / optionColCount,
+  );
   const allModels = imageProviders.flatMap((p) =>
     p.children.map((m) => ({ ...m, providerId: p.id, providerName: p.name })),
   );
@@ -613,25 +605,40 @@ export default function ArtworkScreen({ navigation }: any) {
 
       {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
       <View className="border-b border-gray-100 dark:border-gray-800">
-        <View className="flex-row items-center px-4 pt-1 pb-2">
+        <View
+          className="flex-row items-center px-4"
+          style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingVertical: 6 }}
+        >
           <TouchableOpacity
-            className="flex-row items-center flex-1 mr-3"
+            className="flex-1 mr-3 rounded-2xl px-1 py-1"
             onPress={() => {
               haptics.selection();
               setShowSidebar(true);
             }}
           >
-            <Sparkles color="#f5c542" size={16} strokeWidth={tokens.icon.strokeWidth} />
-            <Text
-              className="text-[14px] font-semibold ml-2 text-gray-900 dark:text-gray-100"
-              numberOfLines={1}
-              style={{ flex: 1 }}
-            >
-              {modelName || t.artworkSelectModel}
-            </Text>
-            <Text className="text-[11px] text-gray-400 dark:text-gray-500">
-              {summaryParts.join(' · ')}
-            </Text>
+            <View className="flex-row items-center">
+              <Sparkles color="#f5c542" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <View className="ml-2 flex-1">
+                <Text
+                  className="text-[14px] font-semibold text-gray-900 dark:text-gray-100"
+                  numberOfLines={1}
+                >
+                  {modelName || t.artworkSelectModel}
+                </Text>
+                <Text
+                  className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500"
+                  numberOfLines={1}
+                >
+                  {summaryParts.join(' · ')}
+                </Text>
+              </View>
+              <ChevronDown
+                color="#9ca3af"
+                size={16}
+                strokeWidth={tokens.icon.strokeWidth}
+                style={{ marginLeft: 10 }}
+              />
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             className="items-center justify-center rounded-full p-2"
@@ -1016,9 +1023,10 @@ export default function ArtworkScreen({ navigation }: any) {
                         <TouchableOpacity
                           key={option}
                           style={{
-                            paddingHorizontal: 12,
+                            width: optionCellW,
                             paddingVertical: 8,
                             borderRadius: 10,
+                            alignItems: 'center',
                             backgroundColor: active ? semanticColors.primary : '#f5f5f5',
                           }}
                           onPress={() => {
@@ -1052,9 +1060,10 @@ export default function ArtworkScreen({ navigation }: any) {
                         <TouchableOpacity
                           key={option}
                           style={{
-                            paddingHorizontal: 12,
+                            width: optionCellW,
                             paddingVertical: 8,
                             borderRadius: 10,
+                            alignItems: 'center',
                             backgroundColor: active ? semanticColors.primary : '#f5f5f5',
                           }}
                           onPress={() => {

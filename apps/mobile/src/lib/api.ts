@@ -9,6 +9,7 @@
  *   GET  /trpc/mobile/<procedure>?input=<json>
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
+
 import type {
   AgentSkillItem,
   AiProviderDetailItem,
@@ -20,12 +21,12 @@ import type {
   ChatMessage,
   ChatSession,
   CreateSessionConfig,
-    DiscoverModel,
-    FileListItem,
-    GenerationBatch,
-    GenerationTopic,
-    HeatmapDay,
-    ImageGenerationParams,
+  DiscoverModel,
+  FileListItem,
+  GenerationBatch,
+  GenerationTopic,
+  HeatmapDay,
+  ImageGenerationParams,
   InstalledPlugin,
   MarketAgent,
   MemoryActivityItem,
@@ -54,11 +55,53 @@ import {
 
 export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
 
+const DEFAULT_UPLOAD_DIRECTORY = 'files';
+
+const computeFileHash = (buffer: ArrayBuffer) => {
+  const bytes = new Uint8Array(buffer);
+  let hash = 2166136261;
+
+  for (const byte of bytes) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `mobile-${bytes.byteLength.toString(16)}-${(hash >>> 0).toString(16)}`;
+};
+
 const toIsoString = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return new Date(value).toISOString();
   if (value instanceof Date) return value.toISOString();
   return new Date().toISOString();
+};
+
+const buildUploadMetadata = (name: string, directory?: string, pathname?: string) => {
+  const extension = name.includes('.') ? name.split('.').pop() : undefined;
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const filename = extension ? `${uniqueId}.${extension}` : uniqueId;
+  const date = Math.floor(Date.now() / 1000 / 60 / 60).toString();
+  const dirname = `${directory || DEFAULT_UPLOAD_DIRECTORY}/${date}`;
+  const path = pathname || `${dirname}/${filename}`;
+
+  return {
+    date,
+    dirname,
+    filename,
+    path,
+  };
+};
+
+const uploadBlobToSignedUrl = async (preSignUrl: string, blob: Blob, type: string) => {
+  const response = await fetch(preSignUrl, {
+    body: blob,
+    headers: { 'Content-Type': type },
+    method: 'PUT',
+  });
+
+  if (!response.ok) {
+    throw new Error(`upload failed: ${response.status}`);
+  }
 };
 
 const normalizeMessage = (message: any): ChatMessage => ({
@@ -216,6 +259,14 @@ export interface CreateMessageParams {
   topicId?: string;
 }
 
+export interface MessageSearchResult {
+  content: string;
+  createdAt?: string;
+  id: string;
+  sessionId: string;
+  topicId?: string;
+}
+
 export const messageApi = {
   list: (sessionId: string, topicId?: string) =>
     trpcQuery<any[]>('message.getMessages', { sessionId, topicId }).then((messages) =>
@@ -235,6 +286,8 @@ export const messageApi = {
   /** Server expects `{ ids: string[] }`, NOT `{ sessionId, topicId }` */
   removeAll: (ids: string[]) =>
     trpcMutate('message.removeMessages', { ids }),
+  search: (keywords: string) =>
+    trpcQuery<MessageSearchResult[]>('message.searchMessages', { keywords }),
 };
 
 // ── AI Chat API ─────────────────────────────────────────────────────
@@ -560,6 +613,7 @@ export const topicApi = {
     trpcMutate('topic.updateTopic', { id, value: { favorite } }),
   update: (id: string, title: string) =>
     trpcMutate('topic.updateTopic', { id, value: { title } }),
+  search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),
 };
 
 // ── Session Group API ──────────────────────────────────────────────
@@ -638,11 +692,7 @@ export const fileApi = {
     }),
 
   /**
-   * Upload a file through the server-side file API.
-   *
-   * Mobile clients cannot reliably access self-hosted localhost/private S3
-   * endpoints from presigned URLs, so this path sends the file to the app
-   * server and lets the server complete storage + record creation.
+   * Upload a file through the same signed-upload flow used by web.
    */
   upload: async (
     uri: string,
@@ -657,44 +707,47 @@ export const fileApi = {
       skipDeduplication?: boolean;
     },
   ): Promise<{ id: string; url: string }> => {
-    const base = await getBaseUrl();
-    const formData = new FormData();
+    const fileResponse = await fetch(uri);
 
-    formData.append(
-      'file',
-      {
-        name,
-        type,
-        uri,
-      } as any,
-    );
-    if (options?.agentId) formData.append('agentId', options.agentId);
-    if (options?.directory) formData.append('directory', options.directory);
-    if (options?.knowledgeBaseId) formData.append('knowledgeBaseId', options.knowledgeBaseId);
-    if (options?.sessionId) formData.append('sessionId', options.sessionId);
-    if (options?.skipCheckFileType) formData.append('skipCheckFileType', 'true');
-    if (options?.skipDeduplication) formData.append('skipDeduplication', 'true');
-
-    const res = await fetch(`${base}/api/v1/files`, {
-      body: formData,
-      headers: await getAuthHeaders(base),
-      method: 'POST',
-    });
-
-    const payload = await res.json().catch(() => undefined);
-    const data = payload?.data;
-    // OpenAPI /files response shape is usually `{ data: { file: { id, url, ... }}}`,
-    // while some legacy paths may return `{ data: { id, url } }`.
-    const fileData = data?.file ?? data;
-    const id = fileData?.id;
-    const url = fileData?.url;
-
-    if (!res.ok || !payload?.success || !id || !url) {
-      const reason = payload?.error || payload?.message || `upload failed: ${res.status}`;
-      throw new Error(reason);
+    if (!fileResponse.ok) {
+      throw new Error(`read file failed: ${fileResponse.status}`);
     }
 
-    return { id, url };
+    const blob = await fileResponse.blob();
+    const fileType = type || blob.type || 'application/octet-stream';
+    const fileBuffer = await blob.arrayBuffer();
+    const hash = computeFileHash(fileBuffer);
+    const metadata = buildUploadMetadata(name, options?.directory);
+    const hashCheck = await trpcMutate<{
+      isExist: boolean;
+      metadata?: { path?: string };
+      url?: string;
+    }>('file.checkFileHash', { hash });
+
+    let storagePath = hashCheck.metadata?.path || hashCheck.url;
+
+    if (!hashCheck.isExist || !storagePath) {
+      const preSignUrl = await trpcMutate<string>('upload.createS3PreSignedUrl', {
+        pathname: metadata.path,
+      });
+
+      await uploadBlobToSignedUrl(preSignUrl, blob, fileType);
+      storagePath = metadata.path;
+    }
+
+    if (!storagePath) {
+      throw new Error('upload path missing');
+    }
+
+    return trpcMutate<{ id: string; url: string }>('file.createFile', {
+      fileType,
+      hash,
+      knowledgeBaseId: options?.knowledgeBaseId,
+      metadata,
+      name,
+      size: blob.size,
+      url: storagePath,
+    });
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),

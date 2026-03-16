@@ -33,18 +33,6 @@
       }
     }
 
-    @keyframes logo-breath {
-      0% {
-        transform: scale(0.92);
-        opacity: 0.8;
-      }
-
-      100% {
-        transform: scale(1.04);
-        opacity: 1;
-      }
-    }
-
     @keyframes dots {
 
       0%,
@@ -79,9 +67,10 @@
       height: 64px;
       border-radius: 16px;
       display: block;
-      animation: logo-breath 1.2s ease-in-out infinite alternate;
       position: relative;
       z-index: 2;
+      backface-visibility: hidden;
+      transform: translateZ(0);
     }
 
     .avato-spinner {

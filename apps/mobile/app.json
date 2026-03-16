@@ -21,7 +21,7 @@
       "package": "com.avato.app",
       "icon": "./assets/avato-icon.png",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#00000000",
         "foregroundImage": "./assets/avato-android-foreground.png",
         "monochromeImage": "./assets/avato-android-monochrome.png"
       },

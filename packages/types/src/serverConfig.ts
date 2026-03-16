@@ -53,6 +53,12 @@ export interface GlobalServerAuthProvider {
   type: 'builtin' | 'generic';
 }
 
+export interface GlobalServerMobileNativeAuthConfig {
+  feishu?: {
+    appId: string;
+  };
+}
+
 export interface GlobalServerConfig {
   aiProvider: ServerLanguageModel;
   authProviders?: GlobalServerAuthProvider[];
@@ -73,6 +79,7 @@ export interface GlobalServerConfig {
   enableUploadFileToServer?: boolean;
   image?: PartialDeep<UserImageConfig>;
   memory?: GlobalMemoryConfig;
+  mobileNativeAuth?: GlobalServerMobileNativeAuthConfig;
   oAuthSSOProviders?: string[];
   systemAgent?: PartialDeep<UserSystemAgentConfig>;
   telemetry: {

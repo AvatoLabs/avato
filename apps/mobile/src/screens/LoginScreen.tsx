@@ -1,44 +1,89 @@
-import { AlertCircle, ArrowRight, ScanQrCode, Server, ShieldCheck } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image as RNImage, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { useToast } from '../components/ui/Toast';
 import { clearTransientAppState } from '../lib/appState';
 import {
   fetchMobileAuthConfig,
   type MobileAuthConfig,
   type MobileAuthProvider,
-  signInWithBrowser,
+  signInWithProvider,
 } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
-import { tokens } from '../theme/tokens';
 
 const PASSWORD_SIGNIN_KEY = '__password__';
 
-const getProviderActionLabel = (
-  provider: MobileAuthProvider,
-  t: { loginContinueWithProvider: string; loginScanWithProvider: string },
+const humanizeAuthError = (
+  error: unknown,
+  providerLabel: string | undefined,
+  t: ReturnType<typeof useI18n.getState>['t'],
 ) => {
-  if (provider.mode === 'qrcode') {
-    return t.loginScanWithProvider.replace('{provider}', provider.label);
+  const message = error instanceof Error ? error.message : '';
+
+  if (!message) return t.errorAuth;
+  if (message.includes('err_code=4401')) {
+    return t.loginFeishuConfigMismatch;
   }
+  if (
+    message.includes('Failed to load auth config') ||
+    message.includes('Unable to reach the mobile sign-in endpoint') ||
+    message.includes('Network request failed') ||
+    message.includes('Connection failed')
+  ) {
+    return t.serverConnectionFailed;
+  }
+  if (message.includes('Unable to launch the Feishu app')) {
+    return t.loginProviderLaunchFailed.replace('{provider}', providerLabel || 'Feishu');
+  }
+  if (message.includes('Feishu authorization failed')) {
+    return t.loginProviderFailed.replace('{provider}', providerLabel || 'Feishu');
+  }
+  if (
+    message.includes('did not return an authorization code') ||
+    message.includes('Authentication was not completed')
+  ) {
+    return t.loginIncomplete;
+  }
+  if (message.includes('not configured on this server')) {
+    return t.loginUnsupportedDesc;
+  }
+  if (message.includes('no providers are configured')) {
+    return t.loginMissingProviders;
+  }
+
+  return message.length <= 120 ? message : t.errorAuth;
+};
+
+const getPrimaryProvider = (config: MobileAuthConfig | null) =>
+  config?.authProviders.length ? config.authProviders[0] : undefined;
+
+const getPrimaryActionLabel = (
+  authConfig: MobileAuthConfig | null,
+  provider: MobileAuthProvider | undefined,
+  t: ReturnType<typeof useI18n.getState>['t'],
+) => {
+  if (!authConfig) return t.errorRetry;
+  if (!authConfig.enableOIDC) return t.errorRetry;
+  if (!provider && authConfig.disableEmailPassword) return t.errorRetry;
+  if (!provider) return t.loginContinueWithEmail;
 
   return t.loginContinueWithProvider.replace('{provider}', provider.label);
 };
 
 export default function LoginScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const toast = useToast();
   const [authConfig, setAuthConfig] = useState<MobileAuthConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [serverUrl, setServerUrl] = useState('');
-  const [error, setError] = useState('');
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
 
-  const continueInNoAuthMode = async () => {
+  const continueInNoAuthMode = useCallback(async () => {
     await clearTransientAppState();
     await Promise.all([
       useSessionStore.getState().fetchSessions(),
@@ -49,16 +94,14 @@ export default function LoginScreen({ navigation }: any) {
       index: 0,
       routes: [{ name: 'MainTabs' }],
     });
-  };
+  }, [navigation]);
 
-  const loadAuthConfig = async () => {
+  const loadAuthConfig = useCallback(async () => {
     setLoading(true);
-    setError('');
 
     try {
       const baseUrl = await getApiUrl();
       const nextConfig = await fetchMobileAuthConfig(baseUrl);
-      setServerUrl(baseUrl);
       setAuthConfig(nextConfig);
 
       if (nextConfig.enableNoAuth) {
@@ -66,200 +109,136 @@ export default function LoginScreen({ navigation }: any) {
       }
     } catch (caughtError) {
       setAuthConfig(null);
-      setError(
-        caughtError instanceof Error && caughtError.message
-          ? caughtError.message
-          : t.serverConnectionFailed,
-      );
+      toast.show('error', humanizeAuthError(caughtError, undefined, t));
     } finally {
       setLoading(false);
     }
-  };
+  }, [continueInNoAuthMode, t, toast]);
 
   useEffect(() => {
     void loadAuthConfig();
-  }, []);
+  }, [loadAuthConfig]);
 
-  const handleSignIn = async (providerId?: string) => {
-    setSigningInProvider(providerId || PASSWORD_SIGNIN_KEY);
-    setError('');
+  const primaryProvider = useMemo(() => getPrimaryProvider(authConfig), [authConfig]);
 
-    try {
-      const baseUrl = await getApiUrl();
-      const session = await signInWithBrowser({ baseUrl, providerId });
+  const handleSignIn = useCallback(
+    async (providerId?: string) => {
+      setSigningInProvider(providerId || PASSWORD_SIGNIN_KEY);
 
-      if (!session) return;
+      try {
+        const baseUrl = await getApiUrl();
+        const session = await signInWithProvider({ authConfig, baseUrl, providerId });
 
-      await clearTransientAppState();
-      await Promise.all([
-        useSessionStore.getState().fetchSessions(),
-        useUserStore.getState().fetchUser(),
-      ]);
+        if (!session) return;
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainTabs' }],
-      });
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error && caughtError.message ? caughtError.message : t.errorAuth,
-      );
-    } finally {
-      setSigningInProvider(null);
+        await clearTransientAppState();
+        await Promise.all([
+          useSessionStore.getState().fetchSessions(),
+          useUserStore.getState().fetchUser(),
+        ]);
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+      } catch (caughtError) {
+        toast.show(
+          'error',
+          humanizeAuthError(caughtError, primaryProvider?.label || providerId, t),
+        );
+      } finally {
+        setSigningInProvider(null);
+      }
+    },
+    [authConfig, navigation, primaryProvider?.label, t, toast],
+  );
+
+  const handlePrimaryPress = useCallback(async () => {
+    if (loading || signingInProvider) return;
+
+    if (!authConfig) {
+      await loadAuthConfig();
+      return;
     }
-  };
+
+    if (!authConfig.enableOIDC) {
+      toast.show('error', t.loginUnsupportedDesc);
+      return;
+    }
+
+    if (primaryProvider) {
+      await handleSignIn(primaryProvider.id);
+      return;
+    }
+
+    if (!authConfig.disableEmailPassword) {
+      await handleSignIn();
+      return;
+    }
+
+    toast.show('error', t.loginMissingProviders);
+  }, [authConfig, handleSignIn, loadAuthConfig, loading, primaryProvider, signingInProvider, t, toast]);
+
+  const primaryLabel = getPrimaryActionLabel(authConfig, primaryProvider, t);
+  const isBusy = loading || !!signingInProvider;
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        titleCompact
-        title={t.loginTitle}
-        rightElement={
-          <Text className="text-primary font-medium text-[15px]">{t.loginChangeServer}</Text>
-        }
-        onPressRight={() => navigation.navigate('ServerConfig')}
-      />
-
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
-        <Animated.View entering={FadeInDown.delay(50).duration(320)}>
-          <View className="mx-5 mt-6 mb-4 rounded-[20px] bg-foreground/5 p-5">
-            <View className="mb-3 flex-row items-center">
-              <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                <Server color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[16px] font-semibold text-foreground tracking-tight">
-                  {t.loginSubtitle}
-                </Text>
-                <Text className="mt-0.5 text-[13px] font-medium text-secondary/60">
-                  {t.loginOpenInBrowser}
-                </Text>
-              </View>
-            </View>
-            <Text className="text-[13px] font-medium text-secondary/70">{serverUrl}</Text>
+    <View
+      className="flex-1 bg-background px-8"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 8 }}
+    >
+      <View className="flex-1 items-center justify-center">
+        <Animated.View
+          className="items-center"
+          entering={FadeInUp.delay(120).duration(720).springify().damping(15).mass(0.9)}
+        >
+          <View
+            className="h-32 w-32 items-center justify-center rounded-[34px] bg-white"
+            style={{
+              elevation: 12,
+              shadowColor: '#0f172a',
+              shadowOffset: { height: 20, width: 0 },
+              shadowOpacity: 0.12,
+              shadowRadius: 36,
+            }}
+          >
+            <RNImage className="h-28 w-28" source={require('../../assets/avato-logo.png')} />
           </View>
+
+          <Text className="mt-8 text-center text-[36px] font-bold tracking-tight text-foreground">
+            Avato
+          </Text>
+          <Text className="mt-4 text-center text-[17px] font-medium leading-7 text-secondary/70">
+            {t.onboardingWelcomeDesc}
+          </Text>
         </Animated.View>
 
-        {loading ? (
-          <Animated.View entering={FadeInDown.delay(90).duration(320)}>
-            <View className="mx-5 mt-4 items-center rounded-[20px] bg-foreground/5 px-5 py-8">
-              <ActivityIndicator color="#007aff" size="small" />
-              <Text className="mt-3 text-[14px] font-medium text-secondary/70">{t.loading}</Text>
-            </View>
-          </Animated.View>
-        ) : (
-          <>
-            {error ? (
-              <Animated.View entering={FadeInDown.delay(110).duration(320)}>
-                <View className="mx-5 mb-4 flex-row rounded-[20px] bg-red-500/10 p-4">
-                  <AlertCircle color="#ff3b30" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  <View className="ml-3 flex-1">
-                    <Text className="text-[14px] font-semibold text-red-500">{t.errorAuth}</Text>
-                    <Text className="mt-1 text-[13px] font-medium text-red-500/80">{error}</Text>
-                  </View>
-                </View>
-              </Animated.View>
-            ) : null}
-
-            {!authConfig?.enableOIDC ? (
-              <Animated.View entering={FadeInDown.delay(130).duration(320)}>
-                <View className="mx-5 rounded-[20px] bg-foreground/5 p-5">
-                  <Text className="text-[16px] font-semibold text-foreground tracking-tight">
-                    {t.loginUnsupportedTitle}
-                  </Text>
-                  <Text className="mt-2 text-[14px] font-medium leading-6 text-secondary/70">
-                    {t.loginUnsupportedDesc}
-                  </Text>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    className="mt-5 rounded-2xl bg-primary py-4 items-center"
-                    onPress={() => void loadAuthConfig()}
-                  >
-                    <Text className="text-[15px] font-semibold text-white">{t.errorRetry}</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+        <Animated.View
+          className="mt-10 w-full"
+          entering={FadeInDown.delay(320).duration(420).springify().damping(16)}
+        >
+          <TouchableOpacity
+            activeOpacity={0.82}
+            className="items-center rounded-2xl bg-primary py-4"
+            disabled={isBusy}
+            onPress={() => void handlePrimaryPress()}
+          >
+            {isBusy ? (
+              <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Animated.View entering={FadeInDown.delay(150).duration(320)}>
-                <View className="mx-5 rounded-[20px] bg-foreground/5 p-4">
-                  {!authConfig.disableEmailPassword ? (
-                    <TouchableOpacity
-                      activeOpacity={0.75}
-                      className="mb-3 flex-row items-center rounded-2xl bg-background px-4 py-4"
-                      disabled={!!signingInProvider}
-                      onPress={() => void handleSignIn()}
-                    >
-                      <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        {signingInProvider === PASSWORD_SIGNIN_KEY ? (
-                          <ActivityIndicator color="#007aff" size="small" />
-                        ) : (
-                          <ShieldCheck
-                            color="#007aff"
-                            size={18}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        )}
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-[15px] font-semibold text-foreground tracking-tight">
-                          {t.loginContinueWithEmail}
-                        </Text>
-                        <Text className="mt-0.5 text-[12px] font-medium text-secondary/60">
-                          {t.loginOpenInBrowser}
-                        </Text>
-                      </View>
-                      <ArrowRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    </TouchableOpacity>
-                  ) : null}
-
-                  {authConfig.authProviders.map((provider) => (
-                    <TouchableOpacity
-                      activeOpacity={0.75}
-                      className="mb-3 flex-row items-center rounded-2xl bg-background px-4 py-4 last:mb-0"
-                      disabled={!!signingInProvider}
-                      key={provider.id}
-                      onPress={() => void handleSignIn(provider.id)}
-                    >
-                      <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-foreground/5">
-                        {signingInProvider === provider.id ? (
-                          <ActivityIndicator color="#007aff" size="small" />
-                        ) : provider.mode === 'qrcode' ? (
-                          <ScanQrCode
-                            color="#007aff"
-                            size={18}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        ) : (
-                          <ShieldCheck
-                            color="#007aff"
-                            size={18}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        )}
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-[15px] font-semibold text-foreground tracking-tight">
-                          {getProviderActionLabel(provider, t)}
-                        </Text>
-                        <Text className="mt-0.5 text-[12px] font-medium text-secondary/60">
-                          {provider.mode === 'qrcode' ? t.loginQrHint : t.loginOpenInBrowser}
-                        </Text>
-                      </View>
-                      <ArrowRight color="#c0c0c0" size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    </TouchableOpacity>
-                  ))}
-
-                  {authConfig.disableEmailPassword && authConfig.authProviders.length === 0 ? (
-                    <Text className="px-2 py-2 text-[13px] font-medium leading-5 text-secondary/70">
-                      {t.loginMissingProviders}
-                    </Text>
-                  ) : null}
-                </View>
-              </Animated.View>
+              <Text className="text-[16px] font-semibold text-white">{primaryLabel}</Text>
             )}
-          </>
-        )}
-      </ScrollView>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="mt-4 items-center"
+            onPress={() => navigation.navigate('ServerConfig')}
+          >
+            <Text className="text-[14px] font-medium text-primary">{t.loginChangeServer}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </View>
   );
 }

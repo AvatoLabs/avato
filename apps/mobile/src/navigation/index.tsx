@@ -56,12 +56,10 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MeTabIcon({
-  color,
   focused,
   size,
   trigger,
 }: {
-  color: string;
   focused: boolean;
   size: number;
   trigger: number;
@@ -119,6 +117,57 @@ function MeTabIcon({
   );
 }
 
+function AnimatedTabLabel({
+  color,
+  focused,
+  label,
+}: {
+  color: string;
+  focused: boolean;
+  label: string;
+}) {
+  const opacity = useSharedValue(focused ? 1 : 0.7);
+  const scale = useSharedValue(focused ? 1 : 0.94);
+  const translateY = useSharedValue(focused ? 0 : 1.5);
+
+  useEffect(() => {
+    opacity.value = withTiming(focused ? 1 : 0.72, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+    scale.value = withTiming(focused ? 1 : 0.94, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+    translateY.value = withTiming(focused ? 0 : 1.5, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [focused, opacity, scale, translateY]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.Text
+      style={[
+        {
+          color,
+          fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+          fontSize: 11,
+          fontWeight: tokens.typography.weight.medium as any,
+          marginTop: 2,
+        },
+        animatedStyle,
+      ]}
+    >
+      {label}
+    </Animated.Text>
+  );
+}
+
 function BottomTabs() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -135,20 +184,19 @@ function BottomTabs() {
         headerShown: false,
         tabBarActiveTintColor: '#007aff',
         tabBarInactiveTintColor: colors.text + '60',
+        tabBarItemStyle: {
+          paddingTop: 4,
+        },
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopWidth: 0, // Removed hard border
           elevation: 0,
+          height: Platform.OS === 'android' ? 64 : 78,
           paddingTop: 8,
           shadowOpacity: 0.05, // Extremely subtle shadow instead of hard line
           shadowOffset: { width: 0, height: -2 },
           shadowRadius: 10,
-          ...(Platform.OS === 'android' ? { height: 60, paddingBottom: 8 } : {}),
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
-          fontWeight: tokens.typography.weight.medium as any,
+          ...(Platform.OS === 'android' ? { paddingBottom: 8 } : {}),
         },
       }}
     >
@@ -159,7 +207,9 @@ function BottomTabs() {
           tabBarIcon: ({ color, size }) => (
             <MessageSquare color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.tabChats,
+          tabBarLabel: ({ color, focused }) => (
+            <AnimatedTabLabel color={color} focused={focused} label={t.tabChats} />
+          ),
           tabBarAccessibilityLabel: 'Chats tab',
         }}
       />
@@ -170,7 +220,9 @@ function BottomTabs() {
           tabBarIcon: ({ color, size }) => (
             <Palette color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.tabArtwork,
+          tabBarLabel: ({ color, focused }) => (
+            <AnimatedTabLabel color={color} focused={focused} label={t.tabArtwork} />
+          ),
           tabBarAccessibilityLabel: 'Artwork tab',
         }}
       />
@@ -181,7 +233,9 @@ function BottomTabs() {
           tabBarIcon: ({ color, size }) => (
             <FolderOpen color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.resourceTitle,
+          tabBarLabel: ({ color, focused }) => (
+            <AnimatedTabLabel color={color} focused={focused} label={t.resourceTitle} />
+          ),
           tabBarAccessibilityLabel: 'Resources tab',
         }}
       />
@@ -192,7 +246,9 @@ function BottomTabs() {
           tabBarIcon: ({ color, size }) => (
             <Puzzle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
-          tabBarLabel: t.skillsTitle,
+          tabBarLabel: ({ color, focused }) => (
+            <AnimatedTabLabel color={color} focused={focused} label={t.skillsTitle} />
+          ),
           tabBarAccessibilityLabel: 'Skills tab',
         }}
       />
@@ -205,10 +261,12 @@ function BottomTabs() {
           },
         }}
         options={{
-          tabBarIcon: ({ color, focused, size }) => (
-            <MeTabIcon color={color} focused={focused} size={size} trigger={meIconTrigger} />
+          tabBarIcon: ({ focused, size }) => (
+            <MeTabIcon focused={focused} size={size} trigger={meIconTrigger} />
           ),
-          tabBarLabel: 'Me',
+          tabBarLabel: ({ color, focused }) => (
+            <AnimatedTabLabel color={color} focused={focused} label={t.tabMe} />
+          ),
           tabBarAccessibilityLabel: 'Me tab',
         }}
       />

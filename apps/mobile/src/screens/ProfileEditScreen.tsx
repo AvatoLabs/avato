@@ -4,10 +4,8 @@
  * Sections (mirrors web /settings/profile):
  *  - Avatar (with image picker + upload)
  *  - Full Name (editable)
- *  - Username (editable with validation)
  *  - Interests (predefined tags + custom)
- *  - Password (reset via email)
- *  - Email (editable with validation)
+ *  - Account identity is managed by Feishu SSO
  */
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -69,8 +67,6 @@ const INTEREST_LABEL_MAP = {
   sales: 'profileInterestsSales',
 } as const;
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
-
 export default function ProfileEditScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
@@ -82,7 +78,6 @@ export default function ProfileEditScreen({ navigation }: any) {
 
   const [loading, setLoading] = useState(!isLoaded);
   const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -90,17 +85,8 @@ export default function ProfileEditScreen({ navigation }: any) {
 
   // Saving states
   const [savingName, setSavingName] = useState(false);
-  const [savingUsername, setSavingUsername] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingInterests, setSavingInterests] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [usernameError, setUsernameError] = useState('');
-
-  // Email editing state
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [savingEmail, setSavingEmail] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -111,7 +97,6 @@ export default function ProfileEditScreen({ navigation }: any) {
   useEffect(() => {
     if (storeProfile) {
       setFullName(storeProfile.fullName || '');
-      setUsername(storeProfile.username || '');
       setInterests(storeProfile.interests || []);
       setAvatarUri(storeProfile.avatar || null);
     }
@@ -161,37 +146,6 @@ export default function ProfileEditScreen({ navigation }: any) {
     }
   };
 
-  // ── Save username (on blur) ─────────────────────────────────────
-  const usernameRegex = /^\w+$/;
-
-  const handleSaveUsername = async () => {
-    const trimmed = username.trim();
-    if (!trimmed || trimmed === (storeProfile?.username || '')) {
-      setUsernameError('');
-      return;
-    }
-
-    if (trimmed.length > 64 || !usernameRegex.test(trimmed)) {
-      setUsernameError(t.profileUsernameRule);
-      return;
-    }
-
-    setSavingUsername(true);
-    setUsernameError('');
-    try {
-      await userApi.updateUsername(trimmed);
-      updateField({ username: trimmed });
-    } catch (err: any) {
-      if (err?.message?.includes('CONFLICT') || err?.message?.includes('TAKEN')) {
-        setUsernameError(t.profileUsernameDuplicate);
-      } else {
-        toast.show('error', t.errorNetwork);
-      }
-    } finally {
-      setSavingUsername(false);
-    }
-  };
-
   // ── Toggle interest ─────────────────────────────────────────────
   const handleToggleInterest = async (label: string) => {
     const updated = interests.includes(label)
@@ -230,59 +184,6 @@ export default function ProfileEditScreen({ navigation }: any) {
     }
   };
 
-  // ── Password reset ──────────────────────────────────────────────
-  const handlePasswordReset = async () => {
-    const email = storeProfile?.email;
-    if (!email) return;
-
-    setSavingPassword(true);
-    try {
-      await userApi.requestPasswordReset(email);
-      haptics.success();
-      toast.show('success', t.profilePasswordResetSent);
-    } catch {
-      toast.show('error', t.profilePasswordResetError);
-    } finally {
-      setSavingPassword(false);
-    }
-  };
-
-  // ── Email change ────────────────────────────────────────────────
-  const handleStartEmailEdit = () => {
-    setNewEmail('');
-    setEmailError('');
-    setEditingEmail(true);
-  };
-
-  const handleCancelEmailEdit = () => {
-    setEditingEmail(false);
-    setNewEmail('');
-    setEmailError('');
-  };
-
-  const handleSaveEmail = async () => {
-    const trimmed = newEmail.trim();
-    if (!trimmed) return;
-
-    if (!EMAIL_REGEX.test(trimmed)) {
-      setEmailError(t.profileEmailInvalid);
-      return;
-    }
-
-    setSavingEmail(true);
-    setEmailError('');
-    try {
-      await userApi.changeEmail(trimmed);
-      setEditingEmail(false);
-      haptics.success();
-      toast.show('success', t.profileEmailChangeSent);
-    } catch (err: any) {
-      setEmailError(err?.message || t.errorNetwork);
-    } finally {
-      setSavingEmail(false);
-    }
-  };
-
   // ── Get translated interest label ──────────────────────────────
   const getInterestLabel = useCallback(
     (key: string): string => {
@@ -295,7 +196,7 @@ export default function ProfileEditScreen({ navigation }: any) {
   const predefinedLabels = INTEREST_AREAS.map((a) => getInterestLabel(a.key));
   const customInterests = interests.filter((i) => !predefinedLabels.includes(i));
 
-  const initials = (fullName || username || storeProfile?.email || 'U').slice(0, 2).toUpperCase();
+  const initials = (fullName || storeProfile?.email || 'U').slice(0, 2).toUpperCase();
 
   if (loading) {
     return (
@@ -387,40 +288,6 @@ export default function ProfileEditScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* Username Row */}
-            <View className="border-b border-black/[0.03]">
-              <View className="flex-row items-center justify-between px-4 py-1.5">
-                <Text className="text-foreground text-[15px] font-medium tracking-tight mr-4">
-                  {t.profileUsername}
-                </Text>
-                <View className="flex-row items-center flex-1 justify-end">
-                  {savingUsername && (
-                    <ActivityIndicator color="#007aff" size="small" style={{ marginRight: 6 }} />
-                  )}
-                  <TextInput
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    className={`text-[15px] text-right flex-1 ${usernameError ? 'text-red-500' : 'text-foreground'}`}
-                    placeholder={t.profileUsername}
-                    placeholderTextColor="#8c8c8c"
-                    returnKeyType="done"
-                    value={username}
-                    onBlur={handleSaveUsername}
-                    onSubmitEditing={handleSaveUsername}
-                    onChangeText={(v) => {
-                      setUsername(v);
-                      if (usernameError) setUsernameError('');
-                    }}
-                  />
-                </View>
-              </View>
-              {usernameError ? (
-                <Text className="text-red-500 text-[11px] font-medium px-4 pb-2">
-                  {usernameError}
-                </Text>
-              ) : null}
-            </View>
-
             {/* Interests Row */}
             <View className="px-4 py-4 border-b border-black/[0.03]">
               <Text className="text-foreground text-[15px] font-medium tracking-tight mb-3">
@@ -507,100 +374,6 @@ export default function ProfileEditScreen({ navigation }: any) {
               )}
             </View>
 
-            {/* Password Row */}
-            {storeProfile?.email && (
-              <View className="flex-row items-center justify-between px-4 py-3.5 border-b border-black/[0.03]">
-                <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                  {t.profilePassword}
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="bg-foreground/5 px-4 py-2 rounded-lg"
-                  disabled={savingPassword}
-                  onPress={handlePasswordReset}
-                >
-                  {savingPassword ? (
-                    <ActivityIndicator color="#007aff" size="small" />
-                  ) : (
-                    <Text className="text-primary text-[13px] font-medium">
-                      {t.profileChangePassword}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Email Row (editable) */}
-            {storeProfile?.email && (
-              <View className="border-b border-black/[0.03]">
-                <View className="flex-row items-center justify-between px-4 py-3.5">
-                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                    {t.profileEmail}
-                  </Text>
-                  {!editingEmail ? (
-                    <View className="flex-row items-center gap-3">
-                      <Text className="text-secondary/60 text-[14px]">{storeProfile.email}</Text>
-                      <TouchableOpacity activeOpacity={0.7} onPress={handleStartEmailEdit}>
-                        <Text className="text-primary text-[13px] font-medium">
-                          {t.profileUpdateEmail}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </View>
-                {editingEmail && (
-                  <View className="px-4 pb-3">
-                    <View className="bg-background rounded-xl px-3 h-10 justify-center mb-2">
-                      <TextInput
-                        autoFocus
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        className={`text-[14px] ${emailError ? 'text-red-500' : 'text-foreground'}`}
-                        keyboardType="email-address"
-                        placeholder={t.profileEmailPlaceholder}
-                        placeholderTextColor="#8c8c8c"
-                        returnKeyType="done"
-                        value={newEmail}
-                        onSubmitEditing={handleSaveEmail}
-                        onChangeText={(v) => {
-                          setNewEmail(v);
-                          if (emailError) setEmailError('');
-                        }}
-                      />
-                    </View>
-                    {emailError ? (
-                      <Text className="text-red-500 text-[11px] font-medium mb-2">
-                        {emailError}
-                      </Text>
-                    ) : null}
-                    <View className="flex-row justify-end gap-2">
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        className="bg-foreground/5 px-4 py-2 rounded-lg"
-                        disabled={savingEmail}
-                        onPress={handleCancelEmailEdit}
-                      >
-                        <Text className="text-foreground/70 text-[13px] font-medium">
-                          {t.cancel}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        className="bg-primary px-4 py-2 rounded-lg"
-                        disabled={savingEmail}
-                        onPress={handleSaveEmail}
-                      >
-                        {savingEmail ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text className="text-white text-[13px] font-medium">{t.save}</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
           </View>
         </Animated.View>
       </ScrollView>

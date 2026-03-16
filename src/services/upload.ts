@@ -1,6 +1,7 @@
 import { parseDataUri } from '@lobechat/model-runtime';
 import { uuid } from '@lobechat/utils';
 import dayjs from 'dayjs';
+import debug from 'debug';
 import { sha256 } from 'js-sha256';
 
 import { fileEnv } from '@/envs/file';
@@ -10,6 +11,8 @@ import { type FileMetadata, type UploadBase64ToS3Result } from '@/types/files';
 import { type FileUploadState, type FileUploadStatus } from '@/types/files/upload';
 
 export const UPLOAD_NETWORK_ERROR = 'NetWorkError';
+
+const log = debug('lobe-client:upload');
 
 /**
  * Generate file storage path metadata for S3-compatible storage
@@ -52,6 +55,29 @@ interface UploadFileToS3Options {
   pathname?: string;
   skipCheckFileType?: boolean;
 }
+
+const shouldUseSameOriginUpload = (preSignUrl: string): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.location.protocol === 'https:' && new URL(preSignUrl).protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
+const getUploadErrorMessage = (responseText: string, fallback: string): string => {
+  if (!responseText) return fallback;
+
+  try {
+    const payload = JSON.parse(responseText) as { error?: string };
+    if (payload.error) return payload.error;
+  } catch {
+    // ignore non-json responses
+  }
+
+  return responseText || fallback;
+};
 
 class UploadService {
   /**
@@ -143,10 +169,21 @@ class UploadService {
       pathname?: string;
     },
   ): Promise<FileMetadata> => {
-    const xhr = new XMLHttpRequest();
-
     const { preSignUrl, ...result } = await this.getSignedUploadUrl(file, { directory, pathname });
     const startTime = Date.now();
+
+    if (shouldUseSameOriginUpload(preSignUrl)) {
+      log('Falling back to same-origin upload for mixed content path: %s', result.path);
+      await this.uploadToSameOrigin(file, result.path, {
+        abortController,
+        onProgress,
+        startTime,
+      });
+
+      return result;
+    }
+
+    const xhr = new XMLHttpRequest();
 
     // Setup abort listener
     if (abortController) {
@@ -201,6 +238,75 @@ class UploadService {
     });
 
     return result;
+  };
+
+  private uploadToSameOrigin = async (
+    file: File,
+    pathname: string,
+    {
+      onProgress,
+      abortController,
+      startTime,
+    }: {
+      abortController?: AbortController;
+      onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
+      startTime: number;
+    },
+  ): Promise<void> => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+
+    formData.append('file', file, file.name);
+    formData.append('pathname', pathname);
+
+    if (abortController) {
+      abortController.signal.addEventListener('abort', () => {
+        xhr.abort();
+      });
+    }
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (!event.lengthComputable) return;
+
+      const progress = Number(((event.loaded / event.total) * 100).toFixed(1));
+      const speedInByte = event.loaded / ((Date.now() - startTime) / 1000);
+
+      onProgress?.('uploading', {
+        progress: progress === 100 ? 99.9 : progress,
+        restTime: (event.total - event.loaded) / speedInByte,
+        speed: speedInByte,
+      });
+    });
+
+    xhr.open('POST', API_ENDPOINTS.fileUpload);
+
+    await new Promise<void>((resolve, reject) => {
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress?.('success', {
+            progress: 100,
+            restTime: 0,
+            speed: file.size / ((Date.now() - startTime) / 1000),
+          });
+          resolve();
+          return;
+        }
+
+        reject(getUploadErrorMessage(xhr.responseText, xhr.statusText));
+      });
+
+      xhr.addEventListener('error', () => {
+        if (xhr.status === 0) reject(UPLOAD_NETWORK_ERROR);
+        else reject(getUploadErrorMessage(xhr.responseText, xhr.statusText));
+      });
+
+      xhr.addEventListener('abort', () => {
+        onProgress?.('cancelled', { progress: 0, restTime: 0, speed: 0 });
+        reject(new Error('Upload cancelled by user'));
+      });
+
+      xhr.send(formData);
+    });
   };
 
   /**

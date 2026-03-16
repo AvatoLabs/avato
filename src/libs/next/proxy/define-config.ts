@@ -170,6 +170,8 @@ export function defineConfig() {
     // backend api
     '/api/v1(.*)', // OpenAPI routes should use OpenAPI auth (API Key/OIDC), not BetterAuth session
     '/api/auth(.*)',
+    '/api/file/upload',
+    '/api/mobile-auth(.*)',
     '/api/webhooks(.*)',
     '/api/workflows(.*)',
     '/api/agent(.*)',
@@ -188,7 +190,9 @@ export function defineConfig() {
     // oauth
     // Make only the consent view public (GET page), not other oauth paths
     '/oauth/consent/(.*)',
+    '/oidc/.well-known/(.*)',
     '/oidc/handoff',
+    '/oidc/jwks',
     '/oidc/device/auth',
     '/oidc/token',
     // market

@@ -16,13 +16,18 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { clearTransientAppState } from '../lib/appState';
 import { clearStoredAuthSession } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
-import { getApiUrl, normalizeApiUrl, setApiUrl, testConnection } from '../lib/server';
+import {
+  formatApiUrlForInput,
+  getApiUrl,
+  normalizeApiUrl,
+  setApiUrl,
+  testConnection,
+} from '../lib/server';
 import { useConnectionStore } from '../store/connection';
 import { tokens } from '../theme/tokens';
 
@@ -32,7 +37,6 @@ interface Props {
 }
 
 export default function ServerConfigScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets();
   const isFirstLaunch = route?.params?.firstLaunch ?? false;
   const { t } = useI18n();
 
@@ -46,7 +50,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
     getApiUrl().then((saved) => {
       if (saved) {
         setInitialUrl(saved);
-        setUrl(saved);
+        setUrl(formatApiUrlForInput(saved));
       }
     });
   }, []);
@@ -91,7 +95,8 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
     const urlChanged = normalized !== normalizedInitialUrl;
 
     await setApiUrl(normalized);
-    setUrl(normalized);
+    setInitialUrl(normalized);
+    setUrl(formatApiUrlForInput(normalized));
 
     if (urlChanged) {
       await clearStoredAuthSession();
@@ -181,7 +186,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                 {t.serverQuickFill}
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {['http://192.168.1.100:3010', 'http://10.0.0.1:3010', 'http://localhost:3010'].map(
+                {['192.168.1.100:3010', '10.0.0.1:3010', 'localhost:3010'].map(
                   (preset) => (
                     <TouchableOpacity
                       activeOpacity={0.7}

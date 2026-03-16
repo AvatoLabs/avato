@@ -96,6 +96,9 @@ export const getServerGlobalConfig = async () => {
     memory: {
       userMemory: cleanObject(getPublicMemoryExtractionConfig()),
     },
+    mobileNativeAuth: cleanObject({
+      feishu: authEnv.AUTH_FEISHU_APP_ID ? { appId: authEnv.AUTH_FEISHU_APP_ID } : undefined,
+    }),
     oAuthSSOProviders: ssoProviders,
     systemAgent: parseSystemAgent(appEnv.SYSTEM_AGENT),
     telemetry: {

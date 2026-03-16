@@ -8,6 +8,7 @@
  *
  * Supports: install / uninstall, import (URL/GitHub), add custom MCP.
  */
+import * as DocumentPicker from 'expo-document-picker';
 import {
   ArrowLeft,
   Blocks,
@@ -41,7 +42,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
-import { agentSkillApi, mcpApi, pluginApi } from '../lib/api';
+import { agentSkillApi, fileApi, mcpApi, pluginApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -987,6 +988,41 @@ export default function SkillSettingsScreen({ navigation }: any) {
     }
   };
 
+  const handleImportZip = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        type: [
+          'application/zip',
+          'application/x-zip-compressed',
+          'application/octet-stream',
+          'application/x-compressed',
+        ],
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+
+      if (!asset.name.toLowerCase().endsWith('.zip')) {
+        toast.show('error', t.skillsImportFailed);
+        return;
+      }
+
+      haptics.light();
+
+      const uploaded = await fileApi.upload(asset.uri, asset.name, asset.mimeType || 'application/zip', {
+        skipCheckFileType: true,
+      });
+
+      await agentSkillApi.importFromZip(uploaded.id);
+      toast.show('success', t.skillsImportSuccess);
+      await fetchAll();
+    } catch {
+      toast.show('error', t.skillsImportFailed);
+    }
+  };
+
   const handleAddCustomMcp = async (params: {
     auth?: { token?: string; type: 'none' | 'bearer' };
     avatar?: string;
@@ -1234,10 +1270,7 @@ export default function SkillSettingsScreen({ navigation }: any) {
             <Animated.View entering={FadeInDown.delay(250).duration(300)}>
               <PressableScale
                 className="bg-foreground/5 rounded-2xl overflow-hidden"
-                onPress={() => {
-                  // TODO: Upload ZIP (requires file picker integration)
-                  toast.show('info', 'Coming soon');
-                }}
+                onPress={() => void handleImportZip()}
               >
                 <View className="flex-row items-center px-4 py-3.5">
                   <View className="w-8 h-8 rounded-full bg-orange-500/10 items-center justify-center mr-3">

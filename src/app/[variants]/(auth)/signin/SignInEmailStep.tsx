@@ -1,7 +1,7 @@
 import { BRANDING_NAME } from '@avatochat/business-const';
 import { Alert, Button, Flexbox, Icon, Input, Skeleton, Text } from '@avatohub/ui';
 import { type FormInstance, type InputRef } from 'antd';
-import { Badge, Divider, Form } from 'antd';
+import { Divider, Form } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import { ChevronRight, Mail } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -27,7 +27,6 @@ export interface SignInEmailStepProps {
   disableEmailPassword?: boolean;
   form: FormInstance<{ email: string }>;
   isSocialOnly: boolean;
-  lastAuthProvider?: string | null;
   loading: boolean;
   oAuthSSOProviders: string[];
   onCheckUser: (values: { email: string }) => Promise<void>;
@@ -41,7 +40,6 @@ export const SignInEmailStep = ({
   disableEmailPassword,
   form,
   isSocialOnly,
-  lastAuthProvider,
   loading,
   oAuthSSOProviders,
   serverConfigInit,
@@ -138,18 +136,7 @@ export const SignInEmailStep = ({
                 {getProviderLabel(provider)}
               </Button>
             );
-            return provider === lastAuthProvider ? (
-              <Badge.Ribbon
-                color="var(--ant-color-info-fill-tertiary)"
-                key={provider}
-                styles={{ content: { color: 'var(--ant-color-info)' } }}
-                text={t('betterAuth.signin.lastUsed')}
-              >
-                {button}
-              </Badge.Ribbon>
-            ) : (
-              button
-            );
+            return button;
           })}
           {!disableEmailPassword && divider}
         </Flexbox>

@@ -2,6 +2,7 @@ import { withElectronProtocolIfElectron } from '@/const/protocol';
 
 export const API_ENDPOINTS = {
   oauth: withElectronProtocolIfElectron('/api/auth'),
+  fileUpload: withElectronProtocolIfElectron('/api/file/upload'),
 
   proxy: withElectronProtocolIfElectron('/webapi/proxy'),
 

@@ -50,11 +50,11 @@ export default function ProfileScreen({ navigation }: any) {
   const checkConnection = useConnectionStore((s) => s.checkConnection);
 
   const userAvatar = useUserStore((s) => s.avatar);
+  const userEmail = useUserStore((s) => s.email);
   const userFullName = useUserStore((s) => s.fullName);
-  const userUsername = useUserStore((s) => s.username);
   const fetchUser = useUserStore((s) => s.fetchUser);
   const isUserLoaded = useUserStore((s) => s.isLoaded);
-  const userName = userFullName || userUsername;
+  const userName = userFullName || userEmail;
 
   const [messageCount, setMessageCount] = useState(0);
   const [topicCount, setTopicCount] = useState(0);

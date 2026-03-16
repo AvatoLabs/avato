@@ -118,11 +118,19 @@ export const validateOIDCJWT = async (token: string) => {
     const userId = payload.sub;
     const clientId = payload.client_id;
     const aud = payload.aud;
+    const purpose = payload.purpose;
 
     if (!userId) {
       throw new TRPCError({
         code: 'UNAUTHORIZED',
         message: 'JWT token 中缺少用户 ID (sub)',
+      });
+    }
+
+    if (purpose && purpose !== 'mobile_access') {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'JWT token purpose is not allowed for API access',
       });
     }
 

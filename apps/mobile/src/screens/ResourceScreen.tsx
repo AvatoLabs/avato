@@ -48,6 +48,7 @@ import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
+const SECONDARY_BAR_HEIGHT = 48;
 
 type FileCategory = 'all' | 'images' | 'documents' | 'others';
 
@@ -357,12 +358,15 @@ export default function ResourceScreen() {
 
       {/* Category tabs */}
       <View className="border-b border-gray-100 dark:border-gray-800">
-        <View className="flex-row px-4 pt-1">
+        <View
+          className="flex-row items-end px-4"
+          style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingBottom: 8, paddingTop: 6 }}
+        >
           {TABS.map((tab) => {
             const active = category === tab.key;
             return (
               <TouchableOpacity
-                className="mr-6 pb-2"
+                className="mr-6"
                 key={tab.key}
                 onPress={() => {
                   haptics.selection();

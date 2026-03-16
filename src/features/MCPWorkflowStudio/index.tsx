@@ -4,15 +4,19 @@ import { DEFAULT_AGENT_CONFIG, isDesktop } from '@lobechat/const';
 import { type LobeAgentConfig, type SkillListItem } from '@lobechat/types';
 import { type LobeChatPluginManifest } from '@lobehub/chat-plugin-sdk';
 import { Avatar, Button, Flexbox, Icon, Markdown, Segmented, Tag, Text } from '@lobehub/ui';
-import { Alert, App, Input, Modal, Select, Switch } from 'antd';
+import { Alert, App, Input, Modal, Select, Switch, Tabs } from 'antd';
+import Dropdown from 'antd/es/dropdown';
 import { type TextAreaRef } from 'antd/es/input/TextArea';
+import type { MenuProps } from 'antd/es/menu';
 import { useResponsive } from 'antd-style';
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   Bot,
   Cable,
   CirclePlus,
+  Ellipsis,
   FileText,
   Globe,
   Image as ImageIcon,
@@ -32,6 +36,7 @@ import {
 import {
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   startTransition,
   useEffect,
   useEffectEvent,
@@ -160,6 +165,12 @@ interface StudioViewport {
   zoom: number;
 }
 
+interface StudioHistorySnapshot {
+  draft: StudioDraft;
+  selectedWorkflowId?: string;
+  workflowName: string;
+}
+
 interface StudioHttpConnectionForm {
   authType: 'bearer' | 'none' | 'oauth2';
   headers: string;
@@ -173,6 +184,15 @@ interface StudioStdioConnectionForm {
   command: string;
   env: string;
   identifier: string;
+}
+
+interface StudioCommandPaletteItem {
+  description: string;
+  group: 'action' | 'node';
+  icon: ReactNode;
+  id: string;
+  label: string;
+  onSelect: () => void;
 }
 
 const defaultHttpConnection: StudioHttpConnectionForm = {
@@ -385,6 +405,10 @@ const MCPWorkflowStudio = () => {
   const promptTextareaRef = useRef<TextAreaRef>(null);
   const viewportRef = useRef<StudioViewport>(STUDIO_DEFAULT_VIEWPORT);
   const viewportInitializedRef = useRef(false);
+  const historyRestoreRef = useRef(false);
+  const historySnapshotRef = useRef<StudioHistorySnapshot>();
+  const redoStackRef = useRef<StudioHistorySnapshot[]>([]);
+  const undoStackRef = useRef<StudioHistorySnapshot[]>([]);
   const panSessionRef = useRef<
     | {
         originPointer: StudioNodePosition;
@@ -410,7 +434,6 @@ const MCPWorkflowStudio = () => {
   const [viewport, setViewport] = useState<StudioViewport>(STUDIO_DEFAULT_VIEWPORT);
   const [editingNodeId, setEditingNodeId] = useState<string>();
   const [renamingNodeId, setRenamingNodeId] = useState<string>();
-  const [spacePressed, setSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [canvasBounds, setCanvasBounds] = useState<{ height: number; width: number }>(
     STUDIO_DEFAULT_CANVAS_BOUNDS,
@@ -425,6 +448,9 @@ const MCPWorkflowStudio = () => {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>();
   const [workflowName, setWorkflowName] = useState('');
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [commandPaletteMode, setCommandPaletteMode] = useState<'all' | 'node'>('node');
+  const [commandQuery, setCommandQuery] = useState('');
   const [serverModalOpen, setServerModalOpen] = useState(false);
   const [connectionMode, setConnectionMode] = useState<'http' | 'stdio'>('http');
   const [httpForm, setHttpForm] = useState<StudioHttpConnectionForm>(defaultHttpConnection);
@@ -486,9 +512,7 @@ const MCPWorkflowStudio = () => {
   const selectedSkill = selectedSkillNode?.data.skillId
     ? availableSkills.find((item) => item.id === selectedSkillNode.data.skillId)
     : undefined;
-  const selectedWorkflow = workflowLibrary.find((item) => item.id === selectedWorkflowId);
   const previewNode = previewNodeId ? nodes.find((node) => node.id === previewNodeId) : undefined;
-  const installedServers = servers.filter((server) => server.origin === 'installed');
   const selectedResourceNode = selectedNode?.type === 'resource' ? selectedNode : undefined;
   const pendingSourceNode = pendingConnection?.sourceId
     ? getNode(pendingConnection.sourceId)
@@ -503,6 +527,31 @@ const MCPWorkflowStudio = () => {
     : [];
   const selectionCount = selectedNodeIds.length + selectedEdgeIds.length;
   const isMultiAgentMode = nodes.filter((node) => node.type === 'agent').length > 1;
+  const selectedWorkflow = selectedWorkflowId
+    ? workflowLibrary.find((item) => item.id === selectedWorkflowId)
+    : undefined;
+  const activeWorkflowTabKey = selectedWorkflowId || 'draft';
+  const workflowTabItems = useMemo(
+    () => [
+      { key: 'draft', label: t('mcpStudio.library.draft') },
+      ...workflowLibrary.map((item) => ({
+        key: item.id,
+        label: item.name,
+      })),
+    ],
+    [t, workflowLibrary],
+  );
+  const isSelectedWorkflowSaved =
+    !!selectedWorkflow &&
+    workflowName.trim() === selectedWorkflow.name &&
+    JSON.stringify(sanitizedDraft) === JSON.stringify(buildStudioDraft(selectedWorkflow.draft));
+  const workflowStatusLabel = workflowSaving
+    ? t('mcpStudio.library.saving')
+    : selectedWorkflowId
+      ? isSelectedWorkflowSaved
+        ? t('mcpStudio.library.savedShort')
+        : t('mcpStudio.library.edited')
+      : t('mcpStudio.library.draft');
   const effectiveAgentProvider =
     selectedAgentNode?.data.provider ||
     selectedAgentConfig?.provider ||
@@ -778,6 +827,39 @@ const MCPWorkflowStudio = () => {
   }, [draftHydrated, sanitizedDraft]);
 
   useEffect(() => {
+    if (!draftHydrated) return;
+
+    const nextSnapshot: StudioHistorySnapshot = {
+      draft: sanitizedDraft,
+      selectedWorkflowId,
+      workflowName,
+    };
+
+    if (!historySnapshotRef.current) {
+      historySnapshotRef.current = nextSnapshot;
+      return;
+    }
+
+    const lastSnapshot = historySnapshotRef.current;
+    const hasChanged =
+      JSON.stringify(lastSnapshot.draft) !== JSON.stringify(nextSnapshot.draft) ||
+      lastSnapshot.selectedWorkflowId !== nextSnapshot.selectedWorkflowId ||
+      lastSnapshot.workflowName !== nextSnapshot.workflowName;
+
+    if (!hasChanged) return;
+
+    if (historyRestoreRef.current) {
+      historyRestoreRef.current = false;
+      historySnapshotRef.current = nextSnapshot;
+      return;
+    }
+
+    undoStackRef.current = [...undoStackRef.current.slice(-49), lastSnapshot];
+    redoStackRef.current = [];
+    historySnapshotRef.current = nextSnapshot;
+  }, [draftHydrated, sanitizedDraft, selectedWorkflowId, workflowName]);
+
+  useEffect(() => {
     if (mobile || !canvasRef.current) return;
 
     const element = canvasRef.current;
@@ -876,6 +958,14 @@ const MCPWorkflowStudio = () => {
     setErrorMessage(undefined);
     setLastRunAt(undefined);
     setRenamingNodeId(undefined);
+  };
+
+  const applyHistorySnapshot = (snapshot: StudioHistorySnapshot) => {
+    historyRestoreRef.current = true;
+    applyDraft(snapshot.draft);
+    setSelectedWorkflowId(snapshot.selectedWorkflowId);
+    setWorkflowName(snapshot.workflowName);
+    requestAnimationFrame(() => fitViewportToNodes());
   };
 
   const getViewportPoint = (clientX: number, clientY: number): StudioNodePosition | undefined => {
@@ -1231,7 +1321,7 @@ const MCPWorkflowStudio = () => {
   const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement | SVGSVGElement>) => {
     if (pendingConnectionRef.current) return;
 
-    if (event.button === 1 || (event.button === 0 && spacePressed)) {
+    if (event.button === 1) {
       event.preventDefault();
       handleStartPan(event.clientX, event.clientY);
 
@@ -1620,41 +1710,48 @@ const MCPWorkflowStudio = () => {
     };
   }, [handleSelectionKeyDown]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== ' ') return;
+  const handleStudioHotkeys = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.isContentEditable ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
 
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.isContentEditable ||
-          target.tagName === 'INPUT' ||
-          target.tagName === 'SELECT' ||
-          target.tagName === 'TEXTAREA')
-      ) {
-        return;
-      }
+    const modKey = event.metaKey || event.ctrlKey;
 
+    if (event.key === ' ' && !modKey && !event.altKey && !event.shiftKey) {
       event.preventDefault();
-      setSpacePressed(true);
-    };
+      handleOpenCommandPalette('all');
+      return;
+    }
 
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === ' ') setSpacePressed(false);
-    };
+    if (modKey && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      handleUndo();
+      return;
+    }
 
-    const handleBlur = () => setSpacePressed(false);
+    if (
+      (modKey && event.key.toLowerCase() === 'y') ||
+      (modKey && event.shiftKey && event.key.toLowerCase() === 'z')
+    ) {
+      event.preventDefault();
+      handleRedo();
+    }
+  });
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
+  useEffect(() => {
+    window.addEventListener('keydown', handleStudioHotkeys);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('keydown', handleStudioHotkeys);
     };
-  }, []);
+  }, [handleStudioHotkeys]);
 
   const handleRemoveEdge = (edgeId: string) => {
     setSelectedEdgeIds((state) => state.filter((id) => id !== edgeId));
@@ -1748,13 +1845,24 @@ const MCPWorkflowStudio = () => {
     }
   };
 
-  const handleLoadWorkflow = () => {
-    if (!selectedWorkflow) return;
+  const handleSelectWorkflowTab = (workflowId?: string) => {
+    if (!workflowId) {
+      if (!selectedWorkflowId) return;
 
-    applyDraft(selectedWorkflow.draft);
-    setWorkflowName(selectedWorkflow.name);
+      handleNewWorkflow();
+
+      return;
+    }
+
+    if (workflowId === selectedWorkflowId) return;
+
+    const workflow = workflowLibrary.find((item) => item.id === workflowId);
+    if (!workflow) return;
+
+    setSelectedWorkflowId(workflow.id);
+    setWorkflowName(workflow.name);
+    applyDraft(workflow.draft);
     requestAnimationFrame(() => fitViewportToNodes());
-    message.success(t('mcpStudio.library.loaded'));
   };
 
   const handleNewWorkflow = () => {
@@ -1765,6 +1873,17 @@ const MCPWorkflowStudio = () => {
     setWorkflowName('');
     requestAnimationFrame(() => fitViewportToNodes());
     message.success(t('mcpStudio.messages.newDraft'));
+  };
+
+  const handleOpenCommandPalette = (mode: 'all' | 'node') => {
+    setCommandPaletteMode(mode);
+    setCommandQuery('');
+    setCommandPaletteOpen(true);
+  };
+
+  const handleCloseCommandPalette = () => {
+    setCommandPaletteOpen(false);
+    setCommandQuery('');
   };
 
   const handleDeleteWorkflow = async () => {
@@ -1785,6 +1904,77 @@ const MCPWorkflowStudio = () => {
       message.error(t('mcpStudio.messages.librarySyncFailed'));
     } finally {
       setWorkflowSaving(false);
+    }
+  };
+
+  const handleWorkflowMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'load-mcp') {
+      setServerModalOpen(true);
+      return;
+    }
+
+    if (key === 'delete-workflow') {
+      void handleDeleteWorkflow();
+      return;
+    }
+  };
+
+  const handleGoBack = () => {
+    if (typeof window === 'undefined') return;
+
+    window.history.back();
+  };
+
+  const handleUndo = () => {
+    const previousSnapshot = undoStackRef.current.at(-1);
+    const currentSnapshot = historySnapshotRef.current;
+    if (!previousSnapshot || !currentSnapshot) return;
+
+    undoStackRef.current = undoStackRef.current.slice(0, -1);
+    redoStackRef.current = [...redoStackRef.current, currentSnapshot];
+    applyHistorySnapshot(previousSnapshot);
+  };
+
+  const handleRedo = () => {
+    const nextSnapshot = redoStackRef.current.at(-1);
+    const currentSnapshot = historySnapshotRef.current;
+    if (!nextSnapshot || !currentSnapshot) return;
+
+    redoStackRef.current = redoStackRef.current.slice(0, -1);
+    undoStackRef.current = [...undoStackRef.current, currentSnapshot];
+    applyHistorySnapshot(nextSnapshot);
+  };
+
+  const handleExportWorkflow = async () => {
+    if (typeof window === 'undefined') return;
+
+    const payload = JSON.stringify(
+      {
+        draft: sanitizedDraft,
+        name: workflowName.trim() || t('mcpStudio.library.defaultName'),
+        workflowDsl,
+      },
+      null,
+      2,
+    );
+
+    try {
+      const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      const filename = (workflowName.trim() || t('mcpStudio.library.defaultName'))
+        .replaceAll(/\s+/g, '-')
+        .replaceAll(/[^\w-]/g, '')
+        .toLowerCase();
+
+      anchor.href = url;
+      anchor.download = `${filename || 'workflow'}.json`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      message.success(t('mcpStudio.messages.exported'));
+    } catch (error) {
+      console.error('Failed to export workflow studio draft:', error);
+      message.error(t('mcpStudio.messages.exportFailed'));
     }
   };
 
@@ -2158,6 +2348,27 @@ const MCPWorkflowStudio = () => {
     if (!sourceNode || !targetNode) return `${edge.source} -> ${edge.target}`;
 
     return `${sourceNode.data.title} -> ${targetNode.data.title}`;
+  };
+
+  const getEdgeMidpoint = (edge: StudioDraft['edges'][number]) => {
+    const sourceNode = getNode(edge.source);
+    const targetNode = getNode(edge.target);
+
+    if (!sourceNode || !targetNode) return undefined;
+
+    const start = getNodeOutputAnchor(
+      sourceNode,
+      resolveStudioOutputPortId(sourceNode, edge.sourcePortId, edge.channel),
+    );
+    const end = getNodeInputAnchor(
+      targetNode,
+      resolveStudioInputPortId(targetNode, edge.targetPortId, edge.channel),
+    );
+
+    return {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2,
+    };
   };
 
   const renderNode = (node: StudioCanvasNode) => {
@@ -3393,91 +3604,171 @@ const MCPWorkflowStudio = () => {
     </Flexbox>
   );
 
-  const nodeTypeOptions: Array<{ label: string; type: StudioCanvasNode['type'] }> = [
-    { label: t('mcpStudio.node.input'), type: 'input' },
-    { label: t('mcpStudio.node.resource'), type: 'resource' },
-    { label: t('mcpStudio.node.skill'), type: 'skill' },
-    { label: t('mcpStudio.node.agent'), type: 'agent' },
-    { label: t('mcpStudio.node.tool'), type: 'mcp-tool' },
-    { label: t('mcpStudio.node.transform'), type: 'transform' },
-    { label: t('mcpStudio.node.chat'), type: 'chat-output' },
+  const nodeTypeOptions: Array<{
+    description: string;
+    label: string;
+    type: StudioCanvasNode['type'];
+  }> = [
+    { description: t('mcpStudio.node.inputDesc'), label: t('mcpStudio.node.input'), type: 'input' },
+    {
+      description: t('mcpStudio.node.resourceDesc'),
+      label: t('mcpStudio.node.resource'),
+      type: 'resource',
+    },
+    { description: t('mcpStudio.node.skillDesc'), label: t('mcpStudio.node.skill'), type: 'skill' },
+    { description: t('mcpStudio.node.agentDesc'), label: t('mcpStudio.node.agent'), type: 'agent' },
+    {
+      description: t('mcpStudio.connection.desc'),
+      label: t('mcpStudio.node.tool'),
+      type: 'mcp-tool',
+    },
+    {
+      description: t('mcpStudio.node.transformDesc'),
+      label: t('mcpStudio.node.transform'),
+      type: 'transform',
+    },
+    {
+      description: t('mcpStudio.node.chatDesc'),
+      label: t('mcpStudio.node.chat'),
+      type: 'chat-output',
+    },
+  ];
+  const commandPaletteItems: StudioCommandPaletteItem[] = [
+    ...nodeTypeOptions.map((item) => ({
+      description: item.description,
+      group: 'node' as const,
+      icon: (
+        <Icon
+          icon={
+            item.type === 'mcp-tool'
+              ? Wrench
+              : getNodeTypeIcon(createStudioNode(item.type, { x: 0, y: 0 }))
+          }
+        />
+      ),
+      id: item.type,
+      label: item.label,
+      onSelect: () => {
+        addBattery(item.type);
+        handleCloseCommandPalette();
+      },
+    })),
+    {
+      description: t('mcpStudio.toolbar.loadMcp'),
+      group: 'action',
+      icon: <Icon icon={PlugZap} />,
+      id: 'load-mcp',
+      label: t('mcpStudio.toolbar.loadMcp'),
+      onSelect: () => {
+        setServerModalOpen(true);
+        handleCloseCommandPalette();
+      },
+    },
+    {
+      description: t('mcpStudio.toolbar.autoLayout'),
+      group: 'action',
+      icon: <Icon icon={RotateCcw} />,
+      id: 'auto-layout',
+      label: t('mcpStudio.toolbar.autoLayout'),
+      onSelect: () => {
+        handleAutoLayout();
+        handleCloseCommandPalette();
+      },
+    },
+  ];
+  const normalizedCommandQuery = commandQuery.trim().toLowerCase();
+  const filteredCommandItems = commandPaletteItems.filter((item) => {
+    if (commandPaletteMode === 'node' && item.group !== 'node') return false;
+    if (!normalizedCommandQuery) return true;
+
+    return (
+      item.label.toLowerCase().includes(normalizedCommandQuery) ||
+      item.description.toLowerCase().includes(normalizedCommandQuery)
+    );
+  });
+  const workflowMenuItems: MenuProps['items'] = [
+    {
+      icon: <Icon icon={PlugZap} />,
+      key: 'load-mcp',
+      label: t('mcpStudio.toolbar.loadMcp'),
+    },
+    { type: 'divider' },
+    {
+      danger: true,
+      disabled: !selectedWorkflowId,
+      icon: <Icon icon={Trash2} />,
+      key: 'delete-workflow',
+      label: t('mcpStudio.library.delete'),
+    },
   ];
 
   return (
     <Flexbox className={styles.workspace} gap={16}>
-      <Flexbox horizontal align={'center'} className={styles.toolbar} gap={8} wrap={'wrap'}>
-        <div className={styles.toolbarGroup}>
-          {nodeTypeOptions.map((item) => (
-            <Button
-              className={styles.toolButton}
-              key={item.type}
-              icon={
-                <Icon
-                  icon={
-                    item.type === 'mcp-tool'
-                      ? Wrench
-                      : getNodeTypeIcon(createStudioNode(item.type, { x: 0, y: 0 }))
-                  }
-                />
-              }
-              onClick={() => addBattery(item.type)}
-            >
-              {item.label}
-            </Button>
-          ))}
-          <Button icon={<Icon icon={PlugZap} />} onClick={() => setServerModalOpen(true)}>
-            {t('mcpStudio.toolbar.loadMcp')}
-          </Button>
-          <Button icon={<Icon icon={RotateCcw} />} onClick={handleAutoLayout}>
-            {t('mcpStudio.toolbar.autoLayout')}
-          </Button>
+      <Flexbox horizontal align={'flex-start'} className={styles.toolbar} gap={8} wrap={'wrap'}>
+        <div className={styles.toolbarLeft}>
+          <Button
+            className={styles.backButton}
+            icon={<Icon icon={ArrowLeft} />}
+            size={'small'}
+            type={'text'}
+            onClick={handleGoBack}
+          />
+          <div className={styles.workflowTitleWrap}>
+            <Input
+              className={styles.workflowNameInput}
+              placeholder={t('mcpStudio.library.name')}
+              size={'small'}
+              value={workflowName}
+              onChange={(event) => setWorkflowName(event.target.value)}
+            />
+            <Text className={styles.workflowStatus} type={'secondary'}>
+              {workflowStatusLabel}
+            </Text>
+          </div>
+        </div>
+
+        <div className={styles.toolbarCenter}>
+          <Tabs
+            activeKey={activeWorkflowTabKey}
+            className={styles.workflowTabs}
+            size={'small'}
+            items={workflowTabItems.map((item) => ({
+              key: item.key,
+              label: <span className={styles.workflowTabLabel}>{item.label}</span>,
+            }))}
+            onChange={(key) => handleSelectWorkflowTab(key === 'draft' ? undefined : key)}
+          />
+        </div>
+
+        <div className={styles.toolbarActions}>
           {canRunPreview && (
-            <Button icon={<Icon icon={Play} />} loading={runLoading} onClick={handleRun}>
+            <Button
+              className={styles.runButton}
+              icon={<Icon icon={Play} />}
+              loading={runLoading}
+              size={'small'}
+              onClick={handleRun}
+            >
               {t('mcpStudio.run.execute')}
             </Button>
           )}
-        </div>
-
-        <div className={styles.toolbarGroup}>
-          <Tag>{`${availableAgents.length} ${t('mcpStudio.toolbar.agents')}`}</Tag>
-          <Tag>{`${servers.length} ${t('mcpStudio.toolbar.servers')}`}</Tag>
-          <Tag>{`${installedServers.length} ${t('mcpStudio.connection.installed')}`}</Tag>
-          <Tag>{`${nodes.length} ${t('mcpStudio.toolbar.batteries')}`}</Tag>
-          <Tag>{`${edges.length} ${t('mcpStudio.toolbar.wires')}`}</Tag>
-        </div>
-
-        <div className={styles.toolbarSpacer} />
-
-        <div className={styles.toolbarGroup}>
-          <Input
-            placeholder={t('mcpStudio.library.name')}
-            value={workflowName}
-            onChange={(event) => setWorkflowName(event.target.value)}
-          />
-          <Button loading={workflowSaving} onClick={() => void handleSaveWorkflow()}>
+          <Button
+            loading={workflowSaving}
+            size={'small'}
+            type={'primary'}
+            onClick={() => void handleSaveWorkflow()}
+          >
             {t('mcpStudio.library.save')}
           </Button>
-          <Select
-            placeholder={t('mcpStudio.library.select')}
-            style={{ minWidth: 220 }}
-            value={selectedWorkflowId}
-            options={workflowLibrary.map((item) => ({
-              label: item.name,
-              value: item.id,
-            }))}
-            onChange={setSelectedWorkflowId}
-          />
-          <Button disabled={!selectedWorkflow} onClick={handleLoadWorkflow}>
-            {t('mcpStudio.library.load')}
+          <Button className={styles.utilityButton} icon={<Icon icon={FileText} />} size={'small'} onClick={() => void handleExportWorkflow()}>
+            {t('mcpStudio.header.export')}
           </Button>
-          <Button onClick={handleNewWorkflow}>{t('mcpStudio.library.new')}</Button>
-          <Button
-            disabled={!selectedWorkflowId}
-            loading={workflowSaving}
-            onClick={() => void handleDeleteWorkflow()}
+          <Dropdown
+            menu={{ items: workflowMenuItems, onClick: handleWorkflowMenuClick }}
+            trigger={['click']}
           >
-            {t('mcpStudio.library.delete')}
-          </Button>
+            <Button className={styles.utilityButton} icon={<Icon icon={Ellipsis} />} size={'small'} />
+          </Dropdown>
         </div>
       </Flexbox>
 
@@ -3488,7 +3779,7 @@ const MCPWorkflowStudio = () => {
 
         <div className={styles.canvasWrap}>
           <div
-            className={`${styles.canvasStage} ${spacePressed || isPanning ? styles.canvasStagePanReady : ''}`}
+            className={`${styles.canvasStage} ${isPanning ? styles.canvasStagePanReady : ''}`}
             ref={canvasRef}
             onDoubleClick={handleCanvasDoubleClick}
             onPointerDown={handleCanvasPointerDown}
@@ -3547,6 +3838,29 @@ const MCPWorkflowStudio = () => {
                           target: targetNode,
                         })}
                       />
+                      {isSelected && (() => {
+                        const midpoint = getEdgeMidpoint(edge);
+                        if (!midpoint) return null;
+
+                        return (
+                          <g
+                            data-studio-ignore-selection="true"
+                            transform={`translate(${midpoint.x} ${midpoint.y})`}
+                          >
+                            <circle
+                              className={styles.edgeActionButton}
+                              cx={0}
+                              cy={0}
+                              r={12}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRemoveEdge(edge.id);
+                              }}
+                            />
+                            <path className={styles.edgeActionIcon} d="M -4 -4 L 4 4 M 4 -4 L -4 4" />
+                          </g>
+                        );
+                      })()}
                     </g>
                   );
                 })}
@@ -3640,12 +3954,39 @@ const MCPWorkflowStudio = () => {
               >
                 {t('mcpStudio.toolbar.fitView')}
               </Button>
+              <Button
+                icon={<Icon icon={RotateCcw} />}
+                size={'small'}
+                onClick={handleAutoLayout}
+              >
+                {t('mcpStudio.toolbar.autoLayout')}
+              </Button>
             </div>
 
-            <div className={styles.stageHint} data-studio-ignore-selection="true">
-              <Text type={'secondary'}>
-                {`${t('mcpStudio.canvas.hint')} · ${t('mcpStudio.canvas.panZoom')}`}
-              </Text>
+            <div className={styles.stageHintDock} data-studio-ignore-selection="true">
+              <div className={styles.stageHint}>
+                <Text type={'secondary'}>
+                  {`${t('mcpStudio.canvas.hint')} · ${t('mcpStudio.canvas.panZoom')}`}
+                </Text>
+                <div className={styles.stageHintMeta}>
+                  <Tag>{`${nodes.length} ${t('mcpStudio.toolbar.batteries')}`}</Tag>
+                  <Tag>{`${edges.length} ${t('mcpStudio.toolbar.wires')}`}</Tag>
+                  <Tag>{`${Math.round(viewport.zoom * 100)}%`}</Tag>
+                </div>
+              </div>
+              {selectionCount > 0 && (
+                <div className={styles.stageHintSelection}>
+                  <Text type={'secondary'}>
+                    {t('mcpStudio.selection.count', {
+                      edges: selectedEdgeIds.length,
+                      nodes: selectedNodeIds.length,
+                    })}
+                  </Text>
+                  <Button danger icon={<Icon icon={Trash2} />} size={'small'} onClick={handleDeleteSelection}>
+                    {t('mcpStudio.selection.delete')}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3658,6 +3999,47 @@ const MCPWorkflowStudio = () => {
               : renderSelectedNodePanel()}
         </div>
       </div>
+
+      <Modal
+        destroyOnClose
+        footer={null}
+        open={commandPaletteOpen}
+        title={t('mcpStudio.commandPalette.title')}
+        onCancel={handleCloseCommandPalette}
+      >
+        <Flexbox gap={12}>
+          <Input
+            autoFocus
+            value={commandQuery}
+            placeholder={
+              commandPaletteMode === 'node'
+                ? t('mcpStudio.commandPalette.searchNodes')
+                : t('mcpStudio.commandPalette.searchAll')
+            }
+            onChange={(event) => setCommandQuery(event.target.value)}
+          />
+          <div className={styles.commandPaletteList}>
+            {filteredCommandItems.length === 0 ? (
+              <Text type={'secondary'}>{t('mcpStudio.commandPalette.empty')}</Text>
+            ) : (
+              filteredCommandItems.map((item) => (
+                <button
+                  className={styles.commandPaletteItem}
+                  key={item.id}
+                  type={'button'}
+                  onClick={item.onSelect}
+                >
+                  <span className={styles.commandPaletteItemIcon}>{item.icon}</span>
+                  <span className={styles.commandPaletteItemBody}>
+                    <Text strong>{item.label}</Text>
+                    <Text type={'secondary'}>{item.description}</Text>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </Flexbox>
+      </Modal>
 
       <Modal
         destroyOnClose

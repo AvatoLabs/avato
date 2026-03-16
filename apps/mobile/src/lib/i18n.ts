@@ -33,6 +33,9 @@ type TranslationKeys = {
   chatListEmpty: string;
   chatListEmptyDesc: string;
   chatListNewConversation: string;
+  chatSearchNoResults: string;
+  chatSearchResults: string;
+  chatSearchSearching: string;
   chatListTapToContinue: string;
 
   // Chat Detail
@@ -345,8 +348,13 @@ type TranslationKeys = {
   loginChangeServer: string;
   loginContinueWithEmail: string;
   loginContinueWithProvider: string;
+  loginFeishuConfigMismatch: string;
   loginMissingProviders: string;
+  loginProviderFailed: string;
+  loginProviderLaunchFailed: string;
+  loginIncomplete: string;
   loginOpenInBrowser: string;
+  loginOpenInProviderApp: string;
   loginQrHint: string;
   loginScanWithProvider: string;
   loginSubtitle: string;
@@ -734,6 +742,9 @@ const en: TranslationKeys = {
   chatListEmpty: 'Start a conversation',
   chatListEmptyDesc: 'Tap the + button above to create your first chat with Avato AI.',
   chatListNewConversation: 'New Conversation',
+  chatSearchNoResults: 'No matching conversations',
+  chatSearchResults: 'Search Results',
+  chatSearchSearching: 'Searching conversations...',
   chatListTapToContinue: 'Tap to continue the conversation',
 
   chatTitle: 'Chat',
@@ -782,9 +793,9 @@ const en: TranslationKeys = {
   serverConnect: 'Connect to Avato',
   serverSubtitle: 'Enter your self-hosted server address',
   serverDesc:
-    'Avato runs on your own server. Enter the URL of your self-hosted Avato instance (e.g., http://192.168.1.100:3010).',
+    'Avato runs on your own server. Enter the address of your self-hosted Avato instance (e.g., avato.turingmesh.com or 192.168.1.100:3010).',
   serverUrlLabel: 'Server URL',
-  serverUrlPlaceholder: 'http://192.168.1.100:3010',
+  serverUrlPlaceholder: 'avato.turingmesh.com',
   serverQuickFill: 'Quick Fill',
   serverTestConnection: 'Test Connection',
   serverTesting: 'Testing...',
@@ -1024,8 +1035,14 @@ const en: TranslationKeys = {
   loginChangeServer: 'Server',
   loginContinueWithEmail: 'Continue with Email or Password',
   loginContinueWithProvider: 'Continue with {provider}',
+  loginFeishuConfigMismatch:
+    'Feishu mobile sign-in is not configured correctly yet. Check the Android package name and MD5 signature in Feishu Open Platform.',
   loginMissingProviders: 'This server requires SSO sign-in, but no providers are configured.',
+  loginProviderFailed: '{provider} sign-in failed. Please try again.',
+  loginProviderLaunchFailed: 'Unable to open {provider}. Make sure it is installed and try again.',
+  loginIncomplete: 'Sign-in was not completed. Please try again.',
   loginOpenInBrowser: 'Authentication continues in your browser and then returns to the app.',
+  loginOpenInProviderApp: 'Authentication continues in {provider} and then returns to the app.',
   loginQrHint: 'Opens a QR code page in your browser.',
   loginScanWithProvider: 'Scan with {provider}',
   loginSubtitle: 'Continue with your server account',
@@ -1402,6 +1419,9 @@ const zh_tw: TranslationKeys = {
   chatListEmpty: '開始一段對話',
   chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 對話。',
   chatListNewConversation: '新對話',
+  chatSearchNoResults: '沒有符合的對話',
+  chatSearchResults: '搜尋結果',
+  chatSearchSearching: '正在搜尋對話...',
   chatListTapToContinue: '點擊繼續對話',
 
   chatTitle: '聊天',
@@ -1449,9 +1469,9 @@ const zh_tw: TranslationKeys = {
   serverTitle: '伺服器設定',
   serverConnect: '連線到 Avato',
   serverSubtitle: '輸入你的自架伺服器位址',
-  serverDesc: 'Avato 執行在你自己的伺服器上。輸入你的 Avato 實例位址（例如 http://192.168.1.100:3010）。',
+  serverDesc: 'Avato 執行在你自己的伺服器上。輸入你的 Avato 實例位址（例如 avato.turingmesh.com 或 192.168.1.100:3010）。',
   serverUrlLabel: '伺服器 URL',
-  serverUrlPlaceholder: 'http://192.168.1.100:3010',
+  serverUrlPlaceholder: 'avato.turingmesh.com',
   serverQuickFill: '快速填入',
   serverTestConnection: '測試連線',
   serverTesting: '測試中...',
@@ -1690,8 +1710,14 @@ const zh_tw: TranslationKeys = {
   loginChangeServer: '伺服器',
   loginContinueWithEmail: '使用郵箱或密碼繼續',
   loginContinueWithProvider: '使用 {provider} 繼續',
+  loginFeishuConfigMismatch:
+    '飛書移動端登入尚未正確配置，請檢查飛書開放平台中的 Android 包名與 MD5 簽名。',
   loginMissingProviders: '此伺服器只允許 SSO 登入，但目前沒有設定任何提供商。',
+  loginProviderFailed: '{provider} 登入失敗，請稍後再試。',
+  loginProviderLaunchFailed: '無法打開 {provider}，請確認已安裝後重試。',
+  loginIncomplete: '登入流程未完成，請再試一次。',
   loginOpenInBrowser: '登入會在瀏覽器中完成，之後會返回 App。',
+  loginOpenInProviderApp: '授權會在 {provider} 中完成，之後會返回 App。',
   loginQrHint: '會在瀏覽器中開啟二維碼頁面。',
   loginScanWithProvider: '使用 {provider} 掃碼登入',
   loginSubtitle: '使用你的伺服器帳號繼續',
@@ -2067,6 +2093,9 @@ const zh: TranslationKeys = {
   chatListEmpty: '开始一段对话',
   chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 对话。',
   chatListNewConversation: '新对话',
+  chatSearchNoResults: '没有匹配的对话',
+  chatSearchResults: '搜索结果',
+  chatSearchSearching: '正在搜索对话...',
   chatListTapToContinue: '点击继续对话',
 
   chatTitle: '聊天',
@@ -2114,9 +2143,9 @@ const zh: TranslationKeys = {
   serverTitle: '服务器配置',
   serverConnect: '连接到 Avato',
   serverSubtitle: '输入你的自托管服务器地址',
-  serverDesc: 'Avato 运行在你自己的服务器上。输入你的 Avato 实例地址（例如 http://192.168.1.100:3010）。',
+  serverDesc: 'Avato 运行在你自己的服务器上。输入你的 Avato 实例地址（例如 avato.turingmesh.com 或 192.168.1.100:3010）。',
   serverUrlLabel: '服务器 URL',
-  serverUrlPlaceholder: 'http://192.168.1.100:3010',
+  serverUrlPlaceholder: 'avato.turingmesh.com',
   serverQuickFill: '快捷填入',
   serverTestConnection: '测试连接',
   serverTesting: '测试中...',
@@ -2355,8 +2384,14 @@ const zh: TranslationKeys = {
   loginChangeServer: '服务器',
   loginContinueWithEmail: '使用邮箱或密码继续',
   loginContinueWithProvider: '使用 {provider} 继续',
+  loginFeishuConfigMismatch:
+    '飞书移动端登录尚未正确配置，请检查飞书开放平台中的 Android 包名和 MD5 签名。',
   loginMissingProviders: '该服务器只允许 SSO 登录，但目前没有配置任何提供商。',
+  loginProviderFailed: '{provider} 登录失败，请稍后再试。',
+  loginProviderLaunchFailed: '无法打开 {provider}，请确认已安装后重试。',
+  loginIncomplete: '登录流程未完成，请再试一次。',
   loginOpenInBrowser: '登录会在浏览器中完成，随后返回 App。',
+  loginOpenInProviderApp: '授权会在 {provider} 中完成，随后返回 App。',
   loginQrHint: '会在浏览器中打开二维码页面。',
   loginScanWithProvider: '使用 {provider} 扫码登录',
   loginSubtitle: '使用你的服务器账号继续',

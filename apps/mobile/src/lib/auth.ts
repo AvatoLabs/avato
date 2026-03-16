@@ -1,6 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
+import { NativeModules, Platform } from 'react-native';
 
 import { normalizeApiUrl } from './server';
 
@@ -12,6 +13,9 @@ const MOBILE_AUTH_SCHEME = 'com.avato.app';
 const MOBILE_AUTH_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/callback`;
 const MOBILE_LOGOUT_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/logout`;
 const MOBILE_AUTH_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
+const FEISHU_NATIVE_SCOPES = ['contact:user.base:readonly', 'contact:user.email:readonly'];
+const FEISHU_NATIVE_REFRESH_ROUTE = '/api/mobile-auth/feishu/native/refresh';
+const FEISHU_NATIVE_EXCHANGE_ROUTE = '/api/mobile-auth/feishu/native/exchange';
 
 let authSessionCache: MobileAuthSession | null | undefined;
 const oidcDiscoveryCache = new Map<string, AuthSession.DiscoveryDocument>();
@@ -28,11 +32,17 @@ export interface MobileAuthConfig {
   disableEmailPassword: boolean;
   enableNoAuth: boolean;
   enableOIDC: boolean;
+  mobileNativeAuth?: {
+    feishu?: {
+      appId: string;
+    };
+  };
   oAuthSSOProviders: string[];
 }
 
 export interface MobileAuthSession {
   accessToken: string;
+  authMode?: 'feishu-native' | 'oidc';
   baseUrl: string;
   expiresIn?: number;
   idToken?: string;
@@ -41,6 +51,22 @@ export interface MobileAuthSession {
   scope?: string;
   tokenType: string;
 }
+
+interface NativeFeishuSignInResult {
+  code: string;
+  codeVerifier?: string;
+}
+
+interface NativeFeishuSSOModule {
+  appId?: string;
+  startSignIn: (options: {
+    appId?: string;
+    language?: string;
+    scopes?: string[];
+  }) => Promise<NativeFeishuSignInResult>;
+}
+
+const feishuNativeModule = NativeModules.FeishuSSO as NativeFeishuSSOModule | undefined;
 
 const parseProviderLabel = (providerId: string) =>
   providerId
@@ -63,6 +89,7 @@ const toStoredSession = (
   existingSession?: MobileAuthSession | null,
 ): MobileAuthSession => ({
   accessToken: tokenResponse.accessToken,
+  authMode: 'oidc',
   baseUrl: normalizeApiUrl(baseUrl),
   expiresIn: tokenResponse.expiresIn,
   idToken: tokenResponse.idToken,
@@ -90,9 +117,86 @@ const getLogoutRedirectUri = () =>
     scheme: MOBILE_AUTH_SCHEME,
   });
 
+const getFeishuDirectSignInUrl = (baseUrl: string, callbackUrl: string) => {
+  const directSignInUrl = new URL('/api/mobile-auth/feishu/start', `${baseUrl}/`);
+
+  directSignInUrl.searchParams.set('callbackUrl', callbackUrl);
+
+  return directSignInUrl.toString();
+};
+
+const getHostedSignInUrl = (baseUrl: string, callbackUrl: string, providerId?: string) => {
+  const signInUrl = new URL('/signin', `${baseUrl}/`);
+
+  signInUrl.searchParams.set('callbackUrl', callbackUrl);
+
+  if (providerId) {
+    signInUrl.searchParams.set('sso', providerId);
+  }
+
+  return signInUrl.toString();
+};
+
 const parseTRPCPayload = <T>(payload: any): T => {
   const data = payload?.result?.data;
   return (data && typeof data === 'object' && 'json' in data ? data.json : data) as T;
+};
+
+const getFeishuNativeAppId = (config?: MobileAuthConfig | null) => {
+  return config?.mobileNativeAuth?.feishu?.appId || feishuNativeModule?.appId;
+};
+
+const shouldUseFeishuNativeSignIn = (providerId?: string, config?: MobileAuthConfig | null) => {
+  return (
+    Platform.OS === 'android' &&
+    providerId === 'feishu' &&
+    !!feishuNativeModule &&
+    !!getFeishuNativeAppId(config)
+  );
+};
+
+const getPreferredLanguage = () => {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
+    if (locale.startsWith('zh')) return 'zh';
+    if (locale.startsWith('ja')) return 'ja';
+    return 'en';
+  } catch {
+    return 'zh';
+  }
+};
+
+const requestNativeFeishuSession = async (
+  baseUrl: string,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<MobileAuthSession> => {
+  const normalizedBaseUrl = normalizeApiUrl(baseUrl);
+  const response = await fetch(new URL(path, `${normalizedBaseUrl}/`).toString(), {
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | (Partial<MobileAuthSession> & { error?: string })
+    | null;
+
+  if (!response.ok || !payload?.accessToken) {
+    throw new Error(payload?.error || `Feishu mobile sign-in failed (${response.status})`);
+  }
+
+  return {
+    accessToken: payload.accessToken,
+    authMode: 'feishu-native',
+    baseUrl: normalizedBaseUrl,
+    expiresIn: payload.expiresIn,
+    idToken: payload.idToken,
+    issuedAt: payload.issuedAt || Math.floor(Date.now() / 1000),
+    refreshToken: payload.refreshToken,
+    scope: payload.scope,
+    tokenType: payload.tokenType || 'bearer',
+  };
 };
 
 export async function loadStoredAuthSession(): Promise<MobileAuthSession | null> {
@@ -134,7 +238,19 @@ export async function fetchOidcDiscovery(baseUrl: string): Promise<AuthSession.D
     return oidcDiscoveryCache.get(normalizedBaseUrl)!;
   }
 
-  const discovery = await AuthSession.fetchDiscoveryAsync(getIssuerUrl(normalizedBaseUrl));
+  let discovery: AuthSession.DiscoveryDocument;
+
+  try {
+    discovery = await AuthSession.fetchDiscoveryAsync(getIssuerUrl(normalizedBaseUrl));
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.message
+        ? `Unable to reach the mobile sign-in endpoint: ${error.message}`
+        : 'Unable to reach the mobile sign-in endpoint',
+      { cause: error },
+    );
+  }
+
   oidcDiscoveryCache.set(normalizedBaseUrl, discovery);
 
   return discovery;
@@ -165,6 +281,7 @@ export async function fetchMobileAuthConfig(baseUrl: string): Promise<MobileAuth
     disableEmailPassword: !!serverConfig.disableEmailPassword,
     enableNoAuth: !!serverConfig.enableNoAuth,
     enableOIDC: !!serverConfig.enableOIDC,
+    mobileNativeAuth: serverConfig.mobileNativeAuth,
     oAuthSSOProviders: serverConfig.oAuthSSOProviders || authProviders.map((provider) => provider.id),
   };
 }
@@ -187,6 +304,19 @@ export async function getValidAuthSession(baseUrl: string): Promise<MobileAuthSe
   }
 
   try {
+    if (storedSession.authMode === 'feishu-native') {
+      const nextSession = await requestNativeFeishuSession(
+        normalizedBaseUrl,
+        FEISHU_NATIVE_REFRESH_ROUTE,
+        {
+          refreshToken: storedSession.refreshToken,
+        },
+      );
+      await saveStoredAuthSession(nextSession);
+
+      return nextSession;
+    }
+
     const discovery = await fetchOidcDiscovery(normalizedBaseUrl);
     const refreshedToken = await AuthSession.refreshAsync(
       {
@@ -221,11 +351,51 @@ export async function getAuthHeaders(baseUrl: string): Promise<Record<string, st
   };
 }
 
-export async function signInWithBrowser(options: {
+export async function signInWithProvider(options: {
+  authConfig?: MobileAuthConfig | null;
   baseUrl: string;
   providerId?: string;
 }): Promise<MobileAuthSession | null> {
   const normalizedBaseUrl = normalizeApiUrl(options.baseUrl);
+
+  if (shouldUseFeishuNativeSignIn(options.providerId, options.authConfig)) {
+    const appId = getFeishuNativeAppId(options.authConfig);
+
+    if (!appId) {
+      throw new Error('Feishu mobile sign-in is not configured on this server.');
+    }
+
+    let nativeResult: NativeFeishuSignInResult;
+
+    try {
+      nativeResult = await feishuNativeModule!.startSignIn({
+        appId,
+        language: getPreferredLanguage(),
+        scopes: FEISHU_NATIVE_SCOPES,
+      });
+    } catch (error) {
+      throw new Error(
+        error instanceof Error && error.message
+          ? error.message
+          : 'Unable to launch the Feishu app for sign-in.',
+        { cause: error },
+      );
+    }
+
+    if (!nativeResult?.code) {
+      throw new Error('Feishu sign-in did not return an authorization code.');
+    }
+
+    const session = await requestNativeFeishuSession(normalizedBaseUrl, FEISHU_NATIVE_EXCHANGE_ROUTE, {
+      code: nativeResult.code,
+      codeVerifier: nativeResult.codeVerifier,
+    });
+
+    await saveStoredAuthSession(session);
+
+    return session;
+  }
+
   const discovery = await fetchOidcDiscovery(normalizedBaseUrl);
   const redirectUri = getAuthRedirectUri();
   const request = new AuthSession.AuthRequest({
@@ -239,15 +409,23 @@ export async function signInWithBrowser(options: {
     usePKCE: true,
   });
   const authorizeUrl = await request.makeAuthUrlAsync(discovery);
-  const signInUrl = new URL('/signin', `${normalizedBaseUrl}/`);
+  const signInUrl =
+    options.providerId === 'feishu'
+      ? getFeishuDirectSignInUrl(normalizedBaseUrl, authorizeUrl)
+      : getHostedSignInUrl(normalizedBaseUrl, authorizeUrl, options.providerId);
 
-  signInUrl.searchParams.set('callbackUrl', authorizeUrl);
+  let result: AuthSession.AuthSessionResult;
 
-  if (options.providerId) {
-    signInUrl.searchParams.set('sso', options.providerId);
+  try {
+    result = await request.promptAsync(discovery, { url: signInUrl });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.message
+        ? `Unable to open the browser sign-in flow: ${error.message}`
+        : 'Unable to open the browser sign-in flow',
+      { cause: error },
+    );
   }
-
-  const result = await request.promptAsync(discovery, { url: signInUrl.toString() });
 
   if (result.type === 'cancel' || result.type === 'dismiss' || result.type === 'locked') {
     return null;
@@ -257,17 +435,29 @@ export async function signInWithBrowser(options: {
     throw new Error('Authentication was not completed');
   }
 
-  const tokenResponse = await AuthSession.exchangeCodeAsync(
-    {
-      clientId: MOBILE_CLIENT_ID,
-      code: result.params.code,
-      extraParams: {
-        code_verifier: request.codeVerifier,
+  let tokenResponse: AuthSession.TokenResponse;
+
+  try {
+    tokenResponse = await AuthSession.exchangeCodeAsync(
+      {
+        clientId: MOBILE_CLIENT_ID,
+        code: result.params.code,
+        extraParams: {
+          code_verifier: request.codeVerifier,
+        },
+        redirectUri,
       },
-      redirectUri,
-    },
-    discovery,
-  );
+      discovery,
+    );
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.message
+        ? `The sign-in page returned, but token exchange failed: ${error.message}`
+        : 'The sign-in page returned, but token exchange failed',
+      { cause: error },
+    );
+  }
+
   const session = toStoredSession(normalizedBaseUrl, tokenResponse);
   await saveStoredAuthSession(session);
 
@@ -276,6 +466,13 @@ export async function signInWithBrowser(options: {
 
 export async function signOutFromBrowser(baseUrl: string): Promise<void> {
   const normalizedBaseUrl = normalizeApiUrl(baseUrl);
+  const storedSession = await loadStoredAuthSession();
+
+  if (storedSession?.authMode === 'feishu-native') {
+    await clearStoredAuthSession();
+    return;
+  }
+
   const redirectUri = getLogoutRedirectUri();
   const signOutUrl = new URL('/mobile-auth/signout', `${normalizedBaseUrl}/`);
 

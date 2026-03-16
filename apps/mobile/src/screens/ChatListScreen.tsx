@@ -52,7 +52,7 @@ import SwipeableRow from '../components/ui/SwipeableRow';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, pluginApi } from '../lib/api';
+import { agentApi, messageApi, type MessageSearchResult,pluginApi, topicApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { getStreak, recordUsage } from '../lib/streak';
@@ -69,6 +69,20 @@ type RelativeTimeText = {
   relativeTimeHours: string;
   relativeTimeMinutes: string;
   relativeTimeNow: string;
+};
+
+interface SearchSessionResult {
+  matchType: 'message' | 'topic';
+  session: ChatSession;
+  summary: string;
+}
+
+const trimSearchSnippet = (value: string, maxLength = 88) => {
+  const normalized = value.replaceAll(/\s+/g, ' ').trim();
+
+  if (normalized.length <= maxLength) return normalized;
+
+  return `${normalized.slice(0, maxLength - 1)}…`;
 };
 
 function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
@@ -201,6 +215,8 @@ export default function ChatListScreen({ navigation }: any) {
 
   const [heroText, setHeroText] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchSessionResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
@@ -279,7 +295,7 @@ export default function ChatListScreen({ navigation }: any) {
         }
       }),
     );
-  }, [initialized, fetchSessions, fetchGroups]);
+  }, [initialized, fetchSessions, fetchGroups, t.streakCelebrate, toast]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
@@ -293,6 +309,71 @@ export default function ChatListScreen({ navigation }: any) {
     fetchModels();
     loadSelection();
   }, [fetchModels, loadSelection]);
+
+  useEffect(() => {
+    const keywords = searchText.trim();
+
+    if (!keywords) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(() => {
+      setSearching(true);
+
+      Promise.all([
+        topicApi.search(keywords).catch(() => []),
+        messageApi.search(keywords).catch(() => []),
+      ])
+        .then(([topics, messages]) => {
+          if (isCancelled) return;
+
+          const sessionMap = new Map(sessions.map((session) => [session.id, session]));
+          const matches = new Map<string, SearchSessionResult>();
+
+          for (const topic of topics) {
+            const session = sessionMap.get(topic.sessionId);
+            if (!session) continue;
+
+            matches.set(session.id, {
+              matchType: 'topic',
+              session,
+              summary: trimSearchSnippet(topic.title),
+            });
+          }
+
+          for (const message of messages as MessageSearchResult[]) {
+            const session = sessionMap.get(message.sessionId);
+            if (!session || matches.has(session.id)) continue;
+
+            matches.set(session.id, {
+              matchType: 'message',
+              session,
+              summary: trimSearchSnippet(message.content),
+            });
+          }
+
+          setSearchResults([...matches.values()]);
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            toast.show('error', t.errorNetwork);
+          }
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setSearching(false);
+          }
+        });
+    }, 260);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchText, sessions, t.errorNetwork, toast]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -442,7 +523,7 @@ export default function ChatListScreen({ navigation }: any) {
   const [skillsVisible, setSkillsVisible] = useState(false);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
-  const [enabledSkills, setEnabledSkills] = useState<Set<string>>(new Set());
+  const [enabledSkills, setEnabledSkills] = useState<Set<string>>(() => new Set());
 
   const handlePluginsPress = useCallback(() => {
     haptics.light();
@@ -495,25 +576,16 @@ export default function ChatListScreen({ navigation }: any) {
     });
   };
 
-  // Filter sessions by search text
-  const filteredSessions = useMemo(() => {
-    if (!searchText.trim()) return sessions;
-    const q = searchText.trim().toLowerCase();
-    return sessions.filter(
-      (s) => s.title?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q),
-    );
-  }, [sessions, searchText]);
-
   // Organize sessions by group
   const { pinnedSessions, groupedSessions, defaultSessions } = useMemo(() => {
-    const pinned = filteredSessions.filter((s) => s.pinned);
+    const pinned = sessions.filter((s) => s.pinned);
     const grouped: Record<string, ChatSession[]> = {};
     groups.forEach((g) => {
       grouped[g.id] = [];
     });
 
     const def: ChatSession[] = [];
-    filteredSessions.forEach((s) => {
+    sessions.forEach((s) => {
       if (s.pinned) return;
       if (s.groupId && grouped[s.groupId]) {
         grouped[s.groupId].push(s);
@@ -523,7 +595,7 @@ export default function ChatListScreen({ navigation }: any) {
     });
 
     return { pinnedSessions: pinned, groupedSessions: grouped, defaultSessions: def };
-  }, [filteredSessions, groups]);
+  }, [sessions, groups]);
 
   const handleLongPress = useCallback((session: ChatSession) => {
     haptics.medium();
@@ -642,6 +714,44 @@ export default function ChatListScreen({ navigation }: any) {
     );
   };
 
+  const renderSearchResultRow = ({ matchType, session, summary }: SearchSessionResult) => {
+    const providerId = session.provider || (session.model ? modelToProvider[session.model] : undefined);
+    const providerLogo = providerId ? providerLogoById[providerId] : undefined;
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.65}
+        className="flex-row items-start px-5 py-3"
+        key={session.id}
+        onPress={() => navigation.navigate('ChatDetail', { sessionId: session.id })}
+      >
+        <View className="mr-3.5 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
+          <SessionLogo
+            avatar={session.avatar}
+            provider={providerId}
+            providerLogo={providerLogo}
+            size={36}
+          />
+        </View>
+        <View className="flex-1">
+          <View className="mb-1 flex-row items-center">
+            <Text className="text-[15px] font-medium tracking-tight text-foreground" numberOfLines={1}>
+              {session.title || t.chatListNewConversation}
+            </Text>
+            <Text className="ml-2 text-[11px] font-semibold uppercase tracking-wider text-secondary/35">
+              {matchType}
+            </Text>
+          </View>
+          <Text className="text-[12px] font-medium leading-5 text-secondary/55" numberOfLines={2}>
+            {summary}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const searchQuery = searchText.trim();
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -730,47 +840,68 @@ export default function ChatListScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
-        {/* Quick Actions */}
-        <Animated.View entering={FadeInDown.delay(100).duration(350)}>
-          <QuickActionRow actions={quickActions} onPress={handleQuickAction} />
-        </Animated.View>
-
-        {/* Pinned Sessions */}
-        {pinnedSessions.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(150).duration(350)}>
-            <SectionBlock title={t.groupPinned}>
-              {pinnedSessions.map(renderSessionRow)}
-            </SectionBlock>
+        {searchQuery ? (
+          <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+            {searching ? (
+              <View className="px-5 pt-6">
+                <Text className="text-center text-[14px] font-medium text-secondary/55">
+                  {t.chatSearchSearching}
+                </Text>
+              </View>
+            ) : searchResults.length > 0 ? (
+              <SectionBlock title={t.chatSearchResults}>
+                {searchResults.map(renderSearchResultRow)}
+              </SectionBlock>
+            ) : (
+              <View className="px-5 pt-6">
+                <Text className="text-center text-[14px] font-medium text-secondary/55">
+                  {t.chatSearchNoResults}
+                </Text>
+              </View>
+            )}
           </Animated.View>
-        )}
-
-        {/* Custom Groups */}
-        {groups.map((group) => {
-          const groupSessions = groupedSessions[group.id] || [];
-          const expanded = expandedGroups[group.id] !== false; // default expanded
-          return (
-            <Animated.View entering={FadeInDown.delay(200).duration(350)} key={group.id}>
-              <SessionGroupHeader
-                count={groupSessions.length}
-                expanded={expanded}
-                title={group.name}
-                onToggle={() => toggleGroup(group.id)}
-              />
-              {expanded && groupSessions.map(renderSessionRow)}
+        ) : (
+          <>
+            {/* Quick Actions */}
+            <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+              <QuickActionRow actions={quickActions} onPress={handleQuickAction} />
             </Animated.View>
-          );
-        })}
 
-        {/* Default / Ungrouped Sessions */}
-        {defaultSessions.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(250).duration(350)}>
-            <SectionBlock
-              action={defaultSessions.length > 5 ? t.homeSeeAll : undefined}
-              title={t.homeRecents}
-            >
-              {defaultSessions.slice(0, 10).map(renderSessionRow)}
-            </SectionBlock>
-          </Animated.View>
+            {/* Pinned Sessions */}
+            {pinnedSessions.length > 0 && (
+              <Animated.View entering={FadeInDown.delay(150).duration(350)}>
+                <SectionBlock title={t.groupPinned}>
+                  {pinnedSessions.map(renderSessionRow)}
+                </SectionBlock>
+              </Animated.View>
+            )}
+
+            {/* Custom Groups */}
+            {groups.map((group) => {
+              const groupSessions = groupedSessions[group.id] || [];
+              const expanded = expandedGroups[group.id] !== false;
+              return (
+                <Animated.View entering={FadeInDown.delay(200).duration(350)} key={group.id}>
+                  <SessionGroupHeader
+                    count={groupSessions.length}
+                    expanded={expanded}
+                    title={group.name}
+                    onToggle={() => toggleGroup(group.id)}
+                  />
+                  {expanded && groupSessions.map(renderSessionRow)}
+                </Animated.View>
+              );
+            })}
+
+            {/* Default / Ungrouped Sessions */}
+            {defaultSessions.length > 0 && (
+              <Animated.View entering={FadeInDown.delay(250).duration(350)}>
+                <SectionBlock title={t.homeRecents}>
+                  {defaultSessions.slice(0, 10).map(renderSessionRow)}
+                </SectionBlock>
+              </Animated.View>
+            )}
+          </>
         )}
       </ScrollView>
 

@@ -155,7 +155,33 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   edgePathSelected: css`
     opacity: 0.82;
     stroke: ${cssVar.colorPrimaryBorder};
-    stroke-width: 3;
+    stroke-width: 3.5;
+  `,
+  edgeActionButton: css`
+    cursor: pointer;
+
+    fill: ${cssVar.colorBgElevated};
+    stroke: ${cssVar.colorErrorBorder};
+    stroke-width: 1.5;
+
+    filter: drop-shadow(0 8px 18px ${cssVar.colorFillSecondary});
+
+    transition:
+      fill 0.2s ease,
+      stroke 0.2s ease,
+      transform 0.2s ease;
+
+    &:hover {
+      fill: ${cssVar.colorErrorBg};
+      stroke: ${cssVar.colorError};
+      transform: scale(1.06);
+    }
+  `,
+  edgeActionIcon: css`
+    pointer-events: none;
+    stroke: ${cssVar.colorError};
+    stroke-linecap: round;
+    stroke-width: 1.8;
   `,
   edgePathDraft: css`
     pointer-events: none;
@@ -181,7 +207,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     height: 100%;
     padding-block: 14px;
     padding-inline: 46px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
+    border: 1px solid ${cssVar.colorBorder};
     border-radius: calc(${cssVar.borderRadiusLG} * 1.1);
 
     background: linear-gradient(180deg, ${cssVar.colorBgElevated}, ${cssVar.colorBgContainer});
@@ -194,7 +220,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
 
     &:hover {
       transform: translateY(-2px);
-      border-color: ${cssVar.colorPrimaryBorder};
+      border-color: ${cssVar.colorTextSecondary};
     }
 
     &:active {
@@ -298,7 +324,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     box-shadow: 0 0 0 6px ${cssVar.colorSuccessBg};
   `,
   nodeSelected: css`
-    border-color: ${cssVar.colorPrimaryBorder};
+    border-color: ${cssVar.colorText};
     box-shadow:
       0 0 0 2px ${cssVar.colorPrimaryBorderHover},
       0 18px 40px ${cssVar.colorFill};
@@ -459,34 +485,127 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   stageHint: css`
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+
+    min-width: 0;
+
+    @media (width <= 900px) {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  `,
+  stageHintDock: css`
     position: absolute;
     z-index: 4;
     inset-block-end: 16px;
-    inset-inline-end: 16px;
+    inset-inline: 16px;
+
+    display: flex;
+    gap: ${cssVar.marginSM};
+    align-items: center;
+    justify-content: space-between;
 
     padding-block: 8px;
-    padding-inline: 12px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: 999px;
+    padding-inline: 10px;
+    border: 1px solid ${cssVar.colorBorder};
+    border-radius: calc(${cssVar.borderRadiusLG} * 1.1);
 
-    background: ${cssVar.colorBgElevated};
+    background: color-mix(in srgb, ${cssVar.colorBgElevated} 94%, transparent);
     backdrop-filter: blur(12px);
+    box-shadow: 0 8px 20px ${cssVar.colorFillTertiary};
+
+    @media (width <= 900px) {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  `,
+  stageHintMeta: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+  `,
+  stageHintSelection: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${cssVar.marginXS};
+    align-items: center;
   `,
   toolbar: css`
-    padding-block: 12px;
-    padding-inline: 14px;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) auto;
+    gap: ${cssVar.marginSM};
+    align-items: center;
+
+    min-height: 60px;
+    padding-block: 6px;
+    padding-inline: 10px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${cssVar.borderRadiusLG};
 
-    background: ${cssVar.colorBgContainer};
+    background:
+      linear-gradient(180deg, ${cssVar.colorBgContainer}, ${cssVar.colorBgElevated}),
+      ${cssVar.colorBgContainer};
+    box-shadow: 0 6px 18px ${cssVar.colorFillQuaternary};
+
+    @media (width <= 1280px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
   `,
-  toolbarGroup: css`
+  toolbarLeft: css`
     display: flex;
-    flex-wrap: wrap;
-    gap: ${cssVar.marginSM};
+    gap: ${cssVar.marginXS};
     align-items: center;
+    min-width: 0;
+
+    @media (width <= 1280px) {
+      flex-wrap: wrap;
+    }
   `,
-  toolButton: css`
+  toolbarCenter: css`
+    display: flex;
+    justify-content: center;
+    min-width: 0;
+
+    @media (width <= 1280px) {
+      justify-content: flex-start;
+    }
+  `,
+  backButton: css`
+    flex: 0 0 auto;
+    color: ${cssVar.colorTextSecondary};
+
+    &:hover,
+    &:focus {
+      color: ${cssVar.colorText};
+      background: ${cssVar.colorFillQuaternary};
+    }
+  `,
+  toolbarActions: css`
+    display: inline-flex;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+
+    @media (width <= 1280px) {
+      justify-content: flex-start;
+    }
+  `,
+  utilityButton: css`
+    border-color: ${cssVar.colorBorderSecondary};
+    color: ${cssVar.colorTextSecondary};
+    background: transparent;
+
+    &:hover,
+    &:focus {
+      border-color: ${cssVar.colorBorder};
+      color: ${cssVar.colorText};
+      background: ${cssVar.colorFillQuaternary};
+    }
+  `,
+  runButton: css`
     border-color: ${cssVar.colorText};
     color: ${cssVar.colorBgContainer};
     background: ${cssVar.colorText};
@@ -498,8 +617,136 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       background: ${cssVar.colorTextSecondary};
     }
   `,
-  toolbarSpacer: css`
-    flex: 1;
+  workflowTitleWrap: css`
+    display: flex;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+    min-width: 0;
+
+    @media (width <= 1280px) {
+      flex: 1 1 100%;
+    }
+  `,
+  workflowNameInput: css`
+    min-width: 180px;
+    max-width: 240px;
+
+    & :global(.ant-input) {
+      font-weight: 600;
+    }
+  `,
+  workflowStatus: css`
+    flex: 0 0 auto;
+    font-size: ${cssVar.fontSizeSM}px;
+    white-space: nowrap;
+  `,
+  workflowTabs: css`
+    flex: 1 1 auto;
+    min-width: 0;
+
+    & :global(.ant-tabs-nav) {
+      margin: 0;
+    }
+
+    & :global(.ant-tabs-nav::before) {
+      display: none;
+    }
+
+    & :global(.ant-tabs-nav-list) {
+      gap: 4px;
+    }
+
+    & :global(.ant-tabs-tab) {
+      margin: 0 !important;
+      padding-block: 0;
+      padding-inline: 0;
+      border-radius: ${cssVar.borderRadius}px;
+      background: transparent;
+      transition:
+        background 0.2s ease,
+        color 0.2s ease;
+    }
+
+    & :global(.ant-tabs-tab:hover) {
+      background: ${cssVar.colorFillQuaternary};
+    }
+
+    & :global(.ant-tabs-tab-active) {
+      background: ${cssVar.colorFillTertiary};
+    }
+
+    & :global(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+      color: ${cssVar.colorText} !important;
+    }
+
+    & :global(.ant-tabs-tab-btn) {
+      color: ${cssVar.colorTextSecondary};
+    }
+
+    & :global(.ant-tabs-ink-bar) {
+      display: none;
+    }
+
+    & :global(.ant-tabs-content-holder) {
+      display: none;
+    }
+  `,
+  workflowTabLabel: css`
+    overflow: hidden;
+    display: block;
+    max-width: 112px;
+    padding-block: 5px;
+    padding-inline: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  `,
+  commandPaletteList: css`
+    overflow: auto;
+    display: grid;
+    gap: ${cssVar.marginXS};
+    max-height: 420px;
+  `,
+  commandPaletteItem: css`
+    cursor: pointer;
+
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: ${cssVar.marginSM};
+    align-items: flex-start;
+
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: ${cssVar.colorBgElevated};
+    text-align: left;
+
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease,
+      transform 0.2s ease;
+
+    &:hover {
+      border-color: ${cssVar.colorBorder};
+      background: ${cssVar.colorBgContainer};
+      transform: translateY(-1px);
+    }
+  `,
+  commandPaletteItemIcon: css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: ${cssVar.borderRadius}px;
+    background: ${cssVar.colorFillQuaternary};
+  `,
+  commandPaletteItemBody: css`
+    overflow: hidden;
+    display: grid;
+    gap: 2px;
+    min-width: 0;
   `,
   viewportToolbar: css`
     position: absolute;
