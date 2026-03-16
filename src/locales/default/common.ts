@@ -120,6 +120,7 @@ export default {
   'cmdk.askAgentHeading': 'Ask Agent',
   'cmdk.askAgentPlaceholder': 'Ask {{agent}} something...',
   'cmdk.askLobeAI': 'Ask Avato',
+  'cmdk.avatoStudio': 'Studio',
   'cmdk.community': 'Community',
   'cmdk.communitySupport': 'Community Support',
   'cmdk.contactUs': 'Contact Us',
@@ -142,6 +143,7 @@ export default {
   'cmdk.keywords.apikey': 'apikey api key token',
 
   'cmdk.keywords.appearance': 'common appearance theme display',
+  'cmdk.keywords.avatoStudio': 'workflow mcp automation graph studio',
 
   'cmdk.keywords.billing': 'billing payment invoice transaction',
 
@@ -473,6 +475,7 @@ export default {
   'sync.unconnected.tip':
     'Signaling server connection failed, and peer-to-peer communication channel cannot be established. Please check the network and try again.',
   'tab.aiImage': 'Artwork',
+  'tab.avatoStudio': 'Studio',
   'tab.audio': 'Audio',
   'tab.chat': 'Chat',
   'tab.community': 'Community',

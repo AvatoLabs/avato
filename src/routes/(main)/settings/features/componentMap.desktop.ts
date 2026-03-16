@@ -13,6 +13,7 @@ import ChatAppearance from '../chat-appearance';
 import Common from '../common';
 import Hotkey from '../hotkey';
 import Image from '../image';
+import MCPStudio from '../mcp-studio';
 import Memory from '../memory';
 import Profile from '../profile';
 import Provider from '../provider';
@@ -30,6 +31,7 @@ export const componentMap = {
   [SettingsTabs.ChatAppearance]: ChatAppearance,
   [SettingsTabs.Provider]: Provider,
   [SettingsTabs.Image]: Image,
+  [SettingsTabs.MCPStudio]: MCPStudio,
   [SettingsTabs.Memory]: Memory,
   [SettingsTabs.TTS]: TTS,
   [SettingsTabs.About]: About,

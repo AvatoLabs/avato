@@ -7,6 +7,7 @@ import {
   Settings,
   ShapesIcon,
   Video,
+  Workflow,
 } from 'lucide-react';
 
 export interface NavigationRoute {
@@ -66,6 +67,16 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     pathPrefix: '/image',
   },
   {
+    cmdkKey: 'cmdk.avatoStudio',
+    electronKey: 'navigation.avatoStudio',
+    icon: Workflow,
+    id: 'studio',
+    keywords: ['workflow', 'mcp', 'automation', 'graph', 'studio'],
+    keywordsKey: 'cmdk.keywords.avatoStudio',
+    path: '/studio',
+    pathPrefix: '/studio',
+  },
+  {
     cmdkKey: 'cmdk.resource',
     electronKey: 'navigation.resources',
     icon: LibraryBigIcon,
@@ -119,5 +130,5 @@ export const getRouteById = (id: string): NavigationRoute | undefined =>
  */
 export const getNavigableRoutes = (): NavigationRoute[] =>
   NAVIGATION_ROUTES.filter((r) =>
-    ['community', 'video', 'image', 'resource', 'page', 'memory'].includes(r.id),
+    ['community', 'video', 'image', 'studio', 'resource', 'page', 'memory'].includes(r.id),
   );

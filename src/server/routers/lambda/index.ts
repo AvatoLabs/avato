@@ -52,6 +52,7 @@ import { userRouter } from './user';
 import { userMemoriesRouter } from './userMemories';
 import { userMemoryRouter } from './userMemory';
 import { videoRouter } from './video';
+import { workflowStudioRouter } from './workflowStudio';
 
 export const lambdaRouter = router({
   agent: agentRouter,
@@ -99,6 +100,7 @@ export const lambdaRouter = router({
   userMemories: userMemoriesRouter,
   userMemory: userMemoryRouter,
   video: videoRouter,
+  workflowStudio: workflowStudioRouter,
   accountDeletion: accountDeletionRouter,
   referral: referralRouter,
   spend: spendRouter,
