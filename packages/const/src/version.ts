@@ -6,7 +6,8 @@ export const CURRENT_VERSION = pkg.version;
 
 export const isDesktop = typeof __ELECTRON__ !== 'undefined' && !!__ELECTRON__;
 
-// @ts-ignore
-export const isCustomBranding = BRANDING_NAME !== 'Avato';
-// @ts-ignore
-export const isCustomORG = ORG_NAME !== 'Avato';
+const DEFAULT_BRANDING_NAME = 'LobeChat';
+const DEFAULT_ORG_NAME = 'LobeHub';
+
+export const isCustomBranding = BRANDING_NAME !== DEFAULT_BRANDING_NAME;
+export const isCustomORG = ORG_NAME !== DEFAULT_ORG_NAME;
