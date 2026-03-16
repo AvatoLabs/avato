@@ -1,13 +1,33 @@
+import { DEFAULT_AGENT_CONFIG } from '@lobechat/const';
+import { type LobeChatDatabase } from '@lobechat/database';
 import { TRPCError } from '@trpc/server';
+import type OpenAI from 'openai';
 import { z } from 'zod';
 
+import { AgentModel } from '@/database/models/agent';
+import { UserPersonaModel } from '@/database/models/userMemory/persona';
 import { type MCPClientParams } from '@/libs/mcp';
 import {
   applyStudioPayloadBindings,
   buildStudioChatPreview,
+  buildStudioResourceContext,
+  canConnectStudioPorts,
+  canStudioTargetPortAcceptEdge,
+  normalizeStudioWorkflowDefinition,
+  resolveStudioEdgeChannel,
+  resolveStudioSourcePortId,
+  resolveStudioTargetPortId,
   resolveStudioTemplateString,
   type StudioConnectionConfig,
+  type StudioNodeType,
+  type StudioWorkflowEdgeChannel,
+  supportsStudioNodeBreakpoint,
 } from '@/libs/mcp/workflowStudio';
+import {
+  serverMessagesEngine,
+  type ServerUserMemoryConfig,
+} from '@/server/modules/Mecha/ContextEngineering';
+import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 import { type ProcessContentBlocksFn } from './contentProcessor';
 import { mcpService } from './index';
@@ -41,6 +61,7 @@ const workflowStudioPayloadBindingSchema = z.object({
 });
 
 const workflowStudioEdgeSchema = z.object({
+  channel: z.enum(['context', 'handoff', 'main']).optional(),
   id: z.string().min(1),
   payloadBindings: z.array(workflowStudioPayloadBindingSchema).optional().default([]),
   sourcePortId: z.string().optional(),
@@ -60,6 +81,7 @@ const workflowStudioInputNodeSchema = z.object({
 
 const workflowStudioToolNodeSchema = z.object({
   data: z.object({
+    breakpoint: z.boolean().optional(),
     connection: workflowStudioConnectionSchema.optional(),
     payload: z.unknown(),
     payloadBindings: z.array(workflowStudioPayloadBindingSchema).default([]),
@@ -70,8 +92,27 @@ const workflowStudioToolNodeSchema = z.object({
   type: z.literal('mcp-tool'),
 });
 
+const workflowStudioAgentNodeSchema = z.object({
+  data: z.object({
+    agentId: z.string().optional(),
+    agentName: z.string().optional(),
+    breakpoint: z.boolean().optional(),
+    inputTemplate: z.string().optional(),
+    memoryEnabled: z.boolean().optional(),
+    model: z.string().optional(),
+    params: z.record(z.unknown()).optional(),
+    prompt: z.string().default(''),
+    provider: z.string().optional(),
+    systemRole: z.string().optional(),
+    title: z.string().optional(),
+  }),
+  id: z.string().min(1),
+  type: z.literal('agent'),
+});
+
 const workflowStudioTransformNodeSchema = z.object({
   data: z.object({
+    breakpoint: z.boolean().optional(),
     mode: z.enum(['instruction', 'template']).default('instruction'),
     prompt: z.string(),
     title: z.string().optional(),
@@ -83,9 +124,15 @@ const workflowStudioTransformNodeSchema = z.object({
 const workflowStudioResourceNodeSchema = z.object({
   data: z.object({
     content: z.string().default(''),
+    kind: z.enum(['file', 'image', 'text']).optional(),
+    mimeType: z.string().optional(),
     resourcePath: z.string().optional(),
     skillId: z.string().optional(),
     skillName: z.string().optional(),
+    sizeBytes: z.number().optional(),
+    sourceLabel: z.string().optional(),
+    sourceType: z.enum(['manual', 'skill-resource', 'upload']).optional(),
+    sourceUri: z.string().optional(),
     title: z.string().optional(),
   }),
   id: z.string().min(1),
@@ -113,6 +160,7 @@ const workflowStudioChatNodeSchema = z.object({
 });
 
 const workflowStudioNodeSchema = z.discriminatedUnion('type', [
+  workflowStudioAgentNodeSchema,
   workflowStudioInputNodeSchema,
   workflowStudioToolNodeSchema,
   workflowStudioResourceNodeSchema,
@@ -172,6 +220,8 @@ const createClientParams = (connection: StudioConnectionConfig): MCPClientParams
       };
 
 interface ExecutionResult {
+  agentName?: string;
+  channelOutputs: Partial<Record<StudioWorkflowEdgeChannel, string>>;
   connection?: StudioConnectionConfig;
   humanPrompt: string;
   outputText?: string;
@@ -191,6 +241,26 @@ interface ToolExecutionRun {
   toolName?: string;
 }
 
+interface WorkflowStudioBreakpoint {
+  nodeId: string;
+  nodeTitle: string;
+  nodeType: StudioNodeType;
+}
+
+interface WorkflowStudioBreakpointSnapshot extends WorkflowStudioBreakpoint {
+  result: ExecutionResult;
+}
+
+class WorkflowStudioBreakpointError extends Error {
+  snapshot: WorkflowStudioBreakpointSnapshot;
+
+  constructor(snapshot: WorkflowStudioBreakpointSnapshot) {
+    super(`Workflow paused at breakpoint "${snapshot.nodeTitle}".`);
+    this.name = 'WorkflowStudioBreakpointError';
+    this.snapshot = snapshot;
+  }
+}
+
 const getNodeMap = (workflow: WorkflowStudioPreviewWorkflow) =>
   new Map(workflow.nodes.map((node) => [node.id, node]));
 
@@ -205,6 +275,29 @@ const getIncomingEdgeMap = (workflow: WorkflowStudioPreviewWorkflow) => {
 
   return map;
 };
+
+const resolveSourcePortId = (
+  nodeType: WorkflowStudioPreviewWorkflow['nodes'][number]['type'],
+  edge: WorkflowStudioPreviewWorkflow['edges'][number],
+) =>
+  resolveStudioSourcePortId({
+    channel: edge.channel,
+    nodeType,
+    portId: edge.sourcePortId,
+  });
+
+const resolveTargetPortId = (
+  nodeType: WorkflowStudioPreviewWorkflow['nodes'][number]['type'],
+  edge: WorkflowStudioPreviewWorkflow['edges'][number],
+) =>
+  resolveStudioTargetPortId({
+    channel: edge.channel,
+    nodeType,
+    portId: edge.targetPortId,
+  });
+
+const getPortKey = (nodeId: string, portId: string | undefined) =>
+  `${nodeId}:${portId || 'default'}`;
 
 const ensurePreviewNode = (workflow: WorkflowStudioPreviewWorkflow) => {
   const previewNode = workflow.nodes.find((node) => node.id === workflow.previewNodeId);
@@ -224,6 +317,75 @@ const ensurePreviewNode = (workflow: WorkflowStudioPreviewWorkflow) => {
   }
 };
 
+const validateWorkflowGraph = (workflow: WorkflowStudioPreviewWorkflow) => {
+  const nodeMap = getNodeMap(workflow);
+  const incomingPortCounts = new Map<string, number>();
+
+  for (const edge of workflow.edges) {
+    const sourceNode = nodeMap.get(edge.source);
+    const targetNode = nodeMap.get(edge.target);
+
+    if (!sourceNode || !targetNode) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Workflow edge "${edge.id}" points to a missing node.`,
+      });
+    }
+
+    const channel = resolveStudioEdgeChannel({
+      channel: edge.channel,
+      sourcePortId: edge.sourcePortId,
+      sourceType: sourceNode.type,
+      targetPortId: edge.targetPortId,
+      targetType: targetNode.type,
+    });
+    const sourcePortId = resolveSourcePortId(sourceNode.type, edge);
+    const targetPortId = resolveTargetPortId(targetNode.type, edge);
+
+    if (!sourcePortId || !targetPortId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Workflow edge "${edge.id}" is missing a valid source or target port.`,
+      });
+    }
+
+    if (
+      !canConnectStudioPorts({
+        sourceId: sourceNode.id,
+        sourcePortId,
+        sourceType: sourceNode.type,
+        targetId: targetNode.id,
+        targetPortId,
+        targetType: targetNode.type,
+      })
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Workflow edge "${edge.id}" has an invalid connection route.`,
+      });
+    }
+
+    const portKey = getPortKey(targetNode.id, targetPortId);
+    const currentCount = incomingPortCounts.get(portKey) || 0;
+
+    if (
+      !canStudioTargetPortAcceptEdge({
+        currentCount,
+        targetPortId,
+        targetType: targetNode.type,
+      })
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Workflow port "${targetNode.id}.${targetPortId}" does not accept more connections.`,
+      });
+    }
+
+    incomingPortCounts.set(portKey, currentCount + 1);
+    edge.channel = channel;
+  }
+};
+
 const uniqueText = (values: Array<string | undefined>) => [
   ...new Set(
     values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)),
@@ -237,6 +399,29 @@ const getNodeLabel = (
   nodeId: string,
 ) => nodeMap.get(nodeId)?.data.title || nodeId;
 
+const getExecutionEdgeText = (params: {
+  edge: WorkflowStudioPreviewWorkflow['edges'][number];
+  nodeMap: Map<string, WorkflowStudioPreviewWorkflow['nodes'][number]>;
+  result: ExecutionResult | undefined;
+}) => {
+  const sourceNode = params.nodeMap.get(params.edge.source);
+  const channel =
+    sourceNode && params.nodeMap.get(params.edge.target)
+      ? resolveStudioEdgeChannel({
+          channel: params.edge.channel,
+          sourcePortId: params.edge.sourcePortId,
+          sourceType: sourceNode.type,
+          targetPortId: params.edge.targetPortId,
+          targetType: params.nodeMap.get(params.edge.target)!.type,
+        })
+      : params.edge.channel;
+
+  return (
+    (channel ? params.result?.channelOutputs[channel]?.trim() : undefined) ||
+    params.result?.outputText?.trim()
+  );
+};
+
 const mergeIncomingOutputText = (params: {
   incomingEdges: WorkflowStudioPreviewWorkflow['edges'];
   nodeMap: Map<string, WorkflowStudioPreviewWorkflow['nodes'][number]>;
@@ -244,7 +429,11 @@ const mergeIncomingOutputText = (params: {
 }) =>
   params.incomingEdges
     .map((edge, index) => {
-      const text = params.parentResults[index]?.outputText?.trim();
+      const text = getExecutionEdgeText({
+        edge,
+        nodeMap: params.nodeMap,
+        result: params.parentResults[index],
+      });
       if (!text) return undefined;
 
       if (params.incomingEdges.length === 1) return text;
@@ -267,21 +456,7 @@ const mergeToolRunText = (toolRuns: ToolExecutionRun[]) =>
     .filter((value): value is string => Boolean(value))
     .join('\n\n');
 
-const getTargetPortOrder = (
-  nodeType: WorkflowStudioPreviewWorkflow['nodes'][number]['type'],
-  portId?: string,
-) => {
-  const orderMap: Record<string, number> =
-    nodeType === 'mcp-tool'
-      ? { config: 2, context: 1, primary: 0 }
-      : nodeType === 'transform'
-        ? { context: 1, primary: 0 }
-        : nodeType === 'chat-output'
-          ? { context: 1, message: 0 }
-          : {};
-
-  return orderMap[portId || ''] ?? 99;
-};
+const getTargetPortOrder = (channel?: StudioWorkflowEdgeChannel) => (channel === 'context' ? 1 : 0);
 
 const pickSingleValue = <T>(values: T[], getKey: (value: T) => string | undefined) => {
   const keyedValues = values
@@ -294,6 +469,49 @@ const pickSingleValue = <T>(values: T[], getKey: (value: T) => string | undefine
   if (uniqueKeys.size !== 1) return undefined;
 
   return keyedValues[0]?.value;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const sanitizeStudioAgentParams = (value: unknown): Record<string, unknown> => {
+  if (!isRecord(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key]) => key !== 'messages' && key !== 'model' && key !== 'provider' && key !== 'stream',
+    ),
+  );
+};
+
+const loadStudioAgentUserMemory = async (params: {
+  enabled: boolean;
+  serverDB: LobeChatDatabase;
+  userId: string;
+}): Promise<ServerUserMemoryConfig | undefined> => {
+  if (!params.enabled) return undefined;
+
+  try {
+    const personaModel = new UserPersonaModel(params.serverDB, params.userId);
+    const persona = await personaModel.getLatestPersonaDocument();
+
+    if (!persona?.persona) return undefined;
+
+    return {
+      fetchedAt: Date.now(),
+      memories: {
+        contexts: [],
+        experiences: [],
+        persona: {
+          narrative: persona.persona,
+          tagline: persona.tagline,
+        },
+        preferences: [],
+      },
+    };
+  } catch {
+    return undefined;
+  }
 };
 
 const buildPreviewToolResult = (toolRuns: ToolExecutionRun[]): ToolCallResult | undefined => {
@@ -312,19 +530,97 @@ const buildPreviewToolResult = (toolRuns: ToolExecutionRun[]): ToolCallResult | 
   };
 };
 
+const extractChatCompletionText = (completion: OpenAI.ChatCompletion) => {
+  const content = completion.choices[0]?.message?.content;
+
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  return content
+    .map((item) =>
+      typeof item === 'string' ? item : item.type === 'text' && 'text' in item ? item.text : '',
+    )
+    .filter(Boolean)
+    .join('\n');
+};
+
+const executeStudioAgent = async (params: {
+  agentId: string;
+  agentName?: string;
+  inputTemplate?: string;
+  memoryEnabled?: boolean;
+  model?: string;
+  params?: Record<string, unknown>;
+  prompt: string;
+  provider?: string;
+  serverDB: LobeChatDatabase;
+  systemRole?: string;
+  userId: string;
+}) => {
+  const agentModel = new AgentModel(params.serverDB, params.userId);
+  const agent = await agentModel.getAgentConfigById(params.agentId);
+
+  if (!agent && !params.model && !params.provider) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Agent "${params.agentId}" was not found.`,
+    });
+  }
+
+  const provider = params.provider || agent?.provider || DEFAULT_AGENT_CONFIG.provider;
+  const model = params.model || agent?.model || DEFAULT_AGENT_CONFIG.model;
+  const systemRole = params.systemRole ?? agent?.systemRole ?? '';
+  const runtimeParams = {
+    ...sanitizeStudioAgentParams(agent?.params),
+    ...sanitizeStudioAgentParams(params.params),
+  };
+  const userMemory = await loadStudioAgentUserMemory({
+    enabled: params.memoryEnabled ?? agent?.chatConfig?.memory?.enabled === true,
+    serverDB: params.serverDB,
+    userId: params.userId,
+  });
+  const messages = await serverMessagesEngine({
+    inputTemplate: params.inputTemplate ?? agent?.chatConfig?.inputTemplate,
+    messages: [{ content: params.prompt, role: 'user' }],
+    model,
+    provider,
+    systemRole,
+    userMemory,
+  });
+  const modelRuntime = await initModelRuntimeFromDB(params.serverDB, params.userId, provider);
+  const response = await modelRuntime.chat({
+    ...runtimeParams,
+    messages,
+    model,
+    stream: false,
+  });
+  const completion = (await response.json()) as OpenAI.ChatCompletion;
+
+  return {
+    agentName: params.agentName || agent?.title || params.agentId,
+    content: extractChatCompletionText(completion),
+  };
+};
+
 export interface WorkflowStudioPreviewResult {
+  breakpoint?: WorkflowStudioBreakpoint;
   chatPreview: ReturnType<typeof buildStudioChatPreview>;
   toolResult?: ToolCallResult;
 }
 
 export const runWorkflowStudioPreview = async (params: {
+  serverDB: LobeChatDatabase;
   processContentBlocks: ProcessContentBlocksFn;
+  userId: string;
   workflow: WorkflowStudioPreviewWorkflowInput;
 }): Promise<WorkflowStudioPreviewResult> => {
-  const { processContentBlocks } = params;
-  const workflow = workflowStudioDslSchema.parse(params.workflow);
+  const { processContentBlocks, serverDB, userId } = params;
+  const workflow = normalizeStudioWorkflowDefinition(
+    workflowStudioDslSchema.parse(params.workflow),
+  );
 
   ensurePreviewNode(workflow);
+  validateWorkflowGraph(workflow);
 
   const nodeMap = getNodeMap(workflow);
   const incomingEdgeMap = getIncomingEdgeMap(workflow);
@@ -350,9 +646,7 @@ export const runWorkflowStudioPreview = async (params: {
     }
 
     const incomingEdges = [...(incomingEdgeMap.get(nodeId) || [])].sort(
-      (left, right) =>
-        getTargetPortOrder(node.type, left.targetPortId) -
-        getTargetPortOrder(node.type, right.targetPortId),
+      (left, right) => getTargetPortOrder(left.channel) - getTargetPortOrder(right.channel),
     );
     const parentResults = await Promise.all(
       incomingEdges.map((edge) => evaluateNode(edge.source, [...stack, nodeId])),
@@ -377,6 +671,12 @@ export const runWorkflowStudioPreview = async (params: {
         .filter((value): value is string => Boolean(value)),
       (value) => value,
     );
+    const primaryAgentName = pickSingleValue(
+      parentResults
+        .map((result) => result.agentName)
+        .filter((value): value is string => Boolean(value)),
+      (value) => value,
+    );
     const primaryConnection = pickSingleValue(
       [
         mergedToolRuns.at(-1)?.connection,
@@ -396,6 +696,9 @@ export const runWorkflowStudioPreview = async (params: {
     switch (node.type) {
       case 'input': {
         result = {
+          channelOutputs: {
+            main: node.data.humanPrompt,
+          },
           humanPrompt: node.data.humanPrompt,
           outputText: node.data.humanPrompt,
           toolRuns: [],
@@ -405,9 +708,23 @@ export const runWorkflowStudioPreview = async (params: {
       }
 
       case 'resource': {
+        const resourceContent = buildStudioResourceContext({
+          content: node.data.content,
+          kind: node.data.kind,
+          mimeType: node.data.mimeType,
+          sizeBytes: node.data.sizeBytes,
+          sourceLabel: node.data.sourceLabel || node.data.skillName,
+          sourceType: node.data.sourceType,
+          sourceUri: node.data.sourceUri || node.data.resourcePath,
+          title: node.data.title,
+        });
+
         result = {
+          channelOutputs: {
+            context: resourceContent,
+          },
           humanPrompt: '',
-          outputText: node.data.content,
+          outputText: resourceContent,
           toolRuns: mergedToolRuns,
           toolName: primaryToolName,
         };
@@ -417,10 +734,60 @@ export const runWorkflowStudioPreview = async (params: {
 
       case 'skill': {
         result = {
+          channelOutputs: {
+            context: node.data.content,
+          },
           humanPrompt: '',
           outputText: node.data.content,
           toolRuns: mergedToolRuns,
           toolName: primaryToolName,
+        };
+
+        break;
+      }
+
+      case 'agent': {
+        if (!node.data.agentId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Agent battery "${node.id}" does not have an agent selected.`,
+          });
+        }
+
+        const upstreamResult = mergedParentOutput || mergedToolResultText || mergedHumanPrompt;
+        const resolvedPrompt = resolveStudioTemplateString({
+          humanPrompt: mergedHumanPrompt,
+          serverIdentifier: primaryConnection?.identifier,
+          template: node.data.prompt,
+          toolName: primaryToolName,
+          toolResult: mergedToolResultText,
+          upstreamResult,
+        });
+        const agentResult = await executeStudioAgent({
+          agentId: node.data.agentId,
+          agentName: node.data.agentName,
+          inputTemplate: node.data.inputTemplate,
+          memoryEnabled: node.data.memoryEnabled,
+          model: node.data.model,
+          params: node.data.params,
+          prompt: resolvedPrompt,
+          provider: node.data.provider,
+          serverDB,
+          systemRole: node.data.systemRole,
+          userId,
+        });
+
+        result = {
+          agentName: agentResult.agentName || node.data.agentName,
+          channelOutputs: {
+            handoff: agentResult.content,
+            main: agentResult.content,
+          },
+          connection: primaryConnection,
+          humanPrompt: mergedHumanPrompt,
+          outputText: agentResult.content,
+          toolName: primaryToolName,
+          toolRuns: mergedToolRuns,
         };
 
         break;
@@ -456,7 +823,11 @@ export const runWorkflowStudioPreview = async (params: {
             payload: currentPayload,
             serverIdentifier: connection.identifier,
             toolName: node.data.toolName,
-            upstreamResult: parentResult?.outputText,
+            upstreamResult: getExecutionEdgeText({
+              edge,
+              nodeMap,
+              result: parentResult,
+            }),
           });
         }, node.data.payload);
         const toolResult = await mcpService.callTool({
@@ -474,6 +845,9 @@ export const runWorkflowStudioPreview = async (params: {
         };
 
         result = {
+          channelOutputs: {
+            main: toolResult.content,
+          },
           connection,
           humanPrompt: mergedHumanPrompt,
           outputText: toolResult.content,
@@ -497,9 +871,13 @@ export const runWorkflowStudioPreview = async (params: {
 
         result = {
           connection: primaryConnection,
+          channelOutputs: {
+            main: node.data.mode === 'template' ? resolvedPrompt : upstreamResult || resolvedPrompt,
+          },
           humanPrompt: mergedHumanPrompt,
           outputText:
             node.data.mode === 'template' ? resolvedPrompt : upstreamResult || resolvedPrompt,
+          agentName: primaryAgentName,
           toolRuns: mergedToolRuns,
           toolName: primaryToolName,
           transformMode: node.data.mode,
@@ -511,6 +889,10 @@ export const runWorkflowStudioPreview = async (params: {
 
       case 'chat-output': {
         result = {
+          agentName: primaryAgentName,
+          channelOutputs: {
+            main: mergedParentOutput || mergedToolResultText,
+          },
           connection: primaryConnection,
           humanPrompt: mergedHumanPrompt,
           outputText: mergedParentOutput || mergedToolResultText,
@@ -524,21 +906,50 @@ export const runWorkflowStudioPreview = async (params: {
       }
     }
 
+    if (
+      supportsStudioNodeBreakpoint(node.type) &&
+      node.id !== workflow.previewNodeId &&
+      'breakpoint' in node.data &&
+      node.data.breakpoint === true
+    ) {
+      throw new WorkflowStudioBreakpointError({
+        nodeId: node.id,
+        nodeTitle: node.data.title || node.id,
+        nodeType: node.type,
+        result,
+      });
+    }
+
     resultMap.set(nodeId, result);
 
     return result;
   };
 
-  const finalResult = await evaluateNode(workflow.previewNodeId);
+  let breakpoint: WorkflowStudioBreakpoint | undefined;
+  let finalResult: ExecutionResult;
+
+  try {
+    finalResult = await evaluateNode(workflow.previewNodeId);
+  } catch (error) {
+    if (!(error instanceof WorkflowStudioBreakpointError)) throw error;
+
+    breakpoint = {
+      nodeId: error.snapshot.nodeId,
+      nodeTitle: error.snapshot.nodeTitle,
+      nodeType: error.snapshot.nodeType,
+    };
+    finalResult = error.snapshot.result;
+  }
 
   return {
+    breakpoint,
     chatPreview: buildStudioChatPreview({
       connection: finalResult.connection,
       humanPrompt: finalResult.humanPrompt,
       result: finalResult.outputText,
       success:
         buildPreviewToolResult(finalResult.toolRuns)?.success ?? Boolean(finalResult.outputText),
-      toolName: finalResult.toolName,
+      toolName: finalResult.agentName || finalResult.toolName,
       transformMode: finalResult.transformMode,
       transformPrompt: finalResult.transformPrompt,
     }),

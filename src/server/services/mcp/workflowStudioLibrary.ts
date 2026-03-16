@@ -1,6 +1,10 @@
 import { type LobeTool } from '@lobechat/types';
 
-import { type StudioConnectionConfig } from '@/libs/mcp/workflowStudio';
+import {
+  resolveStudioEdgeChannel,
+  type StudioConnectionConfig,
+  type StudioNodeType,
+} from '@/libs/mcp/workflowStudio';
 import { nanoid } from '@/utils/uuid';
 
 interface WorkflowStudioSavedWorkflowDraft {
@@ -22,8 +26,10 @@ export interface WorkflowStudioInstalledServerTool {
 }
 
 export interface WorkflowStudioInstalledServer {
+  avatar?: string;
   connection: StudioConnectionConfig;
   createdAt: number;
+  description?: string;
   id: string;
   name: string;
   origin: 'installed';
@@ -43,6 +49,100 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isWorkflowDraft = (value: unknown): value is WorkflowStudioSavedWorkflowDraft =>
   isRecord(value);
 
+const STUDIO_NODE_TYPES = new Set<StudioNodeType>([
+  'agent',
+  'chat-output',
+  'input',
+  'mcp-tool',
+  'resource',
+  'skill',
+  'transform',
+]);
+
+const isStudioNodeType = (value: unknown): value is StudioNodeType =>
+  typeof value === 'string' && STUDIO_NODE_TYPES.has(value as StudioNodeType);
+
+const parseWorkflowPayloadBindings = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+
+  return value.reduce<Array<{ id: string; source: string; targetPath: string }>>((acc, item) => {
+    if (!isRecord(item) || typeof item.id !== 'string') return acc;
+
+    acc.push({
+      id: item.id,
+      source: typeof item.source === 'string' ? item.source : 'humanPrompt',
+      targetPath: typeof item.targetPath === 'string' ? item.targetPath : '',
+    });
+
+    return acc;
+  }, []);
+};
+
+const normalizeWorkflowStudioDraft = (draft: WorkflowStudioSavedWorkflowDraft) => {
+  const nodes = Array.isArray(draft.nodes)
+    ? draft.nodes.reduce<Array<Record<string, unknown> & { id: string; type: StudioNodeType }>>(
+        (acc, item) => {
+          if (!isRecord(item) || typeof item.id !== 'string' || !isStudioNodeType(item.type)) {
+            return acc;
+          }
+
+          acc.push({
+            ...item,
+            id: item.id,
+            type: item.type,
+          });
+
+          return acc;
+        },
+        [],
+      )
+    : [];
+  const nodeTypeMap = new Map(nodes.map((node) => [node.id, node.type]));
+  const edges = Array.isArray(draft.edges)
+    ? draft.edges.reduce<Array<Record<string, unknown>>>((acc, item) => {
+        if (
+          !isRecord(item) ||
+          typeof item.id !== 'string' ||
+          typeof item.source !== 'string' ||
+          typeof item.target !== 'string'
+        ) {
+          return acc;
+        }
+
+        const sourceType = nodeTypeMap.get(item.source);
+        const targetType = nodeTypeMap.get(item.target);
+        if (!sourceType || !targetType) return acc;
+
+        acc.push({
+          channel: resolveStudioEdgeChannel({
+            channel: typeof item.channel === 'string' ? item.channel : undefined,
+            sourcePortId: typeof item.sourcePortId === 'string' ? item.sourcePortId : undefined,
+            sourceType,
+            targetPortId: typeof item.targetPortId === 'string' ? item.targetPortId : undefined,
+            targetType,
+          }),
+          id: item.id,
+          payloadBindings: parseWorkflowPayloadBindings(item.payloadBindings),
+          source: item.source,
+          target: item.target,
+        });
+
+        return acc;
+      }, [])
+    : [];
+
+  return {
+    ...draft,
+    edges,
+    nodes,
+    previewNodeId: typeof draft.previewNodeId === 'string' ? draft.previewNodeId : undefined,
+    selectedNodeId: typeof draft.selectedNodeId === 'string' ? draft.selectedNodeId : undefined,
+    servers: Array.isArray(draft.servers)
+      ? draft.servers.filter((item): item is Record<string, unknown> => isRecord(item))
+      : [],
+  } satisfies WorkflowStudioSavedWorkflowDraft;
+};
+
 const parseWorkflow = (value: unknown): WorkflowStudioSavedWorkflow | undefined => {
   if (
     !isRecord(value) ||
@@ -55,7 +155,7 @@ const parseWorkflow = (value: unknown): WorkflowStudioSavedWorkflow | undefined 
 
   return {
     createdAt: Number(value.createdAt || 0),
-    draft: value.draft,
+    draft: normalizeWorkflowStudioDraft(value.draft),
     id: value.id,
     name: value.name,
     updatedAt: Number(value.updatedAt || 0),
@@ -105,13 +205,13 @@ export const upsertWorkflowStudioWorkflow = (params: {
   const entry: WorkflowStudioSavedWorkflow = existing
     ? {
         ...existing,
-        draft: params.draft,
+        draft: normalizeWorkflowStudioDraft(params.draft),
         name,
         updatedAt: now,
       }
     : {
         createdAt: now,
-        draft: params.draft,
+        draft: normalizeWorkflowStudioDraft(params.draft),
         id: params.id || `wf_${nanoid(10)}`,
         name,
         updatedAt: now,
@@ -177,8 +277,10 @@ export const extractInstalledWorkflowStudioServers = (
 
       return [
         {
+          avatar: plugin.manifest?.meta?.avatar,
           connection,
           createdAt: now,
+          description: plugin.manifest?.meta?.description,
           id: plugin.identifier,
           name:
             plugin.manifest?.meta?.title ||

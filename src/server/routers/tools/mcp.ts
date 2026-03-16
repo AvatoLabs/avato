@@ -209,6 +209,8 @@ export const mcpRouter = router({
 
         result = await runWorkflowStudioPreview({
           processContentBlocks: boundProcessContentBlocks,
+          serverDB: ctx.serverDB,
+          userId: ctx.userId,
           workflow: input.workflow,
         });
 

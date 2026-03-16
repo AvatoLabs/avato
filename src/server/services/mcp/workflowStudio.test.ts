@@ -1,10 +1,24 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { AgentModel } from '@/database/models/agent';
+import { UserPersonaModel } from '@/database/models/userMemory/persona';
 import { buildStudioWorkflowDefinition } from '@/libs/mcp/workflowStudio';
+import * as modelRuntimeModule from '@/server/modules/ModelRuntime';
 
 import { mcpService } from './index';
 import { runWorkflowStudioPreview } from './workflowStudio';
+
+vi.mock('@/database/models/agent', () => ({
+  AgentModel: vi.fn(),
+}));
+
+vi.mock('@/database/models/userMemory/persona', () => ({
+  UserPersonaModel: vi.fn(),
+}));
+
+const mockServerDB = {} as any;
+const mockUserId = 'user_1';
 
 const createHttpWorkflow = () =>
   buildStudioWorkflowDefinition({
@@ -18,11 +32,25 @@ const createHttpWorkflow = () =>
             targetPath: 'query',
           },
         ],
+        sourcePortId: 'prompt',
         source: 'input',
+        targetPortId: 'primary',
         target: 'tool',
       },
-      { id: 'tool->transform', source: 'tool', target: 'transform' },
-      { id: 'transform->chat', source: 'transform', target: 'chat' },
+      {
+        id: 'tool->transform',
+        source: 'tool',
+        sourcePortId: 'result',
+        target: 'transform',
+        targetPortId: 'primary',
+      },
+      {
+        id: 'transform->chat',
+        source: 'transform',
+        sourcePortId: 'result',
+        target: 'chat',
+        targetPortId: 'message',
+      },
     ],
     nodes: [
       {
@@ -75,9 +103,27 @@ const createHttpWorkflow = () =>
 const createStdioWorkflow = () =>
   buildStudioWorkflowDefinition({
     edges: [
-      { id: 'input->tool', source: 'input', target: 'tool' },
-      { id: 'tool->transform', source: 'tool', target: 'transform' },
-      { id: 'transform->chat', source: 'transform', target: 'chat' },
+      {
+        id: 'input->tool',
+        source: 'input',
+        sourcePortId: 'prompt',
+        target: 'tool',
+        targetPortId: 'primary',
+      },
+      {
+        id: 'tool->transform',
+        source: 'tool',
+        sourcePortId: 'result',
+        target: 'transform',
+        targetPortId: 'primary',
+      },
+      {
+        id: 'transform->chat',
+        source: 'transform',
+        sourcePortId: 'result',
+        target: 'chat',
+        targetPortId: 'message',
+      },
     ],
     nodes: [
       {
@@ -146,6 +192,8 @@ describe('runWorkflowStudioPreview', () => {
 
     const result = await runWorkflowStudioPreview({
       processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
       workflow: createHttpWorkflow(),
     });
 
@@ -181,6 +229,8 @@ describe('runWorkflowStudioPreview', () => {
 
     const result = await runWorkflowStudioPreview({
       processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
       workflow: createStdioWorkflow(),
     });
 
@@ -198,6 +248,94 @@ describe('runWorkflowStudioPreview', () => {
     expect(result.chatPreview.user).toContain('filesystem-demo');
   });
 
+  it('accepts pure channel-based DSL without legacy port ids', async () => {
+    const callToolSpy = vi.spyOn(mcpService, 'callTool').mockResolvedValue({
+      content: 'Channel result',
+      state: {
+        content: [{ text: 'Channel result', type: 'text' }],
+      },
+      success: true,
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow: {
+        edges: [
+          {
+            channel: 'main',
+            id: 'input->tool',
+            payloadBindings: [
+              {
+                id: 'binding-1',
+                source: 'humanPrompt',
+                targetPath: 'query',
+              },
+            ],
+            source: 'input',
+            target: 'tool',
+          },
+          {
+            channel: 'main',
+            id: 'tool->chat',
+            source: 'tool',
+            target: 'chat',
+          },
+        ],
+        nodes: [
+          {
+            data: {
+              humanPrompt: 'Use pure channel DSL.',
+              title: 'Input',
+            },
+            id: 'input',
+            type: 'input',
+          },
+          {
+            data: {
+              connection: {
+                identifier: 'channel-demo',
+                type: 'http',
+                url: 'https://example.com/mcp',
+              },
+              payload: { repo: 'lobehub' },
+              payloadBindings: [],
+              title: 'Tool',
+              toolName: 'listIssues',
+            },
+            id: 'tool',
+            type: 'mcp-tool',
+          },
+          {
+            data: {
+              target: 'chat',
+              title: 'Chat',
+            },
+            id: 'chat',
+            type: 'chat-output',
+          },
+        ],
+        policy: {
+          retries: { tool: 1 },
+          timeouts: { toolMs: 60_000 },
+        },
+        previewNodeId: 'chat',
+        trigger: {
+          type: 'manual',
+        },
+        version: '2.0',
+      },
+    });
+
+    expect(callToolSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(callToolSpy.mock.calls[0]![0].argsStr)).toEqual({
+      query: 'Use pure channel DSL.',
+      repo: 'lobehub',
+    });
+    expect(result.chatPreview.assistant).toBe('Channel result');
+  });
+
   it('merges multiple inputs into a single MCP battery through edge bindings', async () => {
     const workflow = buildStudioWorkflowDefinition({
       edges: [
@@ -210,7 +348,9 @@ describe('runWorkflowStudioPreview', () => {
               targetPath: 'filters.primary',
             },
           ],
+          sourcePortId: 'prompt',
           source: 'input-a',
+          targetPortId: 'primary',
           target: 'tool',
         },
         {
@@ -222,10 +362,18 @@ describe('runWorkflowStudioPreview', () => {
               targetPath: 'filters.secondary',
             },
           ],
+          sourcePortId: 'prompt',
           source: 'input-b',
+          targetPortId: 'context',
           target: 'tool',
         },
-        { id: 'tool->chat', source: 'tool', target: 'chat' },
+        {
+          id: 'tool->chat',
+          source: 'tool',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
       ],
       nodes: [
         {
@@ -271,6 +419,8 @@ describe('runWorkflowStudioPreview', () => {
 
     const result = await runWorkflowStudioPreview({
       processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
       workflow,
     });
 
@@ -293,18 +443,40 @@ describe('runWorkflowStudioPreview', () => {
         {
           id: 'input-a->tool-a',
           payloadBindings: [{ id: 'binding-a', source: 'humanPrompt', targetPath: 'query' }],
+          sourcePortId: 'prompt',
           source: 'input-a',
+          targetPortId: 'primary',
           target: 'tool-a',
         },
         {
           id: 'input-b->tool-b',
           payloadBindings: [{ id: 'binding-b', source: 'humanPrompt', targetPath: 'query' }],
+          sourcePortId: 'prompt',
           source: 'input-b',
+          targetPortId: 'primary',
           target: 'tool-b',
         },
-        { id: 'tool-a->transform', source: 'tool-a', target: 'transform' },
-        { id: 'tool-b->transform', source: 'tool-b', target: 'transform' },
-        { id: 'transform->chat', source: 'transform', target: 'chat' },
+        {
+          id: 'tool-a->transform',
+          source: 'tool-a',
+          sourcePortId: 'result',
+          target: 'transform',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'tool-b->transform',
+          source: 'tool-b',
+          sourcePortId: 'result',
+          target: 'transform',
+          targetPortId: 'context',
+        },
+        {
+          id: 'transform->chat',
+          source: 'transform',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
       ],
       nodes: [
         {
@@ -381,6 +553,8 @@ describe('runWorkflowStudioPreview', () => {
 
     const result = await runWorkflowStudioPreview({
       processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
       workflow,
     });
 
@@ -392,12 +566,619 @@ describe('runWorkflowStudioPreview', () => {
     expect(result.chatPreview.assistant).toContain('Design issues: 2');
   });
 
+  it('executes agent batteries and routes agent output into chat preview', async () => {
+    const chatSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        choices: [{ message: { content: 'Agent handoff ready.' } }],
+      }),
+    });
+    vi.mocked(AgentModel).mockImplementation(
+      () =>
+        ({
+          getAgentConfigById: vi.fn().mockResolvedValue({
+            model: 'gpt-4o-mini',
+            provider: 'openai',
+            systemRole: 'You triage issues.',
+            title: 'Triage Agent',
+          }),
+        }) as any,
+    );
+    vi.spyOn(modelRuntimeModule, 'initModelRuntimeFromDB').mockResolvedValue({
+      chat: chatSpy,
+    } as any);
+
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'input->agent',
+          source: 'input',
+          sourcePortId: 'prompt',
+          target: 'agent',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'agent->chat',
+          source: 'agent',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Review the blocker list.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            agentId: 'agent-1',
+            agentName: 'Triage Agent',
+            prompt: 'Prompt: {{humanPrompt}}\nContext: {{upstreamResult}}',
+            title: 'Agent',
+          },
+          id: 'agent',
+          type: 'agent',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow,
+    });
+
+    expect(chatSpy).toHaveBeenCalledTimes(1);
+    expect(chatSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            content: expect.stringContaining('You triage issues.'),
+            role: 'system',
+          }),
+          {
+            content: 'Prompt: Review the blocker list.\nContext: Review the blocker list.',
+            role: 'user',
+          },
+        ]),
+        model: 'gpt-4o-mini',
+        stream: false,
+      }),
+    );
+    expect(result.toolResult).toBeUndefined();
+    expect(result.chatPreview.assistant).toContain('Agent handoff ready.');
+    expect(result.chatPreview.user).toContain('Triage Agent');
+  });
+
+  it('passes agent runtime params and persona memory into studio agent execution', async () => {
+    const chatSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        choices: [{ message: { content: 'Memory-aware answer.' } }],
+      }),
+    });
+    vi.mocked(AgentModel).mockImplementation(
+      () =>
+        ({
+          getAgentConfigById: vi.fn().mockResolvedValue({
+            chatConfig: {
+              inputTemplate: 'User request:\n{{text}}',
+              memory: { enabled: true },
+            },
+            model: 'gpt-4.1-mini',
+            params: { temperature: 0.35 },
+            provider: 'openai',
+            systemRole: 'You remember user preferences.',
+            title: 'Memory Agent',
+          }),
+        }) as any,
+    );
+    vi.mocked(UserPersonaModel).mockImplementation(
+      () =>
+        ({
+          getLatestPersonaDocument: vi.fn().mockResolvedValue({
+            persona: 'Prefers terse release notes.',
+            tagline: 'Terse',
+            version: 2,
+          }),
+        }) as any,
+    );
+    vi.spyOn(modelRuntimeModule, 'initModelRuntimeFromDB').mockResolvedValue({
+      chat: chatSpy,
+    } as any);
+
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          channel: 'main',
+          id: 'input->agent',
+          source: 'input',
+          target: 'agent',
+        },
+        {
+          channel: 'main',
+          id: 'agent->chat',
+          source: 'agent',
+          target: 'chat',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Draft a concise summary.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            agentId: 'agent-memory',
+            agentName: 'Memory Agent',
+            memoryEnabled: true,
+            params: { temperature: 0.2, top_p: 0.8 },
+            prompt: 'Need: {{humanPrompt}}',
+            title: 'Agent',
+          },
+          id: 'agent',
+          type: 'agent',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow,
+    });
+
+    expect(chatSpy).toHaveBeenCalledTimes(1);
+    expect(chatSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        model: 'gpt-4.1-mini',
+        stream: false,
+        temperature: 0.2,
+        top_p: 0.8,
+      }),
+    );
+    expect(chatSpy.mock.calls[0]?.[0].messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          content: expect.stringContaining('You remember user preferences.'),
+          role: 'system',
+        }),
+        expect.objectContaining({
+          content: expect.stringContaining('User request:\nNeed: Draft a concise summary.'),
+          role: 'user',
+        }),
+        expect.objectContaining({
+          content: expect.stringContaining('Prefers terse release notes.'),
+          role: 'user',
+        }),
+      ]),
+    );
+    expect(result.chatPreview.assistant).toBe('Memory-aware answer.');
+  });
+
+  it('falls back to agent snapshot config when the source agent record is missing', async () => {
+    const chatSpy = vi.fn().mockResolvedValue({
+      json: async () => ({
+        choices: [{ message: { content: 'Snapshot answer.' } }],
+      }),
+    });
+    vi.mocked(AgentModel).mockImplementation(
+      () =>
+        ({
+          getAgentConfigById: vi.fn().mockResolvedValue(undefined),
+        }) as any,
+    );
+    vi.spyOn(modelRuntimeModule, 'initModelRuntimeFromDB').mockResolvedValue({
+      chat: chatSpy,
+    } as any);
+
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        { channel: 'main', id: 'input->agent', source: 'input', target: 'agent' },
+        { channel: 'main', id: 'agent->chat', source: 'agent', target: 'chat' },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Use the local snapshot.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            agentId: 'ghost-agent',
+            agentName: 'Ghost Agent',
+            model: 'gpt-4o-mini',
+            params: { temperature: 0.1 },
+            prompt: 'Snapshot prompt: {{humanPrompt}}',
+            provider: 'openai',
+            systemRole: 'Fallback role',
+            title: 'Agent',
+          },
+          id: 'agent',
+          type: 'agent',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow,
+    });
+
+    expect(chatSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-4o-mini',
+        temperature: 0.1,
+      }),
+    );
+    expect(result.chatPreview.assistant).toBe('Snapshot answer.');
+  });
+
+  it('supports chained agent batteries through explicit handoff ports', async () => {
+    const chatSpy = vi.fn().mockImplementation(async ({ messages }) => ({
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: String(messages[0]?.content).includes('Lead agent')
+                ? 'Lead handoff ready.'
+                : 'Reviewer final answer.',
+            },
+          },
+        ],
+      }),
+    }));
+    vi.mocked(AgentModel).mockImplementation(
+      () =>
+        ({
+          getAgentConfigById: vi.fn(async (agentId: string) =>
+            agentId === 'agent-a'
+              ? {
+                  model: 'gpt-4o-mini',
+                  provider: 'openai',
+                  systemRole: 'Lead agent',
+                  title: 'Lead Agent',
+                }
+              : {
+                  model: 'gpt-4o-mini',
+                  provider: 'openai',
+                  systemRole: 'Reviewer agent',
+                  title: 'Reviewer Agent',
+                },
+          ),
+        }) as any,
+    );
+    vi.spyOn(modelRuntimeModule, 'initModelRuntimeFromDB').mockResolvedValue({
+      chat: chatSpy,
+    } as any);
+
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'input->agent-a',
+          source: 'input',
+          sourcePortId: 'prompt',
+          target: 'agent-a',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'agent-a->agent-b',
+          source: 'agent-a',
+          sourcePortId: 'handoff',
+          target: 'agent-b',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'agent-b->chat',
+          source: 'agent-b',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Draft the release note.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            agentId: 'agent-a',
+            agentName: 'Lead Agent',
+            prompt: 'Lead request: {{humanPrompt}}',
+            title: 'Lead',
+          },
+          id: 'agent-a',
+          type: 'agent',
+        },
+        {
+          data: {
+            agentId: 'agent-b',
+            agentName: 'Reviewer Agent',
+            prompt: 'Review this handoff: {{upstreamResult}}',
+            title: 'Reviewer',
+          },
+          id: 'agent-b',
+          type: 'agent',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow,
+    });
+
+    expect(chatSpy).toHaveBeenCalledTimes(2);
+    expect(chatSpy.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            content: expect.stringContaining('Reviewer agent'),
+            role: 'system',
+          }),
+          { content: 'Review this handoff: Lead handoff ready.', role: 'user' },
+        ]),
+      }),
+    );
+    expect(result.chatPreview.assistant).toBe('Reviewer final answer.');
+    expect(result.chatPreview.user).toContain('Reviewer Agent');
+  });
+
+  it('pauses the graph when a breakpoint battery is reached', async () => {
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'input->transform',
+          source: 'input',
+          sourcePortId: 'prompt',
+          target: 'transform',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'transform->chat',
+          source: 'transform',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Pause after formatting.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            breakpoint: true,
+            mode: 'template',
+            prompt: 'Paused output: {{upstreamResult}}',
+            title: 'Transform',
+          },
+          id: 'transform',
+          type: 'transform',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    const result = await runWorkflowStudioPreview({
+      processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
+      workflow,
+    });
+
+    expect(result.breakpoint).toEqual({
+      nodeId: 'transform',
+      nodeTitle: 'Transform',
+      nodeType: 'transform',
+    });
+    expect(result.chatPreview.assistant).toBe('Paused output: Pause after formatting.');
+  });
+
+  it('rejects multiple wires into a single-capacity input port', async () => {
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'input-a->chat',
+          source: 'input-a',
+          sourcePortId: 'prompt',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+        {
+          id: 'input-b->chat',
+          source: 'input-b',
+          sourcePortId: 'prompt',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'First input', title: 'Input A' },
+          id: 'input-a',
+          type: 'input',
+        },
+        {
+          data: { humanPrompt: 'Second input', title: 'Input B' },
+          id: 'input-b',
+          type: 'input',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    await expect(
+      runWorkflowStudioPreview({
+        processContentBlocks: vi.fn(async (blocks) => blocks),
+        serverDB: mockServerDB,
+        userId: mockUserId,
+        workflow,
+      }),
+    ).rejects.toThrow(/does not accept more connections/);
+  });
+
+  it('rejects handoff wires unless they target another agent battery', async () => {
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'input->agent',
+          source: 'input',
+          sourcePortId: 'prompt',
+          target: 'agent',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'agent->chat',
+          source: 'agent',
+          sourcePortId: 'handoff',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: { humanPrompt: 'Draft the answer.', title: 'Input' },
+          id: 'input',
+          type: 'input',
+        },
+        {
+          data: {
+            agentId: 'agent-1',
+            agentName: 'Triage Agent',
+            prompt: 'Draft: {{humanPrompt}}',
+            title: 'Agent',
+          },
+          id: 'agent',
+          type: 'agent',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    await expect(
+      runWorkflowStudioPreview({
+        processContentBlocks: vi.fn(async (blocks) => blocks),
+        serverDB: mockServerDB,
+        userId: mockUserId,
+        workflow,
+      }),
+    ).rejects.toThrow(/invalid connection route/);
+  });
+
+  it('rejects context-only sources when they try to feed chat output directly', async () => {
+    const workflow = buildStudioWorkflowDefinition({
+      edges: [
+        {
+          id: 'resource->chat',
+          source: 'resource',
+          sourcePortId: 'content',
+          target: 'chat',
+          targetPortId: 'message',
+        },
+      ],
+      nodes: [
+        {
+          data: {
+            content: '# Notes\nIncident follow-up guidance.',
+            title: 'Resource',
+          },
+          id: 'resource',
+          type: 'resource',
+        },
+        {
+          data: { target: 'chat', title: 'Chat' },
+          id: 'chat',
+          type: 'chat-output',
+        },
+      ],
+      previewNodeId: 'chat',
+    });
+
+    await expect(
+      runWorkflowStudioPreview({
+        processContentBlocks: vi.fn(async (blocks) => blocks),
+        serverDB: mockServerDB,
+        userId: mockUserId,
+        workflow,
+      }),
+    ).rejects.toThrow(/invalid connection route/);
+  });
+
   it('renders imported resource and skill batteries through downstream transform batteries', async () => {
     const workflow = buildStudioWorkflowDefinition({
       edges: [
-        { id: 'resource->transform', source: 'resource', target: 'transform' },
-        { id: 'skill->transform', source: 'skill', target: 'transform' },
-        { id: 'transform->chat', source: 'transform', target: 'chat' },
+        {
+          id: 'resource->transform',
+          source: 'resource',
+          sourcePortId: 'content',
+          target: 'transform',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'skill->transform',
+          source: 'skill',
+          sourcePortId: 'content',
+          target: 'transform',
+          targetPortId: 'context',
+        },
+        {
+          id: 'transform->chat',
+          source: 'transform',
+          sourcePortId: 'result',
+          target: 'chat',
+          targetPortId: 'message',
+        },
       ],
       nodes: [
         {
@@ -442,6 +1223,8 @@ describe('runWorkflowStudioPreview', () => {
 
     const result = await runWorkflowStudioPreview({
       processContentBlocks: vi.fn(async (blocks) => blocks),
+      serverDB: mockServerDB,
+      userId: mockUserId,
       workflow,
     });
 

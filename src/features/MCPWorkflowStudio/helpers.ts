@@ -4,10 +4,23 @@ import { safeParseJSON } from '@lobechat/utils';
 import {
   buildStudioChatPreview,
   buildStudioWorkflowDefinition,
+  canConnectStudioNodes,
+  canConnectStudioPorts,
+  canStudioTargetPortAcceptEdge,
+  getStudioDefaultNodeTitle,
+  getStudioDefaultTransformPrompt,
+  getStudioNodePorts,
+  inferStudioResourceKind,
+  resolveStudioEdgeChannel,
+  resolveStudioSourcePortId as resolveStudioWorkflowSourcePortId,
+  resolveStudioTargetPortId as resolveStudioWorkflowTargetPortId,
   type StudioConnectionConfig,
+  type StudioNodePortDefinition,
   type StudioNodeType,
   type StudioPayloadBinding,
   type StudioPayloadBindingSource,
+  type StudioResourceKind,
+  type StudioResourceSource,
   type StudioWorkflowDSL,
   type StudioWorkflowEdge,
   type StudioWorkflowNode,
@@ -37,6 +50,7 @@ export interface StudioCanvasInputNode {
 
 export interface StudioCanvasToolNode {
   data: {
+    breakpoint?: boolean;
     payload: string;
     payloadBindings: StudioPayloadBinding[];
     serverId?: string;
@@ -48,8 +62,28 @@ export interface StudioCanvasToolNode {
   type: 'mcp-tool';
 }
 
+export interface StudioCanvasAgentNode {
+  data: {
+    agentId?: string;
+    agentName?: string;
+    breakpoint?: boolean;
+    inputTemplate?: string;
+    memoryEnabled?: boolean;
+    model?: string;
+    params?: string;
+    prompt: string;
+    provider?: string;
+    systemRole?: string;
+    title: string;
+  };
+  id: string;
+  position: StudioNodePosition;
+  type: 'agent';
+}
+
 export interface StudioCanvasTransformNode {
   data: {
+    breakpoint?: boolean;
     mode: 'instruction' | 'template';
     prompt: string;
     title: string;
@@ -62,9 +96,15 @@ export interface StudioCanvasTransformNode {
 export interface StudioCanvasResourceNode {
   data: {
     content: string;
+    kind: StudioResourceKind;
+    mimeType?: string;
     resourcePath?: string;
     skillId?: string;
     skillName?: string;
+    sizeBytes?: number;
+    sourceLabel?: string;
+    sourceType: StudioResourceSource;
+    sourceUri?: string;
     title: string;
   };
   id: string;
@@ -94,6 +134,7 @@ export interface StudioCanvasChatNode {
 }
 
 export type StudioCanvasNode =
+  | StudioCanvasAgentNode
   | StudioCanvasChatNode
   | StudioCanvasInputNode
   | StudioCanvasToolNode
@@ -101,9 +142,62 @@ export type StudioCanvasNode =
   | StudioCanvasSkillNode
   | StudioCanvasTransformNode;
 
+const getStudioResourceAutoTitle = (data: StudioCanvasResourceNode['data']) => {
+  if (data.sourceType === 'skill-resource') {
+    return data.resourcePath || data.sourceUri || data.sourceLabel || data.skillName;
+  }
+
+  return data.sourceLabel || data.sourceUri || data.skillName;
+};
+
+export const getStudioAutoNodeTitle = (
+  node: StudioCanvasNode,
+  options?: {
+    serverName?: string;
+  },
+) => {
+  switch (node.type) {
+    case 'agent': {
+      return node.data.agentName || getStudioDefaultNodeTitle('agent');
+    }
+    case 'mcp-tool': {
+      return node.data.toolName || options?.serverName || getStudioDefaultNodeTitle('mcp-tool');
+    }
+    case 'resource': {
+      return getStudioResourceAutoTitle(node.data) || getStudioDefaultNodeTitle('resource');
+    }
+    case 'skill': {
+      return node.data.skillName || getStudioDefaultNodeTitle('skill');
+    }
+    default: {
+      return getStudioDefaultNodeTitle(node.type);
+    }
+  }
+};
+
+export const shouldStudioSyncNodeTitle = (params: {
+  currentTitle?: string;
+  nextAutoTitle?: string;
+  nodeType: StudioCanvasNode['type'];
+  previousAutoTitle?: string;
+}) => {
+  const currentTitle = params.currentTitle?.trim();
+  if (!currentTitle) return true;
+
+  const autoTitles = new Set(
+    [getStudioDefaultNodeTitle(params.nodeType), params.previousAutoTitle, params.nextAutoTitle]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .map((value) => value.trim()),
+  );
+
+  return autoTitles.has(currentTitle);
+};
+
 export interface StudioLoadedServer {
+  avatar?: string;
   connection: StudioConnectionConfig;
   createdAt: number;
+  description?: string;
   id: string;
   name: string;
   origin?: 'custom' | 'installed';
@@ -132,16 +226,22 @@ export interface StudioCanvasBounds {
   width: number;
 }
 
-export interface StudioNodePort {
-  id: string;
-  kind: 'input' | 'output';
-}
+export type StudioNodePort = StudioNodePortDefinition;
 
 const SENSITIVE_KEY = /authorization|secret|token|key|password/i;
 export const STUDIO_STORAGE_KEY = 'lobehub-mcp-workflow-studio-draft';
 export const STUDIO_LIBRARY_STORAGE_KEY = 'lobehub-mcp-workflow-studio-library';
 export const STUDIO_CANVAS_PADDING = 24;
 export const STUDIO_DEFAULT_CANVAS_BOUNDS = { height: 640, width: 1360 } as const;
+
+const STUDIO_AUTO_LAYOUT_BASE_X = 72;
+const STUDIO_AUTO_LAYOUT_BASE_Y = 88;
+const STUDIO_AUTO_LAYOUT_COLUMN_GAP = 320;
+const STUDIO_AUTO_LAYOUT_ROW_GAP = 52;
+const STUDIO_CONNECTION_INPUT_RAIL_X = 88;
+const STUDIO_CONNECTION_INPUT_RAIL_Y = 26;
+const STUDIO_CONNECTION_SNAP_RADIUS = 104;
+const STUDIO_CONNECTION_FALLBACK_RADIUS = 156;
 
 const isRecord = (value: unknown): value is Record<string, any> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -242,7 +342,7 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
       return {
         data: {
           humanPrompt: String(value.data?.humanPrompt || ''),
-          title: String(value.data?.title || 'Input'),
+          title: String(value.data?.title || getStudioDefaultNodeTitle('input')),
         },
         id: value.id,
         position,
@@ -250,13 +350,43 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
       };
     }
 
+    case 'agent': {
+      return {
+        data: {
+          agentId: typeof value.data?.agentId === 'string' ? value.data.agentId : undefined,
+          agentName: typeof value.data?.agentName === 'string' ? value.data.agentName : undefined,
+          breakpoint: value.data?.breakpoint === true,
+          inputTemplate:
+            typeof value.data?.inputTemplate === 'string' ? value.data.inputTemplate : undefined,
+          memoryEnabled:
+            typeof value.data?.memoryEnabled === 'boolean' ? value.data.memoryEnabled : undefined,
+          model: typeof value.data?.model === 'string' ? value.data.model : undefined,
+          params:
+            typeof value.data?.params === 'string'
+              ? sanitizeJsonString(value.data.params)
+              : isRecord(value.data?.params)
+                ? JSON.stringify(value.data.params, null, 2)
+                : undefined,
+          prompt: String(value.data?.prompt || ''),
+          provider: typeof value.data?.provider === 'string' ? value.data.provider : undefined,
+          systemRole:
+            typeof value.data?.systemRole === 'string' ? value.data.systemRole : undefined,
+          title: String(value.data?.title || getStudioDefaultNodeTitle('agent')),
+        },
+        id: value.id,
+        position,
+        type: 'agent',
+      };
+    }
+
     case 'mcp-tool': {
       return {
         data: {
+          breakpoint: value.data?.breakpoint === true,
           payload: String(value.data?.payload || '{}'),
           payloadBindings: parsePayloadBindings(value.data?.payloadBindings),
           serverId: typeof value.data?.serverId === 'string' ? value.data.serverId : undefined,
-          title: String(value.data?.title || 'MCP Tool'),
+          title: String(value.data?.title || getStudioDefaultNodeTitle('mcp-tool')),
           toolName: typeof value.data?.toolName === 'string' ? value.data.toolName : undefined,
         },
         id: value.id,
@@ -268,9 +398,10 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
     case 'transform': {
       return {
         data: {
+          breakpoint: value.data?.breakpoint === true,
           mode: value.data?.mode === 'template' ? 'template' : 'instruction',
-          prompt: String(value.data?.prompt || ''),
-          title: String(value.data?.title || 'Transform'),
+          prompt: String(value.data?.prompt || getStudioDefaultTransformPrompt()),
+          title: String(value.data?.title || getStudioDefaultNodeTitle('transform')),
         },
         id: value.id,
         position,
@@ -279,14 +410,40 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
     }
 
     case 'resource': {
+      const sourceUri =
+        typeof value.data?.sourceUri === 'string'
+          ? value.data.sourceUri
+          : typeof value.data?.resourcePath === 'string'
+            ? value.data.resourcePath
+            : undefined;
       return {
         data: {
           content: String(value.data?.content || ''),
+          kind: inferStudioResourceKind({
+            content: typeof value.data?.content === 'string' ? value.data.content : undefined,
+            mimeType: typeof value.data?.mimeType === 'string' ? value.data.mimeType : undefined,
+            sourceUri,
+          }),
+          mimeType: typeof value.data?.mimeType === 'string' ? value.data.mimeType : undefined,
           resourcePath:
             typeof value.data?.resourcePath === 'string' ? value.data.resourcePath : undefined,
           skillId: typeof value.data?.skillId === 'string' ? value.data.skillId : undefined,
           skillName: typeof value.data?.skillName === 'string' ? value.data.skillName : undefined,
-          title: String(value.data?.title || 'Resource'),
+          sizeBytes: typeof value.data?.sizeBytes === 'number' ? value.data.sizeBytes : undefined,
+          sourceLabel:
+            typeof value.data?.sourceLabel === 'string'
+              ? value.data.sourceLabel
+              : typeof value.data?.skillName === 'string'
+                ? value.data.skillName
+                : undefined,
+          sourceType:
+            value.data?.sourceType === 'skill-resource' || value.data?.skillId
+              ? 'skill-resource'
+              : value.data?.sourceType === 'upload'
+                ? 'upload'
+                : 'manual',
+          sourceUri,
+          title: String(value.data?.title || getStudioDefaultNodeTitle('resource')),
         },
         id: value.id,
         position,
@@ -300,7 +457,7 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
           content: String(value.data?.content || ''),
           skillId: typeof value.data?.skillId === 'string' ? value.data.skillId : undefined,
           skillName: typeof value.data?.skillName === 'string' ? value.data.skillName : undefined,
-          title: String(value.data?.title || 'Skill'),
+          title: String(value.data?.title || getStudioDefaultNodeTitle('skill')),
         },
         id: value.id,
         position,
@@ -311,7 +468,7 @@ const parseCanvasNode = (value: unknown, fallbackIndex = 0): StudioCanvasNode | 
     case 'chat-output': {
       return {
         data: {
-          title: String(value.data?.title || 'Chat'),
+          title: String(value.data?.title || getStudioDefaultNodeTitle('chat-output')),
         },
         id: value.id,
         position,
@@ -336,6 +493,10 @@ const parseWorkflowEdge = (value: unknown): StudioWorkflowEdge | undefined => {
   }
 
   return {
+    channel:
+      value.channel === 'context' || value.channel === 'handoff' || value.channel === 'main'
+        ? value.channel
+        : undefined,
     id: value.id,
     payloadBindings: parsePayloadBindings(value.payloadBindings),
     sourcePortId: typeof value.sourcePortId === 'string' ? value.sourcePortId : undefined,
@@ -344,6 +505,36 @@ const parseWorkflowEdge = (value: unknown): StudioWorkflowEdge | undefined => {
     target: value.target,
   };
 };
+
+function normalizeDraftEdges(
+  edges: StudioWorkflowEdge[],
+  nodes: StudioCanvasNode[],
+): StudioWorkflowEdge[] {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+
+  return edges.reduce<StudioWorkflowEdge[]>((acc, edge) => {
+    const sourceNode = nodeMap.get(edge.source);
+    const targetNode = nodeMap.get(edge.target);
+
+    if (!sourceNode || !targetNode) return acc;
+
+    acc.push({
+      channel: resolveStudioEdgeChannel({
+        channel: edge.channel,
+        sourcePortId: edge.sourcePortId,
+        sourceType: sourceNode.type,
+        targetPortId: edge.targetPortId,
+        targetType: targetNode.type,
+      }),
+      payloadBindings: parsePayloadBindings(edge.payloadBindings),
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+    });
+
+    return acc;
+  }, []);
+}
 
 const parseLoadedServer = (value: unknown): StudioLoadedServer | undefined => {
   if (!isRecord(value) || typeof value.id !== 'string' || !isRecord(value.connection)) {
@@ -388,8 +579,10 @@ const parseLoadedServer = (value: unknown): StudioLoadedServer | undefined => {
         };
 
   return {
+    avatar: typeof value.avatar === 'string' ? value.avatar : undefined,
     connection,
     createdAt: Number(value.createdAt || 0),
+    description: typeof value.description === 'string' ? value.description : undefined,
     id: value.id,
     name: String(value.name || connection.identifier),
     origin:
@@ -430,7 +623,22 @@ export const createStudioNode = (
       return {
         data: {
           humanPrompt: '',
-          title: 'Input',
+          title: getStudioDefaultNodeTitle('input'),
+        },
+        id,
+        position,
+        type,
+      };
+    }
+
+    case 'agent': {
+      return {
+        data: {
+          breakpoint: false,
+          memoryEnabled: false,
+          params: '{}',
+          prompt: '{{upstreamResult}}{{humanPrompt}}',
+          title: getStudioDefaultNodeTitle('agent'),
         },
         id,
         position,
@@ -441,9 +649,10 @@ export const createStudioNode = (
     case 'mcp-tool': {
       return {
         data: {
+          breakpoint: false,
           payload: '{}',
           payloadBindings: [],
-          title: 'MCP Tool',
+          title: getStudioDefaultNodeTitle('mcp-tool'),
         },
         id,
         position,
@@ -454,9 +663,10 @@ export const createStudioNode = (
     case 'transform': {
       return {
         data: {
+          breakpoint: false,
           mode: 'instruction',
-          prompt: 'Summarize the upstream result for chat.',
-          title: 'Transform',
+          prompt: getStudioDefaultTransformPrompt(),
+          title: getStudioDefaultNodeTitle('transform'),
         },
         id,
         position,
@@ -468,7 +678,9 @@ export const createStudioNode = (
       return {
         data: {
           content: '',
-          title: 'Resource',
+          kind: 'text',
+          sourceType: 'manual',
+          title: getStudioDefaultNodeTitle('resource'),
         },
         id,
         position,
@@ -480,7 +692,7 @@ export const createStudioNode = (
       return {
         data: {
           content: '',
-          title: 'Skill',
+          title: getStudioDefaultNodeTitle('skill'),
         },
         id,
         position,
@@ -491,7 +703,7 @@ export const createStudioNode = (
     case 'chat-output': {
       return {
         data: {
-          title: 'Chat',
+          title: getStudioDefaultNodeTitle('chat-output'),
         },
         id,
         position,
@@ -502,36 +714,46 @@ export const createStudioNode = (
 };
 
 export const createDefaultStudioDraft = (): StudioDraft => {
-  const input = createStudioNode('input', { x: 48, y: 160 });
-  const tool = createStudioNode('mcp-tool', { x: 360, y: 88 });
-  const transform = createStudioNode('transform', { x: 700, y: 160 });
-  const chat = createStudioNode('chat-output', { x: 1040, y: 96 });
+  const input = createStudioNode('input', {
+    x: STUDIO_AUTO_LAYOUT_BASE_X,
+    y: STUDIO_AUTO_LAYOUT_BASE_Y,
+  });
+  const tool = createStudioNode('mcp-tool', {
+    x: STUDIO_AUTO_LAYOUT_BASE_X,
+    y: STUDIO_AUTO_LAYOUT_BASE_Y,
+  });
+  const transform = createStudioNode('transform', {
+    x: STUDIO_AUTO_LAYOUT_BASE_X,
+    y: STUDIO_AUTO_LAYOUT_BASE_Y,
+  });
+  const chat = createStudioNode('chat-output', {
+    x: STUDIO_AUTO_LAYOUT_BASE_X,
+    y: STUDIO_AUTO_LAYOUT_BASE_Y,
+  });
+  const edges: StudioWorkflowEdge[] = [
+    {
+      channel: 'main',
+      id: `edge_${nanoid(6)}`,
+      source: input.id,
+      target: tool.id,
+    },
+    {
+      channel: 'main',
+      id: `edge_${nanoid(6)}`,
+      source: tool.id,
+      target: transform.id,
+    },
+    {
+      channel: 'main',
+      id: `edge_${nanoid(6)}`,
+      source: transform.id,
+      target: chat.id,
+    },
+  ];
 
   return {
-    edges: [
-      {
-        id: `edge_${nanoid(6)}`,
-        source: input.id,
-        sourcePortId: 'prompt',
-        target: tool.id,
-        targetPortId: 'primary',
-      },
-      {
-        id: `edge_${nanoid(6)}`,
-        source: tool.id,
-        sourcePortId: 'result',
-        target: transform.id,
-        targetPortId: 'primary',
-      },
-      {
-        id: `edge_${nanoid(6)}`,
-        source: transform.id,
-        sourcePortId: 'result',
-        target: chat.id,
-        targetPortId: 'message',
-      },
-    ],
-    nodes: [input, tool, transform, chat],
+    edges,
+    nodes: autoLayoutStudioNodes([input, tool, transform, chat], edges),
     previewNodeId: chat.id,
     selectedNodeId: tool.id,
     servers: [],
@@ -539,45 +761,124 @@ export const createDefaultStudioDraft = (): StudioDraft => {
 };
 
 export const buildStudioDraft = (params: StudioDraft): StudioDraft => ({
-  edges: params.edges.map((edge) => ({
-    ...edge,
-    payloadBindings: parsePayloadBindings(edge.payloadBindings),
-    sourcePortId: edge.sourcePortId,
-    targetPortId: edge.targetPortId,
-  })),
-  nodes: params.nodes.map((node) =>
-    node.type === 'mcp-tool'
-      ? {
-          ...node,
-          data: {
-            ...node.data,
-            payload: sanitizeJsonString(node.data.payload),
-            payloadBindings: parsePayloadBindings(node.data.payloadBindings),
-          },
-        }
-      : node.type === 'resource'
+  edges: normalizeDraftEdges(
+    params.edges,
+    params.nodes.map((node) =>
+      node.type === 'agent'
         ? {
             ...node,
             data: {
               ...node.data,
-              content: String(node.data.content || ''),
+              breakpoint: node.data.breakpoint === true,
+              params: sanitizeJsonString(node.data.params || '{}'),
+              prompt: String(node.data.prompt || ''),
             },
           }
-        : node.type === 'skill'
+        : node.type === 'mcp-tool'
           ? {
               ...node,
               data: {
                 ...node.data,
-                content: String(node.data.content || ''),
+                breakpoint: node.data.breakpoint === true,
+                payload: sanitizeJsonString(node.data.payload),
+                payloadBindings: parsePayloadBindings(node.data.payloadBindings),
               },
             }
-          : node,
+          : node.type === 'transform'
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  breakpoint: node.data.breakpoint === true,
+                },
+              }
+            : node.type === 'resource'
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    content: String(node.data.content || ''),
+                    kind: inferStudioResourceKind({
+                      content: String(node.data.content || ''),
+                      mimeType: node.data.mimeType,
+                      sourceUri: node.data.sourceUri || node.data.resourcePath,
+                    }),
+                    sourceType:
+                      node.data.sourceType || (node.data.skillId ? 'skill-resource' : 'manual'),
+                  },
+                }
+              : node.type === 'skill'
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      content: String(node.data.content || ''),
+                    },
+                  }
+                : node,
+    ),
+  ),
+  nodes: params.nodes.map((node) =>
+    node.type === 'agent'
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            breakpoint: node.data.breakpoint === true,
+            params: sanitizeJsonString(node.data.params || '{}'),
+            prompt: String(node.data.prompt || ''),
+          },
+        }
+      : node.type === 'mcp-tool'
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              breakpoint: node.data.breakpoint === true,
+              payload: sanitizeJsonString(node.data.payload),
+              payloadBindings: parsePayloadBindings(node.data.payloadBindings),
+            },
+          }
+        : node.type === 'transform'
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                breakpoint: node.data.breakpoint === true,
+              },
+            }
+          : node.type === 'resource'
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  content: String(node.data.content || ''),
+                  kind: inferStudioResourceKind({
+                    content: String(node.data.content || ''),
+                    mimeType: node.data.mimeType,
+                    sourceUri: node.data.sourceUri || node.data.resourcePath,
+                  }),
+                  sourceType:
+                    node.data.sourceType || (node.data.skillId ? 'skill-resource' : 'manual'),
+                },
+              }
+            : node.type === 'skill'
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    content: String(node.data.content || ''),
+                  },
+                }
+              : node,
   ),
   previewNodeId: params.previewNodeId,
   selectedNodeId: params.selectedNodeId,
   servers: params.servers.map((server) => ({
     ...server,
+    avatar: server.avatar,
     connection: sanitizeConnection(server.connection),
+    description: server.description,
   })),
 });
 
@@ -611,11 +912,14 @@ export const parseStudioDraft = (value: string | null | undefined): StudioDraft 
   if (nodes.length === 0) return undefined;
 
   return {
-    edges: Array.isArray(parsed.edges)
-      ? parsed.edges
-          .map(parseWorkflowEdge)
-          .filter((item): item is StudioWorkflowEdge => Boolean(item))
-      : [],
+    edges: normalizeDraftEdges(
+      Array.isArray(parsed.edges)
+        ? parsed.edges
+            .map(parseWorkflowEdge)
+            .filter((item): item is StudioWorkflowEdge => Boolean(item))
+        : [],
+      nodes,
+    ),
     nodes,
     previewNodeId:
       typeof parsed.previewNodeId === 'string' && parsed.previewNodeId
@@ -702,11 +1006,14 @@ const getNodeSizeSeed = (node: StudioCanvasNode) => {
     case 'input': {
       return node.data.humanPrompt;
     }
+    case 'agent': {
+      return `${node.data.agentName || ''} ${node.data.prompt}`;
+    }
     case 'mcp-tool': {
       return `${node.data.toolName || ''} ${node.data.payload} ${node.data.payloadBindings.map((item) => item.targetPath).join(' ')}`;
     }
     case 'resource': {
-      return `${node.data.skillName || ''} ${node.data.resourcePath || ''} ${node.data.content}`;
+      return `${node.data.sourceLabel || node.data.skillName || ''} ${node.data.sourceUri || node.data.resourcePath || ''} ${node.data.mimeType || ''} ${node.data.content}`;
     }
     case 'skill': {
       return `${node.data.skillName || ''} ${node.data.content}`;
@@ -724,7 +1031,7 @@ export const estimateNodeSize = (node: StudioCanvasNode) => {
   const seed = getNodeSizeSeed(node);
   const lines = Math.max(1, Math.ceil(seed.trim().length / 26));
   const height = Math.min(132 + lines * 20, 280);
-  const width = Math.min(Math.max(220, 220 + Math.min(seed.trim().length, 80) * 1.15), 360);
+  const width = Math.min(Math.max(260, 260 + Math.min(seed.trim().length, 80) * 1.05), 400);
 
   return { height, width };
 };
@@ -748,50 +1055,26 @@ export const clampNodePositions = (
   });
 
 export const buildConnectorPath = (params: {
+  channel?: StudioWorkflowEdge['channel'];
   sourcePortId?: string;
   source: StudioCanvasNode;
   targetPortId?: string;
   target: StudioCanvasNode;
 }) => {
   return buildConnectorPathFromPoints({
-    end: getNodeInputAnchor(params.target, params.targetPortId),
-    start: getNodeOutputAnchor(params.source, params.sourcePortId),
+    end: getNodeInputAnchor(
+      params.target,
+      resolveStudioInputPortId(params.target, params.targetPortId, params.channel),
+    ),
+    start: getNodeOutputAnchor(
+      params.source,
+      resolveStudioOutputPortId(params.source, params.sourcePortId, params.channel),
+    ),
   });
 };
 
 export const getNodePorts = (node: StudioCanvasNode): StudioNodePort[] => {
-  switch (node.type) {
-    case 'input': {
-      return [{ id: 'prompt', kind: 'output' }];
-    }
-    case 'resource': {
-      return [{ id: 'content', kind: 'output' }];
-    }
-    case 'skill': {
-      return [{ id: 'content', kind: 'output' }];
-    }
-    case 'mcp-tool': {
-      return [
-        { id: 'primary', kind: 'input' },
-        { id: 'context', kind: 'input' },
-        { id: 'config', kind: 'input' },
-        { id: 'result', kind: 'output' },
-      ];
-    }
-    case 'transform': {
-      return [
-        { id: 'primary', kind: 'input' },
-        { id: 'context', kind: 'input' },
-        { id: 'result', kind: 'output' },
-      ];
-    }
-    case 'chat-output': {
-      return [
-        { id: 'message', kind: 'input' },
-        { id: 'context', kind: 'input' },
-      ];
-    }
-  }
+  return getStudioNodePorts(node.type);
 };
 
 export const getNodeInputPorts = (node: StudioCanvasNode) =>
@@ -799,6 +1082,165 @@ export const getNodeInputPorts = (node: StudioCanvasNode) =>
 
 export const getNodeOutputPorts = (node: StudioCanvasNode) =>
   getNodePorts(node).filter((port) => port.kind === 'output');
+
+export interface StudioConnectionStateBusy {
+  kind: 'busy';
+}
+
+export interface StudioConnectionStateConnectable {
+  kind: 'connectable';
+}
+
+export interface StudioConnectionStateDuplicate {
+  edge: StudioWorkflowEdge;
+  kind: 'duplicate';
+}
+
+export interface StudioConnectionStateInvalid {
+  kind: 'invalid';
+}
+
+export type StudioConnectionState =
+  | StudioConnectionStateBusy
+  | StudioConnectionStateConnectable
+  | StudioConnectionStateDuplicate
+  | StudioConnectionStateInvalid;
+
+export interface StudioConnectableInputPort {
+  port: StudioNodePort;
+  state: StudioConnectionStateConnectable | StudioConnectionStateDuplicate;
+}
+
+export const resolveStudioInputPortId = (
+  node: StudioCanvasNode,
+  portId?: string,
+  channel?: StudioWorkflowEdge['channel'],
+) =>
+  resolveStudioWorkflowTargetPortId({
+    channel,
+    nodeType: node.type,
+    portId,
+  });
+
+export const resolveStudioOutputPortId = (
+  node: StudioCanvasNode,
+  portId?: string,
+  channel?: StudioWorkflowEdge['channel'],
+) =>
+  resolveStudioWorkflowSourcePortId({
+    channel,
+    nodeType: node.type,
+    portId,
+  });
+
+export const shouldStudioReplaceTargetPortEdges = (
+  targetNode: StudioCanvasNode,
+  targetPortId?: string,
+) =>
+  (
+    getNodeInputPorts(targetNode).find(
+      (port) => port.id === resolveStudioInputPortId(targetNode, targetPortId),
+    ) || getNodeInputPorts(targetNode)[0]
+  )?.maxConnections === 1;
+
+export const findExistingStudioEdge = (params: {
+  edges: StudioWorkflowEdge[];
+  sourceId: string;
+  sourceNode: StudioCanvasNode;
+  sourcePortId: string;
+  targetId: string;
+  targetNode: StudioCanvasNode;
+  targetPortId: string;
+}) =>
+  params.edges.find(
+    (edge) =>
+      edge.source === params.sourceId &&
+      resolveStudioOutputPortId(params.sourceNode, edge.sourcePortId, edge.channel) ===
+        params.sourcePortId &&
+      edge.target === params.targetId &&
+      resolveStudioInputPortId(params.targetNode, edge.targetPortId, edge.channel) ===
+        params.targetPortId,
+  );
+
+const getIncomingStudioPortEdgeCount = (
+  edges: StudioWorkflowEdge[],
+  targetNode: StudioCanvasNode,
+  targetPortId: string,
+) =>
+  edges.filter(
+    (edge) =>
+      edge.target === targetNode.id &&
+      resolveStudioInputPortId(targetNode, edge.targetPortId, edge.channel) === targetPortId,
+  ).length;
+
+export const getStudioConnectionState = (params: {
+  edges: StudioWorkflowEdge[];
+  sourceNode: StudioCanvasNode;
+  sourcePortId: string;
+  targetNode: StudioCanvasNode;
+  targetPortId: string;
+}): StudioConnectionState => {
+  const sourcePortId = resolveStudioOutputPortId(params.sourceNode, params.sourcePortId);
+  const targetPortId = resolveStudioInputPortId(params.targetNode, params.targetPortId);
+  const { edges, sourceNode, targetNode } = params;
+  if (!sourcePortId || !targetPortId) return { kind: 'invalid' };
+
+  if (
+    !canConnectStudioPorts({
+      sourceId: sourceNode.id,
+      sourcePortId,
+      sourceType: sourceNode.type,
+      targetId: targetNode.id,
+      targetPortId,
+      targetType: targetNode.type,
+    })
+  ) {
+    return { kind: 'invalid' };
+  }
+
+  const existingEdge = findExistingStudioEdge({
+    edges,
+    sourceId: sourceNode.id,
+    sourceNode,
+    sourcePortId,
+    targetId: targetNode.id,
+    targetNode,
+    targetPortId,
+  });
+  if (existingEdge) return { edge: existingEdge, kind: 'duplicate' };
+
+  if (
+    !canStudioTargetPortAcceptEdge({
+      currentCount: getIncomingStudioPortEdgeCount(edges, targetNode, targetPortId),
+      targetPortId,
+      targetType: targetNode.type,
+    })
+  ) {
+    return { kind: 'busy' };
+  }
+
+  return { kind: 'connectable' };
+};
+
+export const getStudioConnectableInputPorts = (params: {
+  edges: StudioWorkflowEdge[];
+  sourceNode: StudioCanvasNode;
+  sourcePortId: string;
+  targetNode: StudioCanvasNode;
+}): StudioConnectableInputPort[] =>
+  getNodeInputPorts(params.targetNode).flatMap((port) => {
+    const state = getStudioConnectionState({
+      edges: params.edges,
+      sourceNode: params.sourceNode,
+      sourcePortId: params.sourcePortId,
+      targetNode: params.targetNode,
+      targetPortId: port.id,
+    });
+
+    if (state.kind === 'invalid' || state.kind === 'busy') return [];
+
+    return [{ port, state }];
+  });
 
 const getPortYOffset = (count: number, index: number, height: number) => {
   if (count <= 1) return height / 2;
@@ -839,6 +1281,138 @@ export const getNodeOutputAnchor = (
     x: node.position.x + size.width,
     y: node.position.y + getPortYOffset(ports.length, index, size.height),
   };
+};
+
+const getNodeInputRailBounds = (node: StudioCanvasNode) => {
+  const size = estimateNodeSize(node);
+
+  return {
+    bottom: node.position.y + size.height + STUDIO_CONNECTION_INPUT_RAIL_Y,
+    left: node.position.x - STUDIO_CONNECTION_INPUT_RAIL_X,
+    right: node.position.x + Math.min(size.width * 0.4, 132),
+    top: node.position.y - STUDIO_CONNECTION_INPUT_RAIL_Y,
+  };
+};
+
+const getDistanceToBounds = (
+  point: StudioNodePosition,
+  bounds: { bottom: number; left: number; right: number; top: number },
+) => {
+  const dx =
+    point.x < bounds.left
+      ? bounds.left - point.x
+      : point.x > bounds.right
+        ? point.x - bounds.right
+        : 0;
+  const dy =
+    point.y < bounds.top
+      ? bounds.top - point.y
+      : point.y > bounds.bottom
+        ? point.y - bounds.bottom
+        : 0;
+
+  return Math.hypot(dx, dy);
+};
+
+const isPointWithinBounds = (
+  point: StudioNodePosition,
+  bounds: { bottom: number; left: number; right: number; top: number },
+) =>
+  point.x >= bounds.left &&
+  point.x <= bounds.right &&
+  point.y >= bounds.top &&
+  point.y <= bounds.bottom;
+
+export const getPreferredStudioTargetPortId = (params: {
+  point: StudioNodePosition;
+  ports: StudioConnectableInputPort[];
+  targetNode: StudioCanvasNode;
+}) => {
+  let bestMatch: { id: string; score: number } | undefined;
+
+  for (const { port } of params.ports) {
+    const anchor = getNodeInputAnchor(params.targetNode, port.id);
+    const score =
+      Math.abs(params.point.y - anchor.y) + Math.max(0, anchor.x - params.point.x) * 0.28;
+
+    if (!bestMatch || score < bestMatch.score) {
+      bestMatch = { id: port.id, score };
+    }
+  }
+
+  return bestMatch?.id;
+};
+
+export const findStudioConnectionTarget = (params: {
+  edges: StudioWorkflowEdge[];
+  nodes: StudioCanvasNode[];
+  point: StudioNodePosition;
+  sourceId: string;
+  sourcePortId: string;
+}) => {
+  const sourceNode = params.nodes.find((node) => node.id === params.sourceId);
+  if (!sourceNode) return undefined;
+
+  let bestMatch:
+    | {
+        score: number;
+        targetId: string;
+        targetPortId: string;
+      }
+    | undefined;
+
+  for (const node of [...params.nodes].reverse()) {
+    if (node.id === params.sourceId) continue;
+
+    const connectablePorts = getStudioConnectableInputPorts({
+      edges: params.edges,
+      sourceNode,
+      sourcePortId: params.sourcePortId,
+      targetNode: node,
+    });
+    if (connectablePorts.length === 0) continue;
+
+    const railBounds = getNodeInputRailBounds(node);
+    const withinRail = isPointWithinBounds(params.point, railBounds);
+    const railDistance = getDistanceToBounds(params.point, railBounds);
+    const preferredPortId = getPreferredStudioTargetPortId({
+      point: params.point,
+      ports: connectablePorts,
+      targetNode: node,
+    });
+
+    for (const { port } of connectablePorts) {
+      const anchor = getNodeInputAnchor(node, port.id);
+      const anchorDistance = Math.hypot(params.point.x - anchor.x, params.point.y - anchor.y);
+      const canSnap =
+        withinRail ||
+        anchorDistance <= STUDIO_CONNECTION_SNAP_RADIUS ||
+        railDistance <= STUDIO_CONNECTION_FALLBACK_RADIUS;
+
+      if (!canSnap) continue;
+
+      const score =
+        (preferredPortId === port.id ? 0 : 18) +
+        Math.abs(params.point.y - anchor.y) +
+        Math.max(0, anchor.x - params.point.x) * 0.28 +
+        railDistance * 0.46;
+
+      if (!bestMatch || score < bestMatch.score) {
+        bestMatch = {
+          score,
+          targetId: node.id,
+          targetPortId: port.id,
+        };
+      }
+    }
+  }
+
+  return bestMatch
+    ? {
+        targetId: bestMatch.targetId,
+        targetPortId: bestMatch.targetPortId,
+      }
+    : undefined;
 };
 
 export const buildConnectorPathFromPoints = (params: {
@@ -890,77 +1464,378 @@ export const insertBindingToken = (params: {
 };
 
 export const canConnectNodes = (sourceType: StudioNodeType, targetType: StudioNodeType) => {
-  if (sourceType === targetType && sourceType === 'chat-output') return false;
-  if (targetType === 'input') return false;
-  if (sourceType === 'chat-output') return false;
+  return canConnectStudioNodes(sourceType, targetType);
+};
 
-  switch (targetType) {
+const getNodeBaseLayer = (type: StudioNodeType) => {
+  switch (type) {
+    case 'input':
+    case 'resource':
+    case 'skill': {
+      return 0;
+    }
+    case 'agent': {
+      return 1;
+    }
     case 'mcp-tool': {
-      return (
-        sourceType === 'input' ||
-        sourceType === 'mcp-tool' ||
-        sourceType === 'resource' ||
-        sourceType === 'skill' ||
-        sourceType === 'transform'
-      );
+      return 2;
     }
     case 'transform': {
-      return (
-        sourceType === 'input' ||
-        sourceType === 'mcp-tool' ||
-        sourceType === 'resource' ||
-        sourceType === 'skill' ||
-        sourceType === 'transform'
-      );
+      return 3;
     }
     case 'chat-output': {
-      return (
-        sourceType === 'input' ||
-        sourceType === 'mcp-tool' ||
-        sourceType === 'resource' ||
-        sourceType === 'skill' ||
-        sourceType === 'transform'
-      );
-    }
-    default: {
-      return false;
+      return 4;
     }
   }
 };
 
-export const autoLayoutStudioNodes = (nodes: StudioCanvasNode[]): StudioCanvasNode[] => {
-  const groups: Record<StudioNodeType, StudioCanvasNode[]> = {
-    'chat-output': [],
-    'input': [],
-    'mcp-tool': [],
-    'resource': [],
-    'skill': [],
-    'transform': [],
-  };
-
-  for (const node of nodes) groups[node.type].push(node);
-
-  const columns: StudioNodeType[] = [
-    'input',
-    'resource',
-    'skill',
-    'mcp-tool',
-    'transform',
-    'chat-output',
-  ];
-
-  return columns.flatMap((type, columnIndex) =>
-    groups[type].map((node, rowIndex) => ({
-      ...node,
-      position: {
-        x: 56 + columnIndex * 320,
-        y: 72 + rowIndex * 220 + (columnIndex % 2 === 0 ? 40 : 0),
-      },
-    })),
-  );
+const getNodeTypeOrder = (type: StudioNodeType) => {
+  switch (type) {
+    case 'input': {
+      return 0;
+    }
+    case 'resource': {
+      return 1;
+    }
+    case 'skill': {
+      return 2;
+    }
+    case 'agent': {
+      return 3;
+    }
+    case 'mcp-tool': {
+      return 4;
+    }
+    case 'transform': {
+      return 5;
+    }
+    case 'chat-output': {
+      return 6;
+    }
+  }
 };
 
-const parseToolPayload = (value: string) => {
+const compareStudioLayoutNodes = (left: StudioCanvasNode, right: StudioCanvasNode) =>
+  getNodeTypeOrder(left.type) - getNodeTypeOrder(right.type) ||
+  left.position.y - right.position.y ||
+  left.data.title.localeCompare(right.data.title);
+
+const STUDIO_AUTO_LAYOUT_COMPONENT_GAP = 96;
+
+const getStudioConnectedComponents = (
+  nodes: StudioCanvasNode[],
+  edges: StudioWorkflowEdge[],
+): StudioCanvasNode[][] => {
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const adjacency = new Map<string, Set<string>>(nodes.map((node) => [node.id, new Set<string>()]));
+
+  for (const edge of edges) {
+    if (!nodeMap.has(edge.source) || !nodeMap.has(edge.target) || edge.source === edge.target) {
+      continue;
+    }
+
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  }
+
+  const visited = new Set<string>();
+  const components: StudioCanvasNode[][] = [];
+
+  for (const node of [...nodes].sort(compareStudioLayoutNodes)) {
+    if (visited.has(node.id)) continue;
+
+    const queue = [node.id];
+    const componentIds: string[] = [];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visited.has(currentId)) continue;
+
+      visited.add(currentId);
+      componentIds.push(currentId);
+
+      for (const nextId of [...(adjacency.get(currentId) || [])].sort((leftId, rightId) =>
+        compareStudioLayoutNodes(nodeMap.get(leftId)!, nodeMap.get(rightId)!),
+      )) {
+        if (!visited.has(nextId)) queue.push(nextId);
+      }
+    }
+
+    components.push(
+      componentIds
+        .map((id) => nodeMap.get(id))
+        .filter((item): item is StudioCanvasNode => Boolean(item))
+        .sort(compareStudioLayoutNodes),
+    );
+  }
+
+  return components;
+};
+
+const getStudioComponentPriority = (
+  component: StudioCanvasNode[],
+  edges: StudioWorkflowEdge[],
+): [number, number, number, number, number] => {
+  const componentNodeIds = new Set(component.map((node) => node.id));
+  const componentEdgeCount = edges.filter(
+    (edge) => componentNodeIds.has(edge.source) && componentNodeIds.has(edge.target),
+  ).length;
+  const hasChatOutput = component.some((node) => node.type === 'chat-output') ? 1 : 0;
+  const minTypeOrder = Math.min(...component.map((node) => getNodeTypeOrder(node.type)));
+  const minY = Math.min(...component.map((node) => node.position.y));
+
+  return [-hasChatOutput, -componentEdgeCount, -component.length, minTypeOrder, minY];
+};
+
+const compareStudioComponentPriority = (
+  left: [number, number, number, number, number],
+  right: [number, number, number, number, number],
+) => {
+  for (let index = 0; index < left.length; index += 1) {
+    const delta = left[index]! - right[index]!;
+    if (delta !== 0) return delta;
+  }
+
+  return 0;
+};
+
+const layoutStudioComponent = (params: {
+  edges: StudioWorkflowEdge[];
+  nodes: StudioCanvasNode[];
+  origin: StudioNodePosition;
+}) => {
+  const { edges, nodes, origin } = params;
+  if (nodes.length === 0) return [];
+
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const incoming = new Map<string, string[]>();
+  const outgoing = new Map<string, string[]>();
+  const indegree = new Map(nodes.map((node) => [node.id, 0]));
+
+  for (const edge of edges) {
+    if (!nodeMap.has(edge.source) || !nodeMap.has(edge.target) || edge.source === edge.target) {
+      continue;
+    }
+
+    incoming.set(edge.target, [...(incoming.get(edge.target) || []), edge.source]);
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) || []), edge.target]);
+    indegree.set(edge.target, (indegree.get(edge.target) || 0) + 1);
+  }
+
+  const sortNodeIds = (ids: string[]) =>
+    [...ids].sort((leftId, rightId) =>
+      compareStudioLayoutNodes(nodeMap.get(leftId)!, nodeMap.get(rightId)!),
+    );
+
+  const queue = sortNodeIds(
+    nodes.filter((node) => (indegree.get(node.id) || 0) === 0).map((node) => node.id),
+  );
+  const orderedIds: string[] = [];
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    if (visited.has(currentId)) continue;
+
+    visited.add(currentId);
+    orderedIds.push(currentId);
+
+    for (const targetId of sortNodeIds(outgoing.get(currentId) || [])) {
+      indegree.set(targetId, Math.max((indegree.get(targetId) || 0) - 1, 0));
+
+      if ((indegree.get(targetId) || 0) === 0) {
+        queue.push(targetId);
+      }
+    }
+
+    queue.sort((leftId, rightId) =>
+      compareStudioLayoutNodes(nodeMap.get(leftId)!, nodeMap.get(rightId)!),
+    );
+  }
+
+  for (const node of [...nodes].sort(compareStudioLayoutNodes)) {
+    if (!visited.has(node.id)) orderedIds.push(node.id);
+  }
+
+  const rawLayerMap = new Map<string, number>();
+
+  for (const nodeId of orderedIds) {
+    const node = nodeMap.get(nodeId);
+    if (!node) continue;
+
+    const parentLayers = (incoming.get(nodeId) || [])
+      .map((parentId) => rawLayerMap.get(parentId))
+      .filter((value): value is number => value !== undefined);
+    const baseLayer = getNodeBaseLayer(node.type);
+    const rawLayer =
+      parentLayers.length > 0
+        ? Math.max(baseLayer, ...parentLayers.map((value) => value + 1))
+        : baseLayer;
+
+    rawLayerMap.set(nodeId, rawLayer);
+  }
+
+  const compressedLayers = [...new Set(rawLayerMap.values())].sort((left, right) => left - right);
+  const layerIndexMap = new Map(compressedLayers.map((layer, index) => [layer, index]));
+  const layeredNodes = new Map<number, string[]>();
+
+  for (const nodeId of orderedIds) {
+    const rawLayer = rawLayerMap.get(nodeId);
+    if (rawLayer === undefined) continue;
+
+    const layer = layerIndexMap.get(rawLayer) || 0;
+    layeredNodes.set(layer, [...(layeredNodes.get(layer) || []), nodeId]);
+  }
+
+  const positionedNodes = new Map<string, StudioNodePosition>();
+
+  for (const layer of [...layeredNodes.keys()].sort((left, right) => left - right)) {
+    const columnNodeIds = [...(layeredNodes.get(layer) || [])].sort((leftId, rightId) => {
+      const leftNode = nodeMap.get(leftId)!;
+      const rightNode = nodeMap.get(rightId)!;
+      const leftParents = incoming.get(leftId) || [];
+      const rightParents = incoming.get(rightId) || [];
+      const leftParentY =
+        leftParents.reduce(
+          (sum, parentId) =>
+            sum +
+            (positionedNodes.get(parentId)?.y ??
+              nodeMap.get(parentId)?.position.y ??
+              leftNode.position.y),
+          0,
+        ) / Math.max(leftParents.length, 1);
+      const rightParentY =
+        rightParents.reduce(
+          (sum, parentId) =>
+            sum +
+            (positionedNodes.get(parentId)?.y ??
+              nodeMap.get(parentId)?.position.y ??
+              rightNode.position.y),
+          0,
+        ) / Math.max(rightParents.length, 1);
+
+      return leftParentY - rightParentY || compareStudioLayoutNodes(leftNode, rightNode);
+    });
+
+    let nextY = origin.y;
+
+    for (const nodeId of columnNodeIds) {
+      const node = nodeMap.get(nodeId);
+      if (!node) continue;
+
+      const size = estimateNodeSize(node);
+      const parentIds = incoming.get(nodeId) || [];
+      const preferredY =
+        parentIds.length > 0
+          ? parentIds.reduce(
+              (sum, parentId) =>
+                sum +
+                (positionedNodes.get(parentId)?.y ?? nodeMap.get(parentId)?.position.y ?? origin.y),
+              0,
+            ) /
+              parentIds.length -
+            size.height / 2
+          : Math.max(node.position.y, origin.y);
+      const y = Math.max(nextY, Math.max(preferredY, origin.y));
+
+      positionedNodes.set(nodeId, {
+        x: origin.x + layer * STUDIO_AUTO_LAYOUT_COLUMN_GAP,
+        y,
+      });
+      nextY = y + size.height + STUDIO_AUTO_LAYOUT_ROW_GAP;
+    }
+  }
+
+  return nodes.map((node) => ({
+    ...node,
+    position: positionedNodes.get(node.id) || node.position,
+  }));
+};
+
+export const autoLayoutStudioNodes = (
+  nodes: StudioCanvasNode[],
+  edges: StudioWorkflowEdge[] = [],
+): StudioCanvasNode[] => {
+  if (nodes.length === 0) return [];
+
+  const sortedComponents = getStudioConnectedComponents(nodes, edges).sort((left, right) =>
+    compareStudioComponentPriority(
+      getStudioComponentPriority(left, edges),
+      getStudioComponentPriority(right, edges),
+    ),
+  );
+  const positionedNodes = new Map<string, StudioCanvasNode>();
+  let currentY = STUDIO_AUTO_LAYOUT_BASE_Y;
+
+  for (const component of sortedComponents) {
+    const componentNodeIdSet = new Set(component.map((node) => node.id));
+    const componentEdges = edges.filter(
+      (edge) => componentNodeIdSet.has(edge.source) && componentNodeIdSet.has(edge.target),
+    );
+    const laidOutComponent = layoutStudioComponent({
+      edges: componentEdges,
+      nodes: component,
+      origin: { x: STUDIO_AUTO_LAYOUT_BASE_X, y: currentY },
+    });
+
+    for (const node of laidOutComponent) {
+      positionedNodes.set(node.id, node);
+    }
+
+    const componentBottom = Math.max(
+      ...laidOutComponent.map((node) => node.position.y + estimateNodeSize(node).height),
+    );
+    currentY = componentBottom + STUDIO_AUTO_LAYOUT_COMPONENT_GAP;
+  }
+
+  return nodes.map((node) => positionedNodes.get(node.id) || node);
+};
+
+export const getSuggestedStudioNodePosition = (params: {
+  nodes: StudioCanvasNode[];
+  selectedNode?: StudioCanvasNode;
+  type: StudioNodeType;
+}) => {
+  const baseX =
+    STUDIO_AUTO_LAYOUT_BASE_X + getNodeBaseLayer(params.type) * STUDIO_AUTO_LAYOUT_COLUMN_GAP;
+  const sameLayerNodes = params.nodes
+    .filter((node) => getNodeBaseLayer(node.type) === getNodeBaseLayer(params.type))
+    .sort((left, right) => left.position.y - right.position.y);
+
+  if (params.selectedNode) {
+    const selectedNode = params.selectedNode;
+    const nextNodeSize = estimateNodeSize(createStudioNode(params.type, { x: 0, y: 0 }));
+
+    if (canConnectStudioNodes(selectedNode.type, params.type)) {
+      const selectedSize = estimateNodeSize(selectedNode);
+
+      return {
+        x: selectedNode.position.x + selectedSize.width + 148,
+        y: selectedNode.position.y,
+      };
+    }
+
+    if (canConnectStudioNodes(params.type, selectedNode.type)) {
+      return {
+        x: Math.max(STUDIO_CANVAS_PADDING, selectedNode.position.x - nextNodeSize.width - 148),
+        y: selectedNode.position.y,
+      };
+    }
+  }
+
+  const nextY =
+    sameLayerNodes.length > 0
+      ? Math.max(...sameLayerNodes.map((node) => node.position.y + estimateNodeSize(node).height)) +
+        STUDIO_AUTO_LAYOUT_ROW_GAP
+      : STUDIO_AUTO_LAYOUT_BASE_Y;
+
+  return {
+    x: baseX,
+    y: nextY,
+  };
+};
+
+const parseJsonRecordString = (value?: string) => {
   const parsed = safeParseJSON(value);
 
   if (parsed === undefined || parsed === null) return {};
@@ -984,13 +1859,33 @@ const toWorkflowNode = (
         type: 'input',
       };
     }
+    case 'agent': {
+      return {
+        data: {
+          agentId: node.data.agentId,
+          agentName: node.data.agentName,
+          breakpoint: node.data.breakpoint,
+          inputTemplate: node.data.inputTemplate,
+          memoryEnabled: node.data.memoryEnabled,
+          model: node.data.model,
+          params: parseJsonRecordString(node.data.params),
+          prompt: node.data.prompt,
+          provider: node.data.provider,
+          systemRole: node.data.systemRole,
+          title: node.data.title,
+        },
+        id: node.id,
+        type: 'agent',
+      };
+    }
     case 'mcp-tool': {
       return {
         data: {
+          breakpoint: node.data.breakpoint,
           connection: node.data.serverId
             ? serverMap.get(node.data.serverId)?.connection
             : undefined,
-          payload: parseToolPayload(node.data.payload),
+          payload: parseJsonRecordString(node.data.payload),
           payloadBindings: parsePayloadBindings(node.data.payloadBindings),
           title: node.data.title,
           toolName: node.data.toolName,
@@ -1003,9 +1898,15 @@ const toWorkflowNode = (
       return {
         data: {
           content: node.data.content,
+          kind: node.data.kind,
+          mimeType: node.data.mimeType,
           resourcePath: node.data.resourcePath,
           skillId: node.data.skillId,
           skillName: node.data.skillName,
+          sizeBytes: node.data.sizeBytes,
+          sourceLabel: node.data.sourceLabel,
+          sourceType: node.data.sourceType,
+          sourceUri: node.data.sourceUri,
           title: node.data.title,
         },
         id: node.id,
@@ -1027,6 +1928,7 @@ const toWorkflowNode = (
     case 'transform': {
       return {
         data: {
+          breakpoint: node.data.breakpoint,
           mode: node.data.mode,
           prompt: node.data.prompt,
           title: node.data.title,
@@ -1070,6 +1972,7 @@ export const buildWorkflowDsl = (params: { draft: StudioDraft; previewNodeId?: s
 
 export const buildWorkflowDefinition = (params: { draft: StudioDraft; previewNodeId?: string }) => {
   const serverMap = new Map(params.draft.servers.map((server) => [server.id, server]));
+  const normalizedEdges = normalizeDraftEdges(params.draft.edges, params.draft.nodes);
   const previewNodeId =
     params.previewNodeId ||
     params.draft.previewNodeId ||
@@ -1077,10 +1980,7 @@ export const buildWorkflowDefinition = (params: { draft: StudioDraft; previewNod
     params.draft.nodes[0]?.id;
 
   return buildStudioWorkflowDefinition({
-    edges: params.draft.edges.map((edge) => ({
-      ...edge,
-      payloadBindings: parsePayloadBindings(edge.payloadBindings),
-    })),
+    edges: normalizedEdges,
     nodes: params.draft.nodes.map((node) => toWorkflowNode(node, serverMap)),
     previewNodeId,
   });

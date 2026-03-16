@@ -1,6 +1,7 @@
 import { createStaticStyles } from 'antd-style';
 
 const editorPanelHeight = 'clamp(760px, calc(100vh - 180px), 1120px)';
+const editorPanelMaxHeight = 'min(calc(100vh - 180px), 1120px)';
 
 export const styles = createStaticStyles(({ css, cssVar }) => ({
   actions: css`
@@ -30,6 +31,8 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   canvasStage: css`
+    touch-action: none;
+
     position: relative;
 
     overflow: hidden;
@@ -51,17 +54,46 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       position: absolute;
       inset: 0;
 
-      opacity: 0.18;
-      background-image:
-        linear-gradient(${cssVar.colorBorderSecondary} 1px, transparent 1px),
-        linear-gradient(90deg, ${cssVar.colorBorderSecondary} 1px, transparent 1px);
-      background-size: 28px 28px;
+      opacity: 0.55;
+      background:
+        linear-gradient(180deg, ${cssVar.colorBgElevated} 0, transparent 26%),
+        radial-gradient(circle at top center, ${cssVar.colorFillSecondary} 0, transparent 58%);
     }
 
     @media (width <= 900px) {
       height: 620px;
       min-height: 620px;
     }
+  `,
+  canvasStagePanReady: css`
+    cursor: grab;
+    user-select: none;
+
+    &:active {
+      cursor: grabbing;
+    }
+  `,
+  canvasWorld: css`
+    will-change: transform;
+
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    transform-origin: top left;
+  `,
+  canvasGrid: css`
+    pointer-events: none;
+
+    position: absolute;
+    inset: 0;
+
+    opacity: 0.42;
+    background-image:
+      linear-gradient(${cssVar.colorBorderSecondary} 1px, transparent 1px),
+      linear-gradient(90deg, ${cssVar.colorBorderSecondary} 1px, transparent 1px);
+    background-size: 28px 28px;
+
+    mask-image: linear-gradient(180deg, rgb(0 0 0 / 96%), rgb(0 0 0 / 70%));
   `,
   chatRole: css`
     min-width: 76px;
@@ -94,6 +126,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     pointer-events: auto;
 
     position: absolute;
+    z-index: 0;
     inset: 0;
 
     overflow: visible;
@@ -110,27 +143,27 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     stroke-width: 18;
   `,
   edgePath: css`
-    opacity: 0.88;
-    filter: drop-shadow(0 0 10px ${cssVar.colorPrimaryBg});
+    opacity: 0.56;
+    filter: drop-shadow(0 0 6px ${cssVar.colorFillSecondary});
 
     fill: none;
-    stroke: ${cssVar.colorPrimaryBorder};
+    stroke: ${cssVar.colorTextQuaternary};
     stroke-dasharray: 9 6;
     stroke-linecap: round;
     stroke-width: 2.5;
   `,
   edgePathSelected: css`
-    opacity: 1;
-    stroke: ${cssVar.colorPrimary};
+    opacity: 0.82;
+    stroke: ${cssVar.colorPrimaryBorder};
     stroke-width: 3;
   `,
   edgePathDraft: css`
     pointer-events: none;
 
-    opacity: 0.92;
+    opacity: 0.68;
 
     fill: none;
-    stroke: ${cssVar.colorPrimary};
+    stroke: ${cssVar.colorPrimaryBorder};
     stroke-dasharray: 6 6;
     stroke-linecap: round;
     stroke-width: 3;
@@ -143,11 +176,11 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     overflow: visible;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 
     height: 100%;
     padding-block: 14px;
-    padding-inline: 16px;
+    padding-inline: 46px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: calc(${cssVar.borderRadiusLG} * 1.1);
 
@@ -192,35 +225,77 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
 
     width: 16px;
     height: 16px;
+    padding: 0;
     border: 2px solid ${cssVar.colorBgContainer};
     border-radius: 999px;
 
-    background: ${cssVar.colorPrimary};
-    box-shadow: 0 0 0 5px ${cssVar.colorPrimaryBg};
+    opacity: 0.82;
+    background: ${cssVar.colorTextQuaternary};
+    box-shadow: 0 0 0 3px ${cssVar.colorFillSecondary};
 
     transition:
+      opacity 0.2s ease,
       transform 0.2s ease,
       box-shadow 0.2s ease,
       background 0.2s ease;
   `,
   nodePortActive: css`
+    opacity: 1;
     background: ${cssVar.colorSuccess};
-    box-shadow: 0 0 0 6px ${cssVar.colorSuccessBg};
+    box-shadow: 0 0 0 4px ${cssVar.colorSuccessBg};
   `,
   nodePortConnectable: css`
+    opacity: 1;
     background: ${cssVar.colorPrimary};
-    box-shadow: 0 0 0 8px ${cssVar.colorPrimaryBg};
+    box-shadow: 0 0 0 5px ${cssVar.colorPrimaryBg};
   `,
   nodePortInput: css`
-    margin-inline-end: 8px;
+    order: 1;
+    margin-inline-end: 10px;
   `,
   nodePortOutput: css`
-    margin-inline-start: 8px;
+    order: 2;
+    margin-inline-start: 10px;
+  `,
+  nodePortLabel: css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 40px;
+    min-height: 22px;
+    padding-block: 2px;
+    padding-inline: 6px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 999px;
+
+    font-family: ${cssVar.fontFamilyCode};
+    font-size: ${cssVar.fontSizeSM};
+    line-height: 1;
+    color: ${cssVar.colorTextSecondary};
+    white-space: nowrap;
+
+    background: ${cssVar.colorBgElevated};
+    box-shadow: 0 10px 18px ${cssVar.colorFillQuaternary};
+  `,
+  nodePortLabelHidden: css`
+    display: none;
+  `,
+  nodePortLabelConnectable: css`
+    border-color: ${cssVar.colorPrimaryBorder};
+    color: ${cssVar.colorPrimary};
+    background: ${cssVar.colorPrimaryBg};
+  `,
+  nodePortLabelInput: css`
+    order: 2;
+  `,
+  nodePortLabelOutput: css`
+    order: 1;
   `,
   nodePortTarget: css`
     transform: scale(1.12);
     background: ${cssVar.colorSuccess};
-    box-shadow: 0 0 0 9px ${cssVar.colorSuccessBg};
+    box-shadow: 0 0 0 6px ${cssVar.colorSuccessBg};
   `,
   nodeSelected: css`
     border-color: ${cssVar.colorPrimaryBorder};
@@ -230,32 +305,38 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   nodeShell: css`
     position: absolute !important;
+    z-index: 1;
   `,
   nodePortWrap: css`
     position: absolute;
-    z-index: 2;
+    z-index: 3;
     transform: translateY(-50%);
 
     display: flex;
+    gap: 6px;
     align-items: center;
+
+    padding: 4px;
+    border-radius: 999px;
   `,
   nodePortWrapInput: css`
-    inset-inline-start: -10px;
+    inset-inline-start: 8px;
     justify-content: flex-start;
   `,
   nodePortWrapOutput: css`
-    inset-inline-end: -10px;
+    inset-inline-end: 8px;
     justify-content: flex-end;
   `,
   nodeText: css`
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 8;
+    -webkit-line-clamp: 5;
 
     line-height: 1.65;
     color: ${cssVar.colorText};
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
   `,
   nodeTitleRow: css`
     justify-content: space-between;
@@ -279,7 +360,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     overflow: auto;
 
     min-width: 0;
-    max-height: 280px;
+    max-height: min(32vh, 320px);
     padding: 12px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${cssVar.borderRadiusLG};
@@ -301,32 +382,66 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   scrollPanel: css`
     overflow: auto;
-    height: ${editorPanelHeight};
-    min-height: 760px;
+    align-self: start;
+    height: auto;
+    max-height: ${editorPanelMaxHeight};
 
     @media (width <= 1100px) {
       height: auto;
-      min-height: unset;
-      max-height: 420px;
+      max-height: unset;
     }
   `,
   previewRail: css`
+    align-self: start;
     min-width: 0;
+  `,
+  entityCard: css`
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+
+    padding: ${cssVar.paddingSM};
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: ${cssVar.colorFillQuaternary};
+  `,
+  entityMeta: css`
+    flex: 1;
+    min-width: 0;
+  `,
+  entityTags: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+  `,
+  selectionBox: css`
+    pointer-events: none;
+
+    position: absolute;
+    z-index: 3;
+
+    border: 1px solid ${cssVar.colorPrimary};
+    border-radius: ${cssVar.borderRadiusSM};
+
+    opacity: 0.45;
+    background: ${cssVar.colorPrimaryBg};
+    box-shadow: inset 0 0 0 1px ${cssVar.colorPrimaryBorder};
   `,
   sidebar: css`
     overflow: auto;
     display: grid;
     gap: 16px;
     align-content: start;
+    align-self: start;
 
     min-width: 0;
-    height: ${editorPanelHeight};
-    min-height: 760px;
+    max-height: ${editorPanelMaxHeight};
 
     @media (width <= 1100px) {
       overflow: visible;
-      height: auto;
-      min-height: unset;
+      max-height: unset;
     }
   `,
   sidebarCard: css`
@@ -345,7 +460,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   stageHint: css`
     position: absolute;
-    z-index: 1;
+    z-index: 4;
     inset-block-end: 16px;
     inset-inline-end: 16px;
 
@@ -355,6 +470,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     border-radius: 999px;
 
     background: ${cssVar.colorBgElevated};
+    backdrop-filter: blur(12px);
   `,
   toolbar: css`
     padding-block: 12px;
@@ -384,6 +500,24 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   toolbarSpacer: css`
     flex: 1;
+  `,
+  viewportToolbar: css`
+    position: absolute;
+    z-index: 4;
+    inset-block-start: 16px;
+    inset-inline-end: 16px;
+
+    display: inline-flex;
+    gap: ${cssVar.marginXS};
+    align-items: center;
+
+    padding: 8px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 999px;
+
+    background: color-mix(in srgb, ${cssVar.colorBgElevated} 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 32px ${cssVar.colorFillSecondary};
   `,
   wireRoute: css`
     display: flex;

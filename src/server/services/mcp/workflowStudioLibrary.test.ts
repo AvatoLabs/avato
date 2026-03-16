@@ -70,6 +70,67 @@ describe('workflowStudioLibrary', () => {
     });
   });
 
+  it('normalizes legacy workflow edges into channel-based drafts on save and read', () => {
+    const legacyDraft = {
+      edges: [
+        {
+          id: 'input->tool',
+          source: 'input',
+          sourcePortId: 'prompt',
+          target: 'tool',
+          targetPortId: 'primary',
+        },
+        {
+          id: 'resource->tool',
+          source: 'resource',
+          sourcePortId: 'content',
+          target: 'tool',
+          targetPortId: 'context',
+        },
+      ],
+      nodes: [
+        { data: { humanPrompt: 'Hello' }, id: 'input', type: 'input' },
+        { data: { content: 'Docs' }, id: 'resource', type: 'resource' },
+        { data: { title: 'Tool' }, id: 'tool', type: 'mcp-tool' },
+      ],
+      previewNodeId: 'tool',
+      selectedNodeId: 'tool',
+      servers: [],
+    };
+    const created = upsertWorkflowStudioWorkflow({
+      draft: legacyDraft,
+      name: 'Normalized',
+      now: 100,
+      state: { workflows: [] },
+    });
+    const parsed = parseWorkflowStudioSettingsState({
+      workflowStudio: {
+        workflows: [created.entry],
+      },
+    });
+
+    expect(created.entry.draft).toMatchObject({
+      edges: [
+        { channel: 'main', id: 'input->tool', source: 'input', target: 'tool' },
+        { channel: 'context', id: 'resource->tool', source: 'resource', target: 'tool' },
+      ],
+      previewNodeId: 'tool',
+      selectedNodeId: 'tool',
+    });
+    expect(parsed.workflows[0]?.draft).toMatchObject({
+      edges: [
+        { channel: 'main', id: 'input->tool', source: 'input', target: 'tool' },
+        { channel: 'context', id: 'resource->tool', source: 'resource', target: 'tool' },
+      ],
+    });
+    expect((created.entry.draft.edges as Array<Record<string, unknown>>)[0]).not.toHaveProperty(
+      'sourcePortId',
+    );
+    expect((created.entry.draft.edges as Array<Record<string, unknown>>)[0]).not.toHaveProperty(
+      'targetPortId',
+    );
+  });
+
   it('extracts installed MCP servers from user-installed plugins', () => {
     const servers = extractInstalledWorkflowStudioServers([
       {
@@ -91,6 +152,8 @@ describe('workflowStudioLibrary', () => {
             },
           ],
           meta: {
+            avatar: '🧭',
+            description: 'Linear issue server',
             title: 'Linear Demo',
           },
         } as any,
@@ -108,6 +171,7 @@ describe('workflowStudioLibrary', () => {
         manifest: {
           api: [],
           meta: {
+            avatar: '📁',
             title: 'Filesystem Demo',
           },
         } as any,
@@ -119,8 +183,11 @@ describe('workflowStudioLibrary', () => {
     const linearServer = servers.find((item) => item.id === 'linear-demo');
 
     expect(servers).toHaveLength(2);
+    expect(filesystemServer?.avatar).toBe('📁');
     expect(filesystemServer?.origin).toBe('installed');
     expect(filesystemServer?.connection.type).toBe('stdio');
+    expect(linearServer?.avatar).toBe('🧭');
+    expect(linearServer?.description).toBe('Linear issue server');
     expect(linearServer?.tools[0]?.name).toBe('listIssues');
     expect(linearServer?.connection.type).toBe('http');
   });
