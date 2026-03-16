@@ -516,6 +516,64 @@ const MCPWorkflowStudio = () => {
   const effectiveAgentMemoryEnabled =
     selectedAgentNode?.data.memoryEnabled ??
     selectedAgentConfig?.chatConfig?.memory?.enabled === true;
+  const syncConcreteNodeTitle = (
+    currentNode: StudioCanvasNode,
+    nextNode: StudioCanvasNode,
+    options?: {
+      nextServerName?: string;
+      previousServerName?: string;
+    },
+  ) => {
+    const previousAutoTitle = getStudioAutoNodeTitle(currentNode, {
+      serverName: options?.previousServerName,
+    });
+    const nextAutoTitle = getStudioAutoNodeTitle(nextNode, {
+      serverName: options?.nextServerName,
+    });
+
+    if (
+      !shouldStudioSyncNodeTitle({
+        currentTitle: currentNode.data.title,
+        nextAutoTitle,
+        nodeType: currentNode.type,
+        previousAutoTitle,
+      })
+    ) {
+      return nextNode;
+    }
+
+    return {
+      ...nextNode,
+      data: {
+        ...nextNode.data,
+        title: nextAutoTitle,
+      },
+    };
+  };
+  const applyAgentConfigSnapshot = useEffectEvent(
+    (
+      node: Extract<StudioCanvasNode, { type: 'agent' }>,
+      agentId: string,
+      config?: StudioAgentDetail,
+    ): Extract<StudioCanvasNode, { type: 'agent' }> => {
+      const fallbackAgent = availableAgents.find((item) => item.id === agentId);
+
+      return syncConcreteNodeTitle(node, {
+        ...node,
+        data: {
+          ...node.data,
+          agentId,
+          agentName: config?.title || fallbackAgent?.title || agentId,
+          inputTemplate: config?.chatConfig?.inputTemplate,
+          memoryEnabled: config?.chatConfig?.memory?.enabled === true,
+          model: config?.model || DEFAULT_AGENT_CONFIG.model,
+          params: stringifyStudioAgentParams(config?.params),
+          provider: config?.provider || DEFAULT_AGENT_CONFIG.provider,
+          systemRole: config?.systemRole || '',
+        },
+      }) as Extract<StudioCanvasNode, { type: 'agent' }>;
+    },
+  );
   const workflowDsl = useMemo(
     () =>
       buildWorkflowDsl({
@@ -1046,66 +1104,6 @@ const MCPWorkflowStudio = () => {
       }
     });
   };
-
-  const syncConcreteNodeTitle = (
-    currentNode: StudioCanvasNode,
-    nextNode: StudioCanvasNode,
-    options?: {
-      nextServerName?: string;
-      previousServerName?: string;
-    },
-  ) => {
-    const previousAutoTitle = getStudioAutoNodeTitle(currentNode, {
-      serverName: options?.previousServerName,
-    });
-    const nextAutoTitle = getStudioAutoNodeTitle(nextNode, {
-      serverName: options?.nextServerName,
-    });
-
-    if (
-      !shouldStudioSyncNodeTitle({
-        currentTitle: currentNode.data.title,
-        nextAutoTitle,
-        nodeType: currentNode.type,
-        previousAutoTitle,
-      })
-    ) {
-      return nextNode;
-    }
-
-    return {
-      ...nextNode,
-      data: {
-        ...nextNode.data,
-        title: nextAutoTitle,
-      },
-    };
-  };
-
-  const applyAgentConfigSnapshot = useEffectEvent(
-    (
-      node: Extract<StudioCanvasNode, { type: 'agent' }>,
-      agentId: string,
-      config?: StudioAgentDetail,
-    ): Extract<StudioCanvasNode, { type: 'agent' }> => {
-      const fallbackAgent = availableAgents.find((item) => item.id === agentId);
-
-      return syncConcreteNodeTitle(node, {
-        ...node,
-        data: {
-          ...node.data,
-          agentId,
-          agentName: config?.title || fallbackAgent?.title || agentId,
-          inputTemplate: config?.chatConfig?.inputTemplate,
-          memoryEnabled: config?.chatConfig?.memory?.enabled === true,
-          model: config?.model || DEFAULT_AGENT_CONFIG.model,
-          params: stringifyStudioAgentParams(config?.params),
-          provider: config?.provider || DEFAULT_AGENT_CONFIG.provider,
-          systemRole: config?.systemRole || '',
-        },
-      }) as Extract<StudioCanvasNode, { type: 'agent' }>;
-    },
-  );
 
   const handleSelectAgent = async (nodeId: string, agentId: string) => {
     const fallbackAgent = availableAgents.find((item) => item.id === agentId);
@@ -2565,10 +2563,10 @@ const MCPWorkflowStudio = () => {
             {selectedAgent ? (
               <div className={styles.entityCard}>
                 <Avatar
+                  avatar={selectedAgent.avatar || <Icon icon={Bot} size={20} />}
                   background={selectedAgent.backgroundColor || undefined}
                   shape={'square'}
                   size={44}
-                  avatar={selectedAgent.avatar || <Icon icon={Bot} size={20} />}
                 />
                 <Flexbox className={styles.entityMeta} gap={4}>
                   <Text strong>{selectedAgent.title || selectedAgent.id}</Text>
