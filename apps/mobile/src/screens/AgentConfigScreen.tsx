@@ -1,4 +1,14 @@
-import { ArrowLeft, Bot, ChevronDown, ChevronRight, Cpu, MessageSquare, Puzzle, Save, Settings2 } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  Cpu,
+  MessageSquare,
+  Puzzle,
+  Save,
+  Settings2,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +31,7 @@ import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
+import { useAgentConfig } from '../hooks/useAgentConfig';
 import { agentApi, agentSkillApi, pluginApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -100,7 +111,9 @@ const buildDraft = (config: any): AgentDraft => ({
   memoryEnabled: config?.chatConfig?.memory?.enabled !== false,
   model: config?.model || '',
   openingMessage: config?.openingMessage || '',
-  openingQuestions: Array.isArray(config?.openingQuestions) ? config.openingQuestions.join('\n') : '',
+  openingQuestions: Array.isArray(config?.openingQuestions)
+    ? config.openingQuestions.join('\n')
+    : '',
   presencePenalty: stringifyNumber(config?.params?.presence_penalty),
   provider: config?.provider || '',
   searchMode: config?.chatConfig?.searchMode === 'off' ? 'off' : 'auto',
@@ -110,13 +123,7 @@ const buildDraft = (config: any): AgentDraft => ({
   topP: stringifyNumber(config?.params?.top_p),
 });
 
-function SectionCard({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) {
+function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <View className="mb-5 px-5">
       <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
@@ -144,11 +151,7 @@ function CollapsibleSection({
 }) {
   return (
     <SectionCard title={title}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        className="flex-row items-center"
-        onPress={onToggle}
-      >
+      <TouchableOpacity activeOpacity={0.8} className="flex-row items-center" onPress={onToggle}>
         <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
           <Icon color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
@@ -159,9 +162,17 @@ function CollapsibleSection({
           ) : null}
         </View>
         {expanded ? (
-          <ChevronDown color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <ChevronDown
+            color={semanticColors.secondaryText}
+            size={18}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         ) : (
-          <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <ChevronRight
+            color={semanticColors.secondaryText}
+            size={18}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         )}
       </TouchableOpacity>
 
@@ -253,13 +264,7 @@ function ChoicePill({
   );
 }
 
-function ProviderBadge({
-  logo,
-  providerId,
-}: {
-  logo?: string;
-  providerId?: string;
-}) {
+function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: string }) {
   const [error, setError] = useState(false);
   const uri = logo || (providerId ? getProviderIconUrl(providerId) : undefined);
 
@@ -274,7 +279,9 @@ function ProviderBadge({
   if (!uri || error) {
     return (
       <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-        <Text className="text-[12px] font-bold text-primary">{providerId.slice(0, 2).toUpperCase()}</Text>
+        <Text className="text-[12px] font-bold text-primary">
+          {providerId.slice(0, 2).toUpperCase()}
+        </Text>
       </View>
     );
   }
@@ -342,7 +349,9 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
       />
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 48, paddingTop: 16 }}>
         <SectionCard title={t.agentConfigSessionOnlyTitle}>
-          <Text className="text-[15px] leading-6 text-foreground/78">{t.agentConfigSessionOnlyDesc}</Text>
+          <Text className="text-[15px] leading-6 text-foreground/78">
+            {t.agentConfigSessionOnlyDesc}
+          </Text>
           <TouchableOpacity
             activeOpacity={0.85}
             className="mt-4 self-start rounded-xl bg-primary px-4 py-2.5"
@@ -399,7 +408,9 @@ function SessionAgentConfigScreen({
 
     const model =
       currentProvider?.children.find((item) => item.id === draft.model) ||
-      modelProviders.flatMap((provider) => provider.children).find((item) => item.id === draft.model);
+      modelProviders
+        .flatMap((provider) => provider.children)
+        .find((item) => item.id === draft.model);
 
     return model?.displayName || draft.model;
   }, [currentProvider?.children, draft?.model, modelProviders, t.modelPickerTitle]);
@@ -412,11 +423,18 @@ function SessionAgentConfigScreen({
   const conversationSummary = useMemo(() => {
     if (!draft) return undefined;
 
-    const searchLabel = draft.searchMode === 'auto' ? t.agentConfigSearchAuto : t.agentConfigSearchOff;
+    const searchLabel =
+      draft.searchMode === 'auto' ? t.agentConfigSearchAuto : t.agentConfigSearchOff;
     const memoryLabel = draft.memoryEnabled ? t.memoryToolOnTitle : t.memoryToolOffTitle;
 
     return `${searchLabel} · ${memoryLabel}`;
-  }, [draft, t.agentConfigSearchAuto, t.agentConfigSearchOff, t.memoryToolOffTitle, t.memoryToolOnTitle]);
+  }, [
+    draft,
+    t.agentConfigSearchAuto,
+    t.agentConfigSearchOff,
+    t.memoryToolOffTitle,
+    t.memoryToolOnTitle,
+  ]);
 
   const advancedSummary = useMemo(() => {
     if (!draft) return undefined;
@@ -458,14 +476,14 @@ function SessionAgentConfigScreen({
       ]);
 
       const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
-      const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS
-        .filter((item) => !uninstalled.includes(item.identifier))
-        .map((item) => ({
-          description: (t as any)[item.descriptionKey] ?? '',
-          icon: item.icon,
-          identifier: item.identifier,
-          title: (t as any)[item.titleKey] ?? item.identifier,
-        }));
+      const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+        (item) => !uninstalled.includes(item.identifier),
+      ).map((item) => ({
+        description: (t as any)[item.descriptionKey] ?? '',
+        icon: item.icon,
+        identifier: item.identifier,
+        title: (t as any)[item.titleKey] ?? item.identifier,
+      }));
 
       const builtinIds = new Set(builtins.map((item) => item.identifier));
       const filteredSkills = (skills ?? []).filter(
@@ -486,34 +504,34 @@ function SessionAgentConfigScreen({
     }
   }, [t, t.errorNetwork, toast]);
 
-  const loadConfig = useCallback(async () => {
-    try {
-      setLoading(true);
-      await Promise.all([fetchModels(), loadSelection(sessionId)]);
-      const config = await agentApi.getConfigBySession(sessionId);
-
-      if (!config?.id) {
-        toast.show('error', t.settingsNotConfigured);
-        navigation.goBack();
-        return;
-      }
-
-      setDraft(buildDraft(config));
-      setSelectedSkills(new Set(config.plugins ?? []));
-      setAssistantExpanded(!(config.title || config.description || config.avatar));
-      setConversationExpanded(true);
-      setAdvancedExpanded(!!config.systemRole);
-    } catch {
-      toast.show('error', t.errorNetwork);
-      navigation.goBack();
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchModels, loadSelection, navigation, sessionId, t.errorNetwork, t.settingsNotConfigured, toast]);
+  const {
+    config: agentConfig,
+    loading: configLoading,
+    setConfig,
+  } = useAgentConfig(sessionId, true);
 
   useEffect(() => {
-    void loadConfig();
-  }, [loadConfig]);
+    void fetchModels();
+    void loadSelection(sessionId);
+  }, [fetchModels, loadSelection, sessionId]);
+
+  useEffect(() => {
+    if (agentConfig === undefined) {
+      setLoading(configLoading);
+      return;
+    }
+    if (!agentConfig?.id) {
+      toast.show('error', t.settingsNotConfigured);
+      navigation.goBack();
+      return;
+    }
+    setDraft(buildDraft(agentConfig));
+    setSelectedSkills(new Set(agentConfig.plugins ?? []));
+    setAssistantExpanded(!(agentConfig.title || agentConfig.description || agentConfig.avatar));
+    setConversationExpanded(true);
+    setAdvancedExpanded(!!agentConfig.systemRole);
+    setLoading(false);
+  }, [agentConfig, configLoading, navigation, t.settingsNotConfigured, toast]);
 
   const toggleSkill = useCallback((identifier: string) => {
     haptics.light();
@@ -543,7 +561,7 @@ function SessionAgentConfigScreen({
 
     try {
       setSaving(true);
-      await agentApi.updateConfig(draft.agentId, {
+      const nextConfig = {
         avatar: normalizeText(draft.avatar),
         chatConfig: {
           autoCreateTopicThreshold: draft.enableAutoCreateTopic
@@ -561,6 +579,7 @@ function SessionAgentConfigScreen({
           searchMode: draft.searchMode,
         },
         description: normalizeText(draft.description),
+        id: draft.agentId,
         model: normalizeText(draft.model),
         openingMessage: normalizeText(draft.openingMessage),
         openingQuestions: splitLineList(draft.openingQuestions),
@@ -569,7 +588,9 @@ function SessionAgentConfigScreen({
         provider: normalizeText(draft.provider),
         systemRole: normalizeText(draft.systemRole),
         title: normalizeText(draft.title),
-      });
+      };
+      await agentApi.updateConfig(draft.agentId, nextConfig);
+      if (sessionId) setConfig(nextConfig as any);
       await fetchSessions();
       toast.show('success', t.agentConfigSaved);
       haptics.success();
@@ -578,7 +599,16 @@ function SessionAgentConfigScreen({
     } finally {
       setSaving(false);
     }
-  }, [draft, fetchSessions, selectedSkills, t.agentConfigSaved, t.errorSaveFailed, toast]);
+  }, [
+    draft,
+    fetchSessions,
+    selectedSkills,
+    sessionId,
+    setConfig,
+    t.agentConfigSaved,
+    t.errorSaveFailed,
+    toast,
+  ]);
 
   if (loading || !draft) {
     return (
@@ -660,7 +690,11 @@ function SessionAgentConfigScreen({
             }}
           >
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-              <Puzzle color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Puzzle
+                color={semanticColors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
             </View>
             <View className="ml-3 flex-1">
               <Text className="text-[15px] font-semibold tracking-tight text-foreground">
@@ -692,8 +726,8 @@ function SessionAgentConfigScreen({
             onChangeText={(value) => updateDraft('title', value)}
           />
           <Field
-            label={t.agentConfigDescription}
             multiline
+            label={t.agentConfigDescription}
             placeholder={t.agentConfigDescriptionPlaceholder}
             value={draft.description}
             onChangeText={(value) => updateDraft('description', value)}
@@ -732,8 +766,8 @@ function SessionAgentConfigScreen({
           </View>
 
           <ToggleRow
-            label={t.memoryTitle}
             description={draft.memoryEnabled ? t.memoryToolOnDesc : t.memoryToolOffDesc}
+            label={t.memoryTitle}
             value={draft.memoryEnabled}
             onValueChange={(value) => updateDraft('memoryEnabled', value)}
           />
@@ -764,14 +798,14 @@ function SessionAgentConfigScreen({
           ) : null}
 
           <Field
-            label={t.agentConfigOpeningMessage}
             multiline
+            label={t.agentConfigOpeningMessage}
             value={draft.openingMessage}
             onChangeText={(value) => updateDraft('openingMessage', value)}
           />
           <Field
-            label={t.agentConfigOpeningQuestions}
             multiline
+            label={t.agentConfigOpeningQuestions}
             placeholder={t.agentConfigOpeningQuestionsPlaceholder}
             value={draft.openingQuestions}
             onChangeText={(value) => updateDraft('openingQuestions', value)}
@@ -786,8 +820,8 @@ function SessionAgentConfigScreen({
           onToggle={() => setAdvancedExpanded((value) => !value)}
         >
           <Field
-            label={t.agentConfigInstruction}
             multiline
+            label={t.agentConfigInstruction}
             placeholder={t.chatSettingsSystemPromptPlaceholder}
             value={draft.systemRole}
             onChangeText={(value) => updateDraft('systemRole', value)}
@@ -876,7 +910,10 @@ function SessionAgentConfigScreen({
         visible={skillsVisible}
         onRequestClose={() => setSkillsVisible(false)}
       >
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setSkillsVisible(false)}>
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setSkillsVisible(false)}
+        >
           <Pressable
             className="max-h-[74%] rounded-t-2xl bg-white"
             onPress={(event) => event.stopPropagation()}
@@ -910,8 +947,18 @@ function SessionAgentConfigScreen({
                     <SectionCard title={t.storeBuiltIn}>
                       {builtinSkillItems.map((item) => (
                         <SkillRow
-                          key={`builtin-${item.identifier}`}
                           description={item.description}
+                          key={`builtin-${item.identifier}`}
+                          accessory={
+                            <Switch
+                              trackColor={{
+                                false: 'rgba(120,120,128,0.18)',
+                                true: `${semanticColors.primary}66`,
+                              }}
+                              value={selectedSkills.has(item.identifier)}
+                              onValueChange={() => toggleSkill(item.identifier)}
+                            />
+                          }
                           title={
                             <View className="flex-row items-center">
                               <BuiltinSkillIcon icon={item.icon} size={20} />
@@ -919,13 +966,6 @@ function SessionAgentConfigScreen({
                                 {item.title}
                               </Text>
                             </View>
-                          }
-                          accessory={
-                            <Switch
-                              trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${semanticColors.primary}66` }}
-                              value={selectedSkills.has(item.identifier)}
-                              onValueChange={() => toggleSkill(item.identifier)}
-                            />
                           }
                         />
                       ))}
@@ -938,12 +978,15 @@ function SessionAgentConfigScreen({
                         const identifier = item.identifier || item.id;
                         return (
                           <SkillRow
-                            key={`skill-${identifier}`}
                             description={item.description}
+                            key={`skill-${identifier}`}
                             title={item.name}
                             accessory={
                               <Switch
-                                trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${semanticColors.primary}66` }}
+                                trackColor={{
+                                  false: 'rgba(120,120,128,0.18)',
+                                  true: `${semanticColors.primary}66`,
+                                }}
                                 value={selectedSkills.has(identifier)}
                                 onValueChange={() => toggleSkill(identifier)}
                               />
@@ -958,8 +1001,18 @@ function SessionAgentConfigScreen({
                     <SectionCard title={t.storeInstalled}>
                       {installedPlugins.map((plugin) => (
                         <SkillRow
-                          key={`plugin-${plugin.identifier}`}
                           description={plugin.manifest?.meta?.description}
+                          key={`plugin-${plugin.identifier}`}
+                          accessory={
+                            <Switch
+                              trackColor={{
+                                false: 'rgba(120,120,128,0.18)',
+                                true: `${semanticColors.primary}66`,
+                              }}
+                              value={selectedSkills.has(plugin.identifier)}
+                              onValueChange={() => toggleSkill(plugin.identifier)}
+                            />
+                          }
                           title={
                             <View className="flex-row items-center">
                               <View className="h-6 w-6 items-center justify-center rounded-lg bg-foreground/[0.04]">
@@ -971,13 +1024,6 @@ function SessionAgentConfigScreen({
                                 {plugin.manifest?.meta?.title || plugin.identifier}
                               </Text>
                             </View>
-                          }
-                          accessory={
-                            <Switch
-                              trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${semanticColors.primary}66` }}
-                              value={selectedSkills.has(plugin.identifier)}
-                              onValueChange={() => toggleSkill(plugin.identifier)}
-                            />
                           }
                         />
                       ))}

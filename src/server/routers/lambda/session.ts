@@ -107,6 +107,12 @@ export const sessionRouter = router({
           .passthrough()
           .partial(),
         session: insertSessionSchema.omit({ createdAt: true, updatedAt: true }).partial(),
+        /**
+         * When true, creates a session-only chat (virtual agent).
+         * Virtual agents are excluded from the sidebar "assistants" list.
+         * Use for "new conversation" flows; use agent.createAgent for creating assistants.
+         */
+        sessionOnly: z.boolean().optional(),
         type: z.enum(['agent', 'group']),
       }),
     )
@@ -154,12 +160,8 @@ export const sessionRouter = router({
       const session = await ctx.sessionModel.findByIdOrSlug(sessionId);
       if (!session) return null;
 
-      const effectiveTitle =
-        (session as any).title ?? (session as any).agent?.title ?? '';
-      if (
-        effectiveTitle &&
-        !DEFAULT_SESSION_TITLES.includes(effectiveTitle)
-      ) {
+      const effectiveTitle = (session as any).title ?? (session as any).agent?.title ?? '';
+      if (effectiveTitle && !DEFAULT_SESSION_TITLES.includes(effectiveTitle)) {
         return effectiveTitle;
       }
 

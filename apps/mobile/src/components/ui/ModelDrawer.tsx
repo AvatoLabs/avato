@@ -67,38 +67,58 @@ function getAbilityTags(m: RuntimeEnabledModel): string[] {
 }
 
 interface ModelDrawerProps {
+  initialModel?: string;
+  initialProvider?: string;
   onClose: () => void;
   onSelect?: (modelId: string, providerId: string) => void;
+  /** When true, only call onSelect without persisting to session/agent (for one-off selection) */
+  persistSelection?: boolean;
   sessionId?: string;
   visible: boolean;
 }
 
-export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDrawerProps) {
+export function ModelDrawer({
+  visible,
+  onClose,
+  sessionId,
+  onSelect,
+  persistSelection = true,
+  initialModel,
+  initialProvider,
+}: ModelDrawerProps) {
   const { t } = useI18n();
   const providers = useModelStore((s) => s.providers);
   const loading = useModelStore((s) => s.loading);
   const isLoaded = useModelStore((s) => s.isLoaded);
   const fetchModels = useModelStore((s) => s.fetchModels);
-  const selectedModel = useModelStore((s) => s.selectedModel);
+  const storeSelectedModel = useModelStore((s) => s.selectedModel);
+  const storeSelectedProvider = useModelStore((s) => s.selectedProvider);
   const selectModel = useModelStore((s) => s.selectModel);
   const loadSelection = useModelStore((s) => s.loadSelection);
 
   const [search, setSearch] = useState('');
 
+  const selectedModel = initialModel ?? storeSelectedModel;
+  const selectedProvider = initialProvider ?? storeSelectedProvider;
+
   useEffect(() => {
     if (visible) {
       if (!isLoaded) fetchModels();
-      loadSelection(sessionId);
+      if (persistSelection) {
+        loadSelection(sessionId);
+      }
     }
-  }, [visible, isLoaded, fetchModels, loadSelection, sessionId]);
+  }, [visible, isLoaded, fetchModels, loadSelection, sessionId, persistSelection]);
 
   const handleSelect = useCallback(
     async (modelId: string, providerId: string) => {
-      await selectModel(modelId, providerId, sessionId);
+      if (persistSelection) {
+        await selectModel(modelId, providerId, sessionId);
+      }
       onSelect?.(modelId, providerId);
       onClose();
     },
-    [selectModel, sessionId, onSelect, onClose],
+    [selectModel, sessionId, onSelect, onClose, persistSelection],
   );
 
   const q = search.toLowerCase();
@@ -121,10 +141,7 @@ export function ModelDrawer({ visible, onClose, sessionId, onSelect }: ModelDraw
 
   return (
     <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <Pressable
-        className="flex-1 justify-end bg-black/40"
-        onPress={onClose}
-      >
+      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Pressable
           className="bg-white rounded-t-2xl"
           style={{ maxHeight: '75%' }}

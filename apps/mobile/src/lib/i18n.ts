@@ -162,6 +162,7 @@ type TranslationKeys = {
   groupSettingsRemoveMemberDesc: string;
   groupAddMembers: string;
   groupCreateDefaultTitle: string;
+  groupCreateSupervisorModel: string;
 
   // Notebook
   notebookTitle: string;
@@ -191,6 +192,7 @@ type TranslationKeys = {
   settingsDefaultModel: string;
   settingsDefaultAgent: string;
   agentCurrent: string;
+  agentNoDescription: string;
   agentsEmpty: string;
   agentsEmptyDesc: string;
   agentConfigAvatar: string;
@@ -1055,6 +1057,7 @@ const en: TranslationKeys = {
     'This member will be removed from the group. Virtual members may also be deleted permanently.',
   groupAddMembers: 'Add Members',
   groupCreateDefaultTitle: 'New Group Chat',
+  groupCreateSupervisorModel: 'Host model',
 
   notebookTitle: 'Notebook',
   notebookDesc: 'Your personal notes and documents',
@@ -1128,6 +1131,7 @@ const en: TranslationKeys = {
   agentConfigSkillsEmpty: 'No skills selected',
   agentConfigSkillsCount: '{count} skills selected',
   agentCurrent: 'Current',
+  agentNoDescription: 'No description',
   agentsEmpty: 'No agents yet',
   agentsEmptyDesc: 'Create an agent to get started.',
   agentFirstHint: 'Create an agent first',
@@ -1917,6 +1921,7 @@ const zh_tw: TranslationKeys = {
   groupSettingsRemoveMemberDesc: '此成員將從群組中移除，虛擬成員也可能被永久刪除。',
   groupAddMembers: '新增成員',
   groupCreateDefaultTitle: '新群組聊天',
+  groupCreateSupervisorModel: '主持人模型',
 
   notebookTitle: '筆記本',
   notebookDesc: '你的個人筆記和文檔',
@@ -1991,6 +1996,7 @@ const zh_tw: TranslationKeys = {
   agentConfigSkillsEmpty: '尚未選擇技能',
   agentConfigSkillsCount: '已選擇 {count} 個技能',
   agentCurrent: '當前',
+  agentNoDescription: '暫無描述',
   agentsEmpty: '暫無助手',
   agentsEmptyDesc: '建立助手以開始使用。',
   agentFirstHint: '先建立助手',
@@ -2778,6 +2784,7 @@ const zh: TranslationKeys = {
   groupSettingsRemoveMemberDesc: '此成员将从群组中移除，虚拟成员也可能被永久删除。',
   groupAddMembers: '添加成员',
   groupCreateDefaultTitle: '新群组聊天',
+  groupCreateSupervisorModel: '主持人模型',
 
   notebookTitle: '笔记本',
   notebookDesc: '你的个人笔记和文档',
@@ -2851,6 +2858,7 @@ const zh: TranslationKeys = {
   agentConfigSkillsEmpty: '暂未选择技能',
   agentConfigSkillsCount: '已选择 {count} 个技能',
   agentCurrent: '当前',
+  agentNoDescription: '暂无描述',
   agentsEmpty: '暂无助手',
   agentsEmptyDesc: '创建助手以开始使用。',
   agentFirstHint: '先创建助手',

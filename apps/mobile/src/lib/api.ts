@@ -613,7 +613,11 @@ export const sessionApi = {
       type: s.type ?? 'agent',
     }));
   },
-  /** Create a new session (same semantic path as web). Returns the new session ID string. */
+  /**
+   * Create a new session (simple chat).
+   * Uses sessionOnly: true so the session does not appear in the sidebar "assistants" list.
+   * For creating assistants, use agentApi.create instead.
+   */
   create: (config?: CreateSessionConfig) =>
     trpcMutate<string>('session.createSession', {
       config: {
@@ -626,6 +630,7 @@ export const sessionApi = {
         title: config?.title || 'New Conversation',
       },
       session: { tagId: config?.tagId },
+      sessionOnly: true,
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),
@@ -673,9 +678,14 @@ export interface AgentGroupDetail {
 }
 
 export const agentGroupApi = {
-  createGroup: (config?: { config?: Record<string, any>; title?: string }) =>
+  createGroup: (config?: {
+    config?: Record<string, any>;
+    supervisorConfig?: { model?: string; provider?: string };
+    title?: string;
+  }) =>
     trpcMutate<{ group: { id: string }; supervisorAgentId: string }>('agentGroup.createGroup', {
       config: config?.config,
+      supervisorConfig: config?.supervisorConfig,
       title: config?.title || 'New Group Chat',
     }),
 
@@ -1902,6 +1912,7 @@ export const marketSkillApi = {
             ...m,
             _source: 'mcp' as const,
             avatar: m.meta?.avatar || m.avatar,
+            category: m.category ?? m.meta?.category,
             description: m.meta?.description || m.description || '',
             identifier: m.identifier,
             manifestUrl: m.manifestUrl,

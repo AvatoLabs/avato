@@ -1376,25 +1376,50 @@ export default function StoreScreen() {
         setMarketLoading(true);
       }
 
+      const categoryParam =
+        activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory;
+
       try {
         const result =
           source === 'mcp'
             ? await marketSkillApi.getMcpList({
-                category:
-                  activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory,
+                category: categoryParam,
                 page,
                 pageSize: MARKET_PAGE_SIZE,
                 q: debouncedQuery || undefined,
               })
             : await marketSkillApi.getSkillList({
-                category:
-                  activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory,
+                category: categoryParam,
                 page,
                 pageSize: MARKET_PAGE_SIZE,
                 q: debouncedQuery || undefined,
               });
 
-        const remoteItems = result.items || [];
+        let remoteItems = result.items || [];
+
+        // Fallback: when category filter returns empty but "all" has data, fetch without category
+        // and filter client-side (market API may expect different category format)
+        if (!append && page === 1 && categoryParam && remoteItems.length === 0 && !debouncedQuery) {
+          const allResult =
+            source === 'mcp'
+              ? await marketSkillApi.getMcpList({
+                  page: 1,
+                  pageSize: 200,
+                  q: undefined,
+                })
+              : await marketSkillApi.getSkillList({
+                  page: 1,
+                  pageSize: 200,
+                  q: undefined,
+                });
+          const allItems = allResult.items || [];
+          remoteItems = allItems.filter(
+            (item) =>
+              item.category?.toLowerCase() === categoryParam.toLowerCase() ||
+              item.category === categoryParam,
+          );
+        }
+
         const nextItems =
           source === 'skill' && page === 1
             ? mergeMarketItems([...builtinMarketItems, ...remoteItems])

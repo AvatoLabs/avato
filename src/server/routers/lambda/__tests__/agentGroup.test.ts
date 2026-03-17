@@ -103,10 +103,14 @@ describe('agentGroupRouter', () => {
       const caller = agentGroupRouter.createCaller(mockCtx);
       const result = await caller.createGroup(mockInput);
 
-      expect(agentGroupRepoMock.createGroupWithSupervisor).toHaveBeenCalledWith({
-        ...mockInput,
-        config: { ...DEFAULT_CHAT_GROUP_CHAT_CONFIG, allowDM: true },
-      });
+      expect(agentGroupRepoMock.createGroupWithSupervisor).toHaveBeenCalledWith(
+        {
+          ...mockInput,
+          config: { ...DEFAULT_CHAT_GROUP_CHAT_CONFIG, allowDM: true },
+        },
+        [],
+        undefined,
+      );
       expect(result).toEqual({ group: mockCreatedGroup, supervisorAgentId: 'supervisor-1' });
     });
 
@@ -128,10 +132,14 @@ describe('agentGroupRouter', () => {
       const caller = agentGroupRouter.createCaller(mockCtx);
       const result = await caller.createGroup(mockInput);
 
-      expect(agentGroupRepoMock.createGroupWithSupervisor).toHaveBeenCalledWith({
-        ...mockInput,
-        config: undefined,
-      });
+      expect(agentGroupRepoMock.createGroupWithSupervisor).toHaveBeenCalledWith(
+        {
+          ...mockInput,
+          config: undefined,
+        },
+        [],
+        undefined,
+      );
       expect(result).toEqual({ group: mockCreatedGroup, supervisorAgentId: 'supervisor-1' });
     });
   });

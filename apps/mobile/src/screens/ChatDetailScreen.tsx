@@ -169,7 +169,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   useEffect(() => {
     if (!sessionId) return;
-    switchTopic(sessionId, initialTopicId);
+    // Only switch when route explicitly provides topicId (e.g. from search/deep link).
+    // When absent, preserve existing activeTopic to avoid clearing history on return.
+    if (initialTopicId != null) {
+      switchTopic(sessionId, initialTopicId);
+    }
   }, [initialTopicId, sessionId, switchTopic]);
 
   useEffect(() => {
@@ -246,6 +250,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     fetchMessages(sessionId, activeTopic ?? undefined);
     fetchTopics(sessionId);
   }, [sessionId, fetchMessages, fetchTopics, activeTopic, generating]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!sessionId || generating) return;
+      const currentTopic = useTopicStore.getState().activeTopicBySession[sessionKey] ?? null;
+      fetchMessages(sessionId, currentTopic ?? undefined);
+      fetchTopics(sessionId);
+    }, [sessionId, sessionKey, fetchMessages, fetchTopics, generating]),
+  );
 
   useEffect(() => {
     if (sessionId) return;

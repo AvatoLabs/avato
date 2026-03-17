@@ -40,8 +40,8 @@ import Animated, { FadeInDown, SlideInRight, SlideOutRight } from 'react-native-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
 
-import AttachmentSheet from '../components/ui/AttachmentSheet';
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
+import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import FilePreview from '../components/ui/FilePreview';
 import { HeroComposer } from '../components/ui/HeroComposer';
@@ -252,7 +252,12 @@ export default function ChatListScreen({ navigation }: any) {
 
   const [streak, setStreak] = useState(0);
 
-  const { sessions, initialized, loading, errorMessage: sessionErrorMessage } = useSessionStore(
+  const {
+    sessions,
+    initialized,
+    loading,
+    errorMessage: sessionErrorMessage,
+  } = useSessionStore(
     useShallow((s) => ({
       errorMessage: s.errorMessage,
       sessions: s.sessions,
@@ -383,7 +388,14 @@ export default function ChatListScreen({ navigation }: any) {
         }
       }),
     );
-  }, [fetchSessionTags, fetchSessions, initialized, loadGlobalMemorySettings, t.streakCelebrate, toast]);
+  }, [
+    fetchSessionTags,
+    fetchSessions,
+    initialized,
+    loadGlobalMemorySettings,
+    t.streakCelebrate,
+    toast,
+  ]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
@@ -673,14 +685,14 @@ export default function ChatListScreen({ navigation }: any) {
       .then(([list, userState]) => {
         const plugins = list ?? [];
         const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
-        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS
-          .filter((b) => !uninstalled.includes(b.identifier))
-          .map((b) => ({
-            description: (t as any)[b.descriptionKey] ?? '',
-            icon: b.icon,
-            identifier: b.identifier,
-            title: (t as any)[b.titleKey] ?? b.identifier,
-          }));
+        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+          (b) => !uninstalled.includes(b.identifier),
+        ).map((b) => ({
+          description: (t as any)[b.descriptionKey] ?? '',
+          icon: b.icon,
+          identifier: b.identifier,
+          title: (t as any)[b.titleKey] ?? b.identifier,
+        }));
         setBuiltinSkillItems(builtins);
         const builtinIds = new Set(builtins.map((b) => b.identifier));
         const filteredPlugins = plugins.filter((p) => !builtinIds.has(p.identifier));
@@ -715,11 +727,14 @@ export default function ChatListScreen({ navigation }: any) {
     setActionSession(session);
   }, []);
 
-  const handleRename = useCallback((session: ChatSession) => {
-    closeActionSheet();
-    setRenameTarget(session);
-    setTimeout(() => setRenameModalVisible(true), 300);
-  }, [closeActionSheet]);
+  const handleRename = useCallback(
+    (session: ChatSession) => {
+      closeActionSheet();
+      setRenameTarget(session);
+      setTimeout(() => setRenameModalVisible(true), 300);
+    },
+    [closeActionSheet],
+  );
 
   const closeTagEditor = useCallback(() => {
     setEditingTag(null);
@@ -815,15 +830,7 @@ export default function ChatListScreen({ navigation }: any) {
       const { messageKey } = classifyError(err);
       toast.show('error', t[messageKey]);
     }
-  }, [
-    activeTagId,
-    closeTagEditor,
-    editingTag,
-    fetchSessionTags,
-    fetchSessions,
-    t,
-    toast,
-  ]);
+  }, [activeTagId, closeTagEditor, editingTag, fetchSessionTags, fetchSessions, t, toast]);
 
   const handleMoveSessionToTag = useCallback(
     async (tagId?: string | null) => {
@@ -902,10 +909,21 @@ export default function ChatListScreen({ navigation }: any) {
   }, []);
 
   const handleCreateGroupSubmit = useCallback(
-    async ({ agentIds, title }: { agentIds: string[]; title: string }) => {
+    async ({
+      agentIds,
+      supervisorConfig,
+      title,
+    }: {
+      agentIds: string[];
+      supervisorConfig?: { model?: string; provider?: string };
+      title: string;
+    }) => {
       try {
         const nextTitle = title.trim() || t.groupCreateDefaultTitle;
-        const result = await agentGroupApi.createGroup({ title: nextTitle });
+        const result = await agentGroupApi.createGroup({
+          supervisorConfig,
+          title: nextTitle,
+        });
         if (!result?.group?.id) {
           toast.show('error', t.errorNetwork);
           return;
@@ -928,31 +946,34 @@ export default function ChatListScreen({ navigation }: any) {
 
   const selectedProviderLogo = selectedProvider ? providerLogoById[selectedProvider] : undefined;
 
-  const renderTagChip = useCallback((tagId?: string) => {
-    if (!tagId) return null;
+  const renderTagChip = useCallback(
+    (tagId?: string) => {
+      if (!tagId) return null;
 
-    const tag = tagById[tagId];
-    if (!tag) return null;
+      const tag = tagById[tagId];
+      if (!tag) return null;
 
-    return (
-      <View
-        className="ml-2 flex-row items-center rounded-full px-2.5 py-0.5"
-        style={{ backgroundColor: withAlpha(tag.color, '18') }}
-      >
+      return (
         <View
-          className="mr-1.5 rounded-full"
-          style={{ backgroundColor: resolveTagColor(tag.color), height: 6, width: 6 }}
-        />
-        <Text
-          className="text-[10px] font-semibold"
-          numberOfLines={1}
-          style={{ color: resolveTagColor(tag.color) }}
+          className="ml-2 flex-row items-center rounded-full px-2.5 py-0.5"
+          style={{ backgroundColor: withAlpha(tag.color, '18') }}
         >
-          {tag.name}
-        </Text>
-      </View>
-    );
-  }, [tagById]);
+          <View
+            className="mr-1.5 rounded-full"
+            style={{ backgroundColor: resolveTagColor(tag.color), height: 6, width: 6 }}
+          />
+          <Text
+            className="text-[10px] font-semibold"
+            numberOfLines={1}
+            style={{ color: resolveTagColor(tag.color) }}
+          >
+            {tag.name}
+          </Text>
+        </View>
+      );
+    },
+    [tagById],
+  );
 
   const renderSessionRow = (item: ChatSession) => {
     const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
@@ -968,40 +989,40 @@ export default function ChatListScreen({ navigation }: any) {
         onLongPress={() => handleLongPress(item)}
         onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
       >
-          <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
-            <SessionLogo
-              avatar={item.avatar}
-              provider={providerId}
-              providerLogo={providerLogo}
-              size={36}
-            />
-          </View>
-          <View className="flex-1 mr-3 mt-0.5">
-            <View className="flex-row items-center mb-0.5 flex-wrap">
-              {item.pinned && (
-                <Pin
-                  color={semanticColors.primary}
-                  size={11}
-                  strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 4 }}
-                />
-              )}
-              <Text
-                className="text-foreground text-[15px] font-medium tracking-tight"
-                numberOfLines={1}
-              >
-                {item.title || t.chatListNewConversation}
-              </Text>
-              {renderTagChip(item.tagId)}
-            </View>
-            <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
-              {item.description}
+        <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
+          <SessionLogo
+            avatar={item.avatar}
+            provider={providerId}
+            providerLogo={providerLogo}
+            size={36}
+          />
+        </View>
+        <View className="flex-1 mr-3 mt-0.5">
+          <View className="flex-row items-center mb-0.5 flex-wrap">
+            {item.pinned && (
+              <Pin
+                color={semanticColors.primary}
+                size={11}
+                strokeWidth={tokens.icon.strokeWidth}
+                style={{ marginRight: 4 }}
+              />
+            )}
+            <Text
+              className="text-foreground text-[15px] font-medium tracking-tight"
+              numberOfLines={1}
+            >
+              {item.title || t.chatListNewConversation}
             </Text>
+            {renderTagChip(item.tagId)}
           </View>
-          <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
-            {formatTimeAgo(item.updatedAt, t)}
+          <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
+            {item.description}
           </Text>
-        </TouchableOpacity>
+        </View>
+        <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
+          {formatTimeAgo(item.updatedAt, t)}
+        </Text>
+      </TouchableOpacity>
     );
   };
 
@@ -1013,7 +1034,8 @@ export default function ChatListScreen({ navigation }: any) {
     summary,
     topicId,
   }: SearchSessionResult) => {
-    const providerId = session.provider || (session.model ? modelToProvider[session.model] : undefined);
+    const providerId =
+      session.provider || (session.model ? modelToProvider[session.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
 
     return (
@@ -1039,7 +1061,10 @@ export default function ChatListScreen({ navigation }: any) {
         </View>
         <View className="flex-1">
           <View className="mb-1 flex-row items-center flex-wrap">
-            <Text className="text-[15px] font-medium tracking-tight text-foreground" numberOfLines={1}>
+            <Text
+              className="text-[15px] font-medium tracking-tight text-foreground"
+              numberOfLines={1}
+            >
               {session.title || t.chatListNewConversation}
             </Text>
             <Text className="ml-2 text-[11px] font-semibold uppercase tracking-wider text-secondary/35">
@@ -1062,7 +1087,13 @@ export default function ChatListScreen({ navigation }: any) {
       <ScreenHeader
         subtitle={t.activeChats.replace('{count}', String(visibleSessions.length))}
         title={greeting}
-        titleIcon={<MessageCircle color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        titleIcon={
+          <MessageCircle
+            color={semanticColors.primary}
+            size={20}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         rightActions={
           <View className="flex-row items-center">
             <TouchableOpacity
@@ -1093,8 +1124,12 @@ export default function ChatListScreen({ navigation }: any) {
             const selected = pill.key === selectedPillKey;
             const resolvedColor = pill.tagId ? resolveTagColor(pill.color) : semanticColors.primary;
             const selectedBackground = pill.tagId ? resolvedColor : semanticColors.primary;
-            const unselectedBackground = pill.tagId ? withAlpha(pill.color, '16') : semanticColors.fillTertiary;
-            const countBackground = selected ? withAlpha(selectedBackground, '33') : withAlpha(pill.color, '20');
+            const unselectedBackground = pill.tagId
+              ? withAlpha(pill.color, '16')
+              : semanticColors.fillTertiary;
+            const countBackground = selected
+              ? withAlpha(selectedBackground, '33')
+              : withAlpha(pill.color, '20');
             const editableTag = pill.tagId ? tagById[pill.tagId] : undefined;
 
             return (
@@ -1113,7 +1148,13 @@ export default function ChatListScreen({ navigation }: any) {
               >
                 <Text
                   className="text-[13px] font-semibold"
-                  style={{ color: selected ? '#fff' : pill.tagId ? resolvedColor : semanticColors.foreground }}
+                  style={{
+                    color: selected
+                      ? '#fff'
+                      : pill.tagId
+                        ? resolvedColor
+                        : semanticColors.foreground,
+                  }}
                 >
                   {pill.label}
                 </Text>
@@ -1123,7 +1164,13 @@ export default function ChatListScreen({ navigation }: any) {
                 >
                   <Text
                     className="text-[11px] font-semibold"
-                    style={{ color: selected ? '#fff' : pill.tagId ? resolvedColor : semanticColors.secondaryText }}
+                    style={{
+                      color: selected
+                        ? '#fff'
+                        : pill.tagId
+                          ? resolvedColor
+                          : semanticColors.secondaryText,
+                    }}
                   >
                     {pill.count}
                   </Text>
@@ -1133,7 +1180,6 @@ export default function ChatListScreen({ navigation }: any) {
           })}
         </ScrollView>
       </ScreenHeader>
-
 
       <ScrollView
         className="flex-1"
@@ -1326,7 +1372,11 @@ export default function ChatListScreen({ navigation }: any) {
               className="flex-row items-center px-4 py-3"
               onPress={handleCreateGroup}
             >
-              <UsersRound color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <UsersRound
+                color={semanticColors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
               <Text className="ml-3 text-[15px] font-medium text-foreground">
                 {t.chatListCreateGroup}
               </Text>
@@ -1350,9 +1400,10 @@ export default function ChatListScreen({ navigation }: any) {
 
       <AgentSelectionSheet
         allowEmptySelection
+        showSupervisorModelPicker
+        showTitleInput
         confirmLabel={t.done}
         initialTitle={t.groupCreateDefaultTitle}
-        showTitleInput
         title={t.chatListCreateGroup}
         titleInputLabel={t.agentConfigName}
         titleInputPlaceholder={t.groupCreateDefaultTitle}
@@ -1368,10 +1419,7 @@ export default function ChatListScreen({ navigation }: any) {
         visible={!!actionSession}
         onRequestClose={closeActionSheet}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={closeActionSheet}
-        >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={closeActionSheet}>
           <Pressable
             className="bg-white rounded-t-2xl overflow-hidden"
             style={{ maxHeight: '72%' }}
@@ -1513,9 +1561,7 @@ export default function ChatListScreen({ navigation }: any) {
                           className="mr-3 h-2.5 w-2.5 rounded-full"
                           style={{ backgroundColor: semanticColors.secondaryText }}
                         />
-                        <Text className="text-[15px] font-medium text-foreground">
-                          {t.tagNone}
-                        </Text>
+                        <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                       </View>
                       {!actionSession?.tagId ? (
                         <Check
@@ -1575,7 +1621,7 @@ export default function ChatListScreen({ navigation }: any) {
       </Modal>
 
       <PromptModal
-        defaultValue={renameModalVisible ? renameTarget?.title ?? '' : ''}
+        defaultValue={renameModalVisible ? (renameTarget?.title ?? '') : ''}
         submitLabel={t.save}
         title={t.sessionRenameTitle}
         visible={renameModalVisible}
@@ -1703,14 +1749,9 @@ export default function ChatListScreen({ navigation }: any) {
                     </View>
                   ))}
                   {installedPlugins.map((plugin) => (
-                    <View
-                      className="flex-row items-center py-3.5"
-                      key={plugin.identifier}
-                    >
+                    <View className="flex-row items-center py-3.5" key={plugin.identifier}>
                       <View className="w-9 h-9 rounded-xl bg-foreground/5 items-center justify-center mr-3">
-                        <Text className="text-[18px]">
-                          {plugin.manifest?.meta?.avatar ?? '🔌'}
-                        </Text>
+                        <Text className="text-[18px]">{plugin.manifest?.meta?.avatar ?? '🔌'}</Text>
                       </View>
                       <View className="flex-1 mr-3">
                         <Text

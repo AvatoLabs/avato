@@ -1,3 +1,4 @@
+import { Check, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,16 +10,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Check } from 'lucide-react-native';
 
+import { semanticColors } from '../../constants/colors';
 import { agentApi, type AgentQueryItem } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
-import { semanticColors } from '../../constants/colors';
+import { useModelStore } from '../../store/model';
 import { tokens } from '../../theme/tokens';
+import { ModelDrawer } from './ModelDrawer';
 
 export interface AgentSelectionSheetSubmitPayload {
   agentIds: string[];
+  supervisorConfig?: { model?: string; provider?: string };
   title: string;
 }
 
@@ -30,6 +33,7 @@ export interface AgentSelectionSheetProps {
   initialTitle?: string;
   onClose: () => void;
   onSubmit: (payload: AgentSelectionSheetSubmitPayload) => Promise<void>;
+  showSupervisorModelPicker?: boolean;
   showTitleInput?: boolean;
   title: string;
   titleInputLabel?: string;
@@ -65,6 +69,7 @@ export default function AgentSelectionSheet({
   initialTitle = '',
   onClose,
   onSubmit,
+  showSupervisorModelPicker = false,
   showTitleInput = false,
   title,
   titleInputLabel,
@@ -78,6 +83,17 @@ export default function AgentSelectionSheet({
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelectedAgentIds));
   const [draftTitle, setDraftTitle] = useState(initialTitle);
+  const [supervisorModel, setSupervisorModel] = useState<string>('');
+  const [supervisorProvider, setSupervisorProvider] = useState<string>('');
+  const [supervisorModelDrawerVisible, setSupervisorModelDrawerVisible] = useState(false);
+
+  const providers = useModelStore((s) => s.providers);
+  const supervisorModelLabel = useMemo(() => {
+    if (!supervisorModel || !supervisorProvider) return t.modelPickerTitle;
+    const provider = providers.find((p) => p.id === supervisorProvider);
+    const model = provider?.children.find((m) => m.id === supervisorModel);
+    return model?.displayName || supervisorModel;
+  }, [providers, supervisorModel, supervisorProvider, t.modelPickerTitle]);
 
   useEffect(() => {
     if (!visible) return;
@@ -123,16 +139,10 @@ export default function AgentSelectionSheet({
     return agents.filter((agent) => !excluded.has(agent.id));
   }, [agents, excludedAgentIds]);
 
-  const submitDisabled =
-    submitting || (!allowEmptySelection && selectedIds.size === 0);
+  const submitDisabled = submitting || (!allowEmptySelection && selectedIds.size === 0);
 
   return (
-    <Modal
-      transparent
-      animationType="slide"
-      visible={visible}
-      onRequestClose={onClose}
-    >
+    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Pressable
           className="rounded-t-2xl bg-white"
@@ -155,6 +165,10 @@ export default function AgentSelectionSheet({
                   setSubmitting(true);
                   await onSubmit({
                     agentIds: [...selectedIds],
+                    supervisorConfig:
+                      showSupervisorModelPicker && supervisorModel && supervisorProvider
+                        ? { model: supervisorModel, provider: supervisorProvider }
+                        : undefined,
                     title: draftTitle.trim(),
                   });
                 } finally {
@@ -168,9 +182,7 @@ export default function AgentSelectionSheet({
                 <Text
                   className="text-[15px] font-semibold"
                   style={{
-                    color: submitDisabled
-                      ? semanticColors.secondaryText
-                      : semanticColors.primary,
+                    color: submitDisabled ? semanticColors.secondaryText : semanticColors.primary,
                   }}
                 >
                   {confirmLabel}
@@ -193,6 +205,35 @@ export default function AgentSelectionSheet({
                   onChangeText={setDraftTitle}
                 />
               </View>
+            ) : null}
+
+            {showSupervisorModelPicker ? (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                className="mb-4 flex-row items-center justify-between rounded-2xl bg-foreground/[0.04] px-4 py-3"
+                onPress={() => {
+                  haptics.light();
+                  setSupervisorModelDrawerVisible(true);
+                }}
+              >
+                <Text className="text-[14px] font-medium text-foreground">
+                  {t.groupCreateSupervisorModel}
+                </Text>
+                <View className="flex-row items-center">
+                  <Text
+                    className="mr-1.5 text-[13px] text-secondary/60"
+                    numberOfLines={1}
+                    style={{ maxWidth: 140 }}
+                  >
+                    {supervisorModelLabel}
+                  </Text>
+                  <ChevronRight
+                    color={semanticColors.secondaryText}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </View>
+              </TouchableOpacity>
             ) : null}
 
             <View className="mb-4">
@@ -225,10 +266,10 @@ export default function AgentSelectionSheet({
                 return (
                   <TouchableOpacity
                     activeOpacity={0.75}
+                    key={agent.id}
                     className={`flex-row items-center rounded-2xl px-4 py-3 ${
                       index === filteredAgents.length - 1 ? '' : 'mb-3'
                     }`}
-                    key={agent.id}
                     style={{
                       backgroundColor: selected
                         ? `${semanticColors.primary}12`
@@ -255,7 +296,7 @@ export default function AgentSelectionSheet({
                         {agent.title || t.settingsDefaultAgent}
                       </Text>
                       <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60">
-                        {agent.description || t.settingsNotConfigured}
+                        {agent.description || t.agentNoDescription}
                       </Text>
                     </View>
                     <View
@@ -279,6 +320,20 @@ export default function AgentSelectionSheet({
           </ScrollView>
         </Pressable>
       </Pressable>
+
+      {showSupervisorModelPicker ? (
+        <ModelDrawer
+          initialModel={supervisorModel || undefined}
+          initialProvider={supervisorProvider || undefined}
+          persistSelection={false}
+          visible={supervisorModelDrawerVisible}
+          onClose={() => setSupervisorModelDrawerVisible(false)}
+          onSelect={(modelId, providerId) => {
+            setSupervisorModel(modelId);
+            setSupervisorProvider(providerId);
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }

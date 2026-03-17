@@ -28,11 +28,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
+import { ModelDrawer } from '../components/ui/ModelDrawer';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { resolveTagColor, withAlpha } from '../constants/tags';
+import { useAgentConfig } from '../hooks/useAgentConfig';
 import { agentApi, agentGroupApi, type AgentGroupDetail, sessionTagApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
@@ -147,11 +149,15 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const clearMessages = useChatStore((s) => s.clearMessages);
 
-  const [agentSummary, setAgentSummary] = useState<{
-    avatar?: string;
-    description?: string;
-    title?: string;
-  } | null>(null);
+  const { config: agentConfig } = useAgentConfig(sessionId, !isGroupSession && !!sessionId);
+  const agentSummary =
+    agentConfig && agentConfig.id
+      ? {
+          avatar: agentConfig.avatar ?? undefined,
+          description: agentConfig.description ?? undefined,
+          title: agentConfig.title ?? undefined,
+        }
+      : null;
   const [tagSelectorVisible, setTagSelectorVisible] = useState(false);
   const [tagEditorVisible, setTagEditorVisible] = useState(false);
   const [sessionTags, setSessionTags] = useState<SessionTag[]>([]);
@@ -168,6 +174,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const [groupAllowDM, setGroupAllowDM] = useState(true);
   const [groupRevealDM, setGroupRevealDM] = useState(false);
   const [addMembersVisible, setAddMembersVisible] = useState(false);
+  const [supervisorModelDrawerVisible, setSupervisorModelDrawerVisible] = useState(false);
 
   useEffect(() => {
     if (session?.title) setTitle(session.title);
@@ -236,34 +243,6 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
 
     void loadGroupDetail();
   }, [isGroupSession, loadGroupDetail]);
-
-  useEffect(() => {
-    let disposed = false;
-
-    if (!sessionId || isGroupSession) {
-      setAgentSummary(null);
-      return;
-    }
-
-    agentApi
-      .getConfigBySession(sessionId)
-      .then((config) => {
-        if (disposed || !config) return;
-
-        setAgentSummary({
-          avatar: config.avatar,
-          description: config.description,
-          title: config.title,
-        });
-      })
-      .catch(() => {
-        if (!disposed) setAgentSummary(null);
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, [isGroupSession, sessionId]);
 
   const fetchSessionTags = useCallback(async () => {
     if (isGroupSession) return;
@@ -378,6 +357,22 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       t.groupSettingsRemoveMemberDesc,
       toast,
     ],
+  );
+
+  const handleSupervisorModelSelect = useCallback(
+    async (modelId: string, providerId: string) => {
+      const supervisorId = groupDetail?.supervisorAgentId;
+      if (!supervisorId) return;
+
+      try {
+        await agentApi.updateConfig(supervisorId, { model: modelId, provider: providerId });
+        haptics.success();
+        await loadGroupDetail();
+      } catch {
+        toast.show('error', t.errorSaveFailed);
+      }
+    },
+    [groupDetail?.supervisorAgentId, loadGroupDetail, t.errorSaveFailed, toast],
   );
 
   const handleAddGroupMembers = useCallback(
@@ -741,9 +736,21 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                         ? `${member.provider} · ${member.model}`
                         : member.model || t.settingsNotConfigured);
 
+                    const RowWrapper = member.isSupervisor ? TouchableOpacity : View;
+                    const rowProps = member.isSupervisor
+                      ? {
+                          activeOpacity: 0.75,
+                          onPress: () => {
+                            haptics.light();
+                            setSupervisorModelDrawerVisible(true);
+                          },
+                        }
+                      : {};
+
                     return (
-                      <View
+                      <RowWrapper
                         key={member.id}
+                        {...rowProps}
                         className={`flex-row items-center rounded-2xl bg-foreground/[0.04] px-4 py-3 ${
                           index === (groupDetail.agents?.length ?? 0) - 1 ? '' : 'mb-3'
                         }`}
@@ -770,7 +777,13 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                             {memberSummary}
                           </Text>
                         </View>
-                        {!member.isSupervisor ? (
+                        {member.isSupervisor ? (
+                          <ChevronRight
+                            color={semanticColors.secondaryText}
+                            size={18}
+                            strokeWidth={tokens.icon.strokeWidth}
+                          />
+                        ) : !member.isSupervisor ? (
                           <TouchableOpacity
                             activeOpacity={0.75}
                             className="ml-3 rounded-xl px-3 py-2"
@@ -785,7 +798,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                             </Text>
                           </TouchableOpacity>
                         ) : null}
-                      </View>
+                      </RowWrapper>
                     );
                   })}
                 </>
@@ -962,6 +975,21 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         onClose={() => setAddMembersVisible(false)}
         onSubmit={handleAddGroupMembers}
       />
+
+      {isGroupSession && groupDetail?.supervisorAgentId ? (
+        <ModelDrawer
+          persistSelection={false}
+          visible={supervisorModelDrawerVisible}
+          initialModel={
+            groupDetail.agents?.find((a) => a.id === groupDetail.supervisorAgentId)?.model
+          }
+          initialProvider={
+            groupDetail.agents?.find((a) => a.id === groupDetail.supervisorAgentId)?.provider
+          }
+          onClose={() => setSupervisorModelDrawerVisible(false)}
+          onSelect={handleSupervisorModelSelect}
+        />
+      ) : null}
     </View>
   );
 }

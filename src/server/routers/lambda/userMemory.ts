@@ -13,12 +13,14 @@ import { z } from 'zod';
 
 import { AsyncTaskModel, initUserMemoryExtractionMetadata } from '@/database/models/asyncTask';
 import { TopicModel } from '@/database/models/topic';
-import {   UserMemoryActivityModel,
+import {
+  UserMemoryActivityModel,
   UserMemoryContextModel,
   UserMemoryExperienceModel,
   UserMemoryIdentityModel,
-UserMemoryModel,
-  UserMemoryPreferenceModel } from '@/database/models/userMemory';
+  UserMemoryModel,
+  UserMemoryPreferenceModel,
+} from '@/database/models/userMemory';
 import { UserPersonaModel } from '@/database/models/userMemory/persona';
 import { appEnv } from '@/envs/app';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
@@ -290,6 +292,22 @@ export const userMemoryRouter = router({
       const { webhook, upstashWorkflowExtraHeaders } = parseMemoryExtractionConfig();
       const baseUrl = webhook.baseUrl || appEnv.INTERNAL_APP_URL || appEnv.APP_URL;
 
+      if (!baseUrl) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Memory extraction requires APP_URL or MEMORY_USER_MEMORY_WEBHOOK_BASE_URL to be configured',
+        });
+      }
+
+      if (!process.env.QSTASH_TOKEN) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Memory extraction requires QSTASH_TOKEN to be configured. See docs for Upstash QStash setup.',
+        });
+      }
+
       try {
         await MemoryExtractionWorkflowService.triggerProcessUsers(
           buildWorkflowPayloadInput(
@@ -309,6 +327,7 @@ export const userMemoryRouter = router({
           { extraHeaders: upstashWorkflowExtraHeaders },
         );
       } catch (error) {
+        const causeMessage = error instanceof Error ? error.message : String(error);
         await ctx.asyncTaskModel.update(taskId, {
           error: new AsyncTaskError(
             AsyncTaskErrorType.TaskTriggerError,
@@ -319,7 +338,7 @@ export const userMemoryRouter = router({
         throw new TRPCError({
           cause: error,
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to trigger user memory extraction',
+          message: `Failed to trigger user memory extraction: ${causeMessage}`,
         });
       }
 

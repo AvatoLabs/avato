@@ -215,11 +215,13 @@ export class SessionModel {
     type = 'agent',
     session = {},
     config = {},
+    sessionOnly = false,
     slug,
   }: {
     config?: Partial<NewAgent>;
     id?: string;
     session?: Partial<NewSession>;
+    sessionOnly?: boolean;
     slug?: string;
     type: 'agent' | 'group';
   }): Promise<SessionItem> => {
@@ -300,6 +302,7 @@ export class SessionModel {
           tts: tts || {},
           updatedAt: new Date(),
           userId: this.userId,
+          virtual: sessionOnly,
         })
         .returning();
 
@@ -361,7 +364,7 @@ export class SessionModel {
     const { agent, clientId, ...session } = result;
     const sessionId = this.genId();
 
-    const { id: _, slug: __, ...config } = agent;
+    const { id: _a, slug: _s, virtual, ...config } = agent;
 
     return this.create({
       config,
@@ -370,6 +373,7 @@ export class SessionModel {
         ...session,
         title: newTitle || session.title,
       },
+      sessionOnly: Boolean(virtual),
       type: 'agent',
     });
   };

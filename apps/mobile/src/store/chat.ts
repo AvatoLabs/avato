@@ -343,14 +343,29 @@ const syncTopicsForSession = (
   }));
 };
 
-const DEFAULT_TOPIC_TITLES = ['', 'New Conversation', '新对话', '新對話', 'Topics', '话题', '話題'];
+const DEFAULT_TOPIC_TITLES = [
+  '',
+  'New Chat',
+  'New Conversation',
+  'New conversation',
+  '新对话',
+  '新對話',
+  'Topics',
+  '话题',
+  '話題',
+  'Untitled',
+];
 
 const isDefaultTopicTitle = (title?: string | null) => {
   const trimmedTitle = title?.trim() ?? '';
   if (!trimmedTitle) return true;
 
   const { t } = useI18n.getState();
-  return DEFAULT_TOPIC_TITLES.includes(trimmedTitle) || trimmedTitle === t.topicTitle;
+  return (
+    DEFAULT_TOPIC_TITLES.includes(trimmedTitle) ||
+    trimmedTitle === t.topicTitle ||
+    trimmedTitle === t.chatListNewConversation
+  );
 };
 
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>

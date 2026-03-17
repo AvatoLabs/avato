@@ -114,14 +114,45 @@ export const agentGroupRouter = router({
    * The supervisor agent is automatically created as a virtual agent.
    * Returns the groupId and supervisorAgentId.
    */
-  createGroup: agentGroupProcedure.input(InsertChatGroupSchema).mutation(async ({ input, ctx }) => {
-    const { group, supervisorAgentId } = await ctx.agentGroupRepo.createGroupWithSupervisor({
-      ...input,
-      config: ctx.agentGroupService.normalizeGroupConfig(input.config as ChatGroupConfig | null),
-    });
+  createGroup: agentGroupProcedure
+    .input(
+      InsertChatGroupSchema.extend({
+        supervisorConfig: z
+          .object({
+            avatar: z.string().nullish(),
+            backgroundColor: z.string().nullish(),
+            chatConfig: z.any().nullish(),
+            description: z.string().nullish(),
+            model: z.string().nullish(),
+            params: z.any().nullish(),
+            plugins: z.array(z.string()).nullish(),
+            provider: z.string().nullish(),
+            systemRole: z.string().nullish(),
+            tags: z.array(z.string()).nullish(),
+            title: z.string().nullish(),
+          })
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { supervisorConfig: rawSupervisorConfig, ...groupInput } = input;
+      const supervisorConfig = rawSupervisorConfig
+        ? Object.fromEntries(Object.entries(rawSupervisorConfig).filter(([_, v]) => v != null))
+        : undefined;
 
-    return { group, supervisorAgentId };
-  }),
+      const { group, supervisorAgentId } = await ctx.agentGroupRepo.createGroupWithSupervisor(
+        {
+          ...groupInput,
+          config: ctx.agentGroupService.normalizeGroupConfig(
+            groupInput.config as ChatGroupConfig | null,
+          ),
+        },
+        [],
+        (supervisorConfig as any) || undefined,
+      );
+
+      return { group, supervisorAgentId };
+    }),
 
   /**
    * Create a group with virtual member agents in one request.
