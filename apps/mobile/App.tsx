@@ -6,7 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -76,6 +76,24 @@ function AppCrashFallback() {
   );
 }
 
+const syncMobileBootstrapState = async () => {
+  const [sessionsResult, userResult, agentsResult] = await Promise.allSettled([
+    useSessionStore.getState().fetchSessions({ throwOnError: true }),
+    useUserStore.getState().fetchUser({ throwOnError: true }),
+    useAgentStore.getState().loadAgents(),
+  ]);
+
+  if (sessionsResult.status === 'rejected') {
+    console.warn('[App] bootstrap sessions sync failed:', sessionsResult.reason);
+  }
+  if (userResult.status === 'rejected') {
+    console.warn('[App] bootstrap user sync failed:', userResult.reason);
+  }
+  if (agentsResult.status === 'rejected') {
+    console.warn('[App] bootstrap agents sync failed:', agentsResult.reason);
+  }
+};
+
 export default function App() {
   const [isBootReady, setIsBootReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -99,6 +117,19 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [t]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+
+      void syncMobileBootstrapState();
+      useConnectionStore.getState().checkConnection();
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -132,11 +163,7 @@ export default function App() {
         const authConfig = await fetchMobileAuthConfig(baseUrl);
 
         if (authConfig.enableNoAuth) {
-          await Promise.all([
-            useSessionStore.getState().fetchSessions({ throwOnError: true }),
-            useUserStore.getState().fetchUser({ throwOnError: true }),
-            useAgentStore.getState().loadAgents(),
-          ]);
+          await syncMobileBootstrapState();
           void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
             setInitialRoute('MainTabs');
@@ -147,11 +174,7 @@ export default function App() {
         const authSession = authConfig.enableOIDC ? await getValidAuthSession(baseUrl) : null;
 
         if (authSession) {
-          await Promise.all([
-            useSessionStore.getState().fetchSessions({ throwOnError: true }),
-            useUserStore.getState().fetchUser({ throwOnError: true }),
-            useAgentStore.getState().loadAgents(),
-          ]);
+          await syncMobileBootstrapState();
           void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
             setInitialRoute('MainTabs');
@@ -162,7 +185,8 @@ export default function App() {
         if (!isCancelled) {
           setInitialRoute('Login');
         }
-      } catch {
+      } catch (error) {
+        console.warn('[App] bootstrap init failed:', error);
         if (!isCancelled) {
           setInitialRoute('Login');
         }

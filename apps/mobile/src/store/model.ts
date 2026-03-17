@@ -1,10 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import { agentApi, aiProviderApi, sessionApi } from '../lib/api';
+import { agentApi, agentGroupApi, aiProviderApi, sessionApi, userApi } from '../lib/api';
 import { isGroupSessionLike } from '../lib/session';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
-import { useAgentStore } from './agent';
 import { useSessionStore } from './session';
 
 const CACHE_KEY = 'avato_model_cache';
@@ -129,23 +128,53 @@ export const useModelStore = create<ModelState>((set, get) => ({
       }
     }
 
+    if (sessionId && isGroupSession) {
+      try {
+        const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+        const supervisor = groupDetail?.agents?.find(
+          (agent) => agent.id === groupDetail?.supervisorAgentId,
+        );
+
+        if (!model && typeof supervisor?.model === 'string') model = supervisor.model;
+        if (!provider && typeof supervisor?.provider === 'string') provider = supervisor.provider;
+      } catch {
+        /* ignore */
+      }
+    }
+
     if (session) {
       if (!model && session.model) model = session.model;
       if (!provider && session.provider) provider = session.provider;
     }
 
-    // 2. Local Agent fallback (session's agent or default agent)
-    if ((!model || !provider) && !isGroupSession) {
-      const agentStore = useAgentStore.getState();
-      if (!agentStore.initialized) await agentStore.loadAgents();
-      const agent = sessionId
-        ? agentStore.agents.find((a) => a.sessionIds.includes(sessionId)) ||
-          agentStore.getCurrentAgent()
-        : agentStore.getCurrentAgent();
-      if (agent) {
-        if (!model && agent.model) model = agent.model;
-        if (!provider && agent.provider) provider = agent.provider;
+    // 2. Server-side default agent config
+    if (!model || !provider) {
+      try {
+        const userState = await userApi.getState();
+        const defaultConfig = userState?.settings?.defaultAgent?.config;
+
+        if (!model && typeof defaultConfig?.model === 'string') {
+          model = defaultConfig.model;
+        }
+        if (!provider && typeof defaultConfig?.provider === 'string') {
+          provider = defaultConfig.provider;
+        }
+      } catch {
+        /* ignore */
       }
+    }
+
+    // 3. Runtime fallback: use the first enabled provider/model instead of stale local agent state
+    if (!model || !provider) {
+      if (!get().isLoaded || get().providers.length === 0) {
+        await get().fetchModels();
+      }
+
+      const fallbackProvider = get().providers[0];
+      const fallbackModel = fallbackProvider?.children[0];
+
+      if (!provider && fallbackProvider) provider = fallbackProvider.id;
+      if (!model && fallbackModel) model = fallbackModel.id;
     }
 
     set({ selectedModel: model, selectedProvider: provider });
@@ -171,22 +200,6 @@ export const useModelStore = create<ModelState>((set, get) => ({
         }
       } catch {
         /* best-effort */
-      }
-    } else {
-      // Global default: update current agent in local store (create if none)
-      const agentStore = useAgentStore.getState();
-      if (!agentStore.initialized) await agentStore.loadAgents();
-      let current = agentStore.getCurrentAgent();
-      if (!current && agentStore.agents.length === 0) {
-        await agentStore.createAgent({
-          model: modelId,
-          provider: providerId,
-          title: 'Default',
-        });
-        current = agentStore.getCurrentAgent();
-      }
-      if (current) {
-        await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
       }
     }
   },

@@ -26,19 +26,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Image as RNImage,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
-  Modal,
   Platform,
-  Pressable,
-  ScrollView,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -53,13 +49,13 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
-import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import FilePreview from '../components/ui/FilePreview';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble, { type GroupMessageSpeaker } from '../components/ui/MessageBubble';
 import MessageListSkeleton from '../components/ui/MessageListSkeleton';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
+import SkillsSheet from '../components/ui/SkillsSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
@@ -85,7 +81,6 @@ import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
-import { themeColors } from '../theme';
 import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
@@ -98,7 +93,6 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const initialTopicId = route.params?.topicId ?? null;
   const focusMessageId = route.params?.messageId;
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
   const primaryColor = themeColors.primary;
@@ -134,6 +128,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const listRef = useRef<FlashList<ChatMessage>>(null);
   const isScrolledToBottom = useRef(true);
   const lastAutoScrollAt = useRef(0);
+  const hasObservedTopicChange = useRef(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // Skills drawer
@@ -167,6 +162,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     fetchModels();
     loadSelection(sessionId);
   }, [fetchModels, loadSelection, sessionId]);
+
+  useEffect(() => {
+    hasObservedTopicChange.current = false;
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -213,9 +212,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       const state = useChatStore.getState();
       if (state.generating && state.activeStreamingSessionId === sessionId) return;
       const topicId = useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
+      void fetchSessions();
       fetchMessages(sessionId, topicId);
       fetchTopics(sessionId);
-    }, [sessionId, sessionKey, fetchMessages, fetchTopics]),
+    }, [sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics]),
   );
 
   useEffect(() => {
@@ -245,27 +245,43 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [hints.length]);
 
   useEffect(() => {
-    if (!sessionId) return;
-    // Skip during generating to avoid racing with group chat poll loop
-    if (generating) return;
-    fetchMessages(sessionId, activeTopic ?? undefined);
-    fetchTopics(sessionId);
-  }, [sessionId, fetchMessages, fetchTopics, activeTopic, generating]);
+    if (!sessionId || generating) return;
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!sessionId || generating) return;
-      const currentTopic = useTopicStore.getState().activeTopicBySession[sessionKey] ?? null;
-      fetchMessages(sessionId, currentTopic ?? undefined);
-      fetchTopics(sessionId);
-    }, [sessionId, sessionKey, fetchMessages, fetchTopics, generating]),
-  );
+    if (!hasObservedTopicChange.current) {
+      hasObservedTopicChange.current = true;
+      return;
+    }
+
+    fetchMessages(sessionId, activeTopic ?? undefined);
+  }, [sessionId, fetchMessages, activeTopic, generating]);
 
   useEffect(() => {
     if (sessionId) return;
     toast.show('error', t.errorUnknown);
     navigation.goBack();
   }, [navigation, sessionId, t.errorUnknown, toast]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      if (useChatStore.getState().generating && useChatStore.getState().activeStreamingSessionId === sessionId) {
+        return;
+      }
+
+      const topicId = useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
+      void Promise.allSettled([
+        fetchSessions(),
+        fetchTopics(sessionId),
+        fetchMessages(sessionId, topicId, { preserveOnEmpty: true }),
+      ]);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [fetchMessages, fetchSessions, fetchTopics, sessionId, sessionKey]);
 
   useEffect(() => {
     if (!generating) return;
@@ -355,8 +371,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     }));
     setBuiltinSkillItems(preloadBuiltins);
     setLoadingSkills(true);
-    Promise.all([pluginApi.list(), agentSkillApi.list(), userApi.getState()])
-      .then(([plugins, skills, userState]) => {
+
+    const loadSkills = async (attempt = 0) => {
+      const maxAttempts = 2;
+      try {
+        const [plugins, skills, userState] = await Promise.all([
+          pluginApi.list().catch((e) => {
+            if (attempt === 0) console.warn('[ChatDetailScreen] pluginApi.list failed:', e);
+            return [];
+          }),
+          agentSkillApi.list().catch((e) => {
+            if (attempt === 0) console.warn('[ChatDetailScreen] agentSkillApi.list failed:', e);
+            return [];
+          }),
+          userApi.getState().catch(() => null),
+        ]);
         const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
         const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
           (b) => !uninstalled.includes(b.identifier),
@@ -369,9 +398,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         setBuiltinSkillItems(builtins);
 
         const builtinIds = new Set(builtins.map((b) => b.identifier));
-        const filteredSkills = (skills ?? []).filter(
-          (s) => s.identifier && !builtinIds.has(s.identifier),
-        );
+        const filteredSkills = (skills ?? []).filter((s) => {
+          const id = s.identifier ?? s.id;
+          return id && !builtinIds.has(id);
+        });
         setAgentSkillItems(filteredSkills);
 
         const skillIds = new Set(filteredSkills.map((s) => s.identifier).filter(Boolean));
@@ -379,9 +409,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           (p) => !builtinIds.has(p.identifier) && !skillIds.has(p.identifier),
         );
         setInstalledPlugins(filteredPlugins);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingSkills(false));
+      } catch (e) {
+        console.warn('[ChatDetailScreen] loadSkills failed:', e);
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 400));
+          return loadSkills(attempt + 1);
+        }
+      }
+    };
+    void loadSkills().finally(() => setLoadingSkills(false));
   }, [isGroupSession, t]);
 
   const handleTogglePlugin = useCallback(
@@ -1172,142 +1208,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         }}
       />
 
-      {/* Skills Drawer */}
-      <Modal
-        transparent
-        animationType="slide"
+      <SkillsSheet
+        agentConfigOpenStore={t.agentConfigOpenStore}
+        agentSkillItems={agentSkillItems}
+        builtinItems={builtinSkillItems}
+        enabledIdentifiers={enabledPlugins}
+        installedPlugins={installedPlugins}
+        loading={loadingSkills}
+        skillsEmpty={t.skillsEmpty}
+        skillsEmptyDesc={t.skillsEmptyDesc}
+        skillsTitle={t.skillsTitle}
         visible={skillsSheetVisible && !isGroupSession}
-        onRequestClose={() => setSkillsSheetVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSkillsSheetVisible(false)}
-        >
-          <Pressable
-            className="bg-white rounded-t-2xl"
-            style={{ maxHeight: windowHeight * 0.7 }}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-1">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
-              <Text className="text-foreground text-[18px] font-bold tracking-tight">
-                {t.skillsTitle}
-              </Text>
-            </View>
-            <View style={{ maxHeight: 400 }}>
-              <ScrollView className="px-5 pb-8" showsVerticalScrollIndicator={true}>
-                {loadingSkills ? (
-                  <View className="items-center py-10">
-                    <ActivityIndicator color={semanticColors.primary} size="small" />
-                  </View>
-                ) : builtinSkillItems.length === 0 &&
-                  agentSkillItems.length === 0 &&
-                  installedPlugins.length === 0 ? (
-                  <View className="items-center py-10">
-                    <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
-                    <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
-                      {t.skillsEmptyDesc}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {builtinSkillItems.map((item) => (
-                      <View
-                        className="flex-row items-center py-3.5"
-                        key={`builtin-${item.identifier}`}
-                      >
-                        <BuiltinSkillIcon icon={item.icon} size={36} />
-                        <View className="flex-1 ml-3 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {item.title}
-                          </Text>
-                          {item.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {item.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledPlugins.has(item.identifier)}
-                          onValueChange={() => handleTogglePlugin(item.identifier)}
-                        />
-                      </View>
-                    ))}
-                    {agentSkillItems.map((skill) => (
-                      <View className="flex-row items-center py-3.5" key={`skill-${skill.id}`}>
-                        <View className="flex-1 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {skill.name || skill.identifier || skill.id}
-                          </Text>
-                          {skill.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {skill.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledPlugins.has(skill.identifier ?? skill.id)}
-                          onValueChange={() => handleTogglePlugin(skill.identifier ?? skill.id)}
-                        />
-                      </View>
-                    ))}
-                    {installedPlugins.map((plugin) => (
-                      <View className="flex-row items-center py-3.5" key={plugin.identifier}>
-                        <View className="flex-1 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {plugin.manifest?.meta?.title || plugin.identifier}
-                          </Text>
-                          {plugin.manifest?.meta?.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {plugin.manifest.meta.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledPlugins.has(plugin.identifier)}
-                          onValueChange={() => handleTogglePlugin(plugin.identifier)}
-                        />
-                      </View>
-                    ))}
-                  </>
-                )}
-              </ScrollView>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setSkillsSheetVisible(false)}
+        onOpenStore={() => navigation.getParent()?.navigate('MainTabs', { screen: 'Store' })}
+        onToggle={handleTogglePlugin}
+      />
     </View>
   );
 }

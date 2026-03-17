@@ -16,7 +16,7 @@ import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, aiProviderApi, sessionApi } from '../lib/api';
+import { agentApi, agentGroupApi, aiProviderApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
@@ -256,6 +256,20 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         }
       }
       if (sessionId && isGroupSession) {
+        try {
+          const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+          const supervisor = groupDetail?.agents?.find(
+            (agent: { id: string; model?: string; provider?: string }) =>
+              agent.id === groupDetail?.supervisorAgentId,
+          );
+          if (supervisor?.model) {
+            setSelected(supervisor.model);
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+
         const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
         if (session?.model) setSelected(session.model);
         return;
@@ -296,6 +310,17 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       setSelected(modelId);
 
       if (sessionId && isGroupSession) {
+        try {
+          const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+          if (groupDetail?.supervisorAgentId) {
+            await agentApi.updateConfig(groupDetail.supervisorAgentId, {
+              model: modelId,
+              provider: providerId,
+            });
+          }
+        } catch {
+          /* best-effort */
+        }
         useSessionStore
           .getState()
           .updateSessionMeta(sessionId, { model: modelId, provider: providerId });

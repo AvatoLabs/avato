@@ -45,12 +45,14 @@ export const useTopicStore = create<TopicState>((set, get) => ({
         const activeTopic = s.activeTopicBySession[sessionId] ?? null;
         const activeStillExists = activeTopic
           ? nextTopics.some((topic) => topic.id === activeTopic)
-          : true;
+          : false;
+        const nextActiveTopic =
+          activeStillExists ? activeTopic : (nextTopics[0]?.id ?? null);
 
         return {
           activeTopicBySession: {
             ...s.activeTopicBySession,
-            [sessionId]: activeStillExists ? activeTopic : null,
+            [sessionId]: nextActiveTopic,
           },
           loadingBySession: { ...s.loadingBySession, [sessionId]: false },
           topicsBySession: { ...s.topicsBySession, [sessionId]: nextTopics },

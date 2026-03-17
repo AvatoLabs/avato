@@ -330,11 +330,14 @@ const syncTopicsForSession = (
   }
 
   const items = (topics.items ?? []).map((topic) => normalizeTopicItem(topic, sessionId));
+  const currentActiveTopic = useTopicStore.getState().activeTopicBySession[sessionId] ?? null;
+  const nextActiveTopic =
+    activeTopicId ?? currentActiveTopic ?? (items.length > 0 ? items[0].id : null);
 
   useTopicStore.setState((s) => ({
     activeTopicBySession: {
       ...s.activeTopicBySession,
-      [sessionId]: activeTopicId ?? s.activeTopicBySession[sessionId] ?? null,
+      [sessionId]: nextActiveTopic,
     },
     topicsBySession: {
       ...s.topicsBySession,
@@ -376,7 +379,10 @@ const isDefaultSessionTitle = (title?: string | null) => {
 
   const { t } = useI18n.getState();
   return (
-    DEFAULT_SESSION_TITLES.includes(trimmedTitle) || trimmedTitle === t.chatListNewConversation
+    DEFAULT_SESSION_TITLES.includes(trimmedTitle) ||
+    trimmedTitle === t.chatListNewConversation ||
+    trimmedTitle === t.chatListCreateGroup ||
+    trimmedTitle === t.groupCreateDefaultTitle
   );
 };
 
@@ -390,6 +396,17 @@ const extractPersistedMessageIds = (messages: ChatMessage[]) =>
         !id.startsWith('tmp_') &&
         !id.startsWith('user-'),
     );
+
+const buildMessageContainerParams = (
+  sessionId: string,
+  sessionType: 'agent' | 'group',
+) =>
+  sessionType === 'group'
+    ? {
+        groupId: sessionId,
+        sessionId: null,
+      }
+    : { sessionId };
 
 const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null) => {
   if (!topicId) return;
@@ -413,10 +430,19 @@ const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null)
     });
 };
 
-const isGroupAssistantSettled = (message?: ChatMessage) => {
+const isGroupAssistantSettled = (message?: ChatMessage): boolean => {
   if (!message) return false;
+  if (message.role === 'compareGroup') {
+    return message.children?.some((child) => isGroupAssistantSettled(child)) ?? false;
+  }
+  if (message.role === 'compressedGroup') {
+    const compressedContent = message.content?.trim();
+    return !!compressedContent && compressedContent !== GROUP_LOADING_CONTENT;
+  }
   if (message.error) return true;
   if (message.imageList?.length) return true;
+  if (message.tools?.length) return true;
+  if (message.reasoning?.content?.trim()) return true;
 
   const content = message.content?.trim();
   if (!content || content === GROUP_LOADING_CONTENT) {
@@ -460,6 +486,214 @@ const syncGroupMessagesForSession = (
       [sessionId]: mergedMessages,
     },
   }));
+};
+
+type RuntimeAssistantSnapshot = NonNullable<
+  NonNullable<Awaited<ReturnType<typeof aiAgentApi.getOperationStatus>>>['latestAssistant']
+>;
+
+const toRuntimeGroupToolPayloads = (
+  toolCalls?: RuntimeAssistantSnapshot['toolCalls'],
+): ChatToolPayload[] | undefined => {
+  if (!toolCalls?.length) return undefined;
+
+  const payloads = toolCalls
+    .map((toolCall: NonNullable<RuntimeAssistantSnapshot['toolCalls']>[number], index: number) => {
+      const apiName = toolCall.function?.name?.trim();
+      if (!apiName) return null;
+
+      return {
+        apiName,
+        arguments: toolCall.function?.arguments || '{}',
+        id: toolCall.id || `runtime-tool-${Date.now()}-${index}`,
+        identifier: apiName,
+        type: toolCall.type || 'function',
+      } satisfies ChatToolPayload;
+    })
+    .filter(Boolean) as ChatToolPayload[];
+
+  return payloads.length > 0 ? payloads : undefined;
+};
+
+const applyGroupRuntimeAssistantFallback = (
+  sessionId: string,
+  assistantMessageId: string,
+  operationStatus: Awaited<ReturnType<typeof aiAgentApi.getOperationStatus>>,
+) => {
+  const runtimeAssistant = operationStatus?.latestAssistant;
+
+  const content = runtimeAssistant?.content?.trim() || '';
+  const reasoning = runtimeAssistant?.reasoning?.trim() || '';
+  const tools = toRuntimeGroupToolPayloads(runtimeAssistant?.toolCalls);
+  const hasUsableRuntimeAssistant = !!content || !!reasoning || !!tools?.length;
+
+  if (!hasUsableRuntimeAssistant) return;
+
+  useChatStore.setState((state) => {
+    const currentMessages = state.messagesBySession[sessionId] || [];
+    const assistantIndex = currentMessages.findIndex((message) => message.id === assistantMessageId);
+
+    const buildUpdatedAssistant = (message?: ChatMessage): ChatMessage => ({
+      ...(message ?? {
+        content: '',
+        createdAt: new Date().toISOString(),
+        id: assistantMessageId,
+        role: 'assistant' as const,
+        sessionId,
+      }),
+      ...(content ? { content } : message?.content === GROUP_LOADING_CONTENT ? { content: '' } : {}),
+      ...(reasoning ? { reasoning: { content: reasoning } } : {}),
+      ...(tools?.length ? { tools } : {}),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const nextMessages =
+      assistantIndex >= 0
+        ? currentMessages.map((message, index) =>
+            index === assistantIndex ? buildUpdatedAssistant(message) : message,
+          )
+        : [...currentMessages, buildUpdatedAssistant()];
+
+    return {
+      messagesBySession: {
+        ...state.messagesBySession,
+        [sessionId]: nextMessages,
+      },
+    };
+  });
+};
+
+const findSettledGroupAssistant = (
+  messages: ChatMessage[],
+  preferredAssistantId?: string,
+): ChatMessage | undefined => {
+  if (preferredAssistantId) {
+    for (const message of messages) {
+      if (message.id === preferredAssistantId && isGroupAssistantSettled(message)) {
+        return message;
+      }
+
+      if (
+        message.role === 'compareGroup' &&
+        message.children?.some(
+          (child) => child.id === preferredAssistantId && isGroupAssistantSettled(child),
+        )
+      ) {
+        return message;
+      }
+    }
+  }
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      (message.role === 'assistant' ||
+        message.role === 'compareGroup' ||
+        message.role === 'compressedGroup') &&
+      isGroupAssistantSettled(message)
+    ) {
+      return message;
+    }
+  }
+
+  return undefined;
+};
+
+const findGroupAssistantCandidate = (
+  messages: ChatMessage[],
+  preferredAssistantId?: string,
+): ChatMessage | undefined => {
+  if (preferredAssistantId) {
+    const directMatch = messages.find((message) => message.id === preferredAssistantId);
+    if (directMatch) return directMatch;
+
+    const compareGroupParent = messages.find(
+      (message) =>
+        message.role === 'compareGroup' &&
+        message.children?.some((child) => child.id === preferredAssistantId),
+    );
+    if (compareGroupParent) return compareGroupParent;
+  }
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.role === 'assistant' ||
+      message.role === 'compareGroup' ||
+      message.role === 'compressedGroup'
+    ) {
+      return message;
+    }
+  }
+
+  return undefined;
+};
+
+const pruneGroupLoadingPlaceholder = (
+  sessionId: string,
+  placeholderAssistantId: string,
+  settledAssistantId?: string,
+) => {
+  if (!settledAssistantId || settledAssistantId === placeholderAssistantId) return;
+
+  useChatStore.setState((state) => {
+    const currentMessages = state.messagesBySession[sessionId] || [];
+    const placeholderMessage = currentMessages.find(
+      (message) => message.id === placeholderAssistantId,
+    );
+
+    if (!placeholderMessage || isGroupAssistantSettled(placeholderMessage)) {
+      return state;
+    }
+
+    if (placeholderMessage.content?.trim() !== GROUP_LOADING_CONTENT) {
+      return state;
+    }
+
+    return {
+      messagesBySession: {
+        ...state.messagesBySession,
+        [sessionId]: currentMessages.filter((message) => message.id !== placeholderAssistantId),
+      },
+    };
+  });
+};
+
+const rebindGroupPlaceholderMessages = (
+  sessionId: string,
+  placeholderUserId: string,
+  placeholderAssistantId: string,
+  ids: {
+    assistantMessageId?: string;
+    userMessageId?: string;
+  },
+) => {
+  useChatStore.setState((s) => {
+    const currentMessages = s.messagesBySession[sessionId] || [];
+
+    return {
+      messagesBySession: {
+        ...s.messagesBySession,
+        [sessionId]: currentMessages.map((message) => {
+          if (message.id === placeholderUserId && ids.userMessageId) {
+            return {
+              ...message,
+              id: ids.userMessageId,
+            };
+          }
+
+          if (message.id === placeholderAssistantId && ids.assistantMessageId) {
+            return {
+              ...message,
+              id: ids.assistantMessageId,
+            };
+          }
+
+          return message;
+        }),
+      },
+    };
+  });
 };
 
 const buildUserStreamContent = (
@@ -583,8 +817,16 @@ const mergePersistedMessageWithLocal = (
     local.role === 'user' &&
     hasMessageAttachments(local) &&
     !!local.content?.trim();
+  const shouldPreferLocalAssistantContent =
+    persisted.role === 'assistant' &&
+    local.role === 'assistant' &&
+    persisted.content?.trim() === GROUP_LOADING_CONTENT &&
+    !!local.content?.trim() &&
+    local.content.trim() !== GROUP_LOADING_CONTENT;
   const shouldPreferLocalContent =
-    shouldPreferLocalUserCaption || (!persisted.content && !!local.content);
+    shouldPreferLocalUserCaption ||
+    shouldPreferLocalAssistantContent ||
+    (!persisted.content && !!local.content);
 
   return {
     ...persisted,
@@ -639,7 +881,11 @@ interface ChatState {
   /** Session IDs currently fetching messages (for skeleton) */
   fetchingMessagesBySession: Record<string, boolean>;
   // Actions
-  fetchMessages: (sessionId: string, topicId?: string) => Promise<void>;
+  fetchMessages: (
+    sessionId: string,
+    topicId?: string,
+    options?: { preserveOnEmpty?: boolean },
+  ) => Promise<void>;
   /** Whether a message is currently being generated */
   generating: boolean;
   /** Timestamp when generating started, for watchdog timeout */
@@ -726,14 +972,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  fetchMessages: async (sessionId: string, topicId?: string) => {
+  fetchMessages: async (
+    sessionId: string,
+    topicId?: string,
+    options?: { preserveOnEmpty?: boolean },
+  ) => {
     set((s) => ({
       fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: true },
     }));
     try {
       const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
       const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
-      const messages = await messageApi.list(sessionId, topicId, { sessionType });
+      let effectiveTopicId = topicId;
+      let messages =
+        sessionType === 'group'
+          ? await aiAgentApi.getGroupMessages({ groupId: sessionId, topicId: effectiveTopicId })
+          : await messageApi.list(sessionId, effectiveTopicId, { sessionType });
+
+      if (!effectiveTopicId && (!messages || messages.length === 0)) {
+        const knownTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
+        let fallbackTopics = knownTopics;
+
+        if (fallbackTopics.length === 0) {
+          fallbackTopics = await topicApi.list(sessionId, { sessionType }).catch(() => []);
+          if (fallbackTopics.length > 0) {
+            useTopicStore.setState((s) => ({
+              topicsBySession: {
+                ...s.topicsBySession,
+                [sessionId]: fallbackTopics,
+              },
+            }));
+          }
+        }
+
+        const fallbackTopicId = fallbackTopics[0]?.id;
+        if (fallbackTopicId) {
+          effectiveTopicId = fallbackTopicId;
+          useTopicStore.getState().switchTopic(sessionId, fallbackTopicId);
+          messages =
+            sessionType === 'group'
+              ? await aiAgentApi.getGroupMessages({
+                  groupId: sessionId,
+                  topicId: fallbackTopicId,
+                })
+              : await messageApi.list(sessionId, fallbackTopicId, { sessionType });
+        }
+      }
       const { activeStreamingMessageId, activeStreamingSessionId, generating, messagesBySession } =
         get();
 
@@ -753,15 +1037,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesBySession[sessionId] || [],
       );
 
+      const existingCount = (messagesBySession[sessionId] || []).length;
+      const preserveOnEmpty =
+        options?.preserveOnEmpty &&
+        (messages ?? []).length === 0 &&
+        mergedMessages.length === 0 &&
+        existingCount > 0;
+
+      const finalMessages =
+        preserveOnEmpty ? (messagesBySession[sessionId] || []) : mergedMessages;
+      const finalWithLocal =
+        localStreamingMessage &&
+        !finalMessages.some((message) => message.id === localStreamingMessage.id)
+          ? [...finalMessages, localStreamingMessage]
+          : finalMessages;
+
       set((s) => ({
         fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
         messagesBySession: {
           ...s.messagesBySession,
-          [sessionId]:
-            localStreamingMessage &&
-            !mergedMessages.some((message) => message.id === localStreamingMessage.id)
-              ? [...mergedMessages, localStreamingMessage]
-              : mergedMessages,
+          [sessionId]: finalWithLocal,
         },
       }));
     } catch (err) {
@@ -869,6 +1164,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         /* not a group */
       }
     }
+    const sessionType = isGroupSession ? 'group' : 'agent';
+    const messageContainerParams = buildMessageContainerParams(sessionId, sessionType);
+
     let resolvedTopicId =
       topicId ?? useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
     const shouldCreateTopicAfterResponse = !isGroupSession && !resolvedTopicId;
@@ -925,16 +1223,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const resolvedTopicId = result.topicId ?? topicId ?? null;
         syncTopicsForSession(sessionId, result.topics, resolvedTopicId);
-        syncGroupMessagesForSession(sessionId, result.messages, placeholderMessages);
+        if (result.messages?.length) {
+          syncGroupMessagesForSession(sessionId, result.messages, placeholderMessages);
+        } else {
+          rebindGroupPlaceholderMessages(sessionId, userMsg.id, assistantPlaceholderId, {
+            assistantMessageId: result.assistantMessageId,
+            userMessageId: result.userMessageId,
+          });
+        }
 
-        set((s) => ({
+        // Web uses SSE for real-time updates; mobile polls. If initial result.messages is empty
+        // (backend timing), fetch immediately via aiChat.getMessagesAndTopics (same as execGroupAgent).
+        const hasAssistantInResult = result.messages?.some(
+          (m: ChatMessage) => m.id === (result.assistantMessageId ?? assistantPlaceholderId),
+        );
+        if (!hasAssistantInResult && result.assistantMessageId) {
+          await sleep(300);
+          try {
+            const groupMessages = await aiAgentApi.getGroupMessages({
+              groupId: sessionId,
+              topicId: resolvedTopicId ?? undefined,
+            });
+            if (groupMessages?.length > 0) {
+              const placeholder = get().messagesBySession[sessionId] || [];
+              const merged = mergePersistedMessagesWithLocal(groupMessages, placeholder);
+              set((s) => ({
+                messagesBySession: {
+                  ...s.messagesBySession,
+                  [sessionId]: merged,
+                },
+              }));
+            }
+          } catch {
+            await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+              preserveOnEmpty: true,
+            });
+          }
+        }
+
+        set({
           activeOperationId: result.operationId ?? null,
           activeStreamingMessageId: result.assistantMessageId ?? assistantPlaceholderId,
-          messagesBySession: {
-            ...s.messagesBySession,
-            [sessionId]: s.messagesBySession[sessionId] || [],
-          },
-        }));
+        });
 
         if (abortController.signal.aborted) {
           if (result.operationId) {
@@ -946,14 +1276,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (result.success === false) {
-          throw new Error(result.error?.trim() || t.errorSendFailed);
+          const errMsg = result.error?.trim() || t.errorSendFailed;
+          console.warn('[ChatStore] execGroupAgent failed:', { error: result.error, success: result.success });
+          throw new Error(errMsg);
         }
 
         if (!result.operationId) {
-          throw new Error(result.error?.trim() || t.errorSendFailed);
+          const errMsg = result.error?.trim() || t.errorSendFailed;
+          console.warn('[ChatStore] execGroupAgent no operationId:', { result });
+          throw new Error(errMsg);
         }
 
         let didSettle = false;
+        let completionObserved = false;
 
         for (let attempt = 0; attempt < GROUP_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(GROUP_POLL_INTERVAL_MS);
@@ -963,50 +1298,269 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           const operationStatus = result.operationId
             ? await aiAgentApi
-                .getOperationStatus({ operationId: result.operationId })
+                .getOperationStatus({
+                  historyLimit: 10,
+                  includeHistory: true,
+                  operationId: result.operationId,
+                })
                 .catch(() => null)
             : null;
 
-          await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
+          if (operationStatus?.latestAssistant && result.assistantMessageId) {
+            applyGroupRuntimeAssistantFallback(
+              sessionId,
+              result.assistantMessageId,
+              operationStatus,
+            );
+          }
 
-          let assistantMessage = (get().messagesBySession[sessionId] || []).find(
-            (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
+          // Use aiChat.getMessagesAndTopics (same as execGroupAgent) for consistency with web
+          try {
+            const groupMessages = await aiAgentApi.getGroupMessages({
+              groupId: sessionId,
+              topicId: resolvedTopicId ?? undefined,
+            });
+            if (groupMessages?.length > 0) {
+              const local = get().messagesBySession[sessionId] || [];
+              const merged = mergePersistedMessagesWithLocal(groupMessages, local);
+              set((s) => ({
+                messagesBySession: {
+                  ...s.messagesBySession,
+                  [sessionId]: merged,
+                },
+              }));
+            } else {
+              await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+                preserveOnEmpty: true,
+              });
+            }
+          } catch {
+            await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+              preserveOnEmpty: true,
+            });
+          }
+
+          const currentMessages = get().messagesBySession[sessionId] || [];
+          const settledAssistant = findSettledGroupAssistant(
+            currentMessages,
+            result.assistantMessageId ?? assistantPlaceholderId,
           );
+          let assistantMessage =
+            settledAssistant ||
+            currentMessages.find(
+              (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
+            );
 
-          if (isGroupAssistantSettled(assistantMessage)) {
+          if (settledAssistant) {
+            pruneGroupLoadingPlaceholder(
+              sessionId,
+              result.assistantMessageId ?? assistantPlaceholderId,
+              settledAssistant.id,
+            );
             triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+            const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+            if (sess && isDefaultSessionTitle(sess.title)) {
+              sessionApi
+                .generateTitle(sessionId)
+                .then((newTitle) => {
+                  if (newTitle) {
+                    useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                    useSessionStore.getState().fetchSessions();
+                  }
+                })
+                .catch((err) => {
+                  console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                });
+            }
             didSettle = true;
             break;
           }
 
           if (operationStatus?.hasError || operationStatus?.currentState?.status === 'error') {
-            throw new Error(getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed);
+            const errMsg = getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed;
+            console.warn('[ChatStore] group operation error:', {
+              hasError: operationStatus?.hasError,
+              status: operationStatus?.currentState?.status,
+              error: operationStatus?.currentState?.error,
+            });
+            throw new Error(errMsg);
           }
 
           if (operationStatus?.isCompleted) {
-            await sleep(250);
-            await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
+            completionObserved = true;
+            const targetAssistantId = result.assistantMessageId ?? assistantPlaceholderId;
+            const COMPLETED_FETCH_RETRIES = 5;
+            const COMPLETED_FETCH_DELAY_MS = 600;
+            // Give backend time to persist assistant message before first fetch
+            await sleep(400);
 
-            assistantMessage = (get().messagesBySession[sessionId] || []).find(
-              (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
-            );
+            for (let fetchAttempt = 0; fetchAttempt <= COMPLETED_FETCH_RETRIES; fetchAttempt += 1) {
+              if (fetchAttempt > 0) await sleep(COMPLETED_FETCH_DELAY_MS);
+              // Use aiChat.getMessagesAndTopics (same as execGroupAgent) for consistency with web
+              try {
+                const groupMessages = await aiAgentApi.getGroupMessages({
+                  groupId: sessionId,
+                  topicId: resolvedTopicId ?? undefined,
+                });
+                if (groupMessages?.length > 0) {
+                  const local = get().messagesBySession[sessionId] || [];
+                  const merged = mergePersistedMessagesWithLocal(groupMessages, local);
+                  set((s) => ({
+                    messagesBySession: {
+                      ...s.messagesBySession,
+                      [sessionId]: merged,
+                    },
+                  }));
+                } else {
+                  await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+                    preserveOnEmpty: true,
+                  });
+                }
+              } catch {
+                await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+                  preserveOnEmpty: true,
+                });
+              }
 
-            if (isGroupAssistantSettled(assistantMessage)) {
-              triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-              didSettle = true;
-              break;
+              const iterationMessages = get().messagesBySession[sessionId] || [];
+              let settledAssistant = findSettledGroupAssistant(
+                iterationMessages,
+                targetAssistantId,
+              );
+              assistantMessage =
+                settledAssistant || findGroupAssistantCandidate(iterationMessages, targetAssistantId);
+
+              if (!settledAssistant && operationStatus?.latestAssistant) {
+                applyGroupRuntimeAssistantFallback(sessionId, targetAssistantId, operationStatus);
+                const fallbackMessages = get().messagesBySession[sessionId] || [];
+                settledAssistant = findSettledGroupAssistant(fallbackMessages, targetAssistantId);
+                assistantMessage =
+                  settledAssistant ||
+                  fallbackMessages.find((message) => message.id === targetAssistantId);
+              }
+
+              if (settledAssistant) {
+                pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, settledAssistant.id);
+                triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+                const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+                if (sess && isDefaultSessionTitle(sess.title)) {
+                  sessionApi
+                    .generateTitle(sessionId)
+                    .then((newTitle) => {
+                      if (newTitle) {
+                        useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                        useSessionStore.getState().fetchSessions();
+                      }
+                    })
+                    .catch((err) => {
+                      console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                    });
+                }
+                didSettle = true;
+                break;
+              }
             }
 
-            const assistantError =
-              typeof assistantMessage?.error === 'string' ? assistantMessage.error : '';
+              if (!didSettle && resolvedTopicId) {
+              // Fallback: try fetching without topicId (message might be in group root)
+              await sleep(300);
+              try {
+                const groupMessages = await aiAgentApi.getGroupMessages({
+                  groupId: sessionId,
+                  topicId: undefined,
+                });
+                if (groupMessages?.length > 0) {
+                  const local = get().messagesBySession[sessionId] || [];
+                  const merged = mergePersistedMessagesWithLocal(groupMessages, local);
+                  set((s) => ({
+                    messagesBySession: {
+                      ...s.messagesBySession,
+                      [sessionId]: merged,
+                    },
+                  }));
+                }
+              } catch {
+                await get().fetchMessages(sessionId, undefined, { preserveOnEmpty: true });
+              }
+              const fallbackMessages = get().messagesBySession[sessionId] || [];
+              let settledAssistant = findSettledGroupAssistant(fallbackMessages, targetAssistantId);
+              assistantMessage =
+                settledAssistant || findGroupAssistantCandidate(fallbackMessages, targetAssistantId);
+              if (!settledAssistant && operationStatus?.latestAssistant) {
+                applyGroupRuntimeAssistantFallback(sessionId, targetAssistantId, operationStatus);
+                const runtimeMessages = get().messagesBySession[sessionId] || [];
+                settledAssistant = findSettledGroupAssistant(runtimeMessages, targetAssistantId);
+                assistantMessage =
+                  settledAssistant || runtimeMessages.find((m) => m.id === targetAssistantId);
+              }
+              if (settledAssistant) {
+                pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, settledAssistant.id);
+                didSettle = true;
+              }
+            }
 
-            throw new Error(
-              assistantError || getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed,
-            );
+            if (!didSettle) {
+              const assistantError =
+                typeof assistantMessage?.error === 'string' ? assistantMessage.error : '';
+
+              const errMsg = assistantError || getGroupOperationErrorMessage(operationStatus);
+              console.warn('[ChatStore] group completed but assistant not settled:', {
+                attempt,
+                assistantMessageId: targetAssistantId,
+                hasAssistant: !!assistantMessage,
+                assistantContent: assistantMessage?.content?.slice(0, 50),
+                assistantError: assistantMessage?.error,
+                messageIds: (get().messagesBySession[sessionId] || []).map((m) => m.id),
+              });
+
+              if (!errMsg && completionObserved) {
+                triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+                const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+                if (sess && isDefaultSessionTitle(sess.title)) {
+                  void sessionApi.generateTitle(sessionId).then((newTitle) => {
+                    if (newTitle) {
+                      useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                    }
+                  });
+                }
+
+                setTimeout(() => {
+                  void Promise.allSettled([
+                    get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+                      preserveOnEmpty: true,
+                    }),
+                    useSessionStore.getState().fetchSessions(),
+                  ]);
+                }, 1200);
+
+                setTimeout(() => {
+                  void Promise.allSettled([
+                    get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+                      preserveOnEmpty: true,
+                    }),
+                    useSessionStore.getState().fetchSessions(),
+                  ]);
+                }, 1500);
+
+                didSettle = true;
+                break;
+              }
+              if (errMsg) {
+                throw new Error(errMsg);
+              }
+
+              continue;
+            }
+            if (didSettle) break;
           }
         }
 
         if (!didSettle) {
+          console.warn('[ChatStore] group poll exhausted:', {
+            attempts: GROUP_POLL_MAX_ATTEMPTS,
+            completionObserved,
+            assistantMessageId: result.assistantMessageId ?? assistantPlaceholderId,
+          });
           throw new Error(t.errorSendFailed);
         }
 
@@ -1016,9 +1570,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return true;
         }
 
-        console.warn('[ChatStore] group send error:', err);
+        const rawMessage = err instanceof Error ? err.message : String(err);
+        console.warn('[ChatStore] group send error:', rawMessage, err);
         const t = useI18n.getState().t;
-        const rawMessage = err instanceof Error ? err.message : '';
         const errorMessage = rawMessage || t.errorSendFailed;
         useToast.getState().show('error', errorMessage);
 
@@ -1060,7 +1614,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     let userMessageServerId: string | undefined;
     try {
       const result = await messageApi.create({
-        sessionId,
+        ...messageContainerParams,
         content: displayContent,
         ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
         role: 'user',
@@ -1390,7 +1944,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       );
       try {
         const persistedAssistant = await messageApi.create({
-          sessionId,
+          ...messageContainerParams,
           content: result.text,
           role: 'assistant',
           model: chatOptions.model,
@@ -1551,11 +2105,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (get().generating) return;
 
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    if (isGroupSessionLike(sessionId, session?.type)) {
+    const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
+    if (sessionType === 'group') {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorUnknown);
       return;
     }
+    const messageContainerParams = buildMessageContainerParams(sessionId, sessionType);
 
     const messages = get().messagesBySession[sessionId] || [];
     const targetIdx = messages.findIndex((m) => m.id === messageId);
@@ -1870,7 +2426,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       );
       try {
         const persistedAssistant = await messageApi.create({
-          sessionId,
+          ...messageContainerParams,
           content: result.text,
           ...(result.images ? { imageList: result.images } : {}),
           role: 'assistant',

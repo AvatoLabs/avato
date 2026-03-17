@@ -18,6 +18,7 @@ const DEFAULT_SESSION_TITLES = [
   'New Chat',
   'New Conversation',
   'New conversation',
+  'New Group Chat',
   '新对话',
   '新對話',
   'Untitled',
@@ -196,19 +197,40 @@ export const sessionRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { sessionId } = input;
       const session = await ctx.sessionModel.findByIdOrSlug(sessionId);
-      if (!session) return null;
+      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
+      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
+
+      if (!session) {
+        if (!sessionId.startsWith('cg_')) return null;
+
+        const chatGroupModel = new ChatGroupModel(ctx.serverDB, ctx.userId);
+        const group = await chatGroupModel.findById(sessionId);
+        if (!group) return null;
+
+        if (!isDefaultSessionTitle(group.title)) {
+          return group.title;
+        }
+
+        const messages = await messageModel.query({ groupId: sessionId });
+        const titleContext = pickLatestSessionTitleContext(messages);
+        if (!titleContext) return null;
+
+        const title = await systemAgent.generateTopicTitle(titleContext);
+        if (!title) return null;
+
+        await chatGroupModel.update(sessionId, { title });
+        return title;
+      }
 
       const effectiveTitle = (session as any).title ?? (session as any).agent?.title ?? '';
       if (!isDefaultSessionTitle(effectiveTitle)) {
         return effectiveTitle;
       }
 
-      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const messages = await messageModel.queryBySessionId(sessionId);
       const titleContext = pickLatestSessionTitleContext(messages);
       if (!titleContext) return null;
 
-      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
       const title = await systemAgent.generateTopicTitle(titleContext);
       if (!title) return null;
 

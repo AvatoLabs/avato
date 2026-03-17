@@ -44,6 +44,14 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import {
+  ALL_CATEGORY_KEY,
+  BUILTIN_DEFAULT_CATEGORY,
+  FALLBACK_MCP_CATEGORY_KEYS,
+  FALLBACK_SKILL_CATEGORY_KEYS,
+  getCategoryLabel,
+  normalizeCategoryKey,
+} from '../constants/storeCategories';
+import {
   agentSkillApi,
   fileApi,
   type MarketCategoryItem,
@@ -62,7 +70,6 @@ type ExploreSource = 'mcp' | 'skill';
 type StoreTab = 'explore' | 'installed';
 
 const MARKET_PAGE_SIZE = 21;
-const ALL_CATEGORY_KEY = 'all';
 
 interface StoreInstalledItem {
   avatar?: string;
@@ -106,118 +113,48 @@ const getSkillDescription = (skill: AgentSkillItem) => {
   return skill.description || manifest?.meta?.description || manifest?.description;
 };
 
-const getSkillCategory = (skill: AgentSkillItem) => {
+const getSkillCategoryRaw = (skill: AgentSkillItem) => {
   const manifest = skill.manifest as Record<string, any> | undefined;
   return manifest?.meta?.category || manifest?.category;
 };
 
-const CATEGORY_LABELS: Record<string, Partial<Record<Locale, string>>> = {
-  [ALL_CATEGORY_KEY]: { 'en-US': 'All', 'zh-CN': '全部', 'zh-TW': '全部' },
-  'business': { 'en-US': 'Business', 'zh-CN': '商业', 'zh-TW': '商業' },
-  'agent-to-agent-protocols': {
-    'en-US': 'Agent-to-Agent',
-    'zh-CN': 'Agent 协议',
-    'zh-TW': 'Agent 協議',
-  },
-  'ai-llms': { 'en-US': 'AI & LLMs', 'zh-CN': 'AI 与 LLM', 'zh-TW': 'AI 與 LLM' },
-  'apple-apps-services': {
-    'en-US': 'Apple Apps',
-    'zh-CN': 'Apple 应用',
-    'zh-TW': 'Apple 應用',
-  },
-  'browser-automation': {
-    'en-US': 'Browser & Automation',
-    'zh-CN': '浏览器与自动化',
-    'zh-TW': '瀏覽器與自動化',
-  },
-  'calendar-scheduling': {
-    'en-US': 'Calendar',
-    'zh-CN': '日历与日程',
-    'zh-TW': '日曆與排程',
-  },
-  'clawdbot-tools': { 'en-US': 'Clawdbot', 'zh-CN': 'Clawdbot', 'zh-TW': 'Clawdbot' },
-  'cli-utilities': { 'en-US': 'CLI', 'zh-CN': '命令行', 'zh-TW': '命令列' },
-  'coding-agents-ides': { 'en-US': 'Coding', 'zh-CN': '编程', 'zh-TW': '程式開發' },
-  'communication': { 'en-US': 'Communication', 'zh-CN': '沟通协作', 'zh-TW': '溝通協作' },
-  'data-analytics': { 'en-US': 'Data', 'zh-CN': '数据分析', 'zh-TW': '資料分析' },
-  'developer': { 'en-US': 'Developer', 'zh-CN': '开发者', 'zh-TW': '開發者' },
-  'devops-cloud': { 'en-US': 'DevOps & Cloud', 'zh-CN': 'DevOps 与云', 'zh-TW': 'DevOps 與雲' },
-  'finance': { 'en-US': 'Finance', 'zh-CN': '金融', 'zh-TW': '金融' },
-  'gaming-entertainment': { 'en-US': 'Gaming', 'zh-CN': '游戏娱乐', 'zh-TW': '遊戲娛樂' },
-  'gaming': { 'en-US': 'Gaming', 'zh-CN': '游戏', 'zh-TW': '遊戲' },
-  'git-github': { 'en-US': 'Git & GitHub', 'zh-CN': 'Git 与 GitHub', 'zh-TW': 'Git 與 GitHub' },
-  'health-fitness': { 'en-US': 'Health', 'zh-CN': '健康健身', 'zh-TW': '健康健身' },
-  'health-wellness': { 'en-US': 'Health', 'zh-CN': '健康', 'zh-TW': '健康' },
-  'image-video-generation': {
-    'en-US': 'Image & Video',
-    'zh-CN': '图像与视频',
-    'zh-TW': '圖像與影片',
-  },
-  'ios-macos-development': {
-    'en-US': 'iOS & macOS',
-    'zh-CN': 'iOS 与 macOS',
-    'zh-TW': 'iOS 與 macOS',
-  },
-  'lifestyle': { 'en-US': 'Lifestyle', 'zh-CN': '生活方式', 'zh-TW': '生活方式' },
-  'marketing-sales': { 'en-US': 'Marketing', 'zh-CN': '营销销售', 'zh-TW': '行銷銷售' },
-  'media-generate': { 'en-US': 'Media', 'zh-CN': '媒体生成', 'zh-TW': '媒體生成' },
-  'media-streaming': { 'en-US': 'Media', 'zh-CN': '媒体串流', 'zh-TW': '媒體串流' },
-  'moltbook': { 'en-US': 'Moltbook', 'zh-CN': 'Moltbook', 'zh-TW': 'Moltbook' },
-  'news': { 'en-US': 'News', 'zh-CN': '新闻', 'zh-TW': '新聞' },
-  'notes-pkm': { 'en-US': 'Notes', 'zh-CN': '笔记知识库', 'zh-TW': '筆記知識庫' },
-  'pdf-documents': { 'en-US': 'PDF & Docs', 'zh-CN': 'PDF 与文档', 'zh-TW': 'PDF 與文件' },
-  'productivity': { 'en-US': 'Productivity', 'zh-CN': '效率工具', 'zh-TW': '效率工具' },
-  'productivity-tasks': { 'en-US': 'Tasks', 'zh-CN': '任务效率', 'zh-TW': '任務效率' },
-  'science-education': { 'en-US': 'Education', 'zh-CN': '科学教育', 'zh-TW': '科學教育' },
-  'search-research': { 'en-US': 'Search', 'zh-CN': '搜索研究', 'zh-TW': '搜尋研究' },
-  'security-passwords': { 'en-US': 'Security', 'zh-CN': '安全密码', 'zh-TW': '安全密碼' },
-  'self-hosted-automation': {
-    'en-US': 'Self-Hosted',
-    'zh-CN': '自托管自动化',
-    'zh-TW': '自託管自動化',
-  },
-  'shopping': { 'en-US': 'Shopping', 'zh-CN': '购物', 'zh-TW': '購物' },
-  'shopping-ecommerce': { 'en-US': 'Shopping', 'zh-CN': '电商购物', 'zh-TW': '電商購物' },
-  'smart-home-iot': { 'en-US': 'Smart Home', 'zh-CN': '智能家居', 'zh-TW': '智慧家庭' },
-  'social': { 'en-US': 'Social', 'zh-CN': '社交', 'zh-TW': '社交' },
-  'speech-transcription': { 'en-US': 'Speech', 'zh-CN': '语音转写', 'zh-TW': '語音轉寫' },
-  'stocks-finance': { 'en-US': 'Stocks', 'zh-CN': '股票金融', 'zh-TW': '股票金融' },
-  'tools': { 'en-US': 'Tools', 'zh-CN': '工具', 'zh-TW': '工具' },
-  'transportation': { 'en-US': 'Transport', 'zh-CN': '交通出行', 'zh-TW': '交通出行' },
-  'travel-transport': { 'en-US': 'Travel', 'zh-CN': '旅行交通', 'zh-TW': '旅行交通' },
-  'web-frontend-development': {
-    'en-US': 'Web & Frontend',
-    'zh-CN': 'Web 前端',
-    'zh-TW': 'Web 前端',
-  },
-  'web-search': { 'en-US': 'Web Search', 'zh-CN': '网络搜索', 'zh-TW': '網路搜尋' },
-  'weather': { 'en-US': 'Weather', 'zh-CN': '天气', 'zh-TW': '天氣' },
+/** Normalized category for builtin skill filtering (aligns with API keys) */
+const getSkillCategoryForFilter = (skill: AgentSkillItem): string | undefined => {
+  const raw = getSkillCategoryRaw(skill);
+  const withDefault = raw || BUILTIN_DEFAULT_CATEGORY[skill.identifier || skill.id];
+  return normalizeCategoryKey(withDefault, FALLBACK_SKILL_CATEGORY_KEYS);
 };
 
-const SPECIAL_CATEGORY_PARTS: Record<string, string> = {
-  ai: 'AI',
-  cli: 'CLI',
-  devops: 'DevOps',
-  github: 'GitHub',
-  ide: 'IDE',
-  ides: 'IDEs',
-  ios: 'iOS',
-  llms: 'LLMs',
-  macos: 'macOS',
-  mcp: 'MCP',
-  pkm: 'PKM',
+/** Format large counts for display (e.g. 12345 → "1.2万" / "12.3k") */
+const formatCount = (n: number, locale: Locale): string => {
+  if (n >= 10000) {
+    const wan = n / 10000;
+    if (locale.startsWith('zh')) {
+      return wan >= 10 ? `${Math.floor(wan)}万` : wan % 1 === 0 ? `${wan}万` : `${wan.toFixed(1)}万`;
+    }
+    return `${(n / 1000).toFixed(1)}k`;
+  }
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
 };
 
-const humanizeCategoryKey = (key: string) =>
-  key
-    .split('-')
-    .map(
-      (part) => SPECIAL_CATEGORY_PARTS[part] || `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`,
-    )
-    .join(' ');
-
-const getCategoryLabel = (category: string, locale: Locale) =>
-  CATEGORY_LABELS[category]?.[locale] || humanizeCategoryKey(category);
+const deriveCategoriesFromItems = (
+  items: MarketListItem[],
+  source: ExploreSource,
+): MarketCategoryItem[] => {
+  const validKeys =
+    source === 'mcp' ? [...FALLBACK_MCP_CATEGORY_KEYS] : [...FALLBACK_SKILL_CATEGORY_KEYS];
+  const countByCategory = new Map<string, number>();
+  for (const item of items) {
+    const raw = item.category?.trim();
+    if (!raw) continue;
+    const cat = normalizeCategoryKey(raw, validKeys) || raw;
+    countByCategory.set(cat, (countByCategory.get(cat) ?? 0) + 1);
+  }
+  return Array.from(countByCategory.entries())
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
+};
 
 const buildCategoryOptions = (
   categories: MarketCategoryItem[],
@@ -278,6 +215,7 @@ const buildBuiltinMarketItem = (skill: AgentSkillItem): MarketListItem => ({
   _source: 'builtin',
   author: 'LobeHub',
   avatar: getSkillAvatar(skill),
+  category: getSkillCategoryForFilter(skill) || getSkillCategoryRaw(skill),
   description: getSkillDescription(skill),
   identifier: skill.identifier || skill.id,
   name: skill.name,
@@ -1249,6 +1187,8 @@ export default function StoreScreen() {
 
   const [marketItems, setMarketItems] = useState<MarketListItem[]>([]);
   const [marketCategories, setMarketCategories] = useState<MarketCategoryItem[]>([]);
+  const [marketMcpTotal, setMarketMcpTotal] = useState(0);
+  const [marketSkillTotal, setMarketSkillTotal] = useState(0);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
@@ -1320,9 +1260,10 @@ export default function StoreScreen() {
 
     return builtinSkillsCatalog
       .filter((skill) => {
-        const category = getSkillCategory(skill);
+        const category = getSkillCategoryForFilter(skill);
         const matchesCategory =
-          activeExploreCategory === ALL_CATEGORY_KEY || category === activeExploreCategory;
+          activeExploreCategory === ALL_CATEGORY_KEY ||
+          (category != null && category === activeExploreCategory);
 
         return (
           matchesCategory &&
@@ -1355,16 +1296,48 @@ export default function StoreScreen() {
     [fetchInstalled, uninstalledBuiltinTools],
   );
 
-  const fetchMarketCategories = useCallback(async (source: ExploreSource) => {
+  const fetchCategories = useCallback(async (source: ExploreSource) => {
     try {
-      const categories =
+      const list =
         source === 'mcp'
           ? await marketSkillApi.getMcpCategories()
           : await marketSkillApi.getCategories();
-
-      setMarketCategories(Array.isArray(categories) ? categories : []);
+      const items = Array.isArray(list) ? list : [];
+      if (items.length > 0) {
+        setMarketCategories(items);
+        return;
+      }
+      // API returned empty: use fixed fallback so user can still browse by category
+      const fallbackKeys =
+        source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
+      setMarketCategories(
+        fallbackKeys
+          .filter((k) => k !== ALL_CATEGORY_KEY)
+          .map((category) => ({ category, count: undefined })),
+      );
     } catch {
-      setMarketCategories([]);
+      // API failed: use fixed fallback so user can still browse by category
+      const fallbackKeys =
+        source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
+      setMarketCategories(
+        fallbackKeys
+          .filter((k) => k !== ALL_CATEGORY_KEY)
+          .map((category) => ({ category, count: undefined })),
+      );
+    }
+  }, []);
+
+  const fetchExploreTotals = useCallback(async () => {
+    try {
+      const [mcpResult, skillResult] = await Promise.all([
+        marketSkillApi.getMcpList({ page: 1, pageSize: 1 }),
+        marketSkillApi.getSkillList({ page: 1, pageSize: 1 }),
+      ]);
+
+      setMarketMcpTotal(mcpResult.totalCount ?? 0);
+      setMarketSkillTotal(skillResult.totalCount ?? 0);
+    } catch {
+      // Keep existing counts if totals cannot be refreshed.
     }
   }, []);
 
@@ -1395,28 +1368,19 @@ export default function StoreScreen() {
                 q: debouncedQuery || undefined,
               });
 
-        let remoteItems = result.items || [];
+        const remoteItems = result.items || [];
+        if (source === 'mcp') setMarketMcpTotal(result.totalCount ?? 0);
+        if (source === 'skill') setMarketSkillTotal(result.totalCount ?? 0);
 
-        // Fallback: when category filter returns empty but "all" has data, fetch without category
-        // and filter client-side (market API may expect different category format)
-        if (!append && page === 1 && categoryParam && remoteItems.length === 0 && !debouncedQuery) {
-          const allResult =
-            source === 'mcp'
-              ? await marketSkillApi.getMcpList({
-                  page: 1,
-                  pageSize: 200,
-                  q: undefined,
-                })
-              : await marketSkillApi.getSkillList({
-                  page: 1,
-                  pageSize: 200,
-                  q: undefined,
-                });
-          const allItems = allResult.items || [];
-          remoteItems = allItems.filter(
-            (item) =>
-              item.category?.toLowerCase() === categoryParam.toLowerCase() ||
-              item.category === categoryParam,
+        // Fallback: when categories API failed, derive from "all" items
+        if (
+          !append &&
+          page === 1 &&
+          !categoryParam &&
+          remoteItems.length > 0
+        ) {
+          setMarketCategories((prev) =>
+            prev.length === 0 ? deriveCategoriesFromItems(remoteItems, source) : prev,
           );
         }
 
@@ -1445,10 +1409,16 @@ export default function StoreScreen() {
     void fetchInstalled();
   }, [fetchInstalled]);
 
+  // Fetch categories from API when switching explore source (MCP/Skills)
   useEffect(() => {
     if (activeTab !== 'explore') return;
-    void fetchMarketCategories(activeExploreSource);
-  }, [activeExploreSource, activeTab, fetchMarketCategories]);
+    void fetchCategories(activeExploreSource);
+  }, [activeTab, activeExploreSource, fetchCategories]);
+
+  useEffect(() => {
+    if (activeTab !== 'explore') return;
+    void fetchExploreTotals();
+  }, [activeTab, fetchExploreTotals]);
 
   // Split to avoid loop: fetchMarket depends on builtinMarketItems, which changes when
   // fetchInstalled updates builtinSkillsCatalog — that would retrigger fetchInstalled on installed tab
@@ -1810,7 +1780,7 @@ export default function StoreScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        rightElement={<Plus color={semanticColors.primary} size={20} strokeWidth={2} />}
+        rightElement={<Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.tabStore}
         titleIcon={
           <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
@@ -1879,15 +1849,19 @@ export default function StoreScreen() {
             >
               {exploreSources.map((source) => {
                 const active = activeExploreSource === source.key;
+                const total =
+                  source.key === 'mcp' ? marketMcpTotal : marketSkillTotal;
+                const countStr = total > 0 ? ` ${formatCount(total, locale)}` : '';
                 return (
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    className="rounded-full px-3.5 py-1.5"
+                    className="rounded-full px-4 py-1.5"
                     key={source.key}
                     style={{
                       backgroundColor: active
                         ? 'rgba(0, 122, 255, 0.1)'
                         : semanticColors.fillTertiary,
+                      minWidth: 72,
                     }}
                     onPress={() => {
                       haptics.selection();
@@ -1897,9 +1871,12 @@ export default function StoreScreen() {
                   >
                     <Text
                       className="text-[12px] font-semibold"
-                      style={{ color: active ? semanticColors.primary : semanticColors.muted }}
+                      style={{
+                        color: active ? semanticColors.primary : semanticColors.muted,
+                        flexShrink: 0,
+                      }}
                     >
-                      {source.label}
+                      {source.label}{countStr}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1914,15 +1891,20 @@ export default function StoreScreen() {
             >
               {categoryOptions.map((category) => {
                 const active = activeExploreCategory === category.key;
+                const countStr =
+                  category.count != null && category.count > 0
+                    ? ` ${formatCount(category.count, locale)}`
+                    : '';
                 return (
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    className="rounded-full px-3.5 py-1.5"
+                    className="rounded-full px-4 py-1.5"
                     key={`${activeExploreSource}-${category.key}`}
                     style={{
                       backgroundColor: active
                         ? 'rgba(0, 122, 255, 0.12)'
                         : semanticColors.fillTertiary,
+                      minWidth: 72,
                     }}
                     onPress={() => {
                       haptics.selection();
@@ -1933,10 +1915,10 @@ export default function StoreScreen() {
                       className="text-[12px] font-semibold"
                       style={{
                         color: active ? semanticColors.primary : semanticColors.muted,
+                        flexShrink: 0,
                       }}
                     >
-                      {category.label}
-                      {category.count ? ` ${category.count}` : ''}
+                      {category.label}{countStr}
                     </Text>
                   </TouchableOpacity>
                 );

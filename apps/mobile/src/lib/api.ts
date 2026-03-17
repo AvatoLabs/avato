@@ -289,7 +289,7 @@ const normalizeMessageContent = (content: unknown) => {
   };
 };
 
-const normalizeMessage = (message: any): ChatMessage => {
+const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage => {
   const normalizedContent = normalizeMessageContent(message?.content);
   const baseMetadata = message?.metadata as ChatMessageMetadata | undefined;
   const derivedMetadata = normalizedContent.metadata as ChatMessageMetadata | undefined;
@@ -301,8 +301,14 @@ const normalizeMessage = (message: any): ChatMessage => {
         } as ChatMessageMetadata)
       : null;
 
+  const sessionId = String(message?.sessionId ?? parentSessionId ?? '');
+  const children = Array.isArray(message?.children)
+    ? (message.children as any[]).map((child) => normalizeMessage(child, sessionId))
+    : undefined;
+
   return {
     agentId: message?.agentId ?? message?.agent_id ?? undefined,
+    ...(children?.length ? { children } : {}),
     content: normalizedContent.content,
     createdAt: toIsoString(message?.createdAt),
     error: message?.error ?? null,
@@ -324,7 +330,7 @@ const normalizeMessage = (message: any): ChatMessage => {
     reasoning: message?.reasoning ?? null,
     role: message?.role,
     search: (message?.search as GroundingSearch | null | undefined) ?? null,
-    sessionId: String(message?.sessionId ?? ''),
+    sessionId,
     toolCallId: message?.tool_call_id ?? undefined,
     tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
     traceId: message?.traceId ?? message?.trace_id ?? undefined,
@@ -333,8 +339,13 @@ const normalizeMessage = (message: any): ChatMessage => {
   };
 };
 
-const normalizeMessages = (messages: any[] | undefined | null): ChatMessage[] =>
-  Array.isArray(messages) ? messages.map((message) => normalizeMessage(message)) : [];
+const normalizeMessages = (
+  messages: any[] | undefined | null,
+  parentSessionId?: string,
+): ChatMessage[] =>
+  Array.isArray(messages)
+    ? messages.map((message) => normalizeMessage(message, parentSessionId))
+    : [];
 
 interface MobileToolFunction {
   arguments?: string;
@@ -564,6 +575,58 @@ async function trpcMutate<T = any>(procedure: string, input?: unknown): Promise<
   return requestTrpc<T>({ action: 'mutation', input, procedure });
 }
 
+const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) => {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+
+  return '';
+};
+
+const DEFAULT_SESSION_TITLES = new Set([
+  '',
+  'New Chat',
+  'New Conversation',
+  'New conversation',
+  '新对话',
+  '新對話',
+  'Untitled',
+]);
+
+const isDefaultSessionTitle = (value?: string | null) =>
+  DEFAULT_SESSION_TITLES.has((value ?? '').trim());
+
+const resolveDisplaySessionTitle = (
+  metaTitle?: string | null,
+  configTitle?: string | null,
+  sessionTitle?: string | null,
+) => {
+  const normalizedMetaTitle = pickFirstNonEmptyString(metaTitle);
+  const normalizedConfigTitle = pickFirstNonEmptyString(configTitle);
+  const normalizedSessionTitle = pickFirstNonEmptyString(sessionTitle);
+
+  if (normalizedConfigTitle && isDefaultSessionTitle(normalizedMetaTitle)) {
+    return normalizedConfigTitle;
+  }
+
+  if (
+    normalizedSessionTitle &&
+    isDefaultSessionTitle(normalizedMetaTitle) &&
+    isDefaultSessionTitle(normalizedConfigTitle)
+  ) {
+    return normalizedSessionTitle;
+  }
+
+  return pickFirstNonEmptyString(
+    normalizedMetaTitle,
+    normalizedConfigTitle,
+    normalizedSessionTitle,
+  );
+};
+
 // ── Agent API ───────────────────────────────────────────────────────
 export interface AgentQueryItem {
   avatar?: string | null;
@@ -606,9 +669,13 @@ export const sessionApi = {
     return (result?.sessions ?? []).map((s) => ({
       ...s,
       agentId: s.config?.id ?? undefined,
-      title: s.meta?.title ?? s.title ?? '',
-      description: s.meta?.description ?? s.description,
-      avatar: s.meta?.avatar ?? s.avatar,
+      title: resolveDisplaySessionTitle(s.meta?.title, s.config?.title, s.title),
+      description:
+        pickFirstNonEmptyString(
+          pickFirstNonEmptyString(s.meta?.description, s.config?.description),
+          s.description,
+        ) || undefined,
+      avatar: pickFirstNonEmptyString(s.meta?.avatar, s.config?.avatar, s.avatar) || undefined,
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
@@ -654,9 +721,13 @@ export const sessionApi = {
     return (result ?? []).map((s) => ({
       ...s,
       agentId: s.config?.id ?? undefined,
-      title: s.meta?.title ?? s.title ?? '',
-      description: s.meta?.description ?? s.description,
-      avatar: s.meta?.avatar ?? s.avatar,
+      title: resolveDisplaySessionTitle(s.meta?.title, s.config?.title, s.title),
+      description:
+        pickFirstNonEmptyString(
+          pickFirstNonEmptyString(s.meta?.description, s.config?.description),
+          s.description,
+        ) || undefined,
+      avatar: pickFirstNonEmptyString(s.meta?.avatar, s.config?.avatar, s.avatar) || undefined,
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
@@ -752,6 +823,7 @@ export const aiAgentApi = {
       success?: boolean;
       topicId?: string;
       topics?: { items: any[]; total: number };
+      userMessageId?: string;
     }>('aiAgent.execGroupAgent', params).then((result) => ({
       ...result,
       messages: normalizeMessages(result.messages),
@@ -770,15 +842,37 @@ export const aiAgentApi = {
       } | null;
       hasError?: boolean;
       isActive?: boolean;
+      latestAssistant?: {
+        content?: string;
+        reasoning?: string;
+        toolCalls?: Array<{
+          function?: {
+            arguments?: string;
+            name?: string;
+          };
+          id?: string;
+          type?: string;
+        }>;
+      };
       isCompleted?: boolean;
       operationId: string;
     } | null>('aiAgent.getOperationStatus', params),
+  /** Fetch group messages via aiChat.getMessagesAndTopics (same as execGroupAgent) */
+  getGroupMessages: (params: {
+    agentId?: string;
+    groupId: string;
+    topicId?: string;
+  }) =>
+    trpcQuery<{ messages: any[] }>('aiChat.getMessagesAndTopics', params).then((r) =>
+      (r?.messages ?? []).map((message) => normalizeMessage(message)),
+    ),
 };
 
 // ── Message API ─────────────────────────────────────────────────────
 export interface CreateMessageParams {
   content: string;
   files?: string[];
+  groupId?: string;
   imageList?: ChatImageItem[];
   metadata?: ChatMessageMetadata | null;
   model?: string;
@@ -793,7 +887,7 @@ export interface CreateMessageParams {
   } | null;
   role: 'user' | 'assistant';
   search?: GroundingSearch | null;
-  sessionId: string;
+  sessionId?: string | null;
   tools?: ChatToolPayload[] | null;
   topicId?: string;
   traceId?: string;
@@ -807,6 +901,20 @@ export interface MessageSearchResult {
   topicId?: string;
 }
 
+const normalizeCreateMessageParams = (params: CreateMessageParams): CreateMessageParams => {
+  if (params.groupId) return params;
+
+  if (typeof params.sessionId === 'string' && params.sessionId.startsWith('cg_')) {
+    return {
+      ...params,
+      groupId: params.sessionId,
+      sessionId: null,
+    };
+  }
+
+  return params;
+};
+
 export const messageApi = {
   list: (
     sessionId: string,
@@ -818,14 +926,17 @@ export const messageApi = {
         ? { groupId: sessionId, topicId }
         : { sessionId, topicId };
     return trpcQuery<any[]>('message.getMessages', params).then((messages) =>
-      (messages ?? []).map(normalizeMessage),
+      (messages ?? []).map((message) => normalizeMessage(message)),
     );
   },
 
   create: (params: CreateMessageParams) =>
-    trpcMutate<{ id: string; messages: any[] }>('message.createMessage', params).then((result) => ({
+    trpcMutate<{ id: string; messages: any[] }>(
+      'message.createMessage',
+      normalizeCreateMessageParams(params),
+    ).then((result) => ({
       id: result.id,
-      messages: (result.messages ?? []).map(normalizeMessage),
+      messages: (result.messages ?? []).map((message) => normalizeMessage(message)),
     })),
 
   remove: (id: string) => trpcMutate('message.removeMessage', { id }),
@@ -1900,6 +2011,48 @@ export interface MarketCategoryItem {
   name?: string;
 }
 
+const normalizeMarketCategoryItem = (item: any): MarketCategoryItem | null => {
+  if (!item || typeof item !== 'object') return null;
+
+  const category =
+    (typeof item.category === 'string' && item.category.trim()) ||
+    (typeof item.key === 'string' && item.key.trim()) ||
+    (typeof item.slug === 'string' && item.slug.trim()) ||
+    (typeof item.identifier === 'string' && item.identifier.trim()) ||
+    (typeof item.name === 'string' && item.name.trim()) ||
+    '';
+
+  if (!category) return null;
+
+  const count =
+    typeof item.count === 'number'
+      ? item.count
+      : typeof item.totalCount === 'number'
+        ? item.totalCount
+        : typeof item.itemCount === 'number'
+          ? item.itemCount
+          : typeof item.total === 'number'
+            ? item.total
+            : undefined;
+
+  return {
+    category,
+    ...(count !== undefined ? { count } : {}),
+    ...(typeof item.description === 'string' ? { description: item.description } : {}),
+    ...(typeof item.name === 'string' ? { name: item.name } : {}),
+  };
+};
+
+const resolveMarketTotalCount = (result: {
+  items?: unknown[];
+  total?: number;
+  totalCount?: number;
+}) => {
+  if (typeof result.totalCount === 'number') return result.totalCount;
+  if (typeof result.total === 'number') return result.total;
+  return result.items?.length ?? 0;
+};
+
 export const marketSkillApi = {
   getMcpList: async (params?: {
     category?: string;
@@ -1930,7 +2083,7 @@ export const marketSkillApi = {
             manifestUrl: m.manifestUrl,
             name: m.meta?.title || m.name || m.title || m.identifier,
           })),
-          totalCount: mcpResult.totalCount || mcpResult.items.length,
+          totalCount: resolveMarketTotalCount(mcpResult),
         };
       }
     } catch (error) {
@@ -1964,8 +2117,12 @@ export const marketSkillApi = {
             ...s,
             _source: 'skill' as const,
             avatar: s.icon || s.logo || s.avatar,
+            category: s.category ?? s.meta?.category,
+            description: s.description || s.meta?.description || '',
+            identifier: s.identifier,
+            name: s.name || s.meta?.title || s.identifier,
           })),
-          totalCount: result.totalCount || result.items.length,
+          totalCount: resolveMarketTotalCount(result),
         };
       }
     } catch (error) {
@@ -2084,12 +2241,20 @@ export const marketSkillApi = {
   getCategories: () =>
     trpcQuery<MarketCategoryItem[]>('market.skill.getSkillCategories', {
       locale: getCommunityMarketLocale(),
-    }),
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
 
   getMcpCategories: () =>
     trpcQuery<MarketCategoryItem[]>('market.getMcpCategories', {
       locale: getCommunityMarketLocale(),
-    }),
+    }).then((items) =>
+      (items ?? [])
+        .map((item) => normalizeMarketCategoryItem(item))
+        .filter((item): item is MarketCategoryItem => Boolean(item)),
+    ),
 };
 
 export const lobehubSkillApi = {

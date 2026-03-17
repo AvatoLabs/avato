@@ -136,14 +136,27 @@ createCompressionGroup: messageProcedure
 createMessage: messageProcedure
     .input(CreateNewMessageParamsSchema)
     .mutation(async ({ input, ctx }) => {
+      const normalizedInput =
+        input.sessionId?.startsWith('cg_') && !input.groupId
+          ? {
+              ...input,
+              groupId: input.sessionId,
+              sessionId: null,
+            }
+          : input;
+
       // If there's no agentId but has sessionId, resolve agentId from sessionId
-      let agentId = input.agentId;
-      if (!agentId && input.sessionId) {
-        agentId = (await resolveAgentIdFromSession(input.sessionId, ctx.serverDB, ctx.userId))!;
+      let agentId = normalizedInput.agentId;
+      if (!agentId && normalizedInput.sessionId) {
+        agentId = (await resolveAgentIdFromSession(
+          normalizedInput.sessionId,
+          ctx.serverDB,
+          ctx.userId,
+        ))!;
       }
 
       // Create message with the resolved agentId
-      return ctx.messageService.createMessage({ ...input, agentId } as any);
+      return ctx.messageService.createMessage({ ...normalizedInput, agentId } as any);
     }),
 
   
