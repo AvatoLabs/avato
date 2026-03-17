@@ -27,7 +27,11 @@ import {
   removeStudioWorkflowFromLibrary,
   shouldStudioReplaceTargetPortEdges,
   shouldStudioSyncNodeTitle,
+  type StudioCanvasAgentNode,
   type StudioCanvasNode,
+  type StudioCanvasResourceNode,
+  type StudioCanvasSkillNode,
+  type StudioCanvasToolNode,
   type StudioDraft,
   type StudioLoadedServer,
   upsertStudioWorkflowLibrary,
@@ -125,6 +129,9 @@ const createGraphDraft = (): StudioDraft => {
         case 'chat-output': {
           return node;
         }
+        default: {
+          return node;
+        }
       }
     }),
     servers: [createLoadedServer()],
@@ -189,7 +196,7 @@ describe('MCPWorkflowStudio helpers', () => {
     const draft = createDefaultStudioDraft();
     const input = findNodeByType(draft.nodes, 'input');
     const chat = findNodeByType(draft.nodes, 'chat-output');
-    const agent = createStudioNode('agent', { x: 420, y: 180 });
+    const agent = createStudioNode('agent', { x: 420, y: 180 }) as StudioCanvasAgentNode;
 
     agent.data.agentId = 'agent_snapshot';
     agent.data.agentName = 'Snapshot Agent';
@@ -312,10 +319,10 @@ describe('MCPWorkflowStudio helpers', () => {
   });
 
   it('derives concrete auto titles from selected agents, resources, skills, and tools', () => {
-    const agentNode = createStudioNode('agent', { x: 0, y: 0 });
-    const toolNode = createStudioNode('mcp-tool', { x: 0, y: 0 });
-    const resourceNode = createStudioNode('resource', { x: 0, y: 0 });
-    const skillNode = createStudioNode('skill', { x: 0, y: 0 });
+    const agentNode = createStudioNode('agent', { x: 0, y: 0 }) as StudioCanvasAgentNode;
+    const toolNode = createStudioNode('mcp-tool', { x: 0, y: 0 }) as StudioCanvasToolNode;
+    const resourceNode = createStudioNode('resource', { x: 0, y: 0 }) as StudioCanvasResourceNode;
+    const skillNode = createStudioNode('skill', { x: 0, y: 0 }) as StudioCanvasSkillNode;
 
     agentNode.data.agentName = 'Research Agent';
     toolNode.data.toolName = 'listIssues';

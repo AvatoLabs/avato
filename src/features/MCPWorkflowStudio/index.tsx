@@ -406,7 +406,7 @@ const MCPWorkflowStudio = () => {
   const viewportRef = useRef<StudioViewport>(STUDIO_DEFAULT_VIEWPORT);
   const viewportInitializedRef = useRef(false);
   const historyRestoreRef = useRef(false);
-  const historySnapshotRef = useRef<StudioHistorySnapshot>();
+  const historySnapshotRef = useRef<StudioHistorySnapshot | undefined>(undefined);
   const redoStackRef = useRef<StudioHistorySnapshot[]>([]);
   const undoStackRef = useRef<StudioHistorySnapshot[]>([]);
   const panSessionRef = useRef<
@@ -1200,7 +1200,7 @@ const MCPWorkflowStudio = () => {
 
     updateNode(nodeId, (node) =>
       node.type === 'agent'
-        ? syncConcreteNodeTitle(node, {
+        ? (syncConcreteNodeTitle(node, {
             ...node,
             data: {
               ...node.data,
@@ -1213,7 +1213,7 @@ const MCPWorkflowStudio = () => {
               provider: undefined,
               systemRole: undefined,
             },
-          })
+          }) as StudioCanvasNode)
         : node,
     );
 
@@ -1797,7 +1797,7 @@ const MCPWorkflowStudio = () => {
         state.filter((edgeId) => {
           const edge = edges.find((item) => item.id === edgeId);
 
-          return Boolean(edge) && edge.source !== nodeId && edge.target !== nodeId;
+          return edge != null && edge.source !== nodeId && edge.target !== nodeId;
         }),
       );
       if (previewNodeId === nodeId) {
@@ -2152,7 +2152,7 @@ const MCPWorkflowStudio = () => {
 
       updateNode(nodeId, (node) =>
         node.type === 'skill'
-          ? syncConcreteNodeTitle(node, {
+          ? (syncConcreteNodeTitle(node, {
               ...node,
               data: {
                 ...node.data,
@@ -2160,7 +2160,7 @@ const MCPWorkflowStudio = () => {
                 skillId,
                 skillName: skill?.name || node.data.skillName,
               },
-            })
+            }) as StudioCanvasNode)
           : node,
       );
 
@@ -2176,7 +2176,7 @@ const MCPWorkflowStudio = () => {
 
     updateNode(nodeId, (node) =>
       node.type === 'resource'
-        ? syncConcreteNodeTitle(node, {
+        ? (syncConcreteNodeTitle(node, {
             ...node,
             data: {
               ...node.data,
@@ -2189,7 +2189,7 @@ const MCPWorkflowStudio = () => {
               sourceType: 'skill-resource',
               sourceUri: undefined,
             },
-          })
+          }) as StudioCanvasNode)
         : node,
     );
 
@@ -2218,7 +2218,7 @@ const MCPWorkflowStudio = () => {
 
       updateNode(nodeId, (node) =>
         node.type === 'resource'
-          ? syncConcreteNodeTitle(node, {
+          ? (syncConcreteNodeTitle(node, {
               ...node,
               data: {
                 ...node.data,
@@ -2232,7 +2232,7 @@ const MCPWorkflowStudio = () => {
                 sourceType: 'skill-resource',
                 sourceUri: resourcePath,
               },
-            })
+            }) as StudioCanvasNode)
           : node,
       );
 
@@ -2257,7 +2257,7 @@ const MCPWorkflowStudio = () => {
 
       updateNode(nodeId, (node) =>
         node.type === 'resource'
-          ? syncConcreteNodeTitle(node, {
+          ? (syncConcreteNodeTitle(node, {
               ...node,
               data: {
                 ...node.data,
@@ -2272,7 +2272,7 @@ const MCPWorkflowStudio = () => {
                 sourceType: 'upload',
                 sourceUri: file.name,
               },
-            })
+            }) as StudioCanvasNode)
           : node,
       );
 
@@ -2296,13 +2296,13 @@ const MCPWorkflowStudio = () => {
 
     updateNode(selectedPromptNode.id, (node) =>
       node.type === 'agent' || node.type === 'transform'
-        ? {
+        ? ({
             ...node,
             data: {
               ...node.data,
               prompt: nextValue,
             },
-          }
+          } as StudioCanvasNode)
         : node,
     );
 
@@ -2673,7 +2673,7 @@ const MCPWorkflowStudio = () => {
               />
             ) : (
               <Text className={styles.nodeText}>
-                {createNodeSummary(node, availableAgents, servers, t)}
+                {createNodeSummary(node, availableAgents, servers, (key) => t(key as any))}
               </Text>
             )}
           </Flexbox>
@@ -2726,13 +2726,13 @@ const MCPWorkflowStudio = () => {
               onChange={(checked) =>
                 updateNode(selectedNode.id, (node) =>
                   node.type === 'agent' || node.type === 'mcp-tool' || node.type === 'transform'
-                    ? {
+                    ? ({
                         ...node,
                         data: {
                           ...node.data,
                           breakpoint: checked,
                         },
-                      }
+                      } as StudioCanvasNode)
                     : node,
                 )
               }
@@ -2955,14 +2955,14 @@ const MCPWorkflowStudio = () => {
               onChange={(event) =>
                 updateNode(selectedNode.id, (node) =>
                   node.type === 'resource'
-                    ? syncConcreteNodeTitle(node, {
+                    ? (syncConcreteNodeTitle(node, {
                         ...node,
                         data: {
                           ...node.data,
                           sourceLabel: event.target.value,
                           sourceType: node.data.sourceType || 'manual',
                         },
-                      })
+                      }) as StudioCanvasNode)
                     : node,
                 )
               }
@@ -2974,14 +2974,14 @@ const MCPWorkflowStudio = () => {
               onChange={(event) =>
                 updateNode(selectedNode.id, (node) =>
                   node.type === 'resource'
-                    ? syncConcreteNodeTitle(node, {
+                    ? (syncConcreteNodeTitle(node, {
                         ...node,
                         data: {
                           ...node.data,
                           sourceType: node.data.sourceType || 'manual',
                           sourceUri: event.target.value,
                         },
-                      })
+                      }) as StudioCanvasNode)
                     : node,
                 )
               }
@@ -3144,7 +3144,7 @@ const MCPWorkflowStudio = () => {
                   return syncConcreteNodeTitle(node, nextNode, {
                     nextServerName: nextServer?.name,
                     previousServerName,
-                  });
+                  }) as StudioCanvasNode;
                 })
               }
             />
@@ -3208,7 +3208,7 @@ const MCPWorkflowStudio = () => {
                   return syncConcreteNodeTitle(node, nextNode, {
                     nextServerName: serverName,
                     previousServerName: serverName,
-                  });
+                  }) as StudioCanvasNode;
                 })
               }
             />
@@ -3760,14 +3760,23 @@ const MCPWorkflowStudio = () => {
           >
             {t('mcpStudio.library.save')}
           </Button>
-          <Button className={styles.utilityButton} icon={<Icon icon={FileText} />} size={'small'} onClick={() => void handleExportWorkflow()}>
+          <Button
+            className={styles.utilityButton}
+            icon={<Icon icon={FileText} />}
+            size={'small'}
+            onClick={() => void handleExportWorkflow()}
+          >
             {t('mcpStudio.header.export')}
           </Button>
           <Dropdown
             menu={{ items: workflowMenuItems, onClick: handleWorkflowMenuClick }}
             trigger={['click']}
           >
-            <Button className={styles.utilityButton} icon={<Icon icon={Ellipsis} />} size={'small'} />
+            <Button
+              className={styles.utilityButton}
+              icon={<Icon icon={Ellipsis} />}
+              size={'small'}
+            />
           </Dropdown>
         </div>
       </Flexbox>
@@ -3838,29 +3847,33 @@ const MCPWorkflowStudio = () => {
                           target: targetNode,
                         })}
                       />
-                      {isSelected && (() => {
-                        const midpoint = getEdgeMidpoint(edge);
-                        if (!midpoint) return null;
+                      {isSelected &&
+                        (() => {
+                          const midpoint = getEdgeMidpoint(edge);
+                          if (!midpoint) return null;
 
-                        return (
-                          <g
-                            data-studio-ignore-selection="true"
-                            transform={`translate(${midpoint.x} ${midpoint.y})`}
-                          >
-                            <circle
-                              className={styles.edgeActionButton}
-                              cx={0}
-                              cy={0}
-                              r={12}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleRemoveEdge(edge.id);
-                              }}
-                            />
-                            <path className={styles.edgeActionIcon} d="M -4 -4 L 4 4 M 4 -4 L -4 4" />
-                          </g>
-                        );
-                      })()}
+                          return (
+                            <g
+                              data-studio-ignore-selection="true"
+                              transform={`translate(${midpoint.x} ${midpoint.y})`}
+                            >
+                              <circle
+                                className={styles.edgeActionButton}
+                                cx={0}
+                                cy={0}
+                                r={12}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleRemoveEdge(edge.id);
+                                }}
+                              />
+                              <path
+                                className={styles.edgeActionIcon}
+                                d="M -4 -4 L 4 4 M 4 -4 L -4 4"
+                              />
+                            </g>
+                          );
+                        })()}
                     </g>
                   );
                 })}
@@ -3954,11 +3967,7 @@ const MCPWorkflowStudio = () => {
               >
                 {t('mcpStudio.toolbar.fitView')}
               </Button>
-              <Button
-                icon={<Icon icon={RotateCcw} />}
-                size={'small'}
-                onClick={handleAutoLayout}
-              >
+              <Button icon={<Icon icon={RotateCcw} />} size={'small'} onClick={handleAutoLayout}>
                 {t('mcpStudio.toolbar.autoLayout')}
               </Button>
             </div>
@@ -3982,7 +3991,12 @@ const MCPWorkflowStudio = () => {
                       nodes: selectedNodeIds.length,
                     })}
                   </Text>
-                  <Button danger icon={<Icon icon={Trash2} />} size={'small'} onClick={handleDeleteSelection}>
+                  <Button
+                    danger
+                    icon={<Icon icon={Trash2} />}
+                    size={'small'}
+                    onClick={handleDeleteSelection}
+                  >
                     {t('mcpStudio.selection.delete')}
                   </Button>
                 </div>

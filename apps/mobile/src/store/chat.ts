@@ -30,6 +30,7 @@ import {
 } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { isGroupSessionLike, resolveSessionTypeWithFallback } from '../lib/session';
 import type {
   ChatMessage,
   ChatToolPayload,
@@ -60,39 +61,42 @@ const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayl
  */
 async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOptions> {
   const opts: ChatRequestOptions = {};
+  const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
 
   // 1. Backend agent config (source of truth)
-  try {
-    const config = await agentApi.getConfigBySession(sessionId);
-    if (config) {
-      if (config.model) opts.model = config.model;
-      if (config.provider) opts.provider = config.provider;
-      if (config.params?.temperature != null) opts.temperature = config.params.temperature;
-      if (config.params?.top_p != null) opts.top_p = config.params.top_p;
-      if (config.params?.frequency_penalty != null)
-        opts.frequency_penalty = config.params.frequency_penalty;
-      if (config.params?.presence_penalty != null)
-        opts.presence_penalty = config.params.presence_penalty;
-      if (config.params?.max_tokens != null) opts.max_tokens = config.params.max_tokens;
-      if (config.systemRole) opts.systemPrompt = config.systemRole;
-      const chatConfig = config.chatConfig as MobileChatConfig | undefined;
-      if (chatConfig?.memory) {
-        const effort = chatConfig.memory.effort;
-        opts.memory = {
-          effort: effort === 'low' || effort === 'medium' || effort === 'high' ? effort : 'medium',
-          enabled: chatConfig.memory.enabled !== false,
-        };
+  if (!isGroupSessionLike(sessionId, session?.type)) {
+    try {
+      const config = await agentApi.getConfigBySession(sessionId);
+      if (config) {
+        if (config.model) opts.model = config.model;
+        if (config.provider) opts.provider = config.provider;
+        if (config.params?.temperature != null) opts.temperature = config.params.temperature;
+        if (config.params?.top_p != null) opts.top_p = config.params.top_p;
+        if (config.params?.frequency_penalty != null)
+          opts.frequency_penalty = config.params.frequency_penalty;
+        if (config.params?.presence_penalty != null)
+          opts.presence_penalty = config.params.presence_penalty;
+        if (config.params?.max_tokens != null) opts.max_tokens = config.params.max_tokens;
+        if (config.systemRole) opts.systemPrompt = config.systemRole;
+        const chatConfig = config.chatConfig as MobileChatConfig | undefined;
+        if (chatConfig?.memory) {
+          const effort = chatConfig.memory.effort;
+          opts.memory = {
+            effort:
+              effort === 'low' || effort === 'medium' || effort === 'high' ? effort : 'medium',
+            enabled: chatConfig.memory.enabled !== false,
+          };
+        }
+        if (chatConfig?.searchMode) {
+          opts.enabledSearch = chatConfig.searchMode !== 'off';
+        }
       }
-      if (chatConfig?.searchMode) {
-        opts.enabledSearch = chatConfig.searchMode !== 'off';
-      }
+    } catch {
+      /* network error — fall through to session meta */
     }
-  } catch {
-    /* network error — fall through to session meta */
   }
 
   // 2. Session meta fallback (when agent config missing or incomplete)
-  const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
   if (session) {
     if (!opts.model && session.model) opts.model = session.model;
     if (!opts.provider && session.provider) opts.provider = session.provider;
@@ -180,15 +184,15 @@ const buildPersistedReasoning = (
 
   if (reasoning.isMultimodal && reasoning.tempDisplayContent?.length) {
     return {
-      content:
-        reasoning.content || JSON.stringify(reasoning.tempDisplayContent),
+      content: reasoning.content || JSON.stringify(reasoning.tempDisplayContent),
       ...(reasoning.duration !== undefined ? { duration: reasoning.duration } : {}),
       isMultimodal: true,
       ...(reasoning.signature ? { signature: reasoning.signature } : {}),
     };
   }
 
-  if (!reasoning.content && reasoning.duration === undefined && !reasoning.signature) return undefined;
+  if (!reasoning.content && reasoning.duration === undefined && !reasoning.signature)
+    return undefined;
 
   return {
     ...(reasoning.content ? { content: reasoning.content } : {}),
@@ -268,7 +272,7 @@ const hydrateAttachmentContents = async (attachments: UploadedAttachment[]) => {
       // Content extraction is best-effort; keep retrying.
     }
 
-  if (unresolvedIds.size === 0) break;
+    if (unresolvedIds.size === 0) break;
   }
 };
 
@@ -339,7 +343,26 @@ const syncTopicsForSession = (
   }));
 };
 
-const DEFAULT_TOPIC_TITLES = ['', 'New Conversation', '新对话'];
+const DEFAULT_TOPIC_TITLES = ['', 'New Conversation', '新对话', '新對話', 'Topics', '话题', '話題'];
+
+const isDefaultTopicTitle = (title?: string | null) => {
+  const trimmedTitle = title?.trim() ?? '';
+  if (!trimmedTitle) return true;
+
+  const { t } = useI18n.getState();
+  return DEFAULT_TOPIC_TITLES.includes(trimmedTitle) || trimmedTitle === t.topicTitle;
+};
+
+const extractPersistedMessageIds = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => message.id)
+    .filter(
+      (id) =>
+        !id.startsWith('assistant-') &&
+        !id.startsWith('local-') &&
+        !id.startsWith('tmp_') &&
+        !id.startsWith('user-'),
+    );
 
 const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null) => {
   if (!topicId) return;
@@ -347,8 +370,7 @@ const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null)
     (item) => item.id === topicId,
   );
 
-  const currentTitle = topic?.title?.trim() ?? '';
-  if (currentTitle && !DEFAULT_TOPIC_TITLES.includes(currentTitle)) return;
+  if (!isDefaultTopicTitle(topic?.title)) return;
 
   topicApi
     .generateTitle(topicId)
@@ -375,6 +397,25 @@ const isGroupAssistantSettled = (message?: ChatMessage) => {
   }
 
   return true;
+};
+
+const getGroupOperationErrorMessage = (
+  operationStatus: Awaited<ReturnType<typeof aiAgentApi.getOperationStatus>>,
+) => {
+  const error = operationStatus?.currentState?.error;
+
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  if (
+    typeof error === 'object' &&
+    error &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+
+  return '';
 };
 
 const buildUserStreamContent = (
@@ -485,7 +526,7 @@ const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => 
 };
 
 const hasMessageAttachments = (message?: Pick<ChatMessage, 'fileList' | 'imageList'> | null) =>
-  ((message?.fileList?.length ?? 0) > 0) || ((message?.imageList?.length ?? 0) > 0);
+  (message?.fileList?.length ?? 0) > 0 || (message?.imageList?.length ?? 0) > 0;
 
 const mergePersistedMessageWithLocal = (
   persisted: ChatMessage,
@@ -498,7 +539,8 @@ const mergePersistedMessageWithLocal = (
     local.role === 'user' &&
     hasMessageAttachments(local) &&
     !!local.content?.trim();
-  const shouldPreferLocalContent = shouldPreferLocalUserCaption || (!persisted.content && !!local.content);
+  const shouldPreferLocalContent =
+    shouldPreferLocalUserCaption || (!persisted.content && !!local.content);
 
   return {
     ...persisted,
@@ -507,7 +549,9 @@ const mergePersistedMessageWithLocal = (
       ? {
           fileList: persisted.fileList.map((file) => ({
             ...file,
-            content: file.content || local.fileList?.find((localFile) => localFile.id === file.id)?.content,
+            content:
+              file.content ||
+              local.fileList?.find((localFile) => localFile.id === file.id)?.content,
           })),
         }
       : local.fileList
@@ -644,14 +688,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
     try {
       const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-      const sessionType = session?.type ?? 'agent';
+      const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
       const messages = await messageApi.list(sessionId, topicId, { sessionType });
-      const {
-        activeStreamingMessageId,
-        activeStreamingSessionId,
-        generating,
-        messagesBySession,
-      } = get();
+      const { activeStreamingMessageId, activeStreamingSessionId, generating, messagesBySession } =
+        get();
 
       const shouldKeepLocalStreamingMessage =
         generating &&
@@ -660,7 +700,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         !messages.some((message) => message.id === activeStreamingMessageId);
 
       const localStreamingMessage = shouldKeepLocalStreamingMessage
-        ? (messagesBySession[sessionId] || []).find((message) => message.id === activeStreamingMessageId)
+        ? (messagesBySession[sessionId] || []).find(
+            (message) => message.id === activeStreamingMessageId,
+          )
         : undefined;
       const mergedMessages = mergePersistedMessagesWithLocal(
         messages ?? [],
@@ -773,23 +815,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    let resolvedTopicId =
-      topicId ?? useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
-
-    if (!resolvedTopicId && session?.type !== 'group') {
-      const existingTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
-      const existingMessages = get().messagesBySession[sessionId] ?? [];
-
-      if (existingTopics.length === 0 && existingMessages.length === 0) {
-        const createdTopic = await useTopicStore.getState().createTopic(sessionId, '');
-        if (createdTopic?.id) {
-          resolvedTopicId = createdTopic.id;
-          useTopicStore.getState().switchTopic(sessionId, createdTopic.id);
-        }
+    // When getGroupedSessions fails (e.g. tag_id), session may be undefined; fallback to group detail
+    let isGroupSession = isGroupSessionLike(sessionId, session?.type);
+    if (!isGroupSession && !session) {
+      try {
+        const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+        isGroupSession = !!groupDetail?.supervisorAgentId;
+      } catch {
+        /* not a group */
       }
     }
+    let resolvedTopicId =
+      topicId ?? useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
+    const shouldCreateTopicAfterResponse = !isGroupSession && !resolvedTopicId;
 
-    if (session?.type === 'group') {
+    if (isGroupSession) {
       const assistantPlaceholderId = `assistant-${Date.now()}`;
       const assistantMsg: ChatMessage = {
         id: assistantPlaceholderId,
@@ -818,6 +858,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
 
       try {
+        const t = useI18n.getState().t;
         const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
         const supervisorAgentId = groupDetail?.supervisorAgentId;
 
@@ -859,10 +900,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (result.success === false) {
-          const t = useI18n.getState().t;
-          useToast.getState().show('error', t.errorUnknown);
-          return true;
+          throw new Error(t.errorUnknown);
         }
+
+        let didSettle = false;
 
         for (let attempt = 0; attempt < GROUP_POLL_MAX_ATTEMPTS; attempt += 1) {
           await sleep(GROUP_POLL_INTERVAL_MS);
@@ -870,16 +911,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return true;
           }
 
+          const operationStatus = result.operationId
+            ? await aiAgentApi
+                .getOperationStatus({ operationId: result.operationId })
+                .catch(() => null)
+            : null;
+
           await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
 
-          const assistantMessage = (get().messagesBySession[sessionId] || []).find(
+          let assistantMessage = (get().messagesBySession[sessionId] || []).find(
             (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
           );
 
           if (isGroupAssistantSettled(assistantMessage)) {
             triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+            didSettle = true;
             break;
           }
+
+          if (operationStatus?.hasError || operationStatus?.currentState?.status === 'error') {
+            throw new Error(getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed);
+          }
+
+          if (operationStatus?.isCompleted) {
+            await sleep(250);
+            await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
+
+            assistantMessage = (get().messagesBySession[sessionId] || []).find(
+              (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
+            );
+
+            if (isGroupAssistantSettled(assistantMessage)) {
+              triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+              didSettle = true;
+              break;
+            }
+
+            throw new Error(getGroupOperationErrorMessage(operationStatus) || t.errorUnknown);
+          }
+        }
+
+        if (!didSettle) {
+          throw new Error(t.errorSendFailed);
         }
 
         return true;
@@ -898,7 +971,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           messagesBySession: {
             ...s.messagesBySession,
             [sessionId]: (s.messagesBySession[sessionId] || []).filter(
-              (message) => message.id !== userMsg.id && message.id !== assistantPlaceholderId,
+              (message) => message.id !== assistantPlaceholderId,
             ),
           },
         }));
@@ -934,10 +1007,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await messageApi.create({
         sessionId,
         content: displayContent,
-          ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
-          role: 'user',
-          topicId: resolvedTopicId,
-        } as any);
+        ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
+        role: 'user',
+        topicId: resolvedTopicId,
+      } as any);
       userMessageServerId = result?.id;
       persistedMessagesAfterUser = mergePersistedMessagesWithLocal(result?.messages ?? [], [
         ...(get().messagesBySession[sessionId] || []),
@@ -1037,7 +1110,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Memory: prefer explicit options, else use session/agent chatConfig (for regenerateMessage etc.)
       chatOptions.memory = {
         effort: (options?.memoryEffort ?? chatOptions.memory?.effort) || 'medium',
-        enabled: options?.memoryEnabled !== undefined ? options.memoryEnabled !== false : (chatOptions.memory?.enabled !== false),
+        enabled:
+          options?.memoryEnabled !== undefined
+            ? options.memoryEnabled !== false
+            : chatOptions.memory?.enabled !== false,
       };
       if (options?.searchEnabled !== undefined) {
         chatOptions.enabledSearch = options.searchEnabled;
@@ -1088,7 +1164,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
                         reasoning: finalReasoning
-                          ? { ...buildReasoningState(finalReasoning), ...(duration !== undefined ? { duration } : {}) }
+                          ? {
+                              ...buildReasoningState(finalReasoning),
+                              ...(duration !== undefined ? { duration } : {}),
+                            }
                           : m.reasoning
                             ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
                             : m.reasoning,
@@ -1226,13 +1305,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         result.tools ||
         (result.toolExecutions ? toolExecutionsToPayloads(result.toolExecutions) : undefined);
 
-      if (
-        result.images ||
-        result.search ||
-        resolvedTools ||
-        result.usage ||
-        result.performance
-      ) {
+      if (result.images || result.search || resolvedTools || result.usage || result.performance) {
         set((s) => ({
           messagesBySession: {
             ...s.messagesBySession,
@@ -1282,13 +1355,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (persistedAssistant?.messages?.length) {
           const localMessages = get().messagesBySession[sessionId] || [];
+          const mergedPersistedMessages = mergePersistedMessagesWithLocal(
+            persistedAssistant.messages,
+            localMessages,
+          );
+
           set((s) => ({
             messagesBySession: {
               ...s.messagesBySession,
-              [sessionId]: mergePersistedMessagesWithLocal(
-                persistedAssistant.messages,
-                localMessages,
-              ),
+              [sessionId]: mergedPersistedMessages,
             },
           }));
 
@@ -1305,6 +1380,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 }
               })
               .catch((err) => console.warn('[ChatStore] generateSessionTitle failed:', err));
+          }
+
+          if (shouldCreateTopicAfterResponse && !resolvedTopicId) {
+            const createdTopic = await useTopicStore.getState().createTopic(sessionId, '', {
+              messageIds: extractPersistedMessageIds(mergedPersistedMessages),
+            });
+
+            if (createdTopic?.id) {
+              resolvedTopicId = createdTopic.id;
+              useTopicStore.getState().switchTopic(sessionId, createdTopic.id);
+              await useTopicStore.getState().fetchTopics(sessionId);
+              await get().fetchMessages(sessionId, createdTopic.id);
+            }
           }
 
           triggerTopicTitleGeneration(sessionId, resolvedTopicId);
@@ -1406,7 +1494,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (get().generating) return;
 
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    if (session?.type === 'group') {
+    if (isGroupSessionLike(sessionId, session?.type)) {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.errorUnknown);
       return;
@@ -1450,7 +1538,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
       if (afterIds.length > 0) {
         void messageApi.removeAll(afterIds).catch((error) => {
-          console.warn('[ChatStore] Failed to remove trailing messages during regeneration:', error);
+          console.warn(
+            '[ChatStore] Failed to remove trailing messages during regeneration:',
+            error,
+          );
         });
       }
       contextMessages = messages
@@ -1486,9 +1577,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     }));
 
-    const parentMessageId = target.role === 'assistant'
-      ? messages[targetIdx - 1]?.id
-      : target.id;
+    const parentMessageId = target.role === 'assistant' ? messages[targetIdx - 1]?.id : target.id;
 
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
@@ -1549,7 +1638,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                           ? { metadata: mergeMessageMetadata(m.metadata, contentState) }
                           : {}),
                         reasoning: finalReasoning
-                          ? { ...buildReasoningState(finalReasoning), ...(duration !== undefined ? { duration } : {}) }
+                          ? {
+                              ...buildReasoningState(finalReasoning),
+                              ...(duration !== undefined ? { duration } : {}),
+                            }
                           : m.reasoning
                             ? { ...m.reasoning, ...(duration !== undefined ? { duration } : {}) }
                             : m.reasoning,

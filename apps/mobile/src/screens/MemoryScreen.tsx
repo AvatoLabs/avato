@@ -175,15 +175,10 @@ function HomeTab() {
       pollTimerRef.current = setTimeout(async () => {
         pollTimerRef.current = null;
         try {
-          const nextTask = await memoryApi.getMemoryExtractionTask(
-            taskId ? { taskId } : undefined,
-          );
+          const nextTask = await memoryApi.getMemoryExtractionTask(taskId ? { taskId } : undefined);
           setExtractionTask(nextTask);
 
-          if (
-            nextTask &&
-            (nextTask.status === 'Pending' || nextTask.status === 'Processing')
-          ) {
+          if (nextTask && (nextTask.status === 'Pending' || nextTask.status === 'Processing')) {
             scheduleTaskPoll(nextTask.id);
           } else if (nextTask?.status === 'Success') {
             const [nextPersona, nextRoles] = await Promise.all([
@@ -208,9 +203,7 @@ function HomeTab() {
     try {
       const [p, r, task] = await Promise.all([
         memoryApi.getPersona().catch(() => null),
-        memoryApi
-          .queryIdentityRoles({ page: 1, size: 50 })
-          .catch(() => ({ roles: [], tags: [] })),
+        memoryApi.queryIdentityRoles({ page: 1, size: 50 }).catch(() => ({ roles: [], tags: [] })),
         memoryApi.getMemoryExtractionTask().catch(() => null),
       ]);
       setPersona(p);
@@ -237,15 +230,19 @@ function HomeTab() {
 
     setRequestingExtraction(true);
     try {
-      const task = await memoryApi.requestMemoryFromChatTopic();
+      const task = await memoryApi.requestMemoryFromChatTopic({});
       setExtractionTask(task);
       toast.show('success', task.deduped ? t.memoryExtractQueued : t.memoryExtractSuccess);
 
       if (task.status === 'Pending' || task.status === 'Processing') {
         scheduleTaskPoll(task.id);
       }
-    } catch {
-      toast.show('error', t.memoryExtractFailed);
+    } catch (error) {
+      const detail =
+        error instanceof Error && error.message && error.message !== 'Request failed'
+          ? error.message
+          : t.memoryExtractFailed;
+      toast.show('error', detail);
     } finally {
       setRequestingExtraction(false);
     }
@@ -355,7 +352,9 @@ function HomeTab() {
         ) : (
           <View className="bg-foreground/[0.02] rounded-2xl p-6 items-center">
             <Brain color={semanticColors.secondaryText} size={32} strokeWidth={1.5} />
-            <Text className="text-sm text-secondary/60 mt-3 text-center">{t.memoryPersonaEmpty}</Text>
+            <Text className="text-sm text-secondary/60 mt-3 text-center">
+              {t.memoryPersonaEmpty}
+            </Text>
           </View>
         )}
       </View>
@@ -363,7 +362,9 @@ function HomeTab() {
       {/* Extract Memories card */}
       <View className="mb-6">
         <View className="bg-foreground/[0.02] rounded-2xl p-4">
-          <Text className="text-base font-semibold text-foreground mb-2">{t.memoryExtractTitle}</Text>
+          <Text className="text-base font-semibold text-foreground mb-2">
+            {t.memoryExtractTitle}
+          </Text>
           <Text className="text-sm text-secondary/60 leading-5">{extractionStatusText}</Text>
           {extractionProgressText ? (
             <Text className="text-xs text-secondary/45 mt-2">{extractionProgressText}</Text>
@@ -402,7 +403,9 @@ function HomeTab() {
         <View className="items-center py-10">
           <Brain color={semanticColors.secondaryText} size={48} strokeWidth={1.2} />
           <Text className="text-base font-medium text-secondary/60 mt-4">{t.memoryEmpty}</Text>
-          <Text className="text-sm text-secondary/45 mt-1 text-center px-8">{t.memoryEmptyDesc}</Text>
+          <Text className="text-sm text-secondary/45 mt-1 text-center px-8">
+            {t.memoryEmptyDesc}
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -555,7 +558,10 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
         >
           <View className="flex-row items-start justify-between">
             <View className="flex-1 mr-3">
-              <Text className="text-[15px] font-semibold text-foreground leading-5" numberOfLines={2}>
+              <Text
+                className="text-[15px] font-semibold text-foreground leading-5"
+                numberOfLines={2}
+              >
                 {title}
               </Text>
               {subtext && title !== subtext ? (
@@ -653,7 +659,9 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                   <X color={semanticColors.secondaryText} size={20} strokeWidth={1.5} />
                 </TouchableOpacity>
               </View>
-              <Text className="text-sm font-medium text-foreground/80 mb-1">{t.memoryCreateTitle}</Text>
+              <Text className="text-sm font-medium text-foreground/80 mb-1">
+                {t.memoryCreateTitle}
+              </Text>
               <TextInput
                 className="mb-4 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] px-3 py-2.5 text-base text-foreground"
                 placeholder={t.memoryCreateTitlePlaceholder}
@@ -743,44 +751,54 @@ export default function MemoryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={t.memoryTitle}
         onPressLeft={() => nav.goBack()}
       >
-      {/* Tab Bar */}
-      <ScrollView
-        horizontal
-        className="max-h-[44px]"
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}
-        ref={scrollRef}
-        showsHorizontalScrollIndicator={false}
-      >
-        {TAB_DEFS.map((tab) => {
-          const active = activeTab === tab.key;
-          const Icon = tab.icon;
-          return (
-            <TouchableOpacity
-              className="flex-row items-center px-3 py-1.5 rounded-full"
-              key={tab.key}
-              style={{
-                backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
-              }}
-              onPress={() => setActiveTab(tab.key as any)}
-            >
-              <Icon color={active ? '#fff' : semanticColors.muted} size={15} strokeWidth={active ? 2 : 1.5} />
-              <Text
-                className="ml-1.5 text-sm font-medium"
-                style={{ color: active ? '#fff' : semanticColors.muted }}
+        {/* Tab Bar */}
+        <ScrollView
+          horizontal
+          className="max-h-[44px]"
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}
+          ref={scrollRef}
+          showsHorizontalScrollIndicator={false}
+        >
+          {TAB_DEFS.map((tab) => {
+            const active = activeTab === tab.key;
+            const Icon = tab.icon;
+            return (
+              <TouchableOpacity
+                className="flex-row items-center px-3 py-1.5 rounded-full"
+                key={tab.key}
+                style={{
+                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                }}
+                onPress={() => setActiveTab(tab.key as any)}
               >
-                {(t as any)[tab.labelKey]}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+                <Icon
+                  color={active ? '#fff' : semanticColors.muted}
+                  size={15}
+                  strokeWidth={active ? 2 : 1.5}
+                />
+                <Text
+                  className="ml-1.5 text-sm font-medium"
+                  style={{ color: active ? '#fff' : semanticColors.muted }}
+                >
+                  {(t as any)[tab.labelKey]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-      {/* Separator */}
-      <View className="h-px bg-foreground/[0.06] mt-1" />
+        {/* Separator */}
+        <View className="h-px bg-foreground/[0.06] mt-1" />
       </ScreenHeader>
 
       {/* Tab Content */}

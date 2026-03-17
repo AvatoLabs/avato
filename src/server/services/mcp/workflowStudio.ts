@@ -1,5 +1,6 @@
 import { DEFAULT_AGENT_CONFIG } from '@lobechat/const';
 import { type LobeChatDatabase } from '@lobechat/database';
+import type { UIChatMessage } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import type OpenAI from 'openai';
 import { z } from 'zod';
@@ -20,6 +21,7 @@ import {
   resolveStudioTemplateString,
   type StudioConnectionConfig,
   type StudioNodeType,
+  type StudioWorkflowDSL,
   type StudioWorkflowEdgeChannel,
   supportsStudioNodeBreakpoint,
 } from '@/libs/mcp/workflowStudio';
@@ -536,7 +538,7 @@ const extractChatCompletionText = (completion: OpenAI.ChatCompletion) => {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
 
-  return content
+  return (content as Array<{ type?: string; text?: string } | string>)
     .map((item) =>
       typeof item === 'string' ? item : item.type === 'text' && 'text' in item ? item.text : '',
     )
@@ -567,7 +569,7 @@ const executeStudioAgent = async (params: {
     });
   }
 
-  const provider = params.provider || agent?.provider || DEFAULT_AGENT_CONFIG.provider;
+  const provider = params.provider || agent?.provider || DEFAULT_AGENT_CONFIG.provider || 'openai';
   const model = params.model || agent?.model || DEFAULT_AGENT_CONFIG.model;
   const systemRole = params.systemRole ?? agent?.systemRole ?? '';
   const runtimeParams = {
@@ -581,7 +583,15 @@ const executeStudioAgent = async (params: {
   });
   const messages = await serverMessagesEngine({
     inputTemplate: params.inputTemplate ?? agent?.chatConfig?.inputTemplate,
-    messages: [{ content: params.prompt, role: 'user' }],
+    messages: [
+      {
+        content: params.prompt,
+        createdAt: Date.now(),
+        id: 'studio-user',
+        role: 'user',
+        updatedAt: Date.now(),
+      },
+    ] as UIChatMessage[],
     model,
     provider,
     systemRole,
@@ -615,9 +625,10 @@ export const runWorkflowStudioPreview = async (params: {
   workflow: WorkflowStudioPreviewWorkflowInput;
 }): Promise<WorkflowStudioPreviewResult> => {
   const { processContentBlocks, serverDB, userId } = params;
+  const parsed = workflowStudioDslSchema.parse(params.workflow);
   const workflow = normalizeStudioWorkflowDefinition(
-    workflowStudioDslSchema.parse(params.workflow),
-  );
+    parsed as unknown as StudioWorkflowDSL,
+  ) as WorkflowStudioPreviewWorkflow;
 
   ensurePreviewNode(workflow);
   validateWorkflowGraph(workflow);

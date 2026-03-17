@@ -16,10 +16,10 @@ import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { aiProviderApi } from '../lib/api';
+import { agentApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { agentApi } from '../lib/api';
+import { isGroupSessionLike } from '../lib/session';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
@@ -230,6 +230,10 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   const sessionId: string | undefined = route.params?.sessionId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const sessionType = useSessionStore(
+    (s) => s.sessions.find((item) => item.id === sessionId)?.type,
+  );
+  const isGroupSession = isGroupSessionLike(sessionId, sessionType);
 
   const [selected, setSelected] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -240,7 +244,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   // ── Load selected model from Agent Config or default Agent ─────────
   useEffect(() => {
     (async () => {
-      if (sessionId) {
+      if (sessionId && !isGroupSession) {
         try {
           const config = await agentApi.getConfigBySession(sessionId);
           if (config?.model) {
@@ -251,12 +255,18 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           /* ignore */
         }
       }
+      if (sessionId && isGroupSession) {
+        const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+        if (session?.model) setSelected(session.model);
+        return;
+      }
+
       const agentStore = useAgentStore.getState();
       if (!agentStore.initialized) await agentStore.loadAgents();
       const agent = agentStore.getCurrentAgent();
       if (agent?.model) setSelected(agent.model);
     })();
-  }, [sessionId]);
+  }, [isGroupSession, sessionId]);
 
   // ── Fetch provider→model tree from server ────────────────────────
   const fetchModels = useCallback(async () => {
@@ -280,46 +290,62 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   }, [fetchModels]);
 
   // ── Selection handler ────────────────────────────────────────────
-  const handleSelect = async (modelId: string, providerId: string) => {
-    haptics.selection();
-    setSelected(modelId);
+  const handleSelect = useCallback(
+    async (modelId: string, providerId: string) => {
+      haptics.selection();
+      setSelected(modelId);
 
-    if (sessionId) {
-      try {
-        const config = await agentApi.getConfigBySession(sessionId);
-        if (config?.id) {
-          await agentApi.updateConfig(config.id, { model: modelId, provider: providerId });
+      if (sessionId && isGroupSession) {
+        useSessionStore
+          .getState()
+          .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
+        toast.show('success', t.settingsSavedModel);
+        setTimeout(() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          }
+        }, 200);
+        return;
+      }
+
+      if (sessionId && !isGroupSession) {
+        try {
+          const config = await agentApi.getConfigBySession(sessionId);
+          if (config?.id) {
+            await agentApi.updateConfig(config.id, { model: modelId, provider: providerId });
+          }
+        } catch {
+          /* best-effort */
         }
-      } catch {
-        /* best-effort */
+        useSessionStore
+          .getState()
+          .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
+      } else {
+        const agentStore = useAgentStore.getState();
+        if (!agentStore.initialized) await agentStore.loadAgents();
+        let current = agentStore.getCurrentAgent();
+        if (!current && agentStore.agents.length === 0) {
+          const newId = await agentStore.createAgent({
+            model: modelId,
+            provider: providerId,
+            title: 'Default',
+          });
+          current = agentStore.agents.find((a) => a.id === newId) ?? null;
+        }
+        if (current) {
+          await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
+        }
       }
-      useSessionStore
-        .getState()
-        .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
-    } else {
-      const agentStore = useAgentStore.getState();
-      if (!agentStore.initialized) await agentStore.loadAgents();
-      let current = agentStore.getCurrentAgent();
-      if (!current && agentStore.agents.length === 0) {
-        const newId = await agentStore.createAgent({
-          model: modelId,
-          provider: providerId,
-          title: 'Default',
-        });
-        current = agentStore.agents.find((a) => a.id === newId) ?? null;
-      }
-      if (current) {
-        await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
-      }
-    }
 
-    toast.show('success', t.settingsSavedModel);
-    setTimeout(() => {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-    }, 200);
-  };
+      toast.show('success', t.settingsSavedModel);
+      setTimeout(() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
+      }, 200);
+    },
+    [isGroupSession, navigation, sessionId, t.settingsSavedModel, toast],
+  );
 
   // ── Filter ───────────────────────────────────────────────────────
   const q = searchQuery.toLowerCase();
@@ -434,7 +460,13 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={t.modelPickerTitle}
         onPressLeft={() => navigation.canGoBack() && navigation.goBack()}
       />

@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { agentApi, aiProviderApi } from '../lib/api';
+import { isGroupSessionLike } from '../lib/session';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 import { useAgentStore } from './agent';
+import { useSessionStore } from './session';
 
 const CACHE_KEY = 'avato_model_cache';
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -111,9 +113,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
   loadSelection: async (sessionId?: string) => {
     let model = '';
     let provider = '';
+    const session = sessionId
+      ? useSessionStore.getState().sessions.find((item) => item.id === sessionId)
+      : undefined;
+    const isGroupSession = isGroupSessionLike(sessionId, session?.type);
 
     // 1. Backend agent config (session-specific)
-    if (sessionId) {
+    if (sessionId && !isGroupSession) {
       try {
         const config = await agentApi.getConfigBySession(sessionId);
         if (config?.model) model = config.model;
@@ -123,12 +129,18 @@ export const useModelStore = create<ModelState>((set, get) => ({
       }
     }
 
+    if (session) {
+      if (!model && session.model) model = session.model;
+      if (!provider && session.provider) provider = session.provider;
+    }
+
     // 2. Local Agent fallback (session's agent or default agent)
-    if (!model || !provider) {
+    if ((!model || !provider) && !isGroupSession) {
       const agentStore = useAgentStore.getState();
       if (!agentStore.initialized) await agentStore.loadAgents();
       const agent = sessionId
-        ? agentStore.agents.find((a) => a.sessionIds.includes(sessionId)) || agentStore.getCurrentAgent()
+        ? agentStore.agents.find((a) => a.sessionIds.includes(sessionId)) ||
+          agentStore.getCurrentAgent()
         : agentStore.getCurrentAgent();
       if (agent) {
         if (!model && agent.model) model = agent.model;
@@ -143,6 +155,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
     set({ selectedModel: modelId, selectedProvider: providerId });
 
     if (sessionId) {
+      const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+      if (isGroupSessionLike(sessionId, session?.type)) return;
+
       // Update backend agent config (single source of truth)
       try {
         const config = await agentApi.getConfigBySession(sessionId);

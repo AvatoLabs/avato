@@ -55,6 +55,7 @@ import type {
   UserRegistrationDuration,
 } from '../types';
 import { clearStoredAuthSession, getAuthHeaders } from './auth';
+import { useI18n } from './i18n';
 import {
   getApiUrl,
   hasConfiguredUrl,
@@ -67,6 +68,17 @@ export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setAp
 const DEFAULT_UPLOAD_DIRECTORY = 'files';
 const MOBILE_UPLOAD_CACHE_DIR = `${FileSystem.cacheDirectory || ''}upload-cache/`;
 const MOBILE_DOWNLOAD_DIR = `${FileSystem.documentDirectory || FileSystem.cacheDirectory || ''}downloads/`;
+const COMMUNITY_MARKET_DEFAULT_PAGE_SIZE = 21;
+
+const getCommunityMarketLocale = () => useI18n.getState().locale || 'en-US';
+
+const normalizeCommunityMarketPageSize = (pageSize?: number) => {
+  if (!pageSize || Number.isNaN(pageSize) || pageSize <= 0) {
+    return COMMUNITY_MARKET_DEFAULT_PAGE_SIZE;
+  }
+
+  return pageSize;
+};
 
 const computeStringHash = (value: string) => {
   let hash = 2166136261;
@@ -724,6 +736,21 @@ export const aiAgentApi = {
     }>('aiAgent.execGroupAgent', params),
   interruptTask: (params: { operationId?: string; threadId?: string }) =>
     trpcMutate('aiAgent.interruptTask', params),
+  getOperationStatus: (params: {
+    historyLimit?: number;
+    includeHistory?: boolean;
+    operationId: string;
+  }) =>
+    trpcQuery<{
+      currentState?: {
+        error?: { message?: string } | string | null;
+        status?: string;
+      } | null;
+      hasError?: boolean;
+      isActive?: boolean;
+      isCompleted?: boolean;
+      operationId: string;
+    } | null>('aiAgent.getOperationStatus', params),
 };
 
 // ── Message API ─────────────────────────────────────────────────────
@@ -1469,11 +1496,15 @@ export const topicApi = {
     ).then((res) => (Array.isArray(res) ? res : res?.items ?? []));
   },
   /** Returns topic ID string, not full Topic object. */
-  create: (containerId: string, title: string, options?: { sessionType?: 'agent' | 'group' }) => {
+  create: (
+    containerId: string,
+    title: string,
+    options?: { messageIds?: string[]; sessionType?: 'agent' | 'group' },
+  ) => {
     const params =
       options?.sessionType === 'group'
-        ? { groupId: containerId, title }
-        : { sessionId: containerId, title };
+        ? { groupId: containerId, messages: options?.messageIds, title }
+        : { messages: options?.messageIds, sessionId: containerId, title };
     return trpcMutate<string>('topic.createTopic', params);
   },
   remove: (id: string) => trpcMutate('topic.removeTopic', { id }),
@@ -1832,10 +1863,18 @@ export interface MarketListItem {
   _source: 'builtin' | 'skill' | 'mcp' | 'legacy';
   author?: string;
   avatar?: string;
+  category?: string;
   description?: string;
   identifier: string;
   manifest?: Record<string, any>;
   manifestUrl?: string;
+  name?: string;
+}
+
+export interface MarketCategoryItem {
+  category: string;
+  count?: number;
+  description?: string;
   name?: string;
 }
 
@@ -1848,10 +1887,9 @@ export const marketSkillApi = {
   }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
     const input = {
       category: params?.category,
-      connectionType: 'http' as const, // Mobile only supports HTTP/streamable MCPs (matches web non-desktop)
-      locale: 'en-US',
+      locale: getCommunityMarketLocale(),
       page: params?.page ?? 1,
-      pageSize: params?.pageSize ?? 50,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
       q: params?.q,
       sort: 'recommended' as const,
     };
@@ -1888,9 +1926,9 @@ export const marketSkillApi = {
   }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
     const input = {
       category: params?.category,
-      locale: 'en-US',
+      locale: getCommunityMarketLocale(),
       page: params?.page ?? 1,
-      pageSize: params?.pageSize ?? 50,
+      pageSize: normalizeCommunityMarketPageSize(params?.pageSize),
       q: params?.q,
       sort: 'installCount',
     };
@@ -2012,13 +2050,23 @@ export const marketSkillApi = {
   },
 
   getMcpDetail: (identifier: string) =>
-    trpcQuery<any>('market.getMcpDetail', { identifier }),
+    trpcQuery<any>('market.getMcpDetail', { identifier, locale: getCommunityMarketLocale() }),
 
   getDetail: (identifier: string) =>
-    trpcQuery<any>('market.skill.getSkillDetail', { identifier }),
+    trpcQuery<any>('market.skill.getSkillDetail', {
+      identifier,
+      locale: getCommunityMarketLocale(),
+    }),
 
   getCategories: () =>
-    trpcQuery<string[]>('market.skill.getSkillCategories'),
+    trpcQuery<MarketCategoryItem[]>('market.skill.getSkillCategories', {
+      locale: getCommunityMarketLocale(),
+    }),
+
+  getMcpCategories: () =>
+    trpcQuery<MarketCategoryItem[]>('market.getMcpCategories', {
+      locale: getCommunityMarketLocale(),
+    }),
 };
 
 export const lobehubSkillApi = {
@@ -2191,7 +2239,7 @@ export const memoryApi = {
     trpcMutate<MemoryCreateIdentityResult>('userMemory.createIdentity', data),
 
   // ── Memory Extraction ──
-  requestMemoryFromChatTopic: (params?: RequestMemoryExtractionParams) =>
+  requestMemoryFromChatTopic: (params: RequestMemoryExtractionParams = {}) =>
     trpcMutate<
       MemoryExtractionTask & {
         deduped: boolean;

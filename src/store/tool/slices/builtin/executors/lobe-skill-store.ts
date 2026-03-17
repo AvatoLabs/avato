@@ -48,7 +48,7 @@ const runtime = new SkillStoreExecutionRuntime({
       return {
         items: result.items,
         page: result.currentPage,
-        pageSize: result.pageSize,
+        pageSize: result.pageSize ?? params.pageSize ?? 20,
         total: result.totalCount,
       };
     },

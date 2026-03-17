@@ -44,10 +44,7 @@ export const skillRouter = router({
         );
       } catch (error) {
         log('Error fetching skill categories: %O', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch skill categories',
-        });
+        return [];
       }
     }),
 
@@ -101,10 +98,13 @@ export const skillRouter = router({
         );
       } catch (error) {
         log('Error fetching skill list: %O', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch skill list',
-        });
+        return {
+          currentPage: input?.page ?? 1,
+          items: [],
+          pageSize: input?.pageSize ?? 20,
+          totalCount: 0,
+          totalPages: 0,
+        };
       }
     }),
 });

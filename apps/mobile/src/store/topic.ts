@@ -7,12 +7,17 @@ import { useToast } from '../components/ui/Toast';
 import { topicApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { resolveSessionTypeWithFallback } from '../lib/session';
 import type { Topic } from '../types';
 import { useSessionStore } from './session';
 
 interface TopicState {
   activeTopicBySession: Record<string, string | null>;
-  createTopic: (sessionId: string, title: string) => Promise<Topic | null>;
+  createTopic: (
+    sessionId: string,
+    title: string,
+    options?: { messageIds?: string[] },
+  ) => Promise<Topic | null>;
   favoriteTopic: (id: string) => Promise<void>;
   fetchTopics: (sessionId: string) => Promise<void>;
   loadingBySession: Record<string, boolean>;
@@ -33,7 +38,7 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     }));
     try {
       const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-      const sessionType = session?.type ?? 'agent';
+      const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
       const topics = await topicApi.list(sessionId, { sessionType });
       set((s) => {
         const nextTopics = topics ?? [];
@@ -61,12 +66,15 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     }
   },
 
-  createTopic: async (sessionId: string, title: string) => {
+  createTopic: async (sessionId: string, title: string, options?: { messageIds?: string[] }) => {
     try {
       const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-      const sessionType = session?.type ?? 'agent';
+      const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
       // createTopic now returns the topic ID string, not a full Topic object
-      const topicId = await topicApi.create(sessionId, title, { sessionType });
+      const topicId = await topicApi.create(sessionId, title, {
+        messageIds: options?.messageIds,
+        sessionType,
+      });
       if (topicId) {
         const placeholder: Topic = {
           id: topicId,
@@ -94,7 +102,10 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     set((s) => ({
       activeTopicBySession: {
         ...s.activeTopicBySession,
-        [sessionId]: s.activeTopicBySession[sessionId] === id ? null : (s.activeTopicBySession[sessionId] ?? null),
+        [sessionId]:
+          s.activeTopicBySession[sessionId] === id
+            ? null
+            : (s.activeTopicBySession[sessionId] ?? null),
       },
       topicsBySession: {
         ...s.topicsBySession,
@@ -120,7 +131,9 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       topicsBySession: Object.fromEntries(
         Object.entries(s.topicsBySession).map(([sessionId, topics]) => [
           sessionId,
-          topics.map((topic) => (topic.id === id ? { ...topic, favorite: !topic.favorite } : topic)),
+          topics.map((topic) =>
+            topic.id === id ? { ...topic, favorite: !topic.favorite } : topic,
+          ),
         ]),
       ),
     }));

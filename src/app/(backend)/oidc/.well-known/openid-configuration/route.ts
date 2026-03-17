@@ -22,7 +22,7 @@ const getDiscoveryDocument = async () => {
     ],
     id_token_signing_alg_values_supported: ['RS256'],
     issuer,
-    jwks_uri: provider.urlFor('jwks'),
+    jwks_uri: urlJoin(issuer, 'jwks'),
     response_types_supported: ['code'],
     scopes_supported: defaultScopes,
     subject_types_supported: ['public'],

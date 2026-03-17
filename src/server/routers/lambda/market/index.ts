@@ -58,7 +58,6 @@ export const marketRouter = router({
   // ============================== Skill Management ==============================
   skill: skillRouter,
 
-
   getAgentsByPlugin: marketProcedure
     .input(
       z.object({
@@ -83,7 +82,7 @@ export const marketRouter = router({
     }),
 
   // ============================== Assistant Market ==============================
-getAssistantCategories: marketProcedure
+  getAssistantCategories: marketProcedure
     .input(
       z
         .object({
@@ -97,10 +96,8 @@ getAssistantCategories: marketProcedure
       log('  getAssistantCategories: marketProcedure\n input: %O', input);
 
       try {
-        return await communityMarketCacheService.getCached(
-          'assistant-categories',
-          input,
-          () => ctx.discoverService.getAssistantCategories(input),
+        return await communityMarketCacheService.getCached('assistant-categories', input, () =>
+          ctx.discoverService.getAssistantCategories(input),
         );
       } catch (error) {
         log('Error fetching assistant categories: %O', error);
@@ -148,10 +145,8 @@ getAssistantCategories: marketProcedure
       log('getAssistantIdentifiers called with input: %O', input);
 
       try {
-        return await communityMarketCacheService.getCached(
-          'assistant-identifiers',
-          input,
-          () => ctx.discoverService.getAssistantIdentifiers(input),
+        return await communityMarketCacheService.getCached('assistant-identifiers', input, () =>
+          ctx.discoverService.getAssistantIdentifiers(input),
         );
       } catch (error) {
         log('Error fetching assistant identifiers: %O', error);
@@ -210,10 +205,8 @@ getAssistantCategories: marketProcedure
       log('getGroupAgentCategories input: %O', input);
 
       try {
-        return await communityMarketCacheService.getCached(
-          'group-agent-categories',
-          input,
-          () => ctx.discoverService.getGroupAgentCategories(input),
+        return await communityMarketCacheService.getCached('group-agent-categories', input, () =>
+          ctx.discoverService.getGroupAgentCategories(input),
         );
       } catch (error) {
         log('Error fetching group agent categories: %O', error);
@@ -390,10 +383,14 @@ getAssistantCategories: marketProcedure
         );
       } catch (error) {
         log('Error fetching mcp list: %O', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch mcp list',
-        });
+        return {
+          categories: [],
+          currentPage: input?.page ?? 1,
+          items: [],
+          pageSize: input?.pageSize ?? 20,
+          totalCount: 0,
+          totalPages: 0,
+        };
       }
     }),
 

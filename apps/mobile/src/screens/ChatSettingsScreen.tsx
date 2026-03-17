@@ -37,6 +37,7 @@ import { agentApi, agentGroupApi, type AgentGroupDetail, sessionTagApi } from '.
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { isGroupSessionLike } from '../lib/session';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
@@ -138,7 +139,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const toast = useToast();
 
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
-  const isGroupSession = session?.type === 'group';
+  const isGroupSession = isGroupSessionLike(sessionId, session?.type);
   const removeSession = useSessionStore((s) => s.removeSession);
   const renameSession = useSessionStore((s) => s.renameSession);
   const updateSessionTag = useSessionStore((s) => s.updateSessionTag);
@@ -239,7 +240,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   useEffect(() => {
     let disposed = false;
 
-    if (!sessionId || session?.type === 'group') {
+    if (!sessionId || isGroupSession) {
       setAgentSummary(null);
       return;
     }
@@ -262,7 +263,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     return () => {
       disposed = true;
     };
-  }, [session?.type, sessionId]);
+  }, [isGroupSession, sessionId]);
 
   const fetchSessionTags = useCallback(async () => {
     if (isGroupSession) return;
@@ -742,10 +743,10 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
 
                     return (
                       <View
+                        key={member.id}
                         className={`flex-row items-center rounded-2xl bg-foreground/[0.04] px-4 py-3 ${
                           index === (groupDetail.agents?.length ?? 0) - 1 ? '' : 'mb-3'
                         }`}
-                        key={member.id}
                       >
                         <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
                           <Text className="text-[16px] font-semibold text-primary">

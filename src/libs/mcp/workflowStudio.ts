@@ -495,7 +495,8 @@ const normalizeStudioPortId = (
 ) => {
   if (!portId) return undefined;
 
-  return studioLegacyPortAliases[nodeType][kind][portId] || portId;
+  const aliases = studioLegacyPortAliases as Record<string, Record<string, Record<string, string>>>;
+  return aliases[nodeType]?.[kind]?.[portId] || portId;
 };
 
 export const getStudioNodePorts = (

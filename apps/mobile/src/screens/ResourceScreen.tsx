@@ -10,6 +10,7 @@
  *  • Image thumbnail preview inline
  */
 import * as DocumentPicker from 'expo-document-picker';
+import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
@@ -32,7 +33,6 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  Image,
   Modal,
   Platform,
   RefreshControl,
@@ -44,19 +44,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { tokens } from '../theme/tokens';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
+import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -77,6 +78,71 @@ function isDocument(fileType: string): boolean {
   const docs = ['application/pdf', 'text/', 'application/msword', 'application/vnd'];
   return docs.some((p) => fileType.startsWith(p));
 }
+
+function isMarkdownFile(fileType: string, name?: string): boolean {
+  if (fileType?.includes('markdown') || fileType === 'text/mdx') return true;
+  return !!(name && /\.(?:md|mdx)$/i.test(name));
+}
+
+const resourcePreviewMdStyles = {
+  body: { color: semanticColors.foreground, fontSize: 15, lineHeight: 24 },
+  heading1: {
+    color: semanticColors.foreground,
+    fontSize: 22,
+    fontWeight: '700' as const,
+    marginBottom: 10,
+    marginTop: 18,
+  },
+  heading2: {
+    color: semanticColors.foreground,
+    fontSize: 18,
+    fontWeight: '700' as const,
+    marginBottom: 8,
+    marginTop: 14,
+  },
+  heading3: {
+    color: semanticColors.foreground,
+    fontSize: 16,
+    fontWeight: '600' as const,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  paragraph: { marginBottom: 10 },
+  bullet_list: { marginBottom: 10 },
+  ordered_list: { marginBottom: 10 },
+  list_item: { marginBottom: 4 },
+  code_inline: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 4,
+    color: '#e11d48',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 13,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  fence: {
+    backgroundColor: '#1e1e2e',
+    borderRadius: 8,
+    color: '#cdd6f4',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 10,
+    padding: 12,
+  },
+  blockquote: {
+    backgroundColor: '#f8fafc',
+    borderColor: semanticColors.primary,
+    borderLeftWidth: 3,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  hr: { backgroundColor: '#e5e7eb', height: 1, marginVertical: 12 },
+  link: { color: semanticColors.primary },
+  strong: { fontWeight: '600' as const },
+};
+
 function isAudio(fileType: string): boolean {
   return fileType.startsWith('audio/');
 }
@@ -121,6 +187,31 @@ function formatDate(isoString: string): string {
   }
 }
 
+function resolveRemoteFileUrl(apiBaseUrl: string, item: Pick<FileListItem, 'id' | 'url'>): string {
+  const base = apiBaseUrl?.replace(/\/$/, '') || '';
+
+  if (
+    item.url?.startsWith('http://') ||
+    item.url?.startsWith('https://') ||
+    item.url?.startsWith('file://')
+  ) {
+    return item.url;
+  }
+
+  if (item.url?.startsWith('/')) {
+    return `${base}${item.url}`;
+  }
+
+  return base ? `${base}/f/${item.id}` : '';
+}
+
+function buildRemoteFileCandidates(apiBaseUrl: string, item: Pick<FileListItem, 'id' | 'url'>) {
+  const resolved = resolveRemoteFileUrl(apiBaseUrl, item);
+  const proxyUrl = apiBaseUrl ? `${apiBaseUrl.replace(/\/$/, '')}/f/${item.id}` : '';
+
+  return [...new Set([resolved, proxyUrl].filter(Boolean))];
+}
+
 // ── File Preview Modal ────────────────────────────────────────────────
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -142,27 +233,114 @@ const FilePreviewModal = memo(
     const toast = useToast();
     const [imgLoading, setImgLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+    const [textContent, setTextContent] = useState<string | null>(null);
+    const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+
+    const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
+    const fileUrl = previewCandidates[previewIndex] || '';
+    const imageFile = item ? isImage(item.fileType) : false;
+    const textFile = item
+      ? item.fileType.startsWith('text/') || item.fileType === 'application/json'
+      : false;
+    const pdfFile = item ? item.fileType === 'application/pdf' : false;
+    // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
+    const officeFile = item
+      ? item.fileType.includes('msword') ||
+        item.fileType.includes('vnd.openxmlformats') ||
+        item.fileType.includes('vnd.ms-excel') ||
+        item.fileType.includes('vnd.ms-powerpoint')
+      : false;
+    const previewableDoc = textFile || pdfFile || officeFile;
+
+    useEffect(() => {
+      setImgLoading(true);
+      setPreviewIndex(0);
+      setPdfDataUrl(null);
+      setTextContent(null);
+      setPreviewLoadFailed(false);
+    }, [apiBaseUrl, item?.id, visible]);
+
+    const handlePreviewError = useCallback(() => {
+      if (previewIndex < previewCandidates.length - 1) {
+        setPreviewIndex((current) => current + 1);
+        setImgLoading(true);
+        setPdfDataUrl(null);
+        setTextContent(null);
+        setPreviewLoadFailed(false);
+        return;
+      }
+
+      setImgLoading(false);
+      setPreviewLoadFailed(true);
+    }, [previewCandidates.length, previewIndex]);
+
+    // PDF: fetch via redirect (WebView fails on 302), convert to data URL for reliable display
+    useEffect(() => {
+      if (!pdfFile || !fileUrl || !visible) return;
+
+      let cancelled = false;
+      const loadPdf = async () => {
+        try {
+          const res = await fetch(fileUrl, { redirect: 'follow' });
+          if (cancelled) return;
+          if (!res.ok) {
+            handlePreviewError();
+            return;
+          }
+
+          const blob = await res.blob();
+          if (cancelled) return;
+
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          if (!cancelled) setPdfDataUrl(dataUrl);
+        } catch {
+          if (!cancelled) handlePreviewError();
+        }
+      };
+
+      void loadPdf();
+      return () => {
+        cancelled = true;
+      };
+    }, [fileUrl, pdfFile, visible, handlePreviewError]);
+
+    // Text/Markdown: fetch via redirect (WebView fails on 302), render with Markdown or Text
+    useEffect(() => {
+      if (!textFile || !fileUrl || !visible) return;
+
+      let cancelled = false;
+      const loadText = async () => {
+        try {
+          const res = await fetch(fileUrl, { redirect: 'follow' });
+          if (cancelled) return;
+          if (!res.ok) {
+            handlePreviewError();
+            return;
+          }
+
+          const text = await res.text();
+          if (!cancelled) setTextContent(text);
+        } catch {
+          if (!cancelled) handlePreviewError();
+        }
+      };
+
+      void loadText();
+      return () => {
+        cancelled = true;
+      };
+    }, [fileUrl, textFile, visible, handlePreviewError]);
 
     if (!item) return null;
 
-    // Align with web: absolute URL for /f/ proxy. Prefer client baseUrl; fallback to server url when full
-    const base = apiBaseUrl?.replace(/\/$/, '') || '';
-    const fileUrl =
-      base && base.startsWith('http')
-        ? `${base}/f/${item.id}`
-        : item.url?.startsWith('http')
-          ? item.url
-          : '';
-    const imageFile = isImage(item.fileType);
-    const textFile = item.fileType.startsWith('text/') || item.fileType === 'application/json';
-    const pdfFile = item.fileType === 'application/pdf';
-    // Office docs: use Google Docs viewer for preview (requires publicly accessible URL)
-    const officeFile =
-      item.fileType.includes('msword') ||
-      item.fileType.includes('vnd.openxmlformats') ||
-      item.fileType.includes('vnd.ms-excel') ||
-      item.fileType.includes('vnd.ms-powerpoint');
-    const previewableDoc = textFile || pdfFile || officeFile;
+    const markdownFile = textFile && isMarkdownFile(item.fileType, item.name);
 
     const handleShare = () => {
       void Share.share(
@@ -247,7 +425,9 @@ const FilePreviewModal = memo(
                 </Text>
                 <Text
                   className="text-[11px] mt-0.5"
-                  style={{ color: imageFile ? 'rgba(255,255,255,0.6)' : semanticColors.secondaryText }}
+                  style={{
+                    color: imageFile ? 'rgba(255,255,255,0.6)' : semanticColors.secondaryText,
+                  }}
                 >
                   {formatBytes(item.size)}
                   {'  ·  '}
@@ -273,7 +453,10 @@ const FilePreviewModal = memo(
                 onPress={() => void handleDownload()}
               >
                 {downloading ? (
-                  <ActivityIndicator color={imageFile ? '#fff' : semanticColors.primary} size="small" />
+                  <ActivityIndicator
+                    color={imageFile ? '#fff' : semanticColors.primary}
+                    size="small"
+                  />
                 ) : (
                   <Download
                     color={imageFile ? '#fff' : semanticColors.primary}
@@ -288,7 +471,13 @@ const FilePreviewModal = memo(
           {/* Content */}
           <View style={{ flex: 1 }}>
             {imageFile ? (
-              fileUrl ? (
+              previewLoadFailed ? (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-white/80 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
+              ) : fileUrl ? (
                 <View className="flex-1 items-center justify-center">
                   {imgLoading && (
                     <ActivityIndicator
@@ -297,11 +486,13 @@ const FilePreviewModal = memo(
                       style={{ position: 'absolute', zIndex: 1 }}
                     />
                   )}
-                  <Image
-                    resizeMode="contain"
-                    source={{ uri: fileUrl }}
+                  <ExpoImage
+                    cachePolicy="memory-disk"
+                    contentFit="contain"
+                    source={fileUrl}
                     style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
-                    onError={() => setImgLoading(false)}
+                    transition={120}
+                    onError={handlePreviewError}
                     onLoad={() => setImgLoading(false)}
                   />
                 </View>
@@ -313,38 +504,100 @@ const FilePreviewModal = memo(
                 </View>
               )
             ) : previewableDoc ? (
-              <WebView
-                originWhitelist={['https://*', 'http://*']}
-                startInLoadingState
-                source={{
-                  uri: officeFile
-                    ? `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`
-                    : fileUrl,
-                }}
-                style={{ flex: 1 }}
-                renderLoading={() => (
-                  <View
-                    className="items-center justify-center"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: '#f8f8fa',
-                    }}
-                  >
-                    <ActivityIndicator color={semanticColors.primary} size="large" />
-                  </View>
-                )}
-              />
+              pdfFile && !fileUrl ? (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-foreground/70 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
+              ) : pdfFile && fileUrl && !pdfDataUrl && !previewLoadFailed ? (
+                <View
+                  className="flex-1 items-center justify-center"
+                  style={{ backgroundColor: '#f8f8fa' }}
+                >
+                  <ActivityIndicator color={semanticColors.primary} size="large" />
+                </View>
+              ) : pdfFile && previewLoadFailed ? (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-foreground/70 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
+              ) : textFile && fileUrl && !textContent && !previewLoadFailed ? (
+                <View
+                  className="flex-1 items-center justify-center"
+                  style={{ backgroundColor: '#f8f8fa' }}
+                >
+                  <ActivityIndicator color={semanticColors.primary} size="large" />
+                </View>
+              ) : textFile && previewLoadFailed ? (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-foreground/70 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
+              ) : textFile && textContent ? (
+                <ScrollView
+                  className="flex-1"
+                  contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+                  style={{ backgroundColor: '#fff' }}
+                >
+                  {markdownFile ? (
+                    <Markdown style={resourcePreviewMdStyles}>{textContent}</Markdown>
+                  ) : (
+                    <Text
+                      selectable
+                      className="text-[15px] leading-6"
+                      style={{ color: semanticColors.foreground }}
+                    >
+                      {textContent}
+                    </Text>
+                  )}
+                </ScrollView>
+              ) : (
+                <WebView
+                  cacheEnabled
+                  originWhitelist={['https://*', 'http://*', 'data:*']}
+                  startInLoadingState={!pdfFile}
+                  style={{ flex: 1 }}
+                  renderLoading={() => (
+                    <View
+                      className="items-center justify-center"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: '#f8f8fa',
+                      }}
+                    >
+                      <ActivityIndicator color={semanticColors.primary} size="large" />
+                    </View>
+                  )}
+                  source={
+                    officeFile
+                      ? {
+                          uri: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`,
+                        }
+                      : pdfFile && pdfDataUrl
+                        ? { uri: pdfDataUrl }
+                        : { uri: fileUrl }
+                  }
+                  onError={handlePreviewError}
+                />
+              )
             ) : (
               <View className="flex-1 items-center justify-center px-8">
                 <View
                   className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
                   style={{ width: 96, height: 96 }}
                 >
-                  <FileTypeIcon color={semanticColors.secondaryText} fileType={item.fileType} size={44} />
+                  <FileTypeIcon
+                    color={semanticColors.secondaryText}
+                    fileType={item.fileType}
+                    size={44}
+                  />
                 </View>
                 <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
                   {item.name}
@@ -367,9 +620,7 @@ const FilePreviewModal = memo(
                   ) : (
                     <Download color="#fff" size={18} strokeWidth={2} style={{ marginRight: 8 }} />
                   )}
-                  <Text className="text-white text-[15px] font-semibold">
-                    {t.resourceDownload}
-                  </Text>
+                  <Text className="text-white text-[15px] font-semibold">{t.resourceDownload}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -393,55 +644,66 @@ interface FileRowProps {
 
 function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
   const iconColor = semanticColors.secondaryText;
-  // Align with web: absolute URL only (RN Image requires it). Prefer client baseUrl; fallback to server url
-  const thumbnailUrl = isImage(item.fileType)
-    ? (() => {
-        const base = apiBaseUrl?.replace(/\/$/, '') || '';
-        if (base && (base.startsWith('http://') || base.startsWith('https://'))) {
-          return `${base}/f/${item.id}`;
-        }
-        return item.url?.startsWith('http') ? item.url : null;
-      })()
-    : null;
+  const [thumbnailIndex, setThumbnailIndex] = useState(0);
+  const thumbnailCandidates = isImage(item.fileType)
+    ? buildRemoteFileCandidates(apiBaseUrl, item)
+    : [];
+  const thumbnailUrl = thumbnailCandidates[thumbnailIndex] || null;
+
+  useEffect(() => {
+    setThumbnailIndex(0);
+  }, [apiBaseUrl, item.id, item.url]);
 
   return (
     <TouchableOpacity
       activeOpacity={0.6}
       className="flex-row items-center px-5 py-3 bg-background"
+      onPress={() => onPress(item)}
       onLongPress={() => {
         haptics.medium();
         onDelete(item.id, item.name);
       }}
-      onPress={() => onPress(item)}
     >
-        <View
-          className="items-center justify-center rounded-xl bg-foreground/5"
-          style={{ width: 48, height: 48, marginRight: 12 }}
-        >
-          {thumbnailUrl ? (
-            <Image
-              resizeMode="cover"
-              source={{ uri: thumbnailUrl }}
-              style={{ width: 48, height: 48, borderRadius: 12 }}
-            />
-          ) : (
-            <FileTypeIcon color={iconColor} fileType={item.fileType} size={26} />
-          )}
-        </View>
+      <View
+        className="items-center justify-center rounded-xl bg-foreground/5"
+        style={{ width: 48, height: 48, marginRight: 12 }}
+      >
+        {thumbnailUrl ? (
+          <ExpoImage
+            cachePolicy="memory-disk"
+            contentFit="cover"
+            source={thumbnailUrl}
+            style={{ width: 48, height: 48, borderRadius: 12 }}
+            transition={100}
+            onError={() => {
+              if (thumbnailIndex < thumbnailCandidates.length - 1) {
+                setThumbnailIndex((current) => current + 1);
+              }
+            }}
+          />
+        ) : (
+          <FileTypeIcon color={iconColor} fileType={item.fileType} size={26} />
+        )}
+      </View>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text className="mt-0.5 text-[12px] text-secondary/40">
-            {formatBytes(item.size)}
-            {'  ·  '}
-            {formatDate(item.createdAt)}
-          </Text>
-        </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text className="mt-0.5 text-[12px] text-secondary/40">
+          {formatBytes(item.size)}
+          {'  ·  '}
+          {formatDate(item.createdAt)}
+        </Text>
+      </View>
 
-        <Eye color={semanticColors.secondaryText} size={16} strokeWidth={1.5} style={{ marginLeft: 8 }} />
-      </TouchableOpacity>
+      <Eye
+        color={semanticColors.secondaryText}
+        size={16}
+        strokeWidth={1.5}
+        style={{ marginLeft: 8 }}
+      />
+    </TouchableOpacity>
   );
 }
 
@@ -599,7 +861,13 @@ export default function ResourceScreen() {
       {/* Header */}
       <ScreenHeader
         title={t.resourceTitle}
-        titleIcon={<FolderOpen color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        titleIcon={
+          <FolderOpen
+            color={semanticColors.primary}
+            size={20}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         rightElement={
           <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
@@ -706,7 +974,12 @@ export default function ResourceScreen() {
             />
           }
           renderItem={({ item }) => (
-            <FileRow apiBaseUrl={apiBase} item={item} onDelete={handleDelete} onPress={handlePreview} />
+            <FileRow
+              apiBaseUrl={apiBase}
+              item={item}
+              onDelete={handleDelete}
+              onPress={handlePreview}
+            />
           )}
         />
       )}

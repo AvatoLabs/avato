@@ -92,7 +92,7 @@ export const GET = async (_req: Request, segmentData: { params: Params }) => {
       log('Proxying file content to avoid mixed content: %s', id);
       const byteArray = await fileService.getFileByteArray(file.url);
 
-      return new Response(byteArray, {
+      return new Response(byteArray as unknown as BodyInit, {
         headers: {
           'Cache-Control': 'private, max-age=60',
           'Content-Disposition': `inline; filename="${encodeURIComponent(file.name || id)}"`,

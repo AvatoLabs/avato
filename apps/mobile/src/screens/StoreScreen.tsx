@@ -46,6 +46,7 @@ import { semanticColors } from '../constants/colors';
 import {
   agentSkillApi,
   fileApi,
+  type MarketCategoryItem,
   type MarketListItem,
   marketSkillApi,
   mcpApi,
@@ -53,12 +54,15 @@ import {
   userApi,
 } from '../lib/api';
 import { haptics } from '../lib/haptics';
-import { type I18nStore, useI18n } from '../lib/i18n';
+import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
 
 type ExploreSource = 'mcp' | 'skill';
 type StoreTab = 'explore' | 'installed';
+
+const MARKET_PAGE_SIZE = 21;
+const ALL_CATEGORY_KEY = 'all';
 
 interface StoreInstalledItem {
   avatar?: string;
@@ -100,6 +104,144 @@ const getSkillAvatar = (skill: AgentSkillItem) => {
 const getSkillDescription = (skill: AgentSkillItem) => {
   const manifest = skill.manifest as Record<string, any> | undefined;
   return skill.description || manifest?.meta?.description || manifest?.description;
+};
+
+const getSkillCategory = (skill: AgentSkillItem) => {
+  const manifest = skill.manifest as Record<string, any> | undefined;
+  return manifest?.meta?.category || manifest?.category;
+};
+
+const CATEGORY_LABELS: Record<string, Partial<Record<Locale, string>>> = {
+  [ALL_CATEGORY_KEY]: { 'en-US': 'All', 'zh-CN': '全部', 'zh-TW': '全部' },
+  'business': { 'en-US': 'Business', 'zh-CN': '商业', 'zh-TW': '商業' },
+  'agent-to-agent-protocols': {
+    'en-US': 'Agent-to-Agent',
+    'zh-CN': 'Agent 协议',
+    'zh-TW': 'Agent 協議',
+  },
+  'ai-llms': { 'en-US': 'AI & LLMs', 'zh-CN': 'AI 与 LLM', 'zh-TW': 'AI 與 LLM' },
+  'apple-apps-services': {
+    'en-US': 'Apple Apps',
+    'zh-CN': 'Apple 应用',
+    'zh-TW': 'Apple 應用',
+  },
+  'browser-automation': {
+    'en-US': 'Browser & Automation',
+    'zh-CN': '浏览器与自动化',
+    'zh-TW': '瀏覽器與自動化',
+  },
+  'calendar-scheduling': {
+    'en-US': 'Calendar',
+    'zh-CN': '日历与日程',
+    'zh-TW': '日曆與排程',
+  },
+  'clawdbot-tools': { 'en-US': 'Clawdbot', 'zh-CN': 'Clawdbot', 'zh-TW': 'Clawdbot' },
+  'cli-utilities': { 'en-US': 'CLI', 'zh-CN': '命令行', 'zh-TW': '命令列' },
+  'coding-agents-ides': { 'en-US': 'Coding', 'zh-CN': '编程', 'zh-TW': '程式開發' },
+  'communication': { 'en-US': 'Communication', 'zh-CN': '沟通协作', 'zh-TW': '溝通協作' },
+  'data-analytics': { 'en-US': 'Data', 'zh-CN': '数据分析', 'zh-TW': '資料分析' },
+  'developer': { 'en-US': 'Developer', 'zh-CN': '开发者', 'zh-TW': '開發者' },
+  'devops-cloud': { 'en-US': 'DevOps & Cloud', 'zh-CN': 'DevOps 与云', 'zh-TW': 'DevOps 與雲' },
+  'finance': { 'en-US': 'Finance', 'zh-CN': '金融', 'zh-TW': '金融' },
+  'gaming-entertainment': { 'en-US': 'Gaming', 'zh-CN': '游戏娱乐', 'zh-TW': '遊戲娛樂' },
+  'gaming': { 'en-US': 'Gaming', 'zh-CN': '游戏', 'zh-TW': '遊戲' },
+  'git-github': { 'en-US': 'Git & GitHub', 'zh-CN': 'Git 与 GitHub', 'zh-TW': 'Git 與 GitHub' },
+  'health-fitness': { 'en-US': 'Health', 'zh-CN': '健康健身', 'zh-TW': '健康健身' },
+  'health-wellness': { 'en-US': 'Health', 'zh-CN': '健康', 'zh-TW': '健康' },
+  'image-video-generation': {
+    'en-US': 'Image & Video',
+    'zh-CN': '图像与视频',
+    'zh-TW': '圖像與影片',
+  },
+  'ios-macos-development': {
+    'en-US': 'iOS & macOS',
+    'zh-CN': 'iOS 与 macOS',
+    'zh-TW': 'iOS 與 macOS',
+  },
+  'lifestyle': { 'en-US': 'Lifestyle', 'zh-CN': '生活方式', 'zh-TW': '生活方式' },
+  'marketing-sales': { 'en-US': 'Marketing', 'zh-CN': '营销销售', 'zh-TW': '行銷銷售' },
+  'media-generate': { 'en-US': 'Media', 'zh-CN': '媒体生成', 'zh-TW': '媒體生成' },
+  'media-streaming': { 'en-US': 'Media', 'zh-CN': '媒体串流', 'zh-TW': '媒體串流' },
+  'moltbook': { 'en-US': 'Moltbook', 'zh-CN': 'Moltbook', 'zh-TW': 'Moltbook' },
+  'news': { 'en-US': 'News', 'zh-CN': '新闻', 'zh-TW': '新聞' },
+  'notes-pkm': { 'en-US': 'Notes', 'zh-CN': '笔记知识库', 'zh-TW': '筆記知識庫' },
+  'pdf-documents': { 'en-US': 'PDF & Docs', 'zh-CN': 'PDF 与文档', 'zh-TW': 'PDF 與文件' },
+  'productivity': { 'en-US': 'Productivity', 'zh-CN': '效率工具', 'zh-TW': '效率工具' },
+  'productivity-tasks': { 'en-US': 'Tasks', 'zh-CN': '任务效率', 'zh-TW': '任務效率' },
+  'science-education': { 'en-US': 'Education', 'zh-CN': '科学教育', 'zh-TW': '科學教育' },
+  'search-research': { 'en-US': 'Search', 'zh-CN': '搜索研究', 'zh-TW': '搜尋研究' },
+  'security-passwords': { 'en-US': 'Security', 'zh-CN': '安全密码', 'zh-TW': '安全密碼' },
+  'self-hosted-automation': {
+    'en-US': 'Self-Hosted',
+    'zh-CN': '自托管自动化',
+    'zh-TW': '自託管自動化',
+  },
+  'shopping': { 'en-US': 'Shopping', 'zh-CN': '购物', 'zh-TW': '購物' },
+  'shopping-ecommerce': { 'en-US': 'Shopping', 'zh-CN': '电商购物', 'zh-TW': '電商購物' },
+  'smart-home-iot': { 'en-US': 'Smart Home', 'zh-CN': '智能家居', 'zh-TW': '智慧家庭' },
+  'social': { 'en-US': 'Social', 'zh-CN': '社交', 'zh-TW': '社交' },
+  'speech-transcription': { 'en-US': 'Speech', 'zh-CN': '语音转写', 'zh-TW': '語音轉寫' },
+  'stocks-finance': { 'en-US': 'Stocks', 'zh-CN': '股票金融', 'zh-TW': '股票金融' },
+  'tools': { 'en-US': 'Tools', 'zh-CN': '工具', 'zh-TW': '工具' },
+  'transportation': { 'en-US': 'Transport', 'zh-CN': '交通出行', 'zh-TW': '交通出行' },
+  'travel-transport': { 'en-US': 'Travel', 'zh-CN': '旅行交通', 'zh-TW': '旅行交通' },
+  'web-frontend-development': {
+    'en-US': 'Web & Frontend',
+    'zh-CN': 'Web 前端',
+    'zh-TW': 'Web 前端',
+  },
+  'web-search': { 'en-US': 'Web Search', 'zh-CN': '网络搜索', 'zh-TW': '網路搜尋' },
+  'weather': { 'en-US': 'Weather', 'zh-CN': '天气', 'zh-TW': '天氣' },
+};
+
+const SPECIAL_CATEGORY_PARTS: Record<string, string> = {
+  ai: 'AI',
+  cli: 'CLI',
+  devops: 'DevOps',
+  github: 'GitHub',
+  ide: 'IDE',
+  ides: 'IDEs',
+  ios: 'iOS',
+  llms: 'LLMs',
+  macos: 'macOS',
+  mcp: 'MCP',
+  pkm: 'PKM',
+};
+
+const humanizeCategoryKey = (key: string) =>
+  key
+    .split('-')
+    .map(
+      (part) => SPECIAL_CATEGORY_PARTS[part] || `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`,
+    )
+    .join(' ');
+
+const getCategoryLabel = (category: string, locale: Locale) =>
+  CATEGORY_LABELS[category]?.[locale] || humanizeCategoryKey(category);
+
+const buildCategoryOptions = (
+  categories: MarketCategoryItem[],
+  locale: Locale,
+): Array<{ count?: number; key: string; label: string }> => {
+  const normalized = categories
+    .filter((item): item is MarketCategoryItem & { category: string } => Boolean(item?.category))
+    .sort((left, right) => (right.count ?? 0) - (left.count ?? 0))
+    .map((item) => ({
+      count: item.count,
+      key: item.category,
+      label: getCategoryLabel(item.category, locale),
+    }));
+
+  const totalCount = normalized.reduce((sum, item) => sum + (item.count ?? 0), 0);
+
+  return [
+    {
+      count: totalCount || undefined,
+      key: ALL_CATEGORY_KEY,
+      label: getCategoryLabel(ALL_CATEGORY_KEY, locale),
+    },
+    ...normalized,
+  ];
 };
 
 const mergeSkillLists = (...groups: AgentSkillItem[][]): AgentSkillItem[] => {
@@ -166,19 +308,16 @@ const buildInstalledPluginItem = (
   };
 };
 
-const buildInstalledSkillItem = (
-  skill: AgentSkillItem,
-  t: I18nStore['t'],
-): StoreInstalledItem => {
+const buildInstalledSkillItem = (skill: AgentSkillItem, t: I18nStore['t']): StoreInstalledItem => {
   const source = skill.source || 'user';
   const label =
-    source === 'builtin' ? t.storeBuiltIn : source === 'market' ? t.storeFromStore : t.storeImported;
-  const badgeColor =
     source === 'builtin'
-      ? '#059669'
+      ? t.storeBuiltIn
       : source === 'market'
-        ? semanticColors.primary
-        : '#ea580c';
+        ? t.storeFromStore
+        : t.storeImported;
+  const badgeColor =
+    source === 'builtin' ? '#059669' : source === 'market' ? semanticColors.primary : '#ea580c';
   const badgeBackgroundColor =
     source === 'builtin'
       ? 'rgba(5, 150, 105, 0.12)'
@@ -244,10 +383,7 @@ const ItemCard = memo<{
             <Text
               className="text-[9px] font-bold tracking-wide"
               style={{
-                color:
-                  item._source === 'mcp' || item._source === 'legacy'
-                    ? '#007aff'
-                    : '#059669',
+                color: item._source === 'mcp' || item._source === 'legacy' ? '#007aff' : '#059669',
               }}
             >
               {item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'SKILL'}
@@ -414,7 +550,9 @@ function SimpleImportModal({
               {importing ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text className={`font-semibold text-[15px] ${value.trim() ? 'text-white' : 'text-secondary/40'}`}>
+                <Text
+                  className={`font-semibold text-[15px] ${value.trim() ? 'text-white' : 'text-secondary/40'}`}
+                >
                   {buttonText}
                 </Text>
               )}
@@ -636,7 +774,11 @@ function AddCustomMcpModal({
             <View className="w-9 h-1 rounded-full bg-foreground/10" />
           </View>
 
-          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <View className="px-5 pb-4 pt-2">
               <Text className="text-foreground text-[18px] font-bold tracking-tight mb-4">
                 {t.storeAddCustomMcp}
@@ -675,7 +817,9 @@ function AddCustomMcpModal({
                       style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
                       onPress={() => setShowQuickImport(false)}
                     >
-                      <Text className="text-secondary/60 text-[13px] font-semibold">{t.cancel}</Text>
+                      <Text className="text-secondary/60 text-[13px] font-semibold">
+                        {t.cancel}
+                      </Text>
                     </Pressable>
 
                     <Pressable
@@ -683,7 +827,9 @@ function AddCustomMcpModal({
                       disabled={!isQuickImportReady}
                       onPress={handleQuickImport}
                     >
-                      <Text className={`text-[13px] font-semibold ${isQuickImportReady ? 'text-white' : 'text-secondary/40'}`}>
+                      <Text
+                        className={`text-[13px] font-semibold ${isQuickImportReady ? 'text-white' : 'text-secondary/40'}`}
+                      >
                         {t.confirm}
                       </Text>
                     </Pressable>
@@ -765,7 +911,9 @@ function AddCustomMcpModal({
                   className={`flex-1 py-2.5 rounded-lg items-center ${authType === 'none' ? 'bg-primary/10' : ''}`}
                   onPress={() => setAuthType('none')}
                 >
-                  <Text className={`text-[13px] font-semibold ${authType === 'none' ? 'text-primary' : 'text-secondary/60'}`}>
+                  <Text
+                    className={`text-[13px] font-semibold ${authType === 'none' ? 'text-primary' : 'text-secondary/60'}`}
+                  >
                     {t.skillsCustomMcpAuthNone}
                   </Text>
                 </Pressable>
@@ -773,7 +921,9 @@ function AddCustomMcpModal({
                   className={`flex-1 py-2.5 rounded-lg items-center ${authType === 'bearer' ? 'bg-primary/10' : ''}`}
                   onPress={() => setAuthType('bearer')}
                 >
-                  <Text className={`text-[13px] font-semibold ${authType === 'bearer' ? 'text-primary' : 'text-secondary/60'}`}>
+                  <Text
+                    className={`text-[13px] font-semibold ${authType === 'bearer' ? 'text-primary' : 'text-secondary/60'}`}
+                  >
                     {t.skillsCustomMcpAuthBearer}
                   </Text>
                 </Pressable>
@@ -807,7 +957,9 @@ function AddCustomMcpModal({
                   {testing ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Text className={`text-[13px] font-semibold ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}>
+                    <Text
+                      className={`text-[13px] font-semibold ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                    >
                       {t.skillsCustomMcpTestConnection}
                     </Text>
                   )}
@@ -815,9 +967,15 @@ function AddCustomMcpModal({
               </View>
 
               {testResult ? (
-                <View className={`rounded-xl px-4 py-2.5 mb-3 ${testResult === 'success' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-                  <Text className={`text-[13px] ${testResult === 'success' ? 'text-green-600' : 'text-red-500'}`}>
-                    {testResult === 'success' ? t.skillsCustomMcpTestSuccess : t.skillsCustomMcpTestFailed}
+                <View
+                  className={`rounded-xl px-4 py-2.5 mb-3 ${testResult === 'success' ? 'bg-green-500/10' : 'bg-red-500/10'}`}
+                >
+                  <Text
+                    className={`text-[13px] ${testResult === 'success' ? 'text-green-600' : 'text-red-500'}`}
+                  >
+                    {testResult === 'success'
+                      ? t.skillsCustomMcpTestSuccess
+                      : t.skillsCustomMcpTestFailed}
                   </Text>
                 </View>
               ) : null}
@@ -827,7 +985,9 @@ function AddCustomMcpModal({
                 style={{ backgroundColor: 'rgba(0,0,0,0.03)' }}
                 onPress={() => setShowAdvanced((value) => !value)}
               >
-                <Text className={`text-[13px] font-semibold ${showAdvanced ? 'text-primary' : 'text-foreground/70'}`}>
+                <Text
+                  className={`text-[13px] font-semibold ${showAdvanced ? 'text-primary' : 'text-foreground/70'}`}
+                >
                   {t.skillsCustomMcpAdvanced}
                 </Text>
                 <ChevronRight
@@ -873,9 +1033,15 @@ function AddCustomMcpModal({
                       />
                       <Pressable
                         className="justify-center px-1 active:opacity-60"
-                        onPress={() => setHeaders(headers.filter((_, currentIndex) => currentIndex !== index))}
+                        onPress={() =>
+                          setHeaders(headers.filter((_, currentIndex) => currentIndex !== index))
+                        }
                       >
-                        <Trash2 color={semanticColors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                        <Trash2
+                          color={semanticColors.danger}
+                          size={16}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
                       </Pressable>
                     </View>
                   ))}
@@ -927,7 +1093,9 @@ function AddCustomMcpModal({
                 {saving ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text className={`font-semibold text-[15px] ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}>
+                  <Text
+                    className={`font-semibold text-[15px] ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                  >
                     {t.save}
                   </Text>
                 )}
@@ -989,7 +1157,11 @@ function StoreItemModal({
               ) : isEmojiAvatar(detail.avatar) ? (
                 <Text style={{ fontSize: 20 }}>{detail.avatar}</Text>
               ) : (
-                <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <Package
+                  color={semanticColors.primary}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               )}
             </View>
 
@@ -1024,9 +1196,7 @@ function StoreItemModal({
           ) : null}
 
           {detail.installedSkill?.source === 'builtin' ? (
-            <Text className="text-secondary/45 text-[12px] leading-5 mt-4">
-              {t.storeBuiltIn}
-            </Text>
+            <Text className="text-secondary/45 text-[12px] leading-5 mt-4">{t.storeBuiltIn}</Text>
           ) : null}
 
           <View className="mt-5 gap-2">
@@ -1067,15 +1237,18 @@ function StoreItemModal({
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const locale = useI18n((s) => s.locale);
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<StoreTab>('explore');
   const [activeExploreSource, setActiveExploreSource] = useState<ExploreSource>('mcp');
+  const [activeExploreCategory, setActiveExploreCategory] = useState(ALL_CATEGORY_KEY);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [marketItems, setMarketItems] = useState<MarketListItem[]>([]);
+  const [marketCategories, setMarketCategories] = useState<MarketCategoryItem[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
@@ -1096,14 +1269,12 @@ export default function StoreScreen() {
 
   const installedIds = useMemo(
     () =>
-      new Set(
-        [
-          ...installedPlugins.map((plugin) => plugin.identifier),
-          ...installedSkills
-            .map((skill) => skill.identifier)
-            .filter((identifier): identifier is string => Boolean(identifier)),
-        ],
-      ),
+      new Set([
+        ...installedPlugins.map((plugin) => plugin.identifier),
+        ...installedSkills
+          .map((skill) => skill.identifier)
+          .filter((identifier): identifier is string => Boolean(identifier)),
+      ]),
     [installedPlugins, installedSkills],
   );
 
@@ -1148,11 +1319,23 @@ export default function StoreScreen() {
     const query = debouncedQuery.trim().toLowerCase();
 
     return builtinSkillsCatalog
-      .filter((skill) =>
-        matchesStoreQuery(query, [skill.name, skill.identifier, getSkillDescription(skill)]),
-      )
+      .filter((skill) => {
+        const category = getSkillCategory(skill);
+        const matchesCategory =
+          activeExploreCategory === ALL_CATEGORY_KEY || category === activeExploreCategory;
+
+        return (
+          matchesCategory &&
+          matchesStoreQuery(query, [skill.name, skill.identifier, getSkillDescription(skill)])
+        );
+      })
       .map(buildBuiltinMarketItem);
-  }, [builtinSkillsCatalog, debouncedQuery]);
+  }, [activeExploreCategory, builtinSkillsCatalog, debouncedQuery]);
+
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(marketCategories, locale),
+    [locale, marketCategories],
+  );
 
   const updateBuiltinSkillInstallation = useCallback(
     async (identifier: string, shouldInstall: boolean) => {
@@ -1172,6 +1355,19 @@ export default function StoreScreen() {
     [fetchInstalled, uninstalledBuiltinTools],
   );
 
+  const fetchMarketCategories = useCallback(async (source: ExploreSource) => {
+    try {
+      const categories =
+        source === 'mcp'
+          ? await marketSkillApi.getMcpCategories()
+          : await marketSkillApi.getCategories();
+
+      setMarketCategories(Array.isArray(categories) ? categories : []);
+    } catch {
+      setMarketCategories([]);
+    }
+  }, []);
+
   const fetchMarket = useCallback(
     async (source: ExploreSource, page = 1, append = false) => {
       if (append) {
@@ -1184,13 +1380,17 @@ export default function StoreScreen() {
         const result =
           source === 'mcp'
             ? await marketSkillApi.getMcpList({
+                category:
+                  activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory,
                 page,
-                pageSize: 40,
+                pageSize: MARKET_PAGE_SIZE,
                 q: debouncedQuery || undefined,
               })
             : await marketSkillApi.getSkillList({
+                category:
+                  activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory,
                 page,
-                pageSize: 40,
+                pageSize: MARKET_PAGE_SIZE,
                 q: debouncedQuery || undefined,
               });
 
@@ -1204,7 +1404,7 @@ export default function StoreScreen() {
           append ? mergeMarketItems([...prev, ...remoteItems]) : nextItems,
         );
         setMarketPage(page);
-        setMarketHasMore(remoteItems.length >= 40);
+        setMarketHasMore(remoteItems.length >= MARKET_PAGE_SIZE);
       } catch {
         if (!append) setMarketItems([]);
         toast.show('error', t.errorNetwork);
@@ -1213,7 +1413,7 @@ export default function StoreScreen() {
         setMarketLoadingMore(false);
       }
     },
-    [builtinMarketItems, debouncedQuery, t.errorNetwork, toast],
+    [activeExploreCategory, builtinMarketItems, debouncedQuery, t.errorNetwork, toast],
   );
 
   useEffect(() => {
@@ -1221,13 +1421,26 @@ export default function StoreScreen() {
   }, [fetchInstalled]);
 
   useEffect(() => {
-    if (activeTab === 'installed') {
-      void fetchInstalled();
-      return;
-    }
+    if (activeTab !== 'explore') return;
+    void fetchMarketCategories(activeExploreSource);
+  }, [activeExploreSource, activeTab, fetchMarketCategories]);
 
+  // Split to avoid loop: fetchMarket depends on builtinMarketItems, which changes when
+  // fetchInstalled updates builtinSkillsCatalog — that would retrigger fetchInstalled on installed tab
+  useEffect(() => {
+    if (activeTab === 'installed') void fetchInstalled();
+  }, [activeTab, fetchInstalled]);
+
+  useEffect(() => {
+    if (activeTab !== 'explore') return;
     void fetchMarket(activeExploreSource, 1, false);
-  }, [activeExploreSource, activeTab, debouncedQuery, fetchInstalled, fetchMarket]);
+  }, [activeExploreCategory, activeExploreSource, activeTab, debouncedQuery, fetchMarket]);
+
+  useEffect(() => {
+    if (!categoryOptions.some((item) => item.key === activeExploreCategory)) {
+      setActiveExploreCategory(ALL_CATEGORY_KEY);
+    }
+  }, [activeExploreCategory, categoryOptions]);
 
   const refreshMarket = useCallback(async () => {
     if (activeTab !== 'explore') return;
@@ -1237,7 +1450,15 @@ export default function StoreScreen() {
   const loadMoreMarket = useCallback(async () => {
     if (activeTab !== 'explore' || marketLoading || marketLoadingMore || !marketHasMore) return;
     await fetchMarket(activeExploreSource, marketPage + 1, true);
-  }, [activeExploreSource, activeTab, fetchMarket, marketHasMore, marketLoading, marketLoadingMore, marketPage]);
+  }, [
+    activeExploreSource,
+    activeTab,
+    fetchMarket,
+    marketHasMore,
+    marketLoading,
+    marketLoadingMore,
+    marketPage,
+  ]);
 
   const handleInstall = useCallback(
     async (item: MarketListItem) => {
@@ -1257,7 +1478,13 @@ export default function StoreScreen() {
         return false;
       }
     },
-    [fetchInstalled, t.storeInstallFailed, t.storeInstallSuccess, toast, updateBuiltinSkillInstallation],
+    [
+      fetchInstalled,
+      t.storeInstallFailed,
+      t.storeInstallSuccess,
+      toast,
+      updateBuiltinSkillInstallation,
+    ],
   );
 
   const allInstalled = useMemo(
@@ -1285,7 +1512,8 @@ export default function StoreScreen() {
 
     if (selectedEntry.source === 'market') {
       const item = selectedEntry.item as MarketListItem;
-      const installedPlugin = installedPlugins.find((plugin) => plugin.identifier === item.identifier) || null;
+      const installedPlugin =
+        installedPlugins.find((plugin) => plugin.identifier === item.identifier) || null;
       const installedSkill =
         installedSkills.find((skill) => skill.identifier === item.identifier) || null;
 
@@ -1314,14 +1542,18 @@ export default function StoreScreen() {
         : null;
     const installedSkill =
       item.kind === 'skill'
-        ? installedSkills.find((skill) => skill.id === item.id || skill.identifier === item.identifier) || null
+        ? installedSkills.find(
+            (skill) => skill.id === item.id || skill.identifier === item.identifier,
+          ) || null
         : null;
 
     return {
       avatar: item.avatar,
       author:
         installedPlugin?.manifest?.author ||
-        ((installedSkill?.manifest as Record<string, any> | undefined)?.author as string | undefined),
+        ((installedSkill?.manifest as Record<string, any> | undefined)?.author as
+          | string
+          | undefined),
       description: item.description,
       identifier: item.identifier,
       installedPlugin,
@@ -1353,7 +1585,7 @@ export default function StoreScreen() {
         text: t.storeRemove,
         onPress: async () => {
           setActionLoading(true);
-      haptics.light();
+          haptics.light();
           try {
             if (selectedDetail.installedPlugin) {
               await pluginApi.remove(selectedDetail.installedPlugin.identifier);
@@ -1555,7 +1787,9 @@ export default function StoreScreen() {
       <ScreenHeader
         rightElement={<Plus color={semanticColors.primary} size={20} strokeWidth={2} />}
         title={t.tabStore}
-        titleIcon={<Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        titleIcon={
+          <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        }
         onPressRight={() => setShowCreateMenu(true)}
       >
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
@@ -1588,15 +1822,22 @@ export default function StoreScreen() {
                 activeOpacity={0.7}
                 className="rounded-full px-4 py-1.5"
                 key={tab.key}
-                style={{ backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary }}
+                style={{
+                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                }}
                 onPress={() => {
                   haptics.selection();
                   setActiveTab(tab.key);
                 }}
               >
-                <Text className="text-[13px] font-semibold" style={{ color: active ? '#fff' : semanticColors.muted }}>
+                <Text
+                  className="text-[13px] font-semibold"
+                  style={{ color: active ? '#fff' : semanticColors.muted }}
+                >
                   {tab.label}
-                  {tab.key === 'installed' && allInstalled.length > 0 ? ` ${allInstalled.length}` : ''}
+                  {tab.key === 'installed' && allInstalled.length > 0
+                    ? ` ${allInstalled.length}`
+                    : ''}
                 </Text>
               </TouchableOpacity>
             );
@@ -1604,32 +1845,79 @@ export default function StoreScreen() {
         </ScrollView>
 
         {isExplore ? (
-          <ScrollView
-            horizontal
-            className="mx-4 mb-1"
-            contentContainerStyle={{ gap: 6 }}
-            showsHorizontalScrollIndicator={false}
-          >
-            {exploreSources.map((source) => {
-              const active = activeExploreSource === source.key;
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-3.5 py-1.5"
-                  key={source.key}
-                  style={{ backgroundColor: active ? 'rgba(0, 122, 255, 0.1)' : semanticColors.fillTertiary }}
-                  onPress={() => {
-                    haptics.selection();
-                    setActiveExploreSource(source.key);
-                  }}
-                >
-                  <Text className="text-[12px] font-semibold" style={{ color: active ? semanticColors.primary : semanticColors.muted }}>
-                    {source.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <>
+            <ScrollView
+              horizontal
+              className="mx-4 mb-1"
+              contentContainerStyle={{ gap: 6 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              {exploreSources.map((source) => {
+                const active = activeExploreSource === source.key;
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-3.5 py-1.5"
+                    key={source.key}
+                    style={{
+                      backgroundColor: active
+                        ? 'rgba(0, 122, 255, 0.1)'
+                        : semanticColors.fillTertiary,
+                    }}
+                    onPress={() => {
+                      haptics.selection();
+                      setActiveExploreCategory(ALL_CATEGORY_KEY);
+                      setActiveExploreSource(source.key);
+                    }}
+                  >
+                    <Text
+                      className="text-[12px] font-semibold"
+                      style={{ color: active ? semanticColors.primary : semanticColors.muted }}
+                    >
+                      {source.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <ScrollView
+              horizontal
+              className="mx-4 mb-1"
+              contentContainerStyle={{ gap: 6, paddingRight: 12 }}
+              showsHorizontalScrollIndicator={false}
+            >
+              {categoryOptions.map((category) => {
+                const active = activeExploreCategory === category.key;
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-3.5 py-1.5"
+                    key={`${activeExploreSource}-${category.key}`}
+                    style={{
+                      backgroundColor: active
+                        ? 'rgba(0, 122, 255, 0.12)'
+                        : semanticColors.fillTertiary,
+                    }}
+                    onPress={() => {
+                      haptics.selection();
+                      setActiveExploreCategory(category.key);
+                    }}
+                  >
+                    <Text
+                      className="text-[12px] font-semibold"
+                      style={{
+                        color: active ? semanticColors.primary : semanticColors.muted,
+                      }}
+                    >
+                      {category.label}
+                      {category.count ? ` ${category.count}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </>
         ) : null}
       </ScreenHeader>
 
@@ -1638,8 +1926,14 @@ export default function StoreScreen() {
           <ActivityIndicator color={semanticColors.muted} size="large" />
         </View>
       ) : isEmpty && !loading ? (
-        <Animated.View className="flex-1 items-center justify-center px-8" entering={FadeInDown.duration(350)}>
-          <View className="items-center justify-center rounded-3xl bg-foreground/5 mb-5" style={{ width: 80, height: 80 }}>
+        <Animated.View
+          className="flex-1 items-center justify-center px-8"
+          entering={FadeInDown.duration(350)}
+        >
+          <View
+            className="items-center justify-center rounded-3xl bg-foreground/5 mb-5"
+            style={{ width: 80, height: 80 }}
+          >
             <Package color={semanticColors.secondaryText} size={36} strokeWidth={1.3} />
           </View>
           <Text className="text-foreground text-[17px] font-semibold text-center">
@@ -1692,7 +1986,9 @@ export default function StoreScreen() {
                   setSelectedEntry({ item, source: 'installed' });
                 }}
               />
-              {index < filteredInstalled.length - 1 ? <View className="mx-5 h-px bg-foreground/[0.04]" /> : null}
+              {index < filteredInstalled.length - 1 ? (
+                <View className="mx-5 h-px bg-foreground/[0.04]" />
+              ) : null}
             </Animated.View>
           )}
         />
@@ -1704,12 +2000,17 @@ export default function StoreScreen() {
         visible={showCreateMenu}
         onRequestClose={() => setShowCreateMenu(false)}
       >
-        <Pressable className="flex-1 justify-end bg-black/30" onPress={() => setShowCreateMenu(false)}>
+        <Pressable
+          className="flex-1 justify-end bg-black/30"
+          onPress={() => setShowCreateMenu(false)}
+        >
           <Pressable
             className="bg-background rounded-t-3xl px-5 pt-4 pb-8"
             onPress={(e) => e.stopPropagation()}
           >
-            <Text className="text-foreground text-[16px] font-semibold mb-3">{t.storeAddTitle}</Text>
+            <Text className="text-foreground text-[16px] font-semibold mb-3">
+              {t.storeAddTitle}
+            </Text>
 
             <TouchableOpacity
               activeOpacity={0.7}
@@ -1720,8 +2021,14 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <LinkIcon color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="text-foreground text-[14px] font-medium ml-3">{t.storeImportUrl}</Text>
+                <LinkIcon
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text className="text-foreground text-[14px] font-medium ml-3">
+                  {t.storeImportUrl}
+                </Text>
               </View>
             </TouchableOpacity>
 
@@ -1734,8 +2041,14 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Github color={semanticColors.foreground} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="text-foreground text-[14px] font-medium ml-3">{t.storeImportGithub}</Text>
+                <Github
+                  color={semanticColors.foreground}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text className="text-foreground text-[14px] font-medium ml-3">
+                  {t.storeImportGithub}
+                </Text>
               </View>
             </TouchableOpacity>
 
@@ -1749,7 +2062,9 @@ export default function StoreScreen() {
             >
               <View className="flex-row items-center">
                 <FileArchive color="#f97316" size={16} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="text-foreground text-[14px] font-medium ml-3">{t.storeUploadZip}</Text>
+                <Text className="text-foreground text-[14px] font-medium ml-3">
+                  {t.storeUploadZip}
+                </Text>
               </View>
             </TouchableOpacity>
 
@@ -1762,8 +2077,14 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Plus color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="text-foreground text-[14px] font-medium ml-3">{t.storeAddCustomMcp}</Text>
+                <Plus
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text className="text-foreground text-[14px] font-medium ml-3">
+                  {t.storeAddCustomMcp}
+                </Text>
               </View>
             </TouchableOpacity>
           </Pressable>
