@@ -1,6 +1,7 @@
 import { DEFAULT_AGENT_CONFIG, INBOX_SESSION_ID } from '@lobechat/const';
 import { type KnowledgeItem } from '@lobechat/types';
 import { KnowledgeType } from '@lobechat/types';
+import { merge } from '@lobechat/utils';
 import { z } from 'zod';
 
 import { AgentModel } from '@/database/models/agent';
@@ -222,7 +223,12 @@ export const agentRouter = router({
       if (!session) throw new Error(`Session [${input.sessionId}] not found`);
       const sessionId = session.id;
 
-      return ctx.agentModel.findBySessionId(sessionId);
+      const agentConfig = await ctx.agentModel.findBySessionId(sessionId);
+      if (agentConfig) return agentConfig;
+
+      // Session-only: no agent linked, return config from session.config
+      const sessionConfig = (session as { config?: Record<string, unknown> }).config;
+      return merge({}, DEFAULT_AGENT_CONFIG, sessionConfig ?? {}) as typeof DEFAULT_AGENT_CONFIG;
     }),
 
   getAgentConfigById: agentProcedure

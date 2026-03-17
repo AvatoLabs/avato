@@ -1,3 +1,5 @@
+import { themeColors } from './colors';
+
 export const tokens = {
   // Spacing
   spacing: {
@@ -39,13 +41,13 @@ export const tokens = {
 
   // Semantic colors — markdown & code blocks
   markdownColors: {
-    text: '#1a1a1a',
-    heading: '#111',
-    codeInlineBg: 'rgba(0,0,0,0.05)',
-    codeInlineColor: '#e83e8c',
-    codeBlockBg: '#f5f5f5',
-    codeBlockBorder: 'rgba(0,0,0,0.05)',
-    link: '#007aff',
+    text: themeColors.markdownText,
+    heading: themeColors.markdownHeading,
+    codeInlineBg: themeColors.markdownCodeInlineBg,
+    codeInlineColor: themeColors.markdownCodeInlineColor,
+    codeBlockBg: themeColors.markdownCodeBlockBg,
+    codeBlockBorder: themeColors.border,
+    link: themeColors.markdownLink,
   },
 
   // Typography

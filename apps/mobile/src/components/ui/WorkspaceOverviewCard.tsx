@@ -6,7 +6,6 @@ import { Image as RNImage, Platform, Text, View } from 'react-native';
 import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
-import { themeColors } from '../../theme';
 import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
@@ -39,7 +38,6 @@ export function WorkspaceOverviewCard({
   onPressModel,
   onPressProviders,
 }: WorkspaceOverviewCardProps) {
-  const colors = themeColors.light;
   const { t } = useI18n();
   const useNativeBlur = Platform.OS !== 'android';
   const resolvedAvatarUri = useResolvedRemoteAsset(userAvatar);
@@ -62,7 +60,9 @@ export function WorkspaceOverviewCard({
                 />
               ) : (
                 <Text className="text-primary text-[16px] font-bold">
-                  {String(userName || 'U').slice(0, 2).toUpperCase()}
+                  {String(userName || 'U')
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </Text>
               )}
             </View>
@@ -79,7 +79,11 @@ export function WorkspaceOverviewCard({
                 </Text>
               </View>
             </View>
-            <ChevronRight color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <ChevronRight
+              color={semanticColors.primary}
+              size={20}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           </PressableScale>
 
           {/* Sub-cards — each independently tappable */}
@@ -88,7 +92,10 @@ export function WorkspaceOverviewCard({
               className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
               onPress={onPressModel}
             >
-              <Text className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: semanticColors.primary }}>
+              <Text
+                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                style={{ color: semanticColors.primary }}
+              >
                 {t.settingsDefaultModel}
               </Text>
               <Text
@@ -102,11 +109,17 @@ export function WorkspaceOverviewCard({
               className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
               onPress={onPressProviders}
             >
-              <Text className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: semanticColors.primary }}>
+              <Text
+                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                style={{ color: semanticColors.primary }}
+              >
                 {t.workspaceProviders}
               </Text>
               <Text className="text-foreground text-[14px] font-medium tracking-tight">
-                {(t.providerCountActive ?? '{count} active').replace('{count}', String(providerCount ?? 0))}
+                {(t.providerCountActive ?? '{count} active').replace(
+                  '{count}',
+                  String(providerCount ?? 0),
+                )}
               </Text>
             </PressableScale>
           </View>
@@ -124,7 +137,9 @@ export function WorkspaceOverviewCard({
                 />
               ) : (
                 <Text className="text-primary text-[16px] font-bold">
-                  {String(userName || 'U').slice(0, 2).toUpperCase()}
+                  {String(userName || 'U')
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </Text>
               )}
             </View>
@@ -141,7 +156,11 @@ export function WorkspaceOverviewCard({
                 </Text>
               </View>
             </View>
-            <ChevronRight color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <ChevronRight
+              color={semanticColors.primary}
+              size={20}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           </PressableScale>
 
           {/* Sub-cards — each independently tappable */}
@@ -150,7 +169,10 @@ export function WorkspaceOverviewCard({
               className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
               onPress={onPressModel}
             >
-              <Text className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: semanticColors.primary }}>
+              <Text
+                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                style={{ color: semanticColors.primary }}
+              >
                 {t.settingsDefaultModel}
               </Text>
               <Text
@@ -164,11 +186,17 @@ export function WorkspaceOverviewCard({
               className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
               onPress={onPressProviders}
             >
-              <Text className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: semanticColors.primary }}>
+              <Text
+                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                style={{ color: semanticColors.primary }}
+              >
                 {t.workspaceProviders}
               </Text>
               <Text className="text-foreground text-[14px] font-medium tracking-tight">
-                {(t.providerCountActive ?? '{count} active').replace('{count}', String(providerCount ?? 0))}
+                {(t.providerCountActive ?? '{count} active').replace(
+                  '{count}',
+                  String(providerCount ?? 0),
+                )}
               </Text>
             </PressableScale>
           </View>

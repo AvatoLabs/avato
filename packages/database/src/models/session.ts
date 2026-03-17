@@ -261,6 +261,7 @@ export class SessionModel {
         // Editor data
         editorData,
       } = config as any;
+
       if (type === 'group') {
         const result = await trx
           .insert(sessions)
@@ -275,6 +276,38 @@ export class SessionModel {
           })
           .returning();
 
+        return result[0];
+      }
+
+      if (sessionOnly) {
+        // Session-only: store config in session, no agent created
+        const sessionConfig: Record<string, unknown> = {
+          avatar,
+          backgroundColor,
+          chatConfig: chatConfig || {},
+          description,
+          model: typeof model === 'string' ? model : undefined,
+          params: params || {},
+          plugins,
+          provider,
+          systemRole,
+          title,
+        };
+        const result = await trx
+          .insert(sessions)
+          .values({
+            ...session,
+            config: Object.keys(sessionConfig).some((k) => sessionConfig[k] !== undefined)
+              ? sessionConfig
+              : undefined,
+            createdAt: new Date(),
+            id,
+            slug,
+            type,
+            updatedAt: new Date(),
+            userId: this.userId,
+          })
+          .returning();
         return result[0];
       }
 
@@ -302,7 +335,7 @@ export class SessionModel {
           tts: tts || {},
           updatedAt: new Date(),
           userId: this.userId,
-          virtual: sessionOnly,
+          virtual: false,
         })
         .returning();
 
@@ -502,9 +535,13 @@ export class SessionModel {
     if (!session) return;
 
     if (!session.agent) {
-      throw new Error(
-        'this session is not assign with agent, please contact with admin to fix this issue.',
-      );
+      // Session-only: update session.config instead of agent
+      const existing = ((session as any).config as Record<string, unknown>) ?? {};
+      const merged = merge(existing, data);
+      return this.db
+        .update(sessions)
+        .set({ config: merged, updatedAt: new Date() })
+        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, this.userId)));
     }
 
     // First process the params field: undefined means delete, null means disable flag
@@ -611,20 +648,31 @@ export class SessionModel {
     // For agent sessions, include agent-specific fields
     // TODO: Need a better implementation in the future, currently only taking the first one
     const agent = agentsToSessions?.[0]?.agent;
+    const sessionConfig = (res as { config?: Record<string, unknown> }).config as
+      | Record<string, unknown>
+      | undefined;
+    const effectiveConfig = agent ? (agent as any) : sessionConfig;
     return {
       ...res,
-      config: agent ? (agent as any) : { model: '', plugins: [] }, // Ensure config exists for agent sessions
+      config: effectiveConfig ?? { model: '', plugins: [] }, // Agent or session-level config
       group: groupId,
       meta: {
-        avatar: agent?.avatar ?? avatar ?? undefined,
-        backgroundColor: agent?.backgroundColor ?? backgroundColor ?? undefined,
-        description: agent?.description ?? description ?? undefined,
-
+        avatar: agent?.avatar ?? (sessionConfig?.avatar as string) ?? avatar ?? undefined,
+        backgroundColor:
+          agent?.backgroundColor ??
+          (sessionConfig?.backgroundColor as string) ??
+          backgroundColor ??
+          undefined,
+        description:
+          agent?.description ?? (sessionConfig?.description as string) ?? description ?? undefined,
         marketIdentifier: agent?.marketIdentifier ?? undefined,
         tags: agent?.tags ?? undefined,
-        title: agent?.title ?? title ?? undefined,
+        title: agent?.title ?? (sessionConfig?.title as string) ?? title ?? undefined,
       },
-      model: agent?.model || '',
+      model:
+        (agent?.model as string | undefined) ??
+        (typeof sessionConfig?.model === 'string' ? sessionConfig.model : '') ??
+        '',
       tagId,
       type: 'agent',
     } as LobeAgentSession;

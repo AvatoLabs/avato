@@ -2,13 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sync with src/theme/colors.ts — single source of truth for theming */
 @layer base {
   :root {
-    --color-background: #fff;
+    --color-background: #ffffff;
     --color-foreground: #1f1f1f;
     --color-primary: #007aff;
     --color-secondary: #8c8c8c;
-    --color-border: #d9d9d9;
-    --color-card: #fff;
+    --color-border: rgba(0, 0, 0, 0.05);
+    --color-card: #ffffff;
   }
 }

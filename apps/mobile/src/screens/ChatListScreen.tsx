@@ -60,6 +60,7 @@ import { resolveTagColor, withAlpha } from '../constants/tags';
 import {
   agentApi,
   agentGroupApi,
+  agentSkillApi,
   messageApi,
   type MessageSearchResult,
   pluginApi,
@@ -78,8 +79,15 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { getUserMemorySettings } from '../store/user';
+import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { ChatSession, InstalledPlugin, MobileMemoryEffort, SessionTag } from '../types';
+import type {
+  AgentSkillItem,
+  ChatSession,
+  InstalledPlugin,
+  MobileMemoryEffort,
+  SessionTag,
+} from '../types';
 
 type RelativeTimeText = {
   relativeTimeDays: string;
@@ -553,14 +561,21 @@ export default function ChatListScreen({ navigation }: any) {
       setDraftSessionId(null);
 
       const agentConfig = await agentApi.getConfigBySession(newId);
+      const chatConfigUpdate = {
+        chatConfig: {
+          memory: { effort: memoryEffort, enabled: memoryEnabled },
+          searchMode: searchEnabled ? 'on' : 'off',
+        },
+      };
       if (agentConfig?.id) {
         try {
-          await agentApi.updateConfig(agentConfig.id, {
-            chatConfig: {
-              memory: { effort: memoryEffort, enabled: memoryEnabled },
-              searchMode: searchEnabled ? 'on' : 'off',
-            },
-          });
+          await agentApi.updateConfig(agentConfig.id, chatConfigUpdate);
+        } catch {
+          /* best-effort */
+        }
+      } else {
+        try {
+          await sessionApi.updateSessionConfig(newId, chatConfigUpdate);
         } catch {
           /* best-effort */
         }
@@ -665,6 +680,7 @@ export default function ChatListScreen({ navigation }: any) {
   const [builtinSkillItems, setBuiltinSkillItems] = useState<
     { description: string; icon: MobileRecommendedBuiltinIcon; identifier: string; title: string }[]
   >([]);
+  const [agentSkillItems, setAgentSkillItems] = useState<AgentSkillItem[]>([]);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [enabledSkills, setEnabledSkills] = useState<Set<string>>(() => new Set());
@@ -672,7 +688,7 @@ export default function ChatListScreen({ navigation }: any) {
   const handlePluginsPress = useCallback(() => {
     haptics.light();
     setSkillsVisible(true);
-    // Pre-load builtins immediately (same as web)
+    // Pre-load builtins immediately (same as ChatDetailScreen)
     const preloadBuiltins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((b) => ({
       description: (t as any)[b.descriptionKey] ?? '',
       icon: b.icon,
@@ -681,9 +697,8 @@ export default function ChatListScreen({ navigation }: any) {
     }));
     setBuiltinSkillItems(preloadBuiltins);
     setLoadingSkills(true);
-    Promise.all([pluginApi.list(), userApi.getState()])
-      .then(([list, userState]) => {
-        const plugins = list ?? [];
+    Promise.all([pluginApi.list(), agentSkillApi.list(), userApi.getState()])
+      .then(([plugins, skills, userState]) => {
         const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
         const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
           (b) => !uninstalled.includes(b.identifier),
@@ -694,10 +709,25 @@ export default function ChatListScreen({ navigation }: any) {
           title: (t as any)[b.titleKey] ?? b.identifier,
         }));
         setBuiltinSkillItems(builtins);
+
         const builtinIds = new Set(builtins.map((b) => b.identifier));
-        const filteredPlugins = plugins.filter((p) => !builtinIds.has(p.identifier));
+        const filteredSkills = (skills ?? []).filter(
+          (s) => s.identifier && !builtinIds.has(s.identifier),
+        );
+        setAgentSkillItems(filteredSkills);
+
+        const skillIds = new Set(filteredSkills.map((s) => s.identifier).filter(Boolean));
+        const filteredPlugins = (plugins ?? []).filter(
+          (p) => !builtinIds.has(p.identifier) && !skillIds.has(p.identifier),
+        );
         setInstalledPlugins(filteredPlugins);
-        setEnabledSkills(new Set(filteredPlugins.map((p) => p.identifier)));
+
+        const allIds = [
+          ...builtins.map((b) => b.identifier),
+          ...filteredSkills.map((s) => s.identifier ?? s.id).filter(Boolean),
+          ...filteredPlugins.map((p) => p.identifier),
+        ];
+        setEnabledSkills(new Set(allIds));
       })
       .catch(() => {})
       .finally(() => setLoadingSkills(false));
@@ -1087,13 +1117,6 @@ export default function ChatListScreen({ navigation }: any) {
       <ScreenHeader
         subtitle={t.activeChats.replace('{count}', String(visibleSessions.length))}
         title={greeting}
-        titleIcon={
-          <MessageCircle
-            color={semanticColors.primary}
-            size={20}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
         rightActions={
           <View className="flex-row items-center">
             <TouchableOpacity
@@ -1112,6 +1135,13 @@ export default function ChatListScreen({ navigation }: any) {
               />
             </TouchableOpacity>
           </View>
+        }
+        titleIcon={
+          <MessageCircle
+            color={semanticColors.primary}
+            size={20}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         }
       >
         <ScrollView
@@ -1703,79 +1733,125 @@ export default function ChatListScreen({ navigation }: any) {
             <View className="items-center pt-3 pb-1">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-            <View className="px-5 pb-3 pt-2">
+            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
               <Text className="text-foreground text-[18px] font-bold tracking-tight">
                 {t.skillsTitle}
               </Text>
             </View>
-            <ScrollView className="px-5 pb-8" style={{ maxHeight: 400 }}>
-              {loadingSkills ? (
-                <View className="items-center py-10">
-                  <ActivityIndicator color={semanticColors.primary} size="small" />
-                </View>
-              ) : builtinSkillItems.length === 0 && installedPlugins.length === 0 ? (
-                <View className="items-center py-10">
-                  <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
-                  <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
-                    {t.skillsEmptyDesc}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {builtinSkillItems.map((item) => (
-                    <View
-                      className="flex-row items-center py-3.5"
-                      key={`builtin-${item.identifier}`}
-                    >
-                      <BuiltinSkillIcon icon={item.icon} size={36} />
-                      <View className="flex-1 ml-3 mr-3">
-                        <Text
-                          className="text-foreground text-[15px] font-medium tracking-tight"
-                          numberOfLines={1}
-                        >
-                          {item.title}
-                        </Text>
-                        {item.description ? (
-                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
-                            {item.description}
+            <View style={{ maxHeight: 400 }}>
+              <ScrollView className="px-5 pb-8" showsVerticalScrollIndicator={true}>
+                {loadingSkills ? (
+                  <View className="items-center py-10">
+                    <ActivityIndicator color={semanticColors.primary} size="small" />
+                  </View>
+                ) : builtinSkillItems.length === 0 &&
+                  agentSkillItems.length === 0 &&
+                  installedPlugins.length === 0 ? (
+                  <View className="items-center py-10">
+                    <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
+                    <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
+                      {t.skillsEmptyDesc}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    {builtinSkillItems.map((item) => (
+                      <View
+                        className="flex-row items-center py-3.5"
+                        key={`builtin-${item.identifier}`}
+                      >
+                        <BuiltinSkillIcon icon={item.icon} size={36} />
+                        <View className="flex-1 ml-3 mr-3">
+                          <Text
+                            className="text-foreground text-[15px] font-medium tracking-tight"
+                            numberOfLines={1}
+                          >
+                            {item.title}
                           </Text>
-                        ) : null}
+                          {item.description ? (
+                            <Text
+                              className="text-secondary/50 text-[12px] mt-0.5"
+                              numberOfLines={1}
+                            >
+                              {item.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Switch
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
+                          value={enabledSkills.has(item.identifier)}
+                          onValueChange={() => handleToggleSkill(item.identifier)}
+                        />
                       </View>
-                      <Switch
-                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
-                        value={enabledSkills.has(item.identifier)}
-                        onValueChange={() => handleToggleSkill(item.identifier)}
-                      />
-                    </View>
-                  ))}
-                  {installedPlugins.map((plugin) => (
-                    <View className="flex-row items-center py-3.5" key={plugin.identifier}>
-                      <View className="w-9 h-9 rounded-xl bg-foreground/5 items-center justify-center mr-3">
-                        <Text className="text-[18px]">{plugin.manifest?.meta?.avatar ?? '🔌'}</Text>
-                      </View>
-                      <View className="flex-1 mr-3">
-                        <Text
-                          className="text-foreground text-[15px] font-medium tracking-tight"
-                          numberOfLines={1}
-                        >
-                          {plugin.manifest?.meta?.title || plugin.identifier}
-                        </Text>
-                        {plugin.manifest?.meta?.description ? (
-                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
-                            {plugin.manifest.meta.description}
+                    ))}
+                    {agentSkillItems.map((skill) => (
+                      <View className="flex-row items-center py-3.5" key={`skill-${skill.id}`}>
+                        <View className="flex-1 mr-3">
+                          <Text
+                            className="text-foreground text-[15px] font-medium tracking-tight"
+                            numberOfLines={1}
+                          >
+                            {skill.name || skill.identifier || skill.id}
                           </Text>
-                        ) : null}
+                          {skill.description ? (
+                            <Text
+                              className="text-secondary/50 text-[12px] mt-0.5"
+                              numberOfLines={1}
+                            >
+                              {skill.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Switch
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
+                          value={enabledSkills.has(skill.identifier ?? skill.id)}
+                          onValueChange={() => handleToggleSkill(skill.identifier ?? skill.id)}
+                        />
                       </View>
-                      <Switch
-                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
-                        value={enabledSkills.has(plugin.identifier)}
-                        onValueChange={() => handleToggleSkill(plugin.identifier)}
-                      />
-                    </View>
-                  ))}
-                </>
-              )}
-            </ScrollView>
+                    ))}
+                    {installedPlugins.map((plugin) => (
+                      <View className="flex-row items-center py-3.5" key={plugin.identifier}>
+                        <View className="w-9 h-9 rounded-xl bg-foreground/5 items-center justify-center mr-3">
+                          <Text className="text-[18px]">
+                            {plugin.manifest?.meta?.avatar ?? '🔌'}
+                          </Text>
+                        </View>
+                        <View className="flex-1 mr-3">
+                          <Text
+                            className="text-foreground text-[15px] font-medium tracking-tight"
+                            numberOfLines={1}
+                          >
+                            {plugin.manifest?.meta?.title || plugin.identifier}
+                          </Text>
+                          {plugin.manifest?.meta?.description ? (
+                            <Text
+                              className="text-secondary/50 text-[12px] mt-0.5"
+                              numberOfLines={1}
+                            >
+                              {plugin.manifest.meta.description}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Switch
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
+                          value={enabledSkills.has(plugin.identifier)}
+                          onValueChange={() => handleToggleSkill(plugin.identifier)}
+                        />
+                      </View>
+                    ))}
+                  </>
+                )}
+              </ScrollView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

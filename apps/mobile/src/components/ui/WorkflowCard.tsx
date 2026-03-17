@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import { themeColors } from '../../theme';
+import { themeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 interface WorkflowCardProps {
@@ -24,8 +24,6 @@ export function WorkflowCard({
   icon: IconComp,
   onPress,
 }: WorkflowCardProps) {
-  const colors = themeColors.light;
-
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -35,7 +33,7 @@ export function WorkflowCard({
       <BlurView className="flex-1 p-4 border border-black/5" intensity={40} tint="light">
         <View className="flex-row items-center justify-between mb-3">
           <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-            <IconComp color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <IconComp color={themeColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </View>
           {tag && (
             <View className="bg-primary/10 px-2.5 py-1 rounded-full">

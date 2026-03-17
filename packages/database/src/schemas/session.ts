@@ -1,4 +1,13 @@
-import { boolean, index, integer, pgTable, text, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 
 import { idGenerator, randomSlug } from '../utils/idGenerator';
@@ -95,6 +104,9 @@ export const sessions = pgTable(
     tagId: text('tag_id').references(() => sessionTags.id, { onDelete: 'set null' }),
     clientId: text('client_id'),
     pinned: boolean('pinned').default(false),
+
+    /** Session-level agent config when no agent is linked (sessionOnly flow). */
+    config: jsonb('config').$type<Record<string, unknown>>(),
 
     ...timestamps,
   },

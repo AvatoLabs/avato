@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-import { agentApi, aiProviderApi } from '../lib/api';
+import { agentApi, aiProviderApi, sessionApi } from '../lib/api';
 import { isGroupSessionLike } from '../lib/session';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 import { useAgentStore } from './agent';
@@ -163,6 +163,11 @@ export const useModelStore = create<ModelState>((set, get) => ({
         const config = await agentApi.getConfigBySession(sessionId);
         if (config?.id) {
           await agentApi.updateConfig(config.id, { model: modelId, provider: providerId });
+        } else {
+          await sessionApi.updateSessionConfig(sessionId, {
+            model: modelId,
+            provider: providerId,
+          });
         }
       } catch {
         /* best-effort */

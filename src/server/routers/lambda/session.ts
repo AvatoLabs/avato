@@ -13,7 +13,15 @@ import { LobeMetaDataSchema } from '@/types/meta';
 import { type BatchTaskResult } from '@/types/service';
 import { type ChatSessionList, type LobeGroupSession } from '@/types/session';
 
-const DEFAULT_SESSION_TITLES = ['New Conversation', '新对话'];
+const DEFAULT_SESSION_TITLES = [
+  '',
+  'New Chat',
+  'New Conversation',
+  'New conversation',
+  '新对话',
+  '新對話',
+  'Untitled',
+];
 
 function extractMessageText(content: string | null | undefined): string {
   if (!content || typeof content !== 'string') return '';
@@ -30,6 +38,36 @@ function extractMessageText(content: string | null | undefined): string {
     // Plain text
   }
   return content.trim();
+}
+
+function isDefaultSessionTitle(title: string | null | undefined) {
+  const trimmedTitle = title?.trim() ?? '';
+
+  return !trimmedTitle || DEFAULT_SESSION_TITLES.includes(trimmedTitle);
+}
+
+function pickLatestSessionTitleContext(
+  messages: Awaited<ReturnType<MessageModel['queryBySessionId']>>,
+): { lastAssistantContent: string; userPrompt: string } | null {
+  for (let assistantIndex = messages.length - 1; assistantIndex >= 0; assistantIndex -= 1) {
+    const assistantMessage = messages[assistantIndex];
+    if (assistantMessage.role !== 'assistant') continue;
+
+    const lastAssistantContent = extractMessageText(assistantMessage.content);
+    if (!lastAssistantContent) continue;
+
+    for (let userIndex = assistantIndex - 1; userIndex >= 0; userIndex -= 1) {
+      const userMessage = messages[userIndex];
+      if (userMessage.role !== 'user') continue;
+
+      const userPrompt = extractMessageText(userMessage.content);
+      if (!userPrompt) continue;
+
+      return { lastAssistantContent, userPrompt };
+    }
+  }
+
+  return null;
 }
 
 const sessionProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -117,7 +155,7 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const data = await ctx.sessionModel.create(input);
+      const data = await ctx.sessionModel.create(input as any);
 
       return data.id;
     }),
@@ -161,25 +199,17 @@ export const sessionRouter = router({
       if (!session) return null;
 
       const effectiveTitle = (session as any).title ?? (session as any).agent?.title ?? '';
-      if (effectiveTitle && !DEFAULT_SESSION_TITLES.includes(effectiveTitle)) {
+      if (!isDefaultSessionTitle(effectiveTitle)) {
         return effectiveTitle;
       }
 
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const messages = await messageModel.queryBySessionId(sessionId);
-      const userMsg = messages.find((m) => m.role === 'user');
-      const assistantMsg = messages.find((m) => m.role === 'assistant');
-      if (!userMsg || !assistantMsg) return null;
-
-      const userPrompt = extractMessageText(userMsg.content);
-      const lastAssistantContent = extractMessageText(assistantMsg.content);
-      if (!userPrompt.trim() || !lastAssistantContent.trim()) return null;
+      const titleContext = pickLatestSessionTitleContext(messages);
+      if (!titleContext) return null;
 
       const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
-      const title = await systemAgent.generateTopicTitle({
-        lastAssistantContent,
-        userPrompt,
-      });
+      const title = await systemAgent.generateTopicTitle(titleContext);
       if (!title) return null;
 
       const sess = session as { type?: string; agent?: unknown };
@@ -232,7 +262,7 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return ctx.sessionModel.update(input.id, input.value);
+      return ctx.sessionModel.update(input.id, input.value as any);
     }),
   updateSessionChatConfig: sessionProcedure
     .input(

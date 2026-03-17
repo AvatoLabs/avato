@@ -368,6 +368,18 @@ const isDefaultTopicTitle = (title?: string | null) => {
   );
 };
 
+const DEFAULT_SESSION_TITLES = ['', 'New Conversation', 'New conversation', '新对话', '新對話'];
+
+const isDefaultSessionTitle = (title?: string | null) => {
+  const trimmedTitle = title?.trim() ?? '';
+  if (!trimmedTitle) return true;
+
+  const { t } = useI18n.getState();
+  return (
+    DEFAULT_SESSION_TITLES.includes(trimmedTitle) || trimmedTitle === t.chatListNewConversation
+  );
+};
+
 const extractPersistedMessageIds = (messages: ChatMessage[]) =>
   messages
     .map((message) => message.id)
@@ -431,6 +443,23 @@ const getGroupOperationErrorMessage = (
   }
 
   return '';
+};
+
+const syncGroupMessagesForSession = (
+  sessionId: string,
+  serverMessages: ChatMessage[] | undefined,
+  placeholderMessages: ChatMessage[],
+) => {
+  if (!serverMessages?.length) return;
+
+  const mergedMessages = mergePersistedMessagesWithLocal(serverMessages, placeholderMessages);
+
+  useChatStore.setState((s) => ({
+    messagesBySession: {
+      ...s.messagesBySession,
+      [sessionId]: mergedMessages,
+    },
+  }));
 };
 
 const buildUserStreamContent = (
@@ -874,6 +903,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       try {
         const t = useI18n.getState().t;
+        const placeholderMessages = get().messagesBySession[sessionId] || [];
         const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
         const supervisorAgentId = groupDetail?.supervisorAgentId;
 
@@ -895,6 +925,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const resolvedTopicId = result.topicId ?? topicId ?? null;
         syncTopicsForSession(sessionId, result.topics, resolvedTopicId);
+        syncGroupMessagesForSession(sessionId, result.messages, placeholderMessages);
 
         set((s) => ({
           activeOperationId: result.operationId ?? null,
@@ -915,7 +946,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
 
         if (result.success === false) {
-          throw new Error(t.errorUnknown);
+          throw new Error(result.error?.trim() || t.errorSendFailed);
+        }
+
+        if (!result.operationId) {
+          throw new Error(result.error?.trim() || t.errorSendFailed);
         }
 
         let didSettle = false;
@@ -962,7 +997,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
               break;
             }
 
-            throw new Error(getGroupOperationErrorMessage(operationStatus) || t.errorUnknown);
+            const assistantError =
+              typeof assistantMessage?.error === 'string' ? assistantMessage.error : '';
+
+            throw new Error(
+              assistantError || getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed,
+            );
           }
         }
 
@@ -1384,8 +1424,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
           // Fire-and-forget: generate session title if still default
           const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-          const defaultTitles = ['New Conversation', '新对话'];
-          if (session && (!session.title || defaultTitles.includes(session.title))) {
+          if (session && isDefaultSessionTitle(session.title)) {
             sessionApi
               .generateTitle(sessionId)
               .then((newTitle) => {
@@ -1394,7 +1433,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   useSessionStore.getState().fetchSessions();
                 }
               })
-              .catch((err) => console.warn('[ChatStore] generateSessionTitle failed:', err));
+              .catch((err) => {
+                console.warn('[ChatStore] generateSessionTitle failed:', err);
+                useToast.getState().show('error', useI18n.getState().t.errorUnknown);
+              });
           }
 
           if (shouldCreateTopicAfterResponse && !resolvedTopicId) {

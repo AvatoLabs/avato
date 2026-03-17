@@ -102,14 +102,18 @@ export class DeprecatedDataImporterRepos {
         const mapArray = await trx
           .insert(sessions)
           .values(
-            data.sessions.map(({ id, createdAt, updatedAt, group, ...res }) => ({
-              ...res,
-              clientId: id,
-              createdAt: new Date(createdAt),
-              groupId: group ? sessionGroupIdMap[group] : null,
-              updatedAt: new Date(updatedAt),
-              userId: this.userId,
-            })),
+            data.sessions.map(({ id, createdAt, updatedAt, group, ...res }) => {
+              const { config, ...rest } = res as { config?: unknown; [k: string]: unknown };
+              return {
+                ...rest,
+                clientId: id,
+                config: config as Record<string, unknown> | undefined,
+                createdAt: new Date(createdAt),
+                groupId: group ? sessionGroupIdMap[group] : null,
+                updatedAt: new Date(updatedAt),
+                userId: this.userId,
+              };
+            }),
           )
           .onConflictDoUpdate({
             set: { updatedAt: new Date() },
@@ -190,7 +194,6 @@ export class DeprecatedDataImporterRepos {
       // import messages
       if (data.messages && data.messages.length > 0) {
         // 1. find skip ones
-        console.time('find messages');
         const skipQuery = await trx.query.messages.findMany({
           where: and(
             eq(messages.userId, this.userId),
@@ -200,7 +203,6 @@ export class DeprecatedDataImporterRepos {
             ),
           ),
         });
-        console.timeEnd('find messages');
 
         messageResult.skips = skipQuery.length;
 
@@ -227,15 +229,12 @@ export class DeprecatedDataImporterRepos {
             }),
           );
 
-          console.time('insert messages');
           const BATCH_SIZE = 100; // Number of records to insert per batch
 
           for (let i = 0; i < inertValues.length; i += BATCH_SIZE) {
             const batch = inertValues.slice(i, i + BATCH_SIZE);
             await trx.insert(messages).values(batch);
           }
-
-          console.timeEnd('insert messages');
 
           const messageIdArray = await trx
             .select({ clientId: messages.clientId, id: messages.id })
@@ -255,7 +254,6 @@ export class DeprecatedDataImporterRepos {
           );
 
           // 3. update parentId for messages
-          console.time('execute updates parentId');
           const parentIdUpdates = shouldInsertMessages
             .filter((msg) => msg.parentId) // Only process messages with parentId
             .map((msg) => {
@@ -284,7 +282,6 @@ export class DeprecatedDataImporterRepos {
             // console.log('sql:', SQL.sql);
             // console.log('params:', SQL.params);
           }
-          console.timeEnd('execute updates parentId');
 
           // 4. insert message plugins
           const pluginInserts = shouldInsertMessages.filter((msg) => msg.plugin);

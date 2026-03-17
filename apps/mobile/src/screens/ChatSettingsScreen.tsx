@@ -2,15 +2,7 @@
  * ChatSettingsScreen — conversation-level settings only.
  * Agent management is handled in Agent screens.
  */
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  MessageSquare,
-  Pencil,
-  Tag,
-  Trash2,
-} from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronRight, Tag } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,9 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -34,8 +24,25 @@ import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { resolveTagColor, withAlpha } from '../constants/tags';
+import {
+  AgentSection,
+  DangerZoneSection,
+  DEFAULT_PARAMS,
+  GroupSettingsSection,
+  ParamsSection,
+  SessionHeaderSection,
+  TagSection,
+  toParamsPatch,
+  toParamsState,
+} from '../features/ChatSettings';
 import { useAgentConfig } from '../hooks/useAgentConfig';
-import { agentApi, agentGroupApi, type AgentGroupDetail, sessionTagApi } from '../lib/api';
+import {
+  agentApi,
+  agentGroupApi,
+  type AgentGroupDetail,
+  sessionApi,
+  sessionTagApi,
+} from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -77,63 +84,6 @@ function SectionCard({ children, title }: { children: React.ReactNode; title: st
   );
 }
 
-function Field({
-  label,
-  multiline,
-  onChangeText,
-  placeholder,
-  value,
-}: {
-  label: string;
-  multiline?: boolean;
-  onChangeText: (value: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <View className="mb-3 last:mb-0">
-      <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">{label}</Text>
-      <TextInput
-        className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
-        multiline={multiline}
-        placeholder={placeholder}
-        placeholderTextColor={semanticColors.secondaryText}
-        style={multiline ? { minHeight: 96, textAlignVertical: 'top' } : undefined}
-        value={value}
-        onChangeText={onChangeText}
-      />
-    </View>
-  );
-}
-
-function ToggleRow({
-  description,
-  label,
-  onValueChange,
-  value,
-}: {
-  description?: string;
-  label: string;
-  onValueChange: (value: boolean) => void;
-  value: boolean;
-}) {
-  return (
-    <View className="mb-3 flex-row items-center rounded-2xl bg-foreground/[0.04] px-4 py-3 last:mb-0">
-      <View className="flex-1 pr-4">
-        <Text className="text-[14px] font-semibold text-foreground">{label}</Text>
-        {description ? (
-          <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60">{description}</Text>
-        ) : null}
-      </View>
-      <Switch
-        trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${semanticColors.primary}66` }}
-        value={value}
-        onValueChange={onValueChange}
-      />
-    </View>
-  );
-}
-
 export default function ChatSettingsScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId;
   const insets = useSafeAreaInsets();
@@ -149,7 +99,10 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const clearMessages = useChatStore((s) => s.clearMessages);
 
-  const { config: agentConfig } = useAgentConfig(sessionId, !isGroupSession && !!sessionId);
+  const { config: agentConfig, invalidate } = useAgentConfig(
+    sessionId,
+    !isGroupSession && !!sessionId,
+  );
   const agentSummary =
     agentConfig && agentConfig.id
       ? {
@@ -175,6 +128,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const [groupRevealDM, setGroupRevealDM] = useState(false);
   const [addMembersVisible, setAddMembersVisible] = useState(false);
   const [supervisorModelDrawerVisible, setSupervisorModelDrawerVisible] = useState(false);
+  const [params, setParams] = useState(DEFAULT_PARAMS);
+
+  useEffect(() => {
+    if (agentConfig) setParams(toParamsState(agentConfig));
+  }, [agentConfig]);
 
   useEffect(() => {
     if (session?.title) setTitle(session.title);
@@ -315,6 +273,16 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       const newTitle = title.trim();
       if (newTitle && newTitle !== session?.title) {
         await renameSession(sessionId, newTitle);
+      }
+
+      // Save params: session-only → sessionApi; has agent → agentApi
+      const paramsPatch = toParamsPatch(params);
+      if (agentConfig?.id) {
+        await agentApi.updateConfig(agentConfig.id, { params: paramsPatch });
+        invalidate();
+      } else {
+        await sessionApi.updateSessionConfig(sessionId, { params: paramsPatch });
+        invalidate();
       }
 
       return true;
@@ -509,199 +477,52 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
-        <Animated.View entering={FadeInDown.delay(50).duration(300)}>
-          <View className="mx-5 mb-5 mt-5">
-            <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
-              {t.chatSettingsTitle}
-            </Text>
-            <View className="rounded-2xl bg-foreground/[0.02] px-4 py-3">
-              <View className="flex-row items-center">
-                <View className="flex-1">
-                  <TextInput
-                    className="text-[16px] font-semibold tracking-tight text-foreground"
-                    placeholder={t.chatListNewConversation}
-                    placeholderTextColor={semanticColors.secondaryText}
-                    value={title}
-                    onChangeText={setTitle}
-                  />
-                </View>
-                <Pencil color={semanticColors.secondaryText} size={14} strokeWidth={1.5} />
-              </View>
-              {isGroupSession ? (
-                <View className="mt-4 border-t border-foreground/5 pt-4">
-                  <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
-                    {t.agentConfigDescription}
-                  </Text>
-                  <TextInput
-                    multiline
-                    className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
-                    placeholder={t.agentConfigDescriptionPlaceholder}
-                    placeholderTextColor={semanticColors.secondaryText}
-                    style={{ minHeight: 88, textAlignVertical: 'top' }}
-                    value={groupDescription}
-                    onChangeText={setGroupDescription}
-                  />
-                </View>
-              ) : null}
-            </View>
-          </View>
-        </Animated.View>
+        <SessionHeaderSection
+          delay={50}
+          description={groupDescription}
+          isGroupSession={isGroupSession}
+          title={title}
+          onDescriptionChange={isGroupSession ? setGroupDescription : undefined}
+          onTitleChange={setTitle}
+        />
 
         {!isGroupSession ? (
-          <Animated.View entering={FadeInDown.delay(90).duration(300)}>
-            <View className="mx-5 mb-5">
-              <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
-                {t.chatSettingsTag}
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                className="flex-row items-center rounded-2xl bg-foreground/[0.02] px-4 py-3"
-                onPress={() => setTagSelectorVisible(true)}
-              >
-                <View
-                  className="mr-3 h-2.5 w-2.5 rounded-full"
-                  style={{
-                    backgroundColor: currentTag
-                      ? resolveTagColor(currentTag.color)
-                      : semanticColors.secondaryText,
-                  }}
-                />
-                <View
-                  className="mr-3 rounded-full px-3 py-1"
-                  style={{
-                    backgroundColor: currentTag
-                      ? withAlpha(currentTag.color, '18')
-                      : semanticColors.fillTertiary,
-                  }}
-                >
-                  <Text
-                    className="text-[13px] font-semibold"
-                    style={{
-                      color: currentTag
-                        ? resolveTagColor(currentTag.color)
-                        : semanticColors.secondaryText,
-                    }}
-                  >
-                    {currentTag?.name || t.tagNone}
-                  </Text>
-                </View>
-                <View className="flex-1" />
-                <ChevronRight
-                  color={semanticColors.secondaryText}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
+          <TagSection
+            currentTag={currentTag}
+            delay={90}
+            onPress={() => setTagSelectorVisible(true)}
+          />
         ) : null}
 
         {!isGroupSession ? (
-          <Animated.View entering={FadeInDown.delay(100).duration(300)}>
-            <View className="mx-5 mb-5">
-              <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
-                {t.agentConfigTitle}
-              </Text>
-              <View className="rounded-2xl bg-foreground/[0.02] px-4 py-3">
-                <View>
-                  <Text className="text-[14px] font-medium text-foreground">
-                    {agentSummary
-                      ? `${agentSummary.avatar || '🤖'} ${agentSummary.title || t.settingsDefaultAgent}`
-                      : t.settingsNotConfigured}
-                  </Text>
-                  {agentSummary?.description ? (
-                    <Text className="mt-1 text-[12px] leading-5 text-secondary/60">
-                      {agentSummary.description}
-                    </Text>
-                  ) : null}
-                </View>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  className="mt-4 self-start rounded-xl bg-primary/10 px-3 py-2"
-                  onPress={() => navigation.navigate('AgentConfig', { sessionId })}
-                >
-                  <Text className="text-[13px] font-semibold text-primary">
-                    {t.agentConfigTitle}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Animated.View>
+          <AgentSection
+            agentSummary={agentSummary}
+            delay={100}
+            onPress={() => navigation.navigate('AgentConfig', { sessionId })}
+          />
+        ) : null}
+
+        {!isGroupSession ? (
+          <ParamsSection delay={110} params={params} onParamsChange={setParams} />
         ) : null}
 
         {isGroupSession ? (
-          <Animated.View entering={FadeInDown.delay(100).duration(300)}>
-            <SectionCard title={t.chatSettingsGroup}>
-              {groupLoading ? (
-                <View className="items-center justify-center py-6">
-                  <ActivityIndicator color={semanticColors.primary} />
-                </View>
-              ) : (
-                <>
-                  <ToggleRow
-                    description={t.groupSettingsAllowDMDesc}
-                    label={t.groupSettingsAllowDM}
-                    value={groupAllowDM}
-                    onValueChange={setGroupAllowDM}
-                  />
-                  <ToggleRow
-                    description={t.groupSettingsRevealDMDesc}
-                    label={t.groupSettingsRevealDM}
-                    value={groupRevealDM}
-                    onValueChange={setGroupRevealDM}
-                  />
-                </>
-              )}
-            </SectionCard>
-          </Animated.View>
-        ) : null}
-
-        {isGroupSession ? (
-          <Animated.View entering={FadeInDown.delay(120).duration(300)}>
-            <SectionCard title={t.chatSettingsSystemPrompt}>
-              {groupLoading ? (
-                <View className="items-center justify-center py-6">
-                  <ActivityIndicator color={semanticColors.primary} />
-                </View>
-              ) : (
-                <Field
-                  multiline
-                  label={t.chatSettingsSystemPrompt}
-                  placeholder={t.chatSettingsSystemPromptPlaceholder}
-                  value={groupSystemPrompt}
-                  onChangeText={setGroupSystemPrompt}
-                />
-              )}
-            </SectionCard>
-          </Animated.View>
-        ) : null}
-
-        {isGroupSession ? (
-          <Animated.View entering={FadeInDown.delay(140).duration(300)}>
-            <SectionCard title={t.agentConfigOpening}>
-              {groupLoading ? (
-                <View className="items-center justify-center py-6">
-                  <ActivityIndicator color={semanticColors.primary} />
-                </View>
-              ) : (
-                <>
-                  <Field
-                    multiline
-                    label={t.agentConfigOpeningMessage}
-                    value={groupOpeningMessage}
-                    onChangeText={setGroupOpeningMessage}
-                  />
-                  <Field
-                    multiline
-                    label={t.agentConfigOpeningQuestions}
-                    placeholder={t.agentConfigOpeningQuestionsPlaceholder}
-                    value={groupOpeningQuestions}
-                    onChangeText={setGroupOpeningQuestions}
-                  />
-                </>
-              )}
-            </SectionCard>
-          </Animated.View>
+          <GroupSettingsSection
+            allowDM={groupAllowDM}
+            delay={100}
+            loading={groupLoading}
+            revealDM={groupRevealDM}
+            config={{
+              openingMessage: groupOpeningMessage,
+              openingQuestions: groupOpeningQuestions,
+              systemPrompt: groupSystemPrompt,
+            }}
+            onAllowDMChange={setGroupAllowDM}
+            onOpeningMessageChange={setGroupOpeningMessage}
+            onOpeningQuestionsChange={setGroupOpeningQuestions}
+            onRevealDMChange={setGroupRevealDM}
+            onSystemPromptChange={setGroupSystemPrompt}
+          />
         ) : null}
 
         {isGroupSession ? (
@@ -822,48 +643,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
           </Animated.View>
         ) : null}
 
-        <Animated.View entering={FadeInDown.delay(150).duration(300)}>
-          <View className="mx-5 mt-4">
-            <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
-              {t.chatSettingsDangerZone}
-            </Text>
-            <View className="overflow-hidden rounded-2xl bg-foreground/[0.02]">
-              <TouchableOpacity
-                activeOpacity={0.6}
-                className="flex-row items-center px-5 py-4 active:bg-foreground/[0.04]"
-                onPress={handleClearHistory}
-              >
-                <MessageSquare
-                  color="#f5a623"
-                  size={17}
-                  strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 12 }}
-                />
-                <Text className="flex-1 text-[15px] font-medium text-foreground">
-                  {t.chatSettingsClearHistory}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.6}
-                className="flex-row items-center px-5 py-4 active:bg-foreground/[0.04]"
-                onPress={handleDeleteChat}
-              >
-                <Trash2
-                  color={semanticColors.danger}
-                  size={17}
-                  strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 12 }}
-                />
-                <Text
-                  className="flex-1 text-[15px] font-medium"
-                  style={{ color: semanticColors.danger }}
-                >
-                  {t.chatSettingsDeleteConversation}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
+        <DangerZoneSection
+          delay={150}
+          onClearHistory={handleClearHistory}
+          onDeleteChat={handleDeleteChat}
+        />
       </ScrollView>
 
       <Modal

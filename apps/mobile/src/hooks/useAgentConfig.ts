@@ -14,6 +14,7 @@ export function useAgentConfig(sessionId: string | undefined, enabled = true) {
   const invalidate = useAgentConfigStore((s) => s.invalidate);
   const setConfig = useAgentConfigStore((s) => s.setConfig);
 
+  const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
 
   const config: AgentConfigCacheItem | undefined =
@@ -22,8 +23,12 @@ export function useAgentConfig(sessionId: string | undefined, enabled = true) {
   const refetch = useCallback(async () => {
     if (!sessionId || !enabled) return undefined;
     setLoading(true);
+    setError(null);
     try {
       return await fetchConfig(sessionId);
+    } catch (error) {
+      setError(error);
+      return undefined;
     } finally {
       setLoading(false);
     }
@@ -33,9 +38,14 @@ export function useAgentConfig(sessionId: string | undefined, enabled = true) {
     if (!sessionId || !enabled) return;
     let cancelled = false;
     setLoading(true);
-    fetchConfig(sessionId).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    setError(null);
+    fetchConfig(sessionId)
+      .catch((error) => {
+        if (!cancelled) setError(error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -43,6 +53,7 @@ export function useAgentConfig(sessionId: string | undefined, enabled = true) {
 
   return {
     config: config === undefined && sessionId && enabled ? undefined : config,
+    error,
     invalidate: useCallback(() => {
       if (sessionId) invalidate(sessionId);
     }, [invalidate, sessionId]),

@@ -43,11 +43,9 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
         configMap: { ...s.configMap, [sessionId]: value },
       }));
       return value;
-    } catch {
-      set((s) => ({
-        configMap: { ...s.configMap, [sessionId]: null },
-      }));
-      return null;
+    } catch (error) {
+      console.warn('[AgentConfigStore] fetchConfig error:', error);
+      throw error;
     }
   },
 

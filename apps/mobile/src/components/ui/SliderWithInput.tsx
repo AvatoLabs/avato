@@ -6,6 +6,7 @@ import React, { useCallback, useState } from 'react';
 import { PanResponder, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { semanticColors } from '../../constants/colors';
+import { themeColors, uiColors } from '../../theme/colors';
 
 interface SliderWithInputProps {
   disabled?: boolean;
@@ -182,17 +183,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    borderColor: '#007aff',
-    backgroundColor: '#007aff',
+    borderColor: themeColors.primary,
+    backgroundColor: themeColors.primary,
   },
   checkboxUnchecked: {
-    borderColor: '#d9d9d9',
+    borderColor: themeColors.borderDefault,
     backgroundColor: 'transparent',
   },
   checkboxInner: {
     width: 10,
     height: 10,
-    backgroundColor: '#fff',
+    backgroundColor: themeColors.surface,
     borderRadius: 2,
   },
   sliderContainer: {
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
   },
   trackBackground: {
     height: 6,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: uiColors.sliderTrack,
     borderRadius: 3,
     overflow: 'hidden',
     width: '100%',
@@ -223,47 +224,47 @@ const styles = StyleSheet.create({
   },
   tick: {
     position: 'absolute',
-    backgroundColor: '#999',
+    backgroundColor: themeColors.iconMuted,
     opacity: 0.5,
     bottom: 0,
   },
   trackActive: {
     height: '100%',
-    backgroundColor: '#007aff',
+    backgroundColor: themeColors.primary,
     borderRadius: 3,
   },
   trackDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: uiColors.sliderTrackDisabled,
   },
   thumb: {
     position: 'absolute',
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#007aff',
+    backgroundColor: themeColors.primary,
     top: '50%',
     marginTop: -10,
-    shadowColor: '#000',
+    shadowColor: uiColors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
   thumbDisabled: {
-    backgroundColor: '#999',
+    backgroundColor: themeColors.iconMuted,
   },
   input: {
     width: 60,
     height: 36,
     borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: themeColors.fillTertiary,
     textAlign: 'center',
     fontSize: 14,
     color: semanticColors.foreground,
     fontWeight: '500',
   },
   inputDisabled: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
-    color: '#999',
+    backgroundColor: themeColors.fillQuaternary,
+    color: themeColors.iconMuted,
   },
 });

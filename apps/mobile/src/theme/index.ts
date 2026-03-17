@@ -1,23 +1,28 @@
 import { DefaultTheme } from '@react-navigation/native';
 
+import { themeColors as colorTokens } from './colors';
+
+/** @deprecated Use themeColors from theme/colors for component styling */
 export const themeColors = {
   light: {
-    primary: '#007aff',
-    secondary: '#8c8c8c',
-    muted: '#999999',
-    background: '#ffffff',
+    background: colorTokens.background,
+    muted: colorTokens.muted,
+    primary: colorTokens.primary,
+    secondary: colorTokens.secondaryText,
   },
 };
+
+export { themeColors as colorTokens } from './colors';
 
 export const AvatoLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: themeColors.light.primary,
-    background: themeColors.light.background,
-    card: themeColors.light.background,
-    text: '#1f1f1f',
+    primary: colorTokens.primary,
+    background: colorTokens.background,
+    card: colorTokens.card,
+    text: colorTokens.foreground,
     border: 'transparent',
-    notification: '#ff3b30',
+    notification: colorTokens.danger,
   },
 };

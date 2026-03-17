@@ -502,10 +502,11 @@ function SessionAgentConfigScreen({
     } finally {
       setLoadingSkills(false);
     }
-  }, [t, t.errorNetwork, toast]);
+  }, [t, toast]);
 
   const {
     config: agentConfig,
+    error: agentConfigError,
     loading: configLoading,
     setConfig,
   } = useAgentConfig(sessionId, true);
@@ -516,6 +517,12 @@ function SessionAgentConfigScreen({
   }, [fetchModels, loadSelection, sessionId]);
 
   useEffect(() => {
+    if (agentConfigError) {
+      toast.show('error', t.errorNetwork);
+      navigation.goBack();
+      return;
+    }
+
     if (agentConfig === undefined) {
       setLoading(configLoading);
       return;
@@ -531,7 +538,15 @@ function SessionAgentConfigScreen({
     setConversationExpanded(true);
     setAdvancedExpanded(!!agentConfig.systemRole);
     setLoading(false);
-  }, [agentConfig, configLoading, navigation, t.settingsNotConfigured, toast]);
+  }, [
+    agentConfig,
+    agentConfigError,
+    configLoading,
+    navigation,
+    t.errorNetwork,
+    t.settingsNotConfigured,
+    toast,
+  ]);
 
   const toggleSkill = useCallback((identifier: string) => {
     haptics.light();
@@ -951,11 +966,11 @@ function SessionAgentConfigScreen({
                           key={`builtin-${item.identifier}`}
                           accessory={
                             <Switch
+                              value={selectedSkills.has(item.identifier)}
                               trackColor={{
                                 false: 'rgba(120,120,128,0.18)',
                                 true: `${semanticColors.primary}66`,
                               }}
-                              value={selectedSkills.has(item.identifier)}
                               onValueChange={() => toggleSkill(item.identifier)}
                             />
                           }
@@ -983,11 +998,11 @@ function SessionAgentConfigScreen({
                             title={item.name}
                             accessory={
                               <Switch
+                                value={selectedSkills.has(identifier)}
                                 trackColor={{
                                   false: 'rgba(120,120,128,0.18)',
                                   true: `${semanticColors.primary}66`,
                                 }}
-                                value={selectedSkills.has(identifier)}
                                 onValueChange={() => toggleSkill(identifier)}
                               />
                             }
@@ -1005,11 +1020,11 @@ function SessionAgentConfigScreen({
                           key={`plugin-${plugin.identifier}`}
                           accessory={
                             <Switch
+                              value={selectedSkills.has(plugin.identifier)}
                               trackColor={{
                                 false: 'rgba(120,120,128,0.18)',
                                 true: `${semanticColors.primary}66`,
                               }}
-                              value={selectedSkills.has(plugin.identifier)}
                               onValueChange={() => toggleSkill(plugin.identifier)}
                             />
                           }

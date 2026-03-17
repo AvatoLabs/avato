@@ -333,6 +333,9 @@ const normalizeMessage = (message: any): ChatMessage => {
   };
 };
 
+const normalizeMessages = (messages: any[] | undefined | null): ChatMessage[] =>
+  Array.isArray(messages) ? messages.map((message) => normalizeMessage(message)) : [];
+
 interface MobileToolFunction {
   arguments?: string;
   name?: string;
@@ -663,6 +666,10 @@ export const sessionApi = {
   },
   updateChatConfig: (id: string, config: Record<string, unknown>) =>
     trpcMutate('session.updateSessionChatConfig', { id, value: config }),
+
+  /** Update session-level agent config (for session-only chats with no linked agent). */
+  updateSessionConfig: (id: string, config: Record<string, unknown>) =>
+    trpcMutate('session.updateSessionConfig', { id, value: config }),
   generateTitle: (sessionId: string) =>
     trpcMutate<string | null>('session.generateSessionTitle', { sessionId }),
 };
@@ -738,12 +745,17 @@ export const aiAgentApi = {
   }) =>
     trpcMutate<{
       assistantMessageId?: string;
+      error?: string;
       isCreateNewTopic?: boolean;
+      messages?: any[];
       operationId?: string;
       success?: boolean;
       topicId?: string;
       topics?: { items: any[]; total: number };
-    }>('aiAgent.execGroupAgent', params),
+    }>('aiAgent.execGroupAgent', params).then((result) => ({
+      ...result,
+      messages: normalizeMessages(result.messages),
+    })),
   interruptTask: (params: { operationId?: string; threadId?: string }) =>
     trpcMutate('aiAgent.interruptTask', params),
   getOperationStatus: (params: {

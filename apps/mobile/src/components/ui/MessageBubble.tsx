@@ -51,6 +51,7 @@ import { useI18n } from '../../lib/i18n';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
 import { useSessionStore } from '../../store/session';
+import { chatAccent, themeColors, uiColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import type {
   ChatMessage,
@@ -76,7 +77,7 @@ const StreamingCursor = memo(() => {
       {visible && (
         <View
           style={{
-            backgroundColor: '#0A84FF',
+            backgroundColor: themeColors.userBubbleBg,
             borderRadius: 1,
             height: 16,
             width: 3,
@@ -117,9 +118,9 @@ const CodeCopyButton = memo<{ code: string }>(({ code }) => {
       onPress={handleCopy}
     >
       {copied ? (
-        <Check color="#34C759" size={14} strokeWidth={2} />
+        <Check color={themeColors.iconSuccess} size={14} strokeWidth={2} />
       ) : (
-        <Copy color="#999" size={14} strokeWidth={2} />
+        <Copy color={themeColors.iconMuted} size={14} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );
@@ -310,7 +311,7 @@ const ArtifactBlock = memo<{
 
   const htmlContent = isSvg
     ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0;padding:8px;background:#fff;display:flex;justify-content:center;align-items:center}
+<style>body{margin:0;padding:8px;background:${themeColors.surface};display:flex;justify-content:center;align-items:center}
 svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
     : isHtml
       ? content.includes('<html')
@@ -324,7 +325,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
   return (
     <View
       style={{
-        backgroundColor: 'rgba(0,0,0,0.02)',
+        backgroundColor: themeColors.fillQuaternary,
         borderRadius: 12,
         marginVertical: 6,
         overflow: 'hidden',
@@ -335,7 +336,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           activeOpacity={0.7}
           style={{
             alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.03)',
+            backgroundColor: themeColors.fillTertiary,
             flexDirection: 'row',
             justifyContent: 'space-between',
             paddingHorizontal: 12,
@@ -343,13 +344,16 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           }}
           onPress={() => setExpanded((v) => !v)}
         >
-          <Text numberOfLines={1} style={{ color: '#333', fontSize: 13, fontWeight: '600' }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: uiColors.textDark, fontSize: 13, fontWeight: '600' }}
+          >
             {title}
           </Text>
           {expanded ? (
-            <ChevronDown color="#999" size={14} />
+            <ChevronDown color={themeColors.iconMuted} size={14} />
           ) : (
-            <ChevronRight color="#999" size={14} />
+            <ChevronRight color={themeColors.iconMuted} size={14} />
           )}
         </TouchableOpacity>
       ) : null}
@@ -359,7 +363,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           originWhitelist={['*']}
           scrollEnabled={false}
           source={{ html: htmlContent }}
-          style={{ backgroundColor: '#fff', height, width: '100%' }}
+          style={{ backgroundColor: themeColors.surface, height, width: '100%' }}
           onMessage={(e) => {
             try {
               const data = JSON.parse(e.nativeEvent.data);
@@ -374,20 +378,6 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
   );
 });
 ArtifactBlock.displayName = 'ArtifactBlock';
-
-const chatAccent = {
-  badgeBg: 'rgba(37,99,235,0.1)',
-  badgeText: '#2563eb',
-  bubbleBg: '#ffffff',
-  bubbleBorder: 'rgba(15,23,42,0.06)',
-  chipBg: 'rgba(37,99,235,0.08)',
-  chipBorder: 'rgba(37,99,235,0.16)',
-  elevatedBg: '#ffffff',
-  quoteBorder: '#3b82f6',
-  sectionBg: '#ffffff',
-  sectionBorder: 'rgba(15,23,42,0.06)',
-  subtleBg: 'rgba(15,23,42,0.035)',
-} as const;
 
 const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageSpeaker }>(
   ({ fallbackLabel, speaker }) => {
@@ -566,14 +556,14 @@ const MessageBubble = memo<MessageBubbleProps>(
     const tableStyles = {
       tableWrapper: { marginVertical: 8 },
       table: {
-        borderColor: 'rgba(0,0,0,0.04)',
+        borderColor: themeColors.borderSubtle,
         borderRadius: 8,
         borderWidth: 0.5,
         overflow: 'hidden' as const,
       },
-      thead: { backgroundColor: 'rgba(0,0,0,0.04)' },
+      thead: { backgroundColor: themeColors.fillTertiary },
       th: {
-        borderColor: 'rgba(0,0,0,0.04)',
+        borderColor: themeColors.borderSubtle,
         borderWidth: 0.5,
         color: mc.heading,
         flex: 1,
@@ -581,9 +571,9 @@ const MessageBubble = memo<MessageBubbleProps>(
         fontWeight: '600' as const,
         padding: 8,
       },
-      tr: { borderColor: 'rgba(0,0,0,0.04)', borderBottomWidth: 0.5 },
+      tr: { borderColor: themeColors.borderSubtle, borderBottomWidth: 0.5 },
       td: {
-        borderColor: 'rgba(0,0,0,0.04)',
+        borderColor: themeColors.borderSubtle,
         borderWidth: 0.5,
         color: mc.text,
         flex: 1,
@@ -656,7 +646,7 @@ const MessageBubble = memo<MessageBubbleProps>(
         marginTop: 6,
       },
       list_item: { marginBottom: 4 },
-      hr: { backgroundColor: 'rgba(0,0,0,0.05)', height: 1, marginVertical: 12 },
+      hr: { backgroundColor: themeColors.divider, height: 1, marginVertical: 12 },
       ...tableStyles,
     };
 
@@ -664,7 +654,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       ...markdownStyles,
       body: {
         ...markdownStyles.body,
-        color: '#ffffff',
+        color: themeColors.userBubbleText,
         flexShrink: 1,
         fontSize: 15,
         lineHeight: 20,
@@ -672,37 +662,45 @@ const MessageBubble = memo<MessageBubbleProps>(
       paragraph: { marginBottom: 2, marginTop: 2 },
       blockquote: {
         ...markdownStyles.blockquote,
-        borderLeftColor: 'rgba(255,255,255,0.7)',
+        borderLeftColor: themeColors.userBubbleTextMuted,
       },
       blockquote_content: {
         ...markdownStyles.blockquote_content,
-        color: '#ffffff',
+        color: themeColors.userBubbleText,
       },
       code_inline: {
         ...markdownStyles.code_inline,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        color: '#ffffff',
+        backgroundColor: themeColors.userBubbleCodeBg,
+        color: themeColors.userBubbleText,
       },
       fence: {
         ...markdownStyles.fence,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: themeColors.userBubbleTableBg,
+        borderColor: themeColors.userBubbleTableBorder,
       },
       code_block: {
         ...markdownStyles.code_block,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        color: '#ffffff',
+        backgroundColor: themeColors.userBubbleTableBg,
+        color: themeColors.userBubbleText,
       },
-      link: { color: '#b3d9ff' },
-      heading1: { ...markdownStyles.heading1, color: '#fff' },
-      heading2: { ...markdownStyles.heading2, color: '#fff' },
-      heading3: { ...markdownStyles.heading3, color: '#fff' },
-      hr: { ...markdownStyles.hr, backgroundColor: 'rgba(255,255,255,0.15)' },
-      table: { ...tableStyles.table, borderColor: 'rgba(255,255,255,0.2)' },
-      thead: { backgroundColor: 'rgba(255,255,255,0.1)' },
-      th: { ...tableStyles.th, borderColor: 'rgba(255,255,255,0.15)', color: '#fff' },
-      tr: { ...tableStyles.tr, borderColor: 'rgba(255,255,255,0.12)' },
-      td: { ...tableStyles.td, borderColor: 'rgba(255,255,255,0.1)', color: '#fff' },
+      link: { color: themeColors.userBubbleLink },
+      heading1: { ...markdownStyles.heading1, color: themeColors.userBubbleText },
+      heading2: { ...markdownStyles.heading2, color: themeColors.userBubbleText },
+      heading3: { ...markdownStyles.heading3, color: themeColors.userBubbleText },
+      hr: { ...markdownStyles.hr, backgroundColor: themeColors.userBubbleHr },
+      table: { ...tableStyles.table, borderColor: themeColors.userBubbleTableBorder },
+      thead: { backgroundColor: themeColors.userBubbleTableBorder },
+      th: {
+        ...tableStyles.th,
+        borderColor: themeColors.userBubbleHr,
+        color: themeColors.userBubbleText,
+      },
+      tr: { ...tableStyles.tr, borderColor: themeColors.userBubbleTableBg },
+      td: {
+        ...tableStyles.td,
+        borderColor: themeColors.userBubbleTableBorder,
+        color: themeColors.userBubbleText,
+      },
     };
 
     const markdownRules = {
@@ -967,7 +965,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         isUser
                           ? undefined
                           : {
-                              backgroundColor: '#f5f6f8',
+                              backgroundColor: uiColors.codeBlockLight,
                               borderRadius: 16,
                               padding: 14,
                             }
@@ -977,7 +975,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         autoFocus
                         multiline
                         className="text-[15px] leading-6 min-h-[40px]"
-                        style={{ color: isUser ? '#ffffff' : mc.text }}
+                        style={{ color: isUser ? themeColors.userBubbleText : mc.text }}
                         value={editText}
                         onBlur={handleEditSubmit}
                         onChangeText={setEditText}
@@ -987,13 +985,15 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <TouchableOpacity
                           className="px-3.5 py-1.5 rounded-full"
                           style={{
-                            backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',
+                            backgroundColor: isUser
+                              ? themeColors.userBubbleCodeBg
+                              : themeColors.markdownCodeInlineBg,
                           }}
                           onPress={() => setIsEditing(false)}
                         >
                           <Text
                             style={{
-                              color: isUser ? '#ffffff' : mc.text,
+                              color: isUser ? themeColors.userBubbleText : mc.text,
                               fontSize: 12,
                               fontWeight: '500',
                             }}
@@ -1003,12 +1003,12 @@ const MessageBubble = memo<MessageBubbleProps>(
                         </TouchableOpacity>
                         <TouchableOpacity
                           className="px-3.5 py-1.5 rounded-full bg-primary"
-                          style={isUser ? { backgroundColor: '#ffffff' } : undefined}
+                          style={isUser ? { backgroundColor: themeColors.surface } : undefined}
                           onPress={handleEditSubmit}
                         >
                           <Text
                             style={{
-                              color: isUser ? '#000' : '#ffffff',
+                              color: isUser ? themeColors.foreground : themeColors.userBubbleText,
                               fontSize: 12,
                               fontWeight: '500',
                             }}
@@ -1060,7 +1060,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <ToolResultBlock message={message} />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
-                          <TypingIndicator color="#636366" />
+                          <TypingIndicator color={uiColors.typingIndicator} />
                         )
                       ) : multimodalContentParts?.length ? (
                         <RichContentPartsBlock
@@ -1103,7 +1103,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[12px] font-medium"
-                                style={{ color: '#0A84FF' }}
+                                style={{ color: themeColors.info }}
                               >
                                 {contentCollapsed ? t.chatShowMore : t.chatShowLess}
                               </Text>
@@ -1155,7 +1155,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       accessibilityLabel={t.msgActionRegenerate}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                      style={{ backgroundColor: themeColors.fillTertiary }}
                       onPress={handleRegenerate}
                     >
                       <RefreshCw color={semanticColors.muted} size={14} strokeWidth={2} />
@@ -1166,7 +1166,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       accessibilityLabel={t.msgActionEdit}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                      style={{ backgroundColor: themeColors.fillTertiary }}
                       onPress={handleEdit}
                     >
                       <Pencil color={semanticColors.muted} size={14} strokeWidth={2} />
@@ -1176,7 +1176,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     accessibilityLabel={t.msgActionCopy}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                    style={{ backgroundColor: themeColors.fillTertiary }}
                     onPress={handleCopy}
                   >
                     <Copy color={semanticColors.muted} size={14} strokeWidth={2} />
@@ -1185,7 +1185,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     accessibilityLabel={t.msgActionShare}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                    style={{ backgroundColor: themeColors.fillTertiary }}
                     onPress={handleShare}
                   >
                     <Share2 color={semanticColors.muted} size={14} strokeWidth={2} />
@@ -1195,7 +1195,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       accessibilityLabel={t.msgActionSaveToTopic}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                      style={{ backgroundColor: themeColors.fillTertiary }}
                       onPress={handleSaveToTopic}
                     >
                       <Bookmark color={semanticColors.muted} size={14} strokeWidth={2} />
@@ -1205,7 +1205,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     accessibilityLabel={t.msgActionDelete}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                    style={{ backgroundColor: themeColors.fillTertiary }}
                     onPress={handleDelete}
                   >
                     <Trash2 color={semanticColors.danger} size={14} strokeWidth={2} />
@@ -1380,7 +1380,7 @@ const RichContentPartsBlock = memo<{
             resizeMode="cover"
             source={{ uri: part.image }}
             style={{
-              backgroundColor: 'rgba(0,0,0,0.04)',
+              backgroundColor: themeColors.fillTertiary,
               borderRadius: 16,
               height: 180,
               width: '100%',
@@ -1435,7 +1435,7 @@ const AttachmentBlock = memo<{
             <RNImage
               source={{ uri: image.url }}
               style={{
-                backgroundColor: isUser ? 'rgba(255,255,255,0.14)' : chatAccent.subtleBg,
+                backgroundColor: isUser ? themeColors.userBubbleSubtleBg : chatAccent.subtleBg,
                 borderRadius: 14,
                 height: 120,
                 width: 120,
@@ -1454,7 +1454,7 @@ const AttachmentBlock = memo<{
             className="rounded-2xl px-3 py-2"
             key={file.id}
             style={{
-              backgroundColor: isUser ? 'rgba(255,255,255,0.14)' : chatAccent.subtleBg,
+              backgroundColor: isUser ? themeColors.userBubbleSubtleBg : chatAccent.subtleBg,
             }}
             onPress={() => onOpenFile(file)}
           >
@@ -1463,7 +1463,7 @@ const AttachmentBlock = memo<{
                 <Text
                   numberOfLines={1}
                   style={{
-                    color: isUser ? '#ffffff' : tokens.markdownColors.heading,
+                    color: isUser ? themeColors.userBubbleText : tokens.markdownColors.heading,
                     fontSize: 13,
                     fontWeight: '600',
                   }}
@@ -1473,7 +1473,9 @@ const AttachmentBlock = memo<{
                 <Text
                   numberOfLines={1}
                   style={{
-                    color: isUser ? 'rgba(255,255,255,0.7)' : tokens.markdownColors.text + '88',
+                    color: isUser
+                      ? themeColors.userBubbleTextMuted
+                      : tokens.markdownColors.text + '88',
                     fontSize: 12,
                     marginTop: 2,
                   }}
@@ -1482,10 +1484,13 @@ const AttachmentBlock = memo<{
                 </Text>
               </View>
               {downloadingFileId === file.id ? (
-                <ActivityIndicator color={isUser ? '#ffffff' : chatAccent.badgeText} size="small" />
+                <ActivityIndicator
+                  color={isUser ? themeColors.userBubbleText : chatAccent.badgeText}
+                  size="small"
+                />
               ) : (
                 <Download
-                  color={isUser ? '#ffffff' : chatAccent.badgeText}
+                  color={isUser ? themeColors.userBubbleText : chatAccent.badgeText}
                   size={16}
                   strokeWidth={1.9}
                 />
@@ -1614,7 +1619,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                   key={`${uri}-${index}`}
                   source={{ uri }}
                   style={{
-                    backgroundColor: '#fff',
+                    backgroundColor: themeColors.surface,
                     borderRadius: 8,
                     height: 16,
                     marginLeft: index === 0 ? 0 : -4,
@@ -1627,9 +1632,9 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
           ) : null}
         </View>
         {expanded ? (
-          <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+          <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
         ) : (
-          <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+          <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
         )}
       </TouchableOpacity>
 
@@ -1804,23 +1809,23 @@ const ToolStatusIcon = memo<{
   status?: 'aborted' | 'pending' | 'rejected' | string | null;
 }>(({ status, resultReady, error }) => {
   if (status === 'aborted') {
-    return <Pause color="#8E8E93" size={12} strokeWidth={2.25} />;
+    return <Pause color={themeColors.tertiaryText} size={12} strokeWidth={2.25} />;
   }
 
   if (status === 'rejected') {
-    return <Ban color="#8E8E93" size={12} strokeWidth={2.25} />;
+    return <Ban color={themeColors.tertiaryText} size={12} strokeWidth={2.25} />;
   }
 
   if (status === 'pending') {
-    return <Hand color="#0A84FF" size={12} strokeWidth={2.1} />;
+    return <Hand color={themeColors.info} size={12} strokeWidth={2.1} />;
   }
 
   if (error) {
-    return <X color="#FF3B30" size={12} strokeWidth={2.4} />;
+    return <X color={themeColors.danger} size={12} strokeWidth={2.4} />;
   }
 
   if (resultReady) {
-    return <Check color="#34C759" size={12} strokeWidth={2.4} />;
+    return <Check color={themeColors.iconSuccess} size={12} strokeWidth={2.4} />;
   }
 
   return <ActivityIndicator color={semanticColors.muted} size="small" />;
@@ -1863,9 +1868,9 @@ const ToolContentCopyButton = memo<{ text: string }>(({ text }) => {
       onPress={handleCopy}
     >
       {copied ? (
-        <Check color="#34C759" size={12} strokeWidth={2} />
+        <Check color={themeColors.iconSuccess} size={12} strokeWidth={2} />
       ) : (
-        <Copy color="#999" size={12} strokeWidth={2} />
+        <Copy color={themeColors.iconMuted} size={12} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );
@@ -1912,7 +1917,7 @@ const ToolCard = memo<{
         className="rounded-2xl px-3 py-3"
         disabled={!collapsible}
         style={{
-          backgroundColor: isPending ? 'rgba(10,132,255,0.04)' : chatAccent.elevatedBg,
+          backgroundColor: isPending ? themeColors.infoSubtle : chatAccent.elevatedBg,
         }}
         onPress={() => {
           if (collapsible) setExpanded((value) => !value);
@@ -1922,7 +1927,7 @@ const ToolCard = memo<{
           <View
             className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg"
             style={{
-              backgroundColor: isPending ? 'rgba(10,132,255,0.1)' : chatAccent.badgeBg,
+              backgroundColor: isPending ? themeColors.infoMuted : chatAccent.badgeBg,
             }}
           >
             <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
@@ -1937,9 +1942,9 @@ const ToolCard = memo<{
               </Text>
               {collapsible ? (
                 expanded ? (
-                  <ChevronDown color="#999" size={14} strokeWidth={2.3} />
+                  <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.3} />
                 ) : (
-                  <ChevronRight color="#999" size={14} strokeWidth={2.3} />
+                  <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.3} />
                 )
               ) : null}
             </View>
@@ -1956,20 +1961,23 @@ const ToolCard = memo<{
                   <TouchableOpacity
                     activeOpacity={0.7}
                     className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: 'rgba(10,132,255,0.12)' }}
+                    style={{ backgroundColor: themeColors.infoMuted }}
                     onPress={onApprove}
                   >
-                    <Text className="text-[12px] font-semibold" style={{ color: '#0A84FF' }}>
+                    <Text className="text-[12px] font-semibold" style={{ color: themeColors.info }}>
                       {t.chatToolApprove}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: 'rgba(255,59,48,0.1)' }}
+                    style={{ backgroundColor: themeColors.dangerMuted }}
                     onPress={onReject}
                   >
-                    <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
+                    <Text
+                      className="text-[12px] font-semibold"
+                      style={{ color: themeColors.danger }}
+                    >
                       {t.chatToolReject}
                     </Text>
                   </TouchableOpacity>
@@ -1978,13 +1986,19 @@ const ToolCard = memo<{
             )}
 
             {showDetail && isRejected && (
-              <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
+              <Text
+                className="mt-2 text-[11px] leading-4"
+                style={{ color: themeColors.tertiaryText }}
+              >
                 {t.chatToolRejectedDesc}
               </Text>
             )}
 
             {showDetail && isAborted && (
-              <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
+              <Text
+                className="mt-2 text-[11px] leading-4"
+                style={{ color: themeColors.tertiaryText }}
+              >
                 {t.chatToolAbortedDesc}
               </Text>
             )}
@@ -2038,7 +2052,7 @@ const ToolCard = memo<{
                       setContentExpanded((v) => !v);
                     }}
                   >
-                    <Text className="text-[11px] font-medium" style={{ color: '#0A84FF' }}>
+                    <Text className="text-[11px] font-medium" style={{ color: themeColors.info }}>
                       {contentExpanded ? t.chatShowLess : t.chatShowMore}
                     </Text>
                   </TouchableOpacity>
@@ -2046,7 +2060,7 @@ const ToolCard = memo<{
               </>
             ) : null}
             {showDetail && error ? (
-              <Text className="mt-2 text-[11px] leading-4 text-[#FF3B30]">
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: themeColors.danger }}>
                 {typeof error === 'string' ? error : t.chatToolFailed}
               </Text>
             ) : null}
@@ -2074,7 +2088,7 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
     <View
       className="mb-2 rounded-2xl px-3 py-2"
       style={{
-        backgroundColor: hasPending ? 'rgba(10,132,255,0.04)' : chatAccent.sectionBg,
+        backgroundColor: hasPending ? themeColors.infoSubtle : chatAccent.sectionBg,
       }}
     >
       <TouchableOpacity
@@ -2084,7 +2098,13 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
       >
         <View className="flex-row items-center flex-1">
           <Wrench
-            color={hasPending ? '#0A84FF' : allCompleted ? '#34C759' : '#666'}
+            color={
+              hasPending
+                ? themeColors.info
+                : allCompleted
+                  ? themeColors.iconSuccess
+                  : uiColors.textGray
+            }
             size={14}
             strokeWidth={2}
           />
@@ -2094,9 +2114,9 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
           {hasPending && (
             <View
               className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: 'rgba(10,132,255,0.1)' }}
+              style={{ backgroundColor: themeColors.infoMuted }}
             >
-              <Text className="text-[9px] font-semibold" style={{ color: '#0A84FF' }}>
+              <Text className="text-[9px] font-semibold" style={{ color: themeColors.info }}>
                 {t.chatToolPending}
               </Text>
             </View>
@@ -2104,18 +2124,18 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
           {allCompleted && !hasPending && (
             <View
               className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: 'rgba(52,199,89,0.1)' }}
+              style={{ backgroundColor: themeColors.successMuted }}
             >
-              <Text className="text-[9px] font-semibold" style={{ color: '#34C759' }}>
+              <Text className="text-[9px] font-semibold" style={{ color: themeColors.iconSuccess }}>
                 {t.chatToolCompleted || 'Done'}
               </Text>
             </View>
           )}
         </View>
         {expanded ? (
-          <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+          <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
         ) : (
-          <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+          <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
         )}
       </TouchableOpacity>
 
@@ -2203,9 +2223,9 @@ const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model,
   const ttft = performance?.ttft;
 
   const rows: [string, string, string?][] = [
-    [t.msgStatUncachedInput, uncached.toLocaleString(), '#8E8E93'],
-    [t.msgStatCachedInput, cached.toLocaleString(), '#FF9500'],
-    [t.msgStatOutput, output.toLocaleString(), '#34C759'],
+    [t.msgStatUncachedInput, uncached.toLocaleString(), themeColors.tertiaryText],
+    [t.msgStatCachedInput, cached.toLocaleString(), uiColors.cachedToken],
+    [t.msgStatOutput, output.toLocaleString(), themeColors.iconSuccess],
   ];
 
   return (
@@ -2213,26 +2233,41 @@ const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model,
       <TouchableOpacity
         activeOpacity={1}
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+        style={{ backgroundColor: uiColors.modalOverlay }}
         onPress={onClose}
       >
         <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-          <View className="bg-[#1c1c1e] rounded-2xl p-5 mx-8" style={{ minWidth: 280 }}>
+          <View
+            className="rounded-2xl p-5 mx-8"
+            style={{ minWidth: 280, backgroundColor: uiColors.modalDarkBg }}
+          >
             {/* Progress bar */}
             <View
               className="h-2 rounded-full overflow-hidden flex-row mb-4"
-              style={{ backgroundColor: '#333' }}
+              style={{ backgroundColor: uiColors.progressBarTrack }}
             >
               {total > 0 && (
                 <>
                   <View
-                    style={{ flex: uncached / total, backgroundColor: '#8E8E93', borderRadius: 4 }}
+                    style={{
+                      flex: uncached / total,
+                      backgroundColor: themeColors.tertiaryText,
+                      borderRadius: 4,
+                    }}
                   />
                   <View
-                    style={{ flex: cached / total, backgroundColor: '#FF9500', borderRadius: 4 }}
+                    style={{
+                      flex: cached / total,
+                      backgroundColor: uiColors.cachedToken,
+                      borderRadius: 4,
+                    }}
                   />
                   <View
-                    style={{ flex: output / total, backgroundColor: '#34C759', borderRadius: 4 }}
+                    style={{
+                      flex: output / total,
+                      backgroundColor: themeColors.iconSuccess,
+                      borderRadius: 4,
+                    }}
                   />
                 </>
               )}
@@ -2329,9 +2364,9 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
               style={{ marginRight: 4 }}
             />
           ) : expanded ? (
-            <ChevronDown color="#999" size={14} strokeWidth={2.5} />
+            <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
           ) : (
-            <ChevronRight color="#999" size={14} strokeWidth={2.5} />
+            <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
           )}
           {thinking ? (
             <Text className="text-primary text-[12px] font-medium ml-1">{t.chatThinking}</Text>
@@ -2403,11 +2438,14 @@ const ErrorBlock = memo<{
   return (
     <View
       className="mt-2 rounded-2xl px-3 py-3"
-      style={{ backgroundColor: 'rgba(255,59,48,0.08)' }}
+      style={{ backgroundColor: themeColors.dangerMuted }}
     >
       <View className="flex-row items-center mb-1">
-        <AlertTriangle color="#FF3B30" size={14} strokeWidth={2} />
-        <Text className="ml-1.5 text-[13px] font-semibold flex-1" style={{ color: '#FF3B30' }}>
+        <AlertTriangle color={themeColors.danger} size={14} strokeWidth={2} />
+        <Text
+          className="ml-1.5 text-[13px] font-semibold flex-1"
+          style={{ color: themeColors.danger }}
+        >
           {errorTypeLabel}
         </Text>
       </View>
@@ -2421,7 +2459,7 @@ const ErrorBlock = memo<{
             className="mt-1.5"
             onPress={() => setShowBody((v) => !v)}
           >
-            <Text className="text-[11px] font-medium" style={{ color: '#FF3B30' }}>
+            <Text className="text-[11px] font-medium" style={{ color: themeColors.danger }}>
               {showBody ? t.chatShowLess : t.chatShowMore}
             </Text>
           </TouchableOpacity>
@@ -2431,7 +2469,7 @@ const ErrorBlock = memo<{
                 selectable
                 className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/50"
                 style={{
-                  backgroundColor: 'rgba(255,59,48,0.06)',
+                  backgroundColor: themeColors.dangerSubtle,
                   fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                 }}
               >
@@ -2445,10 +2483,10 @@ const ErrorBlock = memo<{
         <TouchableOpacity
           activeOpacity={0.7}
           className="mt-2 self-start rounded-full px-4 py-1.5"
-          style={{ backgroundColor: 'rgba(255,59,48,0.12)' }}
+          style={{ backgroundColor: themeColors.dangerMuted }}
           onPress={onRetry}
         >
-          <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
+          <Text className="text-[12px] font-semibold" style={{ color: themeColors.danger }}>
             {t.retry}
           </Text>
         </TouchableOpacity>

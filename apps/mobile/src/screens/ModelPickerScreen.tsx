@@ -16,7 +16,7 @@ import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, aiProviderApi } from '../lib/api';
+import { agentApi, aiProviderApi, sessionApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
@@ -313,6 +313,11 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           const config = await agentApi.getConfigBySession(sessionId);
           if (config?.id) {
             await agentApi.updateConfig(config.id, { model: modelId, provider: providerId });
+          } else {
+            await sessionApi.updateSessionConfig(sessionId, {
+              model: modelId,
+              provider: providerId,
+            });
           }
         } catch {
           /* best-effort */
@@ -460,6 +465,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.modelPickerTitle}
         leftElement={
           <ArrowLeft
             color={semanticColors.primary}
@@ -467,7 +473,6 @@ export default function ModelPickerScreen({ navigation, route }: any) {
             strokeWidth={tokens.icon.strokeWidth}
           />
         }
-        title={t.modelPickerTitle}
         onPressLeft={() => navigation.canGoBack() && navigation.goBack()}
       />
 

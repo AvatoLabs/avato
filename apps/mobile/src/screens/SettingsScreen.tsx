@@ -38,6 +38,7 @@ import {
   getUserMemorySettings,
   setCachedUserMemorySettings,
 } from '../store/user';
+import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { MobileMemoryEffort } from '../types';
 
@@ -134,7 +135,11 @@ export default function SettingsScreen({ navigation }: any) {
       <ScreenHeader
         title={t.meMoreSettings ?? 'More Settings'}
         leftElement={
-          <ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         }
         onPressLeft={() => {
           haptics.light();
@@ -168,8 +173,8 @@ export default function SettingsScreen({ navigation }: any) {
                   disabled={memorySaving}
                   value={memoryEnabled}
                   trackColor={{
-                    false: 'rgba(120,120,128,0.18)',
-                    true: `${semanticColors.primary}66`,
+                    false: themeColors.switchTrackOffAlt,
+                    true: `${themeColors.switchTrackOn}66`,
                   }}
                   onValueChange={(value) => {
                     haptics.light();

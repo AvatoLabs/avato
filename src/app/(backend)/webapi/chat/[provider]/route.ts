@@ -6,6 +6,7 @@ import { ChatErrorType } from '@lobechat/types';
 import { checkAuth } from '@/app/(backend)/middleware/auth';
 import { AgentModel } from '@/database/models/agent';
 import { PluginModel } from '@/database/models/plugin';
+import { SessionModel } from '@/database/models/session';
 import { UserMemoryIdentityModel } from '@/database/models/userMemory/identity';
 import { type LobeChatDatabase } from '@/database/type';
 import { type ToolCallContent } from '@/libs/mcp';
@@ -88,15 +89,22 @@ const resolveEffectiveMemoryPayload = async (params: {
   try {
     const agentModel = new AgentModel(params.serverDB, params.userId);
     const agent = await agentModel.findBySessionId(params.sessionId);
-    const sessionMemory = agent?.chatConfig?.memory;
+    let memorySource: { effort?: string; enabled?: boolean } | undefined =
+      agent?.chatConfig?.memory;
+    if (!memorySource) {
+      const sessionModel = new SessionModel(params.serverDB, params.userId);
+      const session = await sessionModel.findByIdOrSlug(params.sessionId);
+      const sessionConfig = (session as { config?: { chatConfig?: { memory?: unknown } } })?.config;
+      memorySource = sessionConfig?.chatConfig?.memory as
+        | { effort?: string; enabled?: boolean }
+        | undefined;
+    }
 
-    if (!sessionMemory) return undefined;
+    if (!memorySource) return undefined;
 
     return {
-      effort: normalizeMemoryEffort(
-        typeof sessionMemory.effort === 'string' ? sessionMemory.effort : undefined,
-      ),
-      enabled: sessionMemory.enabled !== false,
+      effort: normalizeMemoryEffort(memorySource.effort),
+      enabled: memorySource.enabled !== false,
     };
   } catch (error) {
     console.error('[webapi/chat] failed to resolve memory config from session:', error);
@@ -374,7 +382,13 @@ export const POST = checkAuth(
         if (data.sessionId) {
           try {
             const agentModel = new AgentModel(serverDB, userId);
-            const agentConfig = await agentModel.findBySessionId(data.sessionId);
+            let agentConfig = await agentModel.findBySessionId(data.sessionId);
+            if (!agentConfig) {
+              const sessionModel = new SessionModel(serverDB, userId);
+              const session = await sessionModel.findByIdOrSlug(data.sessionId);
+              agentConfig = (session as { config?: { plugins?: string[] } })
+                ?.config as typeof agentConfig;
+            }
             pluginIds = agentConfig?.plugins as string[] | undefined;
 
             console.info(

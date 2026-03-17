@@ -22,12 +22,13 @@ export class SessionService {
   createSession = async (
     type: LobeSessionType,
     data: Partial<LobeAgentSession>,
+    options?: { sessionOnly?: boolean },
   ): Promise<string> => {
     const { config, group, meta, ...session } = data;
     return lambdaClient.session.createSession.mutate({
       config: { ...config, ...meta } as any,
       session: { ...session, groupId: group },
-      sessionOnly: true,
+      ...(options?.sessionOnly !== undefined ? { sessionOnly: options.sessionOnly } : {}),
       type,
     });
   };

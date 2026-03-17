@@ -1303,6 +1303,7 @@ table sessions {
   tag_id text
   client_id text
   pinned boolean [default: false]
+  config jsonb
   accessed_at "timestamp with time zone" [not null, default: `now()`]
   created_at "timestamp with time zone" [not null, default: `now()`]
   updated_at "timestamp with time zone" [not null, default: `now()`]

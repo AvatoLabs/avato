@@ -86,6 +86,7 @@ import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
 import { themeColors } from '../theme';
+import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
 
@@ -100,7 +101,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
-  const primaryColor = themeColors.light.primary;
+  const primaryColor = themeColors.primary;
 
   const messages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
@@ -404,6 +405,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               if (config?.id) {
                 setAgentId(config.id);
                 agentApi.updateConfig(config.id, { plugins: pluginArr }).catch(console.error);
+              } else {
+                sessionApi
+                  .updateSessionConfig(sessionId, { plugins: pluginArr })
+                  .catch(console.error);
               }
             })
             .catch(console.error);
@@ -934,7 +939,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 listRef.current?.scrollToOffset({ offset: 0, animated: true });
               }}
             >
-              <ArrowUp color="#fff" size={18} strokeWidth={2.5} />
+              <ArrowUp color={themeColors.iconOnPrimary} size={18} strokeWidth={2.5} />
             </PressableScale>
           </Animated.View>
         )}
@@ -952,8 +957,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             intensity={80}
             tint="light"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.92)',
-              borderColor: 'rgba(0,122,255,0.16)',
+              backgroundColor: themeColors.overlay,
+              borderColor: themeColors.primaryBorder,
               borderWidth: 1,
             }}
           >
@@ -1110,7 +1115,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     style={{ backgroundColor: semanticColors.muted }}
                     onPress={handleStop}
                   >
-                    <Square color="#fff" fill="#fff" size={12} strokeWidth={0} />
+                    <Square
+                      color={themeColors.iconOnPrimary}
+                      fill={themeColors.iconOnPrimary}
+                      size={12}
+                      strokeWidth={0}
+                    />
                   </TouchableOpacity>
                 </Animated.View>
               ) : inputText.trim() || pendingFiles.length > 0 ? (
@@ -1121,7 +1131,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     onPress={handleSend}
                   >
                     <Send
-                      color="#fff"
+                      color={themeColors.iconOnPrimary}
                       size={16}
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginLeft: 1 }}
@@ -1226,7 +1236,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                           ) : null}
                         </View>
                         <Switch
-                          trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
                           value={enabledPlugins.has(item.identifier)}
                           onValueChange={() => handleTogglePlugin(item.identifier)}
                         />
@@ -1251,7 +1264,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                           ) : null}
                         </View>
                         <Switch
-                          trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
                           value={enabledPlugins.has(skill.identifier ?? skill.id)}
                           onValueChange={() => handleTogglePlugin(skill.identifier ?? skill.id)}
                         />
@@ -1276,7 +1292,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                           ) : null}
                         </View>
                         <Switch
-                          trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                          trackColor={{
+                            false: themeColors.switchTrackOff,
+                            true: themeColors.switchTrackOn,
+                          }}
                           value={enabledPlugins.has(plugin.identifier)}
                           onValueChange={() => handleTogglePlugin(plugin.identifier)}
                         />
