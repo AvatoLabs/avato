@@ -10,9 +10,11 @@
  */
 import { AlertCircle, Check, Info } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
+
+import { useI18n } from '../../lib/i18n';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -20,6 +22,7 @@ interface ToastItem {
   duration?: number;
   id: number;
   message: string;
+  onRetry?: () => void;
   type: ToastType;
 }
 
@@ -28,7 +31,11 @@ interface ToastStore {
   dismiss: () => void;
   mute: (durationMs: number) => void;
   mutedUntil: number;
-  show: (type: ToastType, message: string, options?: { duration?: number }) => void;
+  show: (
+    type: ToastType,
+    message: string,
+    options?: { duration?: number; onRetry?: () => void },
+  ) => void;
 }
 
 let _toastId = 0;
@@ -41,8 +48,9 @@ export const useToast = create<ToastStore>((set, get) => ({
     if (get().mutedUntil > Date.now()) return;
     _toastId += 1;
     const duration =
-      options?.duration ?? (type === 'error' ? Math.max(4000, Math.min(message.length * 60, 8000)) : DURATION);
-    set({ current: { id: _toastId, type, message, duration } });
+      options?.duration ??
+      (type === 'error' ? Math.max(4000, Math.min(message.length * 60, 8000)) : DURATION);
+    set({ current: { id: _toastId, type, message, duration, onRetry: options?.onRetry } });
   },
   dismiss: () => set({ current: null }),
 }));
@@ -56,6 +64,7 @@ const ICON_MAP: Record<ToastType, React.ComponentType<any>> = {
 const DURATION = 2200;
 
 const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDone }) => {
+  const { t } = useI18n();
   const translateY = useRef(new Animated.Value(-24)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
@@ -82,6 +91,12 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
 
   const isError = item.type === 'error';
   const Icon = ICON_MAP[item.type];
+  const showRetry = isError && item.onRetry;
+
+  const handleRetry = useCallback(() => {
+    onDone();
+    item.onRetry?.();
+  }, [item.onRetry, onDone]);
 
   return (
     <Animated.View
@@ -106,21 +121,38 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
           elevation: 6,
         }}
       >
-        <Icon color="#fff" size={15} strokeWidth={2.5} style={isError ? { marginTop: 2 } : undefined} />
+        <Icon
+          color="#fff"
+          size={15}
+          strokeWidth={2.5}
+          style={isError ? { marginTop: 2 } : undefined}
+        />
         <Text
           numberOfLines={isError ? 6 : 1}
           style={{
             color: '#fff',
+            flex: 1,
             fontSize: isError ? 13 : 14,
             fontWeight: '600',
             letterSpacing: -0.2,
             lineHeight: isError ? 18 : undefined,
             marginLeft: 7,
-            maxWidth: 300,
+            maxWidth: showRetry ? 220 : 300,
           }}
         >
           {item.message}
         </Text>
+        {showRetry ? (
+          <TouchableOpacity
+            accessibilityLabel={t.errorRetry}
+            accessibilityRole="button"
+            activeOpacity={0.8}
+            style={{ marginLeft: 8, paddingVertical: 4, paddingHorizontal: 8 }}
+            onPress={handleRetry}
+          >
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.errorRetry}</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -138,7 +170,7 @@ export const ToastContainer = memo(() => {
 
   return (
     <View
-      pointerEvents="none"
+      pointerEvents={current.onRetry ? 'box-none' : 'none'}
       style={{
         position: 'absolute',
         top: insets.top + 10,

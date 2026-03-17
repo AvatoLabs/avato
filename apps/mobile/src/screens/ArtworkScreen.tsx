@@ -663,7 +663,7 @@ export default function ArtworkScreen() {
       const pendingGenerationIds = new Set(
         batchGenerations
           .filter((g) => {
-            const status = normalizeGenerationTaskStatus(g.task.status);
+            const status = normalizeGenerationTaskStatus(g.task?.status);
             return g.asyncTaskId && status !== 'success' && status !== 'error';
           })
           .map((g) => g.id),
@@ -687,7 +687,7 @@ export default function ArtworkScreen() {
           const latestPending = (latestBatches || [])
             .flatMap((batch) => batch.generations)
             .filter((generation) => {
-              const status = normalizeGenerationTaskStatus(generation.task.status);
+              const status = normalizeGenerationTaskStatus(generation.task?.status);
               return (
                 pendingGenerationIds.has(generation.id) &&
                 status !== 'success' &&
@@ -795,9 +795,11 @@ export default function ArtworkScreen() {
       });
 
       if (result?.data?.generations) {
-        // Start polling for status
-        await loadBatches(tid);
-        startPolling(tid, result.data.generations);
+        // Load batches (with task/status) and use those for polling; createImage returns raw DB records without task
+        const loadedBatches = await loadBatches(tid);
+        const newBatch = loadedBatches?.find((b) => b.id === result.data.batch.id);
+        const generationsToPoll = newBatch?.generations ?? result.data.generations;
+        startPolling(tid, generationsToPoll);
       }
 
       setPrompt('');

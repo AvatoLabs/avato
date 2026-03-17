@@ -3,6 +3,7 @@
  * All UI colors should reference these tokens — no hardcoded hex/rgba in components.
  * Add new theme variants (e.g. dark) by extending this structure.
  */
+import { useThemeStore } from '../store/theme';
 
 export interface ColorTokens {
   activeTabBg: string;
@@ -195,6 +196,96 @@ const lightTokens: ColorTokens = {
   sourceCustomMuted: 'rgba(234,88,12,0.12)',
 };
 
+const darkTokens: ColorTokens = {
+  background: '#000000',
+  foreground: '#f5f5f7',
+  surface: '#1c1c1e',
+  surfaceElevated: '#2c2c2e',
+  card: '#1c1c1e',
+
+  primary: '#0a84ff',
+  primaryBorder: 'rgba(10,132,255,0.3)',
+  primaryFocused: '#409cff',
+  primaryMuted: 'rgba(10,132,255,0.4)',
+  primarySubtle: 'rgba(10,132,255,0.15)',
+
+  success: '#30d158',
+  successMuted: 'rgba(48,209,88,0.2)',
+  successSubtle: 'rgba(48,209,88,0.08)',
+  danger: '#ff453a',
+  dangerMuted: 'rgba(255,69,58,0.2)',
+  dangerSubtle: 'rgba(255,69,58,0.1)',
+  warning: '#ff9f0a',
+  warningMuted: 'rgba(255,159,10,0.2)',
+  warningSubtle: 'rgba(255,159,10,0.1)',
+  info: '#64d2ff',
+  infoMuted: 'rgba(100,210,255,0.2)',
+  infoSubtle: 'rgba(100,210,255,0.1)',
+
+  muted: '#8e8e93',
+  secondaryText: '#98989f',
+  tertiaryText: '#636366',
+  placeholder: '#8e8e93',
+
+  border: 'rgba(255,255,255,0.08)',
+  borderDefault: '#38383a',
+  borderSubtle: 'rgba(255,255,255,0.06)',
+  divider: 'rgba(255,255,255,0.08)',
+
+  fillTertiary: 'rgba(255,255,255,0.06)',
+  fillQuaternary: 'rgba(255,255,255,0.04)',
+  overlay: 'rgba(28,28,30,0.95)',
+  overlayDark: 'rgba(0,0,0,0.7)',
+
+  switchTrackOff: '#38383a',
+  switchTrackOffAlt: 'rgba(120,120,128,0.32)',
+  switchTrackOn: '#0a84ff',
+  activeTabBg: '#0a84ff',
+  inactiveTabBg: 'rgba(10,132,255,0.2)',
+
+  markdownText: '#f5f5f7',
+  markdownHeading: '#ffffff',
+  markdownCodeInlineBg: 'rgba(255,255,255,0.12)',
+  markdownCodeInlineColor: '#ff7eb6',
+  markdownCodeBlockBg: '#2c2c2e',
+  markdownLink: '#64d2ff',
+
+  userBubbleBg: '#0a84ff',
+  userBubbleText: '#ffffff',
+  userBubbleTextMuted: 'rgba(255,255,255,0.8)',
+  userBubbleCodeBg: 'rgba(255,255,255,0.2)',
+  userBubbleLink: '#7fc8ff',
+  userBubbleSubtleBg: 'rgba(255,255,255,0.15)',
+  userBubbleTableBg: 'rgba(255,255,255,0.1)',
+  userBubbleTableBorder: 'rgba(255,255,255,0.12)',
+  userBubbleHr: 'rgba(255,255,255,0.2)',
+  assistantBubbleBg: '#2c2c2e',
+  assistantBubbleBorder: 'rgba(255,255,255,0.08)',
+  assistantBubbleText: '#f5f5f7',
+  chatAccentBadgeBg: 'rgba(100,210,255,0.2)',
+  chatAccentBadgeText: '#64d2ff',
+  chatAccentChipBg: 'rgba(100,210,255,0.15)',
+  chatAccentChipBorder: 'rgba(100,210,255,0.3)',
+  chatAccentQuoteBorder: '#64d2ff',
+  chatAccentSectionBg: '#2c2c2e',
+  chatAccentSectionBorder: 'rgba(255,255,255,0.08)',
+  chatAccentSubtleBg: 'rgba(255,255,255,0.06)',
+
+  iconOnPrimary: '#ffffff',
+  iconOnSurface: '#f5f5f7',
+  iconMuted: '#8e8e93',
+  iconSuccess: '#30d158',
+  iconDanger: '#ff453a',
+  iconWarning: '#ff9f0a',
+
+  sourceBuiltin: '#30d158',
+  sourceBuiltinMuted: 'rgba(48,209,88,0.2)',
+  sourceMarket: '#0a84ff',
+  sourceMarketMuted: 'rgba(10,132,255,0.2)',
+  sourceCustom: '#ff9f0a',
+  sourceCustomMuted: 'rgba(255,159,10,0.2)',
+};
+
 // Additional tokens for specific UI patterns
 export const uiColors = {
   inputBg: '#f8f8fa',
@@ -217,7 +308,18 @@ export const uiColors = {
   progressBarTrack: '#333333',
 } as const;
 
-/** Current theme — swap for dark/other themes later */
+export type EffectiveTheme = 'light' | 'dark';
+
+const themeMap: Record<EffectiveTheme, ColorTokens> = {
+  light: lightTokens,
+  dark: darkTokens,
+};
+
+export function getThemeTokens(theme: EffectiveTheme): ColorTokens {
+  return themeMap[theme];
+}
+
+/** Current theme — defaults to light when used outside ThemeProvider. Use useThemeColors() for reactive theme. */
 export const themeColors: ColorTokens = lightTokens;
 
 /** Chat accent group — convenience object for MessageBubble etc. */
@@ -235,7 +337,7 @@ export const chatAccent = {
   subtleBg: lightTokens.chatAccentSubtleBg,
 } as const;
 
-/** @deprecated Use themeColors instead. Kept for backward compatibility. */
+/** @deprecated Use useThemeColors().semanticColors instead. Kept for backward compatibility. */
 export const semanticColors = {
   border: themeColors.border,
   danger: themeColors.danger,
@@ -246,3 +348,23 @@ export const semanticColors = {
   secondaryText: themeColors.secondaryText,
   surface: themeColors.surface,
 } as const;
+
+/** Hook for reactive theme colors. Use when component needs to re-render on theme change. */
+export function useThemeColors(): ColorTokens {
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  return getThemeTokens(effectiveTheme);
+}
+
+/** Semantic colors derived from current theme tokens. Use useSemanticColors() for reactive version. */
+export function getSemanticColors(tokens: ColorTokens) {
+  return {
+    border: tokens.border,
+    danger: tokens.danger,
+    fillTertiary: tokens.fillTertiary,
+    foreground: tokens.foreground,
+    muted: tokens.muted,
+    primary: tokens.primary,
+    secondaryText: tokens.secondaryText,
+    surface: tokens.surface,
+  } as const;
+}

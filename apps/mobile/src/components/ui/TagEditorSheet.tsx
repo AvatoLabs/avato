@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 import { semanticColors } from '../../constants/colors';
-import { TAG_COLOR_OPTIONS, resolveTagColor, withAlpha } from '../../constants/tags';
+import { resolveTagColor, TAG_COLOR_OPTIONS, withAlpha } from '../../constants/tags';
 
 interface TagEditorSheetProps {
   cancelLabel: string;
@@ -48,10 +48,16 @@ export function TagEditorSheet({
   visible,
 }: TagEditorSheetProps) {
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onCancel}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onCancel}
+    >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onCancel}>
         <Pressable
-          className="rounded-t-2xl bg-white"
+          className="rounded-t-2xl bg-card"
           style={{ maxHeight: '78%' }}
           onPress={(event) => event.stopPropagation()}
         >

@@ -10,41 +10,53 @@ import {
   Check,
   Cloud,
   Database,
-  Info,
   Mic,
-  Shield,
+  Monitor,
+  Moon,
+  Sun,
   Volume2,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SettingsRow, SettingsSection } from '../components/ui/SettingsLayout';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import type { ThemePreference } from '../store/theme';
+import { useThemeStore } from '../store/theme';
 import {
   DEFAULT_USER_MEMORY_SETTINGS,
   getUserMemorySettings,
   setCachedUserMemorySettings,
 } from '../store/user';
-import { themeColors } from '../theme/colors';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { MobileMemoryEffort } from '../types';
+
+const THEME_OPTIONS: { icon: typeof Sun; value: ThemePreference }[] = [
+  { icon: Sun, value: 'light' },
+  { icon: Moon, value: 'dark' },
+  { icon: Monitor, value: 'system' },
+];
+
+const getThemeLabel = (
+  value: ThemePreference,
+  t: { themeLight: string; themeDark: string; themeSystem: string },
+) => {
+  if (value === 'light') return t.themeLight;
+  if (value === 'dark') return t.themeDark;
+  return t.themeSystem;
+};
 
 export default function SettingsScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const themePreference = useThemeStore((s) => s.preference);
+  const setThemePreference = useThemeStore((s) => s.setPreference);
+  const themeColors = useThemeColors();
   const [memoryEnabled, setMemoryEnabled] = useState(DEFAULT_USER_MEMORY_SETTINGS.enabled);
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>(
     DEFAULT_USER_MEMORY_SETTINGS.effort,
@@ -65,15 +77,6 @@ export default function SettingsScreen({ navigation }: any) {
     try {
       haptics.light();
       navigation?.navigate?.(name, params);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const safeOpenUrl = (url: string) => {
-    try {
-      haptics.light();
-      Linking.openURL(url).catch(() => {});
     } catch {
       /* ignore */
     }
@@ -135,11 +138,7 @@ export default function SettingsScreen({ navigation }: any) {
       <ScreenHeader
         title={t.meMoreSettings ?? 'More Settings'}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={themeColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => {
           haptics.light();
@@ -148,12 +147,51 @@ export default function SettingsScreen({ navigation }: any) {
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40, paddingTop: 20 }}>
+        <SettingsSection delay={30} title={t.themeTitle}>
+          <View className="flex-row gap-2">
+            {THEME_OPTIONS.map((option) => {
+              const active = themePreference === option.value;
+              const Icon = option.icon;
+              return (
+                <Pressable
+                  key={option.value}
+                  className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-3 py-3 ${
+                    active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
+                  }`}
+                  onPress={() => {
+                    haptics.selection();
+                    setThemePreference(option.value);
+                  }}
+                >
+                  {active ? (
+                    <Check
+                      color={themeColors.primary}
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  ) : null}
+                  <Icon
+                    color={active ? themeColors.primary : themeColors.muted}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text
+                    className={`text-[14px] font-medium ${active ? 'text-primary' : 'text-secondary/70'}`}
+                  >
+                    {getThemeLabel(option.value, t)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </SettingsSection>
+
         <SettingsSection delay={50} title={t.memoryTitle}>
           <View className="mb-2 rounded-2xl bg-foreground/[0.02] px-5 py-4">
             <View className="flex-row items-center">
               <View className="mr-4 h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                 <BrainCircuit
-                  color={semanticColors.primary}
+                  color={themeColors.primary}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -167,7 +205,7 @@ export default function SettingsScreen({ navigation }: any) {
                 </Text>
               </View>
               {memoryLoading ? (
-                <ActivityIndicator color={semanticColors.primary} />
+                <ActivityIndicator color={themeColors.primary} />
               ) : (
                 <Switch
                   disabled={memorySaving}
@@ -189,7 +227,7 @@ export default function SettingsScreen({ navigation }: any) {
             <View className="flex-row items-start">
               <View className="mr-4 mt-0.5 h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                 <BrainCircuit
-                  color={semanticColors.primary}
+                  color={themeColors.primary}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -200,7 +238,7 @@ export default function SettingsScreen({ navigation }: any) {
                     {t.memoryToolEffortTitle}
                   </Text>
                   {memorySaving && !memoryLoading ? (
-                    <ActivityIndicator color={semanticColors.primary} size="small" />
+                    <ActivityIndicator color={themeColors.primary} size="small" />
                   ) : null}
                 </View>
                 <Text className="mt-0.5 text-[12.5px] font-medium text-secondary/70">
@@ -227,7 +265,7 @@ export default function SettingsScreen({ navigation }: any) {
                       >
                         {active ? (
                           <Check
-                            color={semanticColors.primary}
+                            color={themeColors.primary}
                             size={14}
                             strokeWidth={tokens.icon.strokeWidth}
                           />
@@ -251,13 +289,13 @@ export default function SettingsScreen({ navigation }: any) {
         <SettingsSection delay={100} title={t.settingsDataStorage}>
           <SettingsRow
             icon={Cloud}
-            iconColor={semanticColors.primary}
+            iconColor={themeColors.primary}
             label={t.settingsSyncBackup}
             subtitle={t.dataManageComingSoon}
           />
           <SettingsRow
             icon={Database}
-            iconColor={semanticColors.primary}
+            iconColor={themeColors.primary}
             label={t.settingsStorageManagement}
             subtitle={t.settingsStorageManagementDesc}
             onPress={() => safeNavigate('DataManagement')}
@@ -267,31 +305,15 @@ export default function SettingsScreen({ navigation }: any) {
         <SettingsSection delay={150} title={t.settingsVoice}>
           <SettingsRow
             icon={Mic}
-            iconColor={semanticColors.primary}
+            iconColor={themeColors.primary}
             label={t.settingsSpeechRecognition}
             subtitle={t.dataManageComingSoon}
           />
           <SettingsRow
             icon={Volume2}
-            iconColor={semanticColors.primary}
+            iconColor={themeColors.primary}
             label={t.settingsTts}
             subtitle={t.dataManageComingSoon}
-          />
-        </SettingsSection>
-
-        <SettingsSection delay={200} title={t.settingsAbout}>
-          <SettingsRow
-            icon={Shield}
-            iconColor={semanticColors.primary}
-            label={t.settingsPrivacyPolicy}
-            onPress={() => safeOpenUrl('https://github.com/AvatoLabs/avatohub')}
-          />
-          <SettingsRow
-            icon={Info}
-            iconColor={semanticColors.primary}
-            label={t.settingsAboutAvato}
-            subtitle={t.settingsAboutAvatoDesc}
-            onPress={() => safeNavigate('About')}
           />
         </SettingsSection>
       </ScrollView>

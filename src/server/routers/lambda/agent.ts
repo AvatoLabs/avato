@@ -15,6 +15,18 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentService } from '@/server/services/agent';
 
+/** Merge config but omit model/provider when source has none — lets client use its own default. */
+function mergeConfigWithoutForcingModelProvider(
+  base: typeof DEFAULT_AGENT_CONFIG,
+  source: Record<string, unknown>,
+): typeof DEFAULT_AGENT_CONFIG {
+  const merged = merge({}, base, source) as typeof DEFAULT_AGENT_CONFIG;
+  if (source.model === undefined && source.provider === undefined) {
+    return { ...merged, model: '', provider: '' };
+  }
+  return merged;
+}
+
 const agentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
 
@@ -218,6 +230,18 @@ export const agentRouter = router({
         }
       }
 
+      // Group chat: sessionId is chat group id (cg_xxx), not in sessions table
+      if (input.sessionId.startsWith('cg_')) {
+        const group = await ctx.chatGroupModel.findById(input.sessionId);
+        if (group) {
+          const groupConfig = group.config as Record<string, unknown> | null | undefined;
+          return mergeConfigWithoutForcingModelProvider(
+            DEFAULT_AGENT_CONFIG,
+            groupConfig ?? {},
+          ) as typeof DEFAULT_AGENT_CONFIG;
+        }
+      }
+
       const session = await ctx.sessionModel.findByIdOrSlug(input.sessionId);
 
       if (!session) throw new Error(`Session [${input.sessionId}] not found`);
@@ -226,9 +250,12 @@ export const agentRouter = router({
       const agentConfig = await ctx.agentModel.findBySessionId(sessionId);
       if (agentConfig) return agentConfig;
 
-      // Session-only: no agent linked, return config from session.config
+      // Session-only or group-type session: no agent linked, return config from session.config
       const sessionConfig = (session as { config?: Record<string, unknown> }).config;
-      return merge({}, DEFAULT_AGENT_CONFIG, sessionConfig ?? {}) as typeof DEFAULT_AGENT_CONFIG;
+      return mergeConfigWithoutForcingModelProvider(
+        DEFAULT_AGENT_CONFIG,
+        sessionConfig ?? {},
+      ) as typeof DEFAULT_AGENT_CONFIG;
     }),
 
   getAgentConfigById: agentProcedure

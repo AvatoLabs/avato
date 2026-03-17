@@ -1,6 +1,7 @@
 import type { AgentRuntimeContext, AgentState } from '@lobechat/agent-runtime';
 import { AgentRuntime, findInMessages, GeneralChatAgent } from '@lobechat/agent-runtime';
 import { dynamicInterventionAudits } from '@lobechat/builtin-tools/dynamicInterventionAudits';
+import { LOADING_FLAT } from '@lobechat/const';
 import { AgentRuntimeErrorType, ChatErrorType, type ChatMessageError } from '@lobechat/types';
 import debug from 'debug';
 import urlJoin from 'url-join';
@@ -12,6 +13,7 @@ import { type AgentRuntimeCoordinatorOptions } from '@/server/modules/AgentRunti
 import { AgentRuntimeCoordinator, createStreamEventManager } from '@/server/modules/AgentRuntime';
 import { type RuntimeExecutorContext } from '@/server/modules/AgentRuntime/RuntimeExecutors';
 import { createRuntimeExecutors } from '@/server/modules/AgentRuntime/RuntimeExecutors';
+import { type StreamEvent } from '@/server/modules/AgentRuntime/StreamEventManager';
 import { type IStreamEventManager } from '@/server/modules/AgentRuntime/types';
 import { mcpService } from '@/server/services/mcp';
 import { PluginGatewayService } from '@/server/services/pluginGateway';
@@ -40,6 +42,11 @@ if (process.env.VERCEL) {
 }
 
 const log = debug('lobe-server:agent-runtime-service');
+
+const hasUsableAssistantContent = (content?: string) => {
+  const trimmed = typeof content === 'string' ? content.trim() : '';
+  return !!trimmed && trimmed !== LOADING_FLAT;
+};
 
 /**
  * Formats an error into ChatMessageError structure
@@ -1028,6 +1035,78 @@ export class AgentRuntimeService {
         }
       }
 
+      const extractLatestAssistantFromMessages = (
+        messages?: Array<{
+          content?: string;
+          reasoning?: string;
+          role?: string;
+          tool_calls?: any[];
+        }>,
+      ) => {
+        if (!messages?.length) return undefined;
+
+        const latestAssistant = messages
+          .slice()
+          .reverse()
+          .find((message) => {
+            if (message?.role !== 'assistant') return false;
+
+            const content = typeof message.content === 'string' ? message.content : undefined;
+
+            return (
+              hasUsableAssistantContent(content) ||
+              !!message.reasoning?.trim() ||
+              (message.tool_calls?.length ?? 0) > 0
+            );
+          });
+
+        if (!latestAssistant) return undefined;
+
+        return {
+          ...(latestAssistant.content ? { content: latestAssistant.content } : {}),
+          ...(latestAssistant.reasoning ? { reasoning: latestAssistant.reasoning } : {}),
+          ...(latestAssistant.tool_calls?.length ? { toolCalls: latestAssistant.tool_calls } : {}),
+        };
+      };
+
+      const extractLatestAssistantFromRecentEvents = (events?: StreamEvent[]) => {
+        if (!events?.length) return undefined;
+
+        for (const event of events.slice().reverse()) {
+          if (event.type === 'agent_runtime_end') {
+            const finalMessages = event.data?.finalState?.messages as
+              | Array<{ content?: string; reasoning?: string; role?: string; tool_calls?: any[] }>
+              | undefined;
+            const latestAssistant = extractLatestAssistantFromMessages(finalMessages);
+            if (latestAssistant) return latestAssistant;
+          }
+
+          if (event.type === 'stream_end') {
+            const finalContent =
+              typeof event.data?.finalContent === 'string' ? event.data.finalContent : undefined;
+            const reasoning =
+              typeof event.data?.reasoning === 'string' ? event.data.reasoning : undefined;
+            const toolCalls = Array.isArray(event.data?.toolsCalling)
+              ? event.data.toolsCalling
+              : undefined;
+
+            if (hasUsableAssistantContent(finalContent) || reasoning || toolCalls?.length) {
+              return {
+                ...(hasUsableAssistantContent(finalContent) ? { content: finalContent } : {}),
+                ...(reasoning ? { reasoning } : {}),
+                ...(toolCalls?.length ? { toolCalls } : {}),
+              };
+            }
+          }
+        }
+
+        return undefined;
+      };
+
+      const latestAssistant =
+        extractLatestAssistantFromMessages(currentState.messages as any) ||
+        extractLatestAssistantFromRecentEvents(recentEvents);
+
       // Calculate operation statistics
       const stats = {
         lastActiveTime: operationMetadata.lastActiveAt
@@ -1059,6 +1138,7 @@ export class AgentRuntimeService {
         executionHistory: executionHistory?.slice(0, historyLimit),
         hasError: currentState.status === 'error',
         isActive: ['running', 'waiting_for_human'].includes(currentState.status),
+        latestAssistant,
         isCompleted: currentState.status === 'done',
         metadata: operationMetadata,
         needsHumanInput: currentState.status === 'waiting_for_human',

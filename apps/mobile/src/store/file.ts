@@ -88,7 +88,9 @@ export const useFileStore = create<FileState>((set, get) => ({
       return { fileId: result.id, url: result.url };
     } catch {
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t.fileUploadError);
+      useToast.getState().show('error', t.fileUploadError, {
+        onRetry: () => void get().uploadFile(id, options),
+      });
       set((s) => ({
         pendingFiles: s.pendingFiles.map((f) =>
           f.id === id ? { ...f, status: 'error' as const } : f,

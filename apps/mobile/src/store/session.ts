@@ -19,6 +19,9 @@ type FetchSessionsOptions = {
   throwOnError?: boolean;
 };
 
+/** In-flight promise for request deduplication (avoids concurrent duplicate fetches) */
+let fetchSessionsInFlight: Promise<ChatSession[]> | null = null;
+
 interface SessionState {
   activeSessionId: string | null;
   createSession: (titleOrConfig?: string | CreateSessionConfig) => Promise<string>;
@@ -55,6 +58,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   pendingDeletes: new Set<string>(),
 
   reset: () => {
+    fetchSessionsInFlight = null;
     void AsyncStorage.removeItem('activeSessionId');
     set({
       activeSessionId: null,
@@ -67,34 +71,52 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   fetchSessions: async (options) => {
-    set({ loading: true });
-    try {
-      const sessions = await sessionApi.list();
-      const stored = await AsyncStorage.getItem('activeSessionId');
-
-      const pending = get().pendingDeletes;
-      const filtered = (sessions ?? []).filter((s) => !pending.has(s.id));
-      const nextActiveSessionId =
-        stored && filtered.some((session) => session.id === stored)
-          ? stored
-          : (filtered[0]?.id ?? null);
-
-      set({
-        sessions: filtered,
-        activeSessionId: nextActiveSessionId,
-        errorMessage: null,
-        initialized: true,
-        loading: false,
-      });
-      return filtered;
-    } catch (err) {
-      const { messageKey } = classifyError(err);
-      const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
-      set({ errorMessage: t[messageKey], loading: false, initialized: true });
-      if (options?.throwOnError) throw err;
-      return [];
+    if (fetchSessionsInFlight) {
+      try {
+        return await fetchSessionsInFlight;
+      } catch (e) {
+        if (options?.throwOnError) throw e;
+        return [];
+      }
     }
+
+    const promise = (async () => {
+      set({ loading: true });
+      try {
+        const sessions = await sessionApi.list();
+        const stored = await AsyncStorage.getItem('activeSessionId');
+
+        const pending = get().pendingDeletes;
+        const filtered = (sessions ?? []).filter((s) => !pending.has(s.id));
+        const nextActiveSessionId =
+          stored && filtered.some((session) => session.id === stored)
+            ? stored
+            : (filtered[0]?.id ?? null);
+
+        set({
+          sessions: filtered,
+          activeSessionId: nextActiveSessionId,
+          errorMessage: null,
+          initialized: true,
+          loading: false,
+        });
+        return filtered;
+      } catch (err) {
+        const { messageKey } = classifyError(err);
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t[messageKey], {
+          onRetry: () => void get().fetchSessions(),
+        });
+        set({ errorMessage: t[messageKey], loading: false, initialized: true });
+        if (options?.throwOnError) throw err;
+        return [];
+      } finally {
+        fetchSessionsInFlight = null;
+      }
+    })();
+
+    fetchSessionsInFlight = promise;
+    return promise;
   },
 
   createSession: async (titleOrConfig) => {

@@ -50,12 +50,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import EmptyState from '../components/ui/EmptyState';
+import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { codeInlineRules } from '../lib/markdownRules';
 import { useConnectionStore } from '../store/connection';
 import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
@@ -374,6 +377,7 @@ const FilePreviewModal = memo(
 
     return (
       <Modal
+        accessibilityViewIsModal
         statusBarTranslucent
         transparent
         animationType="none"
@@ -543,7 +547,9 @@ const FilePreviewModal = memo(
                   style={{ backgroundColor: '#fff' }}
                 >
                   {markdownFile ? (
-                    <Markdown style={resourcePreviewMdStyles}>{textContent}</Markdown>
+                    <Markdown rules={codeInlineRules} style={resourcePreviewMdStyles}>
+                      {textContent}
+                    </Markdown>
                   ) : (
                     <Text
                       selectable
@@ -656,6 +662,8 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
 
   return (
     <TouchableOpacity
+      accessibilityLabel={`${item.name}, ${formatBytes(item.size)}`}
+      accessibilityRole="button"
       activeOpacity={0.6}
       className="flex-row items-center px-5 py-3 bg-background"
       onPress={() => onPress(item)}
@@ -861,15 +869,15 @@ export default function ResourceScreen() {
       {/* Header */}
       <ScreenHeader
         title={t.resourceTitle}
+        rightElement={
+          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        }
         titleIcon={
           <FolderOpen
             color={semanticColors.primary}
             size={20}
             strokeWidth={tokens.icon.strokeWidth}
           />
-        }
-        rightElement={
-          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={() => setAttachmentSheetVisible(true)}
       />
@@ -931,28 +939,15 @@ export default function ResourceScreen() {
 
       {/* Content */}
       {loading && files.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} size="large" />
-        </View>
+        <FileGridSkeleton />
       ) : (
         <FlatList
           ItemSeparatorComponent={() => <View className="mx-4 h-px bg-foreground/5" />}
           data={filtered}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
-            <Animated.View className="items-center px-8" entering={FadeInDown.duration(350)}>
-              <View
-                className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
-                style={{ width: 80, height: 80 }}
-              >
-                <FolderOpen color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
-              </View>
-              <Text className="text-center text-[17px] font-semibold text-foreground">
-                {t.resourceEmpty}
-              </Text>
-              <Text className="mt-2 text-center text-[14px] text-secondary/40">
-                {t.resourceEmptyDesc}
-              </Text>
+            <Animated.View className="flex-1" entering={FadeInDown.duration(350)}>
+              <EmptyState description={t.resourceEmptyDesc} icon="📁" title={t.resourceEmpty} />
             </Animated.View>
           }
           contentContainerStyle={

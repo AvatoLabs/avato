@@ -136,12 +136,14 @@ export class MessageModel {
       postProcessUrl?: (path: string | null, file: { fileType: string }) => Promise<string>;
     } = {},
   ) => {
-    // Build agent condition (handles legacy sessionId lookup)
+    // Build agent condition (handles legacy sessionId lookup and agentId-stored messages)
     let agentCondition: SQL | undefined;
     if (agentId) {
       agentCondition = await this.buildAgentCondition(agentId);
     } else if (sessionId) {
-      agentCondition = this.matchSession(sessionId);
+      // When querying by sessionId, also match messages stored with agentId (via agents_to_sessions)
+      // so Mobile/Web clients that pass sessionId can find messages created with agentId
+      agentCondition = await this.buildSessionCondition(sessionId);
     }
 
     // For thread queries, we need to fetch complete thread data (parent + thread messages)
@@ -897,12 +899,22 @@ export class MessageModel {
       } else {
         // compareGroup (parallel): include children with basic info
         const children = groupMsgs.map((m) => ({
+          agentId: m.agentId,
           content: m.content,
           createdAt: m.createdAt,
+          error: m.error,
+          fileList: m.fileList,
           id: m.id,
+          imageList: m.imageList,
+          metadata: m.metadata,
           model: m.model,
+          performance: m.performance,
           provider: m.provider,
+          reasoning: m.reasoning,
           role: m.role,
+          tools: m.tools,
+          updatedAt: m.updatedAt,
+          usage: m.usage,
         }));
 
         return {
@@ -967,6 +979,30 @@ export class MessageModel {
     return associatedSessionId
       ? or(eq(messages.agentId, agentId), eq(messages.sessionId, associatedSessionId))
       : eq(messages.agentId, agentId);
+  };
+
+  /**
+   * Build session condition with agentId-stored message support
+   *
+   * When querying by sessionId (e.g. from Mobile), messages may be stored with agentId
+   * (Web creates messages with agentId). Resolve sessionId -> agentId from agents_to_sessions
+   * and match both sessionId and agentId so all messages are found.
+   */
+  private buildSessionCondition = async (sessionId: string): Promise<SQL> => {
+    const agentSession = await this.db
+      .select({ agentId: agentsToSessions.agentId })
+      .from(agentsToSessions)
+      .where(
+        and(eq(agentsToSessions.sessionId, sessionId), eq(agentsToSessions.userId, this.userId)),
+      )
+      .limit(1);
+
+    const associatedAgentId = agentSession[0]?.agentId;
+
+    if (associatedAgentId) {
+      return or(eq(messages.sessionId, sessionId), eq(messages.agentId, associatedAgentId)) as SQL;
+    }
+    return this.matchSession(sessionId);
   };
 
   findById = async (id: string) => {

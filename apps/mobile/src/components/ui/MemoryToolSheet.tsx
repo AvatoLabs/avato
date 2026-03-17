@@ -60,13 +60,16 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
     ];
 
     return (
-      <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={onClose}
-        >
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={visible}
+        onRequestClose={onClose}
+      >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
           <Pressable
-            className="bg-white rounded-t-2xl"
+            className="bg-card rounded-t-2xl"
             style={{ maxHeight: '72%' }}
             onPress={(e) => e.stopPropagation()}
           >
@@ -79,7 +82,13 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                 <ToggleOption
                   active={!enabled}
                   description={t.memoryToolOffDesc}
-                  icon={<CircleOff color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />}
+                  icon={
+                    <CircleOff
+                      color={semanticColors.foreground}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  }
                   title={t.memoryToolOffTitle}
                   onPress={() => {
                     haptics.light();
@@ -91,10 +100,14 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                   isLast
                   active={enabled}
                   description={t.memoryToolOnDesc}
-                  icon={
-                    <BrainCircuit color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  }
                   title={t.memoryToolOnTitle}
+                  icon={
+                    <BrainCircuit
+                      color={semanticColors.foreground}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  }
                   onPress={() => {
                     haptics.light();
                     onChangeEnabled(true);

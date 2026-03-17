@@ -697,11 +697,13 @@ export class AiAgentService {
     }
 
     // 13. Create user message in database
+    // Include groupId for Group Chat (required for getMessagesAndTopics to find messages)
     // Include threadId if provided (for SubAgent task execution in isolated Thread)
     const userMessageRecord = await this.messageModel.create({
       agentId: resolvedAgentId,
       content: prompt,
       files: fileIds,
+      groupId: appContext?.groupId ?? undefined,
       role: 'user',
       threadId: appContext?.threadId ?? undefined,
       topicId,
@@ -709,10 +711,12 @@ export class AiAgentService {
     log('execAgent: created user message %s', userMessageRecord.id);
 
     // 14. Create assistant message placeholder in database
+    // Include groupId for Group Chat (required for getMessagesAndTopics to find messages)
     // Include threadId if provided (for SubAgent task execution in isolated Thread)
     const assistantMessageRecord = await this.messageModel.create({
       agentId: resolvedAgentId,
       content: LOADING_FLAT,
+      groupId: appContext?.groupId ?? undefined,
       model,
       parentId: userMessageRecord.id,
       provider,

@@ -1,12 +1,13 @@
 /**
  * AgentDetailScreen — Detailed view of a market agent.
  */
-import { ArrowLeft, Bot } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ContentSkeleton from '../components/ui/ContentSkeleton';
 import PressableScale from '../components/ui/PressableScale';
 import { useToast } from '../components/ui/Toast';
 import { haptics } from '../lib/haptics';
@@ -136,10 +137,7 @@ export default function AgentDetailScreen({ route, navigation }: any) {
             </Animated.View>
           </>
         ) : (
-          <View className="items-center pt-20">
-            <Bot color="#ccc" size={48} strokeWidth={1} />
-            <Text className="text-secondary/50 mt-4">{t.loading}</Text>
-          </View>
+          <ContentSkeleton />
         )}
       </ScrollView>
     </View>

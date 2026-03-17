@@ -14,6 +14,7 @@ import Animated, {
 import { getProviderIconUrl } from '../../constants/cdn';
 import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
+import { useI18n } from '../../lib/i18n';
 import { themeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
@@ -46,7 +47,7 @@ export function HeroComposer({
   attachmentCount,
   modelProvider,
   modelProviderLogo,
-  placeholder = 'What do you want to do?',
+  placeholder: placeholderProp,
   value = '',
   onChangeText,
   onSubmit,
@@ -59,6 +60,8 @@ export function HeroComposer({
   searchEnabled = false,
   hasAttachment = false,
 }: HeroComposerProps) {
+  const { t } = useI18n();
+  const placeholder = placeholderProp ?? t.homeHeroPlaceholder;
   const [_isFocused, setIsFocused] = useState(false);
   const focusProgress = useSharedValue(0);
   const [providerLogoError, setProviderLogoError] = useState(false);

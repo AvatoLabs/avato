@@ -11,6 +11,9 @@ import { resolveSessionTypeWithFallback } from '../lib/session';
 import type { Topic } from '../types';
 import { useSessionStore } from './session';
 
+/** In-flight promises by sessionId for request deduplication */
+const fetchTopicsInFlight = new Map<string, Promise<void>>();
+
 interface TopicState {
   activeTopicBySession: Record<string, string | null>;
   createTopic: (
@@ -33,39 +36,53 @@ export const useTopicStore = create<TopicState>((set, get) => ({
   loadingBySession: {},
 
   fetchTopics: async (sessionId: string) => {
-    set((s) => ({
-      loadingBySession: { ...s.loadingBySession, [sessionId]: true },
-    }));
-    try {
-      const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-      const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
-      const topics = await topicApi.list(sessionId, { sessionType });
-      set((s) => {
-        const nextTopics = topics ?? [];
-        const activeTopic = s.activeTopicBySession[sessionId] ?? null;
-        const activeStillExists = activeTopic
-          ? nextTopics.some((topic) => topic.id === activeTopic)
-          : false;
-        const nextActiveTopic =
-          activeStillExists ? activeTopic : (nextTopics[0]?.id ?? null);
-
-        return {
-          activeTopicBySession: {
-            ...s.activeTopicBySession,
-            [sessionId]: nextActiveTopic,
-          },
-          loadingBySession: { ...s.loadingBySession, [sessionId]: false },
-          topicsBySession: { ...s.topicsBySession, [sessionId]: nextTopics },
-        };
-      });
-    } catch (err) {
-      const { messageKey } = classifyError(err);
-      const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
-      set((s) => ({
-        loadingBySession: { ...s.loadingBySession, [sessionId]: false },
-      }));
+    const existing = fetchTopicsInFlight.get(sessionId);
+    if (existing) {
+      await existing;
+      return;
     }
+
+    const promise = (async () => {
+      set((s) => ({
+        loadingBySession: { ...s.loadingBySession, [sessionId]: true },
+      }));
+      try {
+        const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+        const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
+        const topics = await topicApi.list(sessionId, { sessionType });
+        set((s) => {
+          const nextTopics = topics ?? [];
+          const activeTopic = s.activeTopicBySession[sessionId] ?? null;
+          const activeStillExists = activeTopic
+            ? nextTopics.some((topic) => topic.id === activeTopic)
+            : false;
+          const nextActiveTopic = activeStillExists ? activeTopic : (nextTopics[0]?.id ?? null);
+
+          return {
+            activeTopicBySession: {
+              ...s.activeTopicBySession,
+              [sessionId]: nextActiveTopic,
+            },
+            loadingBySession: { ...s.loadingBySession, [sessionId]: false },
+            topicsBySession: { ...s.topicsBySession, [sessionId]: nextTopics },
+          };
+        });
+      } catch (err) {
+        const { messageKey } = classifyError(err);
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t[messageKey], {
+          onRetry: () => void get().fetchTopics(sessionId),
+        });
+        set((s) => ({
+          loadingBySession: { ...s.loadingBySession, [sessionId]: false },
+        }));
+      } finally {
+        fetchTopicsInFlight.delete(sessionId);
+      }
+    })();
+
+    fetchTopicsInFlight.set(sessionId, promise);
+    await promise;
   },
 
   createTopic: async (sessionId: string, title: string, options?: { messageIds?: string[] }) => {

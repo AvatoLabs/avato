@@ -6,16 +6,8 @@
  *   2. ChatDetailScreen (per-topic — uses the chat's active topic)
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  ArrowLeft,
-  Edit3,
-  Eye,
-  FileText,
-  NotebookPen,
-  Plus,
-  Trash2,
-} from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Edit3, Eye, FileText, NotebookPen, Plus } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,11 +25,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { notebookApi, type NotebookDocument, topicApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { codeInlineRules } from '../lib/markdownRules';
 import { tokens } from '../theme/tokens';
 
 const PERSONAL_TOPIC_KEY = 'avato_personal_notebook_topic_id';
@@ -46,9 +39,27 @@ const PERSONAL_TOPIC_KEY = 'avato_personal_notebook_topic_id';
 
 const mdStyles = {
   body: { color: '#1a1a1a', fontSize: 15, lineHeight: 24 },
-  heading1: { color: semanticColors.foreground, fontSize: 24, fontWeight: '700' as const, marginBottom: 12, marginTop: 20 },
-  heading2: { color: semanticColors.foreground, fontSize: 20, fontWeight: '700' as const, marginBottom: 10, marginTop: 18 },
-  heading3: { color: semanticColors.foreground, fontSize: 17, fontWeight: '600' as const, marginBottom: 8, marginTop: 14 },
+  heading1: {
+    color: semanticColors.foreground,
+    fontSize: 24,
+    fontWeight: '700' as const,
+    marginBottom: 12,
+    marginTop: 20,
+  },
+  heading2: {
+    color: semanticColors.foreground,
+    fontSize: 20,
+    fontWeight: '700' as const,
+    marginBottom: 10,
+    marginTop: 18,
+  },
+  heading3: {
+    color: semanticColors.foreground,
+    fontSize: 17,
+    fontWeight: '600' as const,
+    marginBottom: 8,
+    marginTop: 14,
+  },
   paragraph: { marginBottom: 12 },
   bullet_list: { marginBottom: 12 },
   ordered_list: { marginBottom: 12 },
@@ -167,7 +178,11 @@ function DocEditor({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           onPress={handleBack}
         >
-          <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft
+            color={semanticColors.foreground}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         </TouchableOpacity>
 
         <View className="flex-row items-center gap-3">
@@ -180,7 +195,10 @@ function DocEditor({
             {previewing ? (
               <>
                 <Edit3 color={semanticColors.primary} size={14} strokeWidth={2} />
-                <Text className="text-[12px] font-semibold ml-1.5" style={{ color: semanticColors.primary }}>
+                <Text
+                  className="text-[12px] font-semibold ml-1.5"
+                  style={{ color: semanticColors.primary }}
+                >
                   {t.notebookEdit}
                 </Text>
               </>
@@ -234,7 +252,9 @@ function DocEditor({
         <View className="px-5 pt-2">
           {previewing ? (
             content.trim() ? (
-              <Markdown style={mdStyles}>{content}</Markdown>
+              <Markdown rules={codeInlineRules} style={mdStyles}>
+                {content}
+              </Markdown>
             ) : (
               <Text className="text-secondary/30 text-[15px] italic">
                 {t.notebookDocContentPlaceholder}
@@ -285,7 +305,9 @@ export default function NotebookScreen({ route, navigation }: any) {
           setTopicId(stored);
           return;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })();
   }, [isStandalone, topicId]);
 
@@ -363,7 +385,9 @@ export default function NotebookScreen({ route, navigation }: any) {
               await notebookApi.remove(doc.id);
               haptics.success();
               setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           },
         },
       ]);
@@ -404,11 +428,19 @@ export default function NotebookScreen({ route, navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
-        title={t.notebookTitle}
-        onPressLeft={() => navigation.goBack()}
-      />
+      <View style={{ zIndex: 1 }}>
+        <ScreenHeader
+          leftElement={
+            <ArrowLeft
+              color={semanticColors.primary}
+              size={22}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          }
+          title={t.notebookTitle}
+          onPressLeft={() => navigation.goBack()}
+        />
+      </View>
 
       {/* Content */}
       {loading ? (
@@ -417,8 +449,15 @@ export default function NotebookScreen({ route, navigation }: any) {
         </View>
       ) : documents.length === 0 ? (
         <Animated.View
-          className="flex-1 items-center justify-center px-8"
+          className="items-center justify-center px-8"
           entering={FadeInDown.duration(350)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
         >
           <View
             className="items-center justify-center rounded-3xl bg-foreground/5 mb-5"
@@ -455,37 +494,35 @@ export default function NotebookScreen({ route, navigation }: any) {
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-row items-center px-5 py-4 bg-background"
+                onPress={() => handleOpenDoc(doc)}
                 onLongPress={() => {
                   haptics.medium();
                   handleDelete(doc);
                 }}
-                onPress={() => handleOpenDoc(doc)}
               >
-                  <View
-                    className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
-                    style={{ width: 44, height: 44 }}
-                  >
-                    <FileText color={semanticColors.primary} size={20} strokeWidth={1.5} />
-                  </View>
+                <View
+                  className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
+                  style={{ width: 44, height: 44 }}
+                >
+                  <FileText color={semanticColors.primary} size={20} strokeWidth={1.5} />
+                </View>
 
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text className="text-foreground text-[15px] font-semibold" numberOfLines={1}>
-                      {doc.title || 'Untitled'}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text className="text-foreground text-[15px] font-semibold" numberOfLines={1}>
+                    {doc.title || 'Untitled'}
+                  </Text>
+                  {doc.content ? (
+                    <Text className="text-secondary/40 text-[13px] mt-0.5" numberOfLines={1}>
+                      {doc.content.slice(0, 80).replaceAll('\n', ' ')}
                     </Text>
-                    {doc.content ? (
-                      <Text className="text-secondary/40 text-[13px] mt-0.5" numberOfLines={1}>
-                        {doc.content.slice(0, 80).replace(/\n/g, ' ')}
-                      </Text>
-                    ) : null}
-                    <Text className="text-secondary/30 text-[11px] mt-1">
-                      {formatDate(doc.updatedAt || doc.createdAt)}
-                      {doc.totalCharCount ? `  ·  ${doc.totalCharCount} chars` : ''}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              {index < documents.length - 1 && (
-                <View className="mx-5 h-px bg-foreground/5" />
-              )}
+                  ) : null}
+                  <Text className="text-secondary/30 text-[11px] mt-1">
+                    {formatDate(doc.updatedAt || doc.createdAt)}
+                    {doc.totalCharCount ? `  ·  ${doc.totalCharCount} chars` : ''}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {index < documents.length - 1 && <View className="mx-5 h-px bg-foreground/5" />}
             </Animated.View>
           ))}
         </ScrollView>

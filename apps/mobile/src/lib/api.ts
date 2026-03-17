@@ -305,10 +305,16 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
   const children = Array.isArray(message?.children)
     ? (message.children as any[]).map((child) => normalizeMessage(child, sessionId))
     : undefined;
+  const compressedMessages = Array.isArray(message?.compressedMessages)
+    ? (message.compressedMessages as any[]).map((child) => normalizeMessage(child, sessionId))
+    : Array.isArray(message?.compressed_messages)
+      ? (message.compressed_messages as any[]).map((child) => normalizeMessage(child, sessionId))
+      : undefined;
 
   return {
     agentId: message?.agentId ?? message?.agent_id ?? undefined,
     ...(children?.length ? { children } : {}),
+    ...(compressedMessages?.length ? { compressedMessages } : {}),
     content: normalizedContent.content,
     createdAt: toIsoString(message?.createdAt),
     error: message?.error ?? null,
@@ -940,6 +946,12 @@ export const messageApi = {
     })),
 
   remove: (id: string) => trpcMutate('message.removeMessage', { id }),
+  /** Remove all messages in a topic (agent session). Aligns with Web clearMessage. */
+  removeMessagesByAssistant: (sessionId: string, topicId?: string | null) =>
+    trpcMutate('message.removeMessagesByAssistant', { agentId: sessionId, topicId: topicId ?? undefined }),
+  /** Remove all messages in a topic (group session). Aligns with Web clearMessage. */
+  removeMessagesByGroup: (groupId: string, topicId?: string | null) =>
+    trpcMutate('message.removeMessagesByGroup', { groupId, topicId: topicId ?? undefined }),
   /** Server procedure is `message.update`, NOT `message.updateMessage` */
   update: (id: string, content: string) =>
     trpcMutate('message.update', { id, value: { content } }),
@@ -1836,6 +1848,8 @@ export const fileApi = {
 
 // ── Config / User API ───────────────────────────────────────────────
 export const configApi = {
+  getDefaultAgentConfig: () =>
+    trpcQuery<{ model?: string; provider?: string }>('config.getDefaultAgentConfig'),
   getGlobalConfig: () => trpcQuery('config.getGlobalConfig'),
 };
 

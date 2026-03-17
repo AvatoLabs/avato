@@ -23,17 +23,16 @@ import {
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image as RNImage,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeInDown, SlideInRight, SlideOutRight } from 'react-native-reanimated';
@@ -42,14 +41,16 @@ import { useShallow } from 'zustand/shallow';
 
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
-import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
+import EmptyState from '../components/ui/EmptyState';
 import FilePreview from '../components/ui/FilePreview';
 import { HeroComposer } from '../components/ui/HeroComposer';
+import ListSkeleton from '../components/ui/ListSkeleton';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SectionBlock } from '../components/ui/SectionBlock';
+import SkillsSheet from '../components/ui/SkillsSheet';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
@@ -79,7 +80,6 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { getUserMemorySettings } from '../store/user';
-import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
   AgentSkillItem,
@@ -244,6 +244,7 @@ function SessionLogo({
 
 export default function ChatListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
 
@@ -697,8 +698,21 @@ export default function ChatListScreen({ navigation }: any) {
     }));
     setBuiltinSkillItems(preloadBuiltins);
     setLoadingSkills(true);
-    Promise.all([pluginApi.list(), agentSkillApi.list(), userApi.getState()])
-      .then(([plugins, skills, userState]) => {
+
+    const loadSkills = async (attempt = 0) => {
+      const maxAttempts = 2;
+      try {
+        const [plugins, skills, userState] = await Promise.all([
+          pluginApi.list().catch((e) => {
+            if (attempt === 0) console.warn('[ChatListScreen] pluginApi.list failed:', e);
+            return [];
+          }),
+          agentSkillApi.list().catch((e) => {
+            if (attempt === 0) console.warn('[ChatListScreen] agentSkillApi.list failed:', e);
+            return [];
+          }),
+          userApi.getState().catch(() => null),
+        ]);
         const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
         const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
           (b) => !uninstalled.includes(b.identifier),
@@ -711,9 +725,10 @@ export default function ChatListScreen({ navigation }: any) {
         setBuiltinSkillItems(builtins);
 
         const builtinIds = new Set(builtins.map((b) => b.identifier));
-        const filteredSkills = (skills ?? []).filter(
-          (s) => s.identifier && !builtinIds.has(s.identifier),
-        );
+        const filteredSkills = (skills ?? []).filter((s) => {
+          const id = s.identifier ?? s.id;
+          return id && !builtinIds.has(id);
+        });
         setAgentSkillItems(filteredSkills);
 
         const skillIds = new Set(filteredSkills.map((s) => s.identifier).filter(Boolean));
@@ -728,9 +743,15 @@ export default function ChatListScreen({ navigation }: any) {
           ...filteredPlugins.map((p) => p.identifier),
         ];
         setEnabledSkills(new Set(allIds));
-      })
-      .catch(() => {})
-      .finally(() => setLoadingSkills(false));
+      } catch (e) {
+        console.warn('[ChatListScreen] loadSkills failed:', e);
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 400));
+          return loadSkills(attempt + 1);
+        }
+      }
+    };
+    void loadSkills().finally(() => setLoadingSkills(false));
   }, [t]);
 
   const handleToggleSkill = useCallback((identifier: string) => {
@@ -1070,6 +1091,8 @@ export default function ChatListScreen({ navigation }: any) {
 
     return (
       <TouchableOpacity
+        accessibilityLabel={`${session.title || t.chatListNewConversation}, ${matchType === 'session' ? t.chatSearchMatchSession : matchType === 'topic' ? t.chatSearchMatchTopic : t.chatSearchMatchMessage}`}
+        accessibilityRole="button"
         activeOpacity={0.65}
         className="flex-row items-start px-5 py-3"
         key={id}
@@ -1098,7 +1121,11 @@ export default function ChatListScreen({ navigation }: any) {
               {session.title || t.chatListNewConversation}
             </Text>
             <Text className="ml-2 text-[11px] font-semibold uppercase tracking-wider text-secondary/35">
-              {matchType}
+              {matchType === 'session'
+                ? t.chatSearchMatchSession
+                : matchType === 'topic'
+                  ? t.chatSearchMatchTopic
+                  : t.chatSearchMatchMessage}
             </Text>
             {renderTagChip(session.tagId)}
           </View>
@@ -1120,7 +1147,7 @@ export default function ChatListScreen({ navigation }: any) {
         rightActions={
           <View className="flex-row items-center">
             <TouchableOpacity
-              accessibilityLabel="Create menu"
+              accessibilityLabel={t.accessibilityCreateMenu}
               activeOpacity={0.7}
               className="h-10 w-10 items-center justify-center"
               onPress={() => {
@@ -1320,7 +1347,9 @@ export default function ChatListScreen({ navigation }: any) {
               </Animated.View>
             )}
 
-            {sessionErrorMessage && visibleSessions.length === 0 && !loading ? (
+            {loading && visibleSessions.length === 0 ? (
+              <ListSkeleton />
+            ) : sessionErrorMessage && visibleSessions.length === 0 ? (
               <Animated.View entering={FadeInDown.delay(150).duration(350)}>
                 <View className="items-center px-5 pb-4 pt-8">
                   <Text className="text-center text-[16px] font-semibold text-foreground">
@@ -1340,17 +1369,10 @@ export default function ChatListScreen({ navigation }: any) {
               </Animated.View>
             ) : null}
 
-            {/* Empty state when no sessions at all */}
-            {visibleSessions.length === 0 && !sessionErrorMessage && (
+            {/* Empty state when no sessions at all (and not loading) */}
+            {visibleSessions.length === 0 && !sessionErrorMessage && !loading && (
               <Animated.View entering={FadeInDown.delay(150).duration(350)}>
-                <View className="px-5 pt-8 pb-4 items-center">
-                  <Text className="text-foreground text-[16px] font-semibold text-center">
-                    {t.chatListEmpty}
-                  </Text>
-                  <Text className="text-secondary/60 text-[14px] font-medium text-center mt-2 px-4">
-                    {t.chatListEmptyDesc}
-                  </Text>
-                </View>
+                <EmptyState description={t.chatListEmptyDesc} icon="💬" title={t.chatListEmpty} />
               </Animated.View>
             )}
           </>
@@ -1358,6 +1380,7 @@ export default function ChatListScreen({ navigation }: any) {
       </ScrollView>
 
       <Modal
+        accessibilityViewIsModal
         transparent
         animationType="fade"
         visible={createMenuVisible}
@@ -1365,7 +1388,7 @@ export default function ChatListScreen({ navigation }: any) {
       >
         <Pressable className="flex-1 bg-black/10" onPress={() => setCreateMenuVisible(false)}>
           <Pressable
-            className="absolute overflow-hidden rounded-2xl bg-white"
+            className="absolute overflow-hidden rounded-2xl bg-card"
             style={{
               minWidth: 220,
               right: 16,
@@ -1444,6 +1467,7 @@ export default function ChatListScreen({ navigation }: any) {
 
       {/* Session Action Sheet */}
       <Modal
+        accessibilityViewIsModal
         transparent
         animationType="slide"
         visible={!!actionSession}
@@ -1451,7 +1475,7 @@ export default function ChatListScreen({ navigation }: any) {
       >
         <Pressable className="flex-1 justify-end bg-black/40" onPress={closeActionSheet}>
           <Pressable
-            className="bg-white rounded-t-2xl overflow-hidden"
+            className="bg-card rounded-t-2xl overflow-hidden"
             style={{ maxHeight: '72%' }}
             onPress={(e) => e.stopPropagation()}
           >
@@ -1559,7 +1583,7 @@ export default function ChatListScreen({ navigation }: any) {
 
               {actionPanel === 'move-tag' && actionSession?.type !== 'group' ? (
                 <Animated.View
-                  className="absolute inset-0 bg-white"
+                  className="absolute inset-0 bg-card"
                   entering={SlideInRight.duration(220)}
                   exiting={SlideOutRight.duration(180)}
                 >
@@ -1715,146 +1739,21 @@ export default function ChatListScreen({ navigation }: any) {
         }}
       />
 
-      {/* Skills Drawer */}
-      <Modal
-        transparent
-        animationType="slide"
+      <SkillsSheet
+        agentConfigOpenStore={t.agentConfigOpenStore}
+        agentSkillItems={agentSkillItems}
+        builtinItems={builtinSkillItems}
+        enabledIdentifiers={enabledSkills}
+        installedPlugins={installedPlugins}
+        loading={loadingSkills}
+        skillsEmpty={t.skillsEmpty}
+        skillsEmptyDesc={t.skillsEmptyDesc}
+        skillsTitle={t.skillsTitle}
         visible={skillsVisible}
-        onRequestClose={() => setSkillsVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSkillsVisible(false)}
-        >
-          <Pressable
-            className="bg-white rounded-t-2xl max-h-[70%]"
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-1">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
-              <Text className="text-foreground text-[18px] font-bold tracking-tight">
-                {t.skillsTitle}
-              </Text>
-            </View>
-            <View style={{ maxHeight: 400 }}>
-              <ScrollView className="px-5 pb-8" showsVerticalScrollIndicator={true}>
-                {loadingSkills ? (
-                  <View className="items-center py-10">
-                    <ActivityIndicator color={semanticColors.primary} size="small" />
-                  </View>
-                ) : builtinSkillItems.length === 0 &&
-                  agentSkillItems.length === 0 &&
-                  installedPlugins.length === 0 ? (
-                  <View className="items-center py-10">
-                    <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
-                    <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
-                      {t.skillsEmptyDesc}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {builtinSkillItems.map((item) => (
-                      <View
-                        className="flex-row items-center py-3.5"
-                        key={`builtin-${item.identifier}`}
-                      >
-                        <BuiltinSkillIcon icon={item.icon} size={36} />
-                        <View className="flex-1 ml-3 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {item.title}
-                          </Text>
-                          {item.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {item.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledSkills.has(item.identifier)}
-                          onValueChange={() => handleToggleSkill(item.identifier)}
-                        />
-                      </View>
-                    ))}
-                    {agentSkillItems.map((skill) => (
-                      <View className="flex-row items-center py-3.5" key={`skill-${skill.id}`}>
-                        <View className="flex-1 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {skill.name || skill.identifier || skill.id}
-                          </Text>
-                          {skill.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {skill.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledSkills.has(skill.identifier ?? skill.id)}
-                          onValueChange={() => handleToggleSkill(skill.identifier ?? skill.id)}
-                        />
-                      </View>
-                    ))}
-                    {installedPlugins.map((plugin) => (
-                      <View className="flex-row items-center py-3.5" key={plugin.identifier}>
-                        <View className="w-9 h-9 rounded-xl bg-foreground/5 items-center justify-center mr-3">
-                          <Text className="text-[18px]">
-                            {plugin.manifest?.meta?.avatar ?? '🔌'}
-                          </Text>
-                        </View>
-                        <View className="flex-1 mr-3">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {plugin.manifest?.meta?.title || plugin.identifier}
-                          </Text>
-                          {plugin.manifest?.meta?.description ? (
-                            <Text
-                              className="text-secondary/50 text-[12px] mt-0.5"
-                              numberOfLines={1}
-                            >
-                              {plugin.manifest.meta.description}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <Switch
-                          trackColor={{
-                            false: themeColors.switchTrackOff,
-                            true: themeColors.switchTrackOn,
-                          }}
-                          value={enabledSkills.has(plugin.identifier)}
-                          onValueChange={() => handleToggleSkill(plugin.identifier)}
-                        />
-                      </View>
-                    ))}
-                  </>
-                )}
-              </ScrollView>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setSkillsVisible(false)}
+        onOpenStore={() => navigation.getParent()?.navigate('Store')}
+        onToggle={handleToggleSkill}
+      />
     </View>
   );
 }

@@ -221,6 +221,11 @@ export interface OperationStatusResult {
   hasError: boolean;
   isActive: boolean;
   isCompleted: boolean;
+  latestAssistant?: {
+    content?: string;
+    reasoning?: string;
+    toolCalls?: any[];
+  };
   metadata: any;
   needsHumanInput: boolean;
   operationId: string;

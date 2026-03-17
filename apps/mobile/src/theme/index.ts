@@ -1,28 +1,36 @@
 import { DefaultTheme } from '@react-navigation/native';
 
-import { themeColors as colorTokens } from './colors';
+import { getThemeTokens } from './colors';
 
-/** @deprecated Use themeColors from theme/colors for component styling */
-export const themeColors = {
-  light: {
-    background: colorTokens.background,
-    muted: colorTokens.muted,
-    primary: colorTokens.primary,
-    secondary: colorTokens.secondaryText,
-  },
-};
+const lightTokens = getThemeTokens('light');
+const darkTokens = getThemeTokens('dark');
 
 export { themeColors as colorTokens } from './colors';
 
 export const AvatoLightTheme = {
   ...DefaultTheme,
+  dark: false,
   colors: {
     ...DefaultTheme.colors,
-    primary: colorTokens.primary,
-    background: colorTokens.background,
-    card: colorTokens.card,
-    text: colorTokens.foreground,
+    primary: lightTokens.primary,
+    background: lightTokens.background,
+    card: lightTokens.card,
+    text: lightTokens.foreground,
     border: 'transparent',
-    notification: colorTokens.danger,
+    notification: lightTokens.danger,
+  },
+};
+
+export const AvatoDarkTheme = {
+  ...DefaultTheme,
+  dark: true,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: darkTokens.primary,
+    background: darkTokens.background,
+    card: darkTokens.card,
+    text: darkTokens.foreground,
+    border: 'transparent',
+    notification: darkTokens.danger,
   },
 };

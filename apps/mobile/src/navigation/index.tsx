@@ -19,17 +19,17 @@ import Animated, {
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import AboutScreen from '../screens/AboutScreen';
-import AppLogsScreen from '../screens/AppLogsScreen';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentDetailScreen from '../screens/AgentDetailScreen';
 import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
+import AppLogsScreen from '../screens/AppLogsScreen';
 import ArtworkScreen from '../screens/ArtworkScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
+import DiscoverScreen from '../screens/DiscoverScreen';
 import LanguagePickerScreen from '../screens/LanguagePickerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
@@ -47,8 +47,8 @@ import ProviderListScreen from '../screens/ProviderListScreen';
 import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import StoreScreen from '../screens/StoreScreen';
 import StatsScreen from '../screens/StatsScreen';
+import StoreScreen from '../screens/StoreScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { tokens } from '../theme/tokens';
 
@@ -389,6 +389,11 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
 
       {/* Discover */}
       <Stack.Screen
+        component={DiscoverScreen}
+        name="Discover"
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
         component={AgentDetailScreen}
         name="AgentDetail"
         options={{ animation: 'slide_from_right' }}
@@ -411,11 +416,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={ProviderListScreen}
         name="ProviderList"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={AboutScreen}
-        name="About"
         options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>

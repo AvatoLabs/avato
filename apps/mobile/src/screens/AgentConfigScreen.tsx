@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 
 import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
+import ContentSkeleton from '../components/ui/ContentSkeleton';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -639,9 +640,7 @@ function SessionAgentConfigScreen({
           }
           onPressLeft={() => navigation.goBack()}
         />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} />
-        </View>
+        <ContentSkeleton />
       </View>
     );
   }
@@ -920,6 +919,7 @@ function SessionAgentConfigScreen({
       />
 
       <Modal
+        accessibilityViewIsModal
         transparent
         animationType="slide"
         visible={skillsVisible}
@@ -930,7 +930,7 @@ function SessionAgentConfigScreen({
           onPress={() => setSkillsVisible(false)}
         >
           <Pressable
-            className="max-h-[74%] rounded-t-2xl bg-white"
+            className="max-h-[74%] rounded-t-2xl bg-card"
             onPress={(event) => event.stopPropagation()}
           >
             <View className="items-center pt-3 pb-1">

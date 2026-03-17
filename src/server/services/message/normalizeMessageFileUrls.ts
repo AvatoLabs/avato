@@ -26,8 +26,11 @@ export const normalizeMessageFileUrlsForClient = (messages: UIChatMessage[]): UI
 
   return messages.map((message) => ({
     ...message,
+    ...(message.children
+      ? { children: normalizeMessageFileUrlsForClient(message.children as UIChatMessage[]) }
+      : {}),
     fileList: withProxyUrl(message.fileList as ChatFileItem[] | undefined),
     imageList: withProxyUrl(message.imageList as ChatImageItem[] | undefined),
     videoList: withProxyUrl(message.videoList as ChatVideoItem[] | undefined),
-  }));
+  })) as UIChatMessage[];
 };

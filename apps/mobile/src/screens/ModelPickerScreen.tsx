@@ -16,11 +16,11 @@ import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, agentGroupApi, aiProviderApi, sessionApi } from '../lib/api';
+import { agentApi, agentGroupApi, aiProviderApi, sessionApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
-import { useAgentStore } from '../store/agent';
+import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
@@ -240,6 +240,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [serverModels, setServerModels] = useState<ProviderWithModels[] | null>(null);
   const toast = useToast();
+  const persistModelSelection = useModelStore((s) => s.selectModel);
 
   // ── Load selected model from Agent Config or default Agent ─────────
   useEffect(() => {
@@ -275,10 +276,20 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         return;
       }
 
-      const agentStore = useAgentStore.getState();
-      if (!agentStore.initialized) await agentStore.loadAgents();
-      const agent = agentStore.getCurrentAgent();
-      if (agent?.model) setSelected(agent.model);
+      try {
+        const userState = await userApi.getState();
+        const defaultModel = userState?.settings?.defaultAgent?.config?.model;
+        if (typeof defaultModel === 'string' && defaultModel) {
+          setSelected(defaultModel);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+
+      await useModelStore.getState().loadSelection();
+      const fallbackModel = useModelStore.getState().selectedModel;
+      if (fallbackModel) setSelected(fallbackModel);
     })();
   }, [isGroupSession, sessionId]);
 
@@ -351,20 +362,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           .getState()
           .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
       } else {
-        const agentStore = useAgentStore.getState();
-        if (!agentStore.initialized) await agentStore.loadAgents();
-        let current = agentStore.getCurrentAgent();
-        if (!current && agentStore.agents.length === 0) {
-          const newId = await agentStore.createAgent({
-            model: modelId,
-            provider: providerId,
-            title: 'Default',
-          });
-          current = agentStore.agents.find((a) => a.id === newId) ?? null;
-        }
-        if (current) {
-          await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
-        }
+        await persistModelSelection(modelId, providerId);
       }
 
       toast.show('success', t.settingsSavedModel);
@@ -374,7 +372,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         }
       }, 200);
     },
-    [isGroupSession, navigation, sessionId, t.settingsSavedModel, toast],
+    [isGroupSession, navigation, persistModelSelection, sessionId, t.settingsSavedModel, toast],
   );
 
   // ── Filter ───────────────────────────────────────────────────────

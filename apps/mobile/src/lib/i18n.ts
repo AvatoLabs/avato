@@ -38,9 +38,15 @@ type TranslationKeys = {
   chatListCreateGroup: string;
   chatListCreateTag: string;
   chatListNewConversation: string;
+  chatSearchMatchMessage: string;
+  chatSearchMatchSession: string;
+  chatSearchMatchTopic: string;
   chatSearchNoResults: string;
   chatSearchResults: string;
   chatSearchSearching: string;
+  accessibilityCreateMenu: string;
+  accessibilityGoBack: string;
+  accessibilitySettings: string;
   chatListTapToContinue: string;
 
   // Chat Detail
@@ -100,6 +106,10 @@ type TranslationKeys = {
   meServerConfig: string;
   meAiProviders: string;
   meAllSettings: string;
+  meAgents: string;
+  meAgentsDesc: string;
+  meDiscover: string;
+  meDiscoverDesc: string;
   meMoreSettings: string;
   meMoreSettingsDesc: string;
   meAbout: string;
@@ -503,7 +513,6 @@ type TranslationKeys = {
   statsSessions: string;
   statsStreak: string;
 
-  // Gap-fix: missing i18n keys
   editCancel: string;
   editSave: string;
   dataClearCacheSubtitle: string;
@@ -523,7 +532,6 @@ type TranslationKeys = {
   actionFavorite: string;
   actionUnfavorite: string;
 
-  // Hardcode audit — new keys
   topicAllMessages: string;
   statusActive: string;
   statusInactive: string;
@@ -566,7 +574,6 @@ type TranslationKeys = {
   relativeTimeHours: string;
   relativeTimeDays: string;
 
-  // Gap-fix round 2
   actionRename: string;
   sessionRenamed: string;
   sessionRenameTitle: string;
@@ -935,9 +942,15 @@ const en: TranslationKeys = {
   chatListCreateGroup: 'New Group Chat',
   chatListCreateTag: 'New Tag',
   chatListNewConversation: 'New Conversation',
+  chatSearchMatchMessage: 'message',
+  chatSearchMatchSession: 'conversation',
+  chatSearchMatchTopic: 'topic',
   chatSearchNoResults: 'No matching conversations',
   chatSearchResults: 'Search Results',
   chatSearchSearching: 'Searching conversations...',
+  accessibilityCreateMenu: 'Create new chat or agent',
+  accessibilityGoBack: 'Go back',
+  accessibilitySettings: 'Chat settings',
   chatListTapToContinue: 'Tap to continue the conversation',
 
   chatTitle: 'Chat',
@@ -992,6 +1005,10 @@ const en: TranslationKeys = {
   meTheme: 'Theme',
   meConfiguration: 'Configuration',
   meServerConfig: 'Server Configuration',
+  meAgents: 'Agents',
+  meAgentsDesc: 'Manage your assistants',
+  meDiscover: 'Discover',
+  meDiscoverDesc: 'Browse agents, models & providers',
   meAiProviders: 'AI Providers',
   meAllSettings: 'All Settings',
   meMoreSettings: 'More Settings',
@@ -1803,9 +1820,15 @@ const zh_tw: TranslationKeys = {
   chatListCreateGroup: '新建群組對話',
   chatListCreateTag: '新建標籤',
   chatListNewConversation: '新對話',
+  chatSearchMatchMessage: '訊息',
+  chatSearchMatchSession: '對話',
+  chatSearchMatchTopic: '話題',
   chatSearchNoResults: '沒有符合的對話',
   chatSearchResults: '搜尋結果',
   chatSearchSearching: '正在搜尋對話...',
+  accessibilityCreateMenu: '建立新對話或助手',
+  accessibilityGoBack: '返回',
+  accessibilitySettings: '對話設定',
   chatListTapToContinue: '點擊繼續對話',
 
   chatTitle: '聊天',
@@ -1860,6 +1883,10 @@ const zh_tw: TranslationKeys = {
   meTheme: '主題',
   meConfiguration: '設定',
   meServerConfig: '伺服器設定',
+  meAgents: '助手',
+  meAgentsDesc: '管理你的助手',
+  meDiscover: '發現',
+  meDiscoverDesc: '瀏覽助手、模型與服務商',
   meAiProviders: 'AI 服務商',
   meAllSettings: '所有設定',
   meMoreSettings: '更多設定',
@@ -2665,9 +2692,15 @@ const zh: TranslationKeys = {
   chatListCreateGroup: '新建群组对话',
   chatListCreateTag: '新建标签',
   chatListNewConversation: '新对话',
+  chatSearchMatchMessage: '消息',
+  chatSearchMatchSession: '对话',
+  chatSearchMatchTopic: '话题',
   chatSearchNoResults: '没有匹配的对话',
   chatSearchResults: '搜索结果',
   chatSearchSearching: '正在搜索对话...',
+  accessibilityCreateMenu: '创建新对话或助手',
+  accessibilityGoBack: '返回',
+  accessibilitySettings: '对话设置',
   chatListTapToContinue: '点击继续对话',
 
   chatTitle: '聊天',
@@ -2722,6 +2755,10 @@ const zh: TranslationKeys = {
   meTheme: '主题',
   meConfiguration: '配置',
   meServerConfig: '服务器配置',
+  meAgents: '助手',
+  meAgentsDesc: '管理你的助手',
+  meDiscover: '发现',
+  meDiscoverDesc: '浏览助手、模型与服务商',
   meAiProviders: 'AI 服务商',
   meAllSettings: '全部设置',
   meMoreSettings: '更多设置',

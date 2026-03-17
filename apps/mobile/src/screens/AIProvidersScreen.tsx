@@ -7,8 +7,9 @@
  *
  * Aligned with web: /settings/provider/all
  */
+import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, ChevronRight, Search, Server } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
@@ -93,9 +94,12 @@ export default function AIProvidersScreen({ navigation }: any) {
     }
   }, [t, toast]);
 
-  useEffect(() => {
-    fetchProviders().finally(() => setLoading(false));
-  }, [fetchProviders]);
+  // Refetch when screen gains focus (e.g. back from ProviderDetailScreen) to keep list in sync
+  useFocusEffect(
+    useCallback(() => {
+      fetchProviders().finally(() => setLoading(false));
+    }, [fetchProviders]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -144,7 +148,13 @@ export default function AIProvidersScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={t.aiProvidersTitle}
         onPressLeft={() => navigation.goBack()}
       />

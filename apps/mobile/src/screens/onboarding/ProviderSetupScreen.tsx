@@ -52,7 +52,11 @@ export default function ProviderSetupScreen({ navigation }: any) {
           className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <ArrowLeft
+            color={semanticColors.foreground}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
         </TouchableOpacity>
       </View>
 
@@ -78,7 +82,7 @@ export default function ProviderSetupScreen({ navigation }: any) {
             autoCorrect={false}
             className="text-foreground text-[16px]"
             placeholder={t.serverUrlPlaceholder}
-            placeholderTextColor="#8c8c8c"
+            placeholderTextColor={semanticColors.muted}
             value={serverUrl}
             onChangeText={setServerUrl}
           />

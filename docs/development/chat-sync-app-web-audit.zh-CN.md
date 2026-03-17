@@ -146,8 +146,70 @@ Web 与 App 均通过 tRPC 调用同一后端，写入同一数据库。**无 We
 3. **Topic 自动创建与总结**：已对齐 Web 的无 - topic 发送路径。移动端现在会在首轮消息持久化完成后，再创建并切换到新 topic；若该会话已有历史消息，会把已持久化消息一并挂到新 topic，再触发标题总结。
 4. **默认 topic 标题识别**：移动端已把 `Topics / 话题 / 話題` 视为默认标题，避免把占位标题误判成用户自定义标题而跳过总结。
 
-## 九、待实施建议
+## 九、群聊消息持久化（createMessage）参数差距
 
-1. **Session 列表**：在 ChatDetailScreen、StoreScreen 等关键页面 focus 时，可选调用 `fetchSessions`，或通过全局事件触发刷新。
-2. **重连刷新**：监听 `NetInfo` 的 `connected` 事件，在恢复连接时触发各 store 的 fetch。
+### 9.1 问题描述（历史）
+
+App 端在群聊中发送消息时，曾仅传递 `sessionId`（群聊场景下为 `cg_xxx`），未传递 `groupId`。
+
+### 9.2 后端期望
+
+- `messages` 表：`sessionId` 引用 `sessions.id`（格式 `ssn_xxx`），`groupId` 引用 `chat_groups.id`（格式 `cg_xxx`）。
+- 群聊消息应使用 `groupId: cg_xxx`、`sessionId: null`；单 agent 会话使用 `sessionId: ssn_xxx`。
+
+### 9.3 当前行为（已修复 ✅）
+
+| 层级      | 实现                                                                                          | 状态    |
+| --------- | --------------------------------------------------------------------------------------------- | ------- |
+| App Store | `buildMessageContainerParams(sessionId, 'group')` → `{ groupId: sessionId, sessionId: null }` | ✅      |
+| App API   | `normalizeCreateMessageParams`：当 `sessionId.startsWith('cg_')` 时转为 `groupId`             | ✅ 兜底 |
+| 后端      | `message.createMessage` 输入：`sessionId?.startsWith('cg_') && !groupId` 时自动转换           | ✅ 兜底 |
+
+- `chat.ts` 中 `sendMessage`、`regenerateMessage` 均通过 `buildMessageContainerParams` 正确传参。
+- `messageApi.create` 在调用前经 `normalizeCreateMessageParams` 处理。
+- 三层保障确保群聊消息正确持久化。
+
+---
+
+## 十、消息结构解析差距
+
+### 10.1 Web 端
+
+- 使用 `conversation-flow` 的 `parse()` 处理 MessageGroup、compressedGroup、assistantGroup 等复杂结构。
+- 支持消息分组、压缩展示、多 agent 回复等。
+
+### 10.2 App 端
+
+- 仅对原始消息做 `normalizeMessage`，未使用 `parse()`。
+- 无法正确处理 MessageGroup、压缩组、Supervisor/Group 结构。
+- `MessageBubble` 不区分成员，无 AgentGroupAvatar。
+
+### 10.3 影响
+
+- 群聊多成员回复在 App 上展示不完整或结构错误。
+- 压缩后的消息组可能无法正确展开或展示。
+
+---
+
+## 十一、待实施建议
+
+1. ~~**Session 列表**~~：已实施。ChatDetailScreen、StoreScreen 的 useFocusEffect 中调用 fetchSessions。
+2. ~~**重连刷新**~~：已实施。App.tsx 中 NetInfo 监听在 `wasOffline && !offline` 时调用 syncMobileBootstrapState。
 3. **长期方案**：评估 WebSocket/SSE 推送，实现跨端近实时同步。
+4. ~~**群聊 createMessage**~~：已修复（见第九节）。
+5. ~~**群聊 settle 判定**~~：已修复。详见 `group-chat-app-web-gap-audit.zh-CN.md` 4.5 节。
+6. **消息结构**：评估在 App 端引入 `conversation-flow` 的 `parse()` 或等价逻辑，以支持 MessageGroup、压缩组等结构。
+
+---
+
+## 十二、审计状态汇总（截至 2026-03）
+
+| 项目                        | 状态      | 说明                                                                       |
+| --------------------------- | --------- | -------------------------------------------------------------------------- |
+| ChatDetailScreen focus 刷新 | ✅ 已实施 | useFocusEffect 调用 fetchSessions、fetchMessages、fetchTopics              |
+| 群聊 createMessage 参数     | ✅ 已修复 | buildMessageContainerParams + API 归一化 + 后端兜底                        |
+| 群聊 settle 判定            | ✅ 已修复 | 结构化判定 + 信任 operationStatus.isCompleted                              |
+| Skill/MCP 分类              | ✅ 已修复 | storeCategories.ts 固定兜底、builtin 归一化                                |
+| Session 列表刷新范围        | ✅ 已实施 | ChatListScreen、ChatDetailScreen、StoreScreen focus 时均调用 fetchSessions |
+| 网络重连刷新                | ✅ 已实施 | NetInfo 监听 `wasOffline && !offline` 时调用 syncMobileBootstrapState      |
+| 消息结构 parse ()           | ⏳ 待评估 | App 未使用 conversation-flow parse                                         |

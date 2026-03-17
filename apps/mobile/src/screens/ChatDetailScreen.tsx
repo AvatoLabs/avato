@@ -266,7 +266,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return;
-      if (useChatStore.getState().generating && useChatStore.getState().activeStreamingSessionId === sessionId) {
+      if (
+        useChatStore.getState().generating &&
+        useChatStore.getState().activeStreamingSessionId === sessionId
+      ) {
         return;
       }
 
@@ -787,7 +790,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         <View className="flex-row items-center justify-between px-4 py-2.5">
           <View className="flex-row items-center flex-1">
             <PressableScale
-              accessibilityLabel="Go back"
+              accessibilityLabel={t.accessibilityGoBack}
               accessibilityRole="button"
               className="w-9 h-9 items-center justify-center rounded-full mr-2"
               onPress={() => {
@@ -871,7 +874,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               />
             </PressableScale>
             <PressableScale
-              accessibilityLabel="Settings"
+              accessibilityLabel={t.accessibilitySettings}
               accessibilityRole="button"
               className="w-9 h-9 items-center justify-center rounded-full"
               onPress={() => {

@@ -44,10 +44,16 @@ export default function PromptModal({
   };
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onCancel}
+    >
       <Pressable className="flex-1 justify-center items-center bg-black/40" onPress={onCancel}>
         <Pressable
-          className="bg-white rounded-2xl mx-10 w-[300px] overflow-hidden"
+          className="bg-card rounded-2xl mx-10 w-[300px] overflow-hidden"
           onPress={(e) => e.stopPropagation()}
         >
           <View className="px-5 pt-5 pb-3">

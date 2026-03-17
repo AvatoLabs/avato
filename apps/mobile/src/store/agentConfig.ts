@@ -13,8 +13,12 @@ export type AgentConfigCacheItem = {
   avatar?: string | null;
   description?: string | null;
   id: string;
+  params?: Record<string, unknown>;
   plugins?: string[];
+  provider?: string;
+  systemRole?: string;
   title?: string | null;
+  model?: string;
   [key: string]: any;
 } | null;
 

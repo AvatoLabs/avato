@@ -24,6 +24,8 @@ export interface ChatSession {
   avatar?: string;
   /** Session-level chat config persisted on server */
   chatConfig?: MobileChatConfig;
+  /** Agent config id (from API, may differ from agentId) */
+  config?: { id?: string };
   createdAt: string;
   description?: string;
   id: string;
@@ -67,7 +69,13 @@ export interface MobileChatConfig {
   searchMode?: 'auto' | 'off' | 'on';
 }
 
-export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
+export type MessageRole =
+  | 'assistant'
+  | 'compareGroup'
+  | 'compressedGroup'
+  | 'system'
+  | 'tool'
+  | 'user';
 
 export interface MessageContentPart {
   image?: string;
@@ -172,6 +180,9 @@ export interface ChatFileItem {
 
 export interface ChatMessage {
   agentId?: string | null;
+  children?: ChatMessage[];
+  /** For compressedGroup: messages when expanded */
+  compressedMessages?: ChatMessage[];
   content: string;
   /** ISO timestamp */
   createdAt: string;
@@ -361,6 +372,15 @@ export interface UserProfile {
 
 export interface MobileUserState extends UserProfile {
   settings?: {
+    defaultAgent?: {
+      config?: {
+        [key: string]: unknown;
+        model?: string;
+        plugins?: string[];
+        provider?: string;
+        systemRole?: string;
+      };
+    };
     memory?: {
       effort?: MobileMemoryEffort;
       enabled?: boolean;

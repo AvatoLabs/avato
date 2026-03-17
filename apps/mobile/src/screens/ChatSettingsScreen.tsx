@@ -384,8 +384,13 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       {
         text: t.chatSettingsClearConfirm,
         style: 'destructive',
-        onPress: () => {
-          clearMessages(sessionId);
+        onPress: async () => {
+          try {
+            await clearMessages(sessionId);
+            haptics.success();
+          } catch {
+            /* error already shown by store */
+          }
         },
       },
     ]);
@@ -651,6 +656,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       </ScrollView>
 
       <Modal
+        accessibilityViewIsModal
         transparent
         animationType="slide"
         visible={!isGroupSession && tagSelectorVisible}
@@ -661,7 +667,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
           onPress={() => setTagSelectorVisible(false)}
         >
           <Pressable
-            className="rounded-t-2xl bg-white"
+            className="rounded-t-2xl bg-card"
             style={{ maxHeight: '72%' }}
             onPress={(event) => event.stopPropagation()}
           >

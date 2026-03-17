@@ -2,7 +2,6 @@ import './global.css';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { NavigationContainer } from '@react-navigation/native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -10,6 +9,7 @@ import { AppState, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ThemeProvider } from './src/components/ThemeProvider';
 import { ToastContainer, useToast } from './src/components/ui/Toast';
 import { migrateDeprecatedStorageKeys } from './src/lib/appState';
 import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
@@ -20,8 +20,8 @@ import RootNavigator from './src/navigation';
 import { useAgentStore } from './src/store/agent';
 import { useConnectionStore } from './src/store/connection';
 import { useSessionStore } from './src/store/session';
+import { useThemeStore } from './src/store/theme';
 import { useUserStore } from './src/store/user';
-import { AvatoLightTheme } from './src/theme';
 
 const ONBOARDING_KEY = 'avato_onboarding_complete';
 
@@ -112,6 +112,7 @@ export default function App() {
       setIsOffline(offline);
       if (wasOffline.current && !offline) {
         useToast.getState().show('success', t.toastConnectionRestored);
+        void syncMobileBootstrapState();
       }
       wasOffline.current = offline;
     });
@@ -214,19 +215,23 @@ export default function App() {
     ExpoSplashScreen.hideAsync().catch(() => {});
   }, [isBootReady]);
 
+  // StatusBar style: light content on dark bg, dark content on light bg (must be before early return for hooks rules)
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const statusBarStyle = effectiveTheme === 'dark' ? 'light' : 'dark';
+
   if (!isBootReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer theme={AvatoLightTheme}>
+        <ThemeProvider>
           <AppErrorBoundary fallback={<AppCrashFallback />}>
             <RootNavigator initialRoute={initialRoute} />
             {isOffline && <OfflineBanner />}
             <ToastContainer />
-            <StatusBar style="dark" />
+            <StatusBar style={statusBarStyle} />
           </AppErrorBoundary>
-        </NavigationContainer>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

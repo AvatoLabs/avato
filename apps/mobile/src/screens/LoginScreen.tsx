@@ -76,6 +76,24 @@ const getPrimaryActionLabel = (
   return t.loginContinueWithProvider.replace('{provider}', provider.label);
 };
 
+const syncAfterMobileLogin = async () => {
+  const [sessionsResult, userResult, agentsResult] = await Promise.allSettled([
+    useSessionStore.getState().fetchSessions({ throwOnError: true }),
+    useUserStore.getState().fetchUser({ throwOnError: true }),
+    useAgentStore.getState().loadAgents(),
+  ]);
+
+  if (sessionsResult.status === 'rejected') {
+    console.warn('[LoginScreen] sessions sync failed after login:', sessionsResult.reason);
+  }
+  if (userResult.status === 'rejected') {
+    console.warn('[LoginScreen] user sync failed after login:', userResult.reason);
+  }
+  if (agentsResult.status === 'rejected') {
+    console.warn('[LoginScreen] agents sync failed after login:', agentsResult.reason);
+  }
+};
+
 export default function LoginScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
@@ -86,11 +104,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const continueInNoAuthMode = useCallback(async () => {
     await clearTransientAppState();
-    await Promise.all([
-      useSessionStore.getState().fetchSessions({ throwOnError: true }),
-      useUserStore.getState().fetchUser({ throwOnError: true }),
-      useAgentStore.getState().loadAgents(),
-    ]);
+    await syncAfterMobileLogin();
 
     navigation.reset({
       index: 0,
@@ -134,11 +148,7 @@ export default function LoginScreen({ navigation }: any) {
         if (!session) return;
 
         await clearTransientAppState();
-        await Promise.all([
-          useSessionStore.getState().fetchSessions({ throwOnError: true }),
-          useUserStore.getState().fetchUser({ throwOnError: true }),
-          useAgentStore.getState().loadAgents(),
-        ]);
+        await syncAfterMobileLogin();
 
         navigation.reset({
           index: 0,
@@ -180,7 +190,16 @@ export default function LoginScreen({ navigation }: any) {
     }
 
     toast.show('error', t.loginMissingProviders);
-  }, [authConfig, handleSignIn, loadAuthConfig, loading, primaryProvider, signingInProvider, t, toast]);
+  }, [
+    authConfig,
+    handleSignIn,
+    loadAuthConfig,
+    loading,
+    primaryProvider,
+    signingInProvider,
+    t,
+    toast,
+  ]);
 
   const primaryLabel = getPrimaryActionLabel(authConfig, primaryProvider, t);
   const isBusy = loading || !!signingInProvider;

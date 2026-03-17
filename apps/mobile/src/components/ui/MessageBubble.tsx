@@ -48,6 +48,7 @@ import { semanticColors } from '../../constants/colors';
 import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
 import { useSessionStore } from '../../store/session';
@@ -410,6 +411,80 @@ const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageS
 
 GroupSpeakerAvatar.displayName = 'GroupSpeakerAvatar';
 
+const CompareGroupBlock = memo<{
+  childrenMessages: ChatMessage[];
+  groupMembersById?: Record<string, GroupMessageSpeaker>;
+  groupSupervisorId?: string;
+  markdownStyles: Record<string, unknown>;
+  onOpenLink: (url?: string) => void;
+  t: ReturnType<typeof useI18n.getState>['t'];
+}>(({ childrenMessages, groupMembersById, groupSupervisorId, markdownStyles, onOpenLink, t }) => {
+  return (
+    <View className="gap-2">
+      {childrenMessages.map((child) => {
+        const speakerId = child.agentId || groupSupervisorId;
+        const speaker = speakerId ? groupMembersById?.[speakerId] : undefined;
+        const isSupervisor = Boolean(
+          speaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
+        );
+        const speakerName =
+          speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
+        const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
+        const childContent = preprocessMathBlocks(
+          injectCitationLinks(child.content, child.search?.citations),
+        );
+
+        return (
+          <View
+            className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.02] px-3 py-2.5"
+            key={child.id}
+          >
+            <View className="mb-2 flex-row items-center">
+              <GroupSpeakerAvatar fallbackLabel={fallbackLabel} speaker={speaker} />
+              <View className="ml-2 min-w-0 flex-1">
+                <Text className="text-[12px] font-semibold text-foreground/75" numberOfLines={1}>
+                  {speakerName}
+                </Text>
+                {child.model ? (
+                  <Text className="text-[11px] text-foreground/35" numberOfLines={1}>
+                    {child.model}
+                  </Text>
+                ) : null}
+              </View>
+              {child.createdAt ? (
+                <Text className="ml-2 text-[10px] text-foreground/20">
+                  {getTimeAgo(child.createdAt)}
+                </Text>
+              ) : null}
+            </View>
+
+            {childContent ? (
+              <Markdown
+                rules={codeInlineRules}
+                style={markdownStyles as any}
+                onLinkPress={(url) => {
+                  onOpenLink(url);
+                  return false;
+                }}
+              >
+                {childContent}
+              </Markdown>
+            ) : child.reasoning?.content ? (
+              <Text className="text-[14px] leading-6 text-foreground/60">
+                {child.reasoning.content}
+              </Text>
+            ) : (
+              <TypingIndicator color={uiColors.typingIndicator} />
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+});
+
+CompareGroupBlock.displayName = 'CompareGroupBlock';
+
 const MessageBubble = memo<MessageBubbleProps>(
   ({ message, sessionId, generating, groupMembersById, groupSupervisorId, onSaveToTopic }) => {
     const isUser = message.role === 'user';
@@ -429,6 +504,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const deleteMessage = useChatStore((s) => s.deleteMessage);
     const editMessage = useChatStore((s) => s.editMessage);
     const regenerateMessage = useChatStore((s) => s.regenerateMessage);
+    const toggleMessageCollapsed = useChatStore((s) => s.toggleMessageCollapsed);
     const isReasoning = useChatStore((s) => s.isReasoning);
     const isGroupSession = useSessionStore(
       (s) => s.sessions.find((session) => session.id === sessionId)?.type === 'group',
@@ -704,6 +780,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     };
 
     const markdownRules = {
+      ...codeInlineRules,
       fence: (node: any, _children: any, _parent: any, styles: any) => {
         const code = node.content ?? '';
         const lang = (node.sourceInfo ?? '').toLowerCase();
@@ -792,7 +869,12 @@ const MessageBubble = memo<MessageBubbleProps>(
       !isUser &&
       !!message.search &&
       !!(message.search.citations?.length || message.search.imageResults?.length);
-    const shouldShowGroupSpeaker = isGroupSession && !isUser && !isToolMessage;
+    const shouldShowGroupSpeaker =
+      isGroupSession &&
+      !isUser &&
+      !isToolMessage &&
+      message.role !== 'compareGroup' &&
+      message.role !== 'compressedGroup';
     const groupSpeakerId = shouldShowGroupSpeaker
       ? message.agentId || groupSupervisorId
       : undefined;
@@ -838,12 +920,24 @@ const MessageBubble = memo<MessageBubbleProps>(
     const userContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
     const hasTextContent = !!(renderedContent?.trim() || multimodalContentParts?.length);
     const showStandaloneUserAttachments = isUser && hasAttachments && !hasTextContent;
+    const compareGroupChildren =
+      message.role === 'compareGroup' && message.children?.length ? message.children : null;
+    const compressedGroupMessages =
+      message.role === 'compressedGroup' && message.compressedMessages?.length
+        ? message.compressedMessages
+        : null;
+    const isCompressedGroupExpanded =
+      message.role === 'compressedGroup' &&
+      (message.metadata as Record<string, unknown>)?.expanded === true;
     const showMessageBubble =
       !showStandaloneUserAttachments ||
       !!renderedContent ||
+      !!compareGroupChildren?.length ||
+      !!compressedGroupMessages?.length ||
       !!multimodalContentParts?.length ||
       isToolMessage ||
-      !!message.error;
+      !!message.error ||
+      message.role === 'compressedGroup';
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
@@ -1056,7 +1150,78 @@ const MessageBubble = memo<MessageBubbleProps>(
                             }
                           />
                         )}
-                      {isToolMessage ? (
+                      {compareGroupChildren?.length ? (
+                        <CompareGroupBlock
+                          childrenMessages={compareGroupChildren}
+                          groupMembersById={groupMembersById}
+                          groupSupervisorId={groupSupervisorId}
+                          markdownStyles={markdownStyles}
+                          t={t}
+                          onOpenLink={handleOpenLink}
+                        />
+                      ) : compressedGroupMessages?.length ? (
+                        isCompressedGroupExpanded ? (
+                          <View className="gap-2">
+                            <CompareGroupBlock
+                              childrenMessages={compressedGroupMessages}
+                              groupMembersById={groupMembersById}
+                              groupSupervisorId={groupSupervisorId}
+                              markdownStyles={markdownStyles}
+                              t={t}
+                              onOpenLink={handleOpenLink}
+                            />
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              className="mt-1 py-1"
+                              onPress={() => {
+                                haptics.light();
+                                toggleMessageCollapsed(sessionId, message.id, false);
+                              }}
+                            >
+                              <Text
+                                className="text-[12px] font-medium"
+                                style={{ color: themeColors.info }}
+                              >
+                                {t.chatShowLess}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <View>
+                            <Markdown
+                              rules={markdownRules}
+                              style={markdownStyles}
+                              onLinkPress={(url) => {
+                                handleOpenLink(url);
+                                return false;
+                              }}
+                            >
+                              {preprocessMathBlocks(
+                                injectCitationLinks(
+                                  (message.content || '').slice(0, 500) +
+                                    (message.content && message.content.length > 500 ? '...' : ''),
+                                  message.search?.citations,
+                                ),
+                              )}
+                            </Markdown>
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              className="mt-2 py-2 rounded-xl bg-foreground/[0.04] items-center"
+                              onPress={() => {
+                                haptics.light();
+                                toggleMessageCollapsed(sessionId, message.id, true);
+                              }}
+                            >
+                              <Text
+                                className="text-[13px] font-medium"
+                                style={{ color: themeColors.info }}
+                              >
+                                {t.chatShowMore}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )
+                      ) : isToolMessage ? (
                         <ToolResultBlock message={message} />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
@@ -1112,10 +1277,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         </>
                       ) : null}
                       {!isUser && !generating && message.error && (
-                        <ErrorBlock
-                          error={message.error}
-                          onRetry={isGroupSession ? undefined : handleRegenerate}
-                        />
+                        <ErrorBlock error={message.error} onRetry={handleRegenerate} />
                       )}
                       {!isUser && message.search?.citations?.length ? (
                         <CitationFootnotesBlock
@@ -1150,7 +1312,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                   className={`flex-row items-center mt-2 gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}
                   entering={FadeIn.duration(200)}
                 >
-                  {!isGroupSession && !isUser && !isToolMessage && (
+                  {!isUser && !isToolMessage && (
                     <TouchableOpacity
                       accessibilityLabel={t.msgActionRegenerate}
                       activeOpacity={0.5}
@@ -1161,7 +1323,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       <RefreshCw color={semanticColors.muted} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
-                  {!isGroupSession && isUser && (
+                  {isUser && (
                     <TouchableOpacity
                       accessibilityLabel={t.msgActionEdit}
                       activeOpacity={0.5}
@@ -1393,6 +1555,7 @@ const RichContentPartsBlock = memo<{
         return (
           <Markdown
             key={`${part.text.slice(0, 24)}-${index}`}
+            rules={codeInlineRules}
             style={markdownStyles}
             onLinkPress={(url) => {
               onOpenLink(url);
@@ -2098,6 +2261,8 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
       >
         <View className="flex-row items-center flex-1">
           <Wrench
+            size={14}
+            strokeWidth={2}
             color={
               hasPending
                 ? themeColors.info
@@ -2105,8 +2270,6 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
                   ? themeColors.iconSuccess
                   : uiColors.textGray
             }
-            size={14}
-            strokeWidth={2}
           />
           <Text className="ml-2 text-[12px] font-medium text-foreground/65">
             {t.chatToolsTitle} ({tools.length})
@@ -2229,7 +2392,13 @@ const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model,
   ];
 
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      visible
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <TouchableOpacity
         activeOpacity={1}
         className="flex-1 items-center justify-center"
@@ -2395,6 +2564,7 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
               />
             ) : (
               <Markdown
+                rules={codeInlineRules}
                 style={markdownStyles}
                 onLinkPress={(url) => {
                   Linking.openURL(url).catch(() => undefined);

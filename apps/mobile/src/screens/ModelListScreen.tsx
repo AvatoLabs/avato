@@ -56,7 +56,13 @@ export default function ModelListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={t.discoverModels}
         onPressLeft={() => {
           haptics.light();
@@ -70,7 +76,7 @@ export default function ModelListScreen({ navigation }: any) {
             <TextInput
               className="text-foreground text-[15px]"
               placeholder={t.modelPickerSearch}
-              placeholderTextColor="#8c8c8c"
+              placeholderTextColor={semanticColors.muted}
               value={search}
               onChangeText={setSearch}
             />

@@ -142,10 +142,16 @@ export default function AgentSelectionSheet({
   const submitDisabled = submitting || (!allowEmptySelection && selectedIds.size === 0);
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Pressable
-          className="rounded-t-2xl bg-white"
+          className="rounded-t-2xl bg-card"
           style={{ maxHeight: '80%' }}
           onPress={(event) => event.stopPropagation()}
         >

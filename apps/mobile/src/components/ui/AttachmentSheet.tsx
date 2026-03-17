@@ -52,7 +52,13 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
       onCamera
         ? {
             description: 'Capture a new photo and attach it instantly.',
-            icon: <Camera color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
+            icon: (
+              <Camera
+                color={semanticColors.foreground}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            ),
             key: 'camera',
             title: t.fileCamera,
             onPress: () => {
@@ -65,7 +71,13 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
       onGallery
         ? {
             description: 'Choose one or more images from your library.',
-            icon: <ImageIcon color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
+            icon: (
+              <ImageIcon
+                color={semanticColors.foreground}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            ),
             key: 'gallery',
             title: t.fileGallery,
             onPress: () => {
@@ -77,7 +89,13 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         : null,
       {
         description: 'Attach files, notes, PDFs, or other supporting material.',
-        icon: <FileText color={semanticColors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />,
+        icon: (
+          <FileText
+            color={semanticColors.foreground}
+            size={18}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        ),
         key: 'document',
         title: t.fileDocument,
         onPress: () => {
@@ -95,13 +113,16 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
     }>;
 
     return (
-      <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={onClose}
-        >
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={visible}
+        onRequestClose={onClose}
+      >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
           <Pressable
-            className="bg-white rounded-t-2xl"
+            className="bg-card rounded-t-2xl"
             style={{ paddingBottom: Math.max(insets.bottom, 16), maxHeight: '72%' }}
             onPress={(e) => e.stopPropagation()}
           >

@@ -7,6 +7,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import EmptyState from '../components/ui/EmptyState';
+import ListSkeleton from '../components/ui/ListSkeleton';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -95,8 +97,16 @@ export default function TopicListScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
-        rightElement={<Plus color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
+        rightElement={
+          <Plus color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         title={t.topicTitle}
         onPressRight={handleCreateTopic}
         onPressLeft={() => {
@@ -110,7 +120,7 @@ export default function TopicListScreen({ route, navigation }: any) {
           <TextInput
             className="flex-1 text-foreground text-[15px]"
             placeholder={t.topicSearch}
-            placeholderTextColor="#8c8c8c"
+            placeholderTextColor={semanticColors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -145,14 +155,11 @@ export default function TopicListScreen({ route, navigation }: any) {
         data={sortedTopics}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          !loading ? (
-            <View className="items-center pt-16 px-8">
-              <Text className="text-secondary/50 text-[15px] font-medium">{t.topicEmpty}</Text>
-              <Text className="text-secondary/40 text-[13px] mt-1 text-center">
-                {t.topicEmptyDesc}
-              </Text>
-            </View>
-          ) : null
+          loading ? (
+            <ListSkeleton />
+          ) : (
+            <EmptyState description={t.topicEmptyDesc} icon="📋" title={t.topicEmpty} />
+          )
         }
         refreshControl={
           <RefreshControl

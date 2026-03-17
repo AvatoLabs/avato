@@ -6,6 +6,7 @@
  * - Level 2 inside Explore: MCP | Skills
  * - Management actions stay inside Store via sheets/modals
  */
+import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import {
   Box,
@@ -39,6 +40,8 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import CardSkeleton from '../components/ui/CardSkeleton';
+import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -63,6 +66,7 @@ import {
 } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
+import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
 
@@ -130,7 +134,11 @@ const formatCount = (n: number, locale: Locale): string => {
   if (n >= 10000) {
     const wan = n / 10000;
     if (locale.startsWith('zh')) {
-      return wan >= 10 ? `${Math.floor(wan)}万` : wan % 1 === 0 ? `${wan}万` : `${wan.toFixed(1)}万`;
+      return wan >= 10
+        ? `${Math.floor(wan)}万`
+        : wan % 1 === 0
+          ? `${wan}万`
+          : `${wan.toFixed(1)}万`;
     }
     return `${(n / 1000).toFixed(1)}k`;
   }
@@ -283,6 +291,8 @@ const ItemCard = memo<{
   onPress: (item: MarketListItem) => void;
 }>(({ item, installed, onPress, onInstall }) => (
   <PressableScale
+    accessibilityLabel={item.name || item.identifier}
+    accessibilityRole="button"
     className="bg-foreground/[0.02] rounded-2xl p-3.5 mb-2.5 mx-5"
     onPress={() => onPress(item)}
   >
@@ -453,7 +463,13 @@ function SimpleImportModal({
   };
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Pressable
           className="bg-background rounded-t-2xl"
@@ -701,7 +717,13 @@ function AddCustomMcpModal({
   };
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={handleClose}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={handleClose}
+    >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={handleClose}>
         <Pressable
           className="bg-background rounded-t-2xl"
@@ -1070,7 +1092,13 @@ function StoreItemModal({
   const canUninstall = Boolean(detail.installedPlugin || detail.installedSkill);
 
   return (
-    <Modal transparent animationType="slide" visible={Boolean(detail)} onRequestClose={onClose}>
+    <Modal
+      accessibilityViewIsModal
+      transparent
+      animationType="slide"
+      visible={Boolean(detail)}
+      onRequestClose={onClose}
+    >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Pressable
           className="bg-background rounded-t-3xl px-5 pt-4"
@@ -1255,6 +1283,12 @@ export default function StoreScreen() {
     }
   }, [t.errorNetwork, toast]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void useSessionStore.getState().fetchSessions();
+    }, []),
+  );
+
   const builtinMarketItems = useMemo(() => {
     const query = debouncedQuery.trim().toLowerCase();
 
@@ -1297,6 +1331,14 @@ export default function StoreScreen() {
   );
 
   const fetchCategories = useCallback(async (source: ExploreSource) => {
+    // Set fallback immediately so user never sees empty or wrong categories
+    const fallbackKeys =
+      source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
+    const fallback = fallbackKeys
+      .filter((k) => k !== ALL_CATEGORY_KEY)
+      .map((category) => ({ category, count: undefined }));
+    setMarketCategories(fallback);
+
     try {
       const list =
         source === 'mcp'
@@ -1305,25 +1347,10 @@ export default function StoreScreen() {
       const items = Array.isArray(list) ? list : [];
       if (items.length > 0) {
         setMarketCategories(items);
-        return;
       }
-      // API returned empty: use fixed fallback so user can still browse by category
-      const fallbackKeys =
-        source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
-      setMarketCategories(
-        fallbackKeys
-          .filter((k) => k !== ALL_CATEGORY_KEY)
-          .map((category) => ({ category, count: undefined })),
-      );
+      // else keep fallback
     } catch {
-      // API failed: use fixed fallback so user can still browse by category
-      const fallbackKeys =
-        source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
-      setMarketCategories(
-        fallbackKeys
-          .filter((k) => k !== ALL_CATEGORY_KEY)
-          .map((category) => ({ category, count: undefined })),
-      );
+      // keep fallback
     }
   }, []);
 
@@ -1373,12 +1400,7 @@ export default function StoreScreen() {
         if (source === 'skill') setMarketSkillTotal(result.totalCount ?? 0);
 
         // Fallback: when categories API failed, derive from "all" items
-        if (
-          !append &&
-          page === 1 &&
-          !categoryParam &&
-          remoteItems.length > 0
-        ) {
+        if (!append && page === 1 && !categoryParam && remoteItems.length > 0) {
           setMarketCategories((prev) =>
             prev.length === 0 ? deriveCategoriesFromItems(remoteItems, source) : prev,
           );
@@ -1780,7 +1802,9 @@ export default function StoreScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        rightElement={<Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        rightElement={
+          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        }
         title={t.tabStore}
         titleIcon={
           <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
@@ -1849,8 +1873,7 @@ export default function StoreScreen() {
             >
               {exploreSources.map((source) => {
                 const active = activeExploreSource === source.key;
-                const total =
-                  source.key === 'mcp' ? marketMcpTotal : marketSkillTotal;
+                const total = source.key === 'mcp' ? marketMcpTotal : marketSkillTotal;
                 const countStr = total > 0 ? ` ${formatCount(total, locale)}` : '';
                 return (
                   <TouchableOpacity
@@ -1876,7 +1899,8 @@ export default function StoreScreen() {
                         flexShrink: 0,
                       }}
                     >
-                      {source.label}{countStr}
+                      {source.label}
+                      {countStr}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1918,7 +1942,8 @@ export default function StoreScreen() {
                         flexShrink: 0,
                       }}
                     >
-                      {category.label}{countStr}
+                      {category.label}
+                      {countStr}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1929,23 +1954,10 @@ export default function StoreScreen() {
       </ScreenHeader>
 
       {loading && isEmpty ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.muted} size="large" />
-        </View>
+        <CardSkeleton />
       ) : isEmpty && !loading ? (
-        <Animated.View
-          className="flex-1 items-center justify-center px-8"
-          entering={FadeInDown.duration(350)}
-        >
-          <View
-            className="items-center justify-center rounded-3xl bg-foreground/5 mb-5"
-            style={{ width: 80, height: 80 }}
-          >
-            <Package color={semanticColors.secondaryText} size={36} strokeWidth={1.3} />
-          </View>
-          <Text className="text-foreground text-[17px] font-semibold text-center">
-            {t.storeEmpty}
-          </Text>
+        <Animated.View className="flex-1" entering={FadeInDown.duration(350)}>
+          <EmptyState icon="📦" title={t.storeEmpty} />
         </Animated.View>
       ) : isExplore ? (
         <FlatList
@@ -2002,6 +2014,7 @@ export default function StoreScreen() {
       )}
 
       <Modal
+        accessibilityViewIsModal
         transparent
         animationType="fade"
         visible={showCreateMenu}

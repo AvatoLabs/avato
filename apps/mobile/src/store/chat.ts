@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
+import { DEFAULT_AGENT_CONFIG } from '../constants/defaultModel';
 import type {
   ChatRequestOptions,
   MobileChatMessage,
@@ -23,10 +24,12 @@ import {
   agentGroupApi,
   aiAgentApi,
   aiChatApi,
+  configApi,
   fileApi,
   messageApi,
   sessionApi,
   topicApi,
+  userApi,
 } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
@@ -39,9 +42,16 @@ import type {
   Topic,
 } from '../types';
 import { useFileStore } from './file';
+import { useModelStore } from './model';
 import { useSessionStore } from './session';
 import { useTopicStore } from './topic';
 import { getUserMemorySettings } from './user';
+
+/** In-flight promises by sessionId:topicId for request deduplication */
+const fetchMessagesInFlight = new Map<string, Promise<void>>();
+
+const fetchMessagesKey = (sessionId: string, topicId?: string) =>
+  `${sessionId}:${topicId ?? 'null'}`;
 
 const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayload[] =>
   executions.map((exec) => ({
@@ -113,6 +123,32 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
     }
   }
 
+  // 3. Default agent fallback (align with Web: DEFAULT -> server -> user)
+  if (!opts.model || !opts.provider) {
+    try {
+      const [serverDefault, userState] = await Promise.all([
+        configApi.getDefaultAgentConfig().catch((): { model?: string; provider?: string } => ({})),
+        userApi.getState(),
+      ]);
+      const userConfig = userState?.settings?.defaultAgent?.config || {};
+      const serverCfg = serverDefault as { model?: string; provider?: string };
+
+      if (!opts.model) {
+        opts.model = userConfig.model || serverCfg.model || DEFAULT_AGENT_CONFIG.model;
+      }
+      if (!opts.provider) {
+        opts.provider = userConfig.provider || serverCfg.provider || DEFAULT_AGENT_CONFIG.provider;
+      }
+    } catch {
+      if (!opts.model) opts.model = DEFAULT_AGENT_CONFIG.model;
+      if (!opts.provider) opts.provider = DEFAULT_AGENT_CONFIG.provider;
+    }
+  }
+
+  if (opts.model && !opts.provider) {
+    opts.provider = resolveProviderByModel(opts.model);
+  }
+
   if (!opts.memory) {
     try {
       const memorySettings = await getUserMemorySettings();
@@ -128,6 +164,18 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
 
   return opts;
 }
+
+const resolveProviderByModel = (modelId?: string): string | undefined => {
+  if (!modelId) return undefined;
+
+  for (const provider of useModelStore.getState().providers) {
+    if (provider.children.some((child) => child.id === modelId)) {
+      return provider.id;
+    }
+  }
+
+  return undefined;
+};
 
 interface UploadedAttachment {
   content?: string;
@@ -397,10 +445,7 @@ const extractPersistedMessageIds = (messages: ChatMessage[]) =>
         !id.startsWith('user-'),
     );
 
-const buildMessageContainerParams = (
-  sessionId: string,
-  sessionType: 'agent' | 'group',
-) =>
+const buildMessageContainerParams = (sessionId: string, sessionType: 'agent' | 'group') =>
   sessionType === 'group'
     ? {
         groupId: sessionId,
@@ -437,7 +482,12 @@ const isGroupAssistantSettled = (message?: ChatMessage): boolean => {
   }
   if (message.role === 'compressedGroup') {
     const compressedContent = message.content?.trim();
-    return !!compressedContent && compressedContent !== GROUP_LOADING_CONTENT;
+    const compressedMessages = (message as any).compressedMessages as ChatMessage[] | undefined;
+    const hasContent = !!compressedContent && compressedContent !== GROUP_LOADING_CONTENT;
+    const hasSettledChildren =
+      Array.isArray(compressedMessages) &&
+      compressedMessages.some((m) => isGroupAssistantSettled(m));
+    return hasContent || hasSettledChildren;
   }
   if (message.error) return true;
   if (message.imageList?.length) return true;
@@ -450,6 +500,22 @@ const isGroupAssistantSettled = (message?: ChatMessage): boolean => {
   }
 
   return true;
+};
+
+/** Recursively find message by id in flat list and nested children (compareGroup, etc.) */
+const findMessageByIdInTree = (
+  messages: ChatMessage[],
+  targetId: string,
+): ChatMessage | undefined => {
+  for (const msg of messages) {
+    if (msg.id === targetId) return msg;
+    const children = (msg as any).children as ChatMessage[] | undefined;
+    if (Array.isArray(children) && children.length > 0) {
+      const found = findMessageByIdInTree(children, targetId);
+      if (found) return found;
+    }
+  }
+  return undefined;
 };
 
 const getGroupOperationErrorMessage = (
@@ -531,7 +597,9 @@ const applyGroupRuntimeAssistantFallback = (
 
   useChatStore.setState((state) => {
     const currentMessages = state.messagesBySession[sessionId] || [];
-    const assistantIndex = currentMessages.findIndex((message) => message.id === assistantMessageId);
+    const assistantIndex = currentMessages.findIndex(
+      (message) => message.id === assistantMessageId,
+    );
 
     const buildUpdatedAssistant = (message?: ChatMessage): ChatMessage => ({
       ...(message ?? {
@@ -541,7 +609,11 @@ const applyGroupRuntimeAssistantFallback = (
         role: 'assistant' as const,
         sessionId,
       }),
-      ...(content ? { content } : message?.content === GROUP_LOADING_CONTENT ? { content: '' } : {}),
+      ...(content
+        ? { content }
+        : message?.content === GROUP_LOADING_CONTENT
+          ? { content: '' }
+          : {}),
       ...(reasoning ? { reasoning: { content: reasoning } } : {}),
       ...(tools?.length ? { tools } : {}),
       updatedAt: new Date().toISOString(),
@@ -568,18 +640,13 @@ const findSettledGroupAssistant = (
   preferredAssistantId?: string,
 ): ChatMessage | undefined => {
   if (preferredAssistantId) {
-    for (const message of messages) {
-      if (message.id === preferredAssistantId && isGroupAssistantSettled(message)) {
-        return message;
-      }
+    const direct = messages.find((m) => m.id === preferredAssistantId);
+    if (direct && isGroupAssistantSettled(direct)) return direct;
 
-      if (
-        message.role === 'compareGroup' &&
-        message.children?.some(
-          (child) => child.id === preferredAssistantId && isGroupAssistantSettled(child),
-        )
-      ) {
-        return message;
+    for (const message of messages) {
+      if (message.role === 'compareGroup' && message.children?.length) {
+        const found = findSettledGroupAssistant(message.children, preferredAssistantId);
+        if (found) return found;
       }
     }
   }
@@ -872,7 +939,7 @@ interface ChatState {
   activeOperationId: string | null;
   activeStreamingMessageId: string | null;
   activeStreamingSessionId: string | null;
-  clearMessages: (sessionId: string) => void;
+  clearMessages: (sessionId: string) => Promise<void>;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   /** Message currently being edited (id) */
   editingMessageId: string | null;
@@ -914,6 +981,7 @@ interface ChatState {
   stopGenerating: () => void;
   /** Streaming content buffer for the current generation */
   streamBuffer: string;
+  toggleMessageCollapsed: (sessionId: string, messageId: string, expanded?: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -931,6 +999,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   abortController: null,
 
   reset: () => {
+    fetchMessagesInFlight.clear();
     get().abortController?.abort();
     set({
       activeOperationId: null,
@@ -977,96 +1046,113 @@ export const useChatStore = create<ChatState>((set, get) => ({
     topicId?: string,
     options?: { preserveOnEmpty?: boolean },
   ) => {
-    set((s) => ({
-      fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: true },
-    }));
-    try {
-      const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-      const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
-      let effectiveTopicId = topicId;
-      let messages =
-        sessionType === 'group'
-          ? await aiAgentApi.getGroupMessages({ groupId: sessionId, topicId: effectiveTopicId })
-          : await messageApi.list(sessionId, effectiveTopicId, { sessionType });
+    const key = fetchMessagesKey(sessionId, topicId);
+    const existing = fetchMessagesInFlight.get(key);
+    if (existing) {
+      await existing;
+      return;
+    }
 
-      if (!effectiveTopicId && (!messages || messages.length === 0)) {
-        const knownTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
-        let fallbackTopics = knownTopics;
+    const promise = (async () => {
+      set((s) => ({
+        fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: true },
+      }));
+      try {
+        const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+        const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
+        let effectiveTopicId = topicId;
+        let messages =
+          sessionType === 'group'
+            ? await aiAgentApi.getGroupMessages({ groupId: sessionId, topicId: effectiveTopicId })
+            : await messageApi.list(sessionId, effectiveTopicId, { sessionType });
 
-        if (fallbackTopics.length === 0) {
-          fallbackTopics = await topicApi.list(sessionId, { sessionType }).catch(() => []);
-          if (fallbackTopics.length > 0) {
-            useTopicStore.setState((s) => ({
-              topicsBySession: {
-                ...s.topicsBySession,
-                [sessionId]: fallbackTopics,
-              },
-            }));
+        if (!effectiveTopicId && (!messages || messages.length === 0)) {
+          const knownTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
+          let fallbackTopics = knownTopics;
+
+          if (fallbackTopics.length === 0) {
+            fallbackTopics = await topicApi.list(sessionId, { sessionType }).catch(() => []);
+            if (fallbackTopics.length > 0) {
+              useTopicStore.setState((s) => ({
+                topicsBySession: {
+                  ...s.topicsBySession,
+                  [sessionId]: fallbackTopics,
+                },
+              }));
+            }
+          }
+
+          const fallbackTopicId = fallbackTopics[0]?.id;
+          if (fallbackTopicId) {
+            effectiveTopicId = fallbackTopicId;
+            useTopicStore.getState().switchTopic(sessionId, fallbackTopicId);
+            messages =
+              sessionType === 'group'
+                ? await aiAgentApi.getGroupMessages({
+                    groupId: sessionId,
+                    topicId: fallbackTopicId,
+                  })
+                : await messageApi.list(sessionId, fallbackTopicId, { sessionType });
           }
         }
+        const {
+          activeStreamingMessageId,
+          activeStreamingSessionId,
+          generating,
+          messagesBySession,
+        } = get();
 
-        const fallbackTopicId = fallbackTopics[0]?.id;
-        if (fallbackTopicId) {
-          effectiveTopicId = fallbackTopicId;
-          useTopicStore.getState().switchTopic(sessionId, fallbackTopicId);
-          messages =
-            sessionType === 'group'
-              ? await aiAgentApi.getGroupMessages({
-                  groupId: sessionId,
-                  topicId: fallbackTopicId,
-                })
-              : await messageApi.list(sessionId, fallbackTopicId, { sessionType });
-        }
+        const shouldKeepLocalStreamingMessage =
+          generating &&
+          activeStreamingSessionId === sessionId &&
+          !!activeStreamingMessageId &&
+          !messages.some((message) => message.id === activeStreamingMessageId);
+
+        const localStreamingMessage = shouldKeepLocalStreamingMessage
+          ? (messagesBySession[sessionId] || []).find(
+              (message) => message.id === activeStreamingMessageId,
+            )
+          : undefined;
+        const mergedMessages = mergePersistedMessagesWithLocal(
+          messages ?? [],
+          messagesBySession[sessionId] || [],
+        );
+
+        const existingCount = (messagesBySession[sessionId] || []).length;
+        const preserveOnEmpty =
+          options?.preserveOnEmpty &&
+          (messages ?? []).length === 0 &&
+          mergedMessages.length === 0 &&
+          existingCount > 0;
+
+        const finalMessages = preserveOnEmpty ? messagesBySession[sessionId] || [] : mergedMessages;
+        const finalWithLocal =
+          localStreamingMessage &&
+          !finalMessages.some((message) => message.id === localStreamingMessage.id)
+            ? [...finalMessages, localStreamingMessage]
+            : finalMessages;
+
+        set((s) => ({
+          fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: finalWithLocal,
+          },
+        }));
+      } catch (err) {
+        set((s) => ({
+          fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
+        }));
+        const { messageKey } = classifyError(err);
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t[messageKey]);
+      } finally {
+        fetchMessagesInFlight.delete(key);
       }
-      const { activeStreamingMessageId, activeStreamingSessionId, generating, messagesBySession } =
-        get();
+    })();
 
-      const shouldKeepLocalStreamingMessage =
-        generating &&
-        activeStreamingSessionId === sessionId &&
-        !!activeStreamingMessageId &&
-        !messages.some((message) => message.id === activeStreamingMessageId);
-
-      const localStreamingMessage = shouldKeepLocalStreamingMessage
-        ? (messagesBySession[sessionId] || []).find(
-            (message) => message.id === activeStreamingMessageId,
-          )
-        : undefined;
-      const mergedMessages = mergePersistedMessagesWithLocal(
-        messages ?? [],
-        messagesBySession[sessionId] || [],
-      );
-
-      const existingCount = (messagesBySession[sessionId] || []).length;
-      const preserveOnEmpty =
-        options?.preserveOnEmpty &&
-        (messages ?? []).length === 0 &&
-        mergedMessages.length === 0 &&
-        existingCount > 0;
-
-      const finalMessages =
-        preserveOnEmpty ? (messagesBySession[sessionId] || []) : mergedMessages;
-      const finalWithLocal =
-        localStreamingMessage &&
-        !finalMessages.some((message) => message.id === localStreamingMessage.id)
-          ? [...finalMessages, localStreamingMessage]
-          : finalMessages;
-
-      set((s) => ({
-        fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
-        messagesBySession: {
-          ...s.messagesBySession,
-          [sessionId]: finalWithLocal,
-        },
-      }));
-    } catch (err) {
-      set((s) => ({
-        fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
-      }));
-      const { messageKey } = classifyError(err);
-      const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
-    }
+    fetchMessagesInFlight.set(key, promise);
+    await promise;
   },
 
   sendMessage: async (
@@ -1277,7 +1363,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (result.success === false) {
           const errMsg = result.error?.trim() || t.errorSendFailed;
-          console.warn('[ChatStore] execGroupAgent failed:', { error: result.error, success: result.success });
+          console.warn('[ChatStore] execGroupAgent failed:', {
+            error: result.error,
+            success: result.success,
+          });
           throw new Error(errMsg);
         }
 
@@ -1376,6 +1465,31 @@ export const useChatStore = create<ChatState>((set, get) => ({
             break;
           }
 
+          if (!settledAssistant && operationStatus?.isCompleted) {
+            const targetId = result.assistantMessageId ?? assistantPlaceholderId;
+            const byId = findMessageByIdInTree(currentMessages, targetId);
+            if (byId) {
+              pruneGroupLoadingPlaceholder(sessionId, targetId, byId.id);
+              triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+              const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+              if (sess && isDefaultSessionTitle(sess.title)) {
+                sessionApi
+                  .generateTitle(sessionId)
+                  .then((newTitle) => {
+                    if (newTitle) {
+                      useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                      useSessionStore.getState().fetchSessions();
+                    }
+                  })
+                  .catch((err) => {
+                    console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                  });
+              }
+              didSettle = true;
+              break;
+            }
+          }
+
           if (operationStatus?.hasError || operationStatus?.currentState?.status === 'error') {
             const errMsg = getGroupOperationErrorMessage(operationStatus) || t.errorSendFailed;
             console.warn('[ChatStore] group operation error:', {
@@ -1428,7 +1542,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 targetAssistantId,
               );
               assistantMessage =
-                settledAssistant || findGroupAssistantCandidate(iterationMessages, targetAssistantId);
+                settledAssistant ||
+                findGroupAssistantCandidate(iterationMessages, targetAssistantId);
 
               if (!settledAssistant && operationStatus?.latestAssistant) {
                 applyGroupRuntimeAssistantFallback(sessionId, targetAssistantId, operationStatus);
@@ -1459,9 +1574,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 didSettle = true;
                 break;
               }
+
+              // Trust backend: when isCompleted, treat assistant found by id as settled
+              if (!settledAssistant && operationStatus?.isCompleted) {
+                const byId = findMessageByIdInTree(iterationMessages, targetAssistantId);
+                if (byId) {
+                  pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, byId.id);
+                  triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+                  const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+                  if (sess && isDefaultSessionTitle(sess.title)) {
+                    sessionApi
+                      .generateTitle(sessionId)
+                      .then((newTitle) => {
+                        if (newTitle) {
+                          useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                          useSessionStore.getState().fetchSessions();
+                        }
+                      })
+                      .catch((err) => {
+                        console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                      });
+                  }
+                  didSettle = true;
+                  break;
+                }
+              }
             }
 
-              if (!didSettle && resolvedTopicId) {
+            if (!didSettle && resolvedTopicId) {
               // Fallback: try fetching without topicId (message might be in group root)
               await sleep(300);
               try {
@@ -1485,7 +1625,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
               const fallbackMessages = get().messagesBySession[sessionId] || [];
               let settledAssistant = findSettledGroupAssistant(fallbackMessages, targetAssistantId);
               assistantMessage =
-                settledAssistant || findGroupAssistantCandidate(fallbackMessages, targetAssistantId);
+                settledAssistant ||
+                findGroupAssistantCandidate(fallbackMessages, targetAssistantId);
               if (!settledAssistant && operationStatus?.latestAssistant) {
                 applyGroupRuntimeAssistantFallback(sessionId, targetAssistantId, operationStatus);
                 const runtimeMessages = get().messagesBySession[sessionId] || [];
@@ -1496,6 +1637,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
               if (settledAssistant) {
                 pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, settledAssistant.id);
                 didSettle = true;
+              }
+              if (!settledAssistant && operationStatus?.isCompleted) {
+                const byId = findMessageByIdInTree(fallbackMessages, targetAssistantId);
+                if (byId) {
+                  pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, byId.id);
+                  didSettle = true;
+                }
               }
             }
 
@@ -1702,7 +1850,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // Stream AI response via XHR (RN fetch lacks ReadableStream support)
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
-      const provider = chatOptions.provider || 'openai';
+      const resolvedProvider =
+        chatOptions.provider || resolveProviderByModel(chatOptions.model) || 'openai';
+      const provider = resolvedProvider;
+      chatOptions.provider = resolvedProvider;
       chatOptions.sessionId = sessionId;
       chatOptions.topicId = resolvedTopicId;
 
@@ -2051,7 +2202,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return true;
   },
 
-  clearMessages: (sessionId: string) => {
+  clearMessages: async (sessionId: string) => {
+    const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+    const isGroup = isGroupSessionLike(sessionId, session?.type);
+    const activeTopicId = useTopicStore.getState().activeTopicBySession[sessionId] ?? null;
+
+    try {
+      if (isGroup) {
+        await messageApi.removeMessagesByGroup(sessionId, activeTopicId);
+      } else {
+        await messageApi.removeMessagesByAssistant(sessionId, activeTopicId);
+      }
+      if (activeTopicId) {
+        await topicApi.remove(activeTopicId);
+      }
+      await useTopicStore.getState().fetchTopics(sessionId);
+      useTopicStore.getState().switchTopic(sessionId, null);
+    } catch (err) {
+      console.warn('[ChatStore] clearMessages failed:', err);
+      const { messageKey } = classifyError(err);
+      const t = useI18n.getState().t;
+      useToast.getState().show('error', t[messageKey]);
+      throw err;
+    }
+
     set((s) => ({
       messagesBySession: {
         ...s.messagesBySession,
@@ -2101,19 +2275,252 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
+  toggleMessageCollapsed: (sessionId: string, messageId: string, expanded?: boolean) => {
+    const messages = get().messagesBySession[sessionId] || [];
+    const target =
+      findMessageByIdInTree(messages, messageId) || messages.find((m) => m.id === messageId);
+    if (!target || target.role !== 'compressedGroup') return;
+
+    const nextExpanded = expanded ?? !(target.metadata as Record<string, unknown>)?.expanded;
+    set((s) => ({
+      messagesBySession: {
+        ...s.messagesBySession,
+        [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                metadata: {
+                  ...m.metadata,
+                  expanded: nextExpanded,
+                },
+              }
+            : m,
+        ),
+      },
+    }));
+  },
+
   regenerateMessage: async (sessionId: string, messageId: string) => {
     if (get().generating) return;
 
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
     const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
+    const messages = get().messagesBySession[sessionId] || [];
+
     if (sessionType === 'group') {
-      const t = useI18n.getState().t;
-      useToast.getState().show('error', t.errorUnknown);
+      let target: ChatMessage | undefined = messages.find((m) => m.id === messageId);
+      let targetIdx = target ? messages.findIndex((m) => m.id === messageId) : -1;
+
+      if (!target || targetIdx < 0) {
+        const foundInTree = findMessageByIdInTree(messages, messageId);
+        if (foundInTree) {
+          const compareGroupParent = messages.find(
+            (m) => m.role === 'compareGroup' && m.children?.some((c) => c.id === messageId),
+          );
+          if (compareGroupParent) {
+            target = compareGroupParent;
+            targetIdx = messages.findIndex((m) => m.id === compareGroupParent.id);
+          }
+        }
+      }
+      if (!target || targetIdx < 0) return;
+      const userMsg = messages[targetIdx - 1];
+      if (!userMsg || userMsg.role !== 'user') {
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t.errorUnknown);
+        return;
+      }
+
+      const messageText = (userMsg.content || '').trim();
+      if (!messageText) {
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t.errorUnknown);
+        return;
+      }
+
+      const fileIds: string[] = [
+        ...(userMsg.fileList?.map((f) => f.id).filter(Boolean) ?? []),
+        ...(userMsg.imageList?.map((i) => i.id).filter(Boolean) ?? []),
+      ];
+
+      const topicId = useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
+
+      const idsToRemove: string[] = [userMsg.id];
+      if (target.role === 'compareGroup' || target.role === 'compressedGroup') {
+        idsToRemove.push(target.id);
+        target.children?.forEach((c) => {
+          if (c.id) idsToRemove.push(c.id);
+        });
+      } else {
+        idsToRemove.push(messageId);
+      }
+
+      set((s) => ({
+        messagesBySession: {
+          ...s.messagesBySession,
+          [sessionId]: (s.messagesBySession[sessionId] || []).filter(
+            (m) => !idsToRemove.includes(m.id),
+          ),
+        },
+      }));
+
+      for (const id of idsToRemove) {
+        void messageApi.remove(id).catch(() => {});
+      }
+
+      const assistantPlaceholderId = `assistant-${Date.now()}`;
+      const assistantMsg: ChatMessage = {
+        id: assistantPlaceholderId,
+        sessionId,
+        role: 'assistant',
+        content: GROUP_LOADING_CONTENT,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const abortController = new AbortController();
+      set((s) => ({
+        activeOperationId: null,
+        activeStreamingMessageId: assistantPlaceholderId,
+        activeStreamingSessionId: sessionId,
+        abortController,
+        generating: true,
+        generatingStartedAt: Date.now(),
+        isReasoning: false,
+        reasoningStartedAt: null,
+        streamBuffer: '',
+        messagesBySession: {
+          ...s.messagesBySession,
+          [sessionId]: [...(s.messagesBySession[sessionId] || []), assistantMsg],
+        },
+      }));
+
+      try {
+        const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+        const supervisorAgentId = groupDetail?.supervisorAgentId;
+        if (!supervisorAgentId) {
+          throw new Error('Group supervisor not found');
+        }
+
+        const result = await aiAgentApi.execGroupAgent({
+          agentId: supervisorAgentId,
+          ...(fileIds.length > 0 ? { files: fileIds } : {}),
+          groupId: sessionId,
+          message: messageText,
+          topicId,
+        });
+
+        const resolvedTopicId = result.topicId ?? topicId ?? null;
+        syncTopicsForSession(sessionId, result.topics, resolvedTopicId);
+        const placeholderMessages = get().messagesBySession[sessionId] || [];
+        if (result.messages?.length) {
+          syncGroupMessagesForSession(sessionId, result.messages, placeholderMessages);
+        } else if (result.assistantMessageId) {
+          rebindGroupPlaceholderMessages(sessionId, '', assistantPlaceholderId, {
+            assistantMessageId: result.assistantMessageId,
+            userMessageId: result.userMessageId,
+          });
+        }
+
+        set({
+          activeOperationId: result.operationId ?? null,
+          activeStreamingMessageId: result.assistantMessageId ?? assistantPlaceholderId,
+        });
+
+        if (result.success === false) {
+          throw new Error(result.error?.trim() || useI18n.getState().t.errorSendFailed);
+        }
+        if (!result.operationId) {
+          throw new Error(useI18n.getState().t.errorSendFailed);
+        }
+
+        let didSettle = false;
+        for (let attempt = 0; attempt < GROUP_POLL_MAX_ATTEMPTS; attempt += 1) {
+          await sleep(GROUP_POLL_INTERVAL_MS);
+          if (abortController.signal.aborted) return;
+
+          const operationStatus = await aiAgentApi
+            .getOperationStatus({
+              historyLimit: 10,
+              includeHistory: true,
+              operationId: result.operationId!,
+            })
+            .catch(() => null);
+
+          if (operationStatus?.latestAssistant && result.assistantMessageId) {
+            applyGroupRuntimeAssistantFallback(
+              sessionId,
+              result.assistantMessageId,
+              operationStatus,
+            );
+          }
+
+          try {
+            const groupMessages = await aiAgentApi.getGroupMessages({
+              groupId: sessionId,
+              topicId: resolvedTopicId ?? undefined,
+            });
+            if (groupMessages?.length > 0) {
+              const local = get().messagesBySession[sessionId] || [];
+              const merged = mergePersistedMessagesWithLocal(groupMessages, local);
+              set((s) => ({
+                messagesBySession: {
+                  ...s.messagesBySession,
+                  [sessionId]: merged,
+                },
+              }));
+            }
+          } catch {
+            await get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
+              preserveOnEmpty: true,
+            });
+          }
+
+          const currentMessages = get().messagesBySession[sessionId] || [];
+          const settledAssistant = findSettledGroupAssistant(
+            currentMessages,
+            result.assistantMessageId ?? assistantPlaceholderId,
+          );
+          if (settledAssistant) {
+            pruneGroupLoadingPlaceholder(
+              sessionId,
+              result.assistantMessageId ?? assistantPlaceholderId,
+              settledAssistant.id,
+            );
+            didSettle = true;
+            break;
+          }
+          if (operationStatus?.isCompleted) {
+            didSettle = true;
+            break;
+          }
+        }
+
+        if (!didSettle) {
+          await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
+        }
+      } catch (err) {
+        const t = useI18n.getState().t;
+        const { messageKey } = classifyError(err);
+        useToast.getState().show('error', t[messageKey] ?? t.errorUnknown);
+        await get().fetchMessages(sessionId, topicId);
+      } finally {
+        set({
+          activeOperationId: null,
+          activeStreamingMessageId: null,
+          activeStreamingSessionId: null,
+          abortController: null,
+          generating: false,
+          generatingStartedAt: null,
+          isReasoning: false,
+          reasoningStartedAt: null,
+          streamBuffer: '',
+        });
+      }
       return;
     }
-    const messageContainerParams = buildMessageContainerParams(sessionId, sessionType);
 
-    const messages = get().messagesBySession[sessionId] || [];
+    const messageContainerParams = buildMessageContainerParams(sessionId, sessionType);
     const targetIdx = messages.findIndex((m) => m.id === messageId);
     if (targetIdx < 0) return;
 
@@ -2194,7 +2601,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const chatOptions = await getSessionChatOptions(sessionId);
-      const provider = chatOptions.provider || 'openai';
+      const resolvedProvider =
+        chatOptions.provider || resolveProviderByModel(chatOptions.model) || 'openai';
+      const provider = resolvedProvider;
+      chatOptions.provider = resolvedProvider;
       chatOptions.sessionId = sessionId;
       chatOptions.topicId = topicId;
       // memory/searchMode come from getSessionChatOptions (agent/session chatConfig)

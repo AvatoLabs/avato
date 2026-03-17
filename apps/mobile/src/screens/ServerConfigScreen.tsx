@@ -1,7 +1,17 @@
 /**
  * ServerConfigScreen — Configure the backend server URL.
+ *
+ * Modern, humanized design with clear hierarchy and helpful guidance.
  */
-import { AlertCircle, ArrowLeft, CheckCircle2, Globe, Loader2, Wifi } from 'lucide-react-native';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Globe,
+  Loader2,
+  Server,
+  Wifi,
+} from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -11,15 +21,16 @@ import {
   ScrollView,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
+import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { semanticColors } from '../constants/colors';
 import { clearTransientAppState } from '../lib/appState';
 import { clearStoredAuthSession } from '../lib/auth';
+import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import {
   formatApiUrlForInput,
@@ -29,6 +40,7 @@ import {
   testConnection,
 } from '../lib/server';
 import { useConnectionStore } from '../store/connection';
+import { themeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 interface Props {
@@ -61,6 +73,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
       return;
     }
 
+    haptics.light();
     Keyboard.dismiss();
     setTesting(true);
     setStatus('idle');
@@ -88,6 +101,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
       return;
     }
 
+    haptics.medium();
     let normalized = url.trim().replace(/\/+$/, '');
     normalized = normalizeApiUrl(normalized);
 
@@ -116,12 +130,16 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.serverTitle}
         leftElement={
           !isFirstLaunch ? (
-            <ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+            <ArrowLeft
+              color={semanticColors.primary}
+              size={22}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           ) : undefined
         }
-        title={t.serverTitle}
         onPressLeft={!isFirstLaunch ? () => navigation.goBack() : undefined}
       />
 
@@ -131,24 +149,75 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
       >
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 48, paddingTop: 8 }}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* URL Input */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <View className="mx-5 mt-6 mb-4">
-              <Text className="text-foreground font-medium text-[14px] mb-2 ml-1 tracking-tight">
-                {t.serverUrlLabel}
+          {/* Hero — welcoming intro */}
+          <Animated.View entering={FadeInDown.delay(50).duration(350)}>
+            <View className="mx-5 mt-4 mb-6 items-center">
+              <View
+                className="mb-4 items-center justify-center rounded-2xl"
+                style={{
+                  backgroundColor: themeColors.primarySubtle,
+                  width: 64,
+                  height: 64,
+                }}
+              >
+                <Server
+                  color={semanticColors.primary}
+                  size={28}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </View>
+              <Text className="text-foreground text-center text-[18px] font-semibold tracking-tight">
+                {t.serverSubtitle}
               </Text>
-              <View className="bg-foreground/[0.04] rounded-2xl px-4 py-1 flex-row items-center">
-                <Globe color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text
+                className="text-secondary/70 mt-2 text-center text-[13px] leading-5"
+                style={{ maxWidth: 280 }}
+              >
+                {t.serverDesc}
+              </Text>
+            </View>
+          </Animated.View>
+
+          {/* URL Input Card */}
+          <Animated.View entering={FadeInDown.delay(120).duration(350)}>
+            <View
+              className="mx-5 mb-4 overflow-hidden rounded-2xl"
+              style={{
+                backgroundColor: themeColors.surface,
+                borderWidth: 1,
+                borderColor: themeColors.borderSubtle,
+              }}
+            >
+              <View className="px-4 pt-4 pb-2">
+                <Text
+                  className="text-foreground text-[12px] font-semibold uppercase tracking-widest"
+                  style={{ color: themeColors.secondaryText }}
+                >
+                  {t.serverUrlLabel}
+                </Text>
+              </View>
+              <View className="flex-row items-center px-4 pb-4">
+                <View
+                  className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: themeColors.fillTertiary }}
+                >
+                  <Globe
+                    color={themeColors.muted}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </View>
                 <TextInput
                   autoCapitalize="none"
                   autoCorrect={false}
-                  className="flex-1 ml-3 text-foreground text-[16px] py-3.5"
+                  className="flex-1 text-foreground text-[16px] py-2"
                   keyboardType="url"
                   placeholder={t.serverUrlPlaceholder}
-                  placeholderTextColor={semanticColors.muted}
+                  placeholderTextColor={themeColors.placeholder}
                   returnKeyType="done"
                   value={url}
                   onChangeText={setUrl}
@@ -157,12 +226,16 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             </View>
           </Animated.View>
 
-          {/* Test Connection */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="mx-5 mb-4 bg-foreground/[0.04] rounded-2xl py-4 flex-row items-center justify-center active:opacity-70"
+          {/* Test Connection — secondary outline style */}
+          <Animated.View entering={FadeInDown.delay(180).duration(350)}>
+            <PressableScale
+              className="mx-5 mb-4 flex-row items-center justify-center rounded-2xl py-3.5"
               disabled={testing}
+              style={{
+                backgroundColor: themeColors.primarySubtle,
+                borderWidth: 1,
+                borderColor: themeColors.primaryBorder,
+              }}
               onPress={handleTest}
             >
               {testing ? (
@@ -180,43 +253,64 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                   style={{ marginRight: 8 }}
                 />
               )}
-              <Text className="text-primary font-medium text-[15px]">
+              <Text className="text-primary font-semibold text-[15px]">
                 {testing ? t.serverTesting : t.serverTestConnection}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           </Animated.View>
 
-          {/* Status */}
+          {/* Status — success */}
           {status === 'success' && (
-            <Animated.View entering={FadeIn.duration(300)}>
-              <View className="mx-5 mb-4 rounded-2xl p-4 flex-row items-center bg-foreground/[0.04]">
+            <Animated.View entering={FadeIn.duration(280)}>
+              <View
+                className="mx-5 mb-4 flex-row items-center rounded-2xl p-4"
+                style={{
+                  backgroundColor: themeColors.successSubtle,
+                  borderWidth: 1,
+                  borderColor: themeColors.successMuted,
+                }}
+              >
                 <CheckCircle2
-                  color={semanticColors.primary}
-                  size={20}
+                  color={themeColors.success}
+                  size={22}
                   strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 10 }}
+                  style={{ marginRight: 12 }}
                 />
-                <Text className="text-primary text-[14px] font-medium flex-1">
+                <Text
+                  className="flex-1 text-[14px] font-medium"
+                  style={{ color: themeColors.success }}
+                >
                   {t.serverSuccess}
                 </Text>
               </View>
             </Animated.View>
           )}
 
+          {/* Status — error */}
           {status === 'error' && (
-            <Animated.View entering={FadeIn.duration(300)}>
-              <View className="mx-5 mb-4 rounded-2xl p-4 flex-row items-start bg-foreground/[0.04]">
+            <Animated.View entering={FadeIn.duration(280)}>
+              <View
+                className="mx-5 mb-4 flex-row items-start rounded-2xl p-4"
+                style={{
+                  backgroundColor: themeColors.dangerSubtle,
+                  borderWidth: 1,
+                  borderColor: themeColors.dangerMuted,
+                }}
+              >
                 <AlertCircle
-                  color={semanticColors.danger}
-                  size={20}
+                  color={themeColors.danger}
+                  size={22}
                   strokeWidth={tokens.icon.strokeWidth}
-                  style={{ marginRight: 10, marginTop: 1 }}
+                  style={{ marginRight: 12, marginTop: 1 }}
                 />
                 <View className="flex-1">
-                  <Text className="text-[14px] font-medium" style={{ color: semanticColors.danger }}>
+                  <Text className="text-[14px] font-semibold" style={{ color: themeColors.danger }}>
                     {t.serverFailed}
                   </Text>
-                  <Text className="text-[12.5px] mt-1 opacity-80" style={{ color: semanticColors.danger }}>
+                  <Text
+                    className="mt-1.5 text-[13px] leading-5"
+                    style={{ color: themeColors.danger }}
+                  >
                     {errorMsg}
                   </Text>
                 </View>
@@ -224,18 +318,27 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             </Animated.View>
           )}
 
-          {/* Save Button */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="mx-5 mt-2 rounded-2xl py-4 items-center active:opacity-90"
+          {/* Save Button — primary CTA */}
+          <Animated.View entering={FadeInDown.delay(240).duration(350)}>
+            <PressableScale
+              className="mx-5 mt-4 items-center justify-center rounded-2xl py-4"
               style={{ backgroundColor: semanticColors.primary }}
               onPress={handleSave}
             >
               <Text className="text-white font-semibold text-[16px]">
                 {isFirstLaunch ? t.serverConnectStart : t.serverSaveConfig}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
+          </Animated.View>
+
+          {/* Tips — subtle */}
+          <Animated.View entering={FadeInDown.delay(300).duration(350)}>
+            <View
+              className="mx-5 mt-6 rounded-xl px-4 py-3"
+              style={{ backgroundColor: themeColors.fillQuaternary }}
+            >
+              <Text className="text-secondary/60 text-[12px] leading-5">{t.serverTips}</Text>
+            </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

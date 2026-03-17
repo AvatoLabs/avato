@@ -11,9 +11,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import {
   BarChart3,
+  Bot,
   Brain,
   BrainCircuit,
   ChevronRight,
+  Compass,
   FileText,
   Globe,
   Key,
@@ -272,8 +274,70 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
+        {/* Agents */}
+        <Animated.View entering={FadeInDown.delay(92).duration(350)}>
+          <View className="px-5 mb-4">
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
+              onPress={() => navigation?.navigate?.('AgentList')}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <Bot
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.meAgents}
+                </Text>
+                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  {t.meAgentsDesc}
+                </Text>
+              </View>
+              <ChevronRight
+                color={semanticColors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+          </View>
+        </Animated.View>
+
+        {/* Discover */}
+        <Animated.View entering={FadeInDown.delay(94).duration(350)}>
+          <View className="px-5 mb-4">
+            <PressableScale
+              className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
+              onPress={() => navigation?.navigate?.('Discover')}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <Compass
+                  color={semanticColors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.meDiscover}
+                </Text>
+                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  {t.meDiscoverDesc}
+                </Text>
+              </View>
+              <ChevronRight
+                color={semanticColors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+          </View>
+        </Animated.View>
+
         {/* Notebook */}
-        <Animated.View entering={FadeInDown.delay(95).duration(350)}>
+        <Animated.View entering={FadeInDown.delay(98).duration(350)}>
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"

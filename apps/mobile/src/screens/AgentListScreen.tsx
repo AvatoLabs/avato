@@ -1,48 +1,263 @@
-import { ArrowLeft, Bot } from 'lucide-react-native';
-import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+/**
+ * AgentListScreen — Manage user agents (assistants).
+ * Lists agents from agentApi.queryAgents, tap to open chat or create new.
+ */
+import { ArrowLeft, Bot, MessageCircle, Plus } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image as RNImage,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
+import { agentApi, type AgentQueryItem } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 
+function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
+  const avatar = agent.avatar?.trim();
+  if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
+    return (
+      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+        <Text className="text-[20px]">{avatar}</Text>
+      </View>
+    );
+  }
+  if (avatar && avatar.startsWith('http')) {
+    return <RNImage source={{ uri: avatar }} style={{ height: 48, width: 48, borderRadius: 12 }} />;
+  }
+  return (
+    <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+      <Bot color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+    </View>
+  );
+}
+
 export default function AgentListScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const toast = useToast();
+  const sessions = useSessionStore((s) => s.sessions);
+  const fetchSessions = useSessionStore((s) => s.fetchSessions);
+
+  const [agents, setAgents] = useState<AgentQueryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const loadAgents = useCallback(async () => {
+    try {
+      const result = await agentApi.queryAgents({ limit: 200 });
+      setAgents(Array.isArray(result) ? result : []);
+    } catch {
+      setAgents([]);
+      toast.show('error', t.errorNetwork);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [t.errorNetwork, toast]);
+
+  useEffect(() => {
+    void loadAgents();
+    void fetchSessions();
+  }, [loadAgents, fetchSessions]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    haptics.light();
+    await Promise.all([loadAgents(), fetchSessions()]);
+  }, [loadAgents, fetchSessions]);
+
+  const getSessionForAgent = useCallback(
+    (agentId: string) => {
+      return sessions.find((s) => s.config?.id === agentId || s.agentId === agentId);
+    },
+    [sessions],
+  );
+
+  const handleAgentPress = useCallback(
+    async (agent: AgentQueryItem) => {
+      haptics.light();
+      const session = getSessionForAgent(agent.id);
+      if (session) {
+        navigation?.navigate?.('ChatDetail', { sessionId: session.id });
+        return;
+      }
+      // No session: create agent (which creates session)
+      try {
+        setCreating(true);
+        const result = await agentApi.create({
+          title: agent.title || t.chatListNewConversation,
+          description: agent.description,
+          avatar: agent.avatar,
+        });
+        if (result?.sessionId) {
+          await fetchSessions();
+          navigation?.navigate?.('ChatDetail', { sessionId: result.sessionId });
+        }
+      } catch {
+        toast.show('error', t.errorNetwork);
+      } finally {
+        setCreating(false);
+      }
+    },
+    [
+      getSessionForAgent,
+      navigation,
+      fetchSessions,
+      t.chatListNewConversation,
+      toast,
+      t.errorNetwork,
+    ],
+  );
+
+  const handleCreateAgent = useCallback(async () => {
+    haptics.light();
+    try {
+      setCreating(true);
+      const result = await agentApi.create();
+      if (result?.sessionId) {
+        await fetchSessions();
+        navigation?.navigate?.('ChatDetail', { sessionId: result.sessionId });
+      }
+    } catch {
+      toast.show('error', t.errorNetwork);
+    } finally {
+      setCreating(false);
+    }
+  }, [navigation, fetchSessions, toast, t.errorNetwork]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: AgentQueryItem }) => (
+      <PressableScale
+        className="mx-5 mb-3 flex-row items-center rounded-xl bg-foreground/[0.03] px-4 py-3.5"
+        onPress={() => handleAgentPress(item)}
+      >
+        <AgentAvatar agent={item} />
+        <View className="ml-4 flex-1">
+          <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
+            {item.title || t.agentConfigNamePlaceholder}
+          </Text>
+          {item.description ? (
+            <Text className="mt-0.5 text-[12px] text-secondary/70" numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+        </View>
+        <MessageCircle
+          color={semanticColors.primary}
+          size={18}
+          strokeWidth={tokens.icon.strokeWidth}
+        />
+      </PressableScale>
+    ),
+    [handleAgentPress, t.agentConfigNamePlaceholder],
+  );
+
+  if (loading) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t.meAgents}
+          leftElement={
+            <ArrowLeft
+              color={semanticColors.primary}
+              size={22}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          }
+          onPressLeft={() => {
+            haptics.light();
+            navigation?.goBack?.();
+          }}
+        />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={semanticColors.primary} size="large" />
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
-        title={t.agentConfigTitle}
+        title={t.meAgents}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         onPressLeft={() => {
           haptics.light();
           navigation?.goBack?.();
         }}
       />
 
-      <View className="flex-1 items-center justify-center px-8">
-        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <Bot color={semanticColors.primary} size={28} strokeWidth={1.6} />
-        </View>
-        <Text className="mt-5 text-center text-[18px] font-semibold text-foreground">
-          {t.agentConfigSessionOnlyTitle}
-        </Text>
-        <Text className="mt-2 text-center text-[14px] leading-6 text-secondary/65">
-          {t.agentConfigSessionOnlyDesc}
-        </Text>
+      <FlatList
+        contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
+        data={agents}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListEmptyComponent={
+          <View className="flex-1 items-center justify-center px-8 py-16">
+            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Bot color={semanticColors.primary} size={28} strokeWidth={1.6} />
+            </View>
+            <Text className="mt-5 text-center text-[18px] font-semibold text-foreground">
+              {t.agentsEmpty}
+            </Text>
+            <Text className="mt-2 text-center text-[14px] leading-6 text-secondary/65">
+              {t.agentsEmptyDesc}
+            </Text>
+            <PressableScale
+              className="mt-6 rounded-2xl bg-primary px-5 py-3"
+              disabled={creating}
+              onPress={handleCreateAgent}
+            >
+              <View className="flex-row items-center gap-2">
+                <Plus color="#fff" size={18} strokeWidth={2} />
+                <Text className="text-[14px] font-semibold text-white">
+                  {t.chatListNewConversation}
+                </Text>
+              </View>
+            </PressableScale>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            colors={[semanticColors.primary]}
+            refreshing={refreshing}
+            tintColor={semanticColors.primary}
+            onRefresh={onRefresh}
+          />
+        }
+      />
+
+      {agents.length > 0 && (
         <TouchableOpacity
-          activeOpacity={0.85}
-          className="mt-6 rounded-2xl bg-primary px-5 py-3"
-          onPress={() => {
-            haptics.light();
-            navigation?.navigate?.('Store');
-          }}
+          activeOpacity={0.8}
+          className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+          disabled={creating}
+          style={{ elevation: 4, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25 }}
+          onPress={handleCreateAgent}
         >
-          <Text className="text-[14px] font-semibold text-white">{t.agentConfigOpenStore}</Text>
+          <Plus color="#fff" size={24} strokeWidth={2} />
         </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 }

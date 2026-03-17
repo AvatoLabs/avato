@@ -1,6 +1,7 @@
 import { type SendMessageServerResponse } from '@lobechat/types';
 import { AiSendMessageServerSchema, StructureOutputSchema } from '@lobechat/types';
 import debug from 'debug';
+import { z } from 'zod';
 
 import { LOADING_FLAT } from '@/const/message';
 import { AgentModel } from '@/database/models/agent';
@@ -32,6 +33,28 @@ const aiChatProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
 });
 
 export const aiChatRouter = router({
+  /**
+   * Get messages and topics for a group/session.
+   * Uses the same getMessagesAndTopics as execGroupAgent for consistency.
+   * Mobile uses this when polling for group chat completion.
+   */
+  getMessagesAndTopics: aiChatProcedure
+    .input(
+      z.object({
+        agentId: z.string().optional(),
+        groupId: z.string().optional(),
+        topicId: z.string().optional(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const { messages } = await ctx.aiChatService.getMessagesAndTopics({
+        agentId: input.agentId,
+        groupId: input.groupId,
+        topicId: input.topicId,
+      });
+      return { messages };
+    }),
+
   outputJSON: aiChatProcedure.input(StructureOutputSchema).mutation(async ({ input, ctx }) => {
     log('outputJSON called with provider: %s, model: %s', input.provider, input.model);
     log('messages count: %d', input.messages.length);

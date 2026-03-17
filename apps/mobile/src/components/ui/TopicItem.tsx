@@ -75,7 +75,12 @@ const TopicItem = memo<TopicItemProps>(
           <View className="flex-1 mr-3">
             <View className="flex-row items-center">
               {topic.favorite && (
-                <Heart color={semanticColors.danger} fill={semanticColors.danger} size={12} style={{ marginRight: 4 }} />
+                <Heart
+                  color={semanticColors.danger}
+                  fill={semanticColors.danger}
+                  size={12}
+                  style={{ marginRight: 4 }}
+                />
               )}
               <Text
                 numberOfLines={1}
@@ -98,12 +103,17 @@ const TopicItem = memo<TopicItemProps>(
               setMenuVisible(true);
             }}
           >
-            <MoreHorizontal color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            <MoreHorizontal
+              color={semanticColors.muted}
+              size={18}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           </TouchableOpacity>
         </TouchableOpacity>
 
         {/* Context Menu */}
         <Modal
+          accessibilityViewIsModal
           transparent
           animationType="fade"
           visible={menuVisible}
@@ -113,7 +123,7 @@ const TopicItem = memo<TopicItemProps>(
             className="flex-1 justify-end bg-black/40"
             onPress={() => setMenuVisible(false)}
           >
-            <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
+            <Pressable className="bg-card rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
               <View className="items-center pt-3 pb-2">
                 <View className="w-9 h-1 rounded-full bg-foreground/10" />
               </View>
@@ -141,7 +151,11 @@ const TopicItem = memo<TopicItemProps>(
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                     onPress={handleRename}
                   >
-                    <Pencil color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Pencil
+                      color={semanticColors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
                     <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                   </Pressable>
                 )}
@@ -149,7 +163,11 @@ const TopicItem = memo<TopicItemProps>(
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={handleDelete}
                 >
-                  <Trash2 color={semanticColors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Trash2
+                    color={semanticColors.danger}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                   <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
                 </Pressable>
               </View>

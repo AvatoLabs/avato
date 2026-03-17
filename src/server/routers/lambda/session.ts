@@ -48,7 +48,7 @@ function isDefaultSessionTitle(title: string | null | undefined) {
 }
 
 function pickLatestSessionTitleContext(
-  messages: Awaited<ReturnType<MessageModel['queryBySessionId']>>,
+  messages: Array<{ role: string; content: string }>,
 ): { lastAssistantContent: string; userPrompt: string } | null {
   for (let assistantIndex = messages.length - 1; assistantIndex >= 0; assistantIndex -= 1) {
     const assistantMessage = messages[assistantIndex];

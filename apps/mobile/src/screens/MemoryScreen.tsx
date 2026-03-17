@@ -633,6 +633,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
       {/* Create Identity Modal */}
       {layer === 'identity' ? (
         <Modal
+          accessibilityViewIsModal
           transparent
           animationType="fade"
           visible={showCreateModal}
@@ -751,6 +752,7 @@ export default function MemoryScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.memoryTitle}
         leftElement={
           <ArrowLeft
             color={semanticColors.primary}
@@ -758,7 +760,6 @@ export default function MemoryScreen() {
             strokeWidth={tokens.icon.strokeWidth}
           />
         }
-        title={t.memoryTitle}
         onPressLeft={() => nav.goBack()}
       >
         {/* Tab Bar */}

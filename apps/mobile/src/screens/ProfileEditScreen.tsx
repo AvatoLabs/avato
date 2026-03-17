@@ -34,8 +34,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
 import { userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -216,7 +216,13 @@ export default function ProfileEditScreen({ navigation }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          leftElement={
+            <ArrowLeft
+              color={semanticColors.primary}
+              size={22}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          }
           title={t.profileTitle}
           rightElement={
             <Text
@@ -239,7 +245,13 @@ export default function ProfileEditScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={t.profileTitle}
         rightElement={
           <Text
@@ -310,7 +322,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                   autoCapitalize="words"
                   className="text-foreground text-[15px] text-right flex-1"
                   placeholder={t.profileFullName}
-                  placeholderTextColor="#8c8c8c"
+                  placeholderTextColor={semanticColors.muted}
                   returnKeyType="done"
                   value={fullName}
                   onChangeText={setFullName}
@@ -395,7 +407,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                     autoFocus
                     className="flex-1 text-foreground text-[14px]"
                     placeholder={t.profileInterestsCustomPlaceholder}
-                    placeholderTextColor="#8c8c8c"
+                    placeholderTextColor={semanticColors.muted}
                     returnKeyType="done"
                     value={customInterest}
                     onChangeText={setCustomInterest}
@@ -404,7 +416,6 @@ export default function ProfileEditScreen({ navigation }: any) {
                 </View>
               )}
             </View>
-
           </View>
         </Animated.View>
       </ScrollView>

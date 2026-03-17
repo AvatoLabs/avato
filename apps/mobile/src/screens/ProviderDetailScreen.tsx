@@ -12,8 +12,9 @@
  * - Connection Checker (when settings.showChecker !== false)
  * - Model list with individual enable/disable toggles
  */
+import { useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, Check, Eye, EyeOff, Key, Save, Search, Wifi, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
@@ -28,6 +29,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import ContentSkeleton from '../components/ui/ContentSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
@@ -105,9 +107,17 @@ function SecureInputRow({
         />
         <TouchableOpacity onPress={() => setVisible(!visible)}>
           {visible ? (
-            <EyeOff color={semanticColors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <EyeOff
+              color={semanticColors.secondaryText}
+              size={16}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           ) : (
-            <Eye color={semanticColors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <Eye
+              color={semanticColors.secondaryText}
+              size={16}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           )}
         </TouchableOpacity>
       </View>
@@ -272,9 +282,12 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     }
   }, [providerId, t, toast]);
 
-  useEffect(() => {
-    fetchData().finally(() => setLoading(false));
-  }, [fetchData]);
+  // Refetch when screen gains focus to stay in sync with list (e.g. toggled from list)
+  useFocusEffect(
+    useCallback(() => {
+      fetchData().finally(() => setLoading(false));
+    }, [fetchData]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -449,13 +462,17 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          leftElement={
+            <ArrowLeft
+              color={semanticColors.primary}
+              size={22}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          }
           title={t.providerDetailTitle}
           onPressLeft={() => navigation.goBack()}
         />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} size="large" />
-        </View>
+        <ContentSkeleton />
       </View>
     );
   }
@@ -463,7 +480,13 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft
+            color={semanticColors.primary}
+            size={22}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        }
         title={detail?.name || providerId}
         onPressLeft={() => navigation.goBack()}
       />
