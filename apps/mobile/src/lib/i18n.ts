@@ -44,8 +44,13 @@ type TranslationKeys = {
   chatSearchNoResults: string;
   chatSearchResults: string;
   chatSearchSearching: string;
+  accessibilityAddResource: string;
+  accessibilityAddStore: string;
+  accessibilityAddTopic: string;
+  accessibilityOpenStore: string;
   accessibilityCreateMenu: string;
   accessibilityGoBack: string;
+  accessibilitySave: string;
   accessibilitySettings: string;
   chatListTapToContinue: string;
 
@@ -948,8 +953,13 @@ const en: TranslationKeys = {
   chatSearchNoResults: 'No matching conversations',
   chatSearchResults: 'Search Results',
   chatSearchSearching: 'Searching conversations...',
+  accessibilityAddResource: 'Add resource',
+  accessibilityAddStore: 'Add to store',
+  accessibilityAddTopic: 'Add topic',
+  accessibilityOpenStore: 'Open store',
   accessibilityCreateMenu: 'Create new chat or agent',
   accessibilityGoBack: 'Go back',
+  accessibilitySave: 'Save',
   accessibilitySettings: 'Chat settings',
   chatListTapToContinue: 'Tap to continue the conversation',
 
@@ -1826,8 +1836,13 @@ const zh_tw: TranslationKeys = {
   chatSearchNoResults: '沒有符合的對話',
   chatSearchResults: '搜尋結果',
   chatSearchSearching: '正在搜尋對話...',
+  accessibilityAddResource: '新增資源',
+  accessibilityAddStore: '新增至商店',
+  accessibilityAddTopic: '新增話題',
+  accessibilityOpenStore: '開啟商店',
   accessibilityCreateMenu: '建立新對話或助手',
   accessibilityGoBack: '返回',
+  accessibilitySave: '儲存',
   accessibilitySettings: '對話設定',
   chatListTapToContinue: '點擊繼續對話',
 
@@ -2698,8 +2713,13 @@ const zh: TranslationKeys = {
   chatSearchNoResults: '没有匹配的对话',
   chatSearchResults: '搜索结果',
   chatSearchSearching: '正在搜索对话...',
+  accessibilityAddResource: '添加资源',
+  accessibilityAddStore: '添加到商店',
+  accessibilityAddTopic: '添加话题',
+  accessibilityOpenStore: '打开商店',
   accessibilityCreateMenu: '创建新对话或助手',
   accessibilityGoBack: '返回',
+  accessibilitySave: '保存',
   accessibilitySettings: '对话设置',
   chatListTapToContinue: '点击继续对话',
 

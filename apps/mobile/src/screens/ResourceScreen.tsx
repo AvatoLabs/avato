@@ -868,6 +868,7 @@ export default function ResourceScreen() {
     <View className="flex-1 bg-background">
       {/* Header */}
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilityAddResource}
         title={t.resourceTitle}
         rightElement={
           <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />

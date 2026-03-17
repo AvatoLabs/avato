@@ -334,6 +334,7 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilityOpenStore}
         title={t.agentConfigTitle}
         leftElement={
           <ArrowLeft
@@ -648,6 +649,7 @@ function SessionAgentConfigScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilitySave}
         title={t.agentConfigTitle}
         leftElement={
           <ArrowLeft

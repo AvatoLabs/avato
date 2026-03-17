@@ -12,6 +12,7 @@ interface ScreenHeaderProps {
   leftElement?: React.ReactNode;
   onPressLeft?: () => void;
   onPressRight?: () => void;
+  rightAccessibilityLabel?: string;
   rightActions?: React.ReactNode;
   rightElement?: React.ReactNode;
   subtitle?: string;
@@ -26,6 +27,7 @@ export function ScreenHeader({
   leftElement,
   rightElement,
   rightActions,
+  rightAccessibilityLabel,
   titleIcon,
   onPressLeft,
   onPressRight,
@@ -70,6 +72,7 @@ export function ScreenHeader({
             <View style={{ minWidth: 40 }}>{rightActions}</View>
           ) : rightElement ? (
             <TouchableOpacity
+              accessibilityLabel={rightAccessibilityLabel}
               accessibilityRole="button"
               activeOpacity={0.6}
               className="-mr-2 h-10 items-end justify-center px-1"
@@ -122,6 +125,8 @@ export function ScreenHeader({
             </View>
           ) : rightElement ? (
             <TouchableOpacity
+              accessibilityLabel={rightAccessibilityLabel}
+              accessibilityRole="button"
               activeOpacity={0.6}
               className="w-10 h-10 items-center justify-center -mr-2"
               disabled={!onPressRight}

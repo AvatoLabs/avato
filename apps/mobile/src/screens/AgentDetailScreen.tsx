@@ -63,6 +63,8 @@ export default function AgentDetailScreen({ route, navigation }: any) {
       <Animated.View entering={FadeInDown.duration(300)}>
         <View className="flex-row items-center px-4 py-2.5">
           <PressableScale
+            accessibilityLabel={t.accessibilityGoBack}
+            accessibilityRole="button"
             className="w-9 h-9 items-center justify-center rounded-full"
             onPress={() => {
               haptics.light();

@@ -453,6 +453,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilitySave}
         title={t.chatSettingsTitle}
         leftElement={
           <ArrowLeft

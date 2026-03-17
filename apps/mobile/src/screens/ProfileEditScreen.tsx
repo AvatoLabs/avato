@@ -216,6 +216,8 @@ export default function ProfileEditScreen({ navigation }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          rightAccessibilityLabel={t.accessibilitySave}
+          title={t.profileTitle}
           leftElement={
             <ArrowLeft
               color={semanticColors.primary}
@@ -223,7 +225,6 @@ export default function ProfileEditScreen({ navigation }: any) {
               strokeWidth={tokens.icon.strokeWidth}
             />
           }
-          title={t.profileTitle}
           rightElement={
             <Text
               className="text-[15px] font-medium"
@@ -245,6 +246,8 @@ export default function ProfileEditScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilitySave}
+        title={t.profileTitle}
         leftElement={
           <ArrowLeft
             color={semanticColors.primary}
@@ -252,7 +255,6 @@ export default function ProfileEditScreen({ navigation }: any) {
             strokeWidth={tokens.icon.strokeWidth}
           />
         }
-        title={t.profileTitle}
         rightElement={
           <Text
             className="text-[15px] font-medium"

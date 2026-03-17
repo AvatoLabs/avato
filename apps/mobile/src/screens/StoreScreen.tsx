@@ -1802,10 +1802,11 @@ export default function StoreScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilityAddStore}
+        title={t.tabStore}
         rightElement={
           <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.tabStore}
         titleIcon={
           <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }

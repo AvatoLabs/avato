@@ -97,6 +97,8 @@ export default function TopicListScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityLabel={t.accessibilityAddTopic}
+        title={t.topicTitle}
         leftElement={
           <ArrowLeft
             color={semanticColors.primary}
@@ -107,7 +109,6 @@ export default function TopicListScreen({ route, navigation }: any) {
         rightElement={
           <Plus color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.topicTitle}
         onPressRight={handleCreateTopic}
         onPressLeft={() => {
           haptics.light();

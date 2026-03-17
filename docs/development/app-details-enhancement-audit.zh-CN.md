@@ -1,7 +1,7 @@
 # App 细节增强全面审计
 
 > 审计日期：2026-03-17\
-> 更新日期：2026-03-18（P1/P2 主要项已落地）\
+> 更新日期：2026-03-18（P1/P2 已落地，图标按钮无障碍已补齐）\
 > 范围：`apps/mobile` 全量功能、UX、性能、无障碍、与 Web 对齐
 
 本文档对移动端 App 进行多维度审计，识别可增强的细节与待完善项，为迭代提供优先级指引。
@@ -24,7 +24,7 @@
 | 功能完整性    | 核心流程已覆盖，群聊重新生成已实现，Thread 有差距 | P2         |
 | 性能与数据流  | 请求去重已修复，轮询 vs SSE 可优化                | P2         |
 | UX / 交互细节 | ✅ 骨架屏、空态、错误重试已补齐                   | -          |
-| 无障碍        | ✅ 列表项、Modal、ScreenHeader 已系统性补齐       | P2 剩余    |
+| 无障碍        | ✅ 列表项、Modal、图标按钮已系统性补齐            | -          |
 | i18n          | 覆盖较全，审计注释已清理                          | P2         |
 | 错误处理      | ✅ Toast 支持 onRetry，session/topic/file 已接入  | -          |
 | 导航与入口    | ✅ DiscoverScreen 已从 Profile 接入               | -          |
@@ -124,7 +124,7 @@
 | 区域              | 建议                                                | 状态      |
 | ----------------- | --------------------------------------------------- | --------- |
 | 列表项            | 为 FlashList/FlatList 每项增加 `accessibilityLabel` | ✅ 已补齐 |
-| 图标按钮          | 所有仅图标按钮需 `accessibilityLabel`               | 部分      |
+| 图标按钮          | 所有仅图标按钮需 `accessibilityLabel`               | ✅ 已补齐 |
 | 表单              | 输入框需 `accessibilityLabel` 描述用途              | 待补齐    |
 | 弹窗              | Sheet/Modal 需 `accessibilityViewIsModal`           | ✅ 已补齐 |
 | 动态内容          | 消息流、加载完成需 `accessibilityLiveRegion`        | 待补齐    |
@@ -268,11 +268,17 @@
 | 项                                                                      | 状态          |
 | ----------------------------------------------------------------------- | ------------- |
 | 无障碍：accessibilityLabel/Role、Modal accessibilityViewIsModal、列表项 | ✅ 已补齐     |
+| 无障碍：图标按钮 ScreenHeader rightElement、AgentDetail 返回键          | ✅ 已补齐     |
 | 错误重试：Toast onRetry、session/topic/file                             | ✅ 已实现     |
 | compressedGroup 展开 / 折叠                                             | ✅ 已实现     |
 | 下拉刷新                                                                | ✅ 已确认支持 |
-| i18n：审计与规范                                                        | 待审计        |
-| 群聊 SSE：若 RN 支持 EventSource                                        | 待评估        |
+| i18n：审计与规范                                                        | 已审计        |
+| 群聊 SSE：若 RN 支持 EventSource                                        | 已评估        |
+
+**P2 审计结论**：
+
+- **i18n**：`chat.ts` 中 `DEFAULT_SESSION_TITLES` 为匹配默认标题用，硬编码合理；其余用户文案已通过 `t` 接入。建议新增功能时同步补充 key。
+- **群聊 SSE**：`react-native-sse`（99K weekly）或 `react-native-event-source-ts` 可用。可评估替换轮询以降低延迟与请求数，非阻塞上线。
 
 ### P3（功能扩展）
 
