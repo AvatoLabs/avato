@@ -13,6 +13,7 @@ import {
 } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
+import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 
@@ -86,8 +87,9 @@ export default function LoginScreen({ navigation }: any) {
   const continueInNoAuthMode = useCallback(async () => {
     await clearTransientAppState();
     await Promise.all([
-      useSessionStore.getState().fetchSessions(),
-      useUserStore.getState().fetchUser(),
+      useSessionStore.getState().fetchSessions({ throwOnError: true }),
+      useUserStore.getState().fetchUser({ throwOnError: true }),
+      useAgentStore.getState().loadAgents(),
     ]);
 
     navigation.reset({
@@ -133,8 +135,9 @@ export default function LoginScreen({ navigation }: any) {
 
         await clearTransientAppState();
         await Promise.all([
-          useSessionStore.getState().fetchSessions(),
-          useUserStore.getState().fetchUser(),
+          useSessionStore.getState().fetchSessions({ throwOnError: true }),
+          useUserStore.getState().fetchUser({ throwOnError: true }),
+          useAgentStore.getState().loadAgents(),
         ]);
 
         navigation.reset({

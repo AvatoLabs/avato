@@ -1,7 +1,7 @@
 'use client';
 
 import { Block } from '@lobehub/ui';
-import { memo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import ImageItem from '@/components/ImageItem';
 
@@ -17,11 +17,47 @@ export const SuccessState = memo<SuccessStateProps>(
     generationBatch,
     prompt,
     aspectRatio,
+    onImageLoadFailed,
     onDelete,
     onDownload,
     onCopySeed,
     seedTooltip,
   }) => {
+    const assetUrl = generation.asset?.url;
+    const assetThumbnailUrl = generation.asset?.thumbnailUrl;
+    const assetOriginalUrl = generation.asset?.originalUrl;
+
+    const candidateUrls = useMemo(() => {
+      const urls = [
+        generation.fileId ? `/f/${generation.fileId}` : undefined,
+        assetUrl,
+        assetThumbnailUrl,
+        assetOriginalUrl?.startsWith('http://') || assetOriginalUrl?.startsWith('https://')
+          ? assetOriginalUrl
+          : undefined,
+      ].filter(Boolean) as string[];
+
+      return [...new Set(urls)];
+    }, [assetOriginalUrl, assetThumbnailUrl, assetUrl, generation.fileId]);
+
+    const [activeUrlIndex, setActiveUrlIndex] = useState(0);
+
+    useEffect(() => {
+      setActiveUrlIndex(0);
+    }, [candidateUrls]);
+
+    const activeUrl = candidateUrls[activeUrlIndex];
+
+    const handleImageError = useCallback(() => {
+      const nextIndex = activeUrlIndex + 1;
+      if (nextIndex < candidateUrls.length) {
+        setActiveUrlIndex(nextIndex);
+        return;
+      }
+
+      onImageLoadFailed(activeUrl);
+    }, [activeUrl, activeUrlIndex, candidateUrls.length, onImageLoadFailed]);
+
     return (
       <Block
         align={'center'}
@@ -36,11 +72,11 @@ export const SuccessState = memo<SuccessStateProps>(
         <ImageItem
           alt={prompt}
           style={{ height: '100%', width: '100%' }}
-          // Thumbnail quality is too bad
-          url={generation.asset!.url}
+          url={activeUrl}
           preview={{
-            src: generation.asset!.url,
+            src: activeUrl,
           }}
+          onError={handleImageError}
         />
         <ActionButtons
           showDownload

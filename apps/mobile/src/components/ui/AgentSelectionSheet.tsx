@@ -1,0 +1,284 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Check } from 'lucide-react-native';
+
+import { agentApi, type AgentQueryItem } from '../../lib/api';
+import { haptics } from '../../lib/haptics';
+import { useI18n } from '../../lib/i18n';
+import { semanticColors } from '../../constants/colors';
+import { tokens } from '../../theme/tokens';
+
+export interface AgentSelectionSheetSubmitPayload {
+  agentIds: string[];
+  title: string;
+}
+
+export interface AgentSelectionSheetProps {
+  allowEmptySelection?: boolean;
+  confirmLabel: string;
+  excludedAgentIds?: string[];
+  initialSelectedAgentIds?: string[];
+  initialTitle?: string;
+  onClose: () => void;
+  onSubmit: (payload: AgentSelectionSheetSubmitPayload) => Promise<void>;
+  showTitleInput?: boolean;
+  title: string;
+  titleInputLabel?: string;
+  titleInputPlaceholder?: string;
+  visible: boolean;
+}
+
+function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
+  const avatar = agent.avatar?.trim();
+
+  if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
+    return (
+      <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+        <Text className="text-[18px]">{avatar}</Text>
+      </View>
+    );
+  }
+
+  const fallback = agent.title?.trim()?.slice(0, 1)?.toUpperCase() || '#';
+
+  return (
+    <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+      <Text className="text-[16px] font-semibold text-primary">{fallback}</Text>
+    </View>
+  );
+}
+
+export default function AgentSelectionSheet({
+  allowEmptySelection = false,
+  confirmLabel,
+  excludedAgentIds = [],
+  initialSelectedAgentIds = [],
+  initialTitle = '',
+  onClose,
+  onSubmit,
+  showTitleInput = false,
+  title,
+  titleInputLabel,
+  titleInputPlaceholder,
+  visible,
+}: AgentSelectionSheetProps) {
+  const { t } = useI18n();
+  const [agents, setAgents] = useState<AgentQueryItem[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelectedAgentIds));
+  const [draftTitle, setDraftTitle] = useState(initialTitle);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    setKeyword('');
+    setSelectedIds(new Set(initialSelectedAgentIds));
+    setDraftTitle(initialTitle);
+  }, [initialSelectedAgentIds, initialTitle, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const result = await agentApi.queryAgents({
+          keyword: keyword.trim() || undefined,
+        });
+
+        if (!cancelled) {
+          setAgents(result ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setAgents([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [keyword, visible]);
+
+  const filteredAgents = useMemo(() => {
+    const excluded = new Set(excludedAgentIds);
+    return agents.filter((agent) => !excluded.has(agent.id));
+  }, [agents, excludedAgentIds]);
+
+  const submitDisabled =
+    submitting || (!allowEmptySelection && selectedIds.size === 0);
+
+  return (
+    <Modal
+      transparent
+      animationType="slide"
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
+        <Pressable
+          className="rounded-t-2xl bg-white"
+          style={{ maxHeight: '80%' }}
+          onPress={(event) => event.stopPropagation()}
+        >
+          <View className="items-center pb-2 pt-3">
+            <View className="h-1 w-9 rounded-full bg-foreground/10" />
+          </View>
+
+          <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
+            <Text className="text-[18px] font-bold tracking-tight text-foreground">{title}</Text>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={submitDisabled}
+              onPress={async () => {
+                if (submitDisabled) return;
+
+                try {
+                  setSubmitting(true);
+                  await onSubmit({
+                    agentIds: [...selectedIds],
+                    title: draftTitle.trim(),
+                  });
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              {submitting ? (
+                <ActivityIndicator color={semanticColors.primary} />
+              ) : (
+                <Text
+                  className="text-[15px] font-semibold"
+                  style={{
+                    color: submitDisabled
+                      ? semanticColors.secondaryText
+                      : semanticColors.primary,
+                  }}
+                >
+                  {confirmLabel}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
+            {showTitleInput ? (
+              <View className="mb-4">
+                <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
+                  {titleInputLabel || t.agentConfigName}
+                </Text>
+                <TextInput
+                  className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
+                  placeholder={titleInputPlaceholder}
+                  placeholderTextColor={semanticColors.secondaryText}
+                  value={draftTitle}
+                  onChangeText={setDraftTitle}
+                />
+              </View>
+            ) : null}
+
+            <View className="mb-4">
+              <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
+                {t.search}
+              </Text>
+              <TextInput
+                className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
+                placeholder={t.search}
+                placeholderTextColor={semanticColors.secondaryText}
+                value={keyword}
+                onChangeText={setKeyword}
+              />
+            </View>
+
+            {loading ? (
+              <View className="items-center justify-center py-8">
+                <ActivityIndicator color={semanticColors.primary} />
+              </View>
+            ) : filteredAgents.length === 0 ? (
+              <View className="rounded-2xl bg-foreground/[0.03] px-4 py-5">
+                <Text className="text-[14px] font-semibold text-foreground">{t.agentsEmpty}</Text>
+                <Text className="mt-1 text-[12px] leading-5 text-secondary/60">
+                  {t.agentsEmptyDesc}
+                </Text>
+              </View>
+            ) : (
+              filteredAgents.map((agent, index) => {
+                const selected = selectedIds.has(agent.id);
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    className={`flex-row items-center rounded-2xl px-4 py-3 ${
+                      index === filteredAgents.length - 1 ? '' : 'mb-3'
+                    }`}
+                    key={agent.id}
+                    style={{
+                      backgroundColor: selected
+                        ? `${semanticColors.primary}12`
+                        : 'rgba(15,23,42,0.03)',
+                      borderColor: selected ? `${semanticColors.primary}36` : 'transparent',
+                      borderWidth: 1,
+                    }}
+                    onPress={() => {
+                      haptics.selection();
+                      setSelectedIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(agent.id)) {
+                          next.delete(agent.id);
+                        } else {
+                          next.add(agent.id);
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    <AgentAvatar agent={agent} />
+                    <View className="flex-1">
+                      <Text className="text-[14px] font-semibold text-foreground">
+                        {agent.title || t.settingsDefaultAgent}
+                      </Text>
+                      <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60">
+                        {agent.description || t.settingsNotConfigured}
+                      </Text>
+                    </View>
+                    <View
+                      className="items-center justify-center rounded-full"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        backgroundColor: selected
+                          ? semanticColors.primary
+                          : 'rgba(120,120,128,0.18)',
+                      }}
+                    >
+                      {selected ? (
+                        <Check color="#fff" size={13} strokeWidth={tokens.icon.strokeWidth + 0.3} />
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}

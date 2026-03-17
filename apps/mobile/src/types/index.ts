@@ -10,11 +10,11 @@ export interface CreateSessionConfig {
   agentId?: string;
   avatar?: string;
   description?: string;
-  groupId?: string;
   model?: string;
   plugins?: string[];
   provider?: string;
   systemPrompt?: string;
+  tagId?: string;
   title?: string;
 }
 
@@ -26,8 +26,6 @@ export interface ChatSession {
   chatConfig?: MobileChatConfig;
   createdAt: string;
   description?: string;
-  /** Group identifier for folder grouping */
-  groupId?: string;
   id: string;
   /** Language model assigned to this session (e.g. 'gpt-4o') */
   model?: string;
@@ -35,6 +33,8 @@ export interface ChatSession {
   pinned?: boolean;
   /** Provider identifier (e.g. 'openai', 'anthropic') */
   provider?: string;
+  /** Tag identifier used for session organization */
+  tagId?: string;
   title: string;
   /** 'agent' for regular sessions, 'group' for multi-agent chat groups */
   type?: 'agent' | 'group';
@@ -171,6 +171,7 @@ export interface ChatFileItem {
 }
 
 export interface ChatMessage {
+  agentId?: string | null;
   content: string;
   /** ISO timestamp */
   createdAt: string;
@@ -260,9 +261,10 @@ export interface MarketProvider {
   name: string;
 }
 
-// ---- Session Group ----
+// ---- Session Tags ----
 
-export interface SessionGroup {
+export interface SessionTag {
+  color?: string | null;
   createdAt: string;
   id: string;
   name: string;
@@ -359,10 +361,15 @@ export interface UserProfile {
 
 export interface MobileUserState extends UserProfile {
   settings?: {
+    memory?: {
+      effort?: MobileMemoryEffort;
+      enabled?: boolean;
+    };
     tool?: {
       uninstalledBuiltinTools?: string[];
     };
   };
+  userId?: string;
 }
 
 // ---- AI Provider Runtime State (mirrors server AiProviderRuntimeState) ----
@@ -627,8 +634,13 @@ export interface MemoryItemBase {
 
 /** Identity layer item */
 export interface MemoryIdentityItem extends MemoryItemBase {
+  description?: string;
+  episodicDate?: string;
+  relationship?: string;
+  role?: string;
   /** E.g. 'person', 'organization', 'role' */
   type?: string;
+  userMemoryId?: string;
 }
 
 /** Context layer item */
@@ -701,6 +713,69 @@ export interface MemoryPreferenceItem {
   updatedAt?: string;
   userMemoryId?: string;
 }
+
+export interface MemorySource {
+  agentId?: string | null;
+  id: string;
+  sessionId?: string | null;
+  title?: string | null;
+}
+
+export type MemorySourceType = 'benchmark_locomo' | 'chat_topic';
+
+export interface MemoryBaseDetail extends MemoryItemBase {
+  accessedAt?: string;
+  accessedCount?: number;
+  details?: string;
+  lastAccessedAt?: string;
+}
+
+export interface MemoryActivityDetail {
+  activity: MemoryActivityItem;
+  layer: 'activity';
+  memory: MemoryBaseDetail;
+  source?: MemorySource | null;
+  sourceType?: MemorySourceType;
+}
+
+export interface MemoryContextDetail {
+  context: MemoryContextItem;
+  layer: 'context';
+  memory: MemoryBaseDetail;
+  source?: MemorySource | null;
+  sourceType?: MemorySourceType;
+}
+
+export interface MemoryExperienceDetail {
+  experience: MemoryExperienceItem;
+  layer: 'experience';
+  memory: MemoryBaseDetail;
+  source?: MemorySource | null;
+  sourceType?: MemorySourceType;
+}
+
+export interface MemoryIdentityDetail {
+  identity: MemoryIdentityItem;
+  layer: 'identity';
+  memory: MemoryBaseDetail;
+  source?: MemorySource | null;
+  sourceType?: MemorySourceType;
+}
+
+export interface MemoryPreferenceDetail {
+  layer: 'preference';
+  memory: MemoryBaseDetail;
+  preference: MemoryPreferenceItem;
+  source?: MemorySource | null;
+  sourceType?: MemorySourceType;
+}
+
+export type MemoryDetail =
+  | MemoryActivityDetail
+  | MemoryContextDetail
+  | MemoryExperienceDetail
+  | MemoryIdentityDetail
+  | MemoryPreferenceDetail;
 
 /** Persona document (from userMemory.getPersona) */
 export interface MemoryPersona {

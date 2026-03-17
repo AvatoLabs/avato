@@ -39,6 +39,7 @@ export default {
   'generation.actions.promptCopied': 'Prompt Copied to Clipboard',
   'generation.actions.promptCopyFailed': 'Failed to Copy Prompt',
   'generation.actions.reuseSettings': 'Reuse Settings',
+  'generation.actions.retryLoad': 'Retry Loading',
   'generation.actions.seedApplied': 'Seed Applied to Configuration',
   'generation.actions.seedApplyFailed': 'Failed to Apply Seed',
   'generation.actions.seedCopied': 'Seed Copied to Clipboard',
@@ -46,6 +47,8 @@ export default {
   'generation.metadata.count': '{{count}} Images',
   'generation.status.failed': 'Generation Failed',
   'generation.status.generating': 'Generating...',
+  'generation.status.imageUnavailable':
+    'The image was generated, but the result URL could not be loaded. Click to retry.',
   'notSupportGuide.desc':
     'The current deployment mode does not support AI image generation. Switch to the <1>server database deployment mode</1>, or use <3>Avatoloud</3>.',
   'notSupportGuide.features.fileIntegration.desc':

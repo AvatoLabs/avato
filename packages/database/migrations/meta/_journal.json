@@ -637,6 +637,20 @@
       "when": 1773115333051,
       "tag": "0090_enable_pg_search",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1773748800000,
+      "tag": "0091_add_session_group_color",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1773757392741,
+      "tag": "0092_public_stick",
+      "breakpoints": true
     }
   ],
   "version": "6"

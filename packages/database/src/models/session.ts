@@ -36,15 +36,12 @@ export class SessionModel {
       .select({
         // Agent fields (from agentsToSessions join)
         agent: agents,
-        // Group fields
-        group: sessionGroups,
         // Session fields
         session: sessions,
       })
       .from(sessions)
       .leftJoin(agentsToSessions, eq(sessions.id, agentsToSessions.sessionId))
       .leftJoin(agents, eq(agentsToSessions.agentId, agents.id))
-      .leftJoin(sessionGroups, eq(sessions.groupId, sessionGroups.id))
       .where(and(eq(sessions.userId, this.userId), not(eq(sessions.slug, INBOX_SESSION_ID))))
       .orderBy(desc(sessions.updatedAt))
       .limit(pageSize)
@@ -60,7 +57,6 @@ export class SessionModel {
         groupedResults.set(sessionId, {
           ...row.session,
           agentsToSessions: [],
-          group: row.group,
         });
       }
       if (row.agent) {
@@ -105,7 +101,6 @@ export class SessionModel {
     const result = await this.db
       .select({
         agent: agents,
-        group: sessionGroups,
         session: sessions,
       })
       .from(sessions)
@@ -117,12 +112,15 @@ export class SessionModel {
       )
       .leftJoin(agentsToSessions, eq(sessions.id, agentsToSessions.sessionId))
       .leftJoin(agents, eq(agentsToSessions.agentId, agents.id))
-      .leftJoin(sessionGroups, eq(sessions.groupId, sessionGroups.id))
       .limit(1);
 
     if (!result || !result[0]) return;
 
-    return { ...result[0].session, agent: result[0].agent, group: result[0].group } as any;
+    return {
+      ...result[0].session,
+      agent: result[0].agent,
+      group: result[0].session.groupId ? { id: result[0].session.groupId } : undefined,
+    } as any;
   };
 
   count = async (params?: {
@@ -563,6 +561,7 @@ export class SessionModel {
     description,
     avatar,
     groupId,
+    tagId,
     type,
     ...res
   }: SessionItem & { agentsToSessions?: { agent: AgentItem }[] }):
@@ -600,6 +599,7 @@ export class SessionModel {
         group: groupId,
         members,
         meta,
+        tagId,
         type: 'group',
       } as LobeGroupSession;
     }
@@ -621,6 +621,7 @@ export class SessionModel {
         title: agent?.title ?? title ?? undefined,
       },
       model: agent?.model || '',
+      tagId,
       type: 'agent',
     } as LobeAgentSession;
   };

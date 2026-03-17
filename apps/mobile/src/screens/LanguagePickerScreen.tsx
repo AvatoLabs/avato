@@ -1,12 +1,11 @@
 /**
  * LanguagePickerScreen — Select app language with i18n.
  */
-import { ArrowLeft, Check } from 'lucide-react-native';
+import { ArrowLeft, Check, Globe } from 'lucide-react-native';
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { semanticColors } from '../constants/colors';
 import { type Locale, useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 
@@ -17,7 +16,6 @@ const LANGUAGES: { code: Locale; label: string; name: string }[] = [
 ];
 
 export default function LanguagePickerScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
   const { locale, setLocale, t } = useI18n();
 
   const handleSelect = async (code: Locale) => {
@@ -28,13 +26,13 @@ export default function LanguagePickerScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.languageTitle}
         onPressLeft={() => navigation.goBack()}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}>
-        <View className="mx-5 rounded-2xl overflow-hidden bg-foreground/5">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 20, paddingBottom: 40 }}>
+        <View className="mx-5 rounded-2xl overflow-hidden bg-foreground/[0.02]">
           {LANGUAGES.map((lang) => (
             <TouchableOpacity
               activeOpacity={0.6}

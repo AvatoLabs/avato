@@ -26,6 +26,7 @@ import debug from 'debug';
 
 import { AgentModel } from '@/database/models/agent';
 import { AiModelModel } from '@/database/models/aiModel';
+import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
 import { PluginModel } from '@/database/models/plugin';
 import { ThreadModel } from '@/database/models/thread';
@@ -108,6 +109,8 @@ interface InternalExecAgentParams extends ExecAgentParams {
   discordContext?: any;
   /** Eval context for injecting environment prompts into system message */
   evalContext?: EvalContext;
+  /** Already-uploaded internal file IDs to attach to the user message */
+  existingFileIds?: string[];
   /** External file URLs to download, upload to S3, and attach to the user message */
   files?: Array<{
     mimeType?: string;
@@ -210,6 +213,7 @@ export class AiAgentService {
       autoStart = true,
       botContext,
       discordContext,
+      existingFileIds = [],
       existingMessageIds = [],
       files,
       stepCallbacks,
@@ -631,26 +635,58 @@ export class AiAgentService {
     let fileIds: string[] | undefined;
     let imageList: Array<{ alt: string; id: string; url: string }> | undefined;
 
-    if (files && files.length > 0) {
+    if ((files && files.length > 0) || existingFileIds.length > 0) {
+      const normalizedExistingFileIds = [...new Set(existingFileIds.filter(Boolean))];
       const fileService = new FileService(this.db, this.userId);
       fileIds = [];
       imageList = [];
 
-      for (const file of files) {
-        const ext = file.name?.split('.').pop() || 'bin';
-        const pathname = `files/${this.userId}/${nanoid()}/${file.name || `file.${ext}`}`;
+      if (normalizedExistingFileIds.length > 0) {
+        const fileModel = new FileModel(this.db, this.userId);
+        const storedFiles = await fileModel.findByIds(normalizedExistingFileIds);
+        const storedFileById = new Map(storedFiles.map((file) => [file.id, file]));
 
-        try {
-          const result = await fileService.uploadFromUrl(file.url, pathname);
-          fileIds.push(result.fileId);
-
-          // Build imageList for vision-capable models
-          const mimeType = file.mimeType || '';
-          if (mimeType.startsWith('image/')) {
-            imageList.push({ alt: file.name || 'image', id: result.fileId, url: result.url });
+        for (const fileId of normalizedExistingFileIds) {
+          const storedFile = storedFileById.get(fileId);
+          if (!storedFile) {
+            log('execAgent: existing file %s not found for user %s', fileId, this.userId);
+            continue;
           }
-        } catch (error) {
-          log('execAgent: failed to upload file %s: %O', file.url, error);
+
+          fileIds.push(fileId);
+
+          if (storedFile.fileType?.startsWith('image/')) {
+            const fileProxyBaseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL;
+            const fileUrl = fileProxyBaseUrl
+              ? new URL(`/f/${storedFile.id}`, fileProxyBaseUrl).toString()
+              : storedFile.url;
+
+            imageList.push({
+              alt: storedFile.name || 'image',
+              id: storedFile.id,
+              url: fileUrl,
+            });
+          }
+        }
+      }
+
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const ext = file.name?.split('.').pop() || 'bin';
+          const pathname = `files/${this.userId}/${nanoid()}/${file.name || `file.${ext}`}`;
+
+          try {
+            const result = await fileService.uploadFromUrl(file.url, pathname);
+            fileIds.push(result.fileId);
+
+            // Build imageList for vision-capable models
+            const mimeType = file.mimeType || '';
+            if (mimeType.startsWith('image/')) {
+              imageList.push({ alt: file.name || 'image', id: result.fileId, url: result.url });
+            }
+          } catch (error) {
+            log('execAgent: failed to upload file %s: %O', file.url, error);
+          }
         }
       }
 
@@ -834,7 +870,7 @@ export class AiAgentService {
    * 2. Delegate to execAgent for the rest
    */
   async execGroupAgent(params: ExecGroupAgentParams): Promise<ExecGroupAgentResult> {
-    const { agentId, groupId, message, topicId: inputTopicId, newTopic } = params;
+    const { agentId, files, groupId, message, topicId: inputTopicId, newTopic } = params;
 
     log(
       'execGroupAgent: agentId=%s, groupId=%s, message=%s',
@@ -870,6 +906,7 @@ export class AiAgentService {
       agentId,
       appContext: { groupId, topicId },
       autoStart: true,
+      existingFileIds: files,
       prompt: message,
     });
 

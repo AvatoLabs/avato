@@ -5,7 +5,6 @@
  * groups by provider, and allows selection. Falls back to a static list if the
  * server is unreachable.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Check, RefreshCw, WifiOff } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image as RNImage, SectionList, Text, View } from 'react-native';
@@ -20,12 +19,11 @@ import { semanticColors } from '../constants/colors';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { agentApi } from '../lib/api';
+import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
-
-const STORAGE_KEY_MODEL = 'avato_default_model';
-const STORAGE_KEY_PROVIDER = 'avato_default_provider';
 
 // ── Fallback static list (used when server is unreachable) ─────────
 interface FallbackModel {
@@ -239,25 +237,24 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   const [serverModels, setServerModels] = useState<ProviderWithModels[] | null>(null);
   const toast = useToast();
 
-  // ── Load selected model ──────────────────────────────────────────
+  // ── Load selected model from Agent Config or default Agent ─────────
   useEffect(() => {
     (async () => {
       if (sessionId) {
-        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
-        if (raw) {
-          try {
-            const saved = JSON.parse(raw);
-            if (saved.model) {
-              setSelected(saved.model);
-              return;
-            }
-          } catch {
-            /* ignore */
+        try {
+          const config = await agentApi.getConfigBySession(sessionId);
+          if (config?.model) {
+            setSelected(config.model);
+            return;
           }
+        } catch {
+          /* ignore */
         }
       }
-      const global = await AsyncStorage.getItem(STORAGE_KEY_MODEL);
-      if (global) setSelected(global);
+      const agentStore = useAgentStore.getState();
+      if (!agentStore.initialized) await agentStore.loadAgents();
+      const agent = agentStore.getCurrentAgent();
+      if (agent?.model) setSelected(agent.model);
     })();
   }, [sessionId]);
 
@@ -287,38 +284,33 @@ export default function ModelPickerScreen({ navigation, route }: any) {
     haptics.selection();
     setSelected(modelId);
 
-    // Resolve vision capability from the loaded model tree
-    let supportsVision = false;
-    if (serverModels) {
-      for (const provider of serverModels) {
-        const found = provider.children.find((m) => m.id === modelId && provider.id === providerId);
-        if (found) {
-          supportsVision = !!found.abilities?.vision;
-          break;
-        }
-      }
-    }
-
     if (sessionId) {
-      let existing: Record<string, unknown> = {};
       try {
-        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
-        if (raw) existing = JSON.parse(raw);
+        const config = await agentApi.getConfigBySession(sessionId);
+        if (config?.id) {
+          await agentApi.updateConfig(config.id, { model: modelId, provider: providerId });
+        }
       } catch {
-        /* ignore */
+        /* best-effort */
       }
-      existing.model = modelId;
-      existing.provider = providerId;
-      existing.vision = supportsVision;
-      await AsyncStorage.setItem(`avato_chat_settings_${sessionId}`, JSON.stringify(existing));
-
-      // Immediately reflect in session store so recent-list logo updates instantly
       useSessionStore
         .getState()
         .updateSessionMeta(sessionId, { model: modelId, provider: providerId });
     } else {
-      await AsyncStorage.setItem(STORAGE_KEY_MODEL, modelId);
-      await AsyncStorage.setItem(STORAGE_KEY_PROVIDER, providerId);
+      const agentStore = useAgentStore.getState();
+      if (!agentStore.initialized) await agentStore.loadAgents();
+      let current = agentStore.getCurrentAgent();
+      if (!current && agentStore.agents.length === 0) {
+        const newId = await agentStore.createAgent({
+          model: modelId,
+          provider: providerId,
+          title: 'Default',
+        });
+        current = agentStore.agents.find((a) => a.id === newId) ?? null;
+      }
+      if (current) {
+        await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
+      }
     }
 
     toast.show('success', t.settingsSavedModel);
@@ -442,7 +434,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.modelPickerTitle}
         onPressLeft={() => navigation.canGoBack() && navigation.goBack()}
       />

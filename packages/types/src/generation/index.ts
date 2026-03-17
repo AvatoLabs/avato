@@ -74,6 +74,7 @@ export interface Generation {
   asset?: GenerationAsset | null;
   asyncTaskId: string | null;
   createdAt: Date;
+  fileId?: string | null;
   id: string;
   seed?: number | null;
 

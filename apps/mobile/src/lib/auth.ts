@@ -13,7 +13,10 @@ const MOBILE_AUTH_SCHEME = 'com.avato.app';
 const MOBILE_AUTH_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/callback`;
 const MOBILE_LOGOUT_CALLBACK_URL = `${MOBILE_AUTH_SCHEME}://auth/logout`;
 const MOBILE_AUTH_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
-const FEISHU_NATIVE_SCOPES = ['contact:user.base:readonly', 'contact:user.email:readonly'];
+// Native Feishu sign-in only needs basic profile access here. Requesting email
+// eagerly can make the SDK reject the client when the app has not been granted
+// that scope in Feishu Open Platform.
+const FEISHU_NATIVE_SCOPES = ['contact:user.base:readonly'];
 const FEISHU_NATIVE_REFRESH_ROUTE = '/api/mobile-auth/feishu/native/refresh';
 const FEISHU_NATIVE_EXCHANGE_ROUTE = '/api/mobile-auth/feishu/native/exchange';
 const LOBE_CHAT_AUTH_HEADER = 'X-lobe-chat-auth';

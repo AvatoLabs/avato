@@ -9,6 +9,7 @@
  */
 import {
   ArrowLeft,
+  BarChart3,
   BookOpen,
   CalendarDays,
   Clock3,
@@ -23,6 +24,7 @@ import {
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image as RNImage,
   RefreshControl,
   ScrollView,
   Text,
@@ -31,7 +33,9 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { getProviderIconUrl } from '../constants/cdn';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { semanticColors } from '../constants/colors';
 import { statsApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -72,11 +76,13 @@ function formatDate(iso?: string): string {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
+const BLUE = '#007aff';
+const BLUE_BG = 'rgba(0,122,255,0.08)';
 const STAT_ICONS: Record<string, { bg: string; color: string; icon: any }> = {
-  messages: { icon: MessageSquare, color: '#007aff', bg: 'rgba(0,122,255,0.08)' },
-  sessions: { icon: Sparkles, color: '#af52de', bg: 'rgba(175,82,222,0.08)' },
-  topics: { icon: BookOpen, color: '#34c759', bg: 'rgba(52,199,89,0.08)' },
-  words: { icon: Zap, color: '#ff9500', bg: 'rgba(255,149,0,0.08)' },
+  messages: { icon: MessageSquare, color: BLUE, bg: BLUE_BG },
+  sessions: { icon: Sparkles, color: BLUE, bg: BLUE_BG },
+  topics: { icon: BookOpen, color: BLUE, bg: BLUE_BG },
+  words: { icon: Zap, color: BLUE, bg: BLUE_BG },
 };
 
 function StatCard({
@@ -103,7 +109,7 @@ function StatCard({
       style={{ backgroundColor: meta.bg }}
     >
       {loading ? (
-        <ActivityIndicator color="#999" size="small" />
+        <ActivityIndicator color={BLUE} size="small" />
       ) : (
         <>
           <View
@@ -118,7 +124,7 @@ function StatCard({
           <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">{title}</Text>
           {pct && (
             <Text
-              className={`text-[10px] font-medium mt-0.5 ${isPositive ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}
+              className={`text-[10px] font-medium mt-0.5 ${isPositive ? 'text-primary' : 'text-secondary/70'}`}
             >
               {pct}
             </Text>
@@ -129,7 +135,7 @@ function StatCard({
   );
 }
 
-const HEATMAP_COLORS = ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+const HEATMAP_COLORS = ['#ebedf0', '#b3d9ff', '#66b3ff', '#3399ff', '#007aff'];
 
 function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }) {
   const { t } = useI18n();
@@ -140,7 +146,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
   if (loading) {
     return (
       <View className="h-24 items-center justify-center">
-        <ActivityIndicator color="#999" size="small" />
+        <ActivityIndicator color={BLUE} size="small" />
       </View>
     );
   }
@@ -163,7 +169,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
     <View>
       <View className="flex-row items-center justify-between mb-3">
         <View className="flex-row items-center gap-1.5">
-          <CalendarDays color="#666" size={15} strokeWidth={tokens.icon.strokeWidth} />
+          <CalendarDays color={BLUE} size={15} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="text-foreground text-[15px] font-semibold tracking-tight">
             {t.statsActivity}
           </Text>
@@ -217,18 +223,43 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
   );
 }
 
-const RANK_MEDALS = ['#ffd700', '#c0c0c0', '#cd7f32'];
+const RANK_MEDALS = ['#007aff', '#3399ff', '#66b3ff'];
+
+function getProviderFromModelId(modelId: string): string | undefined {
+  if (modelId.includes('/')) return modelId.split('/')[0];
+  const lower = modelId.toLowerCase();
+  if (lower.startsWith('gpt') || lower.startsWith('o1') || lower.startsWith('o3')) return 'openai';
+  if (lower.startsWith('claude')) return 'anthropic';
+  if (lower.startsWith('gemini')) return 'google';
+  if (lower.startsWith('deepseek')) return 'deepseek';
+  return undefined;
+}
+
+function ModelLogo({ providerId }: { providerId: string }) {
+  const [err, setErr] = React.useState(false);
+  const url = getProviderIconUrl(providerId);
+  if (err) return <Text className="text-primary text-[10px] font-bold">{providerId.slice(0, 2)}</Text>;
+  return (
+    <RNImage
+      source={{ uri: url }}
+      style={{ width: 20, height: 20, borderRadius: 4 }}
+      onError={() => setErr(true)}
+    />
+  );
+}
 
 function RankSection({
   data,
   icon,
   loading,
   title,
+  modelLogos,
 }: {
   data: { count: number; name: string }[];
   icon: React.ReactNode;
   loading: boolean;
   title: string;
+  modelLogos?: Array<{ providerId?: string }>;
 }) {
   const { t } = useI18n();
   const maxCount = data.length > 0 ? data[0].count : 1;
@@ -241,7 +272,7 @@ function RankSection({
       </View>
       {loading ? (
         <View className="h-20 items-center justify-center">
-          <ActivityIndicator color="#999" size="small" />
+          <ActivityIndicator color={BLUE} size="small" />
         </View>
       ) : data.length === 0 ? (
         <View className="py-8 items-center rounded-2xl bg-foreground/[0.02]">
@@ -250,36 +281,41 @@ function RankSection({
         </View>
       ) : (
         <View className="rounded-2xl overflow-hidden bg-foreground/[0.02] px-3 py-2">
-          {data.slice(0, 5).map((item, i) => (
-            <View className="flex-row items-center py-2" key={i}>
-              <View className="w-6 items-center">
-                {i < 3 ? (
-                  <Crown color={RANK_MEDALS[i]} fill={RANK_MEDALS[i]} size={14} />
-                ) : (
-                  <Text className="text-secondary/40 text-[12px] font-bold">{i + 1}</Text>
-                )}
-              </View>
-              <View className="flex-1 mx-2.5">
-                <View className="flex-row items-center justify-between mb-1">
-                  <Text
-                    className="text-foreground text-[13px] font-medium flex-1"
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </Text>
-                  <Text className="text-secondary/50 text-[12px] font-semibold tabular-nums ml-2">
-                    {item.count}
-                  </Text>
+          {data.slice(0, 5).map((item, i) => {
+            const providerId = modelLogos?.[i]?.providerId ?? getProviderFromModelId(item.name);
+            return (
+              <View className="flex-row items-center py-2" key={i}>
+                <View className="w-8 h-8 items-center justify-center rounded-full bg-primary/10 mr-2">
+                  {providerId ? (
+                    <ModelLogo providerId={providerId} />
+                  ) : i < 3 ? (
+                    <Crown color={RANK_MEDALS[i]} fill={RANK_MEDALS[i]} size={14} />
+                  ) : (
+                    <Text className="text-secondary/40 text-[12px] font-bold">{i + 1}</Text>
+                  )}
                 </View>
-                <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
-                  <View
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
-                  />
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text
+                      className="text-foreground text-[13px] font-medium flex-1"
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text className="text-secondary/50 text-[12px] font-semibold tabular-nums ml-2">
+                      {item.count}
+                    </Text>
+                  </View>
+                  <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
+                    <View
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
+                    />
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>
@@ -392,7 +428,7 @@ export default function StatsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.statsTitle}
         onPressLeft={() => navigation.goBack()}
       />
@@ -420,7 +456,7 @@ export default function StatsScreen({ navigation }: any) {
               <View className="flex-row gap-4 mt-2">
                 {data.registration?.createdAt && (
                   <View className="flex-row items-center gap-1">
-                    <Clock3 color="#999" size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <Clock3 color={semanticColors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="text-secondary/50 text-[11px] font-medium">
                       {formatDate(data.registration.createdAt)}
                     </Text>
@@ -428,7 +464,7 @@ export default function StatsScreen({ navigation }: any) {
                 )}
                 {data.registration?.updatedAt && (
                   <View className="flex-row items-center gap-1">
-                    <ClockArrowUp color="#999" size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <ClockArrowUp color={semanticColors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="text-secondary/50 text-[11px] font-medium">
                       {formatDate(data.registration.updatedAt)}
                     </Text>
@@ -487,8 +523,12 @@ export default function StatsScreen({ navigation }: any) {
           <View className="px-5">
             <RankSection
               data={data.modelRank.map((m) => ({ count: m.count, name: m.id }))}
-              icon={<Trophy color="#f5a623" size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              icon={<Trophy color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
               loading={loading}
+              modelLogos={data.modelRank.map((m) => {
+                const pid = getProviderFromModelId(m.id);
+                return pid ? { providerId: pid } : {};
+              })}
               title={t.statsModelsRank}
             />
             <RankSection
@@ -498,9 +538,7 @@ export default function StatsScreen({ navigation }: any) {
                 count: s.count,
                 name: s.title || 'Untitled',
               }))}
-              icon={
-                <MessageSquare color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
-              }
+              icon={<MessageSquare color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
             <RankSection
               loading={loading}
@@ -509,9 +547,7 @@ export default function StatsScreen({ navigation }: any) {
                 count: tp.count,
                 name: tp.title || 'Untitled',
               }))}
-              icon={
-                <MessageSquare color="#34c759" size={16} strokeWidth={tokens.icon.strokeWidth} />
-              }
+              icon={<BookOpen color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
           </View>
         </Animated.View>

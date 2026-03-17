@@ -11,10 +11,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ToastContainer, useToast } from './src/components/ui/Toast';
+import { migrateDeprecatedStorageKeys } from './src/lib/appState';
 import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
+import { AppErrorBoundary, initAppLogger } from './src/lib/logger';
 import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
+import { useAgentStore } from './src/store/agent';
 import { useConnectionStore } from './src/store/connection';
 import { useSessionStore } from './src/store/session';
 import { useUserStore } from './src/store/user';
@@ -49,6 +52,30 @@ function OfflineBanner() {
   );
 }
 
+function AppCrashFallback() {
+  const insets = useSafeAreaInsets();
+  const t = useI18n((s) => s.t);
+
+  return (
+    <View
+      style={{
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        flex: 1,
+        justifyContent: 'center',
+        paddingBottom: insets.bottom,
+        paddingHorizontal: 24,
+        paddingTop: insets.top,
+      }}
+    >
+      <Text style={{ color: '#111827', fontSize: 22, fontWeight: '700', marginBottom: 12 }}>
+        {t.errorUnknown}
+      </Text>
+      <Text style={{ color: '#6b7280', fontSize: 14, textAlign: 'center' }}>{t.logsCrashHint}</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [isBootReady, setIsBootReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -79,6 +106,7 @@ export default function App() {
     const init = async () => {
       let shouldCheckConnection = false;
       try {
+        await initAppLogger();
         await loadLocale();
 
         const onboardingDone = await AsyncStorage.getItem(ONBOARDING_KEY);
@@ -105,9 +133,11 @@ export default function App() {
 
         if (authConfig.enableNoAuth) {
           await Promise.all([
-            useSessionStore.getState().fetchSessions(),
-            useUserStore.getState().fetchUser(),
+            useSessionStore.getState().fetchSessions({ throwOnError: true }),
+            useUserStore.getState().fetchUser({ throwOnError: true }),
+            useAgentStore.getState().loadAgents(),
           ]);
+          void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
             setInitialRoute('MainTabs');
           }
@@ -118,9 +148,11 @@ export default function App() {
 
         if (authSession) {
           await Promise.all([
-            useSessionStore.getState().fetchSessions(),
-            useUserStore.getState().fetchUser(),
+            useSessionStore.getState().fetchSessions({ throwOnError: true }),
+            useUserStore.getState().fetchUser({ throwOnError: true }),
+            useAgentStore.getState().loadAgents(),
           ]);
+          void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
             setInitialRoute('MainTabs');
           }
@@ -164,10 +196,12 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer theme={AvatoLightTheme}>
-          <RootNavigator initialRoute={initialRoute} />
-          {isOffline && <OfflineBanner />}
-          <ToastContainer />
-          <StatusBar style="dark" />
+          <AppErrorBoundary fallback={<AppCrashFallback />}>
+            <RootNavigator initialRoute={initialRoute} />
+            {isOffline && <OfflineBanner />}
+            <ToastContainer />
+            <StatusBar style="dark" />
+          </AppErrorBoundary>
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>

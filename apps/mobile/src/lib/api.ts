@@ -37,6 +37,7 @@ import type {
   MarketAgent,
   MemoryActivityItem,
   MemoryContextItem,
+  MemoryDetail,
   MemoryExperienceItem,
   MemoryIdentityItem,
   MemoryPagedResult,
@@ -46,8 +47,8 @@ import type {
   MobileMemoryEffort,
   MobileUserState,
   ModelRankItem,
-  SessionGroup,
   SessionRankItem,
+  SessionTag,
   Topic,
   TopicRankItem,
   UserProfile,
@@ -65,6 +66,7 @@ export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setAp
 
 const DEFAULT_UPLOAD_DIRECTORY = 'files';
 const MOBILE_UPLOAD_CACHE_DIR = `${FileSystem.cacheDirectory || ''}upload-cache/`;
+const MOBILE_DOWNLOAD_DIR = `${FileSystem.documentDirectory || FileSystem.cacheDirectory || ''}downloads/`;
 
 const computeStringHash = (value: string) => {
   let hash = 2166136261;
@@ -102,14 +104,15 @@ const buildUploadMetadata = (name: string, directory?: string, pathname?: string
 
 const sanitizeFilename = (name: string) => name.replaceAll(/[^\w.-]+/g, '_');
 
+const ensureDirectoryAsync = async (uri: string) => {
+  if (!uri) throw new Error('filesystem directory unavailable');
+  await FileSystem.makeDirectoryAsync(uri, { intermediates: true });
+};
+
 const ensureUploadableUri = async (uri: string, name: string) => {
   if (uri.startsWith('file://')) return uri;
 
-  if (!FileSystem.cacheDirectory) {
-    throw new Error('upload cache directory unavailable');
-  }
-
-  await FileSystem.makeDirectoryAsync(MOBILE_UPLOAD_CACHE_DIR, { intermediates: true });
+  await ensureDirectoryAsync(MOBILE_UPLOAD_CACHE_DIR);
 
   const filename = `${Date.now()}-${sanitizeFilename(name || 'upload.bin')}`;
   const targetUri = `${MOBILE_UPLOAD_CACHE_DIR}${filename}`;
@@ -122,14 +125,27 @@ const ensureUploadableUri = async (uri: string, name: string) => {
   return targetUri;
 };
 
+const resolveRemoteFileUrl = (baseUrl: string, id: string, url?: string) => {
+  if (url?.startsWith('http://') || url?.startsWith('https://') || url?.startsWith('file://')) {
+    return url;
+  }
+
+  if (url?.startsWith('/')) {
+    return `${baseUrl}${url}`;
+  }
+
+  return `${baseUrl}/f/${id}`;
+};
+
 const uploadFileToSameOrigin = async (
   baseUrl: string,
   uri: string,
   name: string,
   pathname: string,
   type: string,
+  onProgress?: (progress: number) => void,
 ) => {
-  const response = await FileSystem.uploadAsync(
+  const uploadTask = FileSystem.createUploadTask(
     new URL('/api/file/upload', `${baseUrl}/`).toString(),
     uri,
     {
@@ -140,7 +156,17 @@ const uploadFileToSameOrigin = async (
       parameters: { pathname },
       uploadType: FileSystem.FileSystemUploadType.MULTIPART,
     },
+    (progressData) => {
+      const { totalBytesExpectedToSend, totalBytesSent } = progressData;
+      if (!onProgress || totalBytesExpectedToSend <= 0) return;
+      onProgress(Math.min(99, Math.round((totalBytesSent / totalBytesExpectedToSend) * 100)));
+    },
   );
+  const response = await uploadTask.uploadAsync();
+
+  if (!response) {
+    throw new Error('upload failed: empty response');
+  }
 
   if (response.status < 200 || response.status >= 300) {
     let payload: { error?: string } | null;
@@ -264,6 +290,7 @@ const normalizeMessage = (message: any): ChatMessage => {
       : null;
 
   return {
+    agentId: message?.agentId ?? message?.agent_id ?? undefined,
     content: normalizedContent.content,
     createdAt: toIsoString(message?.createdAt),
     error: message?.error ?? null,
@@ -440,43 +467,107 @@ async function getHeaders(): Promise<Record<string, string>> {
 //   • Wrap inputs  → { json: actualInput }            (superjson envelope)
 //   • Unwrap output ← response.result.data.json        (superjson envelope)
 
-async function trpcQuery<T = any>(procedure: string, input?: unknown): Promise<T> {
-  const base = await getBaseUrl();
-  // Wrap input in superjson envelope when present
-  const sjInput = input !== undefined ? { json: input } : undefined;
-  const url = sjInput
-    ? `${base}/trpc/mobile/${procedure}?input=${encodeURIComponent(JSON.stringify(sjInput))}`
-    : `${base}/trpc/mobile/${procedure}`;
-  const res = await fetch(url, { headers: await getHeaders() });
-  if (!res.ok) throw new Error(`tRPC query ${procedure} failed: ${res.status}`);
-  const json = await res.json();
-  // Unwrap superjson envelope
-  const data = json.result?.data;
+const extractTrpcErrorMessage = (payload: any) => {
+  return (
+    payload?.error?.json?.message ||
+    payload?.error?.message ||
+    payload?.message ||
+    undefined
+  );
+};
+
+const createTrpcHttpError = (
+  action: 'mutation' | 'query',
+  procedure: string,
+  status: number,
+  payload: any,
+  rawText: string,
+) => {
+  const detail = extractTrpcErrorMessage(payload) || rawText.slice(0, 240).trim();
+  const error = new Error(
+    `tRPC ${action} ${procedure} failed: ${status}${detail ? ` - ${detail}` : ''}`,
+  ) as Error & {
+    body?: string;
+    procedure?: string;
+    status?: number;
+  };
+
+  error.body = rawText;
+  error.procedure = procedure;
+  error.status = status;
+
+  return error;
+};
+
+const unwrapTrpcPayload = <T>(payload: any) => {
+  const data = payload?.result?.data;
   return (data && typeof data === 'object' && 'json' in data ? data.json : data) as T;
+};
+
+async function requestTrpc<T = any>(params: {
+  action: 'mutation' | 'query';
+  input?: unknown;
+  procedure: string;
+}): Promise<T> {
+  const base = await getBaseUrl();
+  const envelope = params.input !== undefined ? { json: params.input } : undefined;
+  const url =
+    params.action === 'query'
+      ? envelope
+        ? `${base}/trpc/mobile/${params.procedure}?input=${encodeURIComponent(JSON.stringify(envelope))}`
+        : `${base}/trpc/mobile/${params.procedure}`
+      : `${base}/trpc/mobile/${params.procedure}`;
+
+  const res = await fetch(url, {
+    body: params.action === 'mutation' ? JSON.stringify(envelope ?? { json: undefined }) : undefined,
+    headers: await getHeaders(),
+    method: params.action === 'mutation' ? 'POST' : 'GET',
+  });
+  const rawText = await res.text();
+
+  let payload: any = null;
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!res.ok) {
+    throw createTrpcHttpError(params.action, params.procedure, res.status, payload, rawText);
+  }
+
+  return unwrapTrpcPayload<T>(payload);
+}
+
+async function trpcQuery<T = any>(procedure: string, input?: unknown): Promise<T> {
+  return requestTrpc<T>({ action: 'query', input, procedure });
 }
 
 async function trpcMutate<T = any>(procedure: string, input?: unknown): Promise<T> {
-  const base = await getBaseUrl();
-  const res = await fetch(`${base}/trpc/mobile/${procedure}`, {
-    method: 'POST',
-    headers: await getHeaders(),
-    body: JSON.stringify({ json: input }),
-  });
-  if (!res.ok) throw new Error(`tRPC mutation ${procedure} failed: ${res.status}`);
-  const json = await res.json();
-  // Unwrap superjson envelope
-  const data = json.result?.data;
-  return (data && typeof data === 'object' && 'json' in data ? data.json : data) as T;
+  return requestTrpc<T>({ action: 'mutation', input, procedure });
 }
 
 // ── Agent API ───────────────────────────────────────────────────────
+export interface AgentQueryItem {
+  avatar?: string | null;
+  backgroundColor?: string | null;
+  description?: string | null;
+  id: string;
+  title?: string | null;
+}
+
 export const agentApi = {
   /** Create a new agent (with session). Returns { agentId, sessionId }. */
-  create: (config?: Record<string, unknown>, groupId?: string) =>
+  create: (config?: Record<string, unknown>, tagId?: string) =>
     trpcMutate<{ agentId: string; sessionId: string }>('agent.createAgent', {
       config,
-      groupId,
+      tagId,
     }),
+
+  queryAgents: (params?: { keyword?: string; limit?: number; offset?: number }) =>
+    trpcQuery<AgentQueryItem[]>('agent.queryAgents', params),
 
   /** Get agent config by session ID. Returns the agent config including plugins. */
   getConfigBySession: (sessionId: string) =>
@@ -494,20 +585,19 @@ export const agentApi = {
 export const sessionApi = {
   /** Fetch grouped sessions. Server returns {sessionGroups, sessions}. */
   list: async (): Promise<ChatSession[]> => {
-    const result = await trpcQuery<{ sessionGroups: SessionGroup[]; sessions: any[] }>(
+    const result = await trpcQuery<{ sessionGroups: any[]; sessions: any[] }>(
       'session.getGroupedSessions',
     );
-    // Server maps DB groupId → "group" field; normalize to our ChatSession.groupId
     return (result?.sessions ?? []).map((s) => ({
       ...s,
       agentId: s.config?.id ?? undefined,
-      groupId: s.groupId ?? s.group ?? undefined,
       title: s.meta?.title ?? s.title ?? '',
       description: s.meta?.description ?? s.description,
       avatar: s.meta?.avatar ?? s.avatar,
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
+      tagId: s.tagId ?? undefined,
       type: s.type ?? 'agent',
     }));
   },
@@ -523,7 +613,7 @@ export const sessionApi = {
         systemRole: config?.systemPrompt,
         title: config?.title || 'New Conversation',
       },
-      session: { groupId: config?.groupId },
+      session: { tagId: config?.tagId },
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),
@@ -532,8 +622,8 @@ export const sessionApi = {
     trpcMutate('session.updateSession', { id, value: { pinned: true } }),
   unpin: (id: string) =>
     trpcMutate('session.updateSession', { id, value: { pinned: false } }),
-  updateGroup: (id: string, groupId: string) =>
-    trpcMutate('session.updateSession', { id, value: { groupId: groupId || null } }),
+  updateTag: (id: string, tagId?: string | null) =>
+    trpcMutate('session.updateSession', { id, value: { tagId: tagId || null } }),
   duplicate: (id: string, title = 'Duplicated') =>
     trpcMutate<string | undefined>('session.cloneSession', { id, newTitle: title }),
   rename: (id: string, title: string) =>
@@ -544,19 +634,96 @@ export const sessionApi = {
     return (result ?? []).map((s) => ({
       ...s,
       agentId: s.config?.id ?? undefined,
-      groupId: s.groupId ?? s.group ?? undefined,
       title: s.meta?.title ?? s.title ?? '',
       description: s.meta?.description ?? s.description,
       avatar: s.meta?.avatar ?? s.avatar,
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
+      tagId: s.tagId ?? undefined,
       type: s.type ?? 'agent',
     }));
   },
-  /** Update agent chat config (e.g. searchMode) for a session */
   updateChatConfig: (id: string, config: Record<string, unknown>) =>
     trpcMutate('session.updateSessionChatConfig', { id, value: config }),
+  generateTitle: (sessionId: string) =>
+    trpcMutate<string | null>('session.generateSessionTitle', { sessionId }),
+};
+
+// ── Agent Group API (multi-agent chat) ───────────────────────────────
+export interface AgentGroupDetail {
+  [key: string]: any;
+  agents?: Array<{ id: string; title?: string; [key: string]: any }>;
+  config?: Record<string, any>;
+  id: string;
+  meta?: { avatar?: string; description?: string; title?: string };
+  supervisorAgentId?: string;
+}
+
+export const agentGroupApi = {
+  createGroup: (config?: { config?: Record<string, any>; title?: string }) =>
+    trpcMutate<{ group: { id: string }; supervisorAgentId: string }>('agentGroup.createGroup', {
+      config: config?.config,
+      title: config?.title || 'New Group Chat',
+    }),
+
+  createGroupWithMembers: (params: {
+    groupConfig?: { config?: Record<string, any>; title?: string };
+    members: Array<{ model?: string; provider?: string; systemRole?: string; title?: string }>;
+  }) =>
+    trpcMutate<{ agentIds: string[]; groupId: string; supervisorAgentId: string }>(
+      'agentGroup.createGroupWithMembers',
+      {
+        groupConfig: {
+          config: params.groupConfig?.config,
+          title: params.groupConfig?.title || 'New Group Chat',
+        },
+        members: params.members,
+      },
+    ),
+
+  getGroupDetail: (groupId: string) =>
+    trpcQuery<AgentGroupDetail | null>('agentGroup.getGroupDetail', { id: groupId }),
+
+  getGroups: () => trpcQuery<AgentGroupDetail[]>('agentGroup.getGroups'),
+
+  addAgentsToGroup: (groupId: string, agentIds: string[]) =>
+    trpcMutate('agentGroup.addAgentsToGroup', { agentIds, groupId }),
+
+  removeAgentsFromGroup: (
+    groupId: string,
+    agentIds: string[],
+    options?: { deleteVirtualAgents?: boolean },
+  ) =>
+    trpcMutate('agentGroup.removeAgentsFromGroup', {
+      agentIds,
+      deleteVirtualAgents: options?.deleteVirtualAgents,
+      groupId,
+    }),
+
+  updateGroup: (groupId: string, value: Record<string, any>) =>
+    trpcMutate('agentGroup.updateGroup', { id: groupId, value }),
+};
+
+// ── AI Agent API (group chat execution) ───────────────────────────────
+export const aiAgentApi = {
+  execGroupAgent: (params: {
+    agentId: string;
+    files?: string[];
+    groupId: string;
+    message: string;
+    topicId?: string;
+  }) =>
+    trpcMutate<{
+      assistantMessageId?: string;
+      isCreateNewTopic?: boolean;
+      operationId?: string;
+      success?: boolean;
+      topicId?: string;
+      topics?: { items: any[]; total: number };
+    }>('aiAgent.execGroupAgent', params),
+  interruptTask: (params: { operationId?: string; threadId?: string }) =>
+    trpcMutate('aiAgent.interruptTask', params),
 };
 
 // ── Message API ─────────────────────────────────────────────────────
@@ -592,10 +759,19 @@ export interface MessageSearchResult {
 }
 
 export const messageApi = {
-  list: (sessionId: string, topicId?: string) =>
-    trpcQuery<any[]>('message.getMessages', { sessionId, topicId }).then((messages) =>
+  list: (
+    sessionId: string,
+    topicId?: string,
+    options?: { sessionType?: 'agent' | 'group' },
+  ) => {
+    const params =
+      options?.sessionType === 'group'
+        ? { groupId: sessionId, topicId }
+        : { sessionId, topicId };
+    return trpcQuery<any[]>('message.getMessages', params).then((messages) =>
       (messages ?? []).map(normalizeMessage),
-    ),
+    );
+  },
 
   create: (params: CreateMessageParams) =>
     trpcMutate<{ id: string; messages: any[] }>('message.createMessage', params).then((result) => ({
@@ -707,6 +883,112 @@ export interface MobileChatMessage {
   tool_calls?: MobileMessageToolCall[];
 }
 
+const isInlineImageUrl = (url?: string): url is string =>
+  typeof url === 'string' && url.startsWith('data:image/');
+
+const shouldForceInlineImages = (_provider: string) => true;
+
+const collectLastUserMessageDebugStats = (content: MobileChatMessage['content']) => {
+  if (typeof content === 'string') {
+    return {
+      imagePartCount: 0,
+      kind: 'string' as const,
+      textPartCount: content.trim() ? 1 : 0,
+      textPreview: content.slice(0, 160),
+    };
+  }
+
+  let imagePartCount = 0;
+  const textParts: string[] = [];
+
+  for (const part of content) {
+    if (part.type === 'text') {
+      if (part.text.trim()) textParts.push(part.text);
+      continue;
+    }
+
+    if (part.type === 'image_url') imagePartCount += 1;
+  }
+
+  return {
+    imagePartCount,
+    kind: 'array' as const,
+    textPartCount: textParts.length,
+    textPreview: textParts.join('\n\n').slice(0, 160),
+  };
+};
+
+const logFinalLastUserMessage = (provider: string, messages: MobileChatMessage[]) => {
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+
+  if (!lastUserMessage) {
+    console.info(`[aiChatApi] final last user message provider=${provider} role=missing`);
+    return;
+  }
+
+  const { imagePartCount, kind, textPartCount, textPreview } = collectLastUserMessageDebugStats(
+    lastUserMessage.content,
+  );
+
+  console.info(
+    `[aiChatApi] final last user message provider=${provider} role=${lastUserMessage.role} contentType=${kind} textParts=${textPartCount} imageParts=${imagePartCount} textPreview=${JSON.stringify(textPreview)}`,
+  );
+};
+
+const sanitizeMessagesForProvider = (messages: MobileChatMessage[]): MobileChatMessage[] =>
+  messages.map((message) => {
+    if (message.role !== 'user' || !Array.isArray(message.content)) return message;
+
+    const textParts: MobileUserMessageContentPartText[] = [];
+    const inlineImageParts: MobileUserMessageContentPartImage[] = [];
+
+    for (const part of message.content) {
+      if (part.type === 'text') {
+        textParts.push(part);
+        continue;
+      }
+
+      const url = part.image_url?.url;
+
+      if (isInlineImageUrl(url)) {
+        inlineImageParts.push(part);
+      }
+    }
+
+    const collapsedText = textParts
+      .map((part) => part.text)
+      .filter(Boolean)
+      .join('\n\n');
+    const hasText = collapsedText.trim().length > 0;
+    const hasImages = inlineImageParts.length > 0;
+
+    if (!hasText && !hasImages) {
+      return {
+        ...message,
+        content: '',
+      };
+    }
+
+    if (hasText && !hasImages) {
+      return {
+        ...message,
+        content: collapsedText,
+      };
+    }
+
+    if (!hasText && hasImages) {
+      return {
+        ...message,
+        content: inlineImageParts,
+      };
+    }
+
+    return {
+      ...message,
+      content: [...textParts, ...inlineImageParts],
+    };
+  });
+
 /**
  * Create a stateful SSE parser. The parser must be stateful because SSE fields
  * (id, event, data) often arrive in SEPARATE XHR onprogress chunks in React
@@ -799,7 +1081,15 @@ export const aiChatApi = {
       }
 
       return new Promise<StreamResult>((resolve, reject) => {
-        const allMessages = [...messages];
+        let allMessages = [...messages];
+
+        if (shouldForceInlineImages(provider)) {
+          allMessages = sanitizeMessagesForProvider(allMessages);
+          console.info(`[aiChatApi] sanitized provider=${provider} msgCount=${allMessages.length}`);
+        }
+
+        logFinalLastUserMessage(provider, allMessages);
+
         if (options?.systemPrompt) {
           allMessages.unshift({ role: 'system', content: options.systemPrompt });
         }
@@ -848,6 +1138,7 @@ export const aiChatApi = {
         for (const [key, value] of Object.entries(headers)) {
           xhr.setRequestHeader(key, value);
         }
+        xhr.setRequestHeader('X-Avato-Mobile-Client', '1');
 
         let accText = '';
         let accReasoning = '';
@@ -1167,34 +1458,46 @@ export const aiChatApi = {
 
 // ── Topic API ───────────────────────────────────────────────────────
 export const topicApi = {
-  list: (sessionId: string) => trpcQuery<Topic[]>('topic.getTopics', { sessionId }),
+  list: (containerId: string, options?: { sessionType?: 'agent' | 'group' }) => {
+    const params =
+      options?.sessionType === 'group'
+        ? { groupId: containerId }
+        : { sessionId: containerId };
+    return trpcQuery<{ items: Topic[]; total: number } | Topic[]>(
+      'topic.getTopics',
+      params,
+    ).then((res) => (Array.isArray(res) ? res : res?.items ?? []));
+  },
   /** Returns topic ID string, not full Topic object. */
-  create: (sessionId: string, title: string) =>
-    trpcMutate<string>('topic.createTopic', { sessionId, title }),
+  create: (containerId: string, title: string, options?: { sessionType?: 'agent' | 'group' }) => {
+    const params =
+      options?.sessionType === 'group'
+        ? { groupId: containerId, title }
+        : { sessionId: containerId, title };
+    return trpcMutate<string>('topic.createTopic', params);
+  },
   remove: (id: string) => trpcMutate('topic.removeTopic', { id }),
   /** Server has no `favoriteTopic` — use `updateTopic` with favorite flag */
   favorite: (id: string, favorite = true) =>
     trpcMutate('topic.updateTopic', { id, value: { favorite } }),
+  generateTitle: (id: string) =>
+    trpcMutate<string | null>('topic.generateTopicTitle', { id }),
   update: (id: string, title: string) =>
     trpcMutate('topic.updateTopic', { id, value: { title } }),
   search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),
 };
 
-// ── Session Group API ──────────────────────────────────────────────
-export const sessionGroupApi = {
-  /** Server procedure is `getSessionGroup` (singular), not `getSessionGroups` */
-  list: () => trpcQuery<SessionGroup[]>('sessionGroup.getSessionGroup'),
-  /** Returns group ID string, not `{id: string}` */
-  create: (name: string) =>
-    trpcMutate<string | undefined>('sessionGroup.createSessionGroup', { name }),
-  remove: (id: string) =>
-    trpcMutate('sessionGroup.removeSessionGroup', { id }),
-  removeAll: () =>
-    trpcMutate('sessionGroup.removeAllSessionGroups'),
-  rename: (id: string, name: string) =>
-    trpcMutate('sessionGroup.updateSessionGroup', { id, value: { name } }),
+// ── Session Tag API ────────────────────────────────────────────────
+export const sessionTagApi = {
+  list: () => trpcQuery<SessionTag[]>('sessionTag.getSessionTags'),
+  create: (name: string, color?: string | null) =>
+    trpcMutate<string | undefined>('sessionTag.createSessionTag', { color, name }),
+  remove: (id: string) => trpcMutate('sessionTag.removeSessionTag', { id }),
+  removeAll: () => trpcMutate('sessionTag.removeAllSessionTags'),
+  update: (id: string, value: { color?: string | null; name?: string }) =>
+    trpcMutate('sessionTag.updateSessionTag', { id, value }),
   updateOrder: (sortMap: { id: string; sort: number }[]) =>
-    trpcMutate('sessionGroup.updateSessionGroupOrder', { sortMap }),
+    trpcMutate('sessionTag.updateSessionTagOrder', { sortMap }),
 };
 
 // ── Market / Community API ──────────────────────────────────────────
@@ -1266,6 +1569,7 @@ export const fileApi = {
       agentId?: string;
       directory?: string;
       knowledgeBaseId?: string;
+      onProgress?: (progress: number) => void;
       sessionId?: string;
       skipCheckFileType?: boolean;
       skipDeduplication?: boolean;
@@ -1286,7 +1590,8 @@ export const fileApi = {
     let storagePath = hashCheck.metadata?.path || hashCheck.url;
 
     if (!hashCheck.isExist || !storagePath) {
-      await uploadFileToSameOrigin(baseUrl, uploadUri, name, metadata.path, fileType);
+      options?.onProgress?.(5);
+      await uploadFileToSameOrigin(baseUrl, uploadUri, name, metadata.path, fileType, options?.onProgress);
       storagePath = metadata.path;
     }
 
@@ -1309,7 +1614,51 @@ export const fileApi = {
         ? `${baseUrl}/f/${created.id}`
         : created.url;
 
+    options?.onProgress?.(100);
+
     return { id: created.id, url: resolvedUrl };
+  },
+
+  download: async (
+    file: {
+      id: string;
+      name: string;
+      url?: string;
+    },
+    options?: {
+      onProgress?: (progress: number) => void;
+    },
+  ): Promise<{ localUri: string; remoteUrl: string }> => {
+    const baseUrl = await getBaseUrl();
+    await ensureDirectoryAsync(MOBILE_DOWNLOAD_DIR);
+
+    const remoteUrl = resolveRemoteFileUrl(baseUrl, file.id, file.url);
+    const localUri = `${MOBILE_DOWNLOAD_DIR}${Date.now()}-${sanitizeFilename(file.name || file.id)}`;
+    const headers = await getAuthHeaders(baseUrl);
+
+    const downloadTask = FileSystem.createDownloadResumable(
+      remoteUrl,
+      localUri,
+      { headers },
+      (progressData) => {
+        const { totalBytesExpectedToWrite, totalBytesWritten } = progressData;
+        if (!options?.onProgress || totalBytesExpectedToWrite <= 0) return;
+        options.onProgress(Math.round((totalBytesWritten / totalBytesExpectedToWrite) * 100));
+      },
+    );
+
+    const result = await downloadTask.downloadAsync();
+
+    if (!result || result.status < 200 || result.status >= 300) {
+      throw new Error(`download failed: ${result?.status ?? 'unknown'}`);
+    }
+
+    options?.onProgress?.(100);
+
+    return {
+      localUri: result.uri,
+      remoteUrl,
+    };
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),
@@ -1328,7 +1677,7 @@ export const configApi = {
 
 export const userApi = {
   getState: () => trpcQuery<MobileUserState>('user.getUserState'),
-  getUser: () => trpcQuery<UserProfile>('user.getUserState'),
+  getUser: () => trpcQuery<MobileUserState>('user.getUserState'),
   /**
    * Server has NO single `updateUser` procedure.
    * Must call separate procedures per field:
@@ -1480,7 +1829,7 @@ export const mcpApi = {
 
 // ── Market Skills API ───────────────────────────────────────────────
 export interface MarketListItem {
-  _source: 'skill' | 'mcp' | 'legacy';
+  _source: 'builtin' | 'skill' | 'mcp' | 'legacy';
   author?: string;
   avatar?: string;
   description?: string;
@@ -1499,11 +1848,12 @@ export const marketSkillApi = {
   }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
     const input = {
       category: params?.category,
+      connectionType: 'http' as const, // Mobile only supports HTTP/streamable MCPs (matches web non-desktop)
       locale: 'en-US',
       page: params?.page ?? 1,
       pageSize: params?.pageSize ?? 50,
       q: params?.q,
-      sort: 'recommended',
+      sort: 'recommended' as const,
     };
 
     try {
@@ -1522,7 +1872,10 @@ export const marketSkillApi = {
           totalCount: mcpResult.totalCount || mcpResult.items.length,
         };
       }
-    } catch { /* MCP API unavailable */ }
+    } catch (error) {
+      console.error('[marketSkillApi.getMcpList] failed:', error);
+      throw error;
+    }
 
     return { items: [], totalCount: 0 };
   },
@@ -1539,7 +1892,7 @@ export const marketSkillApi = {
       page: params?.page ?? 1,
       pageSize: params?.pageSize ?? 50,
       q: params?.q,
-      sort: 'recommended',
+      sort: 'installCount',
     };
 
     try {
@@ -1554,7 +1907,10 @@ export const marketSkillApi = {
           totalCount: result.totalCount || result.items.length,
         };
       }
-    } catch { /* skill API unavailable */ }
+    } catch (error) {
+      console.error('[marketSkillApi.getSkillList] failed:', error);
+      throw error;
+    }
 
     return { items: [], totalCount: 0 };
   },
@@ -1654,6 +2010,9 @@ export const marketSkillApi = {
       settings: {},
     });
   },
+
+  getMcpDetail: (identifier: string) =>
+    trpcQuery<any>('market.getMcpDetail', { identifier }),
 
   getDetail: (identifier: string) =>
     trpcQuery<any>('market.skill.getSkillDetail', { identifier }),
@@ -1759,14 +2118,19 @@ export interface RequestMemoryExtractionParams {
   toDate?: Date | string;
 }
 
+export interface MemoryCreateIdentityResult {
+  identityId: string;
+  userMemoryId: string;
+}
+
 export const memoryApi = {
   // ── Persona & Tags ──
   /** Get user persona (summary + content) */
   getPersona: () => trpcQuery<MemoryPersona>('userMemory.getPersona'),
 
   /** Get identity roles / tags for the tag cloud */
-  queryIdentityRoles: (params?: { page?: number; pageSize?: number }) =>
-    trpcQuery<{ items: Array<{ count: number; role: string }>; total: number }>(
+  queryIdentityRoles: (params?: { page?: number; size?: number }) =>
+    trpcQuery<{ roles: Array<{ count: number; role: string }>; tags: Array<{ count: number; tag: string }> }>(
       'userMemories.queryIdentityRoles',
       params,
     ),
@@ -1820,11 +2184,11 @@ export const memoryApi = {
 
   // ── Memory Detail ──
   getMemoryDetail: (id: string, layer: string) =>
-    trpcQuery<Record<string, any>>('userMemories.getMemoryDetail', { id, layer }),
+    trpcQuery<MemoryDetail | null>('userMemories.getMemoryDetail', { id, layer }),
 
   // ── Create Identity ──
-  createIdentity: (data: { title: string; summary?: string; role?: string }) =>
-    trpcMutate<MemoryIdentityItem>('userMemory.createIdentity', data),
+  createIdentity: (data: { summary?: string; title: string }) =>
+    trpcMutate<MemoryCreateIdentityResult>('userMemory.createIdentity', data),
 
   // ── Memory Extraction ──
   requestMemoryFromChatTopic: (params?: RequestMemoryExtractionParams) =>

@@ -184,6 +184,22 @@ Run migrations manually when needed:
 pnpm db:migrate
 ```
 
+### `column sessions.tag_id does not exist`
+
+If you see `Error: column sessions.tag_id does not exist` (e.g. from `session.getGroupedSessions`), the database schema is outdated. Run:
+
+```bash
+DATABASE_URL=your-database-url pnpm db:migrate
+```
+
+Or, if you are using Bun:
+
+```bash
+DATABASE_URL=your-database-url bun run db:migrate
+```
+
+Restart the service after migration completes.
+
 ### Clean Install
 
 If you encounter dependency issues, remove all `node_modules` and reinstall:

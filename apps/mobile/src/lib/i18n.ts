@@ -30,8 +30,13 @@ type TranslationKeys = {
   // Chat List
   chatListTitle: string;
   chatListSearch: string;
+  chatListAll: string;
+  chatListAgents: string;
   chatListEmpty: string;
   chatListEmptyDesc: string;
+  chatListCreateAgent: string;
+  chatListCreateGroup: string;
+  chatListCreateTag: string;
   chatListNewConversation: string;
   chatSearchNoResults: string;
   chatSearchResults: string;
@@ -137,6 +142,8 @@ type TranslationKeys = {
   chatSettingsSystemPrompt: string;
   chatSettingsCustomInstructions: string;
   chatSettingsSystemPromptPlaceholder: string;
+  chatSettingsGroup: string;
+  chatSettingsTag: string;
   chatSettingsDangerZone: string;
   chatSettingsClearHistory: string;
   chatSettingsDeleteConversation: string;
@@ -144,6 +151,17 @@ type TranslationKeys = {
   chatSettingsDeleteDesc: string;
   chatSettingsClearConfirm: string;
   chatSettingsClearDesc: string;
+  groupSettingsAllowDM: string;
+  groupSettingsAllowDMDesc: string;
+  groupSettingsRevealDM: string;
+  groupSettingsRevealDMDesc: string;
+  groupSettingsMembers: string;
+  groupSettingsMembersEmpty: string;
+  groupSettingsSupervisor: string;
+  groupSettingsRemoveMemberConfirm: string;
+  groupSettingsRemoveMemberDesc: string;
+  groupAddMembers: string;
+  groupCreateDefaultTitle: string;
 
   // Notebook
   notebookTitle: string;
@@ -172,6 +190,56 @@ type TranslationKeys = {
   settingsAiProvidersDesc: string;
   settingsDefaultModel: string;
   settingsDefaultAgent: string;
+  agentCurrent: string;
+  agentsEmpty: string;
+  agentsEmptyDesc: string;
+  agentConfigAvatar: string;
+  agentConfigBasic: string;
+  agentConfigChats: string;
+  agentConfigInstruction: string;
+  agentConfigModel: string;
+  agentConfigName: string;
+  agentConfigProvider: string;
+  agentConfigMeta: string;
+  agentConfigTitle: string;
+  agentConfigOpening: string;
+  agentConfigModal: string;
+  agentConfigDescription: string;
+  agentConfigTags: string;
+  agentConfigBackgroundColor: string;
+  agentConfigOpeningMessage: string;
+  agentConfigOpeningQuestions: string;
+  agentConfigOpeningQuestionsPlaceholder: string;
+  agentConfigAutoCreateTopic: string;
+  agentConfigAutoCreateTopicThreshold: string;
+  agentConfigEnableHistory: string;
+  agentConfigHistoryCount: string;
+  agentConfigCompressHistory: string;
+  agentConfigAutoScroll: string;
+  agentConfigTemperature: string;
+  agentConfigTopP: string;
+  agentConfigPresencePenalty: string;
+  agentConfigFrequencyPenalty: string;
+  agentConfigMaxTokens: string;
+  agentConfigStreaming: string;
+  agentConfigSaved: string;
+  agentConfigLegacyTitle: string;
+  agentConfigSessionOnlyTitle: string;
+  agentConfigSessionOnlyDesc: string;
+  agentConfigOpenStore: string;
+  agentConfigSkills: string;
+  agentConfigSkillsIds: string;
+  agentConfigAdvanced: string;
+  agentConfigNamePlaceholder: string;
+  agentConfigDescriptionPlaceholder: string;
+  agentConfigAvatarPlaceholder: string;
+  agentConfigSearchMode: string;
+  agentConfigSearchOff: string;
+  agentConfigSearchAuto: string;
+  agentConfigSkillsEmpty: string;
+  agentConfigSkillsCount: string;
+  agentFirstHint: string;
+  agentFirstHintDesc: string;
   settingsGeneral: string;
   settingsLanguage: string;
   settingsTheme: string;
@@ -219,6 +287,7 @@ type TranslationKeys = {
   homeQuickCode: string;
   homeQuickAnalyze: string;
   homeQuickCreate: string;
+  homeAgentAll: string;
   homeRecents: string;
   homeSeeAll: string;
   homeAssistants: string;
@@ -280,6 +349,14 @@ type TranslationKeys = {
   groupPinned: string;
   groupDefault: string;
   groupManage: string;
+  tagCreate: string;
+  tagEdit: string;
+  tagPlaceholder: string;
+  tagColor: string;
+  tagMoveSession: string;
+  tagNone: string;
+  tagDeleteConfirm: string;
+  tagDeleteDesc: string;
 
   // Discover (extended)
   discoverUseAgent: string;
@@ -351,6 +428,19 @@ type TranslationKeys = {
   dataManageResetConfirm: string;
   dataManageResetDesc: string;
   dataManageComingSoon: string;
+  logsCapture: string;
+  logsCaptureDesc: string;
+  logsView: string;
+  logsViewDesc: string;
+  logsTitle: string;
+  logsCopy: string;
+  logsClear: string;
+  logsEmpty: string;
+  logsCopied: string;
+  logsEnabled: string;
+  logsDisabled: string;
+  logsCrashHint: string;
+  chatListLoadFailed: string;
 
   // Toast messages
   toastSessionCreated: string;
@@ -488,6 +578,7 @@ type TranslationKeys = {
   chatClearTitle: string;
   chatClearMessage: string;
   chatClearConfirm: string;
+  chatScrollToTop: string;
   chatSearchOn: string;
   chatSearchOff: string;
   toastCleared: string;
@@ -540,7 +631,11 @@ type TranslationKeys = {
   resourceDeleteConfirm: string;
   resourceDeleteDesc: string;
   resourceUploadFailed: string;
+  resourceDownload: string;
+  resourceDownloaded: string;
+  resourceDownloadFailed: string;
   resourceOpenExternal: string;
+  resourcePreviewUnavailable: string;
   resourceDeleteFailed: string;
   resourceBytes: string;
   resourceKB: string;
@@ -558,6 +653,27 @@ type TranslationKeys = {
   storeInstall: string;
   storeManage: string;
   storeFeatured: string;
+  storeCustom: string;
+  storeBuiltIn: string;
+  storeFromStore: string;
+  storeImported: string;
+  storeRemove: string;
+  storeRemoveConfirm: string;
+  storeRemoveDesc: string;
+  storeRemoved: string;
+  storeRemoveFailed: string;
+  storeAddTitle: string;
+  storeImportUrl: string;
+  storeImportGithub: string;
+  storeUploadZip: string;
+  storeImportUrlPlaceholder: string;
+  storeImportGithubPlaceholder: string;
+  storeImportSuccess: string;
+  storeImportFailed: string;
+  storeInstallSuccess: string;
+  storeInstallFailed: string;
+  storeAddCustomMcp: string;
+  storeCustomMcpSaved: string;
 
   // Skills
   skillsTitle: string;
@@ -809,8 +925,13 @@ const en: TranslationKeys = {
 
   chatListTitle: 'Avato',
   chatListSearch: 'Search conversations...',
+  chatListAll: 'All',
+  chatListAgents: 'Agents',
   chatListEmpty: 'Start a conversation',
   chatListEmptyDesc: 'Tap the + button above to create your first chat with Avato AI.',
+  chatListCreateAgent: 'New Agent',
+  chatListCreateGroup: 'New Group Chat',
+  chatListCreateTag: 'New Tag',
   chatListNewConversation: 'New Conversation',
   chatSearchNoResults: 'No matching conversations',
   chatSearchResults: 'Search Results',
@@ -913,6 +1034,8 @@ const en: TranslationKeys = {
   chatSettingsSystemPrompt: 'System Prompt',
   chatSettingsCustomInstructions: 'Custom Instructions',
   chatSettingsSystemPromptPlaceholder: 'Enter a custom system prompt to define the assistant\'s behavior...',
+  chatSettingsGroup: 'Group',
+  chatSettingsTag: 'Tag',
   chatSettingsDangerZone: 'Danger Zone',
   chatSettingsClearHistory: 'Clear Chat History',
   chatSettingsDeleteConversation: 'Delete Conversation',
@@ -920,6 +1043,18 @@ const en: TranslationKeys = {
   chatSettingsDeleteDesc: 'Are you sure you want to delete this conversation? This action cannot be undone.',
   chatSettingsClearConfirm: 'Clear History',
   chatSettingsClearDesc: 'This will clear all messages in this conversation.',
+  groupSettingsAllowDM: 'Allow Direct Messages',
+  groupSettingsAllowDMDesc: 'Let group members send private replies when needed.',
+  groupSettingsRevealDM: 'Show Private Messages',
+  groupSettingsRevealDMDesc: 'Make private replies from other members visible in the chat.',
+  groupSettingsMembers: 'Members',
+  groupSettingsMembersEmpty: 'No members yet.',
+  groupSettingsSupervisor: 'Host',
+  groupSettingsRemoveMemberConfirm: 'Remove Member',
+  groupSettingsRemoveMemberDesc:
+    'This member will be removed from the group. Virtual members may also be deleted permanently.',
+  groupAddMembers: 'Add Members',
+  groupCreateDefaultTitle: 'New Group Chat',
 
   notebookTitle: 'Notebook',
   notebookDesc: 'Your personal notes and documents',
@@ -946,6 +1081,57 @@ const en: TranslationKeys = {
   settingsAiProvidersDesc: 'Manage API keys & provider settings',
   settingsDefaultModel: 'Default Model',
   settingsDefaultAgent: 'Default Agent',
+  agentConfigTitle: 'Agent Settings',
+  agentConfigLegacyTitle: 'Legacy Agent',
+  agentConfigAvatar: 'Avatar',
+  agentConfigBasic: 'Basic',
+  agentConfigChats: 'Conversation',
+  agentConfigInstruction: 'Instruction',
+  agentConfigModel: 'Model',
+  agentConfigName: 'Name',
+  agentConfigProvider: 'Provider',
+  agentConfigMeta: 'Assistant Info',
+  agentConfigOpening: 'Opening',
+  agentConfigModal: 'Model',
+  agentConfigDescription: 'Description',
+  agentConfigTags: 'Tags',
+  agentConfigBackgroundColor: 'Background Color',
+  agentConfigOpeningMessage: 'Opening Message',
+  agentConfigOpeningQuestions: 'Opening Questions',
+  agentConfigOpeningQuestionsPlaceholder: 'One question per line',
+  agentConfigAutoCreateTopic: 'Auto create topic',
+  agentConfigAutoCreateTopicThreshold: 'Auto topic threshold',
+  agentConfigEnableHistory: 'Use history context',
+  agentConfigHistoryCount: 'History count',
+  agentConfigCompressHistory: 'Compress history',
+  agentConfigAutoScroll: 'Auto scroll while streaming',
+  agentConfigTemperature: 'Temperature',
+  agentConfigTopP: 'Top P',
+  agentConfigPresencePenalty: 'Presence penalty',
+  agentConfigFrequencyPenalty: 'Frequency penalty',
+  agentConfigMaxTokens: 'Max tokens',
+  agentConfigStreaming: 'Enable streaming',
+  agentConfigSaved: 'Agent settings saved',
+  agentConfigSessionOnlyTitle: 'Session-based agent settings',
+  agentConfigSessionOnlyDesc:
+    'Agent configuration now lives inside each conversation, matching the web version. Pick an agent from the store, then edit it from chat settings.',
+  agentConfigOpenStore: 'Open Agent Store',
+  agentConfigSkills: 'Skills',
+  agentConfigSkillsIds: 'Skill IDs (comma-separated)',
+  agentConfigAdvanced: 'Advanced',
+  agentConfigNamePlaceholder: 'Name your assistant',
+  agentConfigDescriptionPlaceholder: 'Add a short description',
+  agentConfigAvatarPlaceholder: 'Emoji or image URL',
+  agentConfigSearchMode: 'Web Search',
+  agentConfigSearchOff: 'Off',
+  agentConfigSearchAuto: 'Auto',
+  agentConfigSkillsEmpty: 'No skills selected',
+  agentConfigSkillsCount: '{count} skills selected',
+  agentCurrent: 'Current',
+  agentsEmpty: 'No agents yet',
+  agentsEmptyDesc: 'Create an agent to get started.',
+  agentFirstHint: 'Create an agent first',
+  agentFirstHintDesc: 'Choose or create an agent to personalize your conversations.',
   settingsGeneral: 'General',
   settingsLanguage: 'Language',
   settingsTheme: 'Theme',
@@ -984,10 +1170,11 @@ const en: TranslationKeys = {
   themeDesc: 'The app uses the Light theme for the best visual experience.',
 
   homeHeroPlaceholder: 'What do you want to do?',
-  homeQuickWrite: 'Write',
-  homeQuickCode: 'Create Agent',
-  homeQuickAnalyze: 'Create Group',
-  homeQuickCreate: 'Create Art',
+  homeQuickWrite: 'New Chat',
+  homeQuickCode: 'Agents',
+  homeQuickAnalyze: 'Groups',
+  homeQuickCreate: 'Art',
+  homeAgentAll: 'All',
   homeRecents: 'Recent',
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
@@ -1044,6 +1231,14 @@ const en: TranslationKeys = {
   groupPinned: 'Pinned',
   groupDefault: 'Default',
   groupManage: 'Manage Groups',
+  tagCreate: 'Create Tag',
+  tagEdit: 'Edit Tag',
+  tagPlaceholder: 'Enter tag name...',
+  tagColor: 'Color',
+  tagMoveSession: 'Move to Tag',
+  tagNone: 'No Tag',
+  tagDeleteConfirm: 'Delete Tag',
+  tagDeleteDesc: 'Delete this tag? Conversations using it will become untagged.',
 
   discoverUseAgent: 'Use Agent',
   discoverAgentDetail: 'Agent Detail',
@@ -1110,6 +1305,19 @@ const en: TranslationKeys = {
   dataManageResetConfirm: 'Reset everything?',
   dataManageResetDesc: 'This will clear all local data including server config, sessions, and preferences.',
   dataManageComingSoon: 'Coming Soon',
+  logsCapture: 'Capture App Logs',
+  logsCaptureDesc: 'When enabled, the app records console errors, crashes, and rejected promises.',
+  logsView: 'View Logs',
+  logsViewDesc: 'Review recent app errors and copy them for debugging.',
+  logsTitle: 'App Logs',
+  logsCopy: 'Copy',
+  logsClear: 'Clear',
+  logsEmpty: 'No logs captured yet.',
+  logsCopied: 'Logs copied',
+  logsEnabled: 'App logging enabled',
+  logsDisabled: 'App logging disabled',
+  logsCrashHint: 'Open App Logs after restarting to inspect the captured error.',
+  chatListLoadFailed: 'The conversation list could not be loaded. Try again after the server finishes syncing.',
 
   toastSessionCreated: 'Conversation created',
   toastSessionDeleted: 'Conversation deleted',
@@ -1240,6 +1448,7 @@ const en: TranslationKeys = {
   chatClearTitle: 'Clear Messages',
   chatClearMessage: 'This will clear all messages in this conversation. This action cannot be undone.',
   chatClearConfirm: 'Clear',
+  chatScrollToTop: 'Scroll to top',
   chatSearchOn: 'Web search enabled',
   chatSearchOff: 'Web search disabled',
   toastCleared: 'Messages cleared',
@@ -1291,7 +1500,11 @@ const en: TranslationKeys = {
   resourceDeleteConfirm: 'Delete File',
   resourceDeleteDesc: 'This file will be permanently deleted.',
   resourceUploadFailed: 'Upload failed',
+  resourceDownload: 'Download',
+  resourceDownloaded: 'Saved to local files',
+  resourceDownloadFailed: 'Download failed',
   resourceOpenExternal: 'Open in Browser',
+  resourcePreviewUnavailable: 'Unable to load preview',
   resourceDeleteFailed: 'Delete failed',
   resourceBytes: 'B',
   resourceKB: 'KB',
@@ -1299,15 +1512,36 @@ const en: TranslationKeys = {
   resourceGB: 'GB',
 
   tabStore: 'Store',
-  storeSearch: 'Search tools & skills...',
+  storeSearch: 'Search extensions...',
   storeExplore: 'Explore',
   storeMcp: 'MCP',
   storeSkills: 'Skills',
   storeInstalled: 'Installed',
-  storeEmpty: 'No items found',
+  storeEmpty: 'No extensions found',
   storeInstall: 'Install',
   storeManage: 'Manage',
   storeFeatured: 'Featured',
+  storeCustom: 'Custom',
+  storeBuiltIn: 'Built-in',
+  storeFromStore: 'Store',
+  storeImported: 'Imported',
+  storeRemove: 'Remove',
+  storeRemoveConfirm: 'Remove extension',
+  storeRemoveDesc: 'Remove this extension?',
+  storeRemoved: 'Extension removed',
+  storeRemoveFailed: 'Failed to remove extension',
+  storeAddTitle: 'Add Extension',
+  storeImportUrl: 'Import from URL',
+  storeImportGithub: 'Import from GitHub',
+  storeUploadZip: 'Upload ZIP',
+  storeImportUrlPlaceholder: 'https://example.com/extension.zip',
+  storeImportGithubPlaceholder: 'https://github.com/user/repo',
+  storeImportSuccess: 'Extension added',
+  storeImportFailed: 'Failed to add extension',
+  storeInstallSuccess: 'Extension installed',
+  storeInstallFailed: 'Failed to install extension',
+  storeAddCustomMcp: 'Add Custom MCP',
+  storeCustomMcpSaved: 'Custom MCP added',
 
   skillsTitle: 'Skills',
   skillsDesc: 'Manage installed skills and plugins',
@@ -1557,8 +1791,13 @@ const zh_tw: TranslationKeys = {
 
   chatListTitle: 'Avato',
   chatListSearch: '搜尋對話...',
+  chatListAll: '全部',
+  chatListAgents: '助手',
   chatListEmpty: '開始一段對話',
   chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 對話。',
+  chatListCreateAgent: '新建助手',
+  chatListCreateGroup: '新建群組對話',
+  chatListCreateTag: '新建標籤',
   chatListNewConversation: '新對話',
   chatSearchNoResults: '沒有符合的對話',
   chatSearchResults: '搜尋結果',
@@ -1659,12 +1898,25 @@ const zh_tw: TranslationKeys = {
   chatSettingsSystemPrompt: '系統提示詞',
   chatSettingsCustomInstructions: '自訂指令',
   chatSettingsSystemPromptPlaceholder: '輸入自訂系統提示詞來定義助手的行為...',
+  chatSettingsGroup: '群組',
+  chatSettingsTag: '標籤',
   chatSettingsDangerZone: '危險區域',
   chatSettingsClearHistory: '清空聊天記錄',
   chatSettingsDeleteConversation: '刪除對話',
   chatSettingsDeleteConfirm: '刪除對話',
   chatSettingsDeleteDesc: '確定要刪除這個對話嗎？此操作無法復原。',
   chatSettingsClearConfirm: '清空記錄',
+  groupSettingsAllowDM: '允許私訊',
+  groupSettingsAllowDMDesc: '允許群組成員在需要時發送私密回覆。',
+  groupSettingsRevealDM: '顯示私訊內容',
+  groupSettingsRevealDMDesc: '讓其他成員的私密回覆也顯示在當前對話中。',
+  groupSettingsMembers: '成員',
+  groupSettingsMembersEmpty: '暫無成員。',
+  groupSettingsSupervisor: '主持人',
+  groupSettingsRemoveMemberConfirm: '移除成員',
+  groupSettingsRemoveMemberDesc: '此成員將從群組中移除，虛擬成員也可能被永久刪除。',
+  groupAddMembers: '新增成員',
+  groupCreateDefaultTitle: '新群組聊天',
 
   notebookTitle: '筆記本',
   notebookDesc: '你的個人筆記和文檔',
@@ -1692,6 +1944,57 @@ const zh_tw: TranslationKeys = {
   settingsAiProvidersDesc: '管理 API 金鑰和服務商設定',
   settingsDefaultModel: '預設模型',
   settingsDefaultAgent: '預設助手',
+  agentConfigTitle: '助手設定',
+  agentConfigLegacyTitle: '舊版助手',
+  agentConfigAvatar: '頭像',
+  agentConfigBasic: '基本',
+  agentConfigChats: '對話偏好',
+  agentConfigInstruction: '指令',
+  agentConfigModel: '模型',
+  agentConfigName: '名稱',
+  agentConfigProvider: '供應商',
+  agentConfigMeta: '助手資訊',
+  agentConfigOpening: '開場',
+  agentConfigModal: '模型',
+  agentConfigDescription: '描述',
+  agentConfigTags: '標籤',
+  agentConfigBackgroundColor: '背景色',
+  agentConfigOpeningMessage: '開場訊息',
+  agentConfigOpeningQuestions: '開場問題',
+  agentConfigOpeningQuestionsPlaceholder: '每行一個問題',
+  agentConfigAutoCreateTopic: '自動建立話題',
+  agentConfigAutoCreateTopicThreshold: '自動建話題門檻',
+  agentConfigEnableHistory: '使用歷史上下文',
+  agentConfigHistoryCount: '歷史數量',
+  agentConfigCompressHistory: '壓縮歷史',
+  agentConfigAutoScroll: '串流時自動捲動',
+  agentConfigTemperature: 'Temperature',
+  agentConfigTopP: 'Top P',
+  agentConfigPresencePenalty: 'Presence penalty',
+  agentConfigFrequencyPenalty: 'Frequency penalty',
+  agentConfigMaxTokens: '最大 Token',
+  agentConfigStreaming: '啟用串流',
+  agentConfigSaved: '助手設定已儲存',
+  agentConfigSessionOnlyTitle: '僅支援會話內助手設定',
+  agentConfigSessionOnlyDesc:
+    '助手設定現在和 Web 版一樣綁定在每段對話裡。先從商店選擇助手，再到聊天設定中編輯。',
+  agentConfigOpenStore: '打開助手商店',
+  agentConfigSkills: '技能',
+  agentConfigSkillsIds: '技能 ID（逗號分隔）',
+  agentConfigAdvanced: '進階設定',
+  agentConfigNamePlaceholder: '為你的助手命名',
+  agentConfigDescriptionPlaceholder: '新增簡短描述',
+  agentConfigAvatarPlaceholder: 'Emoji 或圖片 URL',
+  agentConfigSearchMode: '網頁搜尋',
+  agentConfigSearchOff: '關閉',
+  agentConfigSearchAuto: '自動',
+  agentConfigSkillsEmpty: '尚未選擇技能',
+  agentConfigSkillsCount: '已選擇 {count} 個技能',
+  agentCurrent: '當前',
+  agentsEmpty: '暫無助手',
+  agentsEmptyDesc: '建立助手以開始使用。',
+  agentFirstHint: '先建立助手',
+  agentFirstHintDesc: '建立或選擇助手以開始個性化對話。',
   settingsGeneral: '一般',
   settingsLanguage: '語言',
   settingsTheme: '主題',
@@ -1730,10 +2033,11 @@ const zh_tw: TranslationKeys = {
   themeDesc: '應用程式使用淺色主題以提供最佳視覺體驗。',
 
   homeHeroPlaceholder: '你想做什麼？',
-  homeQuickWrite: '寫作',
-  homeQuickCode: '創建助理',
-  homeQuickAnalyze: '創建群組',
+  homeQuickWrite: '新對話',
+  homeQuickCode: '助手',
+  homeQuickAnalyze: '群組',
   homeQuickCreate: '作圖',
+  homeAgentAll: '全部',
   homeRecents: '最近',
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
@@ -1790,6 +2094,14 @@ const zh_tw: TranslationKeys = {
   groupPinned: '已釘選',
   groupDefault: '預設',
   groupManage: '管理群組',
+  tagCreate: '建立標籤',
+  tagEdit: '編輯標籤',
+  tagPlaceholder: '輸入標籤名稱...',
+  tagColor: '顏色',
+  tagMoveSession: '移動到標籤',
+  tagNone: '無標籤',
+  tagDeleteConfirm: '刪除標籤',
+  tagDeleteDesc: '刪除此標籤？使用中的對話會改成未標籤。',
 
   discoverUseAgent: '使用助手',
   discoverAgentDetail: '助手詳情',
@@ -1856,6 +2168,19 @@ const zh_tw: TranslationKeys = {
   dataManageResetConfirm: '確定重設所有內容嗎？',
   dataManageResetDesc: '這將清除所有本機資料，包括伺服器設定、工作階段和偏好設定。',
   dataManageComingSoon: '即將推出',
+  logsCapture: '記錄 App 日誌',
+  logsCaptureDesc: '開啟後會記錄 console 錯誤、崩潰與未處理的 Promise 拒絕。',
+  logsView: '查看日誌',
+  logsViewDesc: '檢視最近的 App 錯誤，並可複製給開發者。',
+  logsTitle: 'App 日誌',
+  logsCopy: '複製',
+  logsClear: '清除',
+  logsEmpty: '目前尚未捕捉到日誌。',
+  logsCopied: '日誌已複製',
+  logsEnabled: '已開啟 App 日誌',
+  logsDisabled: '已關閉 App 日誌',
+  logsCrashHint: '重新啟動後可到 App 日誌查看剛才捕捉到的錯誤。',
+  chatListLoadFailed: '無法載入對話清單，請稍後再試，或等伺服器同步完成。',
 
   toastSessionCreated: '對話已建立',
   toastSessionDeleted: '對話已刪除',
@@ -1986,6 +2311,7 @@ const zh_tw: TranslationKeys = {
   chatClearTitle: '清空訊息',
   chatClearMessage: '這將清空此對話中的所有訊息。此操作無法復原。',
   chatClearConfirm: '清空',
+  chatScrollToTop: '回到頂部',
   chatSearchOn: '網頁搜尋已開啟',
   chatSearchOff: '網頁搜尋已關閉',
   toastCleared: '訊息已清空',
@@ -2036,7 +2362,11 @@ const zh_tw: TranslationKeys = {
   resourceDeleteConfirm: '刪除檔案',
   resourceDeleteDesc: '該檔案將被永久刪除。',
   resourceUploadFailed: '上傳失敗',
+  resourceDownload: '下載',
+  resourceDownloaded: '已保存到本地檔案',
+  resourceDownloadFailed: '下載失敗',
   resourceOpenExternal: '在瀏覽器中打開',
+  resourcePreviewUnavailable: '無法載入預覽',
   resourceDeleteFailed: '刪除失敗',
   resourceBytes: 'B',
   resourceKB: 'KB',
@@ -2044,15 +2374,36 @@ const zh_tw: TranslationKeys = {
   resourceGB: 'GB',
 
   tabStore: '商店',
-  storeSearch: '搜尋工具和技能...',
+  storeSearch: '搜尋擴充項目...',
   storeExplore: '探索',
   storeMcp: 'MCP',
   storeSkills: '技能',
   storeInstalled: '已安裝',
-  storeEmpty: '未找到項目',
+  storeEmpty: '未找到擴充項目',
   storeInstall: '安裝',
   storeManage: '管理',
   storeFeatured: '精選',
+  storeCustom: '自訂',
+  storeBuiltIn: '內建',
+  storeFromStore: '商店',
+  storeImported: '已匯入',
+  storeRemove: '移除',
+  storeRemoveConfirm: '移除擴充項目',
+  storeRemoveDesc: '要移除此擴充項目嗎？',
+  storeRemoved: '已移除擴充項目',
+  storeRemoveFailed: '移除擴充項目失敗',
+  storeAddTitle: '新增擴充項目',
+  storeImportUrl: '從 URL 匯入',
+  storeImportGithub: '從 GitHub 匯入',
+  storeUploadZip: '上傳 ZIP',
+  storeImportUrlPlaceholder: 'https://example.com/extension.zip',
+  storeImportGithubPlaceholder: 'https://github.com/user/repo',
+  storeImportSuccess: '已新增擴充項目',
+  storeImportFailed: '新增擴充項目失敗',
+  storeInstallSuccess: '擴充項目已安裝',
+  storeInstallFailed: '安裝擴充項目失敗',
+  storeAddCustomMcp: '新增自訂 MCP',
+  storeCustomMcpSaved: '已新增自訂 MCP',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安裝的技能和外掛程式',
@@ -2300,8 +2651,13 @@ const zh: TranslationKeys = {
 
   chatListTitle: 'Avato',
   chatListSearch: '搜索对话...',
+  chatListAll: '全部',
+  chatListAgents: '助手',
   chatListEmpty: '开始一段对话',
   chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 对话。',
+  chatListCreateAgent: '新建助手',
+  chatListCreateGroup: '新建群组对话',
+  chatListCreateTag: '新建标签',
   chatListNewConversation: '新对话',
   chatSearchNoResults: '没有匹配的对话',
   chatSearchResults: '搜索结果',
@@ -2402,6 +2758,8 @@ const zh: TranslationKeys = {
   chatSettingsSystemPrompt: '系统提示词',
   chatSettingsCustomInstructions: '自定义指令',
   chatSettingsSystemPromptPlaceholder: '输入自定义系统提示词来定义助手的行为...',
+  chatSettingsGroup: '分组',
+  chatSettingsTag: '标签',
   chatSettingsDangerZone: '危险区域',
   chatSettingsClearHistory: '清空聊天记录',
   chatSettingsDeleteConversation: '删除对话',
@@ -2409,6 +2767,17 @@ const zh: TranslationKeys = {
   chatSettingsDeleteDesc: '确定要删除这个对话吗？此操作无法撤销。',
   chatSettingsClearConfirm: '清空记录',
   chatSettingsClearDesc: '这将清空此对话中的所有消息。',
+  groupSettingsAllowDM: '允许私信',
+  groupSettingsAllowDMDesc: '允许群组成员在需要时发送私密回复。',
+  groupSettingsRevealDM: '显示私信内容',
+  groupSettingsRevealDMDesc: '让其他成员的私密回复也显示在当前对话中。',
+  groupSettingsMembers: '成员',
+  groupSettingsMembersEmpty: '暂无成员。',
+  groupSettingsSupervisor: '主持人',
+  groupSettingsRemoveMemberConfirm: '移除成员',
+  groupSettingsRemoveMemberDesc: '此成员将从群组中移除，虚拟成员也可能被永久删除。',
+  groupAddMembers: '添加成员',
+  groupCreateDefaultTitle: '新群组聊天',
 
   notebookTitle: '笔记本',
   notebookDesc: '你的个人笔记和文档',
@@ -2435,6 +2804,57 @@ const zh: TranslationKeys = {
   settingsAiProvidersDesc: '管理 API 密钥和服务商设置',
   settingsDefaultModel: '默认模型',
   settingsDefaultAgent: '默认助手',
+  agentConfigTitle: '助手设置',
+  agentConfigLegacyTitle: '旧版助手',
+  agentConfigAvatar: '头像',
+  agentConfigBasic: '基本',
+  agentConfigChats: '对话偏好',
+  agentConfigInstruction: '指令',
+  agentConfigModel: '模型',
+  agentConfigName: '名称',
+  agentConfigProvider: '供应商',
+  agentConfigMeta: '助手信息',
+  agentConfigOpening: '开场',
+  agentConfigModal: '模型',
+  agentConfigDescription: '描述',
+  agentConfigTags: '标签',
+  agentConfigBackgroundColor: '背景色',
+  agentConfigOpeningMessage: '开场消息',
+  agentConfigOpeningQuestions: '开场问题',
+  agentConfigOpeningQuestionsPlaceholder: '每行一个问题',
+  agentConfigAutoCreateTopic: '自动创建话题',
+  agentConfigAutoCreateTopicThreshold: '自动建话题阈值',
+  agentConfigEnableHistory: '使用历史上下文',
+  agentConfigHistoryCount: '历史数量',
+  agentConfigCompressHistory: '压缩历史',
+  agentConfigAutoScroll: '流式生成时自动滚动',
+  agentConfigTemperature: 'Temperature',
+  agentConfigTopP: 'Top P',
+  agentConfigPresencePenalty: 'Presence penalty',
+  agentConfigFrequencyPenalty: 'Frequency penalty',
+  agentConfigMaxTokens: '最大 Token',
+  agentConfigStreaming: '启用流式输出',
+  agentConfigSaved: '助手设置已保存',
+  agentConfigSessionOnlyTitle: '仅支持会话内助手设置',
+  agentConfigSessionOnlyDesc:
+    '助手配置现在和 Web 版一样绑定在每段对话里。先从商店选择助手，再到聊天设置中编辑。',
+  agentConfigOpenStore: '打开助手商店',
+  agentConfigSkills: '技能',
+  agentConfigSkillsIds: '技能 ID（逗号分隔）',
+  agentConfigAdvanced: '进阶设置',
+  agentConfigNamePlaceholder: '给你的助手起个名字',
+  agentConfigDescriptionPlaceholder: '添加一句简短描述',
+  agentConfigAvatarPlaceholder: 'Emoji 或图片 URL',
+  agentConfigSearchMode: '网页搜索',
+  agentConfigSearchOff: '关闭',
+  agentConfigSearchAuto: '自动',
+  agentConfigSkillsEmpty: '暂未选择技能',
+  agentConfigSkillsCount: '已选择 {count} 个技能',
+  agentCurrent: '当前',
+  agentsEmpty: '暂无助手',
+  agentsEmptyDesc: '创建助手以开始使用。',
+  agentFirstHint: '先创建助手',
+  agentFirstHintDesc: '创建或选择助手以开始个性化对话。',
   settingsGeneral: '通用',
   settingsLanguage: '语言',
   settingsTheme: '主题',
@@ -2473,10 +2893,11 @@ const zh: TranslationKeys = {
   themeDesc: '应用使用浅色主题以提供最佳视觉体验。',
 
   homeHeroPlaceholder: '你想做什么？',
-  homeQuickWrite: '写作',
-  homeQuickCode: '创建助理',
-  homeQuickAnalyze: '创建群组',
+  homeQuickWrite: '新对话',
+  homeQuickCode: '助手',
+  homeQuickAnalyze: '群组',
   homeQuickCreate: '作图',
+  homeAgentAll: '全部',
   homeRecents: '最近',
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
@@ -2533,6 +2954,14 @@ const zh: TranslationKeys = {
   groupPinned: '已置顶',
   groupDefault: '默认',
   groupManage: '管理分组',
+  tagCreate: '创建标签',
+  tagEdit: '编辑标签',
+  tagPlaceholder: '输入标签名称...',
+  tagColor: '颜色',
+  tagMoveSession: '移动到标签',
+  tagNone: '无标签',
+  tagDeleteConfirm: '删除标签',
+  tagDeleteDesc: '删除此标签？使用它的对话会变成未打标签。',
 
   discoverUseAgent: '使用助手',
   discoverAgentDetail: '助手详情',
@@ -2599,6 +3028,19 @@ const zh: TranslationKeys = {
   dataManageResetConfirm: '确定重置所有内容吗？',
   dataManageResetDesc: '这将清除所有本地数据，包括服务器配置、会话和偏好设置。',
   dataManageComingSoon: '即将推出',
+  logsCapture: '记录 App 日志',
+  logsCaptureDesc: '开启后会记录 console 错误、崩溃和未处理的 Promise 拒绝。',
+  logsView: '查看日志',
+  logsViewDesc: '查看最近的 App 错误，并可复制给开发者。',
+  logsTitle: 'App 日志',
+  logsCopy: '复制',
+  logsClear: '清除',
+  logsEmpty: '暂时还没有捕捉到日志。',
+  logsCopied: '日志已复制',
+  logsEnabled: '已开启 App 日志',
+  logsDisabled: '已关闭 App 日志',
+  logsCrashHint: '重启后可以到 App 日志查看刚才捕捉到的错误。',
+  chatListLoadFailed: '无法加载会话列表，请稍后重试，或等待服务器同步完成。',
 
   toastSessionCreated: '对话已创建',
   toastSessionDeleted: '对话已删除',
@@ -2729,6 +3171,7 @@ const zh: TranslationKeys = {
   chatClearTitle: '清空消息',
   chatClearMessage: '这将清空此对话中的所有消息。此操作无法撤销。',
   chatClearConfirm: '清空',
+  chatScrollToTop: '回到顶部',
   chatSearchOn: '网页搜索已开启',
   chatSearchOff: '网页搜索已关闭',
   toastCleared: '消息已清空',
@@ -2780,7 +3223,11 @@ const zh: TranslationKeys = {
   resourceDeleteConfirm: '删除文件',
   resourceDeleteDesc: '该文件将被永久删除。',
   resourceUploadFailed: '上传失败',
+  resourceDownload: '下载',
+  resourceDownloaded: '已保存到本地文件',
+  resourceDownloadFailed: '下载失败',
   resourceOpenExternal: '在浏览器中打开',
+  resourcePreviewUnavailable: '无法加载预览',
   resourceDeleteFailed: '删除失败',
   resourceBytes: 'B',
   resourceKB: 'KB',
@@ -2788,15 +3235,36 @@ const zh: TranslationKeys = {
   resourceGB: 'GB',
 
   tabStore: '商店',
-  storeSearch: '搜索工具和技能...',
+  storeSearch: '搜索扩展...',
   storeExplore: '探索',
   storeMcp: 'MCP',
   storeSkills: '技能',
   storeInstalled: '已安装',
-  storeEmpty: '未找到项目',
+  storeEmpty: '未找到扩展',
   storeInstall: '安装',
   storeManage: '管理',
   storeFeatured: '精选',
+  storeCustom: '自定义',
+  storeBuiltIn: '内置',
+  storeFromStore: '商店',
+  storeImported: '已导入',
+  storeRemove: '移除',
+  storeRemoveConfirm: '移除扩展',
+  storeRemoveDesc: '要移除此扩展吗？',
+  storeRemoved: '已移除扩展',
+  storeRemoveFailed: '移除扩展失败',
+  storeAddTitle: '添加扩展',
+  storeImportUrl: '从 URL 导入',
+  storeImportGithub: '从 GitHub 导入',
+  storeUploadZip: '上传 ZIP',
+  storeImportUrlPlaceholder: 'https://example.com/extension.zip',
+  storeImportGithubPlaceholder: 'https://github.com/user/repo',
+  storeImportSuccess: '已添加扩展',
+  storeImportFailed: '添加扩展失败',
+  storeInstallSuccess: '扩展已安装',
+  storeInstallFailed: '安装扩展失败',
+  storeAddCustomMcp: '添加自定义 MCP',
+  storeCustomMcpSaved: '已添加自定义 MCP',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安装的技能和插件',
@@ -3037,7 +3505,7 @@ const translations: Record<Locale, TranslationKeys> = {
 };
 
 // ── Zustand store ───────────────────────────────────────────────────
-interface I18nStore {
+export interface I18nStore {
   loadLocale: () => Promise<void>;
   locale: Locale;
   setLocale: (locale: Locale) => Promise<void>;

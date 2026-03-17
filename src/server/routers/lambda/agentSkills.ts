@@ -1,10 +1,12 @@
-import type { SkillManifest } from '@lobechat/types';
+import { builtinSkills } from '@lobechat/builtin-skills';
+import type { SkillListItem, SkillManifest } from '@lobechat/types';
 import { skillManifestSchema } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
+import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
@@ -83,6 +85,24 @@ const updateSkillSchema = z.object({
   // All metadata should be passed through manifest
   manifest: skillManifestSchema.partial().optional(),
 });
+
+const BUILTIN_SKILL_DATE = new Date(0);
+
+const toBuiltinSkillListItem = (): SkillListItem[] =>
+  filterBuiltinSkills(builtinSkills).map((skill) => ({
+    createdAt: BUILTIN_SKILL_DATE,
+    description: skill.description,
+    id: skill.identifier,
+    identifier: skill.identifier,
+    manifest: {
+      avatar: skill.avatar,
+      description: skill.description,
+      name: skill.name,
+    } as SkillManifest,
+    name: skill.name,
+    source: 'builtin',
+    updatedAt: BUILTIN_SKILL_DATE,
+  }));
 
 // ===== Router =====
 
@@ -201,6 +221,11 @@ export const agentSkillsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (input?.source) {
+        if (input.source === 'builtin') {
+          const data = toBuiltinSkillListItem();
+          return { data, total: data.length };
+        }
+
         return ctx.skillModel.listBySource(input.source);
       }
 

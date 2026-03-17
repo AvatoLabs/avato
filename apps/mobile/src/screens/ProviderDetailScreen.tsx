@@ -449,7 +449,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
           title={t.providerDetailTitle}
           onPressLeft={() => navigation.goBack()}
         />
@@ -463,7 +463,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={detail?.name || providerId}
         onPressLeft={() => navigation.goBack()}
       />

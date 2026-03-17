@@ -4,7 +4,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { FolderOpen, MessageSquare, Palette, Store } from 'lucide-react-native';
+import { FolderOpen, MessageCircle, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Image as RNImage, Platform, View } from 'react-native';
 import Animated, {
@@ -20,6 +20,7 @@ import Animated, {
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import AboutScreen from '../screens/AboutScreen';
+import AppLogsScreen from '../screens/AppLogsScreen';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentDetailScreen from '../screens/AgentDetailScreen';
 import AgentListScreen from '../screens/AgentListScreen';
@@ -45,11 +46,7 @@ import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import ProviderListScreen from '../screens/ProviderListScreen';
 import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
-import SessionGroupScreen from '../screens/SessionGroupScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import SkillDetailScreen from '../screens/SkillDetailScreen';
-import SkillMarketScreen from '../screens/SkillMarketScreen';
-import SkillSettingsScreen from '../screens/SkillSettingsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import StatsScreen from '../screens/StatsScreen';
 import TopicListScreen from '../screens/TopicListScreen';
@@ -208,7 +205,7 @@ function BottomTabs() {
         name="Chats"
         options={{
           tabBarIcon: ({ color, size }) => (
-            <MessageSquare color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            <MessageCircle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
           ),
           tabBarLabel: ({ color, focused }) => (
             <AnimatedTabLabel color={color} focused={focused} label={t.tabChats} />
@@ -333,13 +330,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
 
-      {/* Session Groups */}
-      <Stack.Screen
-        component={SessionGroupScreen}
-        name="SessionGroup"
-        options={{ animation: 'slide_from_right' }}
-      />
-
       {/* Settings */}
       <Stack.Screen
         component={SettingsScreen}
@@ -364,7 +354,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={LanguagePickerScreen}
         name="LanguagePicker"
-        options={{ animation: 'slide_from_right' }}
+        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
       />
       <Stack.Screen
         component={ProfileEditScreen}
@@ -377,18 +367,8 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
-        component={SkillSettingsScreen}
-        name="SkillSettings"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={SkillDetailScreen}
-        name="SkillDetail"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={SkillMarketScreen}
-        name="SkillMarket"
+        component={AppLogsScreen}
+        name="AppLogs"
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen

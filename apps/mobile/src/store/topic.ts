@@ -8,42 +8,65 @@ import { topicApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { Topic } from '../types';
+import { useSessionStore } from './session';
 
 interface TopicState {
-  activeTopic: string | null;
+  activeTopicBySession: Record<string, string | null>;
   createTopic: (sessionId: string, title: string) => Promise<Topic | null>;
   favoriteTopic: (id: string) => Promise<void>;
-
   fetchTopics: (sessionId: string) => Promise<void>;
-  loading: boolean;
+  loadingBySession: Record<string, boolean>;
   removeTopic: (id: string, sessionId: string) => Promise<void>;
-  switchTopic: (topicId: string | null) => void;
-  topics: Topic[];
-  updateTopic: (id: string, title: string) => Promise<void>;
+  switchTopic: (sessionId: string, topicId: string | null) => void;
+  topicsBySession: Record<string, Topic[]>;
+  updateTopic: (id: string, sessionId: string, title: string) => Promise<void>;
 }
 
 export const useTopicStore = create<TopicState>((set, get) => ({
-  topics: [],
-  activeTopic: null,
-  loading: false,
+  topicsBySession: {},
+  activeTopicBySession: {},
+  loadingBySession: {},
 
   fetchTopics: async (sessionId: string) => {
-    set({ loading: true });
+    set((s) => ({
+      loadingBySession: { ...s.loadingBySession, [sessionId]: true },
+    }));
     try {
-      const topics = await topicApi.list(sessionId);
-      set({ topics: topics ?? [], loading: false });
+      const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+      const sessionType = session?.type ?? 'agent';
+      const topics = await topicApi.list(sessionId, { sessionType });
+      set((s) => {
+        const nextTopics = topics ?? [];
+        const activeTopic = s.activeTopicBySession[sessionId] ?? null;
+        const activeStillExists = activeTopic
+          ? nextTopics.some((topic) => topic.id === activeTopic)
+          : true;
+
+        return {
+          activeTopicBySession: {
+            ...s.activeTopicBySession,
+            [sessionId]: activeStillExists ? activeTopic : null,
+          },
+          loadingBySession: { ...s.loadingBySession, [sessionId]: false },
+          topicsBySession: { ...s.topicsBySession, [sessionId]: nextTopics },
+        };
+      });
     } catch (err) {
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t[messageKey]);
-      set({ loading: false });
+      set((s) => ({
+        loadingBySession: { ...s.loadingBySession, [sessionId]: false },
+      }));
     }
   },
 
   createTopic: async (sessionId: string, title: string) => {
     try {
+      const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+      const sessionType = session?.type ?? 'agent';
       // createTopic now returns the topic ID string, not a full Topic object
-      const topicId = await topicApi.create(sessionId, title);
+      const topicId = await topicApi.create(sessionId, title, { sessionType });
       if (topicId) {
         const placeholder: Topic = {
           id: topicId,
@@ -52,7 +75,12 @@ export const useTopicStore = create<TopicState>((set, get) => ({
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        set((s) => ({ topics: [placeholder, ...s.topics] }));
+        set((s) => ({
+          topicsBySession: {
+            ...s.topicsBySession,
+            [sessionId]: [placeholder, ...(s.topicsBySession[sessionId] ?? [])],
+          },
+        }));
         return placeholder;
       }
       return null;
@@ -64,8 +92,14 @@ export const useTopicStore = create<TopicState>((set, get) => ({
 
   removeTopic: async (id: string, sessionId: string) => {
     set((s) => ({
-      topics: s.topics.filter((t) => t.id !== id),
-      activeTopic: s.activeTopic === id ? null : s.activeTopic,
+      activeTopicBySession: {
+        ...s.activeTopicBySession,
+        [sessionId]: s.activeTopicBySession[sessionId] === id ? null : (s.activeTopicBySession[sessionId] ?? null),
+      },
+      topicsBySession: {
+        ...s.topicsBySession,
+        [sessionId]: (s.topicsBySession[sessionId] ?? []).filter((t) => t.id !== id),
+      },
     }));
     try {
       await topicApi.remove(id);
@@ -75,13 +109,20 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     }
   },
 
-  switchTopic: (topicId: string | null) => {
-    set({ activeTopic: topicId });
+  switchTopic: (sessionId: string, topicId: string | null) => {
+    set((s) => ({
+      activeTopicBySession: { ...s.activeTopicBySession, [sessionId]: topicId },
+    }));
   },
 
   favoriteTopic: async (id: string) => {
     set((s) => ({
-      topics: s.topics.map((t) => (t.id === id ? { ...t, favorite: !t.favorite } : t)),
+      topicsBySession: Object.fromEntries(
+        Object.entries(s.topicsBySession).map(([sessionId, topics]) => [
+          sessionId,
+          topics.map((topic) => (topic.id === id ? { ...topic, favorite: !topic.favorite } : topic)),
+        ]),
+      ),
     }));
     try {
       await topicApi.favorite(id);
@@ -90,9 +131,14 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     }
   },
 
-  updateTopic: async (id: string, title: string) => {
+  updateTopic: async (id: string, sessionId: string, title: string) => {
     set((s) => ({
-      topics: s.topics.map((t) => (t.id === id ? { ...t, title } : t)),
+      topicsBySession: {
+        ...s.topicsBySession,
+        [sessionId]: (s.topicsBySession[sessionId] ?? []).map((topic) =>
+          topic.id === id ? { ...topic, title } : topic,
+        ),
+      },
     }));
     try {
       await topicApi.update(id, title);

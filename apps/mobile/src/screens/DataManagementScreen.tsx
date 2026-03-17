@@ -2,20 +2,30 @@
  * DataManagementScreen — Manage local data (clear cache, export, reset).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowLeft, Download, RotateCcw, Trash2 } from 'lucide-react-native';
-import React from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ArrowLeft, Bug, Database, Download, RotateCcw, Trash2 } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SettingsSection } from '../components/ui/SettingsLayout';
+import { useToast } from '../components/ui/Toast';
+import { semanticColors } from '../constants/colors';
+import { haptics } from '../lib/haptics';
 import { clearTransientAppState } from '../lib/appState';
 import { clearStoredAuthSession } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
+import { getAppLoggingEnabled, setAppLoggingEnabled } from '../lib/logger';
 import { tokens } from '../theme/tokens';
 
 export default function DataManagementScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const toast = useToast();
+  const [loggingEnabled, setLoggingEnabledState] = useState(false);
+
+  useEffect(() => {
+    setLoggingEnabledState(getAppLoggingEnabled());
+  }, []);
 
   const handleClearCache = () => {
     Alert.alert(t.dataManageClearCache, 'Clear all cached data?', [
@@ -32,6 +42,12 @@ export default function DataManagementScreen({ navigation }: any) {
 
   const handleExport = () => {
     Alert.alert(t.dataManageExport, t.dataManageComingSoon);
+  };
+
+  const handleToggleLogging = async (value: boolean) => {
+    setLoggingEnabledState(value);
+    await setAppLoggingEnabled(value);
+    toast.show('success', value ? t.logsEnabled : t.logsDisabled);
   };
 
   const handleReset = () => {
@@ -79,28 +95,25 @@ export default function DataManagementScreen({ navigation }: any) {
   ];
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-2.5">
-        <TouchableOpacity
-          activeOpacity={0.7}
-          className="w-9 h-9 items-center justify-center rounded-full active:bg-foreground/10"
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
-        </TouchableOpacity>
-        <Text className="text-[17px] font-semibold text-foreground">{t.dataManageTitle}</Text>
-        <View className="w-9" />
-      </View>
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.dataManageTitle}
+        onPressLeft={() => {
+          haptics.light();
+          navigation?.goBack?.();
+        }}
+      />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}>
-        {items.map((item, index) => (
-          <Animated.View entering={FadeInDown.delay(index * 50).duration(300)} key={item.label}>
-            <TouchableOpacity
-              activeOpacity={0.6}
-              className="flex-row items-center px-5 py-4 mx-4 mb-3 rounded-xl bg-foreground/5 active:bg-foreground/10"
-              onPress={item.onPress}
-            >
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingTop: 20, paddingBottom: 40 }}>
+        <SettingsSection delay={0} title={t.settingsDataStorage}>
+          {items.map((item, index) => (
+            <Animated.View entering={FadeInDown.delay(index * 50).duration(300)} key={item.label}>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
+                onPress={item.onPress}
+              >
               <View
                 className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${item.danger ? 'bg-red-500/10' : 'bg-foreground/5'}`}
               >
@@ -116,9 +129,51 @@ export default function DataManagementScreen({ navigation }: any) {
                   {item.subtitle}
                 </Text>
               </View>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+          <Animated.View entering={FadeInDown.delay(items.length * 50).duration(300)}>
+            <View className="mb-2 rounded-2xl bg-foreground/[0.02] px-5 py-3.5">
+              <View className="flex-row items-center">
+                <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-foreground/5">
+                  <Bug color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-[15px] font-medium tracking-tight text-foreground">
+                    {t.logsCapture}
+                  </Text>
+                  <Text className="mt-0.5 text-[12px] font-medium text-secondary/50">
+                    {t.logsCaptureDesc}
+                  </Text>
+                </View>
+                <Switch
+                  trackColor={{ false: '#d4d4d8', true: semanticColors.primary }}
+                  value={loggingEnabled}
+                  onValueChange={(value) => void handleToggleLogging(value)}
+                />
+              </View>
+            </View>
+          </Animated.View>
+          <Animated.View entering={FadeInDown.delay((items.length + 1) * 50).duration(300)}>
+            <TouchableOpacity
+              activeOpacity={0.6}
+              className="mb-2 flex-row items-center rounded-2xl bg-foreground/[0.02] px-5 py-3.5 active:bg-foreground/[0.04]"
+              onPress={() => navigation.navigate('AppLogs')}
+            >
+              <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-foreground/5">
+                <Download color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[15px] font-medium tracking-tight text-foreground">
+                  {t.logsView}
+                </Text>
+                <Text className="mt-0.5 text-[12px] font-medium text-secondary/50">
+                  {t.logsViewDesc}
+                </Text>
+              </View>
             </TouchableOpacity>
           </Animated.View>
-        ))}
+        </SettingsSection>
       </ScrollView>
     </View>
   );

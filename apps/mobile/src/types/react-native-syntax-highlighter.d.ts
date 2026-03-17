@@ -4,6 +4,8 @@ declare module 'react-native-syntax-highlighter' {
   export interface SyntaxHighlighterProps {
     children: string;
     customStyle?: any;
+    fontSize?: number;
+    highlighter?: 'prism' | 'highlightjs';
     highlightLineNumbers?: boolean;
     language: string;
     style: any;

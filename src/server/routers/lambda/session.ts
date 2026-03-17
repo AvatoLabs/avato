@@ -1,15 +1,36 @@
 import { z } from 'zod';
 
 import { ChatGroupModel } from '@/database/models/chatGroup';
+import { MessageModel } from '@/database/models/message';
 import { SessionModel } from '@/database/models/session';
 import { SessionGroupModel } from '@/database/models/sessionGroup';
 import { insertAgentSchema, insertSessionSchema } from '@/database/schemas';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { SystemAgentService } from '@/server/services/systemAgent';
 import { AgentChatConfigSchema } from '@/types/agent';
 import { LobeMetaDataSchema } from '@/types/meta';
 import { type BatchTaskResult } from '@/types/service';
 import { type ChatSessionList, type LobeGroupSession } from '@/types/session';
+
+const DEFAULT_SESSION_TITLES = ['New Conversation', '新对话'];
+
+function extractMessageText(content: string | null | undefined): string {
+  if (!content || typeof content !== 'string') return '';
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((p: { text?: string; content?: string }) => p?.text ?? p?.content ?? '')
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+    }
+  } catch {
+    // Plain text
+  }
+  return content.trim();
+}
 
 const sessionProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -124,6 +145,48 @@ export const sessionRouter = router({
       );
 
       return { sessionGroups, sessions: allSessions };
+    }),
+
+  generateSessionTitle: sessionProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const { sessionId } = input;
+      const session = await ctx.sessionModel.findByIdOrSlug(sessionId);
+      if (!session) return null;
+
+      const effectiveTitle =
+        (session as any).title ?? (session as any).agent?.title ?? '';
+      if (
+        effectiveTitle &&
+        !DEFAULT_SESSION_TITLES.includes(effectiveTitle)
+      ) {
+        return effectiveTitle;
+      }
+
+      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
+      const messages = await messageModel.queryBySessionId(sessionId);
+      const userMsg = messages.find((m) => m.role === 'user');
+      const assistantMsg = messages.find((m) => m.role === 'assistant');
+      if (!userMsg || !assistantMsg) return null;
+
+      const userPrompt = extractMessageText(userMsg.content);
+      const lastAssistantContent = extractMessageText(assistantMsg.content);
+      if (!userPrompt.trim() || !lastAssistantContent.trim()) return null;
+
+      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
+      const title = await systemAgent.generateTopicTitle({
+        lastAssistantContent,
+        userPrompt,
+      });
+      if (!title) return null;
+
+      const sess = session as { type?: string; agent?: unknown };
+      if (sess.type === 'group') {
+        await ctx.sessionModel.update(sessionId, { title });
+      } else {
+        await ctx.sessionModel.updateConfig(sessionId, { title });
+      }
+      return title;
     }),
 
   getSessions: sessionProcedure

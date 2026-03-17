@@ -54,7 +54,9 @@ const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
             {file.status === 'uploading' && (
               <View className="absolute inset-0 bg-black/40 items-center justify-center">
                 <ActivityIndicator color="#fff" size="small" />
-                <Text className="text-[9px] text-white/90 font-medium mt-1">{t.fileUploading}</Text>
+                <Text className="text-[9px] text-white/90 font-medium mt-1">
+                  {file.progress > 0 ? `${Math.round(file.progress)}%` : t.fileUploading}
+                </Text>
               </View>
             )}
             {file.status === 'error' && (

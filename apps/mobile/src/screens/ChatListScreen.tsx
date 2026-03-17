@@ -1,24 +1,25 @@
 /**
- * ChatListScreen → AI Command Surface with grouped sessions.
+ * ChatListScreen → AI Command Surface backed by server sessions.
  *
- * Shows: HeroComposer, QuickActions, Pinned, Custom Groups, Default sessions.
+ * Shows: HeroComposer, pinned sessions, and recent sessions.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  BotIcon,
-  FolderOpen,
-  ImageIcon,
+  ArrowLeft,
+  Bot,
+  Check,
+  ChevronRight,
+  MessageCircle,
   MessageSquarePlus,
   Pencil,
-  PenLineIcon,
   Pin,
   Search,
+  Tag,
   Trash2,
-  UsersIcon,
+  UsersRound,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -35,42 +36,50 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
+import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import FilePreview from '../components/ui/FilePreview';
 import { HeroComposer } from '../components/ui/HeroComposer';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PromptModal from '../components/ui/PromptModal';
-import { QuickActionRow } from '../components/ui/QuickActionRow';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SectionBlock } from '../components/ui/SectionBlock';
-import SessionGroupHeader from '../components/ui/SessionGroupHeader';
-import SwipeableRow from '../components/ui/SwipeableRow';
+import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
+import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
+import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
+import { resolveTagColor, withAlpha } from '../constants/tags';
 import {
   agentApi,
+  agentGroupApi,
   messageApi,
   type MessageSearchResult,
   pluginApi,
   sessionApi,
+  sessionTagApi,
   topicApi,
+  userApi,
 } from '../lib/api';
+import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { getStreak, recordUsage } from '../lib/streak';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
-import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
-import { useSessionGroupStore } from '../store/sessionGroup';
+import { getUserMemorySettings } from '../store/user';
 import { tokens } from '../theme/tokens';
-import type { ChatSession, InstalledPlugin, MobileMemoryEffort } from '../types';
+import type { ChatSession, InstalledPlugin, MobileMemoryEffort, SessionTag } from '../types';
 
 type RelativeTimeText = {
   relativeTimeDays: string;
@@ -88,6 +97,27 @@ interface SearchSessionResult {
   summary: string;
   topicId?: string;
 }
+
+interface ChatFilterPill {
+  color?: string | null;
+  count: number;
+  key: string;
+  label: string;
+  tagId?: string;
+}
+
+const ALL_CHATS_PILL_KEY = 'all';
+const TAG_PILL_PREFIX = 'tag:';
+
+const getTagPillKey = (tagId: string) => `${TAG_PILL_PREFIX}${tagId}`;
+
+const sortSessionTags = (tags: SessionTag[]) =>
+  [...tags].sort((left, right) => {
+    const leftSort = left.sort ?? Number.MAX_SAFE_INTEGER;
+    const rightSort = right.sort ?? Number.MAX_SAFE_INTEGER;
+    if (leftSort !== rightSort) return leftSort - rightSort;
+    return left.name.localeCompare(right.name);
+  });
 
 const trimSearchSnippet = (value: string, maxLength = 88) => {
   const normalized = value.replaceAll(/\s+/g, ' ').trim();
@@ -122,10 +152,11 @@ function SessionLogo({
   const [imgError, setImgError] = useState(false);
   const iconSize = size * 0.65;
   const iconUrl = providerLogo || (provider ? getProviderIconUrl(provider) : undefined);
+  const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
 
   useEffect(() => {
     setImgError(false);
-  }, [iconUrl]);
+  }, [iconUrl, resolvedAvatarUri]);
 
   if (iconUrl && !imgError) {
     return (
@@ -157,7 +188,7 @@ function SessionLogo({
 
   if (avatar) {
     // If it's an emoji (length <= 4 and not a URL), render as text
-    if (avatar.length <= 4 && !avatar.startsWith('http')) {
+    if (avatar.length <= 4 && !resolvedAvatarUri) {
       return (
         <View
           className="rounded-full bg-foreground/5 items-center justify-center"
@@ -168,12 +199,25 @@ function SessionLogo({
       );
     }
 
+    if (resolvedAvatarUri) {
+      return (
+        <View
+          className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
+          style={{ width: size, height: size }}
+        >
+          <Image source={{ uri: resolvedAvatarUri }} style={{ width: size, height: size }} />
+        </View>
+      );
+    }
+
     return (
       <View
-        className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
+        className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Image source={{ uri: avatar }} style={{ width: size, height: size }} />
+        <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.35 }}>
+          {avatar.slice(0, 2).toUpperCase()}
+        </Text>
       </View>
     );
   }
@@ -191,6 +235,7 @@ function SessionLogo({
 }
 
 export default function ChatListScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
 
@@ -207,10 +252,12 @@ export default function ChatListScreen({ navigation }: any) {
 
   const [streak, setStreak] = useState(0);
 
-  const { sessions, initialized } = useSessionStore(
+  const { sessions, initialized, loading, errorMessage: sessionErrorMessage } = useSessionStore(
     useShallow((s) => ({
+      errorMessage: s.errorMessage,
       sessions: s.sessions,
       initialized: s.initialized,
+      loading: s.loading,
     })),
   );
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
@@ -218,23 +265,25 @@ export default function ChatListScreen({ navigation }: any) {
   const removeSession = useSessionStore((s) => s.removeSession);
   const pinSession = useSessionStore((s) => s.pinSession);
   const unpinSession = useSessionStore((s) => s.unpinSession);
-  const moveToGroup = useSessionStore((s) => s.moveToGroup);
   const renameSession = useSessionStore((s) => s.renameSession);
-  const agents = useAgentStore((s) => s.agents);
-  const agentInitialized = useAgentStore((s) => s.initialized);
-  const loadAgents = useAgentStore((s) => s.loadAgents);
-
-  const groups = useSessionGroupStore((s) => s.groups);
-  const fetchGroups = useSessionGroupStore((s) => s.fetchGroups);
+  const updateSessionTag = useSessionStore((s) => s.updateSessionTag);
   const sendMessage = useChatStore((s) => s.sendMessage);
 
   const [heroText, setHeroText] = useState('');
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SearchSessionResult[]>([]);
+  const [sessionTags, setSessionTags] = useState<SessionTag[]>([]);
   const [searching, setSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [actionSession, setActionSession] = useState<ChatSession | null>(null);
+  const [actionPanel, setActionPanel] = useState<'root' | 'move-tag'>('root');
+  const [createMenuVisible, setCreateMenuVisible] = useState(false);
+  const [createGroupSheetVisible, setCreateGroupSheetVisible] = useState(false);
+  const [tagEditorVisible, setTagEditorVisible] = useState(false);
+  const [tagEditorTargetSessionId, setTagEditorTargetSessionId] = useState<string | null>(null);
+  const [editingTag, setEditingTag] = useState<SessionTag | null>(null);
+  const [tagDraftName, setTagDraftName] = useState('');
+  const [tagDraftColor, setTagDraftColor] = useState<string | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
@@ -242,6 +291,9 @@ export default function ChatListScreen({ navigation }: any) {
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<ChatSession | null>(null);
+  const [selectedPillKey, setSelectedPillKey] = useState<string>(ALL_CHATS_PILL_KEY);
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
@@ -283,23 +335,43 @@ export default function ChatListScreen({ navigation }: any) {
     return map;
   }, [modelProviders]);
 
-  // Load persisted expand/collapse state
-  useEffect(() => {
-    AsyncStorage.getItem('avato_expanded_groups').then((val) => {
-      if (val) {
-        try {
-          setExpandedGroups(JSON.parse(val));
-        } catch {
-          /* ignore */
+  const fetchSessionTags = useCallback(
+    async (showError = false) => {
+      try {
+        const tags = await sessionTagApi.list();
+        setSessionTags(sortSessionTags(tags ?? []));
+      } catch {
+        if (showError) {
+          toast.show('error', t.errorNetwork);
         }
       }
-    });
+    },
+    [t.errorNetwork, toast],
+  );
+
+  const tagById = useMemo(
+    () => Object.fromEntries(sessionTags.map((tag) => [tag.id, tag])),
+    [sessionTags],
+  );
+  const activeTagId = useMemo(
+    () =>
+      selectedPillKey.startsWith(TAG_PILL_PREFIX)
+        ? selectedPillKey.slice(TAG_PILL_PREFIX.length)
+        : undefined,
+    [selectedPillKey],
+  );
+
+  const loadGlobalMemorySettings = useCallback(async () => {
+    const settings = await getUserMemorySettings();
+
+    setMemoryEnabled(settings.enabled);
+    setMemoryEffort(settings.effort);
   }, []);
 
   useEffect(() => {
-    if (!initialized) fetchSessions();
-    if (!agentInitialized) loadAgents();
-    fetchGroups();
+    if (!initialized) void fetchSessions();
+    void fetchSessionTags();
+    void loadGlobalMemorySettings();
     // Record usage for streak tracking + milestone celebration
     recordUsage().then(() =>
       getStreak().then((s) => {
@@ -311,14 +383,24 @@ export default function ChatListScreen({ navigation }: any) {
         }
       }),
     );
-  }, [initialized, agentInitialized, fetchSessions, loadAgents, fetchGroups, t.streakCelebrate, toast]);
+  }, [fetchSessionTags, fetchSessions, initialized, loadGlobalMemorySettings, t.streakCelebrate, toast]);
 
   // Re-read sessions (with AsyncStorage provider overlay) whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
-      if (initialized) fetchSessions();
-    }, [initialized, fetchSessions]),
+      if (initialized) {
+        void fetchSessions();
+      }
+      void fetchSessionTags();
+      void loadGlobalMemorySettings();
+    }, [fetchSessionTags, initialized, fetchSessions, loadGlobalMemorySettings]),
   );
+
+  useEffect(() => {
+    if (!selectedPillKey.startsWith(TAG_PILL_PREFIX)) return;
+    if (activeTagId && tagById[activeTagId]) return;
+    setSelectedPillKey(ALL_CHATS_PILL_KEY);
+  }, [activeTagId, selectedPillKey, tagById]);
 
   // Pre-load models and selection
   useEffect(() => {
@@ -418,19 +500,28 @@ export default function ChatListScreen({ navigation }: any) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchSessions(), fetchGroups()]);
+      await Promise.all([fetchSessions(), fetchSessionTags()]);
       haptics.success();
     } catch {
       toast.show('error', t.errorNetwork);
     }
     setRefreshing(false);
-  }, [fetchSessions, fetchGroups, toast, t]);
+  }, [fetchSessionTags, fetchSessions, toast, t]);
 
   const handleCreateChat = async () => {
-    const newId = draftSessionId || (await createSession());
-    setDraftSessionId(null);
-    haptics.success();
-    navigation.navigate('ChatDetail', { sessionId: newId });
+    setCreateMenuVisible(false);
+    try {
+      const newId =
+        draftSessionId ||
+        (await createSession({
+          tagId: activeTagId,
+        }));
+      setDraftSessionId(null);
+      haptics.success();
+      navigation.navigate('ChatDetail', { sessionId: newId });
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
   };
 
   const handleHeroSubmit = async () => {
@@ -438,36 +529,41 @@ export default function ChatListScreen({ navigation }: any) {
     const hasAttachment = pendingFiles.length > 0;
     if (!prompt && !hasAttachment) return;
 
-    const newId =
-      draftSessionId ||
-      (await createSession({
-        model: selectedModel || undefined,
-        provider: selectedProvider || undefined,
-        plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
-      }));
-    setDraftSessionId(null);
-
     try {
+      const newId =
+        draftSessionId ||
+        (await createSession({
+          tagId: activeTagId,
+          model: selectedModel || undefined,
+          provider: selectedProvider || undefined,
+          plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
+        }));
+      setDraftSessionId(null);
+
       const agentConfig = await agentApi.getConfigBySession(newId);
       if (agentConfig?.id) {
-        await agentApi.updateConfig(agentConfig.id, {
-          chatConfig: {
-            memory: { effort: memoryEffort, enabled: memoryEnabled },
-            searchMode: searchEnabled ? 'on' : 'off',
-          },
-        });
+        try {
+          await agentApi.updateConfig(agentConfig.id, {
+            chatConfig: {
+              memory: { effort: memoryEffort, enabled: memoryEnabled },
+              searchMode: searchEnabled ? 'on' : 'off',
+            },
+          });
+        } catch {
+          /* best-effort */
+        }
       }
-    } catch {
-      /* best-effort */
-    }
 
-    void sendMessage(newId, prompt, undefined, {
-      memoryEffort,
-      memoryEnabled,
-      searchEnabled,
-    });
-    setHeroText('');
-    navigation.navigate('ChatDetail', { sessionId: newId });
+      void sendMessage(newId, prompt, undefined, {
+        memoryEffort,
+        memoryEnabled,
+        searchEnabled,
+      });
+      setHeroText('');
+      navigation.navigate('ChatDetail', { sessionId: newId });
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
   };
 
   const handleModelPress = () => {
@@ -545,7 +641,7 @@ export default function ChatListScreen({ navigation }: any) {
     } catch {
       /* ignore */
     }
-  }, [addFile, t, toast]);
+  }, [addFile]);
 
   const handleAttach = useCallback(() => {
     haptics.selection();
@@ -554,6 +650,9 @@ export default function ChatListScreen({ navigation }: any) {
 
   // ── Skills drawer ─────────────────────────────────────────────────
   const [skillsVisible, setSkillsVisible] = useState(false);
+  const [builtinSkillItems, setBuiltinSkillItems] = useState<
+    { description: string; icon: MobileRecommendedBuiltinIcon; identifier: string; title: string }[]
+  >([]);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [enabledSkills, setEnabledSkills] = useState<Set<string>>(() => new Set());
@@ -561,17 +660,36 @@ export default function ChatListScreen({ navigation }: any) {
   const handlePluginsPress = useCallback(() => {
     haptics.light();
     setSkillsVisible(true);
+    // Pre-load builtins immediately (same as web)
+    const preloadBuiltins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((b) => ({
+      description: (t as any)[b.descriptionKey] ?? '',
+      icon: b.icon,
+      identifier: b.identifier,
+      title: (t as any)[b.titleKey] ?? b.identifier,
+    }));
+    setBuiltinSkillItems(preloadBuiltins);
     setLoadingSkills(true);
-    pluginApi
-      .list()
-      .then((list) => {
+    Promise.all([pluginApi.list(), userApi.getState()])
+      .then(([list, userState]) => {
         const plugins = list ?? [];
-        setInstalledPlugins(plugins);
-        setEnabledSkills(new Set(plugins.map((p) => p.identifier)));
+        const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
+        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS
+          .filter((b) => !uninstalled.includes(b.identifier))
+          .map((b) => ({
+            description: (t as any)[b.descriptionKey] ?? '',
+            icon: b.icon,
+            identifier: b.identifier,
+            title: (t as any)[b.titleKey] ?? b.identifier,
+          }));
+        setBuiltinSkillItems(builtins);
+        const builtinIds = new Set(builtins.map((b) => b.identifier));
+        const filteredPlugins = plugins.filter((p) => !builtinIds.has(p.identifier));
+        setInstalledPlugins(filteredPlugins);
+        setEnabledSkills(new Set(filteredPlugins.map((p) => p.identifier)));
       })
       .catch(() => {})
       .finally(() => setLoadingSkills(false));
-  }, []);
+  }, [t]);
 
   const handleToggleSkill = useCallback((identifier: string) => {
     haptics.light();
@@ -586,134 +704,270 @@ export default function ChatListScreen({ navigation }: any) {
     });
   }, []);
 
-  const handleQuickAction = async (key: string) => {
-    if (key === 'group') {
-      navigation.navigate('SessionGroup');
-      return;
-    }
-    if (key === 'image') {
-      navigation.navigate('Artwork');
-      return;
-    }
-    if (key === 'agent') {
-      haptics.success();
-      const newId = await createSession();
-      navigation.navigate('ChatDetail', { sessionId: newId });
-      return;
-    }
-
-    // 'write' still uses a dedicated session path for now
-    haptics.success();
-    const newId = await createSession();
-    navigation.navigate('ChatDetail', { sessionId: newId });
-  };
-
-  const toggleGroup = (id: string) => {
-    setExpandedGroups((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      AsyncStorage.setItem('avato_expanded_groups', JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-  };
-
-  // Organize sessions by group
-  const { pinnedSessions, groupedSessions, defaultSessions } = useMemo(() => {
-    const pinned = sessions.filter((s) => s.pinned);
-    const grouped: Record<string, ChatSession[]> = {};
-    groups.forEach((g) => {
-      grouped[g.id] = [];
-    });
-
-    const def: ChatSession[] = [];
-    sessions.forEach((s) => {
-      if (s.pinned) return;
-      if (s.groupId && grouped[s.groupId]) {
-        grouped[s.groupId].push(s);
-      } else {
-        def.push(s);
-      }
-    });
-
-    return { pinnedSessions: pinned, groupedSessions: grouped, defaultSessions: def };
-  }, [sessions, groups]);
+  const closeActionSheet = useCallback(() => {
+    setActionPanel('root');
+    setActionSession(null);
+  }, []);
 
   const handleLongPress = useCallback((session: ChatSession) => {
     haptics.medium();
+    setActionPanel('root');
     setActionSession(session);
   }, []);
 
-  const [renameModalVisible, setRenameModalVisible] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<ChatSession | null>(null);
-
   const handleRename = useCallback((session: ChatSession) => {
-    setActionSession(null);
+    closeActionSheet();
     setRenameTarget(session);
     setTimeout(() => setRenameModalVisible(true), 300);
+  }, [closeActionSheet]);
+
+  const closeTagEditor = useCallback(() => {
+    setEditingTag(null);
+    setTagDraftName('');
+    setTagDraftColor(null);
+    setTagEditorTargetSessionId(null);
+    setTagEditorVisible(false);
   }, []);
 
-  const handleMoveToGroup = useCallback(
-    (session: ChatSession) => {
-      setActionSession(null);
-      const options = [
-        { text: t.groupDefault, onPress: () => moveToGroup(session.id, '') },
-        ...groups.map((g) => ({
-          text: g.name,
-          onPress: () => moveToGroup(session.id, g.id),
-        })),
-        { text: t.cancel, style: 'cancel' as const },
-      ];
-      Alert.alert(t.groupMoveSession, undefined, options);
+  const openCreateTag = useCallback((targetSessionId?: string | null) => {
+    setEditingTag(null);
+    setTagDraftName('');
+    setTagDraftColor(null);
+    setTagEditorTargetSessionId(targetSessionId ?? null);
+    setTagEditorVisible(true);
+  }, []);
+
+  const openEditTag = useCallback((tag: SessionTag) => {
+    haptics.light();
+    setEditingTag(tag);
+    setTagDraftName(tag.name);
+    setTagDraftColor(tag.color ?? null);
+    setTagEditorTargetSessionId(null);
+    setTagEditorVisible(true);
+  }, []);
+
+  const handleSubmitTag = useCallback(async () => {
+    const name = tagDraftName.trim();
+    if (!name) {
+      toast.show('error', t.errorUnknown);
+      return;
+    }
+
+    const targetSessionId = tagEditorTargetSessionId;
+
+    try {
+      if (editingTag) {
+        await sessionTagApi.update(editingTag.id, {
+          color: tagDraftColor,
+          name,
+        });
+        await fetchSessionTags(true);
+        haptics.success();
+        closeTagEditor();
+        return;
+      }
+
+      const newTagId = await sessionTagApi.create(name, tagDraftColor);
+      if (!newTagId) {
+        toast.show('error', t.errorNetwork);
+        return;
+      }
+
+      await fetchSessionTags(true);
+
+      if (targetSessionId) {
+        await updateSessionTag(targetSessionId, newTagId);
+        closeActionSheet();
+      }
+
+      setSelectedPillKey(getTagPillKey(newTagId));
+      haptics.success();
+      closeTagEditor();
+    } catch (err) {
+      const { messageKey } = classifyError(err);
+      toast.show('error', t[messageKey]);
+    }
+  }, [
+    closeActionSheet,
+    closeTagEditor,
+    editingTag,
+    fetchSessionTags,
+    t,
+    tagDraftColor,
+    tagDraftName,
+    tagEditorTargetSessionId,
+    toast,
+    updateSessionTag,
+  ]);
+
+  const handleDeleteTag = useCallback(async () => {
+    if (!editingTag) return;
+
+    try {
+      await sessionTagApi.remove(editingTag.id);
+      await Promise.all([fetchSessionTags(true), fetchSessions()]);
+      if (activeTagId === editingTag.id) {
+        setSelectedPillKey(ALL_CHATS_PILL_KEY);
+      }
+      haptics.success();
+      closeTagEditor();
+    } catch (err) {
+      const { messageKey } = classifyError(err);
+      toast.show('error', t[messageKey]);
+    }
+  }, [
+    activeTagId,
+    closeTagEditor,
+    editingTag,
+    fetchSessionTags,
+    fetchSessions,
+    t,
+    toast,
+  ]);
+
+  const handleMoveSessionToTag = useCallback(
+    async (tagId?: string | null) => {
+      if (!actionSession) return;
+
+      try {
+        await updateSessionTag(actionSession.id, tagId);
+        haptics.success();
+        closeActionSheet();
+      } catch (err) {
+        const { messageKey } = classifyError(err);
+        toast.show('error', t[messageKey]);
+      }
     },
-    [groups, t, moveToGroup],
+    [actionSession, closeActionSheet, t, toast, updateSessionTag],
   );
 
-  const quickActions = [
-    { key: 'agent', label: t.homeQuickCode, icon: BotIcon },
-    { key: 'group', label: t.homeQuickAnalyze, icon: UsersIcon },
-    { key: 'write', label: t.homeQuickWrite, icon: PenLineIcon },
-    { key: 'image', label: t.homeQuickCreate, icon: ImageIcon },
-  ];
+  const pillItems = useMemo<ChatFilterPill[]>(() => {
+    const tagPills = sessionTags.map((tag) => ({
+      color: tag.color,
+      count: sessions.filter((session) => session.tagId === tag.id).length,
+      key: getTagPillKey(tag.id),
+      label: tag.name,
+      tagId: tag.id,
+    }));
+
+    return [{ count: sessions.length, key: ALL_CHATS_PILL_KEY, label: t.chatListAll }, ...tagPills];
+  }, [sessionTags, sessions, t.chatListAll]);
+
+  const matchesSelectedPill = useCallback(
+    (session: ChatSession) => {
+      if (selectedPillKey === ALL_CHATS_PILL_KEY) return true;
+      if (activeTagId) return session.tagId === activeTagId;
+      return true;
+    },
+    [activeTagId, selectedPillKey],
+  );
+
+  const visibleSessions = useMemo(
+    () => sessions.filter(matchesSelectedPill),
+    [matchesSelectedPill, sessions],
+  );
+
+  const { pinnedSessions, filteredSessions } = useMemo(() => {
+    const pinned = visibleSessions.filter((session) => session.pinned);
+    const rest = visibleSessions.filter((session) => !session.pinned);
+    return { pinnedSessions: pinned, filteredSessions: rest };
+  }, [visibleSessions]);
+
+  const filteredSearchResults = useMemo(
+    () => searchResults.filter((result) => matchesSelectedPill(result.session)),
+    [matchesSelectedPill, searchResults],
+  );
+
+  const handleCreateAgent = useCallback(async () => {
+    setCreateMenuVisible(false);
+
+    try {
+      const result = await agentApi.create(undefined, activeTagId);
+      if (!result?.sessionId) {
+        toast.show('error', t.errorNetwork);
+        return;
+      }
+
+      await fetchSessions();
+      haptics.success();
+      navigation.navigate('AgentConfig', { sessionId: result.sessionId });
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
+  }, [activeTagId, fetchSessions, navigation, t.errorNetwork, toast]);
+
+  const handleCreateGroup = useCallback(async () => {
+    setCreateMenuVisible(false);
+    setCreateGroupSheetVisible(true);
+  }, []);
+
+  const handleCreateGroupSubmit = useCallback(
+    async ({ agentIds, title }: { agentIds: string[]; title: string }) => {
+      try {
+        const nextTitle = title.trim() || t.groupCreateDefaultTitle;
+        const result = await agentGroupApi.createGroup({ title: nextTitle });
+        if (!result?.group?.id) {
+          toast.show('error', t.errorNetwork);
+          return;
+        }
+
+        if (agentIds.length > 0) {
+          await agentGroupApi.addAgentsToGroup(result.group.id, agentIds);
+        }
+
+        setCreateGroupSheetVisible(false);
+        await fetchSessions();
+        haptics.success();
+        navigation.navigate('ChatDetail', { sessionId: result.group.id });
+      } catch {
+        toast.show('error', t.errorNetwork);
+      }
+    },
+    [fetchSessions, navigation, t.errorNetwork, t.groupCreateDefaultTitle, toast],
+  );
 
   const selectedProviderLogo = selectedProvider ? providerLogoById[selectedProvider] : undefined;
+
+  const renderTagChip = useCallback((tagId?: string) => {
+    if (!tagId) return null;
+
+    const tag = tagById[tagId];
+    if (!tag) return null;
+
+    return (
+      <View
+        className="ml-2 flex-row items-center rounded-full px-2.5 py-0.5"
+        style={{ backgroundColor: withAlpha(tag.color, '18') }}
+      >
+        <View
+          className="mr-1.5 rounded-full"
+          style={{ backgroundColor: resolveTagColor(tag.color), height: 6, width: 6 }}
+        />
+        <Text
+          className="text-[10px] font-semibold"
+          numberOfLines={1}
+          style={{ color: resolveTagColor(tag.color) }}
+        >
+          {tag.name}
+        </Text>
+      </View>
+    );
+  }, [tagById]);
 
   const renderSessionRow = (item: ChatSession) => {
     const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
 
     return (
-      <SwipeableRow
+      <TouchableOpacity
+        accessibilityLabel={item.title}
+        accessibilityRole="button"
+        activeOpacity={0.4}
+        className="flex-row items-start px-5 py-3 active:bg-foreground/10"
         key={item.id}
-        pinLabel={item.pinned ? t.actionUnpin : t.actionPin}
-        onDelete={() => {
-          Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
-            { text: t.cancel, style: 'cancel' },
-            {
-              text: t.delete,
-              style: 'destructive',
-              onPress: () => {
-                haptics.warning();
-                removeSession(item.id);
-              },
-            },
-          ]);
-        }}
-        onPin={() => {
-          haptics.light();
-          if (item.pinned) {
-            unpinSession(item.id);
-          } else {
-            pinSession(item.id);
-          }
-        }}
+        onLongPress={() => handleLongPress(item)}
+        onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
       >
-        <TouchableOpacity
-          accessibilityLabel={item.title}
-          accessibilityRole="button"
-          activeOpacity={0.4}
-          className="flex-row items-start px-5 py-3 active:bg-foreground/10"
-          onLongPress={() => handleLongPress(item)}
-          onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
-        >
           <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
             <SessionLogo
               avatar={item.avatar}
@@ -723,7 +977,7 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
           <View className="flex-1 mr-3 mt-0.5">
-            <View className="flex-row items-center mb-0.5">
+            <View className="flex-row items-center mb-0.5 flex-wrap">
               {item.pinned && (
                 <Pin
                   color={semanticColors.primary}
@@ -738,6 +992,7 @@ export default function ChatListScreen({ navigation }: any) {
               >
                 {item.title || t.chatListNewConversation}
               </Text>
+              {renderTagChip(item.tagId)}
             </View>
             <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
               {item.description}
@@ -747,7 +1002,6 @@ export default function ChatListScreen({ navigation }: any) {
             {formatTimeAgo(item.updatedAt, t)}
           </Text>
         </TouchableOpacity>
-      </SwipeableRow>
     );
   };
 
@@ -784,13 +1038,14 @@ export default function ChatListScreen({ navigation }: any) {
           />
         </View>
         <View className="flex-1">
-          <View className="mb-1 flex-row items-center">
+          <View className="mb-1 flex-row items-center flex-wrap">
             <Text className="text-[15px] font-medium tracking-tight text-foreground" numberOfLines={1}>
               {session.title || t.chatListNewConversation}
             </Text>
             <Text className="ml-2 text-[11px] font-semibold uppercase tracking-wider text-secondary/35">
               {matchType}
             </Text>
+            {renderTagChip(session.tagId)}
           </View>
           <Text className="text-[12px] font-medium leading-5 text-secondary/55" numberOfLines={2}>
             {summary}
@@ -805,21 +1060,79 @@ export default function ChatListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        subtitle={t.activeChats.replace('{count}', String(visibleSessions.length))}
         title={greeting}
-        rightElement={
-          <MessageSquarePlus
-            color={semanticColors.primary}
-            size={20}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+        titleIcon={<MessageCircle color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        rightActions={
+          <View className="flex-row items-center">
+            <TouchableOpacity
+              accessibilityLabel="Create menu"
+              activeOpacity={0.7}
+              className="h-10 w-10 items-center justify-center"
+              onPress={() => {
+                haptics.light();
+                setCreateMenuVisible(true);
+              }}
+            >
+              <MessageSquarePlus
+                color={semanticColors.primary}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </TouchableOpacity>
+          </View>
         }
-        subtitle={
-          sessions.length > 0
-            ? t.activeChats.replace('{count}', String(sessions.length))
-            : undefined
-        }
-        onPressRight={handleCreateChat}
-      />
+      >
+        <ScrollView
+          horizontal
+          className="pb-3"
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
+          showsHorizontalScrollIndicator={false}
+        >
+          {pillItems.map((pill) => {
+            const selected = pill.key === selectedPillKey;
+            const resolvedColor = pill.tagId ? resolveTagColor(pill.color) : semanticColors.primary;
+            const selectedBackground = pill.tagId ? resolvedColor : semanticColors.primary;
+            const unselectedBackground = pill.tagId ? withAlpha(pill.color, '16') : semanticColors.fillTertiary;
+            const countBackground = selected ? withAlpha(selectedBackground, '33') : withAlpha(pill.color, '20');
+            const editableTag = pill.tagId ? tagById[pill.tagId] : undefined;
+
+            return (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                className="flex-row items-center rounded-full px-4 py-2"
+                key={pill.key}
+                style={{
+                  backgroundColor: selected ? selectedBackground : unselectedBackground,
+                }}
+                onLongPress={editableTag ? () => openEditTag(editableTag) : undefined}
+                onPress={() => {
+                  haptics.selection();
+                  setSelectedPillKey(pill.key);
+                }}
+              >
+                <Text
+                  className="text-[13px] font-semibold"
+                  style={{ color: selected ? '#fff' : pill.tagId ? resolvedColor : semanticColors.foreground }}
+                >
+                  {pill.label}
+                </Text>
+                <View
+                  className="ml-2 rounded-full px-2 py-0.5"
+                  style={{ backgroundColor: countBackground }}
+                >
+                  <Text
+                    className="text-[11px] font-semibold"
+                    style={{ color: selected ? '#fff' : pill.tagId ? resolvedColor : semanticColors.secondaryText }}
+                  >
+                    {pill.count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </ScreenHeader>
 
 
       <ScrollView
@@ -839,7 +1152,7 @@ export default function ChatListScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(50).duration(350)}>
           <View className="pt-3">
             {streak > 1 && (
-              <Text className="text-secondary/60 text-[13px] font-medium px-6 mb-2">
+              <Text className="text-secondary/60 text-[13px] font-medium px-5 mb-2">
                 {streak >= 7 ? '🔥 ' : ''}
                 {t.streakMessage.replace('{count}', String(streak))}
               </Text>
@@ -862,7 +1175,7 @@ export default function ChatListScreen({ navigation }: any) {
               onToggleSearch={handleToggleSearch}
             />
             {pendingFiles.length > 0 && (
-              <View className="mx-4 -mt-2 mb-2 px-3 py-2 rounded-2xl bg-foreground/5">
+              <View className="mx-5 -mt-2 mb-2 px-3 py-2 rounded-2xl bg-foreground/5">
                 <FilePreview sessionId={draftSessionId ?? undefined} />
               </View>
             )}
@@ -871,7 +1184,7 @@ export default function ChatListScreen({ navigation }: any) {
 
         {/* Search Bar */}
         <Animated.View entering={FadeInDown.delay(75).duration(350)}>
-          <View className="px-5 mt-2 mb-1">
+          <View className="px-5 mt-3 mb-2">
             <View className="flex-row items-center bg-foreground/5 rounded-xl px-3.5 py-2.5">
               <Search
                 color={semanticColors.muted}
@@ -899,9 +1212,9 @@ export default function ChatListScreen({ navigation }: any) {
                   {t.chatSearchSearching}
                 </Text>
               </View>
-            ) : searchResults.length > 0 ? (
+            ) : filteredSearchResults.length > 0 ? (
               <SectionBlock title={t.chatSearchResults}>
-                {searchResults.map(renderSearchResultRow)}
+                {filteredSearchResults.map(renderSearchResultRow)}
               </SectionBlock>
             ) : (
               <View className="px-5 pt-6">
@@ -913,207 +1226,388 @@ export default function ChatListScreen({ navigation }: any) {
           </Animated.View>
         ) : (
           <>
-            {/* Quick Actions */}
-            <Animated.View entering={FadeInDown.delay(100).duration(350)}>
-              <QuickActionRow actions={quickActions} onPress={handleQuickAction} />
-            </Animated.View>
-
-            <Animated.View entering={FadeInDown.delay(125).duration(350)}>
-              <SectionBlock title={t.settingsDefaultAgent}>
-                <ScrollView
-                  horizontal
-                  className="px-5"
-                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
-                  showsHorizontalScrollIndicator={false}
-                >
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-2xl bg-primary/10 px-4 py-3 items-center justify-center min-w-[88px]"
-                    onPress={() => navigation.navigate('AgentConfig')}
-                  >
-                    <Text className="text-primary text-[20px] leading-5">+</Text>
-                  </TouchableOpacity>
-
-                  {agents.slice(0, 5).map((agent) => (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      className="rounded-2xl bg-foreground/[0.02] px-4 py-3 min-w-[120px]"
-                      key={agent.id}
-                      onPress={() => navigation.navigate('AgentConfig', { agentId: agent.id })}
-                    >
-                      <Text className="text-[18px] mb-1">{agent.avatar || '🤖'}</Text>
-                      <Text className="text-foreground text-[13px] font-semibold" numberOfLines={1}>
-                        {agent.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-2xl bg-foreground/[0.02] px-4 py-3 items-center justify-center min-w-[92px]"
-                    onPress={() => navigation.navigate('AgentList')}
-                  >
-                    <Text className="text-primary text-[12px] font-semibold">{t.profileViewAll}</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </SectionBlock>
-            </Animated.View>
-
             {/* Pinned Sessions */}
             {pinnedSessions.length > 0 && (
-              <Animated.View entering={FadeInDown.delay(150).duration(350)}>
+              <Animated.View entering={FadeInDown.delay(100).duration(350)}>
                 <SectionBlock title={t.groupPinned}>
                   {pinnedSessions.map(renderSessionRow)}
                 </SectionBlock>
               </Animated.View>
             )}
 
-            {/* Custom Groups */}
-            {groups.map((group) => {
-              const groupSessions = groupedSessions[group.id] || [];
-              const expanded = expandedGroups[group.id] !== false;
-              return (
-                <Animated.View entering={FadeInDown.delay(200).duration(350)} key={group.id}>
-                  <SessionGroupHeader
-                    count={groupSessions.length}
-                    expanded={expanded}
-                    title={group.name}
-                    onToggle={() => toggleGroup(group.id)}
-                  />
-                  {expanded && groupSessions.map(renderSessionRow)}
-                </Animated.View>
-              );
-            })}
-
-            {/* Default / Ungrouped Sessions */}
-            {defaultSessions.length > 0 && (
-              <Animated.View entering={FadeInDown.delay(250).duration(350)}>
+            {/* Recent sessions */}
+            {filteredSessions.length > 0 && (
+              <Animated.View entering={FadeInDown.delay(150).duration(350)}>
                 <SectionBlock title={t.homeRecents}>
-                  {defaultSessions.slice(0, 10).map(renderSessionRow)}
+                  {filteredSessions.slice(0, 20).map(renderSessionRow)}
                 </SectionBlock>
+              </Animated.View>
+            )}
+
+            {sessionErrorMessage && visibleSessions.length === 0 && !loading ? (
+              <Animated.View entering={FadeInDown.delay(150).duration(350)}>
+                <View className="items-center px-5 pb-4 pt-8">
+                  <Text className="text-center text-[16px] font-semibold text-foreground">
+                    {sessionErrorMessage}
+                  </Text>
+                  <Text className="mt-2 px-4 text-center text-[14px] font-medium text-secondary/60">
+                    {t.chatListLoadFailed}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    className="mt-4 rounded-full bg-primary px-4 py-2.5"
+                    onPress={() => void onRefresh()}
+                  >
+                    <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            ) : null}
+
+            {/* Empty state when no sessions at all */}
+            {visibleSessions.length === 0 && !sessionErrorMessage && (
+              <Animated.View entering={FadeInDown.delay(150).duration(350)}>
+                <View className="px-5 pt-8 pb-4 items-center">
+                  <Text className="text-foreground text-[16px] font-semibold text-center">
+                    {t.chatListEmpty}
+                  </Text>
+                  <Text className="text-secondary/60 text-[14px] font-medium text-center mt-2 px-4">
+                    {t.chatListEmptyDesc}
+                  </Text>
+                </View>
               </Animated.View>
             )}
           </>
         )}
       </ScrollView>
 
+      <Modal
+        transparent
+        animationType="fade"
+        visible={createMenuVisible}
+        onRequestClose={() => setCreateMenuVisible(false)}
+      >
+        <Pressable className="flex-1 bg-black/10" onPress={() => setCreateMenuVisible(false)}>
+          <Pressable
+            className="absolute overflow-hidden rounded-2xl bg-white"
+            style={{
+              minWidth: 220,
+              right: 16,
+              top: insets.top + 52,
+            }}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="flex-row items-center px-4 py-3"
+              onPress={handleCreateChat}
+            >
+              <MessageSquarePlus
+                color={semanticColors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+              <Text className="ml-3 text-[15px] font-medium text-foreground">
+                {t.chatListNewConversation}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="flex-row items-center px-4 py-3"
+              onPress={handleCreateAgent}
+            >
+              <Bot color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-[15px] font-medium text-foreground">
+                {t.chatListCreateAgent}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="flex-row items-center px-4 py-3"
+              onPress={handleCreateGroup}
+            >
+              <UsersRound color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-[15px] font-medium text-foreground">
+                {t.chatListCreateGroup}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="flex-row items-center px-4 py-3"
+              onPress={() => {
+                setCreateMenuVisible(false);
+                openCreateTag();
+              }}
+            >
+              <Tag color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-[15px] font-medium text-foreground">
+                {t.chatListCreateTag}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <AgentSelectionSheet
+        allowEmptySelection
+        confirmLabel={t.done}
+        initialTitle={t.groupCreateDefaultTitle}
+        showTitleInput
+        title={t.chatListCreateGroup}
+        titleInputLabel={t.agentConfigName}
+        titleInputPlaceholder={t.groupCreateDefaultTitle}
+        visible={createGroupSheetVisible}
+        onClose={() => setCreateGroupSheetVisible(false)}
+        onSubmit={handleCreateGroupSubmit}
+      />
+
       {/* Session Action Sheet */}
       <Modal
         transparent
         animationType="slide"
         visible={!!actionSession}
-        onRequestClose={() => setActionSession(null)}
+        onRequestClose={closeActionSheet}
       >
         <Pressable
           className="flex-1 justify-end bg-black/40"
-          onPress={() => setActionSession(null)}
+          onPress={closeActionSheet}
         >
-          <Pressable className="bg-white rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            className="bg-white rounded-t-2xl overflow-hidden"
+            style={{ maxHeight: '72%' }}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View className="items-center pt-3 pb-2">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-            <View className="px-5">
-              {/* Pin/Unpin */}
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => {
-                  if (actionSession) {
-                    haptics.light();
-                    if (actionSession.pinned) {
-                      unpinSession(actionSession.id);
-                    } else {
-                      pinSession(actionSession.id);
+            <View style={{ paddingBottom: 32, position: 'relative' }}>
+              <View className="px-5">
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    if (actionSession) {
+                      haptics.light();
+                      if (actionSession.pinned) {
+                        unpinSession(actionSession.id);
+                      } else {
+                        pinSession(actionSession.id);
+                      }
                     }
-                  }
-                  setActionSession(null);
-                }}
-              >
-                <Pin
-                  color={semanticColors.muted}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text className="ml-3 text-base text-foreground">
-                  {actionSession?.pinned ? t.actionUnpin : t.actionPin}
-                </Text>
-              </Pressable>
+                    closeActionSheet();
+                  }}
+                >
+                  <Pin
+                    color={semanticColors.muted}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-3 text-base text-foreground">
+                    {actionSession?.pinned ? t.actionUnpin : t.actionPin}
+                  </Text>
+                </Pressable>
 
-              {/* Rename */}
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => actionSession && handleRename(actionSession)}
-              >
-                <Pencil
-                  color={semanticColors.muted}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
-              </Pressable>
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => actionSession && handleRename(actionSession)}
+                >
+                  <Pencil
+                    color={semanticColors.muted}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+                </Pressable>
 
-              {/* Move to Group */}
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => actionSession && handleMoveToGroup(actionSession)}
-              >
-                <FolderOpen color={semanticColors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-foreground">{t.groupMoveSession}</Text>
-              </Pressable>
+                {actionSession?.type !== 'group' ? (
+                  <Pressable
+                    className="flex-row items-center justify-between py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      haptics.light();
+                      setActionPanel('move-tag');
+                    }}
+                  >
+                    <View className="flex-row items-center">
+                      <Tag
+                        color={semanticColors.muted}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text className="ml-3 text-base text-foreground">{t.tagMoveSession}</Text>
+                    </View>
+                    <ChevronRight
+                      color={semanticColors.secondaryText}
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </Pressable>
+                ) : null}
 
-              {/* Delete */}
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => {
-                  if (actionSession) {
-                    setActionSession(null);
-                    Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
-                      { text: t.cancel, style: 'cancel' },
-                      {
-                        text: t.delete,
-                        style: 'destructive',
-                        onPress: () => {
-                          haptics.warning();
-                          removeSession(actionSession.id);
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    if (actionSession) {
+                      closeActionSheet();
+                      Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
+                        { text: t.cancel, style: 'cancel' },
+                        {
+                          text: t.delete,
+                          style: 'destructive',
+                          onPress: () => {
+                            haptics.warning();
+                            removeSession(actionSession.id);
+                          },
                         },
-                      },
-                    ]);
-                  }
-                }}
-              >
-                <Trash2
-                  color={semanticColors.danger}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
-              </Pressable>
-            </View>
+                      ]);
+                    }
+                  }}
+                >
+                  <Trash2
+                    color={semanticColors.danger}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
+                </Pressable>
+              </View>
 
-            <View className="px-5 mt-2">
-              <Pressable
-                className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
-                onPress={() => setActionSession(null)}
-              >
-                <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
-              </Pressable>
+              <View className="px-5 mt-2">
+                <Pressable
+                  className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
+                  onPress={closeActionSheet}
+                >
+                  <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
+                </Pressable>
+              </View>
+
+              {actionPanel === 'move-tag' && actionSession?.type !== 'group' ? (
+                <Animated.View
+                  className="absolute inset-0 bg-white"
+                  entering={SlideInRight.duration(220)}
+                  exiting={SlideOutRight.duration(180)}
+                >
+                  <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="h-10 w-10 items-center justify-center"
+                      onPress={() => setActionPanel('root')}
+                    >
+                      <ArrowLeft
+                        color={semanticColors.primary}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    </TouchableOpacity>
+                    <Text className="text-[16px] font-semibold text-foreground">
+                      {t.tagMoveSession}
+                    </Text>
+                    <View className="h-10 w-10" />
+                  </View>
+
+                  <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
+                    <Pressable
+                      className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
+                      onPress={() => void handleMoveSessionToTag(null)}
+                    >
+                      <View className="flex-row items-center">
+                        <View
+                          className="mr-3 h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: semanticColors.secondaryText }}
+                        />
+                        <Text className="text-[15px] font-medium text-foreground">
+                          {t.tagNone}
+                        </Text>
+                      </View>
+                      {!actionSession?.tagId ? (
+                        <Check
+                          color={semanticColors.primary}
+                          size={18}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
+                      ) : null}
+                    </Pressable>
+
+                    {sessionTags.map((tag) => (
+                      <Pressable
+                        className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
+                        key={tag.id}
+                        onPress={() => void handleMoveSessionToTag(tag.id)}
+                      >
+                        <View className="flex-row items-center">
+                          <View
+                            className="mr-3 h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: resolveTagColor(tag.color) }}
+                          />
+                          <Text className="text-[15px] font-medium text-foreground">
+                            {tag.name}
+                          </Text>
+                        </View>
+                        {actionSession?.tagId === tag.id ? (
+                          <Check
+                            color={semanticColors.primary}
+                            size={18}
+                            strokeWidth={tokens.icon.strokeWidth}
+                          />
+                        ) : null}
+                      </Pressable>
+                    ))}
+
+                    <Pressable
+                      className="mt-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3 py-3.5 active:bg-foreground/10"
+                      onPress={() => {
+                        openCreateTag(actionSession?.id);
+                      }}
+                    >
+                      <Tag
+                        color={semanticColors.primary}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text className="ml-3 text-[15px] font-medium text-primary">
+                        {t.tagCreate}
+                      </Text>
+                    </Pressable>
+                  </ScrollView>
+                </Animated.View>
+              ) : null}
             </View>
           </Pressable>
         </Pressable>
       </Modal>
 
       <PromptModal
-        defaultValue={renameTarget?.title ?? ''}
+        defaultValue={renameModalVisible ? renameTarget?.title ?? '' : ''}
         submitLabel={t.save}
         title={t.sessionRenameTitle}
         visible={renameModalVisible}
-        onCancel={() => setRenameModalVisible(false)}
-        onSubmit={(newName) => {
+        onCancel={() => {
+          setRenameModalVisible(false);
+          setRenameTarget(null);
+        }}
+        onSubmit={(value) => {
           setRenameModalVisible(false);
           if (renameTarget) {
             haptics.success();
-            renameSession(renameTarget.id, newName);
+            renameSession(renameTarget.id, value);
           }
         }}
+      />
+
+      <TagEditorSheet
+        cancelLabel={t.cancel}
+        color={tagDraftColor}
+        colorLabel={t.tagColor}
+        deleteDescription={editingTag ? t.tagDeleteDesc : undefined}
+        deleteLabel={editingTag ? t.delete : undefined}
+        name={tagDraftName}
+        placeholder={t.tagPlaceholder}
+        submitLabel={t.save}
+        title={editingTag ? t.tagEdit : t.tagCreate}
+        visible={tagEditorVisible}
+        onCancel={closeTagEditor}
+        onChangeColor={setTagDraftColor}
+        onChangeName={setTagDraftName}
+        onDelete={editingTag ? () => void handleDeleteTag() : undefined}
+        onSubmit={() => void handleSubmitTag()}
       />
 
       {/* Model Drawer */}
@@ -1163,26 +1657,17 @@ export default function ChatListScreen({ navigation }: any) {
             <View className="items-center pt-3 pb-1">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-            <View className="px-5 pb-3 pt-2 flex-row items-center justify-between">
+            <View className="px-5 pb-3 pt-2">
               <Text className="text-foreground text-[18px] font-bold tracking-tight">
                 {t.skillsTitle}
               </Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  setSkillsVisible(false);
-                  navigation.navigate('Skills');
-                }}
-              >
-                <Text className="text-primary text-[14px] font-medium">{t.skillsConfigure}</Text>
-              </TouchableOpacity>
             </View>
             <ScrollView className="px-5 pb-8" style={{ maxHeight: 400 }}>
               {loadingSkills ? (
                 <View className="items-center py-10">
                   <ActivityIndicator color={semanticColors.primary} size="small" />
                 </View>
-              ) : installedPlugins.length === 0 ? (
+              ) : builtinSkillItems.length === 0 && installedPlugins.length === 0 ? (
                 <View className="items-center py-10">
                   <Text className="text-secondary/50 text-[14px]">{t.skillsEmpty}</Text>
                   <Text className="text-secondary/40 text-[12px] mt-1 text-center px-4">
@@ -1190,31 +1675,64 @@ export default function ChatListScreen({ navigation }: any) {
                   </Text>
                 </View>
               ) : (
-                installedPlugins.map((plugin) => (
-                  <View
-                    className="flex-row items-center py-3.5"
-                    key={plugin.identifier}
-                  >
-                    <View className="flex-1 mr-3">
-                      <Text
-                        className="text-foreground text-[15px] font-medium tracking-tight"
-                        numberOfLines={1}
-                      >
-                        {plugin.manifest?.meta?.title || plugin.identifier}
-                      </Text>
-                      {plugin.manifest?.meta?.description ? (
-                        <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
-                          {plugin.manifest.meta.description}
+                <>
+                  {builtinSkillItems.map((item) => (
+                    <View
+                      className="flex-row items-center py-3.5"
+                      key={`builtin-${item.identifier}`}
+                    >
+                      <BuiltinSkillIcon icon={item.icon} size={36} />
+                      <View className="flex-1 ml-3 mr-3">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {item.title}
                         </Text>
-                      ) : null}
+                        {item.description ? (
+                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                            {item.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Switch
+                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                        value={enabledSkills.has(item.identifier)}
+                        onValueChange={() => handleToggleSkill(item.identifier)}
+                      />
                     </View>
-                    <Switch
-                      trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
-                      value={enabledSkills.has(plugin.identifier)}
-                      onValueChange={() => handleToggleSkill(plugin.identifier)}
-                    />
-                  </View>
-                ))
+                  ))}
+                  {installedPlugins.map((plugin) => (
+                    <View
+                      className="flex-row items-center py-3.5"
+                      key={plugin.identifier}
+                    >
+                      <View className="w-9 h-9 rounded-xl bg-foreground/5 items-center justify-center mr-3">
+                        <Text className="text-[18px]">
+                          {plugin.manifest?.meta?.avatar ?? '🔌'}
+                        </Text>
+                      </View>
+                      <View className="flex-1 mr-3">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {plugin.manifest?.meta?.title || plugin.identifier}
+                        </Text>
+                        {plugin.manifest?.meta?.description ? (
+                          <Text className="text-secondary/50 text-[12px] mt-0.5" numberOfLines={1}>
+                            {plugin.manifest.meta.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Switch
+                        trackColor={{ false: '#e5e5e5', true: semanticColors.primary }}
+                        value={enabledSkills.has(plugin.identifier)}
+                        onValueChange={() => handleToggleSkill(plugin.identifier)}
+                      />
+                    </View>
+                  ))}
+                </>
               )}
             </ScrollView>
           </Pressable>

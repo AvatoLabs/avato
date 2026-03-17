@@ -8,9 +8,7 @@
  *  - More Settings: entry to remaining config
  *  - Sign Out
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import Constants from 'expo-constants';
 import {
   BarChart3,
   Brain,
@@ -33,18 +31,17 @@ import { useToast } from '../components/ui/Toast';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
 import { semanticColors } from '../constants/colors';
 import { aiProviderApi, statsApi } from '../lib/api';
+import { APP_NAME, APP_VERSION } from '../lib/appInfo';
 import { clearTransientAppState } from '../lib/appState';
 import { signOutFromBrowser } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
+import { useAgentStore } from '../store/agent';
 import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
-
-const APP_NAME = Constants.expoConfig?.name ?? 'Avato';
-const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 export default function ProfileScreen({ navigation }: any) {
   const { t, locale } = useI18n();
@@ -64,7 +61,12 @@ export default function ProfileScreen({ navigation }: any) {
   const [topicCount, setTopicCount] = useState(0);
   const [providerCount, setProviderCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [defaultModel, setDefaultModel] = useState<string>('');
+
+  const currentAgent = useAgentStore((s) => {
+    if (!s.initialized) return null;
+    return s.getCurrentAgent();
+  });
+  const defaultModel = currentAgent?.model ?? '';
 
   const loadStats = useCallback(async () => {
     const [msgs, topics, providers] = await Promise.all([
@@ -83,16 +85,19 @@ export default function ProfileScreen({ navigation }: any) {
   useEffect(() => {
     loadStats();
     if (!isUserLoaded) fetchUser();
-    AsyncStorage.getItem('avato_default_model').then((v) => {
-      if (v) setDefaultModel(v);
-    });
+    if (!useAgentStore.getState().initialized) {
+      void useAgentStore.getState().loadAgents();
+    }
   }, [loadStats, isUserLoaded, fetchUser]);
 
-  // Re-check server connection every time the screen gains focus
   useFocusEffect(
     useCallback(() => {
       checkConnection();
-    }, [checkConnection]),
+      void fetchUser();
+      if (!useAgentStore.getState().initialized) {
+        void useAgentStore.getState().loadAgents();
+      }
+    }, [checkConnection, fetchUser]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -114,7 +119,7 @@ export default function ProfileScreen({ navigation }: any) {
             const baseUrl = await getApiUrl();
             await signOutFromBrowser(baseUrl);
             await clearTransientAppState();
-            navigation.reset({
+            navigation?.reset?.({
               index: 0,
               routes: [{ name: 'Login' }],
             });
@@ -128,7 +133,10 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t.settingsTitle} />
+      <ScreenHeader
+        title={t.settingsTitle ?? 'Settings'}
+        titleIcon={<Settings color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+      />
 
       <ScrollView
         className="flex-1"
@@ -136,9 +144,9 @@ export default function ProfileScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={['#007aff']}
+            colors={[semanticColors.primary]}
             refreshing={refreshing}
-            tintColor="#007aff"
+            tintColor={semanticColors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -151,25 +159,25 @@ export default function ProfileScreen({ navigation }: any) {
               isConnected={isConnected}
               providerCount={providerCount}
               userAvatar={userAvatar}
-              userName={userName || t.meUser}
-              onPress={() => navigation.navigate('ProfileEdit')}
-              onPressModel={() => navigation.navigate('ModelPicker')}
-              onPressProviders={() => navigation.navigate('AIProviders')}
+              userName={userName || t.meUser || 'User'}
+              onPress={() => navigation?.navigate?.('ProfileEdit')}
+              onPressModel={() => navigation?.navigate?.('ModelPicker')}
+              onPressProviders={() => navigation?.navigate?.('AIProviders')}
             />
           </View>
         </Animated.View>
 
         {/* Usage Stats — tap to view full stats */}
         <Animated.View entering={FadeInDown.delay(80).duration(350)}>
-          <PressableScale onPress={() => navigation.navigate('Stats')}>
-            <View className="flex-row px-5 gap-3 mb-4">
-              <View className="flex-1 py-3.5 items-center">
+          <PressableScale onPress={() => navigation?.navigate?.('Stats')}>
+            <View className="flex-row px-5 mb-4">
+              <View className="flex-1 py-3.5 items-center border-r border-foreground/10">
                 <Text className="text-foreground text-[20px] font-bold">{messageCount}</Text>
                 <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
                   {t.statsMessages}
                 </Text>
               </View>
-              <View className="flex-1 py-3.5 items-center">
+              <View className="flex-1 py-3.5 items-center border-r border-foreground/10">
                 <Text className="text-foreground text-[20px] font-bold">{sessionCount}</Text>
                 <Text className="text-secondary/40 text-[10px] font-semibold uppercase tracking-widest mt-1">
                   {t.statsSessions}
@@ -187,10 +195,10 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
-              onPress={() => navigation.navigate('Stats')}
+              onPress={() => navigation?.navigate?.('Stats')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <BarChart3 color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <BarChart3 color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -200,7 +208,7 @@ export default function ProfileScreen({ navigation }: any) {
                   {t.statsOverview}
                 </Text>
               </View>
-              <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
           </View>
         </Animated.View>
@@ -210,10 +218,10 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
-              onPress={() => navigation.navigate('Memory')}
+              onPress={() => navigation?.navigate?.('Memory')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <BrainCircuit color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <BrainCircuit color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -223,7 +231,7 @@ export default function ProfileScreen({ navigation }: any) {
                   {t.memoryDesc}
                 </Text>
               </View>
-              <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
           </View>
         </Animated.View>
@@ -233,10 +241,10 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
-              onPress={() => navigation.navigate('Notebook', {})}
+              onPress={() => navigation?.navigate?.('Notebook', {})}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <FileText color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <FileText color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -246,7 +254,7 @@ export default function ProfileScreen({ navigation }: any) {
                   {t.notebookDesc}
                 </Text>
               </View>
-              <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
           </View>
         </Animated.View>
@@ -257,11 +265,11 @@ export default function ProfileScreen({ navigation }: any) {
             <View className="rounded-xl bg-foreground/[0.03] overflow-hidden">
               <TouchableOpacity
                 activeOpacity={0.6}
-                className="flex-row items-center px-4 py-3.5"
-                onPress={() => navigation.navigate('ServerConfig')}
+                className="flex-row items-center px-5 py-3.5"
+                onPress={() => navigation?.navigate?.('ServerConfig')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Server color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  <Server color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -271,16 +279,16 @@ export default function ProfileScreen({ navigation }: any) {
                     {t.settingsServerConfigDesc}
                   </Text>
                 </View>
-                <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.6}
-                className="flex-row items-center px-4 py-3.5"
-                onPress={() => navigation.navigate('AIProviders')}
+                className="flex-row items-center px-5 py-3.5"
+                onPress={() => navigation?.navigate?.('AIProviders')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Key color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  <Key color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -290,16 +298,16 @@ export default function ProfileScreen({ navigation }: any) {
                     {t.settingsAiProvidersDesc}
                   </Text>
                 </View>
-                <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.6}
-                className="flex-row items-center px-4 py-3.5"
-                onPress={() => navigation.navigate('ModelPicker')}
+                className="flex-row items-center px-5 py-3.5"
+                onPress={() => navigation?.navigate?.('ModelPicker')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Brain color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  <Brain color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -309,26 +317,26 @@ export default function ProfileScreen({ navigation }: any) {
                     {defaultModel || t.settingsNotConfigured}
                   </Text>
                 </View>
-                <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 activeOpacity={0.6}
-                className="flex-row items-center px-4 py-3.5"
-                onPress={() => navigation.navigate('LanguagePicker')}
+                className="flex-row items-center px-5 py-3.5"
+                onPress={() => navigation?.navigate?.('LanguagePicker')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Globe color={semanticColors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                  <Globe color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsLanguage}
                   </Text>
                   <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                    {LOCALE_DISPLAY_NAMES[locale] || locale}
+                    {LOCALE_DISPLAY_NAMES[locale as keyof typeof LOCALE_DISPLAY_NAMES] ?? locale ?? 'en-US'}
                   </Text>
                 </View>
-                <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               </TouchableOpacity>
             </View>
           </View>
@@ -339,10 +347,10 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="px-5 mb-4">
             <PressableScale
               className="flex-row items-center rounded-xl px-5 py-4 bg-foreground/[0.03]"
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation?.navigate?.('Settings')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Settings color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <Settings color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -352,7 +360,7 @@ export default function ProfileScreen({ navigation }: any) {
                   {t.meMoreSettingsDesc}
                 </Text>
               </View>
-              <ChevronRight color={semanticColors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </PressableScale>
           </View>
         </Animated.View>

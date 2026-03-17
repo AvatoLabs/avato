@@ -1,21 +1,18 @@
 /**
  * AboutScreen — App info, version, links, and credits.
  */
-import Constants from 'expo-constants';
-import { ArrowLeft, ExternalLink, Github, Heart } from 'lucide-react-native';
+import { ArrowLeft, ExternalLink, Github, Heart, Info } from 'lucide-react-native';
 import React from 'react';
 import { Image as RNImage, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { semanticColors } from '../constants/colors';
 import { haptics } from '../lib/haptics';
+import { APP_NAME, APP_VERSION } from '../lib/appInfo';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
-
-const APP_NAME = Constants.expoConfig?.name ?? 'Avato';
-const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 const PROJECT_URL = 'https://github.com/AvatoLabs/avatohub';
 const ORG_URL = 'https://github.com/AvatoLabs';
 
@@ -33,10 +30,10 @@ function LinkRow({
   return (
     <TouchableOpacity
       activeOpacity={0.6}
-      className="flex-row items-center px-4 py-3.5 mb-1 rounded-2xl active:bg-foreground/5"
+      className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
       onPress={() => {
         haptics.light();
-        Linking.openURL(url);
+        Linking.openURL(url).catch(() => {});
       }}
     >
       <View className="w-8 h-8 rounded-full bg-foreground/5 items-center justify-center mr-4">
@@ -51,25 +48,18 @@ function LinkRow({
 }
 
 export default function AboutScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
   const { t } = useI18n();
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-2.5">
-        <PressableScale
-          className="w-9 h-9 items-center justify-center rounded-full"
-          onPress={() => {
-            haptics.light();
-            navigation.goBack();
-          }}
-        >
-          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
-        </PressableScale>
-        <Text className="text-[17px] font-semibold text-foreground">{t.meAbout}</Text>
-        <View className="w-9 h-9" />
-      </View>
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.meAbout}
+        onPressLeft={() => {
+          haptics.light();
+          navigation.goBack();
+        }}
+      />
 
       <ScrollView
         className="flex-1"
@@ -103,7 +93,7 @@ export default function AboutScreen({ navigation }: any) {
 
         {/* Links */}
         <Animated.View className="w-full px-5" entering={FadeInDown.delay(150).duration(350)}>
-          <Text className="px-3 mb-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+          <Text className="px-2 mb-2 text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
             {t.aboutLinks}
           </Text>
           <LinkRow

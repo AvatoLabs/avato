@@ -1,6 +1,6 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 
-import type { SessionGroupItem } from '../schemas';
+import type { NewSessionGroup, SessionGroupItem } from '../schemas';
 import { sessionGroups } from '../schemas';
 import type { LobeChatDatabase } from '../type';
 import { idGenerator } from '../utils/idGenerator';
@@ -14,7 +14,7 @@ export class SessionGroupModel {
     this.db = db;
   }
 
-  create = async (params: { name: string; sort?: number }) => {
+  create = async (params: Omit<NewSessionGroup, 'userId'>) => {
     const [result] = await this.db
       .insert(sessionGroups)
       .values({ ...params, id: this.genId(), userId: this.userId })

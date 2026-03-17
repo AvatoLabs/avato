@@ -34,10 +34,12 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { semanticColors } from '../constants/colors';
 import { useToast } from '../components/ui/Toast';
 import { userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { useUserStore } from '../store/user';
 import { tokens } from '../theme/tokens';
 
@@ -90,6 +92,7 @@ export default function ProfileEditScreen({ navigation }: any) {
   const trimmedFullName = fullName.trim();
   const isNameDirty = trimmedFullName !== (storeProfile?.fullName || '').trim();
   const canSaveProfile = Boolean(trimmedFullName) && isNameDirty && !savingName;
+  const resolvedAvatarUri = useResolvedRemoteAsset(avatarUri);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -122,8 +125,10 @@ export default function ProfileEditScreen({ navigation }: any) {
     setSavingAvatar(true);
     try {
       const mimeType = asset.mimeType || 'image/jpeg';
-      await userApi.uploadAvatar(asset.uri, mimeType);
-      setAvatarUri(asset.uri);
+      const uploadedAvatar = await userApi.uploadAvatar(asset.uri, mimeType);
+      updateField({ avatar: uploadedAvatar });
+      setAvatarUri(uploadedAvatar);
+      void fetchUser();
       haptics.success();
       toast.show('success', t.profileSaved);
     } catch {
@@ -211,7 +216,7 @@ export default function ProfileEditScreen({ navigation }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+          leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
           title={t.profileTitle}
           rightElement={
             <Text
@@ -234,7 +239,7 @@ export default function ProfileEditScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.profileTitle}
         rightElement={
           <Text
@@ -279,9 +284,9 @@ export default function ProfileEditScreen({ navigation }: any) {
                 </Text>
                 {savingAvatar ? (
                   <ActivityIndicator color="#007aff" size="small" />
-                ) : avatarUri ? (
+                ) : resolvedAvatarUri ? (
                   <RNImage
-                    source={{ uri: avatarUri }}
+                    source={{ uri: resolvedAvatarUri }}
                     style={{ width: 40, height: 40, borderRadius: 8 }}
                   />
                 ) : (

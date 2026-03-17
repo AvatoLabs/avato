@@ -307,6 +307,7 @@ table api_keys {
   id text [pk, not null]
   name varchar(256) [not null]
   key varchar(256) [not null, unique]
+  key_hash varchar(128) [unique]
   enabled boolean [default: true]
   expires_at "timestamp with time zone"
   last_used_at "timestamp with time zone"
@@ -1272,6 +1273,23 @@ table session_groups {
   }
 }
 
+table session_tags {
+  id text [pk, not null]
+  color text
+  name text [not null]
+  sort integer
+  user_id text [not null]
+  client_id text
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (client_id, user_id) [name: 'session_tags_client_id_user_id_unique', unique]
+    user_id [name: 'session_tags_user_id_idx']
+  }
+}
+
 table sessions {
   id text [pk, not null]
   slug varchar(100) [not null]
@@ -1282,6 +1300,7 @@ table sessions {
   type text [default: 'agent']
   user_id text [not null]
   group_id text
+  tag_id text
   client_id text
   pinned boolean [default: false]
   accessed_at "timestamp with time zone" [not null, default: `now()`]
@@ -1295,6 +1314,7 @@ table sessions {
     (id, user_id) [name: 'sessions_id_user_id_idx']
     (user_id, updated_at) [name: 'sessions_user_id_updated_at_idx']
     group_id [name: 'sessions_group_id_idx']
+    tag_id [name: 'sessions_tag_id_idx']
   }
 }
 
@@ -1767,6 +1787,8 @@ ref: messages_files.file_id > files.id
 
 ref: messages_files.message_id > messages.id
 
+ref: messages.id - message_translates.id
+
 ref: messages.session_id - sessions.id
 
 ref: messages.parent_id - messages.id
@@ -1778,6 +1800,8 @@ ref: threads.source_message_id - messages.id
 ref: messages.message_group_id > message_groups.id
 
 ref: sessions.group_id - session_groups.id
+
+ref: sessions.tag_id - session_tags.id
 
 ref: topic_documents.document_id > documents.id
 

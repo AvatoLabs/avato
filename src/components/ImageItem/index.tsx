@@ -42,6 +42,7 @@ interface ImageItemProps {
   editable?: boolean;
   loading?: boolean;
   onClick?: () => void;
+  onError?: ImageProps['onError'];
   onRemove?: () => void;
   preview?: ImageProps['preview'];
   style?: CSSProperties;
@@ -49,7 +50,18 @@ interface ImageItemProps {
 }
 
 const ImageItem = memo<ImageItemProps>(
-  ({ className, style, editable, alt, onRemove, url, loading, alwaysShowClose, preview }) => {
+  ({
+    className,
+    style,
+    editable,
+    alt,
+    onError,
+    onRemove,
+    url,
+    loading,
+    alwaysShowClose,
+    preview,
+  }) => {
     const IMAGE_SIZE = editable ? MIN_IMAGE_SIZE : '100%';
     const { isSafari } = usePlatform();
 
@@ -78,6 +90,7 @@ const ImageItem = memo<ImageItemProps>(
             />
           )
         }
+        onError={onError}
       />
     );
   },

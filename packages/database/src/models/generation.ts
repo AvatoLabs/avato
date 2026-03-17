@@ -180,24 +180,37 @@ export class GenerationModel {
   async transformGeneration(generation: GenerationWithAsyncTask): Promise<Generation> {
     // Process asset URLs if they exist, following the same logic as in generationBatch.ts
     const asset = generation.asset as ImageGenerationAsset | VideoGenerationAsset | null;
-    if (asset && asset.url && asset.thumbnailUrl) {
-      const urlPromises: Promise<string>[] = [
-        this.fileService.getFullFileUrl(asset.url),
-        this.fileService.getFullFileUrl(asset.thumbnailUrl),
-      ];
+    if (asset) {
+      const urlPromises: Promise<string>[] = [];
+      const assignResolvedUrl: Array<(value: string) => void> = [];
 
-      // Also convert coverUrl for video assets
-      const videoAsset = asset as VideoGenerationAsset;
-      const hasCoverUrl = videoAsset.coverUrl;
-      if (hasCoverUrl) {
-        urlPromises.push(this.fileService.getFullFileUrl(videoAsset.coverUrl!));
+      if (asset.url) {
+        urlPromises.push(this.fileService.getFullFileUrl(asset.url));
+        assignResolvedUrl.push((value) => {
+          asset.url = value;
+        });
       }
 
-      const urls = await Promise.all(urlPromises);
-      asset.url = urls[0];
-      asset.thumbnailUrl = urls[1];
-      if (hasCoverUrl) {
-        videoAsset.coverUrl = urls[2];
+      if (asset.thumbnailUrl) {
+        urlPromises.push(this.fileService.getFullFileUrl(asset.thumbnailUrl));
+        assignResolvedUrl.push((value) => {
+          asset.thumbnailUrl = value;
+        });
+      }
+
+      const videoAsset = asset as VideoGenerationAsset;
+      if (videoAsset.coverUrl) {
+        urlPromises.push(this.fileService.getFullFileUrl(videoAsset.coverUrl));
+        assignResolvedUrl.push((value) => {
+          videoAsset.coverUrl = value;
+        });
+      }
+
+      if (urlPromises.length > 0) {
+        const urls = await Promise.all(urlPromises);
+        urls.forEach((value, index) => {
+          assignResolvedUrl[index]?.(value);
+        });
       }
     }
 
@@ -206,6 +219,7 @@ export class GenerationModel {
       asset,
       asyncTaskId: generation.asyncTaskId || null,
       createdAt: generation.createdAt,
+      fileId: generation.fileId || null,
       id: generation.id,
       seed: generation.seed,
       task: {

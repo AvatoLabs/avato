@@ -30,6 +30,7 @@ export interface LobeAgentSession {
   meta: MetaData;
   model: string;
   pinned?: boolean;
+  tagId?: string | null;
   tags?: string[];
   type: LobeSessionType.Agent;
   updatedAt: Date;
@@ -45,6 +46,7 @@ export interface LobeGroupSession {
   members?: GroupMemberWithAgent[];
   meta: MetaData;
   pinned?: boolean;
+  tagId?: string | null;
   tags?: string[];
   type: LobeSessionType.Group;
   updatedAt: Date;

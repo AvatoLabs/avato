@@ -43,6 +43,7 @@ import { ragEvalRouter } from './ragEval';
 import { searchRouter } from './search';
 import { sessionRouter } from './session';
 import { sessionGroupRouter } from './sessionGroup';
+import { sessionTagRouter } from './sessionTag';
 import { shareRouter } from './share';
 import { threadRouter } from './thread';
 import { topicRouter } from './topic';
@@ -91,6 +92,7 @@ export const lambdaRouter = router({
   search: searchRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
+  sessionTag: sessionTagRouter,
   share: shareRouter,
   thread: threadRouter,
   topic: topicRouter,

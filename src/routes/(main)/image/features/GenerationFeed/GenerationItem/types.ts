@@ -19,6 +19,7 @@ export interface SuccessStateProps {
   aspectRatio: string;
   generation: Generation;
   generationBatch: GenerationBatch;
+  onImageLoadFailed: (url?: string) => void;
   onCopySeed?: () => void;
   onDelete: () => void;
   onDownload: () => void;
@@ -28,8 +29,11 @@ export interface SuccessStateProps {
 
 export interface ErrorStateProps {
   aspectRatio: string;
+  actionTitle?: string;
+  errorMessage?: string;
   generation: Generation;
   generationBatch: GenerationBatch;
+  onAction?: () => void;
   onCopyError: () => void;
   onDelete: () => void;
 }

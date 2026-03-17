@@ -10,24 +10,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
-import { sessionApi } from '../lib/api';
+import { agentGroupApi, sessionApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import type { ChatSession, CreateSessionConfig } from '../types';
 
-const SESSION_AGENT_MAP_KEY = 'avato_mobile_session_agent_map_v1';
+type FetchSessionsOptions = {
+  throwOnError?: boolean;
+};
 
 interface SessionState {
   activeSessionId: string | null;
   createSession: (titleOrConfig?: string | CreateSessionConfig) => Promise<string>;
   duplicateSession: (id: string) => Promise<string | null>;
+  errorMessage: string | null;
   // Actions
-  fetchSessions: () => Promise<void>;
+  fetchSessions: (options?: FetchSessionsOptions) => Promise<ChatSession[]>;
 
   /** Whether the initial fetch has completed */
   initialized: boolean;
   loading: boolean;
-  moveToGroup: (sessionId: string, groupId: string) => Promise<void>;
   /** IDs currently being deleted — fetchSessions filters these out to prevent "resurrection" */
   pendingDeletes: Set<string>;
   pinSession: (id: string) => Promise<void>;
@@ -39,11 +41,15 @@ interface SessionState {
   unpinSession: (id: string) => Promise<void>;
   /** Immediately update model/provider on a session (local-only, for instant UI feedback) */
   updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => void;
+  updateSessionTag: (id: string, tagId?: string | null) => Promise<void>;
+  /** Update session title locally (e.g. after auto-generation) */
+  updateSessionTitle: (id: string, title: string) => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   initialized: false,
   loading: false,
+  errorMessage: null,
   sessions: [],
   activeSessionId: null,
   pendingDeletes: new Set<string>(),
@@ -52,6 +58,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     void AsyncStorage.removeItem('activeSessionId');
     set({
       activeSessionId: null,
+      errorMessage: null,
       initialized: false,
       loading: false,
       pendingDeletes: new Set<string>(),
@@ -59,72 +66,64 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
   },
 
-  fetchSessions: async () => {
+  fetchSessions: async (options) => {
     set({ loading: true });
     try {
       const sessions = await sessionApi.list();
       const stored = await AsyncStorage.getItem('activeSessionId');
-      const sessionAgentMapRaw = await AsyncStorage.getItem(SESSION_AGENT_MAP_KEY);
-      const sessionAgentMap = sessionAgentMapRaw ? (JSON.parse(sessionAgentMapRaw) as Record<string, string>) : {};
-
-      // Overlay per-session model/provider from AsyncStorage only when server has no value
-      const settingsKeys = (sessions ?? []).map((s) => `avato_chat_settings_${s.id}`);
-      if (settingsKeys.length > 0) {
-        try {
-          const pairs = await AsyncStorage.multiGet(settingsKeys);
-          for (const [key, raw] of pairs) {
-            if (!raw) continue;
-            try {
-              const saved = JSON.parse(raw);
-              const sid = key.replace('avato_chat_settings_', '');
-              const sess = sessions?.find((s) => s.id === sid);
-              if (sess) {
-                if (!sess.model && saved.model) sess.model = saved.model;
-                if (!sess.provider && saved.provider) sess.provider = saved.provider;
-                if (!sess.agentId && sessionAgentMap[sid]) sess.agentId = sessionAgentMap[sid];
-              }
-            } catch {
-              /* ignore parse error */
-            }
-          }
-        } catch {
-          /* multiGet failed, use server-side values */
-        }
-      }
 
       const pending = get().pendingDeletes;
       const filtered = (sessions ?? []).filter((s) => !pending.has(s.id));
+      const nextActiveSessionId =
+        stored && filtered.some((session) => session.id === stored)
+          ? stored
+          : (filtered[0]?.id ?? null);
 
       set({
         sessions: filtered,
-        activeSessionId: stored || (filtered[0]?.id ?? null),
+        activeSessionId: nextActiveSessionId,
+        errorMessage: null,
         initialized: true,
         loading: false,
       });
+      return filtered;
     } catch (err) {
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t[messageKey]);
-      set({ loading: false, initialized: true });
+      set({ errorMessage: t[messageKey], loading: false, initialized: true });
+      if (options?.throwOnError) throw err;
+      return [];
     }
   },
 
   createSession: async (titleOrConfig) => {
-    const config: CreateSessionConfig =
+    const inputConfig: CreateSessionConfig =
       typeof titleOrConfig === 'string' ? { title: titleOrConfig } : (titleOrConfig ?? {});
-    const title = config.title || 'New Conversation';
-    const { agentId, ...requestConfig } = config;
+    const requestConfig: CreateSessionConfig = {
+      avatar: inputConfig.avatar,
+      description: inputConfig.description,
+      model: inputConfig.model,
+      plugins: inputConfig.plugins,
+      provider: inputConfig.provider,
+      systemPrompt: inputConfig.systemPrompt,
+      tagId: inputConfig.tagId,
+      title: inputConfig.title,
+    };
+    const title = requestConfig.title || 'New Conversation';
 
     try {
       const newId = await sessionApi.create(requestConfig);
 
       const placeholder: ChatSession = {
-        agentId,
         id: newId,
         title,
-        avatar: config.avatar,
-        model: config.model,
-        provider: config.provider,
+        avatar: requestConfig.avatar,
+        description: requestConfig.description,
+        model: requestConfig.model,
+        provider: requestConfig.provider,
+        tagId: requestConfig.tagId,
+        type: 'agent',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -135,12 +134,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }));
 
       await AsyncStorage.setItem('activeSessionId', newId);
-      if (agentId) {
-        const mapRaw = await AsyncStorage.getItem(SESSION_AGENT_MAP_KEY);
-        const mapObj = mapRaw ? (JSON.parse(mapRaw) as Record<string, string>) : {};
-        mapObj[newId] = agentId;
-        await AsyncStorage.setItem(SESSION_AGENT_MAP_KEY, JSON.stringify(mapObj));
-      }
 
       get().fetchSessions();
       return newId;
@@ -149,18 +142,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t[messageKey]);
-      const localId = `local-${Date.now()}`;
-      const fallback: ChatSession = {
-        id: localId,
-        title,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      set((s) => ({
-        sessions: [fallback, ...s.sessions],
-        activeSessionId: localId,
-      }));
-      return localId;
+      throw err;
     }
   },
 
@@ -170,11 +152,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const nextPending = new Set(get().pendingDeletes);
     nextPending.add(id);
 
-    set((s) => ({
-      sessions: s.sessions.filter((sess) => sess.id !== id),
-      activeSessionId: s.activeSessionId === id ? (s.sessions[0]?.id ?? null) : s.activeSessionId,
-      pendingDeletes: nextPending,
-    }));
+    set((s) => {
+      const remaining = s.sessions.filter((sess) => sess.id !== id);
+      return {
+        sessions: remaining,
+        activeSessionId: s.activeSessionId === id ? (remaining[0]?.id ?? null) : s.activeSessionId,
+        pendingDeletes: nextPending,
+      };
+    });
 
     try {
       if (isChatGroup) {
@@ -221,18 +206,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
-  moveToGroup: async (sessionId: string, groupId: string) => {
-    set((s) => ({
-      sessions: s.sessions.map((sess) => (sess.id === sessionId ? { ...sess, groupId } : sess)),
-    }));
-    try {
-      await sessionApi.updateGroup(sessionId, groupId);
-    } catch (err) {
-      console.warn('[SessionStore] moveToGroup error:', err);
-      get().fetchSessions();
-    }
-  },
-
   duplicateSession: async (id: string) => {
     try {
       // cloneSession returns the new session ID string directly
@@ -253,7 +226,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, title } : sess)),
     }));
     try {
-      await sessionApi.rename(id, title);
+      const target = get().sessions.find((session) => session.id === id);
+
+      if (target?.type === 'group') {
+        await agentGroupApi.updateGroup(id, { title });
+      } else {
+        await sessionApi.rename(id, title);
+      }
     } catch (err) {
       console.warn('[SessionStore] renameSession error:', err);
       get().fetchSessions();
@@ -263,6 +242,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => {
     set((s) => ({
       sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, ...meta } : sess)),
+    }));
+  },
+
+  updateSessionTag: async (id: string, tagId?: string | null) => {
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === id ? { ...sess, tagId: tagId || undefined } : sess,
+      ),
+    }));
+    try {
+      await sessionApi.updateTag(id, tagId);
+    } catch (err) {
+      console.warn('[SessionStore] updateSessionTag error:', err);
+      get().fetchSessions();
+      throw err;
+    }
+  },
+
+  updateSessionTitle: (id: string, title: string) => {
+    set((s) => ({
+      sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, title } : sess)),
     }));
   },
 }));

@@ -2,7 +2,7 @@
 
 import { App } from 'antd';
 import dayjs from 'dayjs';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDownloadImage } from '@/hooks/useDownloadImage';
@@ -25,10 +25,13 @@ export const GenerationItem = memo<GenerationItemProps>(
     const { t } = useTranslation('image');
     const useCheckGenerationStatus = useImageStore((s) => s.useCheckGenerationStatus);
     const deleteGeneration = useImageStore((s) => s.removeGeneration);
+    const refreshGenerationBatches = useImageStore((s) => s.refreshGenerationBatches);
     const reuseSeed = useImageStore((s) => s.reuseSeed);
     const activeTopicId = useImageStore((s) => s.activeGenerationTopicId);
     const isSupportSeed = useImageStore(isSupportedParamSelector('seed'));
     const { downloadImage } = useDownloadImage();
+    const hasRetriedBrokenImageRef = useRef(false);
+    const [assetLoadFailed, setAssetLoadFailed] = useState(false);
 
     const isFinalized =
       generation.task.status === AsyncTaskStatus.Success ||
@@ -38,6 +41,22 @@ export const GenerationItem = memo<GenerationItemProps>(
     useCheckGenerationStatus(generation.id, generation.task.id, activeTopicId!, shouldPoll);
 
     const aspectRatio = getAspectRatio(generation, generationBatch);
+    const hasRenderableAsset =
+      !!generation.fileId ||
+      !!generation.asset?.url ||
+      !!generation.asset?.thumbnailUrl ||
+      !!generation.asset?.originalUrl?.match(/^https?:\/\//);
+
+    useEffect(() => {
+      hasRetriedBrokenImageRef.current = false;
+      setAssetLoadFailed(false);
+    }, [
+      generation.asset?.originalUrl,
+      generation.asset?.thumbnailUrl,
+      generation.asset?.url,
+      generation.fileId,
+      generation.id,
+    ]);
 
     // Event handler functions
     const handleDeleteGeneration = useCallback(async () => {
@@ -49,7 +68,8 @@ export const GenerationItem = memo<GenerationItemProps>(
     }, [deleteGeneration, generation.id]);
 
     const handleDownloadImage = useCallback(async () => {
-      if (!generation.asset?.url) return;
+      const downloadUrl = generation.fileId ? `/f/${generation.fileId}` : generation.asset?.url;
+      if (!downloadUrl || !generation.asset?.url) return;
 
       // Generate filename with prompt and timestamp
       const timestamp = dayjs(generation.createdAt).format('YYYY-MM-DD_HH-mm-ss');
@@ -60,8 +80,8 @@ export const GenerationItem = memo<GenerationItemProps>(
       const fileExtension = inferFileExtensionFromImageUrl(generation.asset.url);
       const fileName = `${safePrompt}_${timestamp}.${fileExtension}`;
 
-      await downloadImage(generation.asset.url, fileName);
-    }, [downloadImage, generation.asset?.url, generation.createdAt, prompt]);
+      await downloadImage(downloadUrl, fileName);
+    }, [downloadImage, generation.asset?.url, generation.createdAt, generation.fileId, prompt]);
 
     const handleCopySeed = useCallback(async () => {
       if (!generation.seed) return;
@@ -104,8 +124,52 @@ export const GenerationItem = memo<GenerationItemProps>(
       }
     }, [generation.task.error, message, t]);
 
+    const handleImageLoadFailed = useCallback(async () => {
+      if (!hasRetriedBrokenImageRef.current) {
+        hasRetriedBrokenImageRef.current = true;
+
+        try {
+          await refreshGenerationBatches();
+          return;
+        } catch (error) {
+          console.error('Failed to refresh generation batch after image load error:', error);
+        }
+      }
+
+      setAssetLoadFailed(true);
+      message.error(t('generation.status.imageUnavailable'));
+    }, [message, refreshGenerationBatches, t]);
+
+    const handleRetryBrokenImage = useCallback(async () => {
+      setAssetLoadFailed(false);
+      hasRetriedBrokenImageRef.current = true;
+
+      try {
+        await refreshGenerationBatches();
+      } catch (error) {
+        console.error('Failed to retry image loading:', error);
+        setAssetLoadFailed(true);
+        message.error(t('generation.status.imageUnavailable'));
+      }
+    }, [message, refreshGenerationBatches, t]);
+
     // Render corresponding component based on status
-    if (generation.task.status === AsyncTaskStatus.Success && generation.asset?.url) {
+    if (generation.task.status === AsyncTaskStatus.Success && hasRenderableAsset) {
+      if (assetLoadFailed) {
+        return (
+          <ErrorState
+            actionTitle={t('generation.actions.retryLoad')}
+            aspectRatio={aspectRatio}
+            errorMessage={t('generation.status.imageUnavailable')}
+            generation={generation}
+            generationBatch={generationBatch}
+            onAction={handleRetryBrokenImage}
+            onCopyError={handleCopyError}
+            onDelete={handleDeleteGeneration}
+          />
+        );
+      }
+
       const seedTooltip = isSupportSeed
         ? t('generation.actions.applySeed')
         : t('generation.actions.copySeed');
@@ -120,6 +184,7 @@ export const GenerationItem = memo<GenerationItemProps>(
           onCopySeed={handleCopySeed}
           onDelete={handleDeleteGeneration}
           onDownload={handleDownloadImage}
+          onImageLoadFailed={handleImageLoadFailed}
         />
       );
     }

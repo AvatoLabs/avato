@@ -37,12 +37,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { memoryApi, type MemoryExtractionTask } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { tokens } from '../theme/tokens';
 import type {
   MemoryActivityItem,
   MemoryContextItem,
@@ -84,7 +85,10 @@ function getItemTitle(item: AnyMemoryItem, layer: MemoryLayer): string {
   switch (layer) {
     case 'identity': {
       return (
-        (item as MemoryIdentityItem).title || (item as MemoryIdentityItem).summary || 'Identity'
+        (item as MemoryIdentityItem).title ||
+        (item as MemoryIdentityItem).summary ||
+        (item as MemoryIdentityItem).description ||
+        'Identity'
       );
     }
     case 'context': {
@@ -117,7 +121,7 @@ function getItemTitle(item: AnyMemoryItem, layer: MemoryLayer): string {
 function getItemSubtext(item: AnyMemoryItem, layer: MemoryLayer): string {
   switch (layer) {
     case 'identity': {
-      return (item as MemoryIdentityItem).summary || '';
+      return (item as MemoryIdentityItem).summary || (item as MemoryIdentityItem).description || '';
     }
     case 'context': {
       return (item as MemoryContextItem).description || '';
@@ -185,11 +189,11 @@ function HomeTab() {
             const [nextPersona, nextRoles] = await Promise.all([
               memoryApi.getPersona().catch(() => null),
               memoryApi
-                .queryIdentityRoles({ page: 0, pageSize: 50 })
-                .catch(() => ({ items: [], total: 0 })),
+                .queryIdentityRoles({ page: 1, size: 50 })
+                .catch(() => ({ roles: [], tags: [] })),
             ]);
             setPersona(nextPersona);
-            setRoles((nextRoles as any)?.items || []);
+            setRoles(nextRoles.roles || []);
           }
         } catch {
           // Keep the last known task state if polling fails transiently.
@@ -205,12 +209,12 @@ function HomeTab() {
       const [p, r, task] = await Promise.all([
         memoryApi.getPersona().catch(() => null),
         memoryApi
-          .queryIdentityRoles({ page: 0, pageSize: 50 })
-          .catch(() => ({ items: [], total: 0 })),
+          .queryIdentityRoles({ page: 1, size: 50 })
+          .catch(() => ({ roles: [], tags: [] })),
         memoryApi.getMemoryExtractionTask().catch(() => null),
       ]);
       setPersona(p);
-      setRoles((r as any)?.items || []);
+      setRoles(r.roles || []);
 
       setExtractionTask(task);
       if (task && (task.status === 'Pending' || task.status === 'Processing')) {
@@ -733,21 +737,16 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
 export default function MemoryScreen() {
   const { t } = useI18n();
   const nav = useNavigation<any>();
-  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<MemoryLayer | 'home'>('home');
   const scrollRef = useRef<ScrollView>(null);
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* Header */}
-      <View className="flex-row items-center px-5 py-3">
-        <TouchableOpacity className="mr-3" onPress={() => nav.goBack()}>
-          <ArrowLeft color={semanticColors.foreground} size={24} strokeWidth={1.8} />
-        </TouchableOpacity>
-        <Brain color={semanticColors.primary} size={22} strokeWidth={1.8} />
-        <Text className="text-lg font-bold text-foreground ml-2">{t.memoryTitle}</Text>
-      </View>
-
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.memoryTitle}
+        onPressLeft={() => nav.goBack()}
+      >
       {/* Tab Bar */}
       <ScrollView
         horizontal
@@ -782,6 +781,7 @@ export default function MemoryScreen() {
 
       {/* Separator */}
       <View className="h-px bg-foreground/[0.06] mt-1" />
+      </ScreenHeader>
 
       {/* Tab Content */}
       {activeTab === 'home' ? <HomeTab /> : <MemoryListTab layer={activeTab} />}

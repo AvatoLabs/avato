@@ -32,7 +32,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
-import SwipeableRow from '../components/ui/SwipeableRow';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { semanticColors } from '../constants/colors';
 import { useToast } from '../components/ui/Toast';
 import { notebookApi, type NotebookDocument, topicApi } from '../lib/api';
@@ -404,31 +404,11 @@ export default function NotebookScreen({ route, navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      {/* Header */}
-      <View
-        className="flex-row items-center justify-between px-4"
-        style={{ paddingTop: insets.top + 6, paddingBottom: 10 }}
-      >
-        <TouchableOpacity
-          className="flex-row items-center"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
-          <Text className="text-[17px] font-semibold text-foreground ml-3">
-            {t.notebookTitle}
-          </Text>
-        </TouchableOpacity>
-
-        <PressableScale disabled={creating} onPress={handleCreate}>
-          <View className="flex-row items-center rounded-full px-3.5 py-1.5 bg-primary/10">
-            <Plus color={semanticColors.primary} size={16} strokeWidth={2.5} />
-            <Text className="text-[13px] font-semibold ml-1" style={{ color: semanticColors.primary }}>
-              {t.notebookNewDoc}
-            </Text>
-          </View>
-        </PressableScale>
-      </View>
+      <ScreenHeader
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.notebookTitle}
+        onPressLeft={() => navigation.goBack()}
+      />
 
       {/* Content */}
       {loading ? (
@@ -472,12 +452,15 @@ export default function NotebookScreen({ route, navigation }: any) {
         >
           {documents.map((doc, index) => (
             <Animated.View entering={FadeInDown.delay(index * 40).duration(300)} key={doc.id}>
-              <SwipeableRow onDelete={() => handleDelete(doc)}>
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  className="flex-row items-center px-5 py-4 bg-background"
-                  onPress={() => handleOpenDoc(doc)}
-                >
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-5 py-4 bg-background"
+                onLongPress={() => {
+                  haptics.medium();
+                  handleDelete(doc);
+                }}
+                onPress={() => handleOpenDoc(doc)}
+              >
                   <View
                     className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
                     style={{ width: 44, height: 44 }}
@@ -500,7 +483,6 @@ export default function NotebookScreen({ route, navigation }: any) {
                     </Text>
                   </View>
                 </TouchableOpacity>
-              </SwipeableRow>
               {index < documents.length - 1 && (
                 <View className="mx-5 h-px bg-foreground/5" />
               )}

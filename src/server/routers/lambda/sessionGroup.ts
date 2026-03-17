@@ -69,8 +69,6 @@ export const sessionGroupRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      console.info('sortMap:', input.sortMap);
-
       return ctx.sessionGroupModel.updateOrder(input.sortMap);
     }),
 });

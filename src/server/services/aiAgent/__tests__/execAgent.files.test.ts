@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AiAgentService } from '../index';
 
-const { mockMessageCreate, mockCreateOperation, mockUploadFromUrl } = vi.hoisted(() => ({
+const { mockMessageCreate, mockCreateOperation, mockUploadFromUrl, mockFindFilesByIds } = vi.hoisted(() => ({
   mockCreateOperation: vi.fn(),
+  mockFindFilesByIds: vi.fn(),
   mockMessageCreate: vi.fn(),
   mockUploadFromUrl: vi.fn(),
 }));
@@ -35,6 +36,12 @@ vi.mock('@/database/models/agent', () => ({
       provider: 'openai',
       systemRole: 'You are a helpful assistant',
     }),
+  })),
+}));
+
+vi.mock('@/database/models/file', () => ({
+  FileModel: vi.fn().mockImplementation(() => ({
+    findByIds: mockFindFilesByIds,
   })),
 }));
 
@@ -130,9 +137,14 @@ describe('AiAgentService.execAgent - file upload handling', () => {
   let service: AiAgentService;
   const mockDb = {} as any;
   const userId = 'test-user-id';
+  const originalAppUrl = process.env.APP_URL;
+  const originalInternalAppUrl = process.env.INTERNAL_APP_URL;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.APP_URL = 'https://app.lobehub.com';
+    delete process.env.INTERNAL_APP_URL;
+    mockFindFilesByIds.mockResolvedValue([]);
     mockMessageCreate.mockResolvedValue({ id: 'msg-1' });
     mockCreateOperation.mockResolvedValue({
       autoStarted: true,
@@ -146,6 +158,17 @@ describe('AiAgentService.execAgent - file upload handling', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    if (originalAppUrl === undefined) {
+      delete process.env.APP_URL;
+    } else {
+      process.env.APP_URL = originalAppUrl;
+    }
+
+    if (originalInternalAppUrl === undefined) {
+      delete process.env.INTERNAL_APP_URL;
+    } else {
+      process.env.INTERNAL_APP_URL = originalInternalAppUrl;
+    }
   });
 
   describe('when files are provided', () => {
@@ -254,6 +277,40 @@ describe('AiAgentService.execAgent - file upload handling', () => {
 
       const userMessageCall = mockMessageCreate.mock.calls.find((call) => call[0].role === 'user');
       expect(userMessageCall![0].files).toBeUndefined();
+    });
+  });
+
+  describe('when existing internal file IDs are provided', () => {
+    it('should attach existing files without re-uploading them', async () => {
+      mockFindFilesByIds.mockResolvedValue([
+        {
+          fileType: 'image/png',
+          id: 'file-existing',
+          name: 'diagram.png',
+        },
+      ]);
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        existingFileIds: ['file-existing'],
+        prompt: 'Describe this diagram',
+      } as any);
+
+      expect(mockUploadFromUrl).not.toHaveBeenCalled();
+
+      const userMessageCall = mockMessageCreate.mock.calls.find((call) => call[0].role === 'user');
+      expect(userMessageCall![0].files).toEqual(['file-existing']);
+
+      const createOpArgs = mockCreateOperation.mock.calls[0][0];
+      const lastMessage = createOpArgs.initialMessages.at(-1);
+
+      expect(lastMessage.imageList).toEqual([
+        {
+          alt: 'diagram.png',
+          id: 'file-existing',
+          url: expect.stringContaining('/f/file-existing'),
+        },
+      ]);
     });
   });
 

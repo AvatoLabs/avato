@@ -1,6 +1,7 @@
 /**
  * DiscoverScreen → Tabbed marketplace (Agents / Models / Providers).
  */
+import { Compass } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, LayoutAnimation, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -13,6 +14,8 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { semanticColors } from '../constants/colors';
+import { tokens } from '../theme/tokens';
 import { useDiscoverStore } from '../store/discover';
 
 type Tab = 'agents' | 'models' | 'providers';
@@ -117,7 +120,10 @@ export default function DiscoverScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t.discoverTitle} />
+      <ScreenHeader
+        title={t.discoverTitle}
+        titleIcon={<Compass color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+      />
       {activeTab === 'agents' ? (
         <FlatList
           contentContainerStyle={{ paddingBottom: 30 }}

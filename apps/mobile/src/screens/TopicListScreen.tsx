@@ -1,16 +1,17 @@
 /**
  * TopicListScreen — Lists topics for a session with search, create, and management.
+ * Aligned with Memory/Settings subpage style: ScreenHeader + consistent content padding.
  */
 import { ArrowLeft, MessageCircle, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import PressableScale from '../components/ui/PressableScale';
 import PromptModal from '../components/ui/PromptModal';
+import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
+import { semanticColors } from '../constants/colors';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -19,13 +20,13 @@ import { tokens } from '../theme/tokens';
 
 export default function TopicListScreen({ route, navigation }: any) {
   const sessionId = route.params?.sessionId;
-  const insets = useSafeAreaInsets();
+  const sessionKey = sessionId ?? '__invalid_session__';
   const { t } = useI18n();
   const toast = useToast();
 
-  const topics = useTopicStore((s) => s.topics);
-  const activeTopic = useTopicStore((s) => s.activeTopic);
-  const loading = useTopicStore((s) => s.loading);
+  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
+  const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
+  const loading = useTopicStore((s) => s.loadingBySession[sessionKey] ?? false);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
   const removeTopic = useTopicStore((s) => s.removeTopic);
@@ -71,7 +72,7 @@ export default function TopicListScreen({ route, navigation }: any) {
       if (!sessionId) return;
 
       try {
-        switchTopic(topicId);
+        switchTopic(sessionId, topicId);
         void fetchMessages(sessionId, topicId ?? undefined);
         navigation.goBack();
       } catch {
@@ -92,27 +93,19 @@ export default function TopicListScreen({ route, navigation }: any) {
   });
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center justify-between px-4 py-2.5">
-        <PressableScale
-          className="w-9 h-9 items-center justify-center rounded-full"
-          onPress={() => {
-            haptics.light();
-            navigation.goBack();
-          }}
-        >
-          <ArrowLeft color="#111" size={22} strokeWidth={tokens.icon.strokeWidth} />
-        </PressableScale>
-        <Text className="text-[17px] font-semibold text-foreground">{t.topicTitle}</Text>
-        <PressableScale
-          className="w-9 h-9 items-center justify-center rounded-full"
-          onPress={handleCreateTopic}
-        >
-          <Plus color="#007aff" size={22} strokeWidth={tokens.icon.strokeWidth} />
-        </PressableScale>
-      </View>
+    <View className="flex-1 bg-background">
+      <ScreenHeader
+        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        rightElement={<Plus color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        title={t.topicTitle}
+        onPressRight={handleCreateTopic}
+        onPressLeft={() => {
+          haptics.light();
+          navigation.goBack();
+        }}
+      />
 
-      <View className="px-4 pb-3">
+      <View className="px-5 pb-3 pt-1">
         <View className="bg-foreground/5 rounded-xl px-4 py-2.5 flex-row items-center">
           <TextInput
             className="flex-1 text-foreground text-[15px]"
@@ -127,13 +120,13 @@ export default function TopicListScreen({ route, navigation }: any) {
       <Animated.View entering={FadeInDown.delay(50).duration(250)}>
         <TouchableOpacity
           activeOpacity={0.6}
-          className={`flex-row items-center px-5 py-3.5 rounded-xl mx-3 mb-2 ${
+          className={`flex-row items-center px-5 py-3.5 rounded-2xl mx-5 mb-2 ${
             activeTopic === null ? 'bg-primary/10' : 'active:bg-foreground/5'
           }`}
           onPress={() => handleSwitchTopic(null)}
         >
           <MessageCircle
-            color={activeTopic === null ? '#007aff' : '#666'}
+            color={activeTopic === null ? semanticColors.primary : semanticColors.secondaryText}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -163,9 +156,9 @@ export default function TopicListScreen({ route, navigation }: any) {
         }
         refreshControl={
           <RefreshControl
-            colors={['#007aff']}
+            colors={[semanticColors.primary]}
             refreshing={refreshing}
-            tintColor="#007aff"
+            tintColor={semanticColors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -176,7 +169,7 @@ export default function TopicListScreen({ route, navigation }: any) {
             onDelete={() => removeTopic(item.id, sessionId)}
             onFavorite={() => favoriteTopic(item.id)}
             onPress={() => handleSwitchTopic(item.id)}
-            onRename={(newTitle) => updateTopic(item.id, newTitle)}
+            onRename={(newTitle) => updateTopic(item.id, sessionId, newTitle)}
           />
         )}
       />

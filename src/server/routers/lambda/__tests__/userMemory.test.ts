@@ -11,8 +11,18 @@ const mockUpdate = vi.fn();
 const mockFindById = vi.fn();
 
 const mockCountTopicsForMemoryExtractor = vi.fn();
-const { mockTriggerProcessUsers } = vi.hoisted(() => ({
+const {
+  mockAddIdentityEntry,
+  mockExperienceUpdate,
+  mockGetAllIdentitiesWithMemory,
+  mockTriggerProcessUsers,
+  mockUpdateIdentityEntry,
+} = vi.hoisted(() => ({
+  mockAddIdentityEntry: vi.fn(),
+  mockExperienceUpdate: vi.fn(),
+  mockGetAllIdentitiesWithMemory: vi.fn(),
   mockTriggerProcessUsers: vi.fn(),
+  mockUpdateIdentityEntry: vi.fn(),
 }));
 
 vi.mock('@/database/models/asyncTask', () => ({
@@ -28,6 +38,38 @@ vi.mock('@/database/models/asyncTask', () => ({
 vi.mock('@/database/models/topic', () => ({
   TopicModel: vi.fn(() => ({
     countTopicsForMemoryExtractor: mockCountTopicsForMemoryExtractor,
+  })),
+}));
+
+vi.mock('@/database/models/userMemory', () => ({
+  UserMemoryActivityModel: vi.fn(() => ({
+    delete: vi.fn(),
+    update: vi.fn(),
+  })),
+  UserMemoryContextModel: vi.fn(() => ({
+    delete: vi.fn(),
+    update: vi.fn(),
+  })),
+  UserMemoryExperienceModel: vi.fn(() => ({
+    delete: vi.fn(),
+    update: mockExperienceUpdate,
+  })),
+  UserMemoryIdentityModel: vi.fn(() => ({
+    delete: vi.fn(),
+  })),
+  UserMemoryModel: vi.fn(() => ({
+    addIdentityEntry: mockAddIdentityEntry,
+    getAllIdentitiesWithMemory: mockGetAllIdentitiesWithMemory,
+    removeIdentityEntry: vi.fn(),
+    searchActivities: vi.fn(),
+    searchContexts: vi.fn(),
+    searchExperiences: vi.fn(),
+    searchPreferences: vi.fn(),
+    updateIdentityEntry: mockUpdateIdentityEntry,
+  })),
+  UserMemoryPreferenceModel: vi.fn(() => ({
+    delete: vi.fn(),
+    update: vi.fn(),
   })),
 }));
 
@@ -266,5 +308,157 @@ describe('userMemoryRouter.getMemoryExtractionTask', () => {
       },
       status: AsyncTaskStatus.Error,
     });
+  });
+});
+
+describe('userMemoryRouter identity contracts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('passes title and summary into base memory when creating an identity', async () => {
+    mockAddIdentityEntry.mockResolvedValue({
+      identityId: 'identity-1',
+      userMemoryId: 'memory-1',
+    });
+
+    const caller = createCaller();
+    const result = await caller.createIdentity({
+      description: 'Arthur profile',
+      role: 'founder',
+      summary: 'Key profile summary',
+      title: 'Arthur',
+    });
+
+    expect(mockAddIdentityEntry).toHaveBeenCalledWith({
+      base: {
+        summary: 'Key profile summary',
+        title: 'Arthur',
+      },
+      identity: {
+        description: 'Arthur profile',
+        episodicDate: undefined,
+        relationship: undefined,
+        role: 'founder',
+        tags: undefined,
+        type: undefined,
+      },
+    });
+    expect(result).toEqual({
+      identityId: 'identity-1',
+      userMemoryId: 'memory-1',
+    });
+  });
+
+  it('flattens identity base fields for mobile consumers', async () => {
+    mockGetAllIdentitiesWithMemory.mockResolvedValue([
+      {
+        identity: {
+          capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+          createdAt: new Date('2024-01-02T00:00:00.000Z'),
+          description: 'Likes concise status updates',
+          episodicDate: null,
+          id: 'identity-1',
+          relationship: 'self',
+          role: 'operator',
+          tags: ['ops'],
+          type: 'professional',
+          updatedAt: new Date('2024-01-03T00:00:00.000Z'),
+          userId: 'user-1',
+          userMemoryId: 'memory-1',
+        },
+        memory: {
+          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+          createdAt: new Date('2024-01-01T00:00:00.000Z'),
+          memoryCategory: 'profile',
+          memoryLayer: 'identity',
+          memoryType: 'identity',
+          status: 'active',
+          summary: 'Prefers direct communication',
+          tags: ['profile'],
+          title: 'Arthur',
+          updatedAt: new Date('2024-01-04T00:00:00.000Z'),
+          userId: 'user-1',
+        },
+      },
+    ]);
+
+    const caller = createCaller();
+    const result = await caller.getIdentities();
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        description: 'Likes concise status updates',
+        id: 'identity-1',
+        memoryCategory: 'profile',
+        memoryLayer: 'identity',
+        memoryType: 'identity',
+        role: 'operator',
+        summary: 'Prefers direct communication',
+        title: 'Arthur',
+        type: 'professional',
+        userMemoryId: 'memory-1',
+      }),
+    ]);
+  });
+
+  it('passes title and summary into base memory when updating an identity', async () => {
+    mockUpdateIdentityEntry.mockResolvedValue(true);
+
+    const caller = createCaller();
+    const result = await caller.updateIdentity({
+      data: {
+        description: 'Updated profile',
+        summary: 'Updated summary',
+        title: 'Updated Arthur',
+      },
+      id: 'identity-1',
+    });
+
+    expect(mockUpdateIdentityEntry).toHaveBeenCalledWith({
+      base: {
+        summary: 'Updated summary',
+        title: 'Updated Arthur',
+      },
+      identity: {
+        description: 'Updated profile',
+        episodicDate: undefined,
+        relationship: undefined,
+        role: undefined,
+        tags: undefined,
+        type: undefined,
+      },
+      identityId: 'identity-1',
+    });
+    expect(result).toBe(true);
+  });
+});
+
+describe('userMemoryRouter.updateExperience', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('forwards reasoning updates to the experience model', async () => {
+    mockExperienceUpdate.mockResolvedValue({ success: true });
+
+    const caller = createCaller();
+    const result = await caller.updateExperience({
+      data: {
+        action: 'Ship the patch',
+        keyLearning: 'Validate the mobile contract',
+        reasoning: 'Title and summary belong to base memory',
+        situation: 'Mobile memory audit',
+      },
+      id: 'experience-1',
+    });
+
+    expect(mockExperienceUpdate).toHaveBeenCalledWith('experience-1', {
+      action: 'Ship the patch',
+      keyLearning: 'Validate the mobile contract',
+      reasoning: 'Title and summary belong to base memory',
+      situation: 'Mobile memory audit',
+    });
+    expect(result).toEqual({ success: true });
   });
 });

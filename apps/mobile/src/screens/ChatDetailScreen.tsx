@@ -1,16 +1,21 @@
 /**
  * ChatDetailScreen — Full chat experience with MessageBubble, Topics, and file attachments.
  */
+import { useFocusEffect } from '@react-navigation/native';
+import { FlashList } from '@shopify/flash-list';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowLeft,
+  ArrowUp,
+  BookOpen,
   Brain,
   BrainCircuit,
   Cpu,
   Eraser,
   Globe,
+  MessageCircle,
   Paperclip,
   Puzzle,
   Send,
@@ -21,7 +26,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image as RNImage,
   Keyboard,
   KeyboardAvoidingView,
@@ -39,6 +43,7 @@ import {
 import Animated, {
   FadeInDown,
   FadeInUp,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -47,18 +52,29 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import FilePreview from '../components/ui/FilePreview';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
-import MessageBubble from '../components/ui/MessageBubble';
+import MessageBubble, { type GroupMessageSpeaker } from '../components/ui/MessageBubble';
+import MessageListSkeleton from '../components/ui/MessageListSkeleton';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { semanticColors } from '../constants/colors';
-import { agentApi, agentSkillApi, messageApi, pluginApi, sessionApi, topicApi, userApi } from '../lib/api';
+import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
+import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import {
-  MOBILE_RECOMMENDED_BUILTIN_SKILLS,
-} from '../constants/recommendedBuiltins';
+  agentApi,
+  agentGroupApi,
+  type AgentGroupDetail,
+  agentSkillApi,
+  messageApi,
+  pluginApi,
+  sessionApi,
+  topicApi,
+  userApi,
+} from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
@@ -66,6 +82,7 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
+import { getUserMemorySettings } from '../store/user';
 import { themeColors } from '../theme';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
@@ -73,7 +90,8 @@ import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort }
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
 export default function ChatDetailScreen({ route, navigation }: any) {
-  const sessionId = route.params?.sessionId || 'default';
+  const sessionId = route.params?.sessionId as string | undefined;
+  const sessionKey = sessionId ?? '__invalid_session__';
   const initialTopicId = route.params?.topicId ?? null;
   const focusMessageId = route.params?.messageId;
   const insets = useSafeAreaInsets();
@@ -81,17 +99,18 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const toast = useToast();
   const primaryColor = themeColors.light.primary;
 
-  const messages = useChatStore((s) => s.messagesBySession[sessionId] ?? EMPTY_MESSAGES);
-  const generating = useChatStore(
-    (s) => s.generating && s.activeStreamingSessionId === sessionId,
-  );
+  const messages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
+  const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
+  const generating = useChatStore((s) => s.generating && s.activeStreamingSessionId === sessionKey);
   const isReasoning = useChatStore((s) => s.isReasoning);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGenerating = useChatStore((s) => s.stopGenerating);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
+  const fetchSessions = useSessionStore((s) => s.fetchSessions);
+  const isGroupSession = session?.type === 'group';
 
-  const activeTopic = useTopicStore((s) => s.activeTopic);
+  const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const switchTopic = useTopicStore((s) => s.switchTopic);
 
@@ -102,24 +121,28 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>('medium');
+  const [globalMemoryEnabled, setGlobalMemoryEnabled] = useState(true);
+  const [globalMemoryEffort, setGlobalMemoryEffort] = useState<MobileMemoryEffort>('medium');
   const [memorySheetVisible, setMemorySheetVisible] = useState(false);
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [providerLogoError, setProviderLogoError] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
+  const listRef = useRef<FlashList<ChatMessage>>(null);
   const isScrolledToBottom = useRef(true);
   const lastAutoScrollAt = useRef(0);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   // Skills drawer
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [builtinSkillItems, setBuiltinSkillItems] = useState<
-    { description: string; identifier: string; title: string }[]
+    { description: string; icon: MobileRecommendedBuiltinIcon; identifier: string; title: string }[]
   >([]);
   const [agentSkillItems, setAgentSkillItems] = useState<AgentSkillItem[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [groupDetail, setGroupDetail] = useState<AgentGroupDetail | null>(null);
 
   const sessionModel = useModelStore((s) => s.selectedModel);
   const sessionProvider = useModelStore((s) => s.selectedProvider);
@@ -136,13 +159,59 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   });
 
   useEffect(() => {
+    if (!sessionId) return;
     fetchModels();
     loadSelection(sessionId);
   }, [fetchModels, loadSelection, sessionId]);
 
   useEffect(() => {
-    switchTopic(initialTopicId);
+    if (!sessionId) return;
+    switchTopic(sessionId, initialTopicId);
   }, [initialTopicId, sessionId, switchTopic]);
+
+  useEffect(() => {
+    if (!sessionId || session) return;
+    void fetchSessions();
+  }, [fetchSessions, session, sessionId]);
+
+  const loadGroupDetail = useCallback(async () => {
+    if (!sessionId || !isGroupSession) {
+      setGroupDetail(null);
+      return;
+    }
+
+    try {
+      const detail = await agentGroupApi.getGroupDetail(sessionId);
+      setGroupDetail(detail);
+    } catch {
+      setGroupDetail(null);
+    }
+  }, [isGroupSession, sessionId]);
+
+  useEffect(() => {
+    void loadGroupDetail();
+  }, [loadGroupDetail]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadGroupDetail();
+    }, [loadGroupDetail]),
+  );
+
+  useEffect(() => {
+    let disposed = false;
+
+    getUserMemorySettings().then((settings) => {
+      if (disposed) return;
+
+      setGlobalMemoryEnabled(settings.enabled);
+      setGlobalMemoryEffort(settings.effort);
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   // Rotating placeholder hints
   const hints = useMemo(
@@ -156,9 +225,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [hints.length]);
 
   useEffect(() => {
+    if (!sessionId) return;
     fetchMessages(sessionId, activeTopic ?? undefined);
     fetchTopics(sessionId);
   }, [sessionId, fetchMessages, fetchTopics, activeTopic]);
+
+  useEffect(() => {
+    if (sessionId) return;
+    toast.show('error', t.errorUnknown);
+    navigation.goBack();
+  }, [navigation, sessionId, t.errorUnknown, toast]);
 
   useEffect(() => {
     if (!generating) return;
@@ -179,14 +255,18 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     if (!focusMessageId || messages.length === 0) return;
 
     const messageIndex = messages.findIndex((message) => message.id === focusMessageId);
-    if (messageIndex === -1) return;
+    if (messageIndex < 0 || messageIndex >= messages.length) return;
 
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToIndex({
-        animated: true,
-        index: messageIndex,
-        viewPosition: 0.5,
-      });
+      try {
+        listRef.current?.scrollToIndex({
+          animated: true,
+          index: messageIndex,
+          viewPosition: 0.5,
+        });
+      } catch {
+        /* best-effort */
+      }
     });
   }, [focusMessageId, messages]);
 
@@ -195,6 +275,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [navigation]);
 
   useEffect(() => {
+    if (!sessionId || isGroupSession) {
+      setAgentId(null);
+      setEnabledPlugins(new Set());
+      return;
+    }
     agentApi
       .getConfigBySession(sessionId)
       .then((config) => {
@@ -208,33 +293,48 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       .catch((err) => {
         console.error('[ChatDetail] failed to load agent config:', err);
       });
-  }, [sessionId]);
+  }, [isGroupSession, sessionId]);
 
   const sessionSearchMode = session?.chatConfig?.searchMode;
   const sessionMemoryEnabled = session?.chatConfig?.memory?.enabled;
   const sessionMemoryEffort = session?.chatConfig?.memory?.effort;
 
   useEffect(() => {
-    if (!session?.chatConfig) return;
     setSearchEnabled(sessionSearchMode ? sessionSearchMode !== 'off' : false);
-    setMemoryEnabled(sessionMemoryEnabled !== false);
-    setMemoryEffort(sessionMemoryEffort || 'medium');
-  }, [session?.chatConfig, session?.id, sessionSearchMode, sessionMemoryEnabled, sessionMemoryEffort]);
+    setMemoryEnabled(sessionMemoryEnabled ?? globalMemoryEnabled);
+    setMemoryEffort(sessionMemoryEffort || globalMemoryEffort);
+  }, [
+    globalMemoryEffort,
+    globalMemoryEnabled,
+    sessionMemoryEffort,
+    sessionMemoryEnabled,
+    sessionSearchMode,
+  ]);
 
   const handlePluginsPress = useCallback(() => {
+    if (isGroupSession) return;
     haptics.light();
     setSkillsSheetVisible(true);
+    // Pre-load builtins immediately so they appear without waiting for API
+    const preloadBuiltins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.map((b) => ({
+      description: (t as any)[b.descriptionKey] ?? '',
+      icon: b.icon,
+      identifier: b.identifier,
+      title: (t as any)[b.titleKey] ?? b.identifier,
+    }));
+    setBuiltinSkillItems(preloadBuiltins);
     setLoadingSkills(true);
     Promise.all([pluginApi.list(), agentSkillApi.list(), userApi.getState()])
       .then(([plugins, skills, userState]) => {
         const uninstalled = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
-        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS
-          .filter((b) => !uninstalled.includes(b.identifier))
-          .map((b) => ({
-            description: (t as any)[b.descriptionKey] ?? '',
-            identifier: b.identifier,
-            title: (t as any)[b.titleKey] ?? b.identifier,
-          }));
+        const builtins = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+          (b) => !uninstalled.includes(b.identifier),
+        ).map((b) => ({
+          description: (t as any)[b.descriptionKey] ?? '',
+          icon: b.icon,
+          identifier: b.identifier,
+          title: (t as any)[b.titleKey] ?? b.identifier,
+        }));
         setBuiltinSkillItems(builtins);
 
         const builtinIds = new Set(builtins.map((b) => b.identifier));
@@ -251,10 +351,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       })
       .catch(() => {})
       .finally(() => setLoadingSkills(false));
-  }, [t]);
+  }, [isGroupSession, t]);
 
   const handleTogglePlugin = useCallback(
     (identifier: string) => {
+      if (!sessionId) return;
       haptics.light();
       setEnabledPlugins((prev) => {
         const next = new Set(prev);
@@ -290,6 +391,47 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const toolbarProviderLogo =
     selectedProviderLogo || (sessionProvider ? getProviderIconUrl(sessionProvider) : undefined);
 
+  const groupMembersById = useMemo<Record<string, GroupMessageSpeaker> | undefined>(() => {
+    if (!groupDetail?.agents?.length) return undefined;
+
+    return Object.fromEntries(
+      groupDetail.agents.map((agent) => [
+        agent.id,
+        {
+          avatar: agent.avatar,
+          id: agent.id,
+          isSupervisor: agent.isSupervisor || groupDetail.supervisorAgentId === agent.id,
+          title: agent.title,
+        },
+      ]),
+    );
+  }, [groupDetail]);
+
+  const groupOpeningMessage = useMemo(() => {
+    const value = groupDetail?.config?.openingMessage;
+    return typeof value === 'string' ? value.trim() : '';
+  }, [groupDetail?.config]);
+
+  const groupOpeningQuestions = useMemo(() => {
+    const value = groupDetail?.config?.openingQuestions;
+    if (!Array.isArray(value)) return [];
+
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .slice(0, 4);
+  }, [groupDetail?.config]);
+
+  const emptyStateTitle = isGroupSession
+    ? session?.title || t.groupCreateDefaultTitle
+    : t.chatEmptyWave;
+  const emptyStateDescription =
+    isGroupSession && groupOpeningMessage ? groupOpeningMessage : t.chatEmptyDesc;
+  const emptyStateSuggestions =
+    isGroupSession && groupOpeningQuestions.length > 0
+      ? groupOpeningQuestions
+      : [t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4];
+
   useEffect(() => {
     setProviderLogoError(false);
   }, [toolbarProviderLogo, sessionProvider]);
@@ -300,6 +442,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }));
 
   const autoScrollToEnd = useCallback(() => {
+    if (!listRef.current || messages.length === 0) return;
     if (!isScrolledToBottom.current && !generating) return;
 
     const now = Date.now();
@@ -308,9 +451,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
     lastAutoScrollAt.current = now;
     requestAnimationFrame(() => {
-      flatListRef.current?.scrollToEnd({ animated: !generating });
+      try {
+        listRef.current?.scrollToEnd({ animated: !generating });
+      } catch {
+        /* best-effort */
+      }
     });
-  }, [generating]);
+  }, [generating, messages.length]);
 
   const handleStop = useCallback(() => {
     haptics.light();
@@ -318,7 +465,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [stopGenerating]);
 
   const handleSend = useCallback(async () => {
-    if ((!inputText.trim() && pendingFiles.length === 0) || generating) return;
+    if (!sessionId || (!inputText.trim() && pendingFiles.length === 0) || generating) return;
     haptics.light();
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -417,12 +564,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {
+    if (isGroupSession) return;
     haptics.light();
     setModelDrawerVisible(true);
-  }, []);
+  }, [isGroupSession]);
 
   // ── Toolbar: Search toggle ────────────────────────────────────────
   const handleToggleSearch = useCallback(async () => {
+    if (!sessionId || isGroupSession) return;
     haptics.light();
     const next = !searchEnabled;
     setSearchEnabled(next);
@@ -431,10 +580,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     } catch {
       /* best-effort */
     }
-  }, [searchEnabled, sessionId]);
+  }, [isGroupSession, searchEnabled, sessionId]);
 
   const updateMemoryConfig = useCallback(
     async (nextEnabled: boolean, nextEffort: MobileMemoryEffort) => {
+      if (!sessionId || isGroupSession) return;
       setMemoryEnabled(nextEnabled);
       setMemoryEffort(nextEffort);
 
@@ -449,12 +599,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         /* best-effort */
       }
     },
-    [sessionId],
+    [isGroupSession, sessionId],
   );
 
   // ── Toolbar: Clear messages ───────────────────────────────────────
   const handleClear = useCallback(() => {
-    if (messages.length === 0) return;
+    if (!sessionId || messages.length === 0) return;
     haptics.warning();
     Alert.alert(t.chatClearTitle, t.chatClearMessage, [
       { text: t.cancel, style: 'cancel' },
@@ -475,11 +625,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, [messages, t, sessionId, activeTopic, fetchMessages]);
 
   const handleSaveToTopic = useCallback(async () => {
+    if (!sessionId) return;
     if (activeTopic) {
       return;
     }
     try {
-      const topicId = await topicApi.create(sessionId, t.topicTitle);
+      const topicId = await topicApi.create(sessionId, t.topicTitle, {
+        sessionType: session?.type ?? 'agent',
+      });
       if (topicId) {
         haptics.success();
         fetchTopics(sessionId);
@@ -487,19 +640,74 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     } catch {
       toast.show('error', t.errorNetwork);
     }
-  }, [sessionId, activeTopic, t, toast, fetchTopics]);
+  }, [session?.type, sessionId, activeTopic, t, toast, fetchTopics]);
+
+  const handleOpenNotebook = useCallback(async () => {
+    if (!sessionId) return;
+
+    haptics.light();
+
+    try {
+      const currentTopicId = activeTopic ?? initialTopicId;
+
+      if (currentTopicId) {
+        navigation.navigate('Notebook', { sessionId, topicId: currentTopicId });
+        return;
+      }
+
+      const topicId = await topicApi.create(sessionId, t.topicTitle, {
+        sessionType: session?.type ?? 'agent',
+      });
+
+      if (!topicId) return;
+
+      switchTopic(sessionId, topicId);
+      void fetchTopics(sessionId);
+      navigation.navigate('Notebook', { sessionId, topicId });
+    } catch {
+      toast.show('error', t.errorNetwork);
+    }
+  }, [
+    activeTopic,
+    fetchTopics,
+    initialTopicId,
+    navigation,
+    session?.type,
+    sessionId,
+    switchTopic,
+    t.errorNetwork,
+    t.topicTitle,
+    toast,
+  ]);
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => (
       <MessageBubble
         generating={generating}
+        groupMembersById={groupMembersById}
+        groupSupervisorId={groupDetail?.supervisorAgentId}
         message={item}
-        sessionId={sessionId}
+        sessionId={sessionId || sessionKey}
         onSaveToTopic={handleSaveToTopic}
       />
     ),
-    [sessionId, generating, handleSaveToTopic],
+    [
+      generating,
+      groupDetail?.supervisorAgentId,
+      groupMembersById,
+      handleSaveToTopic,
+      sessionId,
+      sessionKey,
+    ],
   );
+
+  if (!sessionId) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator color={semanticColors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -516,7 +724,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 navigation.goBack();
               }}
             >
-              <ArrowLeft color={semanticColors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
+              <ArrowLeft
+                color={semanticColors.foreground}
+                size={22}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
             </PressableScale>
             <View className="flex-1">
               <Text
@@ -529,19 +741,64 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 <Text className="text-primary text-[12px] mt-0.5 font-medium">
                   {isReasoning ? t.chatThinking : t.chatGenerating}
                 </Text>
-              ) : sessionModel ? (
-                <Text
-                  className="text-[12px] mt-0.5 font-medium"
-                  numberOfLines={1}
-                  style={{ color: semanticColors.muted }}
-                >
-                  {sessionModel}
-                </Text>
+              ) : !isGroupSession && sessionModel ? (
+                <View className="mt-0.5 flex-row items-center">
+                  {toolbarProviderLogo && !providerLogoError ? (
+                    <RNImage
+                      source={{ uri: toolbarProviderLogo }}
+                      style={{ borderRadius: 3, height: 12, marginRight: 5, width: 12 }}
+                      onError={() => setProviderLogoError(true)}
+                    />
+                  ) : (
+                    <Cpu
+                      color={semanticColors.muted}
+                      size={12}
+                      strokeWidth={tokens.icon.strokeWidth}
+                      style={{ marginRight: 5 }}
+                    />
+                  )}
+                  <Text
+                    className="flex-1 text-[12px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: semanticColors.muted }}
+                  >
+                    {sessionModel}
+                  </Text>
+                </View>
               ) : null}
             </View>
           </View>
 
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-1">
+            <PressableScale
+              accessibilityLabel={t.topicTitle}
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full"
+              onPress={() => {
+                haptics.light();
+                navigation.navigate('TopicList', { sessionId });
+              }}
+            >
+              <MessageCircle
+                color={semanticColors.muted}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel={t.notebookTitle}
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full"
+              onPress={() => {
+                void handleOpenNotebook();
+              }}
+            >
+              <BookOpen
+                color={semanticColors.muted}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
             <PressableScale
               accessibilityLabel="Settings"
               accessibilityRole="button"
@@ -567,72 +824,90 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         className="flex-1"
         keyboardVerticalOffset={0}
       >
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          ref={flatListRef}
-          renderItem={renderMessage}
-          scrollEventThrottle={16}
-          ListEmptyComponent={
-            <View className="flex-1 items-center justify-center pt-16">
-              <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
-                <RNImage
-                  className="w-20 h-20 rounded-3xl mb-6"
-                  source={require('../../assets/avato-logo.png')}
-                />
-              </Animated.View>
-              <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>
-                <Text className="text-foreground font-extrabold text-xl tracking-tighter">
-                  {t.chatEmptyWave}
-                </Text>
-              </Animated.View>
-              <Animated.View entering={FadeInUp.delay(300).duration(400).springify()}>
-                <Text className="text-secondary/50 text-[13px] mt-2 text-center px-10 leading-6">
-                  {t.chatEmptyDesc}
-                </Text>
-              </Animated.View>
-              {/* Suggestion chips */}
-              <Animated.View
-                className="flex-row flex-wrap justify-center gap-2 mt-6 px-6"
-                entering={FadeInDown.delay(450).duration(350)}
-              >
-                {[t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4].map((label) => (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
-                    key={label}
-                    onPress={() => {
-                      haptics.light();
-                      setInputText(label);
-                    }}
-                  >
-                    <Text className="text-secondary text-[13px] font-medium">{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </Animated.View>
-            </View>
-          }
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: 12,
-            paddingTop: 12,
-          }}
-          onContentSizeChange={autoScrollToEnd}
-          onLayout={autoScrollToEnd}
-          onScroll={(e) => {
-            const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-            isScrolledToBottom.current =
-              layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
-          }}
-          onScrollToIndexFailed={({ index }) => {
-            requestAnimationFrame(() => {
-              flatListRef.current?.scrollToOffset({
-                animated: true,
-                offset: Math.max(index, 0) * 120,
-              });
-            });
-          }}
-        />
+        {fetchingMessages && messages.length === 0 ? (
+          <MessageListSkeleton />
+        ) : (
+          <FlashList
+            data={messages}
+            estimatedItemSize={120}
+            keyExtractor={(item) => item.id}
+            ref={listRef}
+            renderItem={renderMessage}
+            scrollEventThrottle={16}
+            ListEmptyComponent={
+              <View className="flex-1 items-center justify-center pt-16">
+                <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
+                  <RNImage
+                    className="w-20 h-20 rounded-3xl mb-6"
+                    source={require('../../assets/avato-logo.png')}
+                  />
+                </Animated.View>
+                <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>
+                  <Text className="text-foreground font-extrabold text-xl tracking-tighter">
+                    {emptyStateTitle}
+                  </Text>
+                </Animated.View>
+                <Animated.View entering={FadeInUp.delay(300).duration(400).springify()}>
+                  <Text className="text-secondary/50 text-[13px] mt-2 text-center px-10 leading-6">
+                    {emptyStateDescription}
+                  </Text>
+                </Animated.View>
+                {/* Suggestion chips */}
+                <Animated.View
+                  className="flex-row flex-wrap justify-center gap-2 mt-6 px-6"
+                  entering={FadeInDown.delay(450).duration(350)}
+                >
+                  {emptyStateSuggestions.map((label) => (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
+                      key={label}
+                      onPress={() => {
+                        haptics.light();
+                        setInputText(label);
+                      }}
+                    >
+                      <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </Animated.View>
+              </View>
+            }
+            contentContainerStyle={{
+              paddingBottom: 12,
+              paddingTop: 12,
+            }}
+            onContentSizeChange={autoScrollToEnd}
+            onLayout={autoScrollToEnd}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              const atBottom =
+                layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+              isScrolledToBottom.current = atBottom;
+              setShowScrollToTop(!atBottom && contentOffset.y > 200);
+            }}
+          />
+        )}
+
+        {/* Scroll to top FAB */}
+        {showScrollToTop && (
+          <Animated.View
+            className="absolute right-4 bottom-24"
+            entering={FadeInUp.duration(200)}
+            exiting={FadeOut.duration(150)}
+          >
+            <PressableScale
+              accessibilityLabel={t.chatScrollToTop}
+              className="w-10 h-10 rounded-full bg-foreground/90 items-center justify-center shadow-lg"
+              onPress={() => {
+                haptics.light();
+                listRef.current?.scrollToOffset({ offset: 0, animated: true });
+              }}
+            >
+              <ArrowUp color="#fff" size={18} strokeWidth={2.5} />
+            </PressableScale>
+          </Animated.View>
+        )}
 
         {/* Input Area — Floating Pill */}
         <View
@@ -643,18 +918,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           }}
         >
           <BlurView
-            className="rounded-[26px] overflow-hidden"
+            className="rounded-2xl overflow-hidden"
             intensity={80}
             tint="light"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.72)',
-              borderColor: 'rgba(15,23,42,0.08)',
+              backgroundColor: 'rgba(255,255,255,0.92)',
+              borderColor: 'rgba(0,122,255,0.16)',
               borderWidth: 1,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 6,
-              elevation: 1,
             }}
           >
             {pendingFiles.length > 0 && (
@@ -665,9 +935,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             {/* Text input — full width */}
             <View className="px-3 pt-2">
               <TextInput
+                editable
                 multiline
                 className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
-                editable={!generating}
                 placeholder={generating ? t.chatGenerating : hints[hintIndex]}
                 placeholderTextColor={semanticColors.muted}
                 style={{ paddingVertical: 0, textAlignVertical: 'top' }}
@@ -678,42 +948,46 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             </View>
             {/* Action toolbar row */}
             <View className="flex-row items-center px-2 pb-1.5 pt-1">
-              {/* Model */}
-              <TouchableOpacity
-                accessibilityLabel="Select model"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full"
-                onPress={handleModelPress}
-              >
-                {toolbarProviderLogo && !providerLogoError ? (
-                  <RNImage
-                    style={{ width: 20, height: 20, borderRadius: 4 }}
-                    source={{
-                      uri: toolbarProviderLogo,
-                    }}
-                    onError={() => setProviderLogoError(true)}
-                  />
-                ) : (
-                  <Cpu
-                    color={semanticColors.muted}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                )}
-              </TouchableOpacity>
-              {/* Search */}
-              <TouchableOpacity
-                accessibilityLabel="Toggle search"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
-                onPress={handleToggleSearch}
-              >
-                <Globe
-                  color={searchEnabled ? primaryColor : semanticColors.muted}
-                  size={20}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
+              {!isGroupSession && (
+                <>
+                  {/* Model */}
+                  <TouchableOpacity
+                    accessibilityLabel="Select model"
+                    activeOpacity={0.7}
+                    className="w-8 h-8 items-center justify-center rounded-full"
+                    onPress={handleModelPress}
+                  >
+                    {toolbarProviderLogo && !providerLogoError ? (
+                      <RNImage
+                        style={{ width: 20, height: 20, borderRadius: 4 }}
+                        source={{
+                          uri: toolbarProviderLogo,
+                        }}
+                        onError={() => setProviderLogoError(true)}
+                      />
+                    ) : (
+                      <Cpu
+                        color={semanticColors.muted}
+                        size={20}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    )}
+                  </TouchableOpacity>
+                  {/* Search */}
+                  <TouchableOpacity
+                    accessibilityLabel="Toggle search"
+                    activeOpacity={0.7}
+                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    onPress={handleToggleSearch}
+                  >
+                    <Globe
+                      color={searchEnabled ? primaryColor : semanticColors.muted}
+                      size={20}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </TouchableOpacity>
+                </>
+              )}
               {/* Attach */}
               <TouchableOpacity
                 accessibilityLabel="Attach file"
@@ -739,43 +1013,47 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   )}
                 </View>
               </TouchableOpacity>
-              {/* Tools */}
-              <TouchableOpacity
-                accessibilityLabel="Toggle tools"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
-                onPress={handlePluginsPress}
-              >
-                <Puzzle
-                  color={enabledPlugins.size > 0 ? primaryColor : semanticColors.muted}
-                  size={20}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </TouchableOpacity>
-              {/* Memory */}
-              <TouchableOpacity
-                accessibilityLabel="Toggle memory"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
-                onPress={() => {
-                  haptics.light();
-                  setMemorySheetVisible(true);
-                }}
-              >
-                {memoryEnabled ? (
-                  <BrainCircuit
-                    color={primaryColor}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                ) : (
-                  <Brain
-                    color={semanticColors.muted}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                )}
-              </TouchableOpacity>
+              {!isGroupSession && (
+                <>
+                  {/* Tools */}
+                  <TouchableOpacity
+                    accessibilityLabel="Toggle tools"
+                    activeOpacity={0.7}
+                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    onPress={handlePluginsPress}
+                  >
+                    <Puzzle
+                      color={enabledPlugins.size > 0 ? primaryColor : semanticColors.muted}
+                      size={20}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </TouchableOpacity>
+                  {/* Memory */}
+                  <TouchableOpacity
+                    accessibilityLabel="Toggle memory"
+                    activeOpacity={0.7}
+                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    onPress={() => {
+                      haptics.light();
+                      setMemorySheetVisible(true);
+                    }}
+                  >
+                    {memoryEnabled ? (
+                      <BrainCircuit
+                        color={primaryColor}
+                        size={20}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    ) : (
+                      <Brain
+                        color={semanticColors.muted}
+                        size={20}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
               {/* Separator */}
               <View className="w-px h-4 bg-black/10 mx-1" />
               {/* Clear */}
@@ -830,7 +1108,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
       <ModelDrawer
         sessionId={sessionId}
-        visible={modelDrawerVisible}
+        visible={modelDrawerVisible && !isGroupSession}
         onClose={() => setModelDrawerVisible(false)}
         onSelect={() => setProviderLogoError(false)}
       />
@@ -844,7 +1122,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       <MemoryToolSheet
         effort={memoryEffort}
         enabled={memoryEnabled}
-        visible={memorySheetVisible}
+        visible={memorySheetVisible && !isGroupSession}
         onClose={() => setMemorySheetVisible(false)}
         onChangeEffort={(value) => {
           void updateMemoryConfig(true, value);
@@ -858,7 +1136,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       <Modal
         transparent
         animationType="slide"
-        visible={skillsSheetVisible}
+        visible={skillsSheetVisible && !isGroupSession}
         onRequestClose={() => setSkillsSheetVisible(false)}
       >
         <Pressable
@@ -898,7 +1176,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                       className="flex-row items-center py-3.5"
                       key={`builtin-${item.identifier}`}
                     >
-                      <View className="flex-1 mr-3">
+                      <BuiltinSkillIcon icon={item.icon} size={36} />
+                      <View className="flex-1 ml-3 mr-3">
                         <Text
                           className="text-foreground text-[15px] font-medium tracking-tight"
                           numberOfLines={1}
@@ -919,10 +1198,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     </View>
                   ))}
                   {agentSkillItems.map((skill) => (
-                    <View
-                      className="flex-row items-center py-3.5"
-                      key={`skill-${skill.id}`}
-                    >
+                    <View className="flex-row items-center py-3.5" key={`skill-${skill.id}`}>
                       <View className="flex-1 mr-3">
                         <Text
                           className="text-foreground text-[15px] font-medium tracking-tight"
@@ -944,10 +1220,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     </View>
                   ))}
                   {installedPlugins.map((plugin) => (
-                    <View
-                      className="flex-row items-center py-3.5"
-                      key={plugin.identifier}
-                    >
+                    <View className="flex-row items-center py-3.5" key={plugin.identifier}>
                       <View className="flex-1 mr-3">
                         <Text
                           className="text-foreground text-[15px] font-medium tracking-tight"

@@ -14,11 +14,21 @@ import { getThumbnailMaxWidth } from './utils';
 
 // Error state component
 export const ErrorState = memo<ErrorStateProps>(
-  ({ generation, generationBatch, aspectRatio, onDelete, onCopyError }) => {
+  ({
+    generation,
+    generationBatch,
+    aspectRatio,
+    errorMessage,
+    actionTitle,
+    onAction,
+    onDelete,
+    onCopyError,
+  }) => {
     const { t } = useTranslation('image');
     const { t: tError } = useTranslation('error');
 
-    const errorMessage = useMemo(() => {
+    const resolvedErrorMessage = useMemo(() => {
+      if (errorMessage) return errorMessage;
       if (!generation.task.error) return '';
 
       const error = generation.task.error;
@@ -55,7 +65,9 @@ export const ErrorState = memo<ErrorStateProps>(
 
       // Fallback to original error message
       return errorBody || error.name || 'Unknown error';
-    }, [generation.task.error, generationBatch.provider, tError]);
+    }, [errorMessage, generation.task.error, tError]);
+
+    const handleAction = onAction || onCopyError;
 
     return (
       <Block
@@ -69,25 +81,25 @@ export const ErrorState = memo<ErrorStateProps>(
           cursor: 'pointer',
           maxWidth: getThumbnailMaxWidth(generation, generationBatch),
         }}
-        onClick={onCopyError}
+        onClick={handleAction}
       >
         <Center gap={8}>
           <Icon color={cssVar.colorTextDescription} icon={ImageOffIcon} size={24} />
           <Text strong type={'secondary'}>
             {t('generation.status.failed')}
           </Text>
-          {generation.task.error && (
+          {resolvedErrorMessage && (
             <Text
               code
               ellipsis={{ rows: 2 }}
               fontSize={10}
-              title={t('generation.actions.copyError')}
+              title={actionTitle || t('generation.actions.copyError')}
               type={'secondary'}
               style={{
                 wordBreak: 'break-all',
               }}
             >
-              {errorMessage}
+              {resolvedErrorMessage}
             </Text>
           )}
         </Center>

@@ -6,8 +6,7 @@
  *   - Send user messages, trigger AI response
  *   - Handle streaming responses
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { create } from 'zustand';
 
 import { useToast } from '../components/ui/Toast';
@@ -19,12 +18,29 @@ import type {
   StreamReasoningState,
   ToolExecutionItem,
 } from '../lib/api';
-import { agentApi, aiChatApi, fileApi, messageApi } from '../lib/api';
+import {
+  agentApi,
+  agentGroupApi,
+  aiAgentApi,
+  aiChatApi,
+  fileApi,
+  messageApi,
+  sessionApi,
+  topicApi,
+} from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
-import type { ChatMessage, ChatToolPayload, MobileMemoryEffort } from '../types';
+import type {
+  ChatMessage,
+  ChatToolPayload,
+  MobileChatConfig,
+  MobileMemoryEffort,
+  Topic,
+} from '../types';
 import { useFileStore } from './file';
+import { useSessionStore } from './session';
 import { useTopicStore } from './topic';
+import { getUserMemorySettings } from './user';
 
 const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayload[] =>
   executions.map((exec) => ({
@@ -38,15 +54,14 @@ const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayl
   }));
 
 /**
- * Resolves per-session chat options with a 3-tier priority:
- *   1. Backend agent config (source of truth)
- *   2. Per-session AsyncStorage (legacy / offline fallback)
- *   3. Global default model/provider
+ * Resolves per-session chat options with Agent Config as single source of truth:
+ *   1. Backend agent config (primary) — model, provider, params, chatConfig.memory, chatConfig.searchMode
+ *   2. Session meta fallback (model/provider, chatConfig)
  */
 async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOptions> {
   const opts: ChatRequestOptions = {};
 
-  // 1. Backend agent config
+  // 1. Backend agent config (source of truth)
   try {
     const config = await agentApi.getConfigBySession(sessionId);
     if (config) {
@@ -60,45 +75,53 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
         opts.presence_penalty = config.params.presence_penalty;
       if (config.params?.max_tokens != null) opts.max_tokens = config.params.max_tokens;
       if (config.systemRole) opts.systemPrompt = config.systemRole;
+      const chatConfig = config.chatConfig as MobileChatConfig | undefined;
+      if (chatConfig?.memory) {
+        const effort = chatConfig.memory.effort;
+        opts.memory = {
+          effort: effort === 'low' || effort === 'medium' || effort === 'high' ? effort : 'medium',
+          enabled: chatConfig.memory.enabled !== false,
+        };
+      }
+      if (chatConfig?.searchMode) {
+        opts.enabledSearch = chatConfig.searchMode !== 'off';
+      }
     }
   } catch {
-    /* network error — fall through to AsyncStorage */
+    /* network error — fall through to session meta */
   }
 
-  // 2. Per-session AsyncStorage (legacy / offline)
-  if (!opts.model || !opts.provider) {
-    try {
-      const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (!opts.model && saved.model) opts.model = saved.model;
-        if (!opts.provider && saved.provider) opts.provider = saved.provider;
-        if (opts.temperature == null && saved.temperature)
-          opts.temperature = parseFloat(saved.temperature);
-        if (!opts.systemPrompt && saved.systemPrompt) opts.systemPrompt = saved.systemPrompt;
-      }
-    } catch {
-      /* ignore */
+  // 2. Session meta fallback (when agent config missing or incomplete)
+  const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+  if (session) {
+    if (!opts.model && session.model) opts.model = session.model;
+    if (!opts.provider && session.provider) opts.provider = session.provider;
+    const sessionChatConfig = session.chatConfig as MobileChatConfig | undefined;
+    if (!opts.memory && sessionChatConfig?.memory) {
+      const effort = sessionChatConfig.memory.effort;
+      opts.memory = {
+        effort: effort === 'low' || effort === 'medium' || effort === 'high' ? effort : 'medium',
+        enabled: sessionChatConfig.memory.enabled !== false,
+      };
+    }
+    if (opts.enabledSearch === undefined && sessionChatConfig?.searchMode) {
+      opts.enabledSearch = sessionChatConfig.searchMode !== 'off';
     }
   }
 
-  // 3. Global defaults
-  if (!opts.model) {
+  if (!opts.memory) {
     try {
-      const globalModel = await AsyncStorage.getItem('avato_default_model');
-      if (globalModel) opts.model = globalModel;
+      const memorySettings = await getUserMemorySettings();
+
+      opts.memory = {
+        effort: memorySettings.effort,
+        enabled: memorySettings.enabled,
+      };
     } catch {
-      /* ignore */
+      /* best-effort */
     }
   }
-  if (!opts.provider) {
-    try {
-      const globalProvider = await AsyncStorage.getItem('avato_default_provider');
-      if (globalProvider) opts.provider = globalProvider;
-    } catch {
-      /* ignore */
-    }
-  }
+
   return opts;
 }
 
@@ -189,6 +212,7 @@ const toBase64DataUri = async (uri: string, mimeType: string): Promise<string | 
   }
 };
 const FILE_CONTENT_PREVIEW_LIMIT = 6000;
+const FILE_CONTENT_EXTRACTION_RETRY_DELAYS = [0, 600, 1500];
 
 const buildAttachmentDisplayContent = (attachments: UploadedAttachment[]) =>
   attachments.map((f) => `[${f.name}]`).join('\n');
@@ -205,7 +229,152 @@ const buildAttachmentContextLine = (attachment: UploadedAttachment) => {
     return `- ${attachment.name}:\n${preview}`;
   }
 
-  return `- ${attachment.name}: ${attachment.url}`;
+  return `- ${attachment.name}: [file uploaded successfully, but text extraction is not available yet]`;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const GROUP_LOADING_CONTENT = '...';
+const GROUP_POLL_INTERVAL_MS = 1200;
+const GROUP_POLL_MAX_ATTEMPTS = 45;
+
+const hydrateAttachmentContents = async (attachments: UploadedAttachment[]) => {
+  const pendingFileIds = attachments
+    .filter((attachment) => !isImageAttachment(attachment.type) && !attachment.content?.trim())
+    .map((attachment) => attachment.fileId);
+
+  if (pendingFileIds.length === 0) return;
+
+  const unresolvedIds = new Set(pendingFileIds);
+
+  for (const delay of FILE_CONTENT_EXTRACTION_RETRY_DELAYS) {
+    if (delay > 0) {
+      await sleep(delay);
+    }
+
+    try {
+      const contents = await fileApi.getFileContents([...unresolvedIds]);
+
+      for (const item of contents) {
+        const attachment = attachments.find((candidate) => candidate.fileId === item.fileId);
+        const content = item.content?.trim();
+
+        if (!attachment || !content) continue;
+
+        attachment.content = content;
+        unresolvedIds.delete(item.fileId);
+      }
+    } catch {
+      // Content extraction is best-effort; keep retrying.
+    }
+
+  if (unresolvedIds.size === 0) break;
+  }
+};
+
+const buildAttachmentPromptText = (text: string, attachments: UploadedAttachment[]) => {
+  const nonImageAttachments = attachments.filter((f) => !isImageAttachment(f.type));
+
+  if (nonImageAttachments.length === 0) {
+    return text || buildAttachmentDisplayContent(attachments);
+  }
+
+  const textBlocks: string[] = [];
+
+  if (text) {
+    textBlocks.push(text);
+  } else if (attachments.length > 0) {
+    textBlocks.push(buildAttachmentDisplayContent(attachments));
+  }
+
+  const fileLines = nonImageAttachments.map(buildAttachmentContextLine);
+  textBlocks.push(`Attached files:\n${fileLines.join('\n')}`);
+
+  return textBlocks.join('\n\n');
+};
+
+const normalizeTopicItem = (topic: any, sessionId: string): Topic => ({
+  createdAt:
+    typeof topic?.createdAt === 'string'
+      ? topic.createdAt
+      : new Date(topic?.createdAt ?? Date.now()).toISOString(),
+  favorite: topic?.favorite ?? undefined,
+  id: String(topic?.id ?? ''),
+  sessionId,
+  title: String(topic?.title ?? ''),
+  updatedAt:
+    typeof topic?.updatedAt === 'string'
+      ? topic.updatedAt
+      : new Date(topic?.updatedAt ?? Date.now()).toISOString(),
+});
+
+const syncTopicsForSession = (
+  sessionId: string,
+  topics: { items: any[]; total: number } | undefined,
+  activeTopicId?: string | null,
+) => {
+  if (!topics) {
+    if (!activeTopicId) return;
+
+    useTopicStore.setState((s) => ({
+      activeTopicBySession: {
+        ...s.activeTopicBySession,
+        [sessionId]: activeTopicId,
+      },
+    }));
+    return;
+  }
+
+  const items = (topics.items ?? []).map((topic) => normalizeTopicItem(topic, sessionId));
+
+  useTopicStore.setState((s) => ({
+    activeTopicBySession: {
+      ...s.activeTopicBySession,
+      [sessionId]: activeTopicId ?? s.activeTopicBySession[sessionId] ?? null,
+    },
+    topicsBySession: {
+      ...s.topicsBySession,
+      [sessionId]: items,
+    },
+  }));
+};
+
+const DEFAULT_TOPIC_TITLES = ['', 'New Conversation', '新对话'];
+
+const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null) => {
+  if (!topicId) return;
+  const topic = (useTopicStore.getState().topicsBySession[sessionId] ?? []).find(
+    (item) => item.id === topicId,
+  );
+
+  const currentTitle = topic?.title?.trim() ?? '';
+  if (currentTitle && !DEFAULT_TOPIC_TITLES.includes(currentTitle)) return;
+
+  topicApi
+    .generateTitle(topicId)
+    .then((newTitle) => {
+      if (!newTitle) return;
+      return useTopicStore.getState().fetchTopics(sessionId);
+    })
+    .then(() => {
+      void useSessionStore.getState().fetchSessions();
+    })
+    .catch((error) => {
+      console.warn('[ChatStore] generateTopicTitle failed:', error);
+    });
+};
+
+const isGroupAssistantSettled = (message?: ChatMessage) => {
+  if (!message) return false;
+  if (message.error) return true;
+  if (message.imageList?.length) return true;
+
+  const content = message.content?.trim();
+  if (!content || content === GROUP_LOADING_CONTENT) {
+    return false;
+  }
+
+  return true;
 };
 
 const buildUserStreamContent = (
@@ -315,9 +484,62 @@ const buildContextMessage = (message: ChatMessage): MobileChatMessage | null => 
   return null;
 };
 
+const hasMessageAttachments = (message?: Pick<ChatMessage, 'fileList' | 'imageList'> | null) =>
+  ((message?.fileList?.length ?? 0) > 0) || ((message?.imageList?.length ?? 0) > 0);
+
+const mergePersistedMessageWithLocal = (
+  persisted: ChatMessage,
+  local?: ChatMessage,
+): ChatMessage => {
+  if (!local) return persisted;
+
+  const shouldPreferLocalUserCaption =
+    persisted.role === 'user' &&
+    local.role === 'user' &&
+    hasMessageAttachments(local) &&
+    !!local.content?.trim();
+  const shouldPreferLocalContent = shouldPreferLocalUserCaption || (!persisted.content && !!local.content);
+
+  return {
+    ...persisted,
+    ...(shouldPreferLocalContent ? { content: local.content } : {}),
+    ...(persisted.fileList?.length
+      ? {
+          fileList: persisted.fileList.map((file) => ({
+            ...file,
+            content: file.content || local.fileList?.find((localFile) => localFile.id === file.id)?.content,
+          })),
+        }
+      : local.fileList
+        ? { fileList: local.fileList }
+        : {}),
+    ...(persisted.imageList?.length ? {} : local.imageList ? { imageList: local.imageList } : {}),
+    ...(persisted.metadata ? {} : local.metadata ? { metadata: local.metadata } : {}),
+    ...(persisted.reasoning ? {} : local.reasoning ? { reasoning: local.reasoning } : {}),
+    ...(persisted.search ? {} : local.search ? { search: local.search } : {}),
+    ...(persisted.tools ? {} : local.tools ? { tools: local.tools } : {}),
+    ...(persisted.usage ? {} : local.usage ? { usage: local.usage } : {}),
+    ...(persisted.performance ? {} : local.performance ? { performance: local.performance } : {}),
+    ...(persisted.provider ? {} : local.provider ? { provider: local.provider } : {}),
+    ...(persisted.model ? {} : local.model ? { model: local.model } : {}),
+  };
+};
+
+const mergePersistedMessagesWithLocal = (
+  persistedMessages: ChatMessage[],
+  localMessages: ChatMessage[],
+) => {
+  const localById = new Map(localMessages.map((message) => [message.id, message]));
+
+  return persistedMessages.map((message) =>
+    mergePersistedMessageWithLocal(message, localById.get(message.id)),
+  );
+};
+
 interface ChatState {
   /** AbortController for the current streaming request */
   abortController: AbortController | null;
+  activeOperationId: string | null;
   activeStreamingMessageId: string | null;
   activeStreamingSessionId: string | null;
   clearMessages: (sessionId: string) => void;
@@ -326,6 +548,8 @@ interface ChatState {
   editingMessageId: string | null;
   editMessage: (sessionId: string, messageId: string, content: string) => Promise<void>;
 
+  /** Session IDs currently fetching messages (for skeleton) */
+  fetchingMessagesBySession: Record<string, boolean>;
   // Actions
   fetchMessages: (sessionId: string, topicId?: string) => Promise<void>;
   /** Whether a message is currently being generated */
@@ -359,8 +583,10 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
+  activeOperationId: null,
   activeStreamingMessageId: null,
   activeStreamingSessionId: null,
+  fetchingMessagesBySession: {},
   messagesBySession: {},
   generating: false,
   generatingStartedAt: null,
@@ -373,10 +599,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   reset: () => {
     get().abortController?.abort();
     set({
+      activeOperationId: null,
       activeStreamingMessageId: null,
       activeStreamingSessionId: null,
       abortController: null,
       editingMessageId: null,
+      fetchingMessagesBySession: {},
       generating: false,
       generatingStartedAt: null,
       isReasoning: false,
@@ -388,10 +616,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   stopGenerating: () => {
     const controller = get().abortController;
+    const operationId = get().activeOperationId;
     if (controller) {
       controller.abort();
     }
+    if (operationId) {
+      void aiAgentApi.interruptTask({ operationId }).catch((error) => {
+        console.warn('[ChatStore] Failed to interrupt group operation:', error);
+      });
+    }
     set({
+      activeOperationId: null,
       activeStreamingMessageId: null,
       activeStreamingSessionId: null,
       abortController: null,
@@ -404,8 +639,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   fetchMessages: async (sessionId: string, topicId?: string) => {
+    set((s) => ({
+      fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: true },
+    }));
     try {
-      const messages = await messageApi.list(sessionId, topicId);
+      const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+      const sessionType = session?.type ?? 'agent';
+      const messages = await messageApi.list(sessionId, topicId, { sessionType });
       const {
         activeStreamingMessageId,
         activeStreamingSessionId,
@@ -422,17 +662,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const localStreamingMessage = shouldKeepLocalStreamingMessage
         ? (messagesBySession[sessionId] || []).find((message) => message.id === activeStreamingMessageId)
         : undefined;
+      const mergedMessages = mergePersistedMessagesWithLocal(
+        messages ?? [],
+        messagesBySession[sessionId] || [],
+      );
 
       set((s) => ({
+        fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
         messagesBySession: {
           ...s.messagesBySession,
           [sessionId]:
-            localStreamingMessage && !messages.some((message) => message.id === localStreamingMessage.id)
-              ? [...messages, localStreamingMessage]
-              : (messages ?? []),
+            localStreamingMessage &&
+            !mergedMessages.some((message) => message.id === localStreamingMessage.id)
+              ? [...mergedMessages, localStreamingMessage]
+              : mergedMessages,
         },
       }));
     } catch (err) {
+      set((s) => ({
+        fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
+      }));
       const { messageKey } = classifyError(err);
       const t = useI18n.getState().t;
       useToast.getState().show('error', t[messageKey]);
@@ -491,23 +740,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return false;
       }
       uploadedAttachments.push(...successful);
-
-      const nonImageFileIds = successful
-        .filter((f) => !isImageAttachment(f.type))
-        .map((f) => f.fileId);
-      if (nonImageFileIds.length > 0) {
-        try {
-          const contents = await fileApi.getFileContents(nonImageFileIds);
-          for (const item of contents) {
-            const attachment = uploadedAttachments.find((a) => a.fileId === item.fileId);
-            if (attachment && item.content) {
-              attachment.content = item.content;
-            }
-          }
-        } catch {
-          // File content extraction is best-effort; continue without it
-        }
-      }
+      await hydrateAttachmentContents(uploadedAttachments);
     }
 
     const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
@@ -521,6 +754,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       fileList: uploadedAttachments
         .filter((f) => !isImageAttachment(f.type))
         .map((f) => ({
+          content: f.content,
           fileType: f.type,
           id: f.fileId,
           name: f.name,
@@ -538,6 +772,153 @@ export const useChatStore = create<ChatState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     };
 
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    let resolvedTopicId =
+      topicId ?? useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
+
+    if (!resolvedTopicId && session?.type !== 'group') {
+      const existingTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
+      const existingMessages = get().messagesBySession[sessionId] ?? [];
+
+      if (existingTopics.length === 0 && existingMessages.length === 0) {
+        const createdTopic = await useTopicStore.getState().createTopic(sessionId, '');
+        if (createdTopic?.id) {
+          resolvedTopicId = createdTopic.id;
+          useTopicStore.getState().switchTopic(sessionId, createdTopic.id);
+        }
+      }
+    }
+
+    if (session?.type === 'group') {
+      const assistantPlaceholderId = `assistant-${Date.now()}`;
+      const assistantMsg: ChatMessage = {
+        id: assistantPlaceholderId,
+        sessionId,
+        role: 'assistant',
+        content: GROUP_LOADING_CONTENT,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const abortController = new AbortController();
+      set((s) => ({
+        activeOperationId: null,
+        activeStreamingMessageId: assistantPlaceholderId,
+        activeStreamingSessionId: sessionId,
+        abortController,
+        generating: true,
+        generatingStartedAt: Date.now(),
+        isReasoning: false,
+        reasoningStartedAt: null,
+        streamBuffer: '',
+        messagesBySession: {
+          ...s.messagesBySession,
+          [sessionId]: [...(s.messagesBySession[sessionId] || []), userMsg, assistantMsg],
+        },
+      }));
+
+      try {
+        const groupDetail = await agentGroupApi.getGroupDetail(sessionId);
+        const supervisorAgentId = groupDetail?.supervisorAgentId;
+
+        if (!supervisorAgentId) {
+          throw new Error('Group supervisor not found');
+        }
+
+        const result = await aiAgentApi.execGroupAgent({
+          agentId: supervisorAgentId,
+          ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
+          groupId: sessionId,
+          message: buildAttachmentPromptText(textContent, uploadedAttachments),
+          topicId,
+        });
+
+        if (uploadedAttachments.length > 0) {
+          useFileStore.getState().clearPending();
+        }
+
+        const resolvedTopicId = result.topicId ?? topicId ?? null;
+        syncTopicsForSession(sessionId, result.topics, resolvedTopicId);
+
+        set((s) => ({
+          activeOperationId: result.operationId ?? null,
+          activeStreamingMessageId: result.assistantMessageId ?? assistantPlaceholderId,
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: s.messagesBySession[sessionId] || [],
+          },
+        }));
+
+        if (abortController.signal.aborted) {
+          if (result.operationId) {
+            void aiAgentApi.interruptTask({ operationId: result.operationId }).catch((error) => {
+              console.warn('[ChatStore] Failed to interrupt aborted group operation:', error);
+            });
+          }
+          return true;
+        }
+
+        if (result.success === false) {
+          const t = useI18n.getState().t;
+          useToast.getState().show('error', t.errorUnknown);
+          return true;
+        }
+
+        for (let attempt = 0; attempt < GROUP_POLL_MAX_ATTEMPTS; attempt += 1) {
+          await sleep(GROUP_POLL_INTERVAL_MS);
+          if (abortController.signal.aborted) {
+            return true;
+          }
+
+          await get().fetchMessages(sessionId, resolvedTopicId ?? undefined);
+
+          const assistantMessage = (get().messagesBySession[sessionId] || []).find(
+            (message) => message.id === (result.assistantMessageId ?? assistantPlaceholderId),
+          );
+
+          if (isGroupAssistantSettled(assistantMessage)) {
+            triggerTopicTitleGeneration(sessionId, resolvedTopicId);
+            break;
+          }
+        }
+
+        return true;
+      } catch (err) {
+        if (abortController.signal.aborted) {
+          return true;
+        }
+
+        console.warn('[ChatStore] group send error:', err);
+        const t = useI18n.getState().t;
+        const rawMessage = err instanceof Error ? err.message : '';
+        const errorMessage = rawMessage || t.errorSendFailed;
+        useToast.getState().show('error', errorMessage);
+
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).filter(
+              (message) => message.id !== userMsg.id && message.id !== assistantPlaceholderId,
+            ),
+          },
+        }));
+
+        return false;
+      } finally {
+        set({
+          activeOperationId: null,
+          activeStreamingMessageId: null,
+          activeStreamingSessionId: null,
+          abortController: null,
+          generating: false,
+          generatingStartedAt: null,
+          isReasoning: false,
+          reasoningStartedAt: null,
+          streamBuffer: '',
+        });
+      }
+    }
+
     // Optimistically add user message
     set((s) => ({
       messagesBySession: {
@@ -553,21 +934,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await messageApi.create({
         sessionId,
         content: displayContent,
-        ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
-        role: 'user',
-        topicId,
-      } as any);
+          ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
+          role: 'user',
+          topicId: resolvedTopicId,
+        } as any);
       userMessageServerId = result?.id;
-      persistedMessagesAfterUser = result?.messages?.map((message) =>
-        message.id === result?.id
-          ? {
-              ...message,
-              content: message.content || displayContent,
-              ...(message.fileList?.length ? {} : { fileList: userMsg.fileList }),
-              ...(message.imageList?.length ? {} : { imageList: userMsg.imageList }),
-            }
-          : message,
-      );
+      persistedMessagesAfterUser = mergePersistedMessagesWithLocal(result?.messages ?? [], [
+        ...(get().messagesBySession[sessionId] || []),
+        userMsg,
+      ]);
 
       if (persistedMessagesAfterUser?.length) {
         set((s) => ({
@@ -595,12 +970,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // This keeps local image data-URIs (when available) so model providers
     // don't need to fetch internal `/f/:id` URLs and trigger SSRF-safe fetch.
     if (uploadedAttachments.length > 0 && contextMessages.length > 0) {
-      const lastCtx = contextMessages[contextMessages.length - 1];
+      const lastIndex = contextMessages.length - 1;
+      const lastCtx = contextMessages.at(-1);
+      if (!lastCtx) return false;
       if (lastCtx.role === 'user') {
         const lastTextContent =
           typeof lastCtx.content === 'string' ? lastCtx.content : textContent || displayContent;
         const multimodalContent = buildUserStreamContent(lastTextContent, uploadedAttachments);
-        contextMessages[contextMessages.length - 1] = {
+        contextMessages[lastIndex] = {
           ...lastCtx,
           content: multimodalContent,
         };
@@ -645,7 +1022,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const chatOptions = await getSessionChatOptions(sessionId);
       const provider = chatOptions.provider || 'openai';
       chatOptions.sessionId = sessionId;
-      chatOptions.topicId = topicId;
+      chatOptions.topicId = resolvedTopicId;
 
       // Set model/provider on the assistant message for immediate UI display
       set((s) => ({
@@ -657,13 +1034,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }));
 
-      if (options?.searchEnabled) {
-        chatOptions.enabledSearch = true;
-      }
+      // Memory: prefer explicit options, else use session/agent chatConfig (for regenerateMessage etc.)
       chatOptions.memory = {
-        effort: options?.memoryEffort || 'medium',
-        enabled: options?.memoryEnabled !== false,
+        effort: (options?.memoryEffort ?? chatOptions.memory?.effort) || 'medium',
+        enabled: options?.memoryEnabled !== undefined ? options.memoryEnabled !== false : (chatOptions.memory?.enabled !== false),
       };
+      if (options?.searchEnabled !== undefined) {
+        chatOptions.enabledSearch = options.searchEnabled;
+      }
       if (options?.plugins?.length) {
         chatOptions.plugins = options.plugins;
       }
@@ -898,17 +1276,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ...(resolvedTools ? { tools: resolvedTools } : {}),
           provider,
           parentId: userMessageServerId,
-          topicId,
+          topicId: resolvedTopicId,
           reasoning: buildPersistedReasoning(localMsg?.reasoning),
         });
 
         if (persistedAssistant?.messages?.length) {
+          const localMessages = get().messagesBySession[sessionId] || [];
           set((s) => ({
             messagesBySession: {
               ...s.messagesBySession,
-              [sessionId]: persistedAssistant.messages,
+              [sessionId]: mergePersistedMessagesWithLocal(
+                persistedAssistant.messages,
+                localMessages,
+              ),
             },
           }));
+
+          // Fire-and-forget: generate session title if still default
+          const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
+          const defaultTitles = ['New Conversation', '新对话'];
+          if (session && (!session.title || defaultTitles.includes(session.title))) {
+            sessionApi
+              .generateTitle(sessionId)
+              .then((newTitle) => {
+                if (newTitle) {
+                  useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                  useSessionStore.getState().fetchSessions();
+                }
+              })
+              .catch((err) => console.warn('[ChatStore] generateSessionTitle failed:', err));
+          }
+
+          triggerTopicTitleGeneration(sessionId, resolvedTopicId);
         }
       } catch (err) {
         console.warn('[ChatStore] Failed to persist assistant message:', err);
@@ -939,6 +1338,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     } finally {
       set({
+        activeOperationId: null,
         activeStreamingMessageId: null,
         activeStreamingSessionId: null,
         abortController: null,
@@ -1005,12 +1405,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   regenerateMessage: async (sessionId: string, messageId: string) => {
     if (get().generating) return;
 
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (session?.type === 'group') {
+      const t = useI18n.getState().t;
+      useToast.getState().show('error', t.errorUnknown);
+      return;
+    }
+
     const messages = get().messagesBySession[sessionId] || [];
     const targetIdx = messages.findIndex((m) => m.id === messageId);
     if (targetIdx < 0) return;
 
     const target = messages[targetIdx];
-    const topicId = useTopicStore.getState().activeTopic ?? undefined;
+    const topicId = useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
 
     // If it's an assistant message, remove it and resend from previous user message
     // If it's a user message, remove subsequent assistant and regenerate
@@ -1088,6 +1495,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const provider = chatOptions.provider || 'openai';
       chatOptions.sessionId = sessionId;
       chatOptions.topicId = topicId;
+      // memory/searchMode come from getSessionChatOptions (agent/session chatConfig)
+      // When undefined, backend resolveEffectiveMemoryPayload falls back to agent config
 
       // Set model/provider on the assistant message for immediate display
       set((s) => ({
@@ -1331,10 +1740,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
 
         if (persistedAssistant?.messages?.length) {
+          const localMessages = get().messagesBySession[sessionId] || [];
           set((s) => ({
             messagesBySession: {
               ...s.messagesBySession,
-              [sessionId]: persistedAssistant.messages,
+              [sessionId]: mergePersistedMessagesWithLocal(
+                persistedAssistant.messages,
+                localMessages,
+              ),
             },
           }));
         }
@@ -1367,6 +1780,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     } finally {
       set({
+        activeOperationId: null,
         activeStreamingMessageId: null,
         activeStreamingSessionId: null,
         abortController: null,

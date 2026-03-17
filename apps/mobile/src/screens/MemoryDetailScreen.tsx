@@ -1,8 +1,8 @@
 /**
  * MemoryDetailScreen — Full-screen detail view for a single memory item.
  *
- * Supports viewing all fields, editing, and deleting.
- * Aligns with web's right-panel detail view but adapted for mobile navigation.
+ * Uses the backend detail endpoint so mobile can show the same source/tag/category
+ * metadata as the web side while keeping inline edit/delete support.
  */
 import { useNavigation, useRoute } from '@react-navigation/native';
 import {
@@ -10,14 +10,17 @@ import {
   ChevronLeft,
   Clock,
   Edit3,
+  ExternalLink,
+  Link2,
   MapPin,
   Save,
   Tag,
   Trash2,
   X,
 } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -29,15 +32,25 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { semanticColors } from '../constants/colors';
 import { memoryApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { tokens } from '../theme/tokens';
 import type {
+  MemoryActivityDetail,
   MemoryActivityItem,
+  MemoryBaseDetail,
+  MemoryContextDetail,
   MemoryContextItem,
+  MemoryDetail,
+  MemoryExperienceDetail,
   MemoryExperienceItem,
+  MemoryIdentityDetail,
   MemoryIdentityItem,
   MemoryLayer,
+  MemoryPreferenceDetail,
   MemoryPreferenceItem,
+  MemorySource,
 } from '../types';
 
 type AnyMemoryItem =
@@ -47,7 +60,7 @@ type AnyMemoryItem =
   | MemoryIdentityItem
   | MemoryPreferenceItem;
 
-const LAYER_COLORS: Record<string, string> = {
+const LAYER_COLORS: Record<MemoryLayer, string> = {
   activity: '#f59e0b',
   context: '#8b5cf6',
   experience: '#10b981',
@@ -55,11 +68,13 @@ const LAYER_COLORS: Record<string, string> = {
   preference: '#ec4899',
 };
 
-function formatDate(dateStr?: string): string {
+function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString(undefined, {
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleDateString(undefined, {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
@@ -68,11 +83,37 @@ function formatDate(dateStr?: string): string {
   });
 }
 
-// ── Field Section Component ──────────────────────────────────────────
+function formatScore(value?: number | null) {
+  if (value === undefined || value === null) return undefined;
+  if (value <= 1) return `${Math.round(value * 100)}%`;
+
+  return String(value);
+}
+
+function getDetailEntity(detail: MemoryDetail): AnyMemoryItem {
+  switch (detail.layer) {
+    case 'activity': {
+      return (detail as MemoryActivityDetail).activity;
+    }
+    case 'context': {
+      return (detail as MemoryContextDetail).context;
+    }
+    case 'experience': {
+      return (detail as MemoryExperienceDetail).experience;
+    }
+    case 'identity': {
+      return (detail as MemoryIdentityDetail).identity;
+    }
+    case 'preference': {
+      return (detail as MemoryPreferenceDetail).preference;
+    }
+  }
+}
+
 function FieldSection({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <View className="mb-4">
-      <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+      <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
         {label}
       </Text>
       {children}
@@ -82,7 +123,8 @@ function FieldSection({ children, label }: { children: React.ReactNode; label: s
 
 function FieldText({ value }: { value?: string | null }) {
   if (!value) return <Text className="text-sm text-gray-300">—</Text>;
-  return <Text className="text-sm text-gray-700 leading-5">{value}</Text>;
+
+  return <Text className="text-sm leading-5 text-gray-700">{value}</Text>;
 }
 
 function EditableField({
@@ -95,16 +137,16 @@ function EditableField({
   editing: boolean;
   label: string;
   multiline?: boolean;
-  onChangeText: (t: string) => void;
+  onChangeText: (value: string) => void;
   value: string;
 }) {
   return (
     <FieldSection label={label}>
       {editing ? (
         <TextInput
-          className="text-sm text-gray-700 border border-gray-200 rounded-xl px-3 py-2"
+          className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700"
           multiline={multiline}
-          style={multiline ? { minHeight: 80, textAlignVertical: 'top' } : {}}
+          style={multiline ? { minHeight: 80, textAlignVertical: 'top' } : undefined}
           value={value}
           onChangeText={onChangeText}
         />
@@ -115,19 +157,43 @@ function EditableField({
   );
 }
 
-// ── Tags Display ─────────────────────────────────────────────────────
-function TagsRow({ color, tags }: { color: string; tags: string[] }) {
-  if (!tags.length) return null;
+function MetaChip({
+  color,
+  label,
+  subtle,
+}: {
+  color: string;
+  label: string;
+  subtle?: boolean;
+}) {
   return (
-    <View className="flex-row flex-wrap gap-1.5 mb-4">
-      {tags.map((tag, i) => (
+    <View
+      className="mr-2 rounded-full px-2.5 py-1"
+      style={{ backgroundColor: subtle ? '#f3f4f6' : `${color}15` }}
+    >
+      <Text
+        className="text-xs font-semibold"
+        style={{ color: subtle ? '#6b7280' : color }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function TagList({ color, tags }: { color: string; tags: string[] }) {
+  if (tags.length === 0) return null;
+
+  return (
+    <View className="flex-row flex-wrap gap-2">
+      {tags.map((tag) => (
         <View
-          className="flex-row items-center px-2.5 py-1 rounded-full"
-          key={`${tag}-${i}`}
+          className="flex-row items-center rounded-full px-2.5 py-1"
+          key={tag}
           style={{ backgroundColor: `${color}12` }}
         >
-          <Tag color={color} size={10} strokeWidth={2} />
-          <Text className="text-xs font-medium ml-1" style={{ color }}>
+          <Tag color={color} size={10} strokeWidth={tokens.icon.strokeWidth} />
+          <Text className="ml-1 text-xs font-medium" style={{ color }}>
             {tag}
           </Text>
         </View>
@@ -136,7 +202,6 @@ function TagsRow({ color, tags }: { color: string; tags: string[] }) {
   );
 }
 
-// ── Score Badge ──────────────────────────────────────────────────────
 function ScoreBadge({
   color,
   label,
@@ -146,129 +211,341 @@ function ScoreBadge({
   label: string;
   value?: number | null;
 }) {
-  if (value === undefined || value === null) return null;
+  const formatted = formatScore(value);
+  if (!formatted) return null;
+
   return (
     <View
-      className="items-center px-3 py-2 rounded-xl mr-2 mb-2"
+      className="mb-2 mr-2 items-center rounded-xl px-3 py-2"
       style={{ backgroundColor: `${color}10` }}
     >
       <Text className="text-lg font-bold" style={{ color }}>
-        {value}
+        {formatted}
       </Text>
-      <Text className="text-[10px] text-gray-400 mt-0.5">{label}</Text>
+      <Text className="mt-0.5 text-[10px] text-gray-400">{label}</Text>
     </View>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────────
+function SourceCard({
+  canOpen,
+  onPress,
+  source,
+  sourceLabel,
+  subtitle,
+}: {
+  canOpen: boolean;
+  onPress: () => void;
+  source?: MemorySource | null;
+  sourceLabel: string;
+  subtitle?: string;
+}) {
+  if (!source) return null;
+
+  const title = source.title || source.id;
+
+  return (
+    <FieldSection label={sourceLabel}>
+      <TouchableOpacity
+        activeOpacity={canOpen ? 0.7 : 1}
+        className="flex-row items-center rounded-2xl bg-gray-100 px-4 py-3"
+        disabled={!canOpen}
+        onPress={onPress}
+      >
+        <View className="mr-3 h-9 w-9 items-center justify-center rounded-xl bg-white">
+          {canOpen ? (
+            <Link2 color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          ) : (
+            <ExternalLink
+              color={semanticColors.secondaryText}
+              size={16}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          )}
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-gray-800" numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text className="mt-0.5 text-xs text-gray-500" numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {canOpen ? (
+          <ExternalLink
+            color={semanticColors.secondaryText}
+            size={14}
+            strokeWidth={tokens.icon.strokeWidth}
+          />
+        ) : null}
+      </TouchableOpacity>
+    </FieldSection>
+  );
+}
+
 export default function MemoryDetailScreen() {
   const { t } = useI18n();
   const nav = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
 
-  const item: AnyMemoryItem = route.params?.item;
-  const layer: MemoryLayer = route.params?.layer;
-  const layerColor = LAYER_COLORS[layer] || '#6b7280';
+  const initialItem = route.params?.item as AnyMemoryItem | undefined;
+  const layer = route.params?.layer as MemoryLayer | undefined;
+  const itemId = initialItem?.id;
+
+  const layerColor = layer ? LAYER_COLORS[layer] : '#6b7280';
 
   const [editing, setEditing] = useState(false);
+  const [itemState, setItemState] = useState<AnyMemoryItem | undefined>(initialItem);
+  const [memoryState, setMemoryState] = useState<MemoryBaseDetail | null>(null);
+  const [detailState, setDetailState] = useState<MemoryDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const [refreshingDetail, setRefreshingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Editable fields (varies by layer)
   const [editState, setEditState] = useState<Record<string, string>>({});
 
+  const applyDetail = useCallback((detail: MemoryDetail) => {
+    setDetailState(detail);
+    setMemoryState(detail.memory);
+    setItemState(getDetailEntity(detail));
+  }, []);
+
+  const loadDetail = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!itemId || !layer) {
+        setLoadingDetail(false);
+        return;
+      }
+
+      if (options?.silent) {
+        setRefreshingDetail(true);
+      } else {
+        setLoadingDetail(true);
+      }
+
+      try {
+        const detail = await memoryApi.getMemoryDetail(itemId, layer);
+        if (detail) {
+          applyDetail(detail);
+        }
+      } catch {
+        /* best-effort fallback to route param */
+      } finally {
+        setLoadingDetail(false);
+        setRefreshingDetail(false);
+      }
+    },
+    [applyDetail, itemId, layer],
+  );
+
+  useEffect(() => {
+    if (!itemId || !layer) {
+      nav.goBack();
+      return;
+    }
+
+    void loadDetail();
+  }, [itemId, layer, loadDetail, nav]);
+
+  const setField = (key: string) => (value: string) =>
+    setEditState((prev) => ({ ...prev, [key]: value }));
+
+  const resolvedType = useMemo(
+    () =>
+      (itemState as any)?.type ||
+      memoryState?.memoryCategory ||
+      memoryState?.memoryType ||
+      undefined,
+    [itemState, memoryState],
+  );
+
+  const resolvedTags = useMemo(() => {
+    const layerTags = ((itemState as any)?.tags as string[] | undefined) || [];
+
+    return layerTags.length > 0 ? layerTags : memoryState?.tags || [];
+  }, [itemState, memoryState]);
+
+  const resolvedSummary = useMemo(() => {
+    if (layer === 'identity') {
+      const identity = itemState as MemoryIdentityItem | undefined;
+
+      return memoryState?.summary || identity?.summary || identity?.description || '';
+    }
+
+    return memoryState?.summary || '';
+  }, [itemState, layer, memoryState]);
+
+  const source = detailState?.source;
+  const canOpenSource =
+    detailState?.sourceType === 'chat_topic' && !!source?.sessionId && !!source?.id;
+
+  const sourceSubtitle = useMemo(() => {
+    if (!source) return undefined;
+
+    if (detailState?.sourceType === 'chat_topic') {
+      return source.sessionId ? `${t.topicTitle} • ${source.sessionId}` : t.topicTitle;
+    }
+
+    return detailState?.sourceType || undefined;
+  }, [detailState?.sourceType, source, t.topicTitle]);
+
   const startEdit = useCallback(() => {
-    // Pre-fill editable fields from current item
+    if (!itemState || !layer) return;
+
     const fields: Record<string, string> = {};
+
     switch (layer) {
       case 'identity': {
-        fields.title = (item as MemoryIdentityItem).title || '';
-        fields.summary = (item as MemoryIdentityItem).summary || '';
+        fields.title = (itemState as any).title || memoryState?.title || '';
+        fields.summary = resolvedSummary;
         break;
       }
       case 'context': {
-        fields.title = (item as MemoryContextItem).title || '';
-        fields.description = (item as MemoryContextItem).description || '';
-        fields.currentStatus = (item as MemoryContextItem).currentStatus || '';
+        const context = itemState as MemoryContextItem;
+        fields.title = context.title || '';
+        fields.description = context.description || '';
+        fields.currentStatus = context.currentStatus || '';
         break;
       }
       case 'activity': {
-        fields.narrative = (item as MemoryActivityItem).narrative || '';
-        fields.notes = (item as MemoryActivityItem).notes || '';
-        fields.status = (item as MemoryActivityItem).status || '';
+        const activity = itemState as MemoryActivityItem;
+        fields.narrative = activity.narrative || '';
+        fields.notes = activity.notes || '';
+        fields.status = activity.status || '';
         break;
       }
       case 'experience': {
-        fields.situation = (item as MemoryExperienceItem).situation || '';
-        fields.action = (item as MemoryExperienceItem).action || '';
-        fields.keyLearning = (item as MemoryExperienceItem).keyLearning || '';
-        fields.reasoning = (item as MemoryExperienceItem).reasoning || '';
+        const experience = itemState as MemoryExperienceItem;
+        fields.situation = experience.situation || '';
+        fields.action = experience.action || '';
+        fields.keyLearning = experience.keyLearning || '';
+        fields.reasoning = experience.reasoning || '';
         break;
       }
       case 'preference': {
-        fields.conclusionDirectives = (item as MemoryPreferenceItem).conclusionDirectives || '';
-        fields.suggestions = (item as MemoryPreferenceItem).suggestions || '';
+        const preference = itemState as MemoryPreferenceItem;
+        fields.conclusionDirectives = preference.conclusionDirectives || '';
+        fields.suggestions = preference.suggestions || '';
         break;
       }
     }
+
     setEditState(fields);
     setEditing(true);
-  }, [item, layer]);
+  }, [itemState, layer, memoryState?.title, resolvedSummary]);
 
   const handleSave = useCallback(async () => {
+    if (!itemState || !layer) return;
+
     setSaving(true);
+
     try {
       switch (layer) {
         case 'identity': {
-          await memoryApi.updateIdentity(item.id, {
+          await memoryApi.updateIdentity(itemState.id, {
             summary: editState.summary,
             title: editState.title,
-          } as any);
+          });
+          setMemoryState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  summary: editState.summary,
+                  title: editState.title,
+                }
+              : prev,
+          );
           break;
         }
         case 'context': {
-          await memoryApi.updateContext(item.id, {
+          await memoryApi.updateContext(itemState.id, {
             currentStatus: editState.currentStatus,
             description: editState.description,
             title: editState.title,
           });
+          setItemState((prev) =>
+            prev
+              ? {
+                  ...(prev as MemoryContextItem),
+                  currentStatus: editState.currentStatus,
+                  description: editState.description,
+                  title: editState.title,
+                }
+              : prev,
+          );
           break;
         }
         case 'activity': {
-          await memoryApi.updateActivity(item.id, {
+          await memoryApi.updateActivity(itemState.id, {
             narrative: editState.narrative,
             notes: editState.notes,
             status: editState.status,
           });
+          setItemState((prev) =>
+            prev
+              ? {
+                  ...(prev as MemoryActivityItem),
+                  narrative: editState.narrative,
+                  notes: editState.notes,
+                  status: editState.status,
+                }
+              : prev,
+          );
           break;
         }
         case 'experience': {
-          await memoryApi.updateExperience(item.id, {
+          await memoryApi.updateExperience(itemState.id, {
             action: editState.action,
             keyLearning: editState.keyLearning,
             reasoning: editState.reasoning,
             situation: editState.situation,
           });
+          setItemState((prev) =>
+            prev
+              ? {
+                  ...(prev as MemoryExperienceItem),
+                  action: editState.action,
+                  keyLearning: editState.keyLearning,
+                  reasoning: editState.reasoning,
+                  situation: editState.situation,
+                }
+              : prev,
+          );
           break;
         }
         case 'preference': {
-          await memoryApi.updatePreference(item.id, {
+          await memoryApi.updatePreference(itemState.id, {
             conclusionDirectives: editState.conclusionDirectives,
             suggestions: editState.suggestions,
           });
+          setItemState((prev) =>
+            prev
+              ? {
+                  ...(prev as MemoryPreferenceItem),
+                  conclusionDirectives: editState.conclusionDirectives,
+                  suggestions: editState.suggestions,
+                }
+              : prev,
+          );
           break;
         }
       }
-      Alert.alert(t.memorySaved);
+
+      await loadDetail({ silent: true });
       setEditing(false);
+      Alert.alert(t.memorySaved);
     } catch {
       Alert.alert(t.errorUnknown);
     } finally {
       setSaving(false);
     }
-  }, [editState, item.id, layer, t]);
+  }, [editState, itemState, layer, loadDetail, t.errorUnknown, t.memorySaved]);
 
   const handleDelete = useCallback(() => {
+    if (!itemState || !layer) return;
+
     Alert.alert(t.memoryDeleteConfirm, t.memoryDeleteDesc, [
       { style: 'cancel', text: t.cancel },
       {
@@ -278,26 +555,27 @@ export default function MemoryDetailScreen() {
           try {
             switch (layer) {
               case 'identity': {
-                await memoryApi.deleteIdentity(item.id);
+                await memoryApi.deleteIdentity(itemState.id);
                 break;
               }
               case 'context': {
-                await memoryApi.deleteContext(item.id);
+                await memoryApi.deleteContext(itemState.id);
                 break;
               }
               case 'activity': {
-                await memoryApi.deleteActivity(item.id);
+                await memoryApi.deleteActivity(itemState.id);
                 break;
               }
               case 'experience': {
-                await memoryApi.deleteExperience(item.id);
+                await memoryApi.deleteExperience(itemState.id);
                 break;
               }
               case 'preference': {
-                await memoryApi.deletePreference(item.id);
+                await memoryApi.deletePreference(itemState.id);
                 break;
               }
             }
+
             nav.goBack();
           } catch {
             /* ignore */
@@ -305,247 +583,376 @@ export default function MemoryDetailScreen() {
         },
       },
     ]);
-  }, [item.id, layer, nav, t]);
+  }, [itemState, layer, nav, t]);
 
-  const setField = (key: string) => (val: string) =>
-    setEditState((prev) => ({ ...prev, [key]: val }));
+  const handleOpenSource = useCallback(() => {
+    if (!canOpenSource || !source?.sessionId || !source.id) return;
 
-  // ── Render Layer-Specific Content ──────────────────────────────────
-  function renderContent() {
-    const tags: string[] = (item as any).tags || [];
+    nav.navigate('ChatDetail', {
+      sessionId: source.sessionId,
+      topicId: source.id,
+    });
+  }, [canOpenSource, nav, source]);
+
+  const getHeaderTitle = useCallback((): string => {
+    if (!itemState || !layer) return t.memoryDetail;
 
     switch (layer) {
       case 'identity': {
-        const it = item as MemoryIdentityItem;
+        return editing
+          ? editState.title
+          : (itemState as any).title || memoryState?.title || t.memoryIdentity;
+      }
+      case 'context': {
+        return editing
+          ? editState.title
+          : (itemState as MemoryContextItem).title || memoryState?.title || t.memoryContext;
+      }
+      case 'activity': {
+        return (
+          (itemState as any).title ||
+          memoryState?.title ||
+          (itemState as MemoryActivityItem).type ||
+          t.memoryActivity
+        );
+      }
+      case 'experience': {
+        return (
+          (itemState as any).title ||
+          memoryState?.title ||
+          (itemState as MemoryExperienceItem).type ||
+          t.memoryExperience
+        );
+      }
+      case 'preference': {
+        return (
+          (itemState as any).title ||
+          memoryState?.title ||
+          (itemState as MemoryPreferenceItem).type ||
+          t.memoryPreference
+        );
+      }
+    }
+  }, [editState.title, editing, itemState, layer, memoryState?.title, t]);
+
+  const renderCommonMeta = () => (
+    <>
+      <View className="mb-4 flex-row flex-wrap items-center">
+        <MetaChip
+          color={layerColor}
+          label={(t as any)[`memory${layer?.charAt(0).toUpperCase()}${layer?.slice(1)}`] || layer || ''}
+        />
+        {resolvedType ? <MetaChip subtle color={layerColor} label={resolvedType} /> : null}
+      </View>
+
+      <SourceCard
+        canOpen={canOpenSource}
+        source={source}
+        sourceLabel={t.skillsMemorySource}
+        subtitle={sourceSubtitle}
+        onPress={handleOpenSource}
+      />
+
+      {layer !== 'identity' && resolvedSummary ? (
+        <FieldSection label={t.memorySummary}>
+          <FieldText value={resolvedSummary} />
+        </FieldSection>
+      ) : null}
+    </>
+  );
+
+  const renderContent = () => {
+    if (!itemState || !layer) return null;
+
+    const createdAt = (itemState as any).createdAt || memoryState?.createdAt;
+    const updatedAt = (itemState as any).updatedAt || memoryState?.updatedAt;
+    const capturedAt = (itemState as any).capturedAt || memoryState?.capturedAt;
+
+    switch (layer) {
+      case 'identity': {
+        const identity = itemState as MemoryIdentityItem;
+
         return (
           <>
-            <TagsRow color={layerColor} tags={tags} />
+            {renderCommonMeta()}
             <EditableField
               multiline
               editing={editing}
               label={t.memorySummary}
-              value={editing ? editState.summary : it.summary || ''}
+              value={editing ? editState.summary : resolvedSummary}
               onChangeText={setField('summary')}
             />
-            {it.memoryCategory && (
-              <FieldSection label={t.memoryType}>
-                <FieldText value={it.memoryCategory} />
-              </FieldSection>
-            )}
             <FieldSection label={t.memoryCreatedAt}>
-              <FieldText value={formatDate(it.createdAt)} />
+              <FieldText value={formatDate(createdAt)} />
             </FieldSection>
-            {it.updatedAt && (
+            {updatedAt ? (
               <FieldSection label={t.memoryUpdatedAt}>
-                <FieldText value={formatDate(it.updatedAt)} />
+                <FieldText value={formatDate(updatedAt)} />
               </FieldSection>
-            )}
+            ) : null}
+            {identity.episodicDate ? (
+              <FieldSection label={t.memoryCapturedAt}>
+                <FieldText value={formatDate(identity.episodicDate)} />
+              </FieldSection>
+            ) : null}
+            {resolvedTags.length > 0 ? (
+              <FieldSection label={t.memoryTags}>
+                <TagList color={layerColor} tags={resolvedTags} />
+              </FieldSection>
+            ) : null}
           </>
         );
       }
       case 'context': {
-        const it = item as MemoryContextItem;
+        const context = itemState as MemoryContextItem;
+
         return (
           <>
-            <TagsRow color={layerColor} tags={tags} />
+            {renderCommonMeta()}
             <EditableField
               multiline
               editing={editing}
               label={t.memoryDescription}
-              value={editing ? editState.description : it.description || ''}
+              value={editing ? editState.description : context.description || ''}
               onChangeText={setField('description')}
             />
             <EditableField
               editing={editing}
               label={t.memoryStatus}
-              value={editing ? editState.currentStatus : it.currentStatus || ''}
+              value={editing ? editState.currentStatus : context.currentStatus || ''}
               onChangeText={setField('currentStatus')}
             />
             <View className="flex-row flex-wrap">
-              <ScoreBadge color="#f59e0b" label={t.memoryImpact} value={it.scoreImpact} />
-              <ScoreBadge color="#ef4444" label={t.memoryUrgency} value={it.scoreUrgency} />
+              <ScoreBadge color="#f59e0b" label={t.memoryImpact} value={context.scoreImpact} />
+              <ScoreBadge color="#ef4444" label={t.memoryUrgency} value={context.scoreUrgency} />
             </View>
-            {it.associatedSubjects?.length ? (
+            {context.associatedSubjects?.length ? (
               <FieldSection label={t.memoryAssociatedSubjects}>
-                <View className="flex-row flex-wrap gap-1">
-                  {it.associatedSubjects.map((s, i) => (
-                    <View className="px-2 py-0.5 rounded bg-gray-100" key={i}>
-                      <Text className="text-xs text-gray-600">{s}</Text>
-                    </View>
-                  ))}
-                </View>
+                <TagList color={layerColor} tags={context.associatedSubjects} />
+              </FieldSection>
+            ) : null}
+            {capturedAt ? (
+              <FieldSection label={t.memoryCapturedAt}>
+                <FieldText value={formatDate(capturedAt)} />
               </FieldSection>
             ) : null}
             <FieldSection label={t.memoryCreatedAt}>
-              <FieldText value={formatDate(it.createdAt)} />
+              <FieldText value={formatDate(createdAt)} />
             </FieldSection>
+            {updatedAt ? (
+              <FieldSection label={t.memoryUpdatedAt}>
+                <FieldText value={formatDate(updatedAt)} />
+              </FieldSection>
+            ) : null}
+            {resolvedTags.length > 0 ? (
+              <FieldSection label={t.memoryTags}>
+                <TagList color={layerColor} tags={resolvedTags} />
+              </FieldSection>
+            ) : null}
           </>
         );
       }
       case 'activity': {
-        const it = item as MemoryActivityItem;
+        const activity = itemState as MemoryActivityItem;
+
         return (
           <>
-            <TagsRow color={layerColor} tags={tags} />
+            {renderCommonMeta()}
             <EditableField
               multiline
               editing={editing}
               label={t.memoryNarrative}
-              value={editing ? editState.narrative : it.narrative || ''}
+              value={editing ? editState.narrative : activity.narrative || ''}
               onChangeText={setField('narrative')}
             />
             <EditableField
               multiline
               editing={editing}
               label={t.memoryNotes}
-              value={editing ? editState.notes : it.notes || ''}
+              value={editing ? editState.notes : activity.notes || ''}
               onChangeText={setField('notes')}
             />
             <EditableField
               editing={editing}
               label={t.memoryStatus}
-              value={editing ? editState.status : it.status || ''}
+              value={editing ? editState.status : activity.status || ''}
               onChangeText={setField('status')}
             />
-            {it.feedback && (
+            {activity.feedback ? (
               <FieldSection label={t.memoryFeedback}>
-                <FieldText value={it.feedback} />
-              </FieldSection>
-            )}
-            <View className="flex-row flex-wrap gap-4 mb-4">
-              {it.startsAt && (
-                <View className="flex-row items-center">
-                  <Calendar color="#9ca3af" size={14} strokeWidth={1.5} />
-                  <Text className="text-xs text-gray-500 ml-1">{formatDate(it.startsAt)}</Text>
-                </View>
-              )}
-              {it.endsAt && (
-                <View className="flex-row items-center">
-                  <Clock color="#9ca3af" size={14} strokeWidth={1.5} />
-                  <Text className="text-xs text-gray-500 ml-1">{formatDate(it.endsAt)}</Text>
-                </View>
-              )}
-              {it.timezone && (
-                <View className="flex-row items-center">
-                  <MapPin color="#9ca3af" size={14} strokeWidth={1.5} />
-                  <Text className="text-xs text-gray-500 ml-1">{it.timezone}</Text>
-                </View>
-              )}
-            </View>
-            {it.associatedLocations?.length ? (
-              <FieldSection label={t.memoryAssociatedLocations}>
-                <View className="flex-row flex-wrap gap-1">
-                  {it.associatedLocations.map((loc, i) => (
-                    <View className="px-2 py-0.5 rounded bg-gray-100" key={i}>
-                      <Text className="text-xs text-gray-600">{loc}</Text>
-                    </View>
-                  ))}
-                </View>
+                <FieldText value={activity.feedback} />
               </FieldSection>
             ) : null}
-            <FieldSection label={t.memoryCapturedAt}>
-              <FieldText value={formatDate(it.capturedAt)} />
+            <View className="mb-4 flex-row flex-wrap gap-4">
+              {activity.startsAt ? (
+                <View className="flex-row items-center">
+                  <Calendar color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs text-gray-500">{formatDate(activity.startsAt)}</Text>
+                </View>
+              ) : null}
+              {activity.endsAt ? (
+                <View className="flex-row items-center">
+                  <Clock color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs text-gray-500">{formatDate(activity.endsAt)}</Text>
+                </View>
+              ) : null}
+              {activity.timezone ? (
+                <View className="flex-row items-center">
+                  <MapPin color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs text-gray-500">{activity.timezone}</Text>
+                </View>
+              ) : null}
+            </View>
+            {activity.associatedLocations?.length ? (
+              <FieldSection label={t.memoryAssociatedLocations}>
+                <TagList color={layerColor} tags={activity.associatedLocations} />
+              </FieldSection>
+            ) : null}
+            {capturedAt ? (
+              <FieldSection label={t.memoryCapturedAt}>
+                <FieldText value={formatDate(capturedAt)} />
+              </FieldSection>
+            ) : null}
+            <FieldSection label={t.memoryCreatedAt}>
+              <FieldText value={formatDate(createdAt)} />
             </FieldSection>
+            {updatedAt ? (
+              <FieldSection label={t.memoryUpdatedAt}>
+                <FieldText value={formatDate(updatedAt)} />
+              </FieldSection>
+            ) : null}
+            {resolvedTags.length > 0 ? (
+              <FieldSection label={t.memoryTags}>
+                <TagList color={layerColor} tags={resolvedTags} />
+              </FieldSection>
+            ) : null}
           </>
         );
       }
       case 'experience': {
-        const it = item as MemoryExperienceItem;
+        const experience = itemState as MemoryExperienceItem;
+
         return (
           <>
-            <TagsRow color={layerColor} tags={tags} />
+            {renderCommonMeta()}
             <EditableField
               multiline
               editing={editing}
               label={t.memorySituation}
-              value={editing ? editState.situation : it.situation || ''}
+              value={editing ? editState.situation : experience.situation || ''}
               onChangeText={setField('situation')}
             />
             <EditableField
               multiline
               editing={editing}
               label={t.memoryAction}
-              value={editing ? editState.action : it.action || ''}
+              value={editing ? editState.action : experience.action || ''}
               onChangeText={setField('action')}
             />
             <EditableField
               multiline
               editing={editing}
               label={t.memoryKeyLearning}
-              value={editing ? editState.keyLearning : it.keyLearning || ''}
+              value={editing ? editState.keyLearning : experience.keyLearning || ''}
               onChangeText={setField('keyLearning')}
             />
             <EditableField
               multiline
               editing={editing}
               label={t.memoryReasoning}
-              value={editing ? editState.reasoning : it.reasoning || ''}
+              value={editing ? editState.reasoning : experience.reasoning || ''}
               onChangeText={setField('reasoning')}
             />
-            {it.possibleOutcome && (
+            {experience.possibleOutcome ? (
               <FieldSection label={t.memoryOutcome}>
-                <FieldText value={it.possibleOutcome} />
+                <FieldText value={experience.possibleOutcome} />
               </FieldSection>
-            )}
+            ) : null}
             <View className="flex-row flex-wrap">
-              <ScoreBadge color="#10b981" label={t.memoryConfidence} value={it.scoreConfidence} />
+              <ScoreBadge
+                color="#10b981"
+                label={t.memoryConfidence}
+                value={experience.scoreConfidence}
+              />
             </View>
-            <FieldSection label={t.memoryCapturedAt}>
-              <FieldText value={formatDate(it.capturedAt)} />
+            {capturedAt ? (
+              <FieldSection label={t.memoryCapturedAt}>
+                <FieldText value={formatDate(capturedAt)} />
+              </FieldSection>
+            ) : null}
+            <FieldSection label={t.memoryCreatedAt}>
+              <FieldText value={formatDate(createdAt)} />
             </FieldSection>
+            {updatedAt ? (
+              <FieldSection label={t.memoryUpdatedAt}>
+                <FieldText value={formatDate(updatedAt)} />
+              </FieldSection>
+            ) : null}
+            {resolvedTags.length > 0 ? (
+              <FieldSection label={t.memoryTags}>
+                <TagList color={layerColor} tags={resolvedTags} />
+              </FieldSection>
+            ) : null}
           </>
         );
       }
       case 'preference': {
-        const it = item as MemoryPreferenceItem;
+        const preference = itemState as MemoryPreferenceItem;
+
         return (
           <>
-            <TagsRow color={layerColor} tags={tags} />
+            {renderCommonMeta()}
             <EditableField
               multiline
               editing={editing}
               label={t.memoryConclusion}
-              value={editing ? editState.conclusionDirectives : it.conclusionDirectives || ''}
+              value={editing ? editState.conclusionDirectives : preference.conclusionDirectives || ''}
               onChangeText={setField('conclusionDirectives')}
             />
             <EditableField
               multiline
               editing={editing}
               label={t.memorySuggestions}
-              value={editing ? editState.suggestions : it.suggestions || ''}
+              value={editing ? editState.suggestions : preference.suggestions || ''}
               onChangeText={setField('suggestions')}
             />
             <View className="flex-row flex-wrap">
-              <ScoreBadge color="#ec4899" label={t.memoryPriority} value={it.scorePriority} />
+              <ScoreBadge
+                color="#ec4899"
+                label={t.memoryPriority}
+                value={preference.scorePriority}
+              />
             </View>
+            {capturedAt ? (
+              <FieldSection label={t.memoryCapturedAt}>
+                <FieldText value={formatDate(capturedAt)} />
+              </FieldSection>
+            ) : null}
             <FieldSection label={t.memoryCreatedAt}>
-              <FieldText value={formatDate(it.createdAt)} />
+              <FieldText value={formatDate(createdAt)} />
             </FieldSection>
+            {updatedAt ? (
+              <FieldSection label={t.memoryUpdatedAt}>
+                <FieldText value={formatDate(updatedAt)} />
+              </FieldSection>
+            ) : null}
+            {resolvedTags.length > 0 ? (
+              <FieldSection label={t.memoryTags}>
+                <TagList color={layerColor} tags={resolvedTags} />
+              </FieldSection>
+            ) : null}
           </>
         );
       }
     }
-  }
+  };
 
-  // ── Get title for header ──────────────────────────────────────────
-  function getHeaderTitle(): string {
-    switch (layer) {
-      case 'identity': {
-        return editing ? editState.title : (item as MemoryIdentityItem).title || t.memoryIdentity;
-      }
-      case 'context': {
-        return editing ? editState.title : (item as MemoryContextItem).title || t.memoryContext;
-      }
-      case 'activity': {
-        return t.memoryActivity;
-      }
-      case 'experience': {
-        return t.memoryExperience;
-      }
-      case 'preference': {
-        return t.memoryPreference;
-      }
-    }
+  if (!itemState || !layer) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <ActivityIndicator color={semanticColors.primary} />
+      </View>
+    );
   }
 
   return (
@@ -554,9 +961,8 @@ export default function MemoryDetailScreen() {
       className="flex-1 bg-gray-50"
       style={{ paddingTop: insets.top }}
     >
-      {/* Header */}
       <View className="flex-row items-center justify-between px-5 py-3">
-        <View className="flex-row items-center flex-1">
+        <View className="flex-1 flex-row items-center">
           <TouchableOpacity className="mr-3" onPress={() => nav.goBack()}>
             <ChevronLeft color="#111" size={24} strokeWidth={1.8} />
           </TouchableOpacity>
@@ -567,13 +973,16 @@ export default function MemoryDetailScreen() {
               onChangeText={setField('title')}
             />
           ) : (
-            <Text className="text-lg font-bold text-gray-900 flex-1" numberOfLines={1}>
+            <Text className="flex-1 text-lg font-bold text-gray-900" numberOfLines={1}>
               {getHeaderTitle()}
             </Text>
           )}
         </View>
 
         <View className="flex-row items-center gap-3">
+          {loadingDetail || refreshingDetail ? (
+            <ActivityIndicator color={layerColor} size="small" />
+          ) : null}
           {editing ? (
             <>
               <TouchableOpacity onPress={() => setEditing(false)}>
@@ -596,23 +1005,6 @@ export default function MemoryDetailScreen() {
         </View>
       </View>
 
-      {/* Layer badge */}
-      <View className="px-5 mb-3">
-        <View className="flex-row items-center">
-          <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: `${layerColor}15` }}>
-            <Text className="text-xs font-bold uppercase" style={{ color: layerColor }}>
-              {(t as any)[`memory${layer.charAt(0).toUpperCase() + layer.slice(1)}`] || layer}
-            </Text>
-          </View>
-          {(item as any).type ? (
-            <View className="px-2 py-0.5 rounded-full bg-gray-100 ml-2">
-              <Text className="text-xs text-gray-500">{(item as any).type}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      {/* Content */}
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20 }}

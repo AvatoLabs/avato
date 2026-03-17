@@ -8,6 +8,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { after } from 'next/server';
 import { z } from 'zod';
 
+import { MessageModel } from '@/database/models/message';
 import { TopicModel } from '@/database/models/topic';
 import { TopicShareModel } from '@/database/models/topicShare';
 import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
@@ -15,6 +16,7 @@ import { TopicImporterRepo } from '@/database/repositories/topicImporter';
 import { agents, chatGroups, chatGroupsAgents } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { SystemAgentService } from '@/server/services/systemAgent';
 import { type BatchTaskResult } from '@/types/service';
 
 import {
@@ -64,6 +66,26 @@ const shouldScheduleAgentMigration = (key: string): boolean => {
 
   return true;
 };
+
+function extractMessageText(content: string | null | undefined): string {
+  if (!content || typeof content !== 'string') return '';
+
+  try {
+    const parsed = JSON.parse(content);
+
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((part: { content?: string; text?: string }) => part?.text ?? part?.content ?? '')
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+    }
+  } catch {
+    // Plain text content.
+  }
+
+  return content.trim();
+}
 
 export const topicRouter = router({
   batchCreateTopics: topicProcedure
@@ -288,6 +310,34 @@ export const topicRouter = router({
   hasTopics: topicProcedure.query(async ({ ctx }) => {
     return (await ctx.topicModel.count()) === 0;
   }),
+
+  generateTopicTitle: topicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
+      const messages = await messageModel.query({ topicId: input.id });
+      const userMessage = messages.find((message) => message.role === 'user');
+      const assistantMessage = [...messages].reverse().find((message) => message.role === 'assistant');
+
+      if (!userMessage || !assistantMessage) return null;
+
+      const userPrompt = extractMessageText(userMessage.content);
+      const lastAssistantContent = extractMessageText(assistantMessage.content);
+
+      if (!userPrompt || !lastAssistantContent) return null;
+
+      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
+      const title = await systemAgent.generateTopicTitle({
+        lastAssistantContent,
+        userPrompt,
+      });
+
+      if (!title) return null;
+
+      await ctx.topicModel.update(input.id, { title });
+
+      return title;
+    }),
 
   importTopic: topicProcedure
     .input(

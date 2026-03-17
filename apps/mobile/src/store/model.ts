@@ -3,11 +3,10 @@ import { create } from 'zustand';
 
 import { agentApi, aiProviderApi } from '../lib/api';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
+import { useAgentStore } from './agent';
 
 const CACHE_KEY = 'avato_model_cache';
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-const SELECTED_MODEL_KEY = 'avato_default_model';
-const SELECTED_PROVIDER_KEY = 'avato_default_provider';
 
 interface CachedData {
   providers: ProviderWithModels[];
@@ -113,31 +112,27 @@ export const useModelStore = create<ModelState>((set, get) => ({
     let model = '';
     let provider = '';
 
+    // 1. Backend agent config (session-specific)
     if (sessionId) {
       try {
-        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (saved.model) model = saved.model;
-          if (saved.provider) provider = saved.provider;
-        }
+        const config = await agentApi.getConfigBySession(sessionId);
+        if (config?.model) model = config.model;
+        if (config?.provider) provider = config.provider;
       } catch {
         /* ignore */
       }
     }
 
-    if (!model) {
-      try {
-        model = (await AsyncStorage.getItem(SELECTED_MODEL_KEY)) || '';
-      } catch {
-        /* ignore */
-      }
-    }
-    if (!provider) {
-      try {
-        provider = (await AsyncStorage.getItem(SELECTED_PROVIDER_KEY)) || '';
-      } catch {
-        /* ignore */
+    // 2. Local Agent fallback (session's agent or default agent)
+    if (!model || !provider) {
+      const agentStore = useAgentStore.getState();
+      if (!agentStore.initialized) await agentStore.loadAgents();
+      const agent = sessionId
+        ? agentStore.agents.find((a) => a.sessionIds.includes(sessionId)) || agentStore.getCurrentAgent()
+        : agentStore.getCurrentAgent();
+      if (agent) {
+        if (!model && agent.model) model = agent.model;
+        if (!provider && agent.provider) provider = agent.provider;
       }
     }
 
@@ -148,30 +143,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     set({ selectedModel: modelId, selectedProvider: providerId });
 
     if (sessionId) {
-      let existing: Record<string, unknown> = {};
-      try {
-        const raw = await AsyncStorage.getItem(`avato_chat_settings_${sessionId}`);
-        if (raw) existing = JSON.parse(raw);
-      } catch {
-        /* ignore */
-      }
-
-      const { providers } = get();
-      let supportsVision = false;
-      for (const p of providers) {
-        const found = p.children.find((m) => m.id === modelId && p.id === providerId);
-        if (found) {
-          supportsVision = !!found.abilities?.vision;
-          break;
-        }
-      }
-
-      existing.model = modelId;
-      existing.provider = providerId;
-      existing.vision = supportsVision;
-      await AsyncStorage.setItem(`avato_chat_settings_${sessionId}`, JSON.stringify(existing));
-
-      // Also update backend agent config so model/provider persists server-side
+      // Update backend agent config (single source of truth)
       try {
         const config = await agentApi.getConfigBySession(sessionId);
         if (config?.id) {
@@ -180,9 +152,22 @@ export const useModelStore = create<ModelState>((set, get) => ({
       } catch {
         /* best-effort */
       }
+    } else {
+      // Global default: update current agent in local store (create if none)
+      const agentStore = useAgentStore.getState();
+      if (!agentStore.initialized) await agentStore.loadAgents();
+      let current = agentStore.getCurrentAgent();
+      if (!current && agentStore.agents.length === 0) {
+        await agentStore.createAgent({
+          model: modelId,
+          provider: providerId,
+          title: 'Default',
+        });
+        current = agentStore.getCurrentAgent();
+      }
+      if (current) {
+        await agentStore.updateAgent(current.id, { model: modelId, provider: providerId });
+      }
     }
-
-    await AsyncStorage.setItem(SELECTED_MODEL_KEY, modelId);
-    await AsyncStorage.setItem(SELECTED_PROVIDER_KEY, providerId);
   },
 }));

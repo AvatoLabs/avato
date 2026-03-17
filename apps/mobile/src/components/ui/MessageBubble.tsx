@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   Globe,
   Hand,
   Pause,
@@ -18,7 +19,6 @@ import {
   RefreshCw,
   Share2,
   Trash2,
-  User,
   Wrench,
   X,
 } from 'lucide-react-native';
@@ -40,14 +40,17 @@ import {
 import Markdown from 'react-native-markdown-display';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import SyntaxHighlighter from 'react-native-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { WebView } from 'react-native-webview';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import { getProviderIconUrl } from '../../constants/cdn';
 import { semanticColors } from '../../constants/colors';
+import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
+import { useSessionStore } from '../../store/session';
 import { tokens } from '../../theme/tokens';
 import type {
   ChatMessage,
@@ -63,7 +66,7 @@ import TypingIndicator from './TypingIndicator';
 
 const StreamingCursor = memo(() => {
   const [visible, setVisible] = useState(true);
-  const timer = useRef<ReturnType<typeof setInterval>>();
+  const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   useEffect(() => {
     timer.current = setInterval(() => setVisible((v) => !v), 530);
     return () => clearInterval(timer.current);
@@ -130,7 +133,7 @@ const MermaidBlock = memo<{ code: string }>(({ code }) => {
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>body{margin:0;padding:8px;background:transparent;display:flex;justify-content:center}
 .mermaid{font-size:13px}</style></head><body>
-<div class="mermaid">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+<div class="mermaid">${code.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>
 <script>mermaid.initialize({startOnLoad:true,theme:'neutral'});
 mermaid.run().then(()=>{setTimeout(()=>{
 const h=document.querySelector('.mermaid').scrollHeight;
@@ -148,7 +151,9 @@ window.ReactNativeWebView.postMessage(JSON.stringify({height:h+16}));
           try {
             const data = JSON.parse(e.nativeEvent.data);
             if (data.height) setHeight(Math.min(data.height, 600));
-          } catch {}
+          } catch {
+            // Ignore malformed height payloads from the embedded renderer.
+          }
         }}
       />
     </View>
@@ -158,7 +163,10 @@ MermaidBlock.displayName = 'MermaidBlock';
 
 const MathBlock = memo<{ display?: boolean; math: string }>(({ math, display }) => {
   const [height, setHeight] = useState(display ? 60 : 22);
-  const escaped = math.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/<\/script/g, '<\\/script');
+  const escaped = math
+    .replaceAll('\\', '\\\\')
+    .replaceAll('`', '\\`')
+    .replaceAll('</script', '<\\/script');
   const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
@@ -184,7 +192,9 @@ catch(e){document.getElementById('m').textContent=\`${escaped}\`}</script></body
         try {
           const data = JSON.parse(e.nativeEvent.data);
           if (data.height) setHeight(data.height);
-        } catch {}
+        } catch {
+          // Ignore malformed height payloads from the embedded renderer.
+        }
       }}
     />
   );
@@ -193,13 +203,22 @@ MathBlock.displayName = 'MathBlock';
 
 interface MessageBubbleProps {
   generating?: boolean;
+  groupMembersById?: Record<string, GroupMessageSpeaker>;
+  groupSupervisorId?: string;
   message: ChatMessage;
   onSaveToTopic?: () => void;
   sessionId: string;
 }
 
+export interface GroupMessageSpeaker {
+  avatar?: string;
+  id: string;
+  isSupervisor?: boolean;
+  title?: string;
+}
+
 const preprocessMathBlocks = (content: string): string => {
-  return content.replace(
+  return content.replaceAll(
     /\$\$([\s\S]+?)\$\$/g,
     (_match, math) => `\n\`\`\`math\n${math.trim()}\n\`\`\`\n`,
   );
@@ -209,12 +228,12 @@ const ARTIFACT_TAG_REGEX = /<lobeArtifact\b([^>]*)>([\s\S]*?)(?:<\/lobeArtifact>
 const ARTIFACT_ATTR_REGEX = /(\w+)="([^"]*)"/g;
 
 interface ArtifactSegment {
+  artifactType?: string;
   content: string;
   identifier?: string;
   language?: string;
   title?: string;
   type: 'markdown' | 'artifact';
-  artifactType?: string;
 }
 
 const splitArtifacts = (text: string): ArtifactSegment[] => {
@@ -255,7 +274,7 @@ const ArtifactBlock = memo<{
   content: string;
   language?: string;
   title?: string;
-}>(({ title, artifactType, content, language }) => {
+}>(({ title, artifactType, content, language: _language }) => {
   const [height, setHeight] = useState(300);
   const [expanded, setExpanded] = useState(false);
 
@@ -269,7 +288,14 @@ const ArtifactBlock = memo<{
     return (
       <View style={{ marginVertical: 6 }}>
         {title ? (
-          <Text style={{ color: semanticColors.muted, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>
+          <Text
+            style={{
+              color: semanticColors.muted,
+              fontSize: 12,
+              fontWeight: '600',
+              marginBottom: 4,
+            }}
+          >
             {title}
           </Text>
         ) : null}
@@ -287,8 +313,10 @@ const ArtifactBlock = memo<{
 <style>body{margin:0;padding:8px;background:#fff;display:flex;justify-content:center;align-items:center}
 svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
     : isHtml
-      ? (content.includes('<html') ? content : `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0;padding:8px;font-family:-apple-system,system-ui,sans-serif;font-size:14px}</style></head><body>${content}</body></html>`)
+      ? content.includes('<html')
+        ? content
+        : `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0;padding:8px;font-family:-apple-system,system-ui,sans-serif;font-size:14px}</style></head><body>${content}</body></html>`
       : null;
 
   if (!htmlContent) return null;
@@ -315,7 +343,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           }}
           onPress={() => setExpanded((v) => !v)}
         >
-          <Text style={{ color: '#333', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+          <Text numberOfLines={1} style={{ color: '#333', fontSize: 13, fontWeight: '600' }}>
             {title}
           </Text>
           {expanded ? (
@@ -336,7 +364,9 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
             try {
               const data = JSON.parse(e.nativeEvent.data);
               if (data.height) setHeight(Math.min(data.height, 500));
-            } catch {}
+            } catch {
+              // Ignore malformed height payloads from the embedded renderer.
+            }
           }}
         />
       )}
@@ -359,8 +389,39 @@ const chatAccent = {
   subtleBg: 'rgba(15,23,42,0.035)',
 } as const;
 
+const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageSpeaker }>(
+  ({ fallbackLabel, speaker }) => {
+    const avatar = speaker?.avatar?.trim();
+    const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
+
+    if (avatar && avatar.length <= 4 && !resolvedAvatarUri) {
+      return (
+        <View className="h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+          <Text className="text-[14px]">{avatar}</Text>
+        </View>
+      );
+    }
+
+    if (resolvedAvatarUri) {
+      return (
+        <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+          <RNImage source={{ uri: resolvedAvatarUri }} style={{ height: 28, width: 28 }} />
+        </View>
+      );
+    }
+
+    return (
+      <View className="h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+        <Text className="text-[12px] font-semibold text-primary">{fallbackLabel}</Text>
+      </View>
+    );
+  },
+);
+
+GroupSpeakerAvatar.displayName = 'GroupSpeakerAvatar';
+
 const MessageBubble = memo<MessageBubbleProps>(
-  ({ message, sessionId, generating, onSaveToTopic }) => {
+  ({ message, sessionId, generating, groupMembersById, groupSupervisorId, onSaveToTopic }) => {
     const isUser = message.role === 'user';
     const isToolMessage = message.role === 'tool';
     const { t } = useI18n();
@@ -373,11 +434,15 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [showStats, setShowStats] = useState(false);
     const [viewerUri, setViewerUri] = useState<string | null>(null);
     const [contentCollapsed, setContentCollapsed] = useState(true);
+    const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
     const deleteMessage = useChatStore((s) => s.deleteMessage);
     const editMessage = useChatStore((s) => s.editMessage);
     const regenerateMessage = useChatStore((s) => s.regenerateMessage);
     const isReasoning = useChatStore((s) => s.isReasoning);
+    const isGroupSession = useSessionStore(
+      (s) => s.sessions.find((session) => session.id === sessionId)?.type === 'group',
+    );
 
     const dismissActions = useCallback(() => setShowActions(false), []);
 
@@ -458,6 +523,24 @@ const MessageBubble = memo<MessageBubbleProps>(
         }
       },
       [t, toast],
+    );
+
+    const handleDownloadFile = useCallback(
+      async (file: NonNullable<ChatMessage['fileList']>[number]) => {
+        if (downloadingFileId === file.id) return;
+
+        setDownloadingFileId(file.id);
+        try {
+          await fileApi.download(file);
+          haptics.success();
+          toast.show('success', t.resourceDownloaded);
+        } catch {
+          toast.show('error', t.resourceDownloadFailed);
+        } finally {
+          setDownloadingFileId(null);
+        }
+      },
+      [downloadingFileId, t, toast],
     );
 
     const mc = tokens.markdownColors;
@@ -579,7 +662,14 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const userMarkdownStyles = {
       ...markdownStyles,
-      body: { ...markdownStyles.body, color: '#ffffff', flexShrink: 1 },
+      body: {
+        ...markdownStyles.body,
+        color: '#ffffff',
+        flexShrink: 1,
+        fontSize: 15,
+        lineHeight: 20,
+      },
+      paragraph: { marginBottom: 2, marginTop: 2 },
       blockquote: {
         ...markdownStyles.blockquote,
         borderLeftColor: 'rgba(255,255,255,0.7)',
@@ -703,12 +793,20 @@ const MessageBubble = memo<MessageBubbleProps>(
     const hasSearch =
       !isUser &&
       !!message.search &&
-      !!(
-        message.search.citations?.length ||
-        message.search.searchQueries?.length ||
-        message.search.imageResults?.length ||
-        message.search.imageSearchQueries?.length
-      );
+      !!(message.search.citations?.length || message.search.imageResults?.length);
+    const shouldShowGroupSpeaker = isGroupSession && !isUser && !isToolMessage;
+    const groupSpeakerId = shouldShowGroupSpeaker
+      ? message.agentId || groupSupervisorId
+      : undefined;
+    const groupSpeaker = groupSpeakerId ? groupMembersById?.[groupSpeakerId] : undefined;
+    const isSupervisorSpeaker = Boolean(
+      groupSpeaker?.isSupervisor || (groupSpeakerId && groupSpeakerId === groupSupervisorId),
+    );
+    const groupSpeakerName =
+      groupSpeaker?.title || (isSupervisorSpeaker ? t.groupSettingsSupervisor : undefined);
+    const groupSpeakerFallbackLabel = (groupSpeakerName || t.settingsDefaultAgent)
+      .slice(0, 1)
+      .toUpperCase();
     const hasTools = !isUser && (message.tools?.length ?? 0) > 0;
     const multimodalContentParts =
       !isToolMessage && message.metadata?.isMultimodal
@@ -729,18 +827,19 @@ const MessageBubble = memo<MessageBubbleProps>(
       ? fullContent.replace(ARTIFACT_TAG_REGEX, '')
       : fullContent;
     const artifactSegments = hasArtifacts ? splitArtifacts(fullContent) : null;
-    const isLongContent =
-      !isUser && contentWithoutArtifacts.length > CONTENT_COLLAPSE_THRESHOLD;
-    const renderedContent = isLongContent && contentCollapsed
-      ? contentWithoutArtifacts.slice(0, CONTENT_COLLAPSE_THRESHOLD)
-      : contentWithoutArtifacts;
+    const isLongContent = !isUser && contentWithoutArtifacts.length > CONTENT_COLLAPSE_THRESHOLD;
+    const renderedContent =
+      isLongContent && contentCollapsed
+        ? contentWithoutArtifacts.slice(0, CONTENT_COLLAPSE_THRESHOLD)
+        : contentWithoutArtifacts;
     const renderedReasoning = injectCitationLinks(
       message.reasoning?.content,
       message.search?.citations,
     );
-    const assistantContentWidth = { maxWidth: '100%' as const, width: '100%' as const };
-    const userContentWidth = { maxWidth: '92%' as const, minWidth: 96 };
-    const showStandaloneUserAttachments = isUser && hasAttachments;
+    const assistantContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
+    const userContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
+    const hasTextContent = !!(renderedContent?.trim() || multimodalContentParts?.length);
+    const showStandaloneUserAttachments = isUser && hasAttachments && !hasTextContent;
     const showMessageBubble =
       !showStandaloneUserAttachments ||
       !!renderedContent ||
@@ -749,53 +848,95 @@ const MessageBubble = memo<MessageBubbleProps>(
       !!message.error;
 
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-      >
+      <Animated.View entering={FadeIn.duration(200)}>
         <TouchableOpacity
           activeOpacity={1}
-          delayLongPress={180}
           className={`flex-row w-full mb-1.5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
+          delayLongPress={180}
           onLongPress={handlePress}
         >
-          <View className={isUser ? 'items-end min-w-0' : 'flex-1 min-w-0'}>
-            {!isUser && (
-              <View className="flex-row items-center mb-1.5">
-                <View className="w-7 h-7 rounded-full bg-foreground/[0.04] items-center justify-center mr-2.5 overflow-hidden">
-                  {message.provider ? (
-                    <RNImage
-                      className="w-4 h-4"
-                      defaultSource={require('../../../assets/avato-icon.png')}
-                      resizeMode="contain"
-                      source={{ uri: getProviderIconUrl(message.provider) }}
-                    />
-                  ) : (
-                    <RNImage
-                      className="w-5 h-5 rounded-md"
-                      source={require('../../../assets/avato-icon.png')}
-                    />
-                  )}
-                </View>
-                {message.model ? (
-                  <Text className="text-[11px] text-foreground/35 flex-1" numberOfLines={1}>
-                    {message.model}
-                  </Text>
-                ) : null}
-                {message.createdAt ? (
-                  <Text className="text-[10px] text-foreground/20 ml-2">
-                    {getTimeAgo(message.createdAt)}
-                  </Text>
-                ) : null}
+          {!isUser && (
+            <View className="mr-2.5 w-7 items-center pt-0.5">
+              <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-foreground/[0.04]">
+                {shouldShowGroupSpeaker ? (
+                  <GroupSpeakerAvatar
+                    fallbackLabel={groupSpeakerFallbackLabel}
+                    speaker={groupSpeaker}
+                  />
+                ) : message.provider ? (
+                  <RNImage
+                    className="w-4 h-4"
+                    defaultSource={require('../../../assets/avato-icon.png')}
+                    resizeMode="contain"
+                    source={{ uri: getProviderIconUrl(message.provider) }}
+                  />
+                ) : (
+                  <RNImage
+                    className="w-5 h-5 rounded-md"
+                    source={require('../../../assets/avato-icon.png')}
+                  />
+                )}
               </View>
-            )}
+            </View>
+          )}
+
+          <View className={isUser ? 'items-end min-w-0 flex-1' : 'flex-1 min-w-0'}>
+            {!isUser &&
+              (shouldShowGroupSpeaker ? (
+                <View className="mb-1.5 flex-row items-center">
+                  <View className="min-w-0 flex-1 flex-row items-center">
+                    <Text
+                      className="text-[12px] font-semibold text-foreground/75"
+                      numberOfLines={1}
+                    >
+                      {groupSpeakerName || t.settingsDefaultAgent}
+                    </Text>
+                    {isSupervisorSpeaker ? (
+                      <View className="ml-2 rounded-full bg-primary/10 px-2 py-0.5">
+                        <Text className="text-[10px] font-semibold text-primary">
+                          {t.groupSettingsSupervisor}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {message.model ? (
+                      <Text
+                        className="ml-2 flex-1 text-[11px] text-foreground/35"
+                        numberOfLines={1}
+                      >
+                        {message.model}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {message.createdAt ? (
+                    <Text className="ml-2 text-[10px] text-foreground/20">
+                      {getTimeAgo(message.createdAt)}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (
+                <View className="mb-1.5 flex-row items-center">
+                  {message.model ? (
+                    <Text className="text-[11px] text-foreground/35 flex-1" numberOfLines={1}>
+                      {message.model}
+                    </Text>
+                  ) : null}
+                  {message.createdAt ? (
+                    <Text className="text-[10px] text-foreground/20 ml-2">
+                      {getTimeAgo(message.createdAt)}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
 
             <View style={isUser ? userContentWidth : assistantContentWidth}>
               {showStandaloneUserAttachments ? (
                 <View className="mb-2">
                   <AttachmentBlock
+                    downloadingFileId={downloadingFileId}
                     fileList={message.fileList}
                     imageList={message.imageList}
                     isUser={isUser}
+                    onOpenFile={handleDownloadFile}
                     onOpenImage={(url) => {
                       setViewerUri(url);
                       setShowImageViewer(true);
@@ -806,180 +947,186 @@ const MessageBubble = memo<MessageBubbleProps>(
               {showMessageBubble ? (
                 <View
                   className={
-                    isUser
-                      ? 'px-4 py-3 rounded-[22px] bg-primary rounded-tr-md'
-                      : 'py-0.5'
+                    isUser ? 'px-3.5 py-2 rounded-[18px] bg-primary rounded-tr-md' : 'py-0.5'
                   }
                   style={
                     isUser
                       ? {
                           shadowColor: semanticColors.primary,
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.12,
-                          shadowRadius: 8,
-                          elevation: 3,
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.08,
+                          shadowRadius: 4,
+                          elevation: 2,
                         }
                       : undefined
                   }
                 >
-              {isEditing ? (
-                <View
-                  style={
-                    isUser
-                      ? undefined
-                      : {
-                          backgroundColor: '#f5f6f8',
-                          borderRadius: 16,
-                          padding: 14,
-                        }
-                  }
-                >
-                  <TextInput
-                    autoFocus
-                    multiline
-                    className="text-[15px] leading-6 min-h-[40px]"
-                    style={{ color: isUser ? '#ffffff' : mc.text }}
-                    value={editText}
-                    onBlur={handleEditSubmit}
-                    onChangeText={setEditText}
-                    onSubmitEditing={handleEditSubmit}
-                  />
-                  <View className="flex-row justify-end mt-2.5 gap-2">
-                    <TouchableOpacity
-                      className="px-3.5 py-1.5 rounded-full"
-                      style={{
-                        backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',
-                      }}
-                      onPress={() => setIsEditing(false)}
+                  {isEditing ? (
+                    <View
+                      style={
+                        isUser
+                          ? undefined
+                          : {
+                              backgroundColor: '#f5f6f8',
+                              borderRadius: 16,
+                              padding: 14,
+                            }
+                      }
                     >
-                      <Text
-                        style={{
-                          color: isUser ? '#ffffff' : mc.text,
-                          fontSize: 12,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {t.editCancel}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      className="px-3.5 py-1.5 rounded-full bg-primary"
-                      style={isUser ? { backgroundColor: '#ffffff' } : undefined}
-                      onPress={handleEditSubmit}
-                    >
-                      <Text
-                        style={{
-                          color: isUser ? '#000' : '#ffffff',
-                          fontSize: 12,
-                          fontWeight: '500',
-                        }}
-                      >
-                        {t.editSave}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  {!showStandaloneUserAttachments && hasAttachments ? (
-                    <View className="mb-3">
-                      <AttachmentBlock
-                        fileList={message.fileList}
-                        imageList={message.imageList}
-                        isUser={isUser}
-                        onOpenImage={(url) => {
-                          setViewerUri(url);
-                          setShowImageViewer(true);
-                        }}
+                      <TextInput
+                        autoFocus
+                        multiline
+                        className="text-[15px] leading-6 min-h-[40px]"
+                        style={{ color: isUser ? '#ffffff' : mc.text }}
+                        value={editText}
+                        onBlur={handleEditSubmit}
+                        onChangeText={setEditText}
+                        onSubmitEditing={handleEditSubmit}
                       />
+                      <View className="flex-row justify-end mt-2.5 gap-2">
+                        <TouchableOpacity
+                          className="px-3.5 py-1.5 rounded-full"
+                          style={{
+                            backgroundColor: isUser ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.06)',
+                          }}
+                          onPress={() => setIsEditing(false)}
+                        >
+                          <Text
+                            style={{
+                              color: isUser ? '#ffffff' : mc.text,
+                              fontSize: 12,
+                              fontWeight: '500',
+                            }}
+                          >
+                            {t.editCancel}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          className="px-3.5 py-1.5 rounded-full bg-primary"
+                          style={isUser ? { backgroundColor: '#ffffff' } : undefined}
+                          onPress={handleEditSubmit}
+                        >
+                          <Text
+                            style={{
+                              color: isUser ? '#000' : '#ffffff',
+                              fontSize: 12,
+                              fontWeight: '500',
+                            }}
+                          >
+                            {t.editSave}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  ) : null}
+                  ) : (
+                    <>
+                      {!showStandaloneUserAttachments && hasAttachments ? (
+                        <View className="mb-2">
+                          <AttachmentBlock
+                            downloadingFileId={downloadingFileId}
+                            fileList={message.fileList}
+                            imageList={message.imageList}
+                            isUser={isUser}
+                            onOpenFile={handleDownloadFile}
+                            onOpenImage={(url) => {
+                              setViewerUri(url);
+                              setShowImageViewer(true);
+                            }}
+                          />
+                        </View>
+                      ) : null}
 
-                {hasSearch && message.search && <SearchGroundingBlock search={message.search} />}
+                      {hasSearch && message.search && (
+                        <SearchGroundingBlock search={message.search} />
+                      )}
 
-                {hasTools && message.tools && <ToolCallsBlock tools={message.tools} />}
+                      {hasTools && message.tools && <ToolCallsBlock tools={message.tools} />}
 
-                {!isUser &&
-                  !isToolMessage &&
-                  (renderedReasoning || (generating && isReasoning)) && (
-                    <ThinkingBlock
-                      content={renderedReasoning}
-                      duration={message.reasoning?.duration}
-                      isMultimodal={message.reasoning?.isMultimodal}
-                      markdownStyles={reasoningMarkdownStyles}
-                      tempDisplayContent={multimodalReasoningParts || undefined}
-                      thinking={generating && isReasoning && message.id.startsWith('assistant-')}
-                    />
-                  )}
-                {isToolMessage ? (
-                  <ToolResultBlock message={message} />
-                ) : !message.content && !multimodalContentParts && generating ? (
-                  isReasoning ? null : (
-                    <TypingIndicator color="#636366" />
-                  )
-                ) : multimodalContentParts?.length ? (
-                  <RichContentPartsBlock
-                    citations={message.search?.citations}
-                    markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
-                    parts={multimodalContentParts}
-                    onOpenLink={handleOpenLink}
-                  />
-                ) : renderedContent || artifactSegments ? (
-                  <>
-                    {renderedContent ? (
-                      <Markdown
-                        rules={markdownRules}
-                        style={isUser ? userMarkdownStyles : markdownStyles}
-                        onLinkPress={(url) => {
-                          handleOpenLink(url);
-                          return false;
-                        }}
-                      >
-                        {renderedContent}
-                      </Markdown>
-                    ) : null}
-                    {artifactSegments?.map((seg, idx) =>
-                      seg.type === 'artifact' ? (
-                        <ArtifactBlock
-                          artifactType={seg.artifactType}
-                          content={seg.content}
-                          key={`artifact-${idx}`}
-                          language={seg.language}
-                          title={seg.title}
+                      {!isUser &&
+                        !isToolMessage &&
+                        (renderedReasoning || (generating && isReasoning)) && (
+                          <ThinkingBlock
+                            content={renderedReasoning}
+                            duration={message.reasoning?.duration}
+                            isMultimodal={message.reasoning?.isMultimodal}
+                            markdownStyles={reasoningMarkdownStyles}
+                            tempDisplayContent={multimodalReasoningParts || undefined}
+                            thinking={
+                              generating && isReasoning && message.id.startsWith('assistant-')
+                            }
+                          />
+                        )}
+                      {isToolMessage ? (
+                        <ToolResultBlock message={message} />
+                      ) : !message.content && !multimodalContentParts && generating ? (
+                        isReasoning ? null : (
+                          <TypingIndicator color="#636366" />
+                        )
+                      ) : multimodalContentParts?.length ? (
+                        <RichContentPartsBlock
+                          citations={message.search?.citations}
+                          markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
+                          parts={multimodalContentParts}
+                          onOpenLink={handleOpenLink}
                         />
-                      ) : null,
-                    )}
-                    {generating && !isUser && !isReasoning && <StreamingCursor />}
-                    {isLongContent && (
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        className="mt-1 py-1"
-                        onPress={() => setContentCollapsed((v) => !v)}
-                      >
-                        <Text className="text-[12px] font-medium" style={{ color: '#0A84FF' }}>
-                          {contentCollapsed ? t.chatShowMore : t.chatShowLess}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </>
-                ) : null}
-                  {!isUser && !generating && message.error && (
-                    <ErrorBlock
-                      error={message.error}
-                      onRetry={handleRegenerate}
-                    />
+                      ) : renderedContent || artifactSegments ? (
+                        <>
+                          {renderedContent ? (
+                            <Markdown
+                              rules={markdownRules}
+                              style={isUser ? userMarkdownStyles : markdownStyles}
+                              onLinkPress={(url) => {
+                                handleOpenLink(url);
+                                return false;
+                              }}
+                            >
+                              {renderedContent}
+                            </Markdown>
+                          ) : null}
+                          {artifactSegments?.map((seg, idx) =>
+                            seg.type === 'artifact' ? (
+                              <ArtifactBlock
+                                artifactType={seg.artifactType}
+                                content={seg.content}
+                                key={`artifact-${idx}`}
+                                language={seg.language}
+                                title={seg.title}
+                              />
+                            ) : null,
+                          )}
+                          {generating && !isUser && !isReasoning && <StreamingCursor />}
+                          {isLongContent && (
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              className="mt-1 py-1"
+                              onPress={() => setContentCollapsed((v) => !v)}
+                            >
+                              <Text
+                                className="text-[12px] font-medium"
+                                style={{ color: '#0A84FF' }}
+                              >
+                                {contentCollapsed ? t.chatShowMore : t.chatShowLess}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      ) : null}
+                      {!isUser && !generating && message.error && (
+                        <ErrorBlock
+                          error={message.error}
+                          onRetry={isGroupSession ? undefined : handleRegenerate}
+                        />
+                      )}
+                      {!isUser && message.search?.citations?.length ? (
+                        <CitationFootnotesBlock
+                          citations={message.search.citations}
+                          onOpenLink={handleOpenLink}
+                        />
+                      ) : null}
+                    </>
                   )}
-                  {!isUser && message.search?.citations?.length ? (
-                    <CitationFootnotesBlock
-                      citations={message.search.citations}
-                      onOpenLink={handleOpenLink}
-                    />
-                  ) : null}
-                </>
-              )}
                 </View>
               ) : null}
-
 
               {/* Token stats badge (clickable) */}
               {hasStats && !generating && (
@@ -1003,7 +1150,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                   className={`flex-row items-center mt-2 gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}
                   entering={FadeIn.duration(200)}
                 >
-                  {!isUser && !isToolMessage && (
+                  {!isGroupSession && !isUser && !isToolMessage && (
                     <TouchableOpacity
                       accessibilityLabel={t.msgActionRegenerate}
                       activeOpacity={0.5}
@@ -1014,7 +1161,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       <RefreshCw color={semanticColors.muted} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
-                  {isUser && (
+                  {!isGroupSession && isUser && (
                     <TouchableOpacity
                       accessibilityLabel={t.msgActionEdit}
                       activeOpacity={0.5}
@@ -1067,12 +1214,6 @@ const MessageBubble = memo<MessageBubbleProps>(
               )}
             </View>
           </View>
-
-          {isUser && (
-            <View className="w-7 h-7 mt-0.5 rounded-full bg-foreground/[0.06] items-center justify-center ml-2.5">
-              <User color={semanticColors.muted} size={15} strokeWidth={1.8} />
-            </View>
-          )}
         </TouchableOpacity>
 
         {/* Token Stats Modal */}
@@ -1139,7 +1280,9 @@ const getImageResultFavicon = (item: ImageCitationItem) => {
   return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : undefined;
 };
 
-const formatToolDisplayTitle = (tool: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'>) => {
+const formatToolDisplayTitle = (
+  tool: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'>,
+) => {
   const titleSegments = [tool.identifier, tool.apiName].filter(Boolean);
   const args = safeParseJsonRecord(tool.arguments);
 
@@ -1269,11 +1412,13 @@ const RichContentPartsBlock = memo<{
 RichContentPartsBlock.displayName = 'RichContentPartsBlock';
 
 const AttachmentBlock = memo<{
+  downloadingFileId?: string | null;
   fileList?: ChatMessage['fileList'];
   imageList?: ChatMessage['imageList'];
   isUser: boolean;
+  onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenImage: (url: string) => void;
-}>(({ imageList, fileList, isUser, onOpenImage }) => (
+}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId }) => (
   <View className="gap-2">
     {imageList?.length ? (
       <ScrollView
@@ -1304,34 +1449,49 @@ const AttachmentBlock = memo<{
     {fileList?.length ? (
       <View className="gap-2">
         {fileList.map((file) => (
-          <View
+          <TouchableOpacity
+            activeOpacity={0.85}
             className="rounded-2xl px-3 py-2"
             key={file.id}
             style={{
               backgroundColor: isUser ? 'rgba(255,255,255,0.14)' : chatAccent.subtleBg,
             }}
+            onPress={() => onOpenFile(file)}
           >
-            <Text
-              numberOfLines={1}
-              style={{
-                color: isUser ? '#ffffff' : tokens.markdownColors.heading,
-                fontSize: 13,
-                fontWeight: '600',
-              }}
-            >
-              {file.name}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: isUser ? 'rgba(255,255,255,0.7)' : tokens.markdownColors.text + '88',
-                fontSize: 12,
-                marginTop: 2,
-              }}
-            >
-              {file.fileType}
-            </Text>
-          </View>
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1">
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: isUser ? '#ffffff' : tokens.markdownColors.heading,
+                    fontSize: 13,
+                    fontWeight: '600',
+                  }}
+                >
+                  {file.name}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: isUser ? 'rgba(255,255,255,0.7)' : tokens.markdownColors.text + '88',
+                    fontSize: 12,
+                    marginTop: 2,
+                  }}
+                >
+                  {file.fileType}
+                </Text>
+              </View>
+              {downloadingFileId === file.id ? (
+                <ActivityIndicator color={isUser ? '#ffffff' : chatAccent.badgeText} size="small" />
+              ) : (
+                <Download
+                  color={isUser ? '#ffffff' : chatAccent.badgeText}
+                  size={16}
+                  strokeWidth={1.9}
+                />
+              )}
+            </View>
+          </TouchableOpacity>
         ))}
       </View>
     ) : null}
@@ -1370,10 +1530,7 @@ const CitationFootnotesBlock = memo<{
               className="items-center justify-center mr-3 mt-0.5 rounded-full"
               style={{ backgroundColor: chatAccent.badgeBg, height: 22, width: 22 }}
             >
-              <Text
-                className="text-[11px] font-semibold"
-                style={{ color: chatAccent.badgeText }}
-              >
+              <Text className="text-[11px] font-semibold" style={{ color: chatAccent.badgeText }}>
                 {index + 1}
               </Text>
             </View>
@@ -1531,7 +1688,10 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                     }}
                     onPress={() => handleOpenLink(citation.url)}
                   >
-                    <Text className="text-[13px] font-semibold text-foreground/80" numberOfLines={3}>
+                    <Text
+                      className="text-[13px] font-semibold text-foreground/80"
+                      numberOfLines={3}
+                    >
                       {citation.title || citation.url}
                     </Text>
                     <View className="mt-3 flex-row items-center">
@@ -1604,14 +1764,13 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                   onPress={() => handleOpenLink(item.sourceUri || item.imageUri)}
                 >
                   {item.imageUri ? (
-                    <RNImage
-                      source={{ uri: item.imageUri }}
-                      style={{ height: 72, width: 124 }}
-                    />
+                    <RNImage source={{ uri: item.imageUri }} style={{ height: 72, width: 124 }} />
                   ) : null}
                   <View className="px-2 py-2">
                     <Text className="text-[11px] font-medium text-foreground/75" numberOfLines={2}>
-                      {item.title ? stripHtml(item.title) : item.domain || item.sourceUri || 'Image'}
+                      {item.title
+                        ? stripHtml(item.title)
+                        : item.domain || item.sourceUri || 'Image'}
                     </Text>
                     {item.domain || item.sourceUri ? (
                       <View className="mt-2 flex-row items-center">
@@ -1724,180 +1883,191 @@ const ToolCard = memo<{
   resultReady?: boolean;
   status?: 'aborted' | 'pending' | 'rejected' | string | null;
   title: string;
-}>(({ title, argumentsText, status, resultReady, error, content, collapsible = false, onApprove, onReject }) => {
-  const { t } = useI18n();
-  const mc = tokens.markdownColors;
-  const isPending = status === 'pending';
-  const isRejected = status === 'rejected';
-  const isAborted = status === 'aborted';
-  const [expanded, setExpanded] = useState(!collapsible || isPending);
-  const showDetail = expanded || !collapsible;
-  const [contentExpanded, setContentExpanded] = useState(false);
+}>(
+  ({
+    title,
+    argumentsText,
+    status,
+    resultReady,
+    error,
+    content,
+    collapsible = false,
+    onApprove,
+    onReject,
+  }) => {
+    const { t } = useI18n();
+    const isPending = status === 'pending';
+    const isRejected = status === 'rejected';
+    const isAborted = status === 'aborted';
+    const [expanded, setExpanded] = useState(!collapsible || isPending);
+    const showDetail = expanded || !collapsible;
+    const [contentExpanded, setContentExpanded] = useState(false);
 
-  const truncatedContent = content && content.length > 500 && !contentExpanded
-    ? content.slice(0, 500) + '...'
-    : content;
+    const truncatedContent =
+      content && content.length > 500 && !contentExpanded ? content.slice(0, 500) + '...' : content;
 
-  return (
-    <TouchableOpacity
-      activeOpacity={collapsible ? 0.82 : 1}
-      className="rounded-2xl px-3 py-3"
-      disabled={!collapsible}
-      style={{
-        backgroundColor: isPending ? 'rgba(10,132,255,0.04)' : chatAccent.elevatedBg,
-      }}
-      onPress={() => {
-        if (collapsible) setExpanded((value) => !value);
-      }}
-    >
-      <View className="flex-row items-start">
-        <View
-          className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg"
-          style={{
-            backgroundColor: isPending ? 'rgba(10,132,255,0.1)' : chatAccent.badgeBg,
-          }}
-        >
-          <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
-        </View>
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            <Text className="flex-1 text-[12px] font-semibold text-foreground/80" numberOfLines={1}>
-              {title}
-            </Text>
-            {collapsible ? (
-              expanded ? (
-                <ChevronDown color="#999" size={14} strokeWidth={2.3} />
-              ) : (
-                <ChevronRight color="#999" size={14} strokeWidth={2.3} />
-              )
-            ) : null}
+    return (
+      <TouchableOpacity
+        activeOpacity={collapsible ? 0.82 : 1}
+        className="rounded-2xl px-3 py-3"
+        disabled={!collapsible}
+        style={{
+          backgroundColor: isPending ? 'rgba(10,132,255,0.04)' : chatAccent.elevatedBg,
+        }}
+        onPress={() => {
+          if (collapsible) setExpanded((value) => !value);
+        }}
+      >
+        <View className="flex-row items-start">
+          <View
+            className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor: isPending ? 'rgba(10,132,255,0.1)' : chatAccent.badgeBg,
+            }}
+          >
+            <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
           </View>
-          <Text className="mt-0.5 text-[10px] uppercase tracking-[0.5px] text-foreground/38">
-            <ToolStatusLabel error={error} resultReady={resultReady} status={status} />
-          </Text>
-
-          {showDetail && isPending && (
-            <View className="mt-2">
-              <Text className="text-[11px] leading-4 text-foreground/55 mb-2">
-                {t.chatToolPendingDesc}
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text
+                className="flex-1 text-[12px] font-semibold text-foreground/80"
+                numberOfLines={1}
+              >
+                {title}
               </Text>
-              <View className="flex-row gap-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-4 py-1.5"
-                  style={{ backgroundColor: 'rgba(10,132,255,0.12)' }}
-                  onPress={onApprove}
-                >
-                  <Text className="text-[12px] font-semibold" style={{ color: '#0A84FF' }}>
-                    {t.chatToolApprove}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-4 py-1.5"
-                  style={{ backgroundColor: 'rgba(255,59,48,0.1)' }}
-                  onPress={onReject}
-                >
-                  <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
-                    {t.chatToolReject}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {collapsible ? (
+                expanded ? (
+                  <ChevronDown color="#999" size={14} strokeWidth={2.3} />
+                ) : (
+                  <ChevronRight color="#999" size={14} strokeWidth={2.3} />
+                )
+              ) : null}
             </View>
-          )}
-
-          {showDetail && isRejected && (
-            <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
-              {t.chatToolRejectedDesc}
+            <Text className="mt-0.5 text-[10px] uppercase tracking-[0.5px] text-foreground/38">
+              <ToolStatusLabel error={error} resultReady={resultReady} status={status} />
             </Text>
-          )}
 
-          {showDetail && isAborted && (
-            <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
-              {t.chatToolAbortedDesc}
-            </Text>
-          )}
+            {showDetail && isPending && (
+              <View className="mt-2">
+                <Text className="text-[11px] leading-4 text-foreground/55 mb-2">
+                  {t.chatToolPendingDesc}
+                </Text>
+                <View className="flex-row gap-2">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-4 py-1.5"
+                    style={{ backgroundColor: 'rgba(10,132,255,0.12)' }}
+                    onPress={onApprove}
+                  >
+                    <Text className="text-[12px] font-semibold" style={{ color: '#0A84FF' }}>
+                      {t.chatToolApprove}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="rounded-full px-4 py-1.5"
+                    style={{ backgroundColor: 'rgba(255,59,48,0.1)' }}
+                    onPress={onReject}
+                  >
+                    <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
+                      {t.chatToolReject}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
-          {showDetail && argumentsText ? (
-            <>
-              <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
-                {t.chatToolArguments}
+            {showDetail && isRejected && (
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
+                {t.chatToolRejectedDesc}
               </Text>
-              <View style={{ position: 'relative' }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            )}
+
+            {showDetail && isAborted && (
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: '#8E8E93' }}>
+                {t.chatToolAbortedDesc}
+              </Text>
+            )}
+
+            {showDetail && argumentsText ? (
+              <>
+                <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                  {t.chatToolArguments}
+                </Text>
+                <View style={{ position: 'relative' }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <Text
+                      selectable
+                      className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/60"
+                      style={{
+                        backgroundColor: chatAccent.subtleBg,
+                        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                      }}
+                    >
+                      {argumentsText}
+                    </Text>
+                  </ScrollView>
+                  <ToolContentCopyButton text={argumentsText} />
+                </View>
+              </>
+            ) : null}
+            {showDetail && truncatedContent ? (
+              <>
+                <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                  {t.chatToolResponse}
+                </Text>
+                <View style={{ position: 'relative' }}>
                   <Text
                     selectable
-                    className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/60"
+                    className="mt-1 rounded-xl px-3 py-2 text-[12px] leading-5 text-foreground/72"
                     style={{
                       backgroundColor: chatAccent.subtleBg,
                       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                     }}
                   >
-                    {argumentsText}
+                    {truncatedContent}
                   </Text>
-                </ScrollView>
-                <ToolContentCopyButton text={argumentsText} />
-              </View>
-            </>
-          ) : null}
-          {showDetail && truncatedContent ? (
-            <>
-              <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
-                {t.chatToolResponse}
+                  {content ? <ToolContentCopyButton text={content} /> : null}
+                </View>
+                {content && content.length > 500 && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="mt-1 self-start"
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setContentExpanded((v) => !v);
+                    }}
+                  >
+                    <Text className="text-[11px] font-medium" style={{ color: '#0A84FF' }}>
+                      {contentExpanded ? t.chatShowLess : t.chatShowMore}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : null}
+            {showDetail && error ? (
+              <Text className="mt-2 text-[11px] leading-4 text-[#FF3B30]">
+                {typeof error === 'string' ? error : t.chatToolFailed}
               </Text>
-              <View style={{ position: 'relative' }}>
-                <Text
-                  selectable
-                  className="mt-1 rounded-xl px-3 py-2 text-[12px] leading-5 text-foreground/72"
-                  style={{
-                    backgroundColor: chatAccent.subtleBg,
-                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                  }}
-                >
-                  {truncatedContent}
-                </Text>
-                {content ? <ToolContentCopyButton text={content} /> : null}
-              </View>
-              {content && content.length > 500 && (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="mt-1 self-start"
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setContentExpanded((v) => !v);
-                  }}
-                >
-                  <Text className="text-[11px] font-medium" style={{ color: '#0A84FF' }}>
-                    {contentExpanded ? t.chatShowLess : t.chatShowMore}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : null}
-          {showDetail && error ? (
-            <Text className="mt-2 text-[11px] leading-4 text-[#FF3B30]">
-              {typeof error === 'string' ? error : t.chatToolFailed}
-            </Text>
-          ) : null}
-          {!showDetail && argumentsText ? (
-            <Text className="mt-2 text-[11px] leading-4 text-foreground/55" numberOfLines={2}>
-              {argumentsText}
-            </Text>
-          ) : null}
+            ) : null}
+            {!showDetail && argumentsText ? (
+              <Text className="mt-2 text-[11px] leading-4 text-foreground/55" numberOfLines={2}>
+                {argumentsText}
+              </Text>
+            ) : null}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
+      </TouchableOpacity>
+    );
+  },
+);
 
 ToolCard.displayName = 'ToolCard';
 
 const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
   const { t } = useI18n();
   const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
-  const allCompleted = tools.every(
-    (tool) => tool.result_content || tool.result_msg_id,
-  );
+  const allCompleted = tools.every((tool) => tool.result_content || tool.result_msg_id);
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -2153,7 +2323,11 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
           onPress={() => !thinking && setExpanded((v) => !v)}
         >
           {thinking ? (
-            <ActivityIndicator color={semanticColors.primary} size={12} style={{ marginRight: 4 }} />
+            <ActivityIndicator
+              color={semanticColors.primary}
+              size={12}
+              style={{ marginRight: 4 }}
+            />
           ) : expanded ? (
             <ChevronDown color="#999" size={14} strokeWidth={2.5} />
           ) : (
@@ -2206,7 +2380,7 @@ ThinkingBlock.displayName = 'ThinkingBlock';
 
 const ErrorBlock = memo<{
   error: { body?: unknown; message: string; type: string };
-  onRetry: () => void;
+  onRetry?: () => void;
 }>(({ error, onRetry }) => {
   const { t } = useI18n();
   const [showBody, setShowBody] = useState(false);
@@ -2267,16 +2441,18 @@ const ErrorBlock = memo<{
           )}
         </>
       )}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        className="mt-2 self-start rounded-full px-4 py-1.5"
-        style={{ backgroundColor: 'rgba(255,59,48,0.12)' }}
-        onPress={onRetry}
-      >
-        <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
-          {t.retry}
-        </Text>
-      </TouchableOpacity>
+      {onRetry ? (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          className="mt-2 self-start rounded-full px-4 py-1.5"
+          style={{ backgroundColor: 'rgba(255,59,48,0.12)' }}
+          onPress={onRetry}
+        >
+          <Text className="text-[12px] font-semibold" style={{ color: '#FF3B30' }}>
+            {t.retry}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 });

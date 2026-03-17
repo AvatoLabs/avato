@@ -181,6 +181,22 @@ lsof -i :8180  # SearXNG
 pnpm db:migrate
 ```
 
+### `column sessions.tag_id does not exist`
+
+若出现 `Error: column sessions.tag_id does not exist`（常见于 `session.getGroupedSessions` 调用），说明数据库 schema 未更新。请执行：
+
+```bash
+DATABASE_URL=你的数据库连接串 pnpm db:migrate
+```
+
+或者如果你使用 Bun：
+
+```bash
+DATABASE_URL=你的数据库连接串 bun run db:migrate
+```
+
+迁移完成后重启服务即可。
+
 ### 清洁安装
 
 如遇到依赖问题，删除所有 `node_modules` 并重新安装：

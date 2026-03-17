@@ -49,12 +49,25 @@ export const useFileStore = create<FileState>((set, get) => ({
 
     set((s) => ({
       pendingFiles: s.pendingFiles.map((f) =>
-        f.id === id ? { ...f, status: 'uploading' as const, progress: 30 } : f,
+        f.id === id ? { ...f, status: 'uploading' as const, progress: 0 } : f,
       ),
     }));
 
     try {
       const result = await fileApi.upload(file.uri, file.name, file.type, {
+        onProgress: (progress) => {
+          set((s) => ({
+            pendingFiles: s.pendingFiles.map((pendingFile) =>
+              pendingFile.id === id
+                ? {
+                    ...pendingFile,
+                    progress,
+                    status: 'uploading' as const,
+                  }
+                : pendingFile,
+            ),
+          }));
+        },
         sessionId: options?.sessionId,
       });
 
@@ -73,7 +86,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       }));
 
       return { fileId: result.id, url: result.url };
-    } catch (err) {
+    } catch {
       const t = useI18n.getState().t;
       useToast.getState().show('error', t.fileUploadError);
       set((s) => ({

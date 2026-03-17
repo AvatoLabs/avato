@@ -82,6 +82,10 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     uniqueConstraints: [],
   },
   {
+    table: 'sessionTags',
+    uniqueConstraints: [],
+  },
+  {
     fieldProcessors: {
       slug: (value) => (value ? `${value}-${uuid().slice(0, 8)}` : null),
     },
@@ -97,6 +101,10 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       {
         field: 'groupId',
         sourceTable: 'sessionGroups',
+      },
+      {
+        field: 'tagId',
+        sourceTable: 'sessionTags',
       },
     ],
     table: 'sessions',
@@ -301,7 +309,7 @@ export class DataImporterRepos {
 
           // Use unified import method
           const result = await this.importTableData(trx, config, tableData, conflictStrategy);
-          console.log(`imported table: ${tableName}, records: ${tableData.length}`);
+          console.info(`imported table: ${tableName}, records: ${tableData.length}`);
 
           if (Object.values(result).some((value) => value > 0)) {
             results[tableName] = result;
@@ -453,7 +461,7 @@ export class DataImporterRepos {
         if (item.accessedAt) dateFields.accessedAt = new Date(item.accessedAt);
 
         // Create new record object
-        let newRecord: any = {};
+        let newRecord: any;
 
         // Decide how to process based on whether it's composite key and whether to preserve ID
         if (isCompositeKey) {

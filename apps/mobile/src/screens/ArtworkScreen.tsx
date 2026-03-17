@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Copy,
   Image as ImageIcon,
+  Palette,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -67,6 +68,8 @@ const EDITABLE_NUMERIC_PARAM_KEYS = ['width', 'height', 'steps', 'cfg', 'seed'] 
 const PRESET_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
 const SECONDARY_BAR_HEIGHT = 48;
 const SIDEBAR_OPTION_GAP = 8;
+
+type ArtworkTaskStatus = 'pending' | 'processing' | 'success' | 'error';
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);
@@ -142,6 +145,32 @@ function normalizeParamsForSchema(
   }
 
   return normalized;
+}
+
+function normalizeGenerationTaskStatus(status?: string): ArtworkTaskStatus {
+  switch (status?.toLowerCase()) {
+    case 'error': {
+      return 'error';
+    }
+    case 'processing': {
+      return 'processing';
+    }
+    case 'success': {
+      return 'success';
+    }
+    default: {
+      return 'pending';
+    }
+  }
+}
+
+function getGenerationPreviewSources(generation: GenerationItem) {
+  return [
+    generation.asset?.thumbnailUrl,
+    generation.fileId ? `/f/${generation.fileId}` : undefined,
+    generation.asset?.url,
+    generation.asset?.originalUrl,
+  ].filter((url, index, list): url is string => Boolean(url) && list.indexOf(url) === index);
 }
 
 function applyRatioToDimensions(ratio: string, base = 1024) {
@@ -223,7 +252,14 @@ function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }
         marginTop: 16,
       }}
     >
-      <Text style={{ color: semanticColors.foreground, fontSize: 15, fontWeight: '600', letterSpacing: -0.2 }}>
+      <Text
+        style={{
+          color: semanticColors.foreground,
+          fontSize: 15,
+          fontWeight: '600',
+          letterSpacing: -0.2,
+        }}
+      >
         {text}
       </Text>
       {right}
@@ -345,13 +381,13 @@ function SidebarOptionStrip<T extends string | number>({
 
 function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
-  const map: Record<string, { bg: string; fg: string; label: string }> = {
-    Pending: { bg: '#f59e0b20', fg: '#f59e0b', label: t.artworkPending },
-    Processing: { bg: '#3b82f620', fg: '#3b82f6', label: t.artworkProcessing },
-    Success: { bg: '#10b98120', fg: '#10b981', label: t.artworkSuccess },
-    Error: { bg: '#ef444420', fg: '#ef4444', label: t.artworkError },
+  const map: Record<ArtworkTaskStatus, { bg: string; fg: string; label: string }> = {
+    pending: { bg: '#f59e0b20', fg: '#f59e0b', label: t.artworkPending },
+    processing: { bg: '#3b82f620', fg: '#3b82f6', label: t.artworkProcessing },
+    success: { bg: '#10b98120', fg: '#10b981', label: t.artworkSuccess },
+    error: { bg: '#ef444420', fg: '#ef4444', label: t.artworkError },
   };
-  const s = map[status] || map.Pending;
+  const s = map[normalizeGenerationTaskStatus(status)];
   return (
     <View
       style={{ backgroundColor: s.bg, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}
@@ -606,7 +642,7 @@ export default function ArtworkScreen() {
         return typeof maxCount === 'number' ? merged.slice(0, maxCount) : merged;
       });
     }
-  }, [paramsSchema, t]);
+  }, [paramsSchema]);
 
   // ── Load batches for topic ──
   const loadBatches = useCallback(async (tid: string) => {
@@ -626,7 +662,10 @@ export default function ArtworkScreen() {
       stopPolling();
       const pendingGenerationIds = new Set(
         batchGenerations
-          .filter((g) => g.asyncTaskId && g.task.status !== 'Success' && g.task.status !== 'Error')
+          .filter((g) => {
+            const status = normalizeGenerationTaskStatus(g.task.status);
+            return g.asyncTaskId && status !== 'success' && status !== 'error';
+          })
           .map((g) => g.id),
       );
       if (pendingGenerationIds.size === 0) return;
@@ -647,12 +686,14 @@ export default function ArtworkScreen() {
 
           const latestPending = (latestBatches || [])
             .flatMap((batch) => batch.generations)
-            .filter(
-              (generation) =>
+            .filter((generation) => {
+              const status = normalizeGenerationTaskStatus(generation.task.status);
+              return (
                 pendingGenerationIds.has(generation.id) &&
-                generation.task.status !== 'Success' &&
-                generation.task.status !== 'Error',
-            );
+                status !== 'success' &&
+                status !== 'error'
+              );
+            });
 
           const allDone = latestPending.length === 0;
           if (allDone || attempt >= 60) {
@@ -816,7 +857,9 @@ export default function ArtworkScreen() {
         ? PRESET_ASPECT_RATIOS
         : [];
   const currentAspectRatio = getAspectRatioSelection(generationParams, paramsSchema);
-  const imageCountSelection: number | string = IMAGE_COUNTS.includes(imgCount) ? imgCount : 'custom';
+  const imageCountSelection: number | string = IMAGE_COUNTS.includes(imgCount)
+    ? imgCount
+    : 'custom';
   const summaryParts = [
     generationParams.resolution ? String(generationParams.resolution) : undefined,
     generationParams.size ? String(generationParams.size) : undefined,
@@ -840,7 +883,12 @@ export default function ArtworkScreen() {
       keyboardVerticalOffset={0}
     >
       {/* ── Header ── */}
-      <ScreenHeader title={t.artworkTitle} />
+      <ScreenHeader
+        title={t.artworkTitle}
+        titleIcon={
+          <Palette color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        }
+      />
 
       {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
       <View>
@@ -858,16 +906,10 @@ export default function ArtworkScreen() {
             <View className="flex-row items-center">
               <Sparkles color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
               <View className="ml-2 flex-1">
-                <Text
-                  className="text-[14px] font-semibold text-foreground"
-                  numberOfLines={1}
-                >
+                <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
                   {modelName || t.artworkSelectModel}
                 </Text>
-                <Text
-                  className="mt-0.5 text-[11px] text-secondary/40"
-                  numberOfLines={1}
-                >
+                <Text className="mt-0.5 text-[11px] text-secondary/40" numberOfLines={1}>
                   {summaryParts.join(' · ')}
                 </Text>
               </View>
@@ -975,15 +1017,10 @@ export default function ArtworkScreen() {
       <View
         className="absolute bottom-0 left-0 right-0"
         style={{
-          paddingBottom: insets.bottom + 12,
-          paddingTop: 10,
-          paddingHorizontal: containerPad,
+          paddingBottom: Math.max(insets.bottom, 8) + 4,
+          paddingTop: 4,
+          paddingHorizontal: 16,
           backgroundColor: 'rgba(255,255,255,0.96)',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -1 },
-          shadowOpacity: 0.04,
-          shadowRadius: 6,
-          elevation: 2,
         }}
       >
         <View className="flex-row items-end gap-2">
@@ -1000,7 +1037,11 @@ export default function ArtworkScreen() {
           <TouchableOpacity
             className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? '' : 'bg-foreground/10'}`}
             disabled={!prompt.trim() || !model || generating}
-            style={{ width: 48, height: 48, ...(prompt.trim() && model ? { backgroundColor: '#007aff' } : {}) }}
+            style={{
+              width: 48,
+              height: 48,
+              ...(prompt.trim() && model ? { backgroundColor: '#007aff' } : {}),
+            }}
             onPress={handleGenerate}
           >
             {generating ? (
@@ -1075,7 +1116,7 @@ export default function ArtworkScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: 'semanticColors.fillTertiary',
+                  backgroundColor: semanticColors.fillTertiary,
                   borderRadius: 16,
                   paddingHorizontal: 16,
                   paddingVertical: 12,
@@ -1101,7 +1142,7 @@ export default function ArtworkScreen() {
                 <Animated.View
                   entering={FadeInDown.duration(350)}
                   style={{
-                    backgroundColor: 'semanticColors.fillTertiary',
+                    backgroundColor: semanticColors.fillTertiary,
                     borderRadius: 12,
                     marginTop: 8,
                     maxHeight: 208,
@@ -1163,7 +1204,7 @@ export default function ArtworkScreen() {
                   />
                   <TouchableOpacity
                     style={{
-                      backgroundColor: 'semanticColors.fillTertiary',
+                      backgroundColor: semanticColors.fillTertiary,
                       borderRadius: 16,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1359,7 +1400,7 @@ export default function ArtworkScreen() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: 'semanticColors.fillTertiary',
+                      backgroundColor: semanticColors.fillTertiary,
                       borderRadius: 14,
                       paddingHorizontal: 14,
                       paddingVertical: 12,
@@ -1388,15 +1429,6 @@ export default function ArtworkScreen() {
                 itemWidth={58}
                 items={[...IMAGE_COUNTS, 'custom']}
                 selectedValue={imageCountSelection}
-                onSelect={(item) => {
-                  haptics.selection();
-                  if (item === 'custom') {
-                    setCustomCountVisible(true);
-                    return;
-                  }
-
-                  setImgCount(Number(item));
-                }}
                 renderContent={(item, active) => (
                   <Text
                     style={{
@@ -1408,6 +1440,15 @@ export default function ArtworkScreen() {
                     {item === 'custom' ? '+' : item}
                   </Text>
                 )}
+                onSelect={(item) => {
+                  haptics.selection();
+                  if (item === 'custom') {
+                    setCustomCountVisible(true);
+                    return;
+                  }
+
+                  setImgCount(Number(item));
+                }}
               />
             </ScrollView>
           </Animated.View>
@@ -1470,6 +1511,50 @@ export default function ArtworkScreen() {
   );
 }
 
+function GenerationPreview({
+  cols,
+  generation,
+  imgH,
+  imgW,
+  resolveUrl,
+}: {
+  cols: number;
+  generation: GenerationItem;
+  imgH: number;
+  imgW: number;
+  resolveUrl: (url?: string) => string | undefined;
+}) {
+  const candidateUrls = getGenerationPreviewSources(generation)
+    .map((url) => resolveUrl(url))
+    .filter((url, index, list): url is string => Boolean(url) && list.indexOf(url) === index);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [
+    generation.asset?.originalUrl,
+    generation.asset?.thumbnailUrl,
+    generation.asset?.url,
+    generation.fileId,
+  ]);
+
+  const activeUrl = candidateUrls[activeIndex];
+
+  if (!activeUrl) return null;
+
+  return (
+    <RNImage
+      resizeMode={cols === 1 ? 'contain' : 'cover'}
+      source={{ uri: activeUrl }}
+      style={{ width: imgW, height: imgH }}
+      onError={() => {
+        if (activeIndex >= candidateUrls.length - 1) return;
+        setActiveIndex((current) => Math.min(current + 1, candidateUrls.length - 1));
+      }}
+    />
+  );
+}
+
 // ── BatchCard ────────────────────────────────────────────────────────
 function BatchCard({
   batch,
@@ -1523,12 +1608,13 @@ function BatchCard({
         </View>
       </View>
 
-      {/* Generation grid */}
+      {/* Generation grid — align with web SuccessState: fileId, asset.url, asset.thumbnailUrl */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
         {batch.generations.map((gen) => {
-          const url = resolveUrl(gen.asset?.url || gen.asset?.thumbnailUrl);
-          const isDone = gen.task.status === 'Success' && url;
-          const isErr = gen.task.status === 'Error';
+          const status = normalizeGenerationTaskStatus(gen.task.status);
+          const hasPreview = getGenerationPreviewSources(gen).length > 0;
+          const isDone = status === 'success' && hasPreview;
+          const isErr = status === 'error';
           return (
             <View
               key={gen.id}
@@ -1543,10 +1629,12 @@ function BatchCard({
               }}
             >
               {isDone ? (
-                <RNImage
-                  resizeMode={cols === 1 ? 'contain' : 'cover'}
-                  source={{ uri: url }}
-                  style={{ width: imgW, height: imgH }}
+                <GenerationPreview
+                  cols={cols}
+                  generation={gen}
+                  imgH={imgH}
+                  imgW={imgW}
+                  resolveUrl={resolveUrl}
                 />
               ) : isErr ? (
                 <View className="items-center p-2">
@@ -1555,7 +1643,7 @@ function BatchCard({
               ) : (
                 <View className="items-center">
                   <ActivityIndicator color="#666" size="small" />
-                  <StatusBadge status={gen.task.status} />
+                  <StatusBadge status={status} />
                 </View>
               )}
             </View>

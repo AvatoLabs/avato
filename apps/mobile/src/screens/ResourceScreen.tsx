@@ -33,7 +33,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -51,14 +50,13 @@ import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import SwipeableRow from '../components/ui/SwipeableRow';
+import { tokens } from '../theme/tokens';
 import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import { fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
-import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -127,15 +125,6 @@ function formatDate(isoString: string): string {
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-function canPreviewInline(fileType: string): boolean {
-  return (
-    isImage(fileType) ||
-    fileType === 'application/pdf' ||
-    fileType.startsWith('text/') ||
-    fileType === 'application/json'
-  );
-}
-
 const FilePreviewModal = memo(
   ({
     apiBaseUrl,
@@ -150,32 +139,66 @@ const FilePreviewModal = memo(
   }) => {
     const insets = useSafeAreaInsets();
     const { t } = useI18n();
+    const toast = useToast();
     const [imgLoading, setImgLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
 
     if (!item) return null;
 
-    const fileUrl = `${apiBaseUrl}/f/${item.id}`;
+    // Align with web: absolute URL for /f/ proxy. Prefer client baseUrl; fallback to server url when full
+    const base = apiBaseUrl?.replace(/\/$/, '') || '';
+    const fileUrl =
+      base && base.startsWith('http')
+        ? `${base}/f/${item.id}`
+        : item.url?.startsWith('http')
+          ? item.url
+          : '';
     const imageFile = isImage(item.fileType);
     const textFile = item.fileType.startsWith('text/') || item.fileType === 'application/json';
     const pdfFile = item.fileType === 'application/pdf';
+    // Office docs: use Google Docs viewer for preview (requires publicly accessible URL)
+    const officeFile =
+      item.fileType.includes('msword') ||
+      item.fileType.includes('vnd.openxmlformats') ||
+      item.fileType.includes('vnd.ms-excel') ||
+      item.fileType.includes('vnd.ms-powerpoint');
+    const previewableDoc = textFile || pdfFile || officeFile;
 
     const handleShare = () => {
-      Share.share({
-        title: item.name,
-        url: Platform.OS === 'ios' ? fileUrl : undefined,
-        message: Platform.OS === 'android' ? fileUrl : undefined,
-      });
+      void Share.share(
+        Platform.OS === 'ios'
+          ? {
+              title: item.name,
+              url: fileUrl,
+            }
+          : {
+              message: fileUrl,
+              title: item.name,
+            },
+      );
     };
 
-    const handleOpen = () => {
-      Linking.openURL(fileUrl);
+    const handleDownload = async () => {
+      if (downloading) return;
+      setDownloading(true);
+      try {
+        await fileApi.download(item, {
+          onProgress: () => undefined,
+        });
+        haptics.success();
+        toast.show('success', t.resourceDownloaded);
+      } catch {
+        toast.show('error', t.resourceDownloadFailed);
+      } finally {
+        setDownloading(false);
+      }
     };
 
     return (
       <Modal
+        statusBarTranslucent
         transparent
         animationType="none"
-        statusBarTranslucent
         visible={visible}
         onRequestClose={onClose}
       >
@@ -188,7 +211,7 @@ const FilePreviewModal = memo(
 
           {/* Header */}
           <View
-            className="flex-row items-center justify-between px-4"
+            className="flex-row items-center px-4"
             style={{
               paddingTop: insets.top + 8,
               paddingBottom: 10,
@@ -205,7 +228,7 @@ const FilePreviewModal = memo(
             }}
           >
             <TouchableOpacity
-              className="flex-row items-center"
+              className="flex-row items-center flex-1 min-w-0"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={onClose}
             >
@@ -214,7 +237,7 @@ const FilePreviewModal = memo(
                 size={22}
                 strokeWidth={tokens.icon.strokeWidth}
               />
-              <View style={{ flex: 1, marginLeft: 8, marginRight: 50 }}>
+              <View className="flex-1 min-w-0 ml-2 mr-2">
                 <Text
                   className="text-[15px] font-semibold"
                   numberOfLines={1}
@@ -233,7 +256,7 @@ const FilePreviewModal = memo(
               </View>
             </TouchableOpacity>
 
-            <View className="flex-row items-center gap-3">
+            <View className="flex-row items-center gap-3 flex-shrink-0">
               <TouchableOpacity
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={handleShare}
@@ -244,40 +267,61 @@ const FilePreviewModal = memo(
                   strokeWidth={1.8}
                 />
               </TouchableOpacity>
-              {!imageFile && (
-                <TouchableOpacity
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={handleOpen}
-                >
-                  <Download color={semanticColors.primary} size={20} strokeWidth={1.8} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                disabled={downloading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => void handleDownload()}
+              >
+                {downloading ? (
+                  <ActivityIndicator color={imageFile ? '#fff' : semanticColors.primary} size="small" />
+                ) : (
+                  <Download
+                    color={imageFile ? '#fff' : semanticColors.primary}
+                    size={20}
+                    strokeWidth={1.8}
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
           {/* Content */}
           <View style={{ flex: 1 }}>
             {imageFile ? (
-              <View className="flex-1 items-center justify-center">
-                {imgLoading && (
-                  <ActivityIndicator
-                    color="#fff"
-                    size="large"
-                    style={{ position: 'absolute', zIndex: 1 }}
+              fileUrl ? (
+                <View className="flex-1 items-center justify-center">
+                  {imgLoading && (
+                    <ActivityIndicator
+                      color="#fff"
+                      size="large"
+                      style={{ position: 'absolute', zIndex: 1 }}
+                    />
+                  )}
+                  <Image
+                    resizeMode="contain"
+                    source={{ uri: fileUrl }}
+                    style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
+                    onError={() => setImgLoading(false)}
+                    onLoad={() => setImgLoading(false)}
                   />
-                )}
-                <Image
-                  resizeMode="contain"
-                  source={{ uri: fileUrl }}
-                  style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
-                  onLoad={() => setImgLoading(false)}
-                  onError={() => setImgLoading(false)}
-                />
-              </View>
-            ) : textFile || pdfFile ? (
+                </View>
+              ) : (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-white/80 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
+              )
+            ) : previewableDoc ? (
               <WebView
-                source={{ uri: fileUrl }}
+                originWhitelist={['https://*', 'http://*']}
                 startInLoadingState
+                source={{
+                  uri: officeFile
+                    ? `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`
+                    : fileUrl,
+                }}
+                style={{ flex: 1 }}
                 renderLoading={() => (
                   <View
                     className="items-center justify-center"
@@ -293,7 +337,6 @@ const FilePreviewModal = memo(
                     <ActivityIndicator color={semanticColors.primary} size="large" />
                   </View>
                 )}
-                style={{ flex: 1 }}
               />
             ) : (
               <View className="flex-1 items-center justify-center px-8">
@@ -317,11 +360,15 @@ const FilePreviewModal = memo(
                 <TouchableOpacity
                   className="flex-row items-center rounded-2xl px-8 py-3.5"
                   style={{ backgroundColor: semanticColors.primary }}
-                  onPress={handleOpen}
+                  onPress={() => void handleDownload()}
                 >
-                  <Eye color="#fff" size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                  {downloading ? (
+                    <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
+                  ) : (
+                    <Download color="#fff" size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                  )}
                   <Text className="text-white text-[15px] font-semibold">
-                    {t.resourceOpenExternal || 'Open in Browser'}
+                    {t.resourceDownload}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -346,15 +393,27 @@ interface FileRowProps {
 
 function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
   const iconColor = semanticColors.secondaryText;
-  const thumbnailUrl = isImage(item.fileType) ? `${apiBaseUrl}/f/${item.id}` : null;
+  // Align with web: absolute URL only (RN Image requires it). Prefer client baseUrl; fallback to server url
+  const thumbnailUrl = isImage(item.fileType)
+    ? (() => {
+        const base = apiBaseUrl?.replace(/\/$/, '') || '';
+        if (base && (base.startsWith('http://') || base.startsWith('https://'))) {
+          return `${base}/f/${item.id}`;
+        }
+        return item.url?.startsWith('http') ? item.url : null;
+      })()
+    : null;
 
   return (
-    <SwipeableRow onDelete={() => onDelete(item.id, item.name)}>
-      <TouchableOpacity
-        activeOpacity={0.6}
-        className="flex-row items-center px-5 py-3 bg-background"
-        onPress={() => onPress(item)}
-      >
+    <TouchableOpacity
+      activeOpacity={0.6}
+      className="flex-row items-center px-5 py-3 bg-background"
+      onLongPress={() => {
+        haptics.medium();
+        onDelete(item.id, item.name);
+      }}
+      onPress={() => onPress(item)}
+    >
         <View
           className="items-center justify-center rounded-xl bg-foreground/5"
           style={{ width: 48, height: 48, marginRight: 12 }}
@@ -383,7 +442,6 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
 
         <Eye color={semanticColors.secondaryText} size={16} strokeWidth={1.5} style={{ marginLeft: 8 }} />
       </TouchableOpacity>
-    </SwipeableRow>
   );
 }
 
@@ -541,11 +599,14 @@ export default function ResourceScreen() {
       {/* Header */}
       <ScreenHeader
         title={t.resourceTitle}
+        titleIcon={<FolderOpen color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
         rightElement={
           <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={() => setAttachmentSheetVisible(true)}
-      >
+      />
+
+      <View className="pb-2">
         {/* Search */}
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
           <Search color={semanticColors.muted} size={16} strokeWidth={2} />
@@ -569,7 +630,7 @@ export default function ResourceScreen() {
         {/* Category pills */}
         <ScrollView
           horizontal
-          className="mx-4 mb-2"
+          className="mx-4"
           contentContainerStyle={{ gap: 4 }}
           showsHorizontalScrollIndicator={false}
         >
@@ -598,7 +659,7 @@ export default function ResourceScreen() {
             );
           })}
         </ScrollView>
-      </ScreenHeader>
+      </View>
 
       {/* Content */}
       {loading && files.length === 0 ? (
@@ -610,14 +671,6 @@ export default function ResourceScreen() {
           ItemSeparatorComponent={() => <View className="mx-4 h-px bg-foreground/5" />}
           data={filtered}
           keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              colors={[semanticColors.primary]}
-              refreshing={refreshing}
-              tintColor={semanticColors.primary}
-              onRefresh={onRefresh}
-            />
-          }
           ListEmptyComponent={
             <Animated.View className="items-center px-8" entering={FadeInDown.duration(350)}>
               <View
@@ -643,6 +696,14 @@ export default function ResourceScreen() {
                   paddingBottom: insets.bottom + 80,
                 }
               : { paddingBottom: insets.bottom + 80 }
+          }
+          refreshControl={
+            <RefreshControl
+              colors={[semanticColors.primary]}
+              refreshing={refreshing}
+              tintColor={semanticColors.primary}
+              onRefresh={onRefresh}
+            />
           }
           renderItem={({ item }) => (
             <FileRow apiBaseUrl={apiBase} item={item} onDelete={handleDelete} onPress={handlePreview} />

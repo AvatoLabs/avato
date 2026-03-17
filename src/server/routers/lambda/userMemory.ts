@@ -77,7 +77,10 @@ export const userMemoryRouter = router({
     .input(CreateUserMemoryIdentitySchema)
     .mutation(async ({ ctx, input }) => {
       return ctx.userMemoryModel.addIdentityEntry({
-        base: {},
+        base: {
+          summary: input.summary,
+          title: input.title,
+        },
         identity: {
           description: input.description,
           episodicDate: input.episodicDate,
@@ -136,7 +139,28 @@ export const userMemoryRouter = router({
   }),
 
   getIdentities: userMemoryProcedure.query(async ({ ctx }) => {
-    return ctx.userMemoryModel.getAllIdentities();
+    const rows = await ctx.userMemoryModel.getAllIdentitiesWithMemory();
+
+    return rows.map(({ identity, memory }) => ({
+      capturedAt: identity.capturedAt ?? memory.capturedAt,
+      createdAt: identity.createdAt ?? memory.createdAt,
+      description: identity.description,
+      episodicDate: identity.episodicDate,
+      id: identity.id,
+      memoryCategory: memory.memoryCategory,
+      memoryLayer: memory.memoryLayer,
+      memoryType: memory.memoryType,
+      relationship: identity.relationship,
+      role: identity.role,
+      status: memory.status,
+      summary: memory.summary ?? identity.description,
+      tags: identity.tags ?? memory.tags,
+      title: memory.title,
+      type: identity.type,
+      updatedAt: identity.updatedAt ?? memory.updatedAt,
+      userId: identity.userId ?? memory.userId,
+      userMemoryId: identity.userMemoryId,
+    }));
   }),
 
   getMemoryExtractionTask: userMemoryProcedure
@@ -343,6 +367,7 @@ export const userMemoryRouter = router({
         data: z.object({
           action: z.string().optional(),
           keyLearning: z.string().optional(),
+          reasoning: z.string().optional(),
           situation: z.string().optional(),
         }),
         id: z.string(),
@@ -360,7 +385,16 @@ export const userMemoryRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const base =
+        input.data.summary !== undefined || input.data.title !== undefined
+          ? {
+              summary: input.data.summary,
+              title: input.data.title,
+            }
+          : undefined;
+
       return ctx.userMemoryModel.updateIdentityEntry({
+        base,
         identity: {
           description: input.data.description,
           episodicDate: input.data.episodicDate,

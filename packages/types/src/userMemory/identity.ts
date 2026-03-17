@@ -57,6 +57,8 @@ export interface NewUserMemoryIdentity {
   labels?: Record<string, any>;
   relationship?: string;
   role?: string;
+  summary?: string;
+  title?: string;
   type?: IdentityType;
   userMemoryId?: string;
 }
@@ -68,6 +70,8 @@ export interface UpdateUserMemoryIdentity {
   labels?: Record<string, any>;
   relationship?: string;
   role?: string;
+  summary?: string;
+  title?: string;
   type?: IdentityType;
 }
 
@@ -80,6 +84,8 @@ export const CreateUserMemoryIdentitySchema = z.object({
   labels: z.record(z.any()).optional(),
   relationship: z.string().optional(),
   role: z.string().optional(),
+  summary: z.string().optional(),
+  title: z.string().optional(),
   type: IdentityTypeSchema.optional(),
   userMemoryId: z.string().optional(),
 });
@@ -91,5 +97,7 @@ export const UpdateUserMemoryIdentitySchema = z.object({
   labels: z.record(z.any()).optional(),
   relationship: z.string().optional(),
   role: z.string().optional(),
+  summary: z.string().optional(),
+  title: z.string().optional(),
   type: IdentityTypeSchema.optional(),
 });
