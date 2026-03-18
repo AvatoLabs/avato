@@ -315,6 +315,7 @@ type TranslationKeys = {
   themeColorBlue: string;
   themeColorViolet: string;
   themeColorGreen: string;
+  themeColorSlate: string;
 
   // Home / Command Surface
   homeHeroPlaceholder: string;
@@ -508,6 +509,7 @@ type TranslationKeys = {
   errorEditFailed: string;
   errorSaveFailed: string;
   loginChangeServer: string;
+  loginDesc: string;
   loginContinueWithEmail: string;
   loginContinueWithProvider: string;
   loginFeishuConfigMismatch: string;
@@ -1241,6 +1243,7 @@ const en: TranslationKeys = {
   themeColorBlue: 'Blue',
   themeColorViolet: 'Violet',
   themeColorGreen: 'Green',
+  themeColorSlate: 'Slate',
 
   homeHeroPlaceholder: 'What do you want to do?',
   homeQuickWrite: 'New Session',
@@ -1422,6 +1425,7 @@ const en: TranslationKeys = {
   errorEditFailed: 'Failed to save edit',
   errorSaveFailed: 'Failed to save',
   loginChangeServer: 'Server',
+  loginDesc: 'Sign in to continue to your workspace.',
   loginContinueWithEmail: 'Continue with Email or Password',
   loginContinueWithProvider: 'Continue with {provider}',
   loginFeishuConfigMismatch:
@@ -2146,6 +2150,7 @@ const zh_tw: TranslationKeys = {
   themeColorBlue: '藍色',
   themeColorViolet: '紫色',
   themeColorGreen: '綠色',
+  themeColorSlate: '灰藍',
 
   homeHeroPlaceholder: '你想做什麼？',
   homeQuickWrite: '新會話',
@@ -2326,6 +2331,7 @@ const zh_tw: TranslationKeys = {
   errorEditFailed: '編輯儲存失敗',
   errorSaveFailed: '儲存失敗',
   loginChangeServer: '伺服器',
+  loginDesc: '登入以繼續使用你的工作區。',
   loginContinueWithEmail: '使用郵箱或密碼繼續',
   loginContinueWithProvider: '使用 {provider} 繼續',
   loginFeishuConfigMismatch:
@@ -3047,6 +3053,7 @@ const zh: TranslationKeys = {
   themeColorBlue: '蓝色',
   themeColorViolet: '紫色',
   themeColorGreen: '绿色',
+  themeColorSlate: '灰蓝',
 
   homeHeroPlaceholder: '你想做什么？',
   homeQuickWrite: '新会话',
@@ -3227,6 +3234,7 @@ const zh: TranslationKeys = {
   errorEditFailed: '编辑保存失败',
   errorSaveFailed: '保存失败',
   loginChangeServer: '服务器',
+  loginDesc: '登录以继续使用你的工作区。',
   loginContinueWithEmail: '使用邮箱或密码继续',
   loginContinueWithProvider: '使用 {provider} 继续',
   loginFeishuConfigMismatch:

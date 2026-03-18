@@ -11,7 +11,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -37,8 +36,6 @@ import MemoryScreen from '../screens/MemoryScreen';
 import ModelListScreen from '../screens/ModelListScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
 import NotebookScreen from '../screens/NotebookScreen';
-import CompletionScreen from '../screens/onboarding/CompletionScreen';
-import ProviderSetupScreen from '../screens/onboarding/ProviderSetupScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -65,43 +62,26 @@ function MeTabIcon({
   trigger: number;
 }) {
   const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
-  const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
 
   useEffect(() => {
     if (trigger === 0) return;
 
-    rotation.value = 0;
     scale.value = 1;
-
-    rotation.value = withTiming(360, {
-      duration: 900,
-      easing: Easing.out(Easing.cubic),
-    });
-    scale.value = withDelay(
-      700,
-      withSequence(
-        withTiming(1.12, {
-          duration: 120,
-          easing: Easing.out(Easing.quad),
-        }),
-        withSpring(1, {
-          damping: 10,
-          stiffness: 220,
-        }),
-      ),
+    scale.value = withSequence(
+      withTiming(1.08, { duration: 120, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 12, stiffness: 200 }),
     );
-  }, [rotation, scale, trigger]);
+  }, [scale, trigger]);
 
   useEffect(() => {
     if (!focused) {
-      rotation.value = 0;
       scale.value = 1;
     }
-  }, [focused, rotation, scale]);
+  }, [focused, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }, { scale: scale.value }],
+    transform: [{ scale: scale.value }],
   }));
 
   return (
@@ -126,28 +106,17 @@ function AnimatedTabLabel({
   focused: boolean;
   label: string;
 }) {
-  const opacity = useSharedValue(focused ? 1 : 0.7);
-  const scale = useSharedValue(focused ? 1 : 0.94);
-  const translateY = useSharedValue(focused ? 0 : 1.5);
+  const opacity = useSharedValue(focused ? 1 : 0.72);
 
   useEffect(() => {
     opacity.value = withTiming(focused ? 1 : 0.72, {
-      duration: 180,
+      duration: 150,
       easing: Easing.out(Easing.quad),
     });
-    scale.value = withTiming(focused ? 1 : 0.94, {
-      duration: 180,
-      easing: Easing.out(Easing.quad),
-    });
-    translateY.value = withTiming(focused ? 0 : 1.5, {
-      duration: 180,
-      easing: Easing.out(Easing.quad),
-    });
-  }, [focused, opacity, scale, translateY]);
+  }, [focused, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ scale: scale.value }, { translateY: translateY.value }],
   }));
 
   return (
@@ -281,29 +250,17 @@ interface RootNavigatorProps {
 export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigatorProps) {
   return (
     <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
-      {/* Onboarding */}
+      {/* Onboarding: Welcome -> ServerConfig (Connect) -> Login/MainTabs */}
       <Stack.Screen
         component={WelcomeScreen}
         name="OnboardingWelcome"
         options={{ animation: 'fade' }}
       />
       <Stack.Screen
-        component={ProviderSetupScreen}
-        name="OnboardingProviderSetup"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={CompletionScreen}
-        name="OnboardingCompletion"
-        options={{ animation: 'slide_from_right' }}
-      />
-
-      {/* Main */}
-      <Stack.Screen
         component={ServerConfigScreen}
         initialParams={{ firstLaunch: initialRoute === 'ServerConfig' }}
         name="ServerConfig"
-        options={{ animation: 'slide_from_bottom' }}
+        options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen component={LoginScreen} name="Login" options={{ animation: 'fade' }} />
       <Stack.Screen component={BottomTabs} name="MainTabs" />

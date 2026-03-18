@@ -77,10 +77,10 @@ const splitLineList = (value: string) =>
 function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <View className="mx-5 mb-5">
-      <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+      <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
         {title}
       </Text>
-      <View className="rounded-2xl bg-foreground/[0.02] p-4">{children}</View>
+      <View className="rounded-xl bg-foreground/[0.02] p-4">{children}</View>
     </View>
   );
 }
@@ -586,11 +586,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                       <RowWrapper
                         key={member.id}
                         {...rowProps}
-                        className={`flex-row items-center rounded-2xl bg-foreground/[0.04] px-4 py-3 ${
+                        className={`flex-row items-center rounded-xl bg-foreground/[0.04] px-4 py-3 ${
                           index === (groupDetail.agents?.length ?? 0) - 1 ? '' : 'mb-3'
                         }`}
                       >
-                        <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+                        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
                           <Text className="text-[16px] font-semibold text-primary">
                             {avatarText}
                           </Text>

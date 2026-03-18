@@ -48,7 +48,7 @@ export function SettingsRow({
 
   if (!onPress) {
     return (
-      <View className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02]">
+      <View className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02]">
         {content}
       </View>
     );
@@ -57,7 +57,7 @@ export function SettingsRow({
   return (
     <TouchableOpacity
       activeOpacity={0.6}
-      className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
+      className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
       onPress={onPress}
     >
       {content}
@@ -75,7 +75,7 @@ export function SettingsSection({ children, delay = 0, title }: SettingsSectionP
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mb-5 px-5">
-        <Text className="px-2 mb-2 text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
+        <Text className="px-2 mb-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
           {title}
         </Text>
         <View>{children}</View>

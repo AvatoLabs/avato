@@ -940,7 +940,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   />
                 </Animated.View>
                 <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>
-                  <Text className="text-foreground font-extrabold text-xl tracking-tighter">
+                  <Text className="text-foreground font-semibold text-xl tracking-tighter">
                     {emptyStateTitle}
                   </Text>
                 </Animated.View>

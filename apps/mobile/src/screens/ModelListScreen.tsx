@@ -106,7 +106,7 @@ export default function ModelListScreen({ navigation }: any) {
           }
           renderItem={({ item: [provider, providerModels] }) => (
             <View className="mb-4">
-              <Text className="px-5 py-2 text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
+              <Text className="px-5 py-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
                 {provider}
               </Text>
               {providerModels.map((model) => (

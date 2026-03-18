@@ -293,7 +293,7 @@ const ItemCard = memo<{
   <PressableScale
     accessibilityLabel={item.name || item.identifier}
     accessibilityRole="button"
-    className="bg-foreground/[0.02] rounded-2xl p-3.5 mb-2.5 mx-5"
+    className="bg-foreground/[0.02] rounded-xl p-3.5 mb-2.5 mx-5"
     onPress={() => onPress(item)}
   >
     <View className="flex-row items-start">
@@ -2036,7 +2036,7 @@ export default function StoreScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              className="rounded-2xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
+              className="rounded-xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
               onPress={() => {
                 setShowCreateMenu(false);
                 setImportUrlVisible(true);
@@ -2056,7 +2056,7 @@ export default function StoreScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              className="rounded-2xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
+              className="rounded-xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
               onPress={() => {
                 setShowCreateMenu(false);
                 setImportGithubVisible(true);
@@ -2076,7 +2076,7 @@ export default function StoreScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              className="rounded-2xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
+              className="rounded-xl bg-foreground/[0.03] px-4 py-3.5 mb-2"
               onPress={() => {
                 setShowCreateMenu(false);
                 void handleImportZip();
@@ -2092,7 +2092,7 @@ export default function StoreScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              className="rounded-2xl bg-foreground/[0.03] px-4 py-3.5"
+              className="rounded-xl bg-foreground/[0.03] px-4 py-3.5"
               onPress={() => {
                 setShowCreateMenu(false);
                 setAddMcpVisible(true);

@@ -11,19 +11,18 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { ThemeProvider } from './src/components/ThemeProvider';
 import { ToastContainer, useToast } from './src/components/ui/Toast';
-import { migrateDeprecatedStorageKeys } from './src/lib/appState';
+import {
+  migrateDeprecatedStorageKeys,
+  ONBOARDING_KEY,
+  syncMobileBootstrapState,
+} from './src/lib/appState';
 import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
 import { AppErrorBoundary, initAppLogger } from './src/lib/logger';
 import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
-import { useAgentStore } from './src/store/agent';
 import { useConnectionStore } from './src/store/connection';
-import { useSessionStore } from './src/store/session';
 import { useThemeStore } from './src/store/theme';
-import { useUserStore } from './src/store/user';
-
-const ONBOARDING_KEY = 'avato_onboarding_complete';
 
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -75,24 +74,6 @@ function AppCrashFallback() {
     </View>
   );
 }
-
-const syncMobileBootstrapState = async () => {
-  const [sessionsResult, userResult, agentsResult] = await Promise.allSettled([
-    useSessionStore.getState().fetchSessions({ throwOnError: true }),
-    useUserStore.getState().fetchUser({ throwOnError: true }),
-    useAgentStore.getState().loadAgents(),
-  ]);
-
-  if (sessionsResult.status === 'rejected') {
-    console.warn('[App] bootstrap sessions sync failed:', sessionsResult.reason);
-  }
-  if (userResult.status === 'rejected') {
-    console.warn('[App] bootstrap user sync failed:', userResult.reason);
-  }
-  if (agentsResult.status === 'rejected') {
-    console.warn('[App] bootstrap agents sync failed:', agentsResult.reason);
-  }
-};
 
 export default function App() {
   const [isBootReady, setIsBootReady] = useState(false);

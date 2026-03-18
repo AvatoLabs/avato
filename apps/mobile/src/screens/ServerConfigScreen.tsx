@@ -1,8 +1,10 @@
 /**
  * ServerConfigScreen — Configure the backend server URL.
  *
- * Modern, humanized design with clear hierarchy and helpful guidance.
+ * Unified Connect screen: URL config, test, save. First-launch flow continues
+ * to Login or MainTabs (no-auth) after successful connection.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AlertCircle,
   ArrowLeft,
@@ -27,8 +29,13 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { clearTransientAppState } from '../lib/appState';
-import { clearStoredAuthSession } from '../lib/auth';
+import {
+  clearTransientAppState,
+  migrateDeprecatedStorageKeys,
+  ONBOARDING_KEY,
+  syncMobileBootstrapState,
+} from '../lib/appState';
+import { clearStoredAuthSession, fetchMobileAuthConfig } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import {
@@ -124,7 +131,24 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
     // Update global connection state so ProfileScreen reflects the change
     useConnectionStore.getState().checkConnection();
 
-    if (isFirstLaunch || urlChanged) {
+    if (isFirstLaunch) {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      try {
+        const authConfig = await fetchMobileAuthConfig(normalized);
+        if (authConfig.enableNoAuth) {
+          await syncMobileBootstrapState();
+          void migrateDeprecatedStorageKeys();
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+          return;
+        }
+      } catch {
+        /* fall through to Login on auth config failure */
+      }
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      return;
+    }
+
+    if (urlChanged) {
       navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } else {
       navigation.goBack();
@@ -157,7 +181,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           <Animated.View entering={FadeInDown.delay(50).duration(350)}>
             <View className="mx-5 mt-4 mb-6 items-center">
               <View
-                className="mb-4 items-center justify-center rounded-2xl"
+                className="mb-4 items-center justify-center rounded-xl"
                 style={{
                   backgroundColor: colors.primarySubtle,
                   width: 64,
@@ -181,7 +205,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {/* URL Input Card */}
           <Animated.View entering={FadeInDown.delay(120).duration(350)}>
             <View
-              className="mx-5 mb-4 overflow-hidden rounded-2xl"
+              className="mx-5 mb-4 overflow-hidden rounded-xl"
               style={{
                 backgroundColor: colors.surface,
                 borderWidth: 1,
@@ -190,7 +214,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             >
               <View className="px-4 pt-4 pb-2">
                 <Text
-                  className="text-foreground text-[12px] font-semibold uppercase tracking-widest"
+                  className="text-foreground text-[12px] font-medium uppercase tracking-wider"
                   style={{ color: colors.secondaryText }}
                 >
                   {t.serverUrlLabel}
@@ -221,7 +245,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {/* Test Connection — secondary outline style */}
           <Animated.View entering={FadeInDown.delay(180).duration(350)}>
             <PressableScale
-              className="mx-5 mb-4 flex-row items-center justify-center rounded-2xl py-3.5"
+              className="mx-5 mb-4 flex-row items-center justify-center rounded-xl py-3.5"
               disabled={testing}
               style={{
                 backgroundColor: colors.primarySubtle,
@@ -255,7 +279,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {status === 'success' && (
             <Animated.View entering={FadeIn.duration(280)}>
               <View
-                className="mx-5 mb-4 flex-row items-center rounded-2xl p-4"
+                className="mx-5 mb-4 flex-row items-center rounded-xl p-4"
                 style={{
                   backgroundColor: colors.successSubtle,
                   borderWidth: 1,
@@ -279,7 +303,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {status === 'error' && (
             <Animated.View entering={FadeIn.duration(280)}>
               <View
-                className="mx-5 mb-4 flex-row items-start rounded-2xl p-4"
+                className="mx-5 mb-4 flex-row items-start rounded-xl p-4"
                 style={{
                   backgroundColor: colors.dangerSubtle,
                   borderWidth: 1,
@@ -307,7 +331,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           {/* Save Button — primary CTA */}
           <Animated.View entering={FadeInDown.delay(240).duration(350)}>
             <PressableScale
-              className="mx-5 mt-4 items-center justify-center rounded-2xl py-4"
+              className="mx-5 mt-4 items-center justify-center rounded-xl py-4"
               style={{ backgroundColor: colors.primary }}
               onPress={handleSave}
             >

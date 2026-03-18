@@ -524,7 +524,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Configuration Section — dynamic fields */}
         {visibleFields.length > 0 && (
           <Animated.View entering={FadeInDown.delay(50).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl p-4">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl p-4">
               {visibleFields.map((fieldKey) => {
                 const meta = vaultFieldMeta[fieldKey] || {
                   label: fieldKey
@@ -600,7 +600,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Client-side Fetch Toggle */}
         {showFetchOnClient && (
           <Animated.View entering={FadeInDown.delay(75).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl overflow-hidden">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl overflow-hidden">
               <View className="flex-row items-center px-4 py-3.5">
                 <View className="flex-1">
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
@@ -624,7 +624,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         {/* Connection Checker */}
         {showChecker && (
           <Animated.View entering={FadeInDown.delay(100).duration(250)}>
-            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-2xl overflow-hidden">
+            <View className="mx-5 mb-4 bg-foreground/[0.02] rounded-xl overflow-hidden">
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="flex-row items-center px-4 py-3.5"
@@ -692,7 +692,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               <Text className="text-secondary/50 text-[14px]">{t.providerDetailNoModels}</Text>
             </View>
           ) : (
-            <View className="mx-5 bg-foreground/[0.02] rounded-2xl overflow-hidden">
+            <View className="mx-5 bg-foreground/[0.02] rounded-xl overflow-hidden">
               {filteredModels.map((model) => (
                 <View
                   className="flex-row items-center px-4 py-3 border-b border-border"

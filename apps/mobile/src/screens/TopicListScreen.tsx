@@ -148,7 +148,7 @@ export default function TopicListScreen({ route, navigation }: any) {
       <Animated.View entering={FadeInDown.delay(50).duration(250)}>
         <TouchableOpacity
           activeOpacity={0.6}
-          className={`flex-row items-center px-5 py-3.5 rounded-2xl mx-5 mb-2 ${
+          className={`flex-row items-center px-5 py-3.5 rounded-xl mx-5 mb-2 ${
             activeTopic === null ? 'bg-primary/10' : 'active:bg-foreground/5'
           }`}
           onPress={() => handleSwitchTopic(null)}

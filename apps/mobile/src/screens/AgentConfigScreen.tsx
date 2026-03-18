@@ -127,7 +127,7 @@ const buildDraft = (config: any): AgentDraft => ({
 function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
   return (
     <View className="mb-5 px-5">
-      <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+      <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
         {title}
       </Text>
       <View className="rounded-2xl bg-foreground/[0.02] p-4">{children}</View>

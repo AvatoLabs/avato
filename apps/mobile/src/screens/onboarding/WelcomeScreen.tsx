@@ -8,10 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import TextType from '../../components/ui/TextType';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 
 export default function WelcomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [showCTA, setShowCTA] = useState(false);
 
   return (
@@ -28,7 +30,7 @@ export default function WelcomeScreen({ navigation }: any) {
             className="w-32 h-32 rounded-[34px] bg-white items-center justify-center"
             style={{
               elevation: 12,
-              shadowColor: '#0f172a',
+              shadowColor: colors.shadow,
               shadowOffset: { height: 20, width: 0 },
               shadowOpacity: 0.12,
               shadowRadius: 36,
@@ -51,7 +53,7 @@ export default function WelcomeScreen({ navigation }: any) {
             containerStyle={{ minHeight: 64 }}
             cursorBlinkDuration={0.42}
             cursorCharacter="_"
-            cursorStyle={{ color: '#0f172a', fontSize: 17, fontWeight: '600' }}
+            cursorStyle={{ color: colors.foreground, fontSize: 17, fontWeight: '600' }}
             initialDelay={220}
             loop={false}
             pauseDuration={600}
@@ -59,7 +61,7 @@ export default function WelcomeScreen({ navigation }: any) {
             typingSpeed={26}
             variableSpeedEnabled={false}
             style={{
-              color: '#5b6778',
+              color: colors.secondaryText,
               fontSize: 17,
               fontWeight: '500',
               letterSpacing: 0.2,
@@ -78,8 +80,8 @@ export default function WelcomeScreen({ navigation }: any) {
         >
           <TouchableOpacity
             activeOpacity={0.82}
-            className="bg-primary rounded-2xl py-4 items-center active:bg-[#005bb5]"
-            onPress={() => navigation.navigate('OnboardingProviderSetup')}
+            className="bg-primary rounded-2xl py-4 items-center"
+            onPress={() => navigation.navigate('ServerConfig', { firstLaunch: true })}
           >
             <Text className="text-white text-[16px] font-semibold">{t.onboardingGetStarted}</Text>
           </TouchableOpacity>

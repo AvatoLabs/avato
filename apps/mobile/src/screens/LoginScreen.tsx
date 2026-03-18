@@ -16,6 +16,7 @@ import { getApiUrl } from '../lib/server';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
+import { useThemeColors } from '../theme/colors';
 
 const PASSWORD_SIGNIN_KEY = '__password__';
 
@@ -98,6 +99,7 @@ export default function LoginScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const [authConfig, setAuthConfig] = useState<MobileAuthConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
@@ -218,7 +220,7 @@ export default function LoginScreen({ navigation }: any) {
             className="h-32 w-32 items-center justify-center rounded-[34px] bg-white"
             style={{
               elevation: 12,
-              shadowColor: '#0f172a',
+              shadowColor: colors.shadow,
               shadowOffset: { height: 20, width: 0 },
               shadowOpacity: 0.12,
               shadowRadius: 36,
@@ -231,7 +233,7 @@ export default function LoginScreen({ navigation }: any) {
             Avato
           </Text>
           <Text className="mt-4 text-center text-[17px] font-medium leading-7 text-secondary/70">
-            {t.onboardingWelcomeDesc}
+            {t.loginDesc}
           </Text>
         </Animated.View>
 

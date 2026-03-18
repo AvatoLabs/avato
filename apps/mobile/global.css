@@ -37,4 +37,12 @@
   .dark.theme-green {
     --color-primary: #34d399;
   }
+
+  /* Color scheme: slate (enterprise) */
+  .theme-slate {
+    --color-primary: #475569;
+  }
+  .dark.theme-slate {
+    --color-primary: #94a3b8;
+  }
 }

@@ -3,7 +3,7 @@
  * Each palette defines primary, user bubble, chat accent, and source badge colors.
  * Combined with base (light/dark) tokens to produce full ColorTokens.
  */
-export type ColorSchemeId = 'blue' | 'violet' | 'green';
+export type ColorSchemeId = 'blue' | 'violet' | 'green' | 'slate';
 
 export interface ColorSchemePalette {
   activeTabBg: string;
@@ -100,10 +100,34 @@ const GREEN: ColorSchemePalette = {
   sourceMarketMuted: withAlpha('#10b981', 0.12),
 };
 
+/** Enterprise-oriented neutral gray-blue palette */
+const SLATE: ColorSchemePalette = {
+  id: 'slate',
+  primary: '#475569',
+  primaryBorder: withAlpha('#475569', 0.2),
+  primaryFocused: '#64748b',
+  primaryMuted: withAlpha('#475569', 0.4),
+  primarySubtle: withAlpha('#475569', 0.08),
+  switchTrackOn: '#475569',
+  activeTabBg: '#475569',
+  inactiveTabBg: withAlpha('#475569', 0.12),
+  userBubbleBg: '#334155',
+  userBubbleLink: '#94a3b8',
+  markdownLink: '#475569',
+  chatAccentBadgeBg: withAlpha('#475569', 0.12),
+  chatAccentBadgeText: '#334155',
+  chatAccentChipBg: withAlpha('#475569', 0.08),
+  chatAccentChipBorder: withAlpha('#475569', 0.16),
+  chatAccentQuoteBorder: '#64748b',
+  sourceMarket: '#475569',
+  sourceMarketMuted: withAlpha('#475569', 0.1),
+};
+
 export const COLOR_SCHEMES: Record<ColorSchemeId, ColorSchemePalette> = {
   blue: BLUE,
   violet: VIOLET,
   green: GREEN,
+  slate: SLATE,
 };
 
 export function getColorSchemePalette(id: ColorSchemeId): ColorSchemePalette {

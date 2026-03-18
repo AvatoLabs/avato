@@ -1476,7 +1476,7 @@ export default function ChatListScreen({ navigation }: any) {
               onToggleSearch={handleToggleSearch}
             />
             {pendingFiles.length > 0 && (
-              <View className="mx-5 -mt-2 mb-2 px-3 py-2 rounded-2xl bg-foreground/5">
+              <View className="mx-5 -mt-2 mb-2 px-3 py-2 rounded-xl bg-foreground/5">
                 <FilePreview sessionId={draftSessionId ?? undefined} />
               </View>
             )}
@@ -1655,7 +1655,7 @@ export default function ChatListScreen({ navigation }: any) {
       >
         <Pressable className="flex-1 bg-black/10" onPress={() => setCreateMenuVisible(false)}>
           <Pressable
-            className="absolute overflow-hidden rounded-2xl bg-card"
+            className="absolute overflow-hidden rounded-xl bg-card"
             style={{
               minWidth: 220,
               right: 16,

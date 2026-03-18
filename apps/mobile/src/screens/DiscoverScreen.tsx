@@ -23,7 +23,7 @@ type Tab = 'agents' | 'models' | 'providers';
 function SectionHeader({ title }: { title: string }) {
   return (
     <View className="mb-3 px-5">
-      <Text className="text-secondary/60 text-[11px] font-semibold uppercase tracking-widest">
+      <Text className="text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
         {title}
       </Text>
     </View>

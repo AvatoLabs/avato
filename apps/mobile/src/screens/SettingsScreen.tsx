@@ -47,15 +47,22 @@ const COLOR_SCHEME_OPTIONS: { color: string; value: ColorSchemeId }[] = [
   { color: '#007aff', value: 'blue' },
   { color: '#8b5cf6', value: 'violet' },
   { color: '#10b981', value: 'green' },
+  { color: '#475569', value: 'slate' },
 ];
 
 const getColorSchemeLabel = (
   value: ColorSchemeId,
-  t: { themeColorBlue: string; themeColorViolet: string; themeColorGreen: string },
+  t: {
+    themeColorBlue: string;
+    themeColorViolet: string;
+    themeColorGreen: string;
+    themeColorSlate: string;
+  },
 ) => {
   if (value === 'blue') return t.themeColorBlue;
   if (value === 'violet') return t.themeColorViolet;
-  return t.themeColorGreen;
+  if (value === 'green') return t.themeColorGreen;
+  return t.themeColorSlate;
 };
 
 const getThemeLabel = (

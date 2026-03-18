@@ -276,7 +276,7 @@ export default function ProfileEditScreen({ navigation }: any) {
             </Text>
           </View>
 
-          <View className="mx-5 bg-foreground/5 rounded-2xl overflow-hidden">
+          <View className="mx-5 bg-foreground/5 rounded-xl overflow-hidden">
             {/* Avatar Row */}
             <TouchableOpacity
               activeOpacity={0.7}

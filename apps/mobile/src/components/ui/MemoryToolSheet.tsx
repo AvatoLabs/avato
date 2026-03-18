@@ -78,10 +78,11 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
             </View>
 
             <View className="px-5 pb-6 pt-2">
-              <View className="bg-foreground/5 rounded-2xl overflow-hidden">
+              <View className="bg-foreground/5 rounded-xl overflow-hidden">
                 <ToggleOption
                   active={!enabled}
                   description={t.memoryToolOffDesc}
+                  title={t.memoryToolOffTitle}
                   icon={
                     <CircleOff
                       color={semanticColors.foreground}
@@ -89,7 +90,6 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                       strokeWidth={tokens.icon.strokeWidth}
                     />
                   }
-                  title={t.memoryToolOffTitle}
                   onPress={() => {
                     haptics.light();
                     onChangeEnabled(false);
@@ -116,7 +116,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
               </View>
 
               {enabled && (
-                <View className="mt-3 bg-foreground/5 rounded-2xl p-3.5">
+                <View className="mt-3 bg-foreground/5 rounded-xl p-3.5">
                   <Text className="text-foreground text-[17px] font-semibold tracking-tight">
                     {t.memoryToolEffortTitle}
                   </Text>

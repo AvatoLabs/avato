@@ -342,7 +342,7 @@ function HomeTab() {
       <View className="mb-6">
         <Text className="text-base font-semibold text-foreground mb-3">{t.memoryPersona}</Text>
         {persona?.content || persona?.summary ? (
-          <View className="bg-foreground/[0.02] rounded-2xl p-4">
+          <View className="bg-foreground/[0.02] rounded-xl p-4">
             {persona.summary ? (
               <Text className="text-sm text-foreground/80 leading-5 mb-2">{persona.summary}</Text>
             ) : null}
@@ -351,7 +351,7 @@ function HomeTab() {
             ) : null}
           </View>
         ) : (
-          <View className="bg-foreground/[0.02] rounded-2xl p-6 items-center">
+          <View className="bg-foreground/[0.02] rounded-xl p-6 items-center">
             <Brain color={colors.secondaryText} size={32} strokeWidth={1.5} />
             <Text className="text-sm text-secondary/60 mt-3 text-center">
               {t.memoryPersonaEmpty}
@@ -362,7 +362,7 @@ function HomeTab() {
 
       {/* Extract Memories card */}
       <View className="mb-6">
-        <View className="bg-foreground/[0.02] rounded-2xl p-4">
+        <View className="bg-foreground/[0.02] rounded-xl p-4">
           <Text className="text-base font-semibold text-foreground mb-2">
             {t.memoryExtractTitle}
           </Text>
@@ -554,7 +554,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
       return (
         <TouchableOpacity
           activeOpacity={0.7}
-          className="bg-foreground/[0.02] rounded-2xl p-4 mb-3"
+          className="bg-foreground/[0.02] rounded-xl p-4 mb-3"
           onLongPress={() => handleDelete(item)}
           onPress={() => nav.navigate('MemoryDetail', { item, layer })}
         >
@@ -648,7 +648,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
           >
             <TouchableOpacity
               activeOpacity={1}
-              className="bg-background rounded-2xl p-5"
+              className="bg-background rounded-xl p-5"
               onPress={(e) => e.stopPropagation()}
             >
               <View className="flex-row items-center justify-between mb-4">

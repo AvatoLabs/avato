@@ -472,7 +472,7 @@ export default function NotebookScreen({ route, navigation }: any) {
             {t.notebookDesc}
           </Text>
           <PressableScale
-            className="flex-row items-center gap-2 px-6 py-3.5 rounded-2xl"
+            className="flex-row items-center gap-2 px-6 py-3.5 rounded-xl"
             style={{ backgroundColor: semanticColors.primary }}
             onPress={handleCreate}
           >

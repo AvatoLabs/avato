@@ -75,7 +75,7 @@ export function TagEditorSheet({
             keyboardShouldPersistTaps="handled"
           >
             <View>
-              <Text className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
                 {title}
               </Text>
               <TextInput
@@ -89,7 +89,7 @@ export function TagEditorSheet({
             </View>
 
             <View>
-              <Text className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
                 {colorLabel}
               </Text>
               <View className="rounded-2xl bg-foreground/[0.03] px-3 py-3">

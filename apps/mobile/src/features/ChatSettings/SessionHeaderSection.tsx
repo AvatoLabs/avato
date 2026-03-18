@@ -32,7 +32,7 @@ export function SessionHeaderSection({
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mx-5 mb-5 mt-5">
-        <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+        <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsTitle}
         </Text>
         <View className="rounded-2xl bg-foreground/[0.02] px-4 py-3">

@@ -98,10 +98,10 @@ export default function DataManagementScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.dataManageTitle}
         leftElement={
           <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.dataManageTitle}
         onPressLeft={() => {
           haptics.light();
           navigation?.goBack?.();
@@ -114,7 +114,7 @@ export default function DataManagementScreen({ navigation }: any) {
             <Animated.View entering={FadeInDown.delay(index * 50).duration(300)} key={item.label}>
               <TouchableOpacity
                 activeOpacity={0.6}
-                className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
+                className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
                 onPress={item.onPress}
               >
                 <View
@@ -136,7 +136,7 @@ export default function DataManagementScreen({ navigation }: any) {
             </Animated.View>
           ))}
           <Animated.View entering={FadeInDown.delay(items.length * 50).duration(300)}>
-            <View className="mb-2 rounded-2xl bg-foreground/[0.02] px-5 py-3.5">
+            <View className="mb-2 rounded-xl bg-foreground/[0.02] px-5 py-3.5">
               <View className="flex-row items-center">
                 <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-foreground/5">
                   <Bug color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
@@ -160,7 +160,7 @@ export default function DataManagementScreen({ navigation }: any) {
           <Animated.View entering={FadeInDown.delay((items.length + 1) * 50).duration(300)}>
             <TouchableOpacity
               activeOpacity={0.6}
-              className="mb-2 flex-row items-center rounded-2xl bg-foreground/[0.02] px-5 py-3.5 active:bg-foreground/[0.04]"
+              className="mb-2 flex-row items-center rounded-xl bg-foreground/[0.02] px-5 py-3.5 active:bg-foreground/[0.04]"
               onPress={() => navigation.navigate('AppLogs')}
             >
               <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-foreground/5">

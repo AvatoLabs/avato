@@ -7,8 +7,13 @@ import { useI18n } from '../../lib/i18n';
 import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
 
+/** 'flat' = enterprise-style solid bg + border; 'blur' = glassmorphic */
+type HeaderStyle = 'flat' | 'blur';
+
 interface ScreenHeaderProps {
   children?: React.ReactNode;
+  /** 'flat' for enterprise look (default); 'blur' for glassmorphic */
+  headerStyle?: HeaderStyle;
   leftElement?: React.ReactNode;
   onPressLeft?: () => void;
   onPressRight?: () => void;
@@ -31,6 +36,7 @@ export function ScreenHeader({
   rightAccessibilityLabel,
   rightAccessibilityHint,
   titleIcon,
+  headerStyle = 'flat',
   onPressLeft,
   onPressRight,
 }: ScreenHeaderProps) {
@@ -40,64 +46,74 @@ export function ScreenHeader({
   const isSubScreen = !!leftElement;
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
+  const useFlat = headerStyle === 'flat';
 
-  if (isSubScreen) {
-    return (
+  const headerContent = (content: React.ReactNode) =>
+    useFlat ? (
+      <View className="bg-background border-b border-border" style={{ paddingTop: insets.top }}>
+        {content}
+      </View>
+    ) : (
       <BlurView intensity={85} style={{ paddingTop: insets.top }} tint={blurTint}>
-        <View className="flex-row items-center justify-between px-5 py-3" style={{ minHeight: 64 }}>
-          <TouchableOpacity
-            accessibilityHint={t.accessibilityHintGoBack}
-            accessibilityLabel={t.accessibilityGoBack}
-            accessibilityRole="button"
-            activeOpacity={0.6}
-            className="-ml-2 h-10 items-center justify-center px-1"
-            disabled={!onPressLeft}
-            style={{ minWidth: 40 }}
-            onPress={onPressLeft}
-          >
-            {leftElement}
-          </TouchableOpacity>
-
-          <View className="ml-1 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
-            {titleIcon ? (
-              <View className="mr-2 items-center justify-center" style={{ minHeight: 28 }}>
-                {titleIcon}
-              </View>
-            ) : null}
-            <Text
-              className="flex-1 text-[22px] font-extrabold text-foreground tracking-tighter"
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-          </View>
-
-          {rightActions ? (
-            <View style={{ minWidth: 40 }}>{rightActions}</View>
-          ) : rightElement ? (
-            <TouchableOpacity
-              accessibilityHint={rightAccessibilityHint}
-              accessibilityLabel={rightAccessibilityLabel}
-              accessibilityRole="button"
-              activeOpacity={0.6}
-              className="-mr-2 h-10 items-end justify-center px-1"
-              disabled={!onPressRight}
-              style={{ minWidth: 40 }}
-              onPress={onPressRight}
-            >
-              {rightElement}
-            </TouchableOpacity>
-          ) : (
-            <View style={{ minWidth: 40 }} />
-          )}
-        </View>
-        {children}
+        {content}
       </BlurView>
     );
-  }
 
-  return (
-    <BlurView intensity={85} style={{ paddingTop: insets.top }} tint={blurTint}>
+  const subScreenContent = (
+    <>
+      <View className="flex-row items-center justify-between px-5 py-3" style={{ minHeight: 64 }}>
+        <TouchableOpacity
+          accessibilityHint={t.accessibilityHintGoBack}
+          accessibilityLabel={t.accessibilityGoBack}
+          accessibilityRole="button"
+          activeOpacity={0.6}
+          className="-ml-2 h-10 items-center justify-center px-1"
+          disabled={!onPressLeft}
+          style={{ minWidth: 40 }}
+          onPress={onPressLeft}
+        >
+          {leftElement}
+        </TouchableOpacity>
+
+        <View className="ml-1 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
+          {titleIcon ? (
+            <View className="mr-2 items-center justify-center" style={{ minHeight: 28 }}>
+              {titleIcon}
+            </View>
+          ) : null}
+          <Text
+            className="flex-1 text-[22px] font-semibold text-foreground tracking-tighter"
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+        </View>
+
+        {rightActions ? (
+          <View style={{ minWidth: 40 }}>{rightActions}</View>
+        ) : rightElement ? (
+          <TouchableOpacity
+            accessibilityHint={rightAccessibilityHint}
+            accessibilityLabel={rightAccessibilityLabel}
+            accessibilityRole="button"
+            activeOpacity={0.6}
+            className="-mr-2 h-10 items-end justify-center px-1"
+            disabled={!onPressRight}
+            style={{ minWidth: 40 }}
+            onPress={onPressRight}
+          >
+            {rightElement}
+          </TouchableOpacity>
+        ) : (
+          <View style={{ minWidth: 40 }} />
+        )}
+      </View>
+      {children}
+    </>
+  );
+
+  const mainScreenContent = (
+    <>
       <View className="px-5 py-3" style={{ minHeight: 72 }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-1 mr-3 flex-row items-center min-h-[34px]">
@@ -110,7 +126,7 @@ export function ScreenHeader({
               </View>
             ) : null}
             <View className="flex-1 justify-center">
-              <Text className="text-[22px] font-extrabold text-foreground tracking-tighter">
+              <Text className="text-[22px] font-semibold text-foreground tracking-tighter">
                 {title}
               </Text>
               {subtitle ? (
@@ -144,6 +160,12 @@ export function ScreenHeader({
         </View>
       </View>
       {children}
-    </BlurView>
+    </>
   );
+
+  if (isSubScreen) {
+    return headerContent(subScreenContent);
+  }
+
+  return headerContent(mainScreenContent);
 }

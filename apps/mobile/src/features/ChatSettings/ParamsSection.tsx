@@ -66,7 +66,7 @@ export function ParamsSection({ delay = 0, params, onParamsChange }: ParamsSecti
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mb-5 px-5">
-        <Text className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-widest text-secondary/60">
+        <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
           {t.chatSettingsModelParams}
         </Text>
         <View className="rounded-2xl bg-foreground/[0.02] p-4">

@@ -238,7 +238,7 @@ function SourceCard({
     <FieldSection label={sourceLabel}>
       <TouchableOpacity
         activeOpacity={canOpen ? 0.7 : 1}
-        className="flex-row items-center rounded-2xl bg-gray-100 px-4 py-3"
+        className="flex-row items-center rounded-xl bg-gray-100 px-4 py-3"
         disabled={!canOpen}
         onPress={onPress}
       >

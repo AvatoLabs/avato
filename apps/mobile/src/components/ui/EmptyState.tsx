@@ -33,7 +33,7 @@ export default function EmptyState({
       className={`items-center justify-center px-8 py-12 ${className}`}
       style={{ minHeight: 160 }}
     >
-      <Text className="text-4xl mb-4" style={{ fontSize: 48 }}>
+      <Text className="text-4xl mb-4" style={{ fontSize: 32 }}>
         {icon}
       </Text>
       <Text
