@@ -48,7 +48,8 @@ export default function LanguagePickerScreen({ navigation }: any) {
                 <Text className="text-foreground/60 text-[11px] font-semibold">{lang.label}</Text>
               </View>
               <Text
-                className={`flex-1 text-[15.5px] font-medium tracking-tight ${locale === lang.code ? 'text-primary' : 'text-foreground'}`}
+                className="flex-1 text-[15.5px] font-medium tracking-tight"
+                style={{ color: locale === lang.code ? colors.primary : colors.foreground }}
               >
                 {lang.name}
               </Text>

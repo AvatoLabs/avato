@@ -27,6 +27,7 @@ const TopicItem = memo<TopicItemProps>(
   ({ topic, isActive, onPress, onFavorite, onDelete, onRename, onSmartRename }) => {
     const { t } = useI18n();
     const toast = useToast();
+    const colors = useThemeColors();
     const [menuVisible, setMenuVisible] = useState(false);
     const [renameVisible, setRenameVisible] = useState(false);
 
@@ -61,9 +62,8 @@ const TopicItem = memo<TopicItemProps>(
           accessibilityLabel={topic.title}
           accessibilityRole="button"
           activeOpacity={0.6}
-          className={`flex-row items-center px-5 py-3.5 rounded-xl mx-3 mb-1 ${
-            isActive ? 'bg-primary/10' : 'active:bg-foreground/5'
-          }`}
+          className="flex-row items-center px-5 py-3.5 rounded-xl mx-3 mb-1"
+          style={isActive ? { backgroundColor: colors.primarySubtle } : undefined}
           onLongPress={() => {
             haptics.medium();
             setMenuVisible(true);
@@ -85,9 +85,8 @@ const TopicItem = memo<TopicItemProps>(
               )}
               <Text
                 numberOfLines={1}
-                className={`text-[15px] font-medium tracking-tight ${
-                  isActive ? 'text-primary' : 'text-foreground'
-                }`}
+                className="text-[15px] font-medium tracking-tight"
+              style={{ color: isActive ? colors.primary : colors.foreground }}
               >
                 {topic.title}
               </Text>

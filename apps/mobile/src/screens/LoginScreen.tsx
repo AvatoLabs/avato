@@ -15,12 +15,14 @@ import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
-import { useThemeStore } from '../store/theme';
 import { useUserStore } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const PASSWORD_SIGNIN_KEY = '__password__';
+const USER_SYNC_RETRY_DELAY_MS = 300;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const humanizeAuthError = (
   error: unknown,
@@ -79,10 +81,30 @@ const getPrimaryActionLabel = (
   return t.loginContinueWithProvider.replace('{provider}', provider.label);
 };
 
+const syncUserAfterLogin = async () => {
+  let lastError: unknown;
+
+  for (const attempt of [0, 1]) {
+    try {
+      const user = await useUserStore.getState().fetchUser({ throwOnError: true });
+
+      if (!user) throw new Error('user state is empty after login');
+      return user;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await sleep(USER_SYNC_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('failed to sync user after login');
+};
+
 const syncAfterMobileLogin = async () => {
   const [sessionsResult, userResult, agentsResult] = await Promise.allSettled([
     useSessionStore.getState().fetchSessions({ throwOnError: true }),
-    useUserStore.getState().fetchUser({ throwOnError: true }),
+    syncUserAfterLogin(),
     useAgentStore.getState().loadAgents(),
   ]);
 
@@ -91,6 +113,7 @@ const syncAfterMobileLogin = async () => {
   }
   if (userResult.status === 'rejected') {
     console.warn('[LoginScreen] user sync failed after login:', userResult.reason);
+    throw userResult.reason;
   }
   if (agentsResult.status === 'rejected') {
     console.warn('[LoginScreen] agents sync failed after login:', agentsResult.reason);
@@ -102,13 +125,12 @@ export default function LoginScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
-  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [authConfig, setAuthConfig] = useState<MobileAuthConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
 
   const continueInNoAuthMode = useCallback(async () => {
-    await clearTransientAppState();
+    await clearTransientAppState({ preserveUserProfile: true });
     await syncAfterMobileLogin();
 
     navigation.reset({
@@ -152,7 +174,7 @@ export default function LoginScreen({ navigation }: any) {
 
         if (!session) return;
 
-        await clearTransientAppState();
+        await clearTransientAppState({ preserveUserProfile: true });
         await syncAfterMobileLogin();
 
         navigation.reset({
@@ -211,8 +233,12 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <View
-      className="flex-1 bg-background px-8"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 8 }}
+      className="flex-1 px-8"
+      style={{
+        backgroundColor: colors.background,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom + 8,
+      }}
     >
       <View className="flex-1 items-center justify-center">
         <Animated.View
@@ -225,8 +251,8 @@ export default function LoginScreen({ navigation }: any) {
         >
           <View
             className="h-32 w-32 items-center justify-center rounded-[34px]"
-            style={{ backgroundColor: colors.surface }}
             style={{
+              backgroundColor: colors.surface,
               elevation: 12,
               shadowColor: colors.shadow,
               shadowOffset: { height: 20, width: 0 },
@@ -237,14 +263,20 @@ export default function LoginScreen({ navigation }: any) {
             <RNImage
               className="h-28 w-28"
               source={require('../../assets/avato-logo.png')}
-              style={effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined}
+              style={{ tintColor: colors.foreground }}
             />
           </View>
 
-          <Text className="mt-8 text-center text-[36px] font-bold tracking-tight text-foreground">
+          <Text
+            className="mt-3 text-center text-[36px] font-bold tracking-tight"
+            style={{ color: colors.foreground }}
+          >
             Avato
           </Text>
-          <Text className="mt-4 text-center text-[17px] font-medium leading-7 text-secondary/70">
+          <Text
+            className="mt-4 text-center text-[17px] font-medium leading-7"
+            style={{ color: colors.secondaryText }}
+          >
             {t.loginDesc}
           </Text>
         </Animated.View>
@@ -258,14 +290,17 @@ export default function LoginScreen({ navigation }: any) {
         >
           <TouchableOpacity
             activeOpacity={0.82}
-            className="items-center rounded-2xl bg-primary py-4"
+            className="items-center rounded-2xl py-4"
+            style={{ backgroundColor: colors.primary }}
             disabled={isBusy}
             onPress={() => void handlePrimaryPress()}
           >
             {isBusy ? (
               <ActivityIndicator color={colors.iconOnPrimary} size="small" />
             ) : (
-              <Text className="text-[16px] font-semibold text-white">{primaryLabel}</Text>
+              <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                {primaryLabel}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -274,7 +309,9 @@ export default function LoginScreen({ navigation }: any) {
             className="mt-4 items-center"
             onPress={() => navigation.navigate('ServerConfig')}
           >
-            <Text className="text-[14px] font-medium text-primary">{t.loginChangeServer}</Text>
+            <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
+              {t.loginChangeServer}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

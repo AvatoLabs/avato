@@ -35,8 +35,8 @@ export default function WelcomeScreen({ navigation }: any) {
         >
           <View
             className="w-32 h-32 rounded-[34px] items-center justify-center"
-            style={{ backgroundColor: colors.surface }}
             style={{
+              backgroundColor: colors.surface,
               elevation: 12,
               shadowColor: colors.shadow,
               shadowOffset: { height: 20, width: 0 },
@@ -98,10 +98,11 @@ export default function WelcomeScreen({ navigation }: any) {
         >
           <TouchableOpacity
             activeOpacity={0.82}
-            className="bg-primary rounded-2xl py-4 items-center"
+            className="rounded-2xl py-4 items-center"
+            style={{ backgroundColor: colors.primary }}
             onPress={() => navigation.navigate('ServerConfig', { firstLaunch: true })}
           >
-            <Text className="text-white text-[16px] font-semibold">{t.onboardingGetStarted}</Text>
+            <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>{t.onboardingGetStarted}</Text>
           </TouchableOpacity>
         </Animated.View>
       )}

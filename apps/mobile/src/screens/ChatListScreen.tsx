@@ -1714,7 +1714,8 @@ export default function ChatListScreen({ navigation }: any) {
                   </Text>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    className="mt-4 rounded-full bg-primary px-4 py-2.5"
+                    className="mt-4 rounded-full px-4 py-2.5"
+                    style={{ backgroundColor: colors.primary }}
                     onPress={() => void onRefresh()}
                   >
                     <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
@@ -2005,7 +2006,7 @@ export default function ChatListScreen({ navigation }: any) {
                       }}
                     >
                       <Tag color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                      <Text className="ml-3 text-[15px] font-medium text-primary">
+                      <Text className="ml-3 text-[15px] font-medium" style={{ color: colors.primary }}>
                         {t.tagCreate}
                       </Text>
                     </Pressable>

@@ -24,7 +24,6 @@ import { ModelDrawer } from '../components/ui/ModelDrawer';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { resolveTagColor, withAlpha } from '../constants/tags';
 import {
   AgentSection,
@@ -52,6 +51,7 @@ import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike } from '../lib/session';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { SessionTag } from '../types';
 
@@ -88,6 +88,7 @@ function SectionCard({ children, title }: { children: React.ReactNode; title: st
 }
 
 export default function ChatSettingsScreen({ route, navigation }: any) {
+  const colors = useThemeColors();
   const sessionId = route.params?.sessionId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
@@ -471,16 +472,16 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         title={t.chatSettingsTitle}
         leftElement={
           <ArrowLeft
-            color={semanticColors.primary}
+            color={colors.primary}
             size={22}
             strokeWidth={tokens.icon.strokeWidth}
           />
         }
         rightElement={
           saving ? (
-            <ActivityIndicator color={semanticColors.primary} />
+            <ActivityIndicator color={colors.primary} />
           ) : (
-            <Text className="text-primary font-medium text-[15px]">{t.save}</Text>
+            <Text className="font-medium text-[15px]" style={{ color: colors.primary }}>{t.save}</Text>
           )
         }
         onPressLeft={() => {
@@ -554,16 +555,17 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
             <SectionCard title={t.groupSettingsMembers}>
               {groupLoading ? (
                 <View className="items-center justify-center py-6">
-                  <ActivityIndicator color={semanticColors.primary} />
+                  <ActivityIndicator color={colors.primary} />
                 </View>
               ) : groupDetail?.agents?.length ? (
                 <>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    className="mb-3 self-start rounded-xl bg-primary/10 px-3 py-2"
+                    className="mb-3 self-start rounded-xl px-3 py-2"
+                    style={{ backgroundColor: colors.primarySubtle }}
                     onPress={() => setAddMembersVisible(true)}
                   >
-                    <Text className="text-[13px] font-semibold text-primary">
+                    <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
                       {t.groupAddMembers}
                     </Text>
                   </TouchableOpacity>
@@ -600,8 +602,8 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                           index === (groupDetail.agents?.length ?? 0) - 1 ? '' : 'mb-3'
                         }`}
                       >
-                        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                          <Text className="text-[16px] font-semibold text-primary">
+                        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: colors.primarySubtle }}>
+                          <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>
                             {avatarText}
                           </Text>
                         </View>
@@ -611,8 +613,8 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                               {member.title || t.settingsDefaultAgent}
                             </Text>
                             {member.isSupervisor ? (
-                              <View className="ml-2 rounded-full bg-primary/10 px-2 py-0.5">
-                                <Text className="text-[11px] font-semibold text-primary">
+                              <View className="ml-2 rounded-full px-2 py-0.5" style={{ backgroundColor: colors.primarySubtle }}>
+                                <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
                                   {t.groupSettingsSupervisor}
                                 </Text>
                               </View>
@@ -624,7 +626,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                         </View>
                         {member.isSupervisor ? (
                           <ChevronRight
-                            color={semanticColors.secondaryText}
+                            color={colors.secondaryText}
                             size={18}
                             strokeWidth={tokens.icon.strokeWidth}
                           />
@@ -632,12 +634,12 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                           <TouchableOpacity
                             activeOpacity={0.75}
                             className="ml-3 rounded-xl px-3 py-2"
-                            style={{ backgroundColor: withAlpha(semanticColors.danger, '14') }}
+                            style={{ backgroundColor: withAlpha(colors.danger, '14') }}
                             onPress={() => handleRemoveGroupMember(member.id)}
                           >
                             <Text
                               className="text-[12px] font-semibold"
-                              style={{ color: semanticColors.danger }}
+                              style={{ color: colors.danger }}
                             >
                               {t.delete}
                             </Text>
@@ -651,10 +653,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 <>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    className="mb-3 self-start rounded-xl bg-primary/10 px-3 py-2"
+                    className="mb-3 self-start rounded-xl px-3 py-2"
+                    style={{ backgroundColor: colors.primarySubtle }}
                     onPress={() => setAddMembersVisible(true)}
                   >
-                    <Text className="text-[13px] font-semibold text-primary">
+                    <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
                       {t.groupAddMembers}
                     </Text>
                   </TouchableOpacity>
@@ -707,13 +710,13 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 <View className="flex-row items-center">
                   <View
                     className="mr-3 h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: semanticColors.secondaryText }}
+                    style={{ backgroundColor: colors.secondaryText }}
                   />
                   <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                 </View>
                 {!session?.tagId ? (
                   <Check
-                    color={semanticColors.primary}
+                    color={colors.primary}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -736,7 +739,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                   </View>
                   {session?.tagId === tag.id ? (
                     <Check
-                      color={semanticColors.primary}
+                      color={colors.primary}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -746,15 +749,16 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
 
               <TouchableOpacity
                 activeOpacity={0.8}
-                className="mt-2 flex-row items-center rounded-xl bg-primary/10 px-4 py-3"
+                className="mt-2 flex-row items-center rounded-xl px-4 py-3"
+                style={{ backgroundColor: colors.primarySubtle }}
                 onPress={() => setTagEditorVisible(true)}
               >
                 <Tag
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
-                <Text className="ml-3 text-[14px] font-semibold text-primary">{t.tagCreate}</Text>
+                <Text className="ml-3 text-[14px] font-semibold" style={{ color: colors.primary }}>{t.tagCreate}</Text>
               </TouchableOpacity>
             </ScrollView>
           </Pressable>

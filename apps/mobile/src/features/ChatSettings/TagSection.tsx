@@ -6,8 +6,8 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import { resolveTagColor, withAlpha } from '../../constants/tags';
+import { useThemeColors } from '../../theme/colors';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
 import type { SessionTag } from '../../types';
@@ -19,6 +19,7 @@ interface TagSectionProps {
 }
 
 export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps) {
+  const colors = useThemeColors();
   const { t } = useI18n();
 
   return (
@@ -37,7 +38,7 @@ export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps)
             style={{
               backgroundColor: currentTag
                 ? resolveTagColor(currentTag.color)
-                : semanticColors.secondaryText,
+                : colors.secondaryText,
             }}
           />
           <View
@@ -45,15 +46,15 @@ export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps)
             style={{
               backgroundColor: currentTag
                 ? withAlpha(currentTag.color, '18')
-                : semanticColors.fillTertiary,
+                : colors.fillTertiary,
             }}
           >
             <Text
               className="text-[13px] font-semibold"
               style={{
                 color: currentTag
-                  ? resolveTagColor(currentTag.color)
-                  : semanticColors.secondaryText,
+                  ? resolveTagColor(currentTag.color, colors.primary)
+                  : colors.secondaryText,
               }}
             >
               {currentTag?.name || t.tagNone}
@@ -61,7 +62,7 @@ export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps)
           </View>
           <View className="flex-1" />
           <ChevronRight
-            color={semanticColors.secondaryText}
+            color={colors.secondaryText}
             size={16}
             strokeWidth={tokens.icon.strokeWidth}
           />

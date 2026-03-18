@@ -1,10 +1,18 @@
 import React from 'react';
 import { Text, TouchableOpacity, type TouchableOpacityProps, View } from 'react-native';
 
+import { useThemeColors } from '../../theme/colors';
+
 interface QuickActionChipProps extends TouchableOpacityProps {
   active?: boolean;
   icon?: React.ReactNode;
   label: string;
+}
+
+/** Hex alpha: 20% = 33, 10% = 1A */
+function withAlpha(hex: string, alpha: number): string {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return hex.length === 7 ? `${hex}${a}` : hex;
 }
 
 /**
@@ -17,18 +25,25 @@ export function QuickActionChip({
   className = '',
   ...props
 }: QuickActionChipProps) {
+  const colors = useThemeColors();
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       className={`flex-row items-center px-4 py-2 rounded-full border ${
-        active
-          ? 'bg-primary/10 border-primary/20'
-          : 'bg-foreground/5 border-transparent active:bg-foreground/10'
+        active ? '' : 'border-transparent active:bg-foreground/10'
       } ${className}`}
+      style={
+        active
+          ? { backgroundColor: colors.primarySubtle, borderColor: withAlpha(colors.primary, 0.2) }
+          : { backgroundColor: colors.fillTertiary }
+      }
       {...props}
     >
       {icon && <View className="mr-1.5">{icon}</View>}
-      <Text className={`text-[14px] font-medium ${active ? 'text-primary' : 'text-foreground'}`}>
+      <Text
+        className="text-[14px] font-medium"
+        style={{ color: active ? colors.primary : colors.foreground }}
+      >
         {label}
       </Text>
     </TouchableOpacity>

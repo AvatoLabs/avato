@@ -272,7 +272,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                   style={{ marginRight: 8 }}
                 />
               )}
-              <Text className="text-primary font-semibold text-[15px]">
+              <Text className="font-semibold text-[15px]" style={{ color: colors.primary }}>
                 {testing ? t.serverTesting : t.serverTestConnection}
               </Text>
             </PressableScale>

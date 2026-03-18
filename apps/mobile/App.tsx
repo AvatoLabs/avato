@@ -43,10 +43,11 @@ if (__DEV__) {
 function OfflineBanner() {
   const insets = useSafeAreaInsets();
   const t = useI18n((s) => s.t);
+  const colors = useThemeColors();
   return (
     <View style={{ position: 'absolute', top: insets.top, left: 0, right: 0, zIndex: 999 }}>
-      <View style={{ backgroundColor: '#ff3b30', paddingVertical: 6, alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{t.errorOffline}</Text>
+      <View style={{ backgroundColor: colors.danger, paddingVertical: 6, alignItems: 'center' }}>
+        <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '600' }}>{t.errorOffline}</Text>
       </View>
     </View>
   );

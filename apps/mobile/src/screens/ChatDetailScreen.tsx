@@ -876,7 +876,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 {session?.title || t.chatTitle}
               </Text>
               {generating ? (
-                <Text className="text-primary text-[12px] mt-0.5 font-medium">
+                <Text className="text-[12px] mt-0.5 font-medium" style={{ color: colors.primary }}>
                   {isReasoning ? t.chatThinking : t.chatGenerating}
                 </Text>
               ) : !isGroupSession && sessionModel ? (
@@ -1161,10 +1161,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   />
                   {pendingFiles.length > 0 && (
                     <View
-                      className="absolute -right-2 -top-1 rounded-full bg-primary items-center justify-center"
-                      style={{ minWidth: 14, height: 14, paddingHorizontal: 3 }}
+                      className="absolute -right-2 -top-1 rounded-full items-center justify-center"
+                      style={{ backgroundColor: colors.primary, minWidth: 14, height: 14, paddingHorizontal: 3 }}
                     >
-                      <Text className="text-[9px] font-semibold text-white">
+                      <Text className="text-[9px] font-semibold" style={{ color: colors.iconOnPrimary }}>
                         {pendingFiles.length > 9 ? '9+' : pendingFiles.length}
                       </Text>
                     </View>
@@ -1242,7 +1242,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 <Animated.View style={sendAnimStyle}>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    className="w-9 h-9 bg-primary rounded-full items-center justify-center"
+                    className="w-9 h-9 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.primary }}
                     onPress={handleSend}
                   >
                     <Send

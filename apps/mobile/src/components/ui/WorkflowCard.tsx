@@ -39,12 +39,12 @@ export function WorkflowCard({
         tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
       >
         <View className="flex-row items-center justify-between mb-3">
-          <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+          <View className="w-10 h-10 rounded-full items-center justify-center" style={{ backgroundColor: colors.primarySubtle }}>
             <IconComp color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </View>
           {tag && (
-            <View className="bg-primary/10 px-2.5 py-1 rounded-full">
-              <Text className="text-primary text-[12px] font-semibold">{tag}</Text>
+            <View className="px-2.5 py-1 rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
+              <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>{tag}</Text>
             </View>
           )}
         </View>

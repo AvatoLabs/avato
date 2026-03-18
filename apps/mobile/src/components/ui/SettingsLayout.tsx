@@ -29,9 +29,13 @@ export function SettingsRow({
 }: SettingsRowProps) {
   const colors = useThemeColors();
   const effectiveIconColor = iconColor ?? colors.primary;
+  const isPrimaryIconBg = iconBg === 'bg-primary/10';
   const content = (
     <>
-      <View className={`w-8 h-8 rounded-full ${iconBg} items-center justify-center mr-4`}>
+      <View
+        className={`w-8 h-8 rounded-full items-center justify-center mr-4 ${!isPrimaryIconBg ? iconBg : ''}`}
+        style={isPrimaryIconBg ? { backgroundColor: colors.primarySubtle } : undefined}
+      >
         <IconComp color={effectiveIconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
       </View>
       <View className="flex-1">

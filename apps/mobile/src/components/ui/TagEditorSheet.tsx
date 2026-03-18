@@ -9,8 +9,8 @@ import {
   View,
 } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
 import { resolveTagColor, TAG_COLOR_OPTIONS, withAlpha } from '../../constants/tags';
+import { useThemeColors } from '../../theme/colors';
 
 interface TagEditorSheetProps {
   cancelLabel: string;
@@ -47,6 +47,7 @@ export function TagEditorSheet({
   title,
   visible,
 }: TagEditorSheetProps) {
+  const colors = useThemeColors();
   return (
     <Modal
       accessibilityViewIsModal
@@ -82,7 +83,7 @@ export function TagEditorSheet({
                 autoFocus
                 className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] font-medium text-foreground"
                 placeholder={placeholder}
-                placeholderTextColor={semanticColors.secondaryText}
+                placeholderTextColor={colors.secondaryText}
                 value={name}
                 onChangeText={onChangeName}
               />
@@ -141,7 +142,8 @@ export function TagEditorSheet({
             <View style={{ gap: 10 }}>
               <TouchableOpacity
                 activeOpacity={0.85}
-                className="items-center rounded-2xl bg-primary px-4 py-3"
+                className="items-center rounded-2xl px-4 py-3"
+                style={{ backgroundColor: colors.primary }}
                 onPress={onSubmit}
               >
                 <Text className="text-[15px] font-semibold text-white">{submitLabel}</Text>

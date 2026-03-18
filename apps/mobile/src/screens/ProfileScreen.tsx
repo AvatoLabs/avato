@@ -138,9 +138,10 @@ export default function ProfileScreen({ navigation }: any) {
   const userAvatar = useUserStore((s) => s.avatar);
   const userEmail = useUserStore((s) => s.email);
   const userFullName = useUserStore((s) => s.fullName);
+  const username = useUserStore((s) => s.username);
   const fetchUser = useUserStore((s) => s.fetchUser);
   const isUserLoaded = useUserStore((s) => s.isLoaded);
-  const userName = userFullName || userEmail;
+  const userName = userFullName || username || userEmail;
 
   const [messageCount, setMessageCount] = useState(0);
   const [topicCount, setTopicCount] = useState(0);
@@ -345,7 +346,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('Stats')}
             >
               <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-primary/10">
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4" style={{ backgroundColor: colors.primarySubtle }}>
                   <BarChart3
                     color={colors.primary}
                     size={16}
@@ -488,7 +489,7 @@ export default function ProfileScreen({ navigation }: any) {
             className="mb-4 flex-row items-center rounded-xl bg-foreground/[0.03] px-5 py-4"
             onPress={() => navigation?.navigate?.('ServerConfig')}
           >
-            <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+            <View className="mr-4 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
               <Server color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="min-w-0 flex-1">
@@ -637,9 +638,8 @@ export default function ProfileScreen({ navigation }: any) {
                   return (
                     <Pressable
                       key={opt.value}
-                      className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 ${
-                        active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
-                      }`}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5"
+                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
                       onPress={() => {
                         haptics.selection();
                         setThemePreference(opt.value);
@@ -673,9 +673,8 @@ export default function ProfileScreen({ navigation }: any) {
                   return (
                     <Pressable
                       key={opt.value}
-                      className={`flex-row items-center gap-1.5 rounded-lg py-2 px-3 ${
-                        active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
-                      }`}
+                      className="flex-row items-center gap-1.5 rounded-lg py-2 px-3"
+                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
                       onPress={() => {
                         haptics.selection();
                         setColorScheme(opt.value);
@@ -704,7 +703,7 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="mb-4">
             <View className="rounded-xl bg-foreground/[0.03] overflow-hidden px-5 py-4">
               <View className="flex-row items-center mb-4">
-                <View className="mr-4 h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                <View className="mr-4 h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
                   <BrainCircuit
                     color={colors.primary}
                     size={16}
@@ -743,9 +742,8 @@ export default function ProfileScreen({ navigation }: any) {
                     <Pressable
                       disabled={memoryLoading || memorySaving}
                       key={opt.value}
-                      className={`flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5 ${
-                        active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
-                      }`}
+                      className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
+                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
                       onPress={() => {
                         if (active) return;
                         haptics.selection();

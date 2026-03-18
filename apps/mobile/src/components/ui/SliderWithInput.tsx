@@ -2,11 +2,10 @@
  * SliderWithInput - A slider component with integrated input field
  * Similar to @lobehub/ui SliderWithInput but for React Native
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { PanResponder, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
-import { themeColors, uiColors } from '../../theme/colors';
+import { useThemeColors } from '../../theme/colors';
 
 interface SliderWithInputProps {
   disabled?: boolean;
@@ -31,8 +30,111 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
   step = 0.1,
   value,
 }) => {
+  const colors = useThemeColors();
   const [inputValue, setInputValue] = useState(String(value));
   const [sliderWidth, setSliderWidth] = useState<number>(0);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+        checkbox: {
+          width: 18,
+          height: 18,
+          borderRadius: 4,
+          borderWidth: 1.5,
+          marginRight: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        checkboxChecked: {
+          borderColor: colors.primary,
+          backgroundColor: colors.primary,
+        },
+        checkboxUnchecked: {
+          borderColor: colors.borderDefault,
+          backgroundColor: 'transparent',
+        },
+        checkboxInner: {
+          width: 10,
+          height: 10,
+          backgroundColor: colors.surface,
+          borderRadius: 2,
+        },
+        sliderContainer: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        },
+        sliderWrapper: {
+          flex: 1,
+          height: 40,
+          justifyContent: 'center',
+          position: 'relative' as const,
+        },
+        trackBackground: {
+          height: 6,
+          backgroundColor: colors.sliderTrack,
+          borderRadius: 3,
+          overflow: 'hidden' as const,
+          width: '100%',
+        },
+        ticksContainer: {
+          position: 'absolute' as const,
+          top: 14,
+          left: 0,
+          right: 0,
+          height: 8,
+        },
+        tick: {
+          position: 'absolute' as const,
+          backgroundColor: colors.iconMuted,
+          opacity: 0.5,
+          bottom: 0,
+        },
+        trackActive: {
+          height: '100%',
+          backgroundColor: colors.primary,
+          borderRadius: 3,
+        },
+        trackDisabled: {
+          backgroundColor: colors.sliderTrackDisabled,
+        },
+        thumb: {
+          position: 'absolute' as const,
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: colors.primary,
+          top: '50%',
+          marginTop: -10,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 4,
+          elevation: 4,
+        },
+        thumbDisabled: {
+          backgroundColor: colors.iconMuted,
+        },
+        input: {
+          width: 60,
+          height: 36,
+          borderRadius: 8,
+          backgroundColor: colors.fillTertiary,
+          textAlign: 'center',
+          fontSize: 14,
+          color: colors.foreground,
+          fontWeight: '500',
+        },
+        inputDisabled: {
+          backgroundColor: colors.fillQuaternary,
+          color: colors.iconMuted,
+        },
+      }),
+    [colors],
+  );
 
   // Calculate number of steps for tick marks
   const tickCount = Math.round((max - min) / step) + 1;
@@ -166,105 +268,3 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    borderColor: themeColors.primary,
-    backgroundColor: themeColors.primary,
-  },
-  checkboxUnchecked: {
-    borderColor: themeColors.borderDefault,
-    backgroundColor: 'transparent',
-  },
-  checkboxInner: {
-    width: 10,
-    height: 10,
-    backgroundColor: themeColors.surface,
-    borderRadius: 2,
-  },
-  sliderContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  sliderWrapper: {
-    flex: 1,
-    height: 40,
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  trackBackground: {
-    height: 6,
-    backgroundColor: uiColors.sliderTrack,
-    borderRadius: 3,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  ticksContainer: {
-    position: 'absolute',
-    top: 14,
-    left: 0,
-    right: 0,
-    height: 8,
-  },
-  tick: {
-    position: 'absolute',
-    backgroundColor: themeColors.iconMuted,
-    opacity: 0.5,
-    bottom: 0,
-  },
-  trackActive: {
-    height: '100%',
-    backgroundColor: themeColors.primary,
-    borderRadius: 3,
-  },
-  trackDisabled: {
-    backgroundColor: uiColors.sliderTrackDisabled,
-  },
-  thumb: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: themeColors.primary,
-    top: '50%',
-    marginTop: -10,
-    shadowColor: uiColors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  thumbDisabled: {
-    backgroundColor: themeColors.iconMuted,
-  },
-  input: {
-    width: 60,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: themeColors.fillTertiary,
-    textAlign: 'center',
-    fontSize: 14,
-    color: semanticColors.foreground,
-    fontWeight: '500',
-  },
-  inputDisabled: {
-    backgroundColor: themeColors.fillQuaternary,
-    color: themeColors.iconMuted,
-  },
-});

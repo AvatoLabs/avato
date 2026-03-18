@@ -62,6 +62,92 @@
 
 ---
 
+## 五、硬编码蓝色按钮与字体审计（2026-03-18 补充）
+
+### 5.1 semanticColors（P0 — 不随主题变化）
+
+`semanticColors` 来自 `themeColors`，固定为 light+blue，**不响应主题切换**。使用处应改为 `useThemeColors()`：
+
+| 文件 | 用法 | 修复 |
+|------|------|------|
+| SkillsSheet | `semanticColors.primary` | `useThemeColors().primary` |
+| ChatSettingsScreen | `semanticColors.primary`, `semanticColors.danger`, `semanticColors.secondaryText` | `useThemeColors()` |
+| MemoryToolSheet | `semanticColors.foreground` | `useThemeColors().foreground` |
+| SliderWithInput | `semanticColors.foreground` | `useThemeColors().foreground` |
+| TagEditorSheet | `semanticColors.secondaryText` | `useThemeColors().secondaryText` |
+| TagSection | `semanticColors.secondaryText`, `semanticColors.fillTertiary` | `useThemeColors()` |
+| AttachmentSheet | `semanticColors.foreground` | `useThemeColors().foreground` |
+| constants/tags.ts | `resolveTagColor` fallback `semanticColors.primary` | 需传入 tokens 或使用 hook 上下文 |
+
+### 5.2 colors.info（固定蓝色）
+
+`colors.info` 在 base 中为 `#0A84FF`（light）/ `#64d2ff`（dark），始终为蓝色。用于「展开更多」、工具 pending 等。若需随主题变化，可考虑加入 palette 的 `iconOnPrimary` 或新增 `info` 覆盖。
+
+| 文件 | 用法 |
+|------|------|
+| MessageBubble | Show more/less、Tool pending、Approve 按钮 |
+| MemoryScreen | identity 层颜色 |
+| MemoryDetailScreen | identity |
+
+### 5.3 NativeWind 类（text-primary / bg-primary）
+
+`text-primary`、`bg-primary` 使用 CSS 变量 `--color-primary`，理论上随 ThemeProvider 的 theme 类变化。若仍出现蓝色，需检查：
+
+- 组件是否在 ThemeProvider 子树内
+- NativeWind 是否正确解析 `theme-{colorScheme}`
+
+**使用 text-primary / bg-primary 的组件（共 40+ 处）：**
+
+| 文件 | 典型用法 |
+|------|----------|
+| HeroComposer | `bg-primary` 发送按钮、模型选择 |
+| ChatDetailScreen | `bg-primary` 发送按钮 |
+| StoreScreen | `bg-primary` 多个 CTA 按钮、`text-primary` |
+| LoginScreen | `bg-primary` 登录按钮、`text-primary` |
+| WelcomeScreen | `bg-primary` CTA |
+| AgentConfigScreen | `bg-primary` 保存、`text-primary`、`bg-primary/10` 图标背景 |
+| AgentListScreen | `bg-primary` 创建按钮、FAB |
+| ChatSettingsScreen | `text-primary`、`bg-primary/10` |
+| ProfileScreen | `bg-primary/10` 色系选择、统计图标 |
+| TopicItem / TopicListScreen | `bg-primary/10`、`text-primary` 选中态 |
+| ModelChip | `text-primary`、`bg-primary/10` |
+| QuickActionChip | `text-primary`、`bg-primary/10` |
+| GroupMentionInput | `text-primary`、`bg-primary/10` |
+| MessageBubble | `bg-primary` 编辑保存、`text-primary` Thinking |
+| WorkflowCard | `text-primary`、`bg-primary/10` |
+| ProfileEditScreen | `text-primary`、`bg-primary/10` |
+| WorkspaceOverviewCard | `text-primary`、`bg-primary/10` |
+| AssistantCard | `bg-primary/10` |
+| SettingsLayout | `iconBg = 'bg-primary/10'` |
+| SectionBlock | `text-primary` |
+| ModelDrawer | `text-primary` 选中 |
+| ModelPickerScreen | `text-primary` 选中 |
+| ProviderDetailScreen | `bg-primary` CTA |
+| TagEditorSheet | `bg-primary` 保存 |
+| PromptModal | `text-primary` |
+| ServerConfigScreen | `text-primary` |
+| ChatListScreen | `bg-primary` 创建按钮、`text-primary` |
+| ParamsSection | `bg-primary/10` |
+| AgentSection | `text-primary`、`bg-primary/10` |
+| StatsScreen | `text-primary`、`bg-primary/10` |
+
+### 5.4 其他硬编码
+
+| 文件 | 问题 |
+|------|------|
+| App.tsx | `color: '#fff'` 离线错误文案 |
+| ProfileScreen:81 | `COLOR_SCHEME_OPTIONS` 的 `color` — 色板预览用，保留 |
+
+---
+
+## 六、修复优先级建议
+
+1. **P0**：将 `semanticColors` 替换为 `useThemeColors()`（7 个文件）
+2. **P1**：验证 NativeWind `text-primary`/`bg-primary` 在 ThemeProvider 下是否生效；若不生效，改为 `style={{ color: colors.primary }}` 等
+3. **P2**：评估 `colors.info` 是否需进入 palette 以支持主题色
+
+---
+
 ## 三、参考
 
 - 主题 token 定义：`apps/mobile/src/theme/colors.ts`

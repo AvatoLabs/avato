@@ -357,12 +357,11 @@ export default function ProfileEditScreen({ navigation }: any) {
                   return (
                     <PressableScale
                       key={area.key}
-                      style={savingInterests ? { opacity: 0.6 } : undefined}
-                      className={`flex-row items-center px-3 py-2 rounded-lg border ${
-                        isSelected
-                          ? 'bg-primary/10 border-primary/20'
-                          : 'bg-foreground/5 border-transparent'
-                      }`}
+                      className="flex-row items-center px-3 py-2 rounded-lg border"
+                      style={[
+                        isSelected ? { backgroundColor: colors.primarySubtle, borderColor: colors.primaryBorder } : { backgroundColor: colors.fillTertiary, borderColor: 'transparent' },
+                        savingInterests && { opacity: 0.6 },
+                      ]}
                       onPress={() => !savingInterests && handleToggleInterest(label)}
                     >
                       <View className="mr-1.5">
@@ -385,20 +384,20 @@ export default function ProfileEditScreen({ navigation }: any) {
                 })}
                 {customInterests.map((interest) => (
                   <PressableScale
-                    className="flex-row items-center px-3 py-2 rounded-lg bg-primary/10 border border-primary/20"
+                    className="flex-row items-center px-3 py-2 rounded-lg border"
+                    style={[
+                      { backgroundColor: colors.primarySubtle, borderColor: colors.primaryBorder },
+                      savingInterests && { opacity: 0.6 },
+                    ]}
                     key={interest}
-                    style={savingInterests ? { opacity: 0.6 } : undefined}
                     onPress={() => !savingInterests && handleToggleInterest(interest)}
                   >
-                    <Text className="text-[13px] font-medium text-primary">{interest}</Text>
+                    <Text className="text-[13px] font-medium" style={{ color: colors.primary }}>{interest}</Text>
                   </PressableScale>
                 ))}
                 <PressableScale
-                  className={`flex-row items-center px-3 py-2 rounded-lg border ${
-                    showCustomInput
-                      ? 'bg-primary/10 border-primary/20'
-                      : 'bg-foreground/5 border-transparent'
-                  }`}
+                  className="flex-row items-center px-3 py-2 rounded-lg border"
+                  style={showCustomInput ? { backgroundColor: colors.primarySubtle, borderColor: colors.primaryBorder } : { backgroundColor: colors.fillTertiary, borderColor: 'transparent' }}
                   onPress={() => setShowCustomInput(!showCustomInput)}
                 >
                   <View className="mr-1.5">

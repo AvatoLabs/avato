@@ -18,9 +18,8 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import type { MobileRecommendedBuiltinIcon } from '../../constants/recommendedBuiltins';
-import { themeColors } from '../../theme/colors';
+import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 import type { AgentSkillItem, InstalledPlugin } from '../../types';
 import { BuiltinSkillIcon } from './BuiltinSkillIcon';
@@ -90,6 +89,7 @@ export default function SkillsSheet({
   skillsEmptyDesc,
   agentConfigOpenStore,
 }: SkillsSheetProps) {
+  const colors = useThemeColors();
   const { height: windowHeight } = useWindowDimensions();
   const items = buildItems(builtinItems, agentSkillItems, installedPlugins);
   const showStoreHint =
@@ -116,8 +116,8 @@ export default function SkillsSheet({
           <Switch
             value={enabledIdentifiers.has(item.identifier)}
             trackColor={{
-              false: themeColors.switchTrackOff,
-              true: themeColors.switchTrackOn,
+              false: colors.switchTrackOff,
+              true: colors.switchTrackOn,
             }}
             onValueChange={() => onToggle(item.identifier)}
           />
@@ -144,8 +144,8 @@ export default function SkillsSheet({
           <Switch
             value={enabledIdentifiers.has(id)}
             trackColor={{
-              false: themeColors.switchTrackOff,
-              true: themeColors.switchTrackOn,
+              false: colors.switchTrackOff,
+              true: colors.switchTrackOn,
             }}
             onValueChange={() => onToggle(id)}
           />
@@ -174,8 +174,8 @@ export default function SkillsSheet({
         <Switch
           value={enabledIdentifiers.has(plugin.identifier)}
           trackColor={{
-            false: themeColors.switchTrackOff,
-            true: themeColors.switchTrackOn,
+            false: colors.switchTrackOff,
+            true: colors.switchTrackOn,
           }}
           onValueChange={() => onToggle(plugin.identifier)}
         />
@@ -187,7 +187,7 @@ export default function SkillsSheet({
     if (loading) {
       return (
         <View className="items-center py-10">
-          <ActivityIndicator color={semanticColors.primary} size="small" />
+          <ActivityIndicator color={colors.primary} size="small" />
         </View>
       );
     }
@@ -255,7 +255,7 @@ export default function SkillsSheet({
                 onOpenStore();
               }}
             >
-              <Text className="text-[14px] font-medium" style={{ color: semanticColors.primary }}>
+              <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
                 {agentConfigOpenStore}
               </Text>
             </TouchableOpacity>

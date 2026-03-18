@@ -148,9 +148,8 @@ export default function TopicListScreen({ route, navigation }: any) {
       <Animated.View entering={FadeInDown.delay(50).duration(250)}>
         <TouchableOpacity
           activeOpacity={0.6}
-          className={`flex-row items-center px-5 py-3.5 rounded-xl mx-5 mb-2 ${
-            activeTopic === null ? 'bg-primary/10' : 'active:bg-foreground/5'
-          }`}
+          className="flex-row items-center px-5 py-3.5 rounded-xl mx-5 mb-2"
+          style={activeTopic === null ? { backgroundColor: colors.primarySubtle } : undefined}
           onPress={() => handleSwitchTopic(null)}
         >
           <MessageCircle
@@ -159,9 +158,8 @@ export default function TopicListScreen({ route, navigation }: any) {
             strokeWidth={tokens.icon.strokeWidth}
           />
           <Text
-            className={`ml-3 text-[15px] font-medium ${
-              activeTopic === null ? 'text-primary' : 'text-foreground'
-            }`}
+            className="ml-3 text-[15px] font-medium"
+            style={{ color: activeTopic === null ? colors.primary : colors.foreground }}
           >
             {t.topicAllMessages}
           </Text>

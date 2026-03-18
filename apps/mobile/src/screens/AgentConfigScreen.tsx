@@ -158,7 +158,7 @@ function CollapsibleSection({
   return (
     <SectionCard title={title}>
       <TouchableOpacity activeOpacity={0.8} className="flex-row items-center" onPress={onToggle}>
-        <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
+        <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
           <Icon color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
         <View className="flex-1">
@@ -281,7 +281,7 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
 
   if (!providerId) {
     return (
-      <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+      <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
         <Cpu color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
       </View>
     );
@@ -289,8 +289,8 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
 
   if (!uri || error) {
     return (
-      <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-        <Text className="text-[12px] font-bold text-primary">
+      <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+        <Text className="text-[12px] font-bold" style={{ color: colors.primary }}>
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -298,7 +298,7 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
   }
 
   return (
-    <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+    <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
       <RNImage
         source={{ uri }}
         style={{ borderRadius: 10, height: 24, width: 24 }}
@@ -382,10 +382,11 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
           </Text>
           <TouchableOpacity
             activeOpacity={0.85}
-            className="mt-4 self-start rounded-xl bg-primary px-4 py-2.5"
+            className="mt-4 self-start rounded-xl px-4 py-2.5"
+            style={{ backgroundColor: colors.primary }}
             onPress={openStore}
           >
-            <Text className="text-[13px] font-semibold text-white">{t.agentConfigOpenStore}</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: colors.iconOnPrimary }}>{t.agentConfigOpenStore}</Text>
           </TouchableOpacity>
         </SectionCard>
       </ScrollView>
@@ -734,7 +735,7 @@ function SessionAgentConfigScreen({
               void loadSkills();
             }}
           >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
               <Puzzle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="ml-3 flex-1">
@@ -968,7 +969,7 @@ function SessionAgentConfigScreen({
                 {t.skillsTitle}
               </Text>
               <TouchableOpacity activeOpacity={0.7} onPress={() => setSkillsVisible(false)}>
-                <Text className="text-[14px] font-semibold text-primary">{t.done}</Text>
+                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>{t.done}</Text>
               </TouchableOpacity>
             </View>
 
@@ -1403,7 +1404,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
               void loadSkills();
             }}
           >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+            <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
               <Puzzle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="ml-3 flex-1">
@@ -1618,7 +1619,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
                 {t.skillsTitle}
               </Text>
               <TouchableOpacity activeOpacity={0.7} onPress={() => setSkillsVisible(false)}>
-                <Text className="text-[14px] font-semibold text-primary">{t.done}</Text>
+                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>{t.done}</Text>
               </TouchableOpacity>
             </View>
 

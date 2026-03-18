@@ -4,8 +4,8 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
+import { useThemeColors } from '../../theme/colors';
 import { useI18n } from '../../lib/i18n';
 import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
@@ -47,6 +47,7 @@ AttachmentOption.displayName = 'AttachmentOption';
 
 const AttachmentSheet = memo<AttachmentSheetProps>(
   ({ visible, onClose, onCamera, onGallery, onDocument }) => {
+    const colors = useThemeColors();
     const { t } = useI18n();
     const insets = useSafeAreaInsets();
 
@@ -56,7 +57,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
             description: 'Capture a new photo and attach it instantly.',
             icon: (
               <Camera
-                color={semanticColors.foreground}
+                color={colors.foreground}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -75,7 +76,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
             description: 'Choose one or more images from your library.',
             icon: (
               <ImageIcon
-                color={semanticColors.foreground}
+                color={colors.foreground}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -93,7 +94,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         description: 'Attach files, notes, PDFs, or other supporting material.',
         icon: (
           <FileText
-            color={semanticColors.foreground}
+            color={colors.foreground}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />

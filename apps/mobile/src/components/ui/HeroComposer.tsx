@@ -208,10 +208,10 @@ export function HeroComposer({
                 />
                 {hasAttachedFile && (
                   <View
-                    className="absolute -right-2 -top-1 rounded-full bg-primary items-center justify-center"
-                    style={{ minWidth: 14, height: 14, paddingHorizontal: 3 }}
+                    className="absolute -right-2 -top-1 rounded-full items-center justify-center"
+                    style={{ minWidth: 14, height: 14, paddingHorizontal: 3, backgroundColor: colors.primary }}
                   >
-                    <Text className="text-[9px] font-semibold text-white">
+                    <Text className="text-[9px] font-semibold" style={{ color: colors.iconOnPrimary }}>
                       {attachmentBadgeText}
                     </Text>
                   </View>
@@ -240,7 +240,8 @@ export function HeroComposer({
             {canSend ? (
               <Animated.View style={sendAnimStyle}>
                 <PressableScale
-                  className="w-9 h-9 bg-primary rounded-full items-center justify-center"
+                  className="w-9 h-9 rounded-full items-center justify-center"
+                  style={{ backgroundColor: colors.primary }}
                   onPress={handleSend}
                 >
                   <Send
@@ -339,10 +340,10 @@ export function HeroComposer({
                 />
                 {hasAttachedFile && (
                   <View
-                    className="absolute -right-2 -top-1 rounded-full bg-primary items-center justify-center"
-                    style={{ minWidth: 14, height: 14, paddingHorizontal: 3 }}
+                    className="absolute -right-2 -top-1 rounded-full items-center justify-center"
+                    style={{ minWidth: 14, height: 14, paddingHorizontal: 3, backgroundColor: colors.primary }}
                   >
-                    <Text className="text-[9px] font-semibold text-white">
+                    <Text className="text-[9px] font-semibold" style={{ color: colors.iconOnPrimary }}>
                       {attachmentBadgeText}
                     </Text>
                   </View>
@@ -371,7 +372,8 @@ export function HeroComposer({
             {canSend ? (
               <Animated.View style={sendAnimStyle}>
                 <PressableScale
-                  className="w-9 h-9 bg-primary rounded-full items-center justify-center"
+                  className="w-9 h-9 rounded-full items-center justify-center"
+                  style={{ backgroundColor: colors.primary }}
                   onPress={handleSend}
                 >
                   <Send

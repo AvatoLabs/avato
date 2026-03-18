@@ -48,11 +48,15 @@ export interface AgentSelectionSheetProps {
 }
 
 function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
+  const colors = useThemeColors();
   const avatar = agent.avatar?.trim();
 
   if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
     return (
-      <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+      <View
+        className="mr-3 h-11 w-11 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: colors.primarySubtle }}
+      >
         <Text className="text-[18px]">{avatar}</Text>
       </View>
     );
@@ -61,8 +65,11 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
   const fallback = agent.title?.trim()?.slice(0, 1)?.toUpperCase() || '#';
 
   return (
-    <View className="mr-3 h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-      <Text className="text-[16px] font-semibold text-primary">{fallback}</Text>
+    <View
+      className="mr-3 h-11 w-11 items-center justify-center rounded-2xl"
+      style={{ backgroundColor: colors.primarySubtle }}
+    >
+      <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>{fallback}</Text>
     </View>
   );
 }

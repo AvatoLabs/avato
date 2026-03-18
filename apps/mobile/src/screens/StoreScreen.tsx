@@ -535,7 +535,8 @@ function SimpleImportModal({
             />
 
             <Pressable
-              className={`rounded-xl py-3.5 items-center ${value.trim() ? 'bg-primary' : 'bg-foreground/5'}`}
+              className="rounded-xl py-3.5 items-center"
+              style={{ backgroundColor: value.trim() ? colors.primary : colors.fillTertiary }}
               disabled={!value.trim() || importing}
               onPress={handleImport}
             >
@@ -825,7 +826,8 @@ function AddCustomMcpModal({
                     </Pressable>
 
                     <Pressable
-                      className={`flex-1 rounded-lg py-2.5 px-4 items-center active:opacity-80 ${isQuickImportReady ? 'bg-primary' : 'bg-foreground/10'}`}
+                      className="flex-1 rounded-lg py-2.5 px-4 items-center active:opacity-80"
+                      style={{ backgroundColor: isQuickImportReady ? colors.primary : colors.fillTertiary }}
                       disabled={!isQuickImportReady}
                       onPress={handleQuickImport}
                     >
@@ -844,8 +846,8 @@ function AddCustomMcpModal({
                 <Pressable
                   className="rounded-2xl py-3.5 items-center mb-4 active:opacity-80"
                   style={{
-                    backgroundColor: 'rgba(0,122,255,0.06)',
-                    borderColor: 'rgba(0,122,255,0.35)',
+                    backgroundColor: colors.primarySubtle,
+                    borderColor: colors.primaryBorder,
                     borderRadius: 16,
                     borderStyle: 'dashed',
                     borderWidth: 1.5,
@@ -855,7 +857,7 @@ function AddCustomMcpModal({
                     setShowQuickImport(true);
                   }}
                 >
-                  <Text className="text-primary text-[14px] font-semibold">
+                  <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
                     {t.skillsCustomMcpQuickImport}
                   </Text>
                 </Pressable>
@@ -913,7 +915,8 @@ function AddCustomMcpModal({
               </Text>
               <View className="flex-row mb-3 bg-foreground/5 rounded-xl p-1">
                 <Pressable
-                  className={`flex-1 py-2.5 rounded-lg items-center ${authType === 'none' ? 'bg-primary/10' : ''}`}
+                  className="flex-1 py-2.5 rounded-lg items-center"
+                  style={authType === 'none' ? { backgroundColor: colors.primarySubtle } : undefined}
                   onPress={() => setAuthType('none')}
                 >
                   <Text
@@ -926,7 +929,8 @@ function AddCustomMcpModal({
                   </Text>
                 </Pressable>
                 <Pressable
-                  className={`flex-1 py-2.5 rounded-lg items-center ${authType === 'bearer' ? 'bg-primary/10' : ''}`}
+                  className="flex-1 py-2.5 rounded-lg items-center"
+                  style={authType === 'bearer' ? { backgroundColor: colors.primarySubtle } : undefined}
                   onPress={() => setAuthType('bearer')}
                 >
                   <Text
@@ -961,7 +965,8 @@ function AddCustomMcpModal({
 
               <View className="mb-3">
                 <Pressable
-                  className={`rounded-xl py-3 items-center active:opacity-80 ${isConnectionReady ? 'bg-primary' : 'bg-foreground/5'}`}
+                  className="rounded-xl py-3 items-center active:opacity-80"
+                  style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                   disabled={!isConnectionReady || testing}
                   onPress={handleTestConnection}
                 >
@@ -982,10 +987,12 @@ function AddCustomMcpModal({
 
               {testResult ? (
                 <View
-                  className={`rounded-xl px-4 py-2.5 mb-3 ${testResult === 'success' ? 'bg-green-500/10' : 'bg-red-500/10'}`}
+                  className="rounded-xl px-4 py-2.5 mb-3"
+                  style={{ backgroundColor: testResult === 'success' ? colors.successSubtle : colors.dangerSubtle }}
                 >
                   <Text
-                    className={`text-[13px] ${testResult === 'success' ? 'text-green-600' : 'text-red-500'}`}
+                    className="text-[13px]"
+                    style={{ color: testResult === 'success' ? colors.success : colors.danger }}
                   >
                     {testResult === 'success'
                       ? t.skillsCustomMcpTestSuccess
@@ -1066,7 +1073,7 @@ function AddCustomMcpModal({
                     className="mb-3 active:opacity-60"
                     onPress={() => setHeaders([...headers, { key: '', value: '' }])}
                   >
-                    <Text className="text-primary text-[13px] font-medium">
+                    <Text className="text-[13px] font-medium" style={{ color: colors.primary }}>
                       + {t.skillsCustomMcpHeadersAdd}
                     </Text>
                   </Pressable>
@@ -1103,7 +1110,8 @@ function AddCustomMcpModal({
               ) : null}
 
               <Pressable
-                className={`rounded-xl py-3.5 items-center mt-2 active:opacity-80 ${isConnectionReady ? 'bg-primary' : 'bg-foreground/5'}`}
+                className="rounded-xl py-3.5 items-center mt-2 active:opacity-80"
+                style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                 disabled={!isConnectionReady || saving}
                 onPress={handleSave}
               >
@@ -1207,12 +1215,12 @@ function StoreItemModal({
                 {detail.identifier}
               </Text>
             </View>
-            <View className="px-2 py-0.5 rounded-full bg-primary/10">
-              <Text className="text-primary text-[11px] font-medium">{detail.label}</Text>
+            <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
+              <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>{detail.label}</Text>
             </View>
             {isInstalled ? (
-              <View className="px-2 py-0.5 rounded-full bg-green-500/10">
-                <Text className="text-green-600 text-[11px] font-medium">{t.storeInstalled}</Text>
+              <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.successSubtle }}>
+                <Text className="text-[11px] font-medium" style={{ color: colors.success }}>{t.storeInstalled}</Text>
               </View>
             ) : null}
           </View>
@@ -1237,14 +1245,15 @@ function StoreItemModal({
           <View className="mt-5 gap-2">
             {canInstall ? (
               <PressableScale
-                className="rounded-xl py-3 items-center bg-primary"
+                className="rounded-xl py-3 items-center"
+                style={{ backgroundColor: colors.primary }}
                 disabled={actionLoading}
                 onPress={onInstall}
               >
                 {actionLoading ? (
                   <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
-                  <Text className="text-white text-[14px] font-semibold">{t.storeInstall}</Text>
+                  <Text className="text-[14px] font-semibold" style={{ color: colors.iconOnPrimary }}>{t.storeInstall}</Text>
                 )}
               </PressableScale>
             ) : null}

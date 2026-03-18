@@ -1,4 +1,5 @@
-import { semanticColors } from './colors';
+import { useThemeStore } from '../store/theme';
+import { getThemeTokens } from '../theme/colors';
 
 export const TAG_COLOR_OPTIONS = [
   '#64748b',
@@ -15,7 +16,9 @@ export const TAG_COLOR_OPTIONS = [
   '#ec4899',
 ] as const;
 
-export const resolveTagColor = (color?: string | null) => color || semanticColors.primary;
+/** Resolve tag color. Pass fallback from useThemeColors().primary when caller has theme context. */
+export const resolveTagColor = (color?: string | null, fallback?: string) =>
+  color || fallback || getThemeTokens(useThemeStore.getState().effectiveTheme, useThemeStore.getState().colorScheme).primary;
 
 export const withAlpha = (color?: string | null, alpha = '1A') => {
   const resolved = resolveTagColor(color);

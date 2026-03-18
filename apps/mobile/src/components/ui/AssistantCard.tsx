@@ -31,7 +31,7 @@ export function AssistantCard({ name, description, icon: IconComp, onPress }: As
         intensity={40}
         tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
       >
-        <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center mb-3">
+        <View className="w-10 h-10 rounded-full items-center justify-center mb-3" style={{ backgroundColor: colors.primarySubtle }}>
           <IconComp color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
         <Text

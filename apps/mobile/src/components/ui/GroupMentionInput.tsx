@@ -184,7 +184,7 @@ export function GroupMentionInput({
                     onPress={() => handleSelectMention(item.id, item.title || item.id)}
                   >
                     {item.isAll ? (
-                      <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-primary/15">
+                      <View className="mr-3 h-9 w-9 items-center justify-center rounded-full" style={{ backgroundColor: colors.primaryMuted }}>
                         <Users color={colors.primary} size={18} strokeWidth={2} />
                       </View>
                     ) : (
@@ -193,7 +193,7 @@ export function GroupMentionInput({
                           <RNImage className="h-9 w-9" source={{ uri: item.avatar }} />
                         ) : (
                           <View className="h-full w-full items-center justify-center">
-                            <Text className="text-[14px] font-semibold text-primary">
+                            <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
                               {(item.title || '#').slice(0, 1).toUpperCase()}
                             </Text>
                           </View>

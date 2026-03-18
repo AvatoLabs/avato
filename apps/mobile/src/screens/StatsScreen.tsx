@@ -249,10 +249,11 @@ function getProviderFromModelId(modelId: string): string | undefined {
 }
 
 function ModelLogo({ providerId }: { providerId: string }) {
+  const colors = useThemeColors();
   const [err, setErr] = React.useState(false);
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const url = getProviderIconUrl(providerId, effectiveTheme);
-  if (err) return <Text className="text-primary text-[10px] font-bold">{providerId.slice(0, 2)}</Text>;
+  if (err) return <Text className="text-[10px] font-bold" style={{ color: colors.primary }}>{providerId.slice(0, 2)}</Text>;
   return (
     <RNImage
       source={{ uri: url }}
@@ -305,7 +306,7 @@ function RankSection({
             const providerId = modelLogos?.[i]?.providerId ?? getProviderFromModelId(item.name);
             return (
               <View className="flex-row items-center py-2" key={i}>
-                <View className="w-8 h-8 items-center justify-center rounded-full bg-primary/10 mr-2">
+                <View className="w-8 h-8 items-center justify-center rounded-full mr-2" style={{ backgroundColor: colors.primarySubtle }}>
                   {providerId ? (
                     <ModelLogo providerId={providerId} />
                   ) : i < 3 ? (
@@ -333,8 +334,8 @@ function RankSection({
                   </View>
                   <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
                     <View
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: colors.primary, width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
                     />
                   </View>
                 </View>
@@ -475,7 +476,7 @@ export default function StatsScreen({ navigation }: any) {
         {/* Welcome Banner */}
         {regDays && (
           <Animated.View entering={FadeInDown.delay(30).duration(300)}>
-            <View className="mx-5 mb-5 p-4 rounded-2xl bg-primary/[0.06]">
+            <View className="mx-5 mb-5 p-4 rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
               <Text className="text-foreground text-[16px] font-semibold leading-6">
                 {t.statsWelcome.replace('{days}', String(regDays))}
               </Text>

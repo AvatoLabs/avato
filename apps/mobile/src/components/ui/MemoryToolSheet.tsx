@@ -2,8 +2,8 @@ import { BrainCircuit, CircleOff } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
+import { useThemeColors } from '../../theme/colors';
 import { useI18n } from '../../lib/i18n';
 import { tokens } from '../../theme/tokens';
 import type { MobileMemoryEffort } from '../../types';
@@ -28,11 +28,11 @@ interface ToggleOptionProps {
 
 const ToggleOption = memo<ToggleOptionProps>(
   ({ active, description, icon, isLast, title, onPress }) => {
+    const colors = useThemeColors();
     return (
       <Pressable
-        className={`flex-row items-start px-3.5 py-3 ${
-          !isLast ? 'mb-px' : ''
-        } ${active ? 'bg-primary/5' : ''}`}
+        className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'mb-px' : ''}`}
+        style={active ? { backgroundColor: colors.primarySubtle } : undefined}
         onPress={onPress}
       >
         <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
@@ -51,6 +51,7 @@ ToggleOption.displayName = 'ToggleOption';
 
 const MemoryToolSheet = memo<MemoryToolSheetProps>(
   ({ visible, enabled, effort, onClose, onChangeEnabled, onChangeEffort }) => {
+    const colors = useThemeColors();
     const { t } = useI18n();
 
     const effortOptions: Array<{ label: string; value: MobileMemoryEffort }> = [
@@ -85,7 +86,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                   title={t.memoryToolOffTitle}
                   icon={
                     <CircleOff
-                      color={semanticColors.foreground}
+                      color={colors.foreground}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -103,7 +104,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                   title={t.memoryToolOnTitle}
                   icon={
                     <BrainCircuit
-                      color={semanticColors.foreground}
+                      color={colors.foreground}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -130,18 +131,16 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                       return (
                         <Pressable
                           key={item.value}
-                          className={`flex-1 items-center py-2.5 rounded-xl ${
-                            active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
-                          }`}
+                          className="flex-1 items-center py-2.5 rounded-xl"
+                          style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
                           onPress={() => {
                             haptics.selection();
                             onChangeEffort(item.value);
                           }}
                         >
                           <Text
-                            className={`text-[15px] font-medium ${
-                              active ? 'text-primary' : 'text-secondary/70'
-                            }`}
+                            className="text-[15px] font-medium"
+                            style={{ color: active ? colors.primary : colors.secondaryText }}
                           >
                             {item.label}
                           </Text>

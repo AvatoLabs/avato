@@ -92,7 +92,7 @@ export default function PromptModal({
                 className="flex-1 py-3.5 items-center"
                 onPress={handleSubmit}
               >
-                <Text className="text-[16px] text-primary font-semibold">{finalSubmitLabel}</Text>
+                <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>{finalSubmitLabel}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>

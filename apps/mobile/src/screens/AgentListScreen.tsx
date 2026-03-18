@@ -31,7 +31,7 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
   const avatar = agent.avatar?.trim();
   if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
     return (
-      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+      <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
         <Text className="text-[20px]">{avatar}</Text>
       </View>
     );
@@ -40,7 +40,7 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
     return <RNImage source={{ uri: avatar }} style={{ height: 48, width: 48, borderRadius: 12 }} />;
   }
   return (
-    <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+    <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
       <Bot color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
     </View>
   );
@@ -293,7 +293,8 @@ export default function AgentListScreen({ navigation }: any) {
             title={t.agentsEmpty}
             action={
               <PressableScale
-                className="rounded-2xl bg-primary px-5 py-3"
+                className="rounded-2xl px-5 py-3"
+                style={{ backgroundColor: colors.primary }}
                 disabled={creating}
                 onPress={handleCreateAgent}
               >
@@ -325,9 +326,9 @@ export default function AgentListScreen({ navigation }: any) {
       {agents.length > 0 && (
         <TouchableOpacity
           activeOpacity={0.8}
-          className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+          className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full shadow-lg"
+          style={{ backgroundColor: colors.primary, elevation: 4, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25 }}
           disabled={creating}
-          style={{ elevation: 4, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25 }}
           onPress={handleCreateAgent}
         >
           <Plus color={colors.iconOnPrimary} size={24} strokeWidth={2} />

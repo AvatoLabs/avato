@@ -27,7 +27,7 @@ export function SectionBlock({ title, action, onAction, children }: SectionBlock
         </Text>
         {action && (
           <TouchableOpacity activeOpacity={0.6} onPress={onAction}>
-            <Text className="text-primary text-[13px] font-medium">{action}</Text>
+            <Text className="text-[13px] font-medium" style={{ color: colors.primary }}>{action}</Text>
           </TouchableOpacity>
         )}
       </View>

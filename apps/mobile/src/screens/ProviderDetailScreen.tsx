@@ -54,6 +54,7 @@ function ProviderLogo({
   providerId: string;
   size?: number;
 }) {
+  const colors = useThemeColors();
   const [imgError, setImgError] = useState(false);
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const url = logo || getProviderIconUrl(providerId, effectiveTheme);
@@ -585,7 +586,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               {/* Save Button */}
               <TouchableOpacity
                 activeOpacity={0.8}
-                className="bg-primary rounded-xl py-3 items-center flex-row justify-center"
+                className="rounded-xl py-3 items-center flex-row justify-center"
+                style={{ backgroundColor: colors.primary }}
                 disabled={saving}
                 onPress={handleSave}
               >
@@ -599,7 +601,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginRight: 6 }}
                     />
-                    <Text className="text-white font-medium text-[14px]">
+                    <Text className="font-medium text-[14px]" style={{ color: colors.iconOnPrimary }}>
                       {t.providerDetailSave}
                     </Text>
                   </>

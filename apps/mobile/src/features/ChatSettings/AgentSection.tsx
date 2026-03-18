@@ -6,6 +6,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 
 interface AgentSectionProps {
   agentSummary?: {
@@ -19,6 +20,7 @@ interface AgentSectionProps {
 
 export function AgentSection({ agentSummary, delay = 100, onPress }: AgentSectionProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
@@ -41,10 +43,11 @@ export function AgentSection({ agentSummary, delay = 100, onPress }: AgentSectio
           </View>
           <TouchableOpacity
             activeOpacity={0.8}
-            className="mt-4 self-start rounded-xl bg-primary/10 px-3 py-2"
+            className="mt-4 self-start rounded-xl px-3 py-2"
+            style={{ backgroundColor: colors.primarySubtle }}
             onPress={onPress}
           >
-            <Text className="text-[13px] font-semibold text-primary">{t.agentConfigTitle}</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>{t.agentConfigTitle}</Text>
           </TouchableOpacity>
         </View>
       </View>

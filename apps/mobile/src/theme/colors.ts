@@ -357,6 +357,7 @@ function mergeTokens(
     }),
     ...(palette.userBubbleHr != null && { userBubbleHr: palette.userBubbleHr }),
     ...(palette.iconOnPrimary != null && { iconOnPrimary: palette.iconOnPrimary }),
+    info: palette.primary,
     markdownLink: palette.markdownLink,
     chatAccentBadgeBg: palette.chatAccentBadgeBg,
     chatAccentBadgeText: palette.chatAccentBadgeText,
@@ -366,6 +367,8 @@ function mergeTokens(
     sourceMarket: palette.sourceMarket,
     sourceMarketMuted: palette.sourceMarketMuted,
     sliderThumb: palette.primary,
+    markdownCodeInlineBg: palette.primarySubtle,
+    markdownCodeInlineColor: palette.primary,
   };
 }
 

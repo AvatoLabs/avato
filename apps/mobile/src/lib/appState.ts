@@ -59,10 +59,18 @@ export const migrateDeprecatedStorageKeys = async () => {
   }
 };
 
-export const clearTransientAppState = async () => {
+export const clearTransientAppState = async (
+  options?: { preserveUserProfile?: boolean },
+) => {
   await AsyncStorage.removeItem('activeSessionId');
   useChatStore.getState().reset();
   useFileStore.getState().clearPending();
   useSessionStore.getState().reset();
+
+  if (options?.preserveUserProfile) {
+    useUserStore.setState({ isLoaded: false });
+    return;
+  }
+
   useUserStore.getState().clearProfile();
 };

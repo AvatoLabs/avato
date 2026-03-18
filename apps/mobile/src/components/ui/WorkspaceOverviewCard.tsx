@@ -55,7 +55,7 @@ export function WorkspaceOverviewCard({
         <BlurView className="rounded-2xl overflow-hidden p-5" intensity={80} tint={blurTint}>
           {/* Identity — tap → ProfileEdit */}
           <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
-            <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-3.5 overflow-hidden">
+            <View className="w-12 h-12 rounded-full items-center justify-center mr-3.5 overflow-hidden" style={{ backgroundColor: colors.primarySubtle }}>
               {resolvedAvatarUri ? (
                 <RNImage
                   source={{ uri: resolvedAvatarUri }}
@@ -63,7 +63,7 @@ export function WorkspaceOverviewCard({
                   onError={() => {}}
                 />
               ) : (
-                <Text className="text-primary text-[16px] font-bold">
+                <Text className="text-[16px] font-bold" style={{ color: colors.primary }}>
                   {String(userName || 'U')
                     .slice(0, 2)
                     .toUpperCase()}
@@ -131,7 +131,7 @@ export function WorkspaceOverviewCard({
         <View className="rounded-2xl overflow-hidden p-5">
           {/* Identity — tap → ProfileEdit */}
           <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
-            <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-3.5 overflow-hidden">
+            <View className="w-12 h-12 rounded-full items-center justify-center mr-3.5 overflow-hidden" style={{ backgroundColor: colors.primarySubtle }}>
               {resolvedAvatarUri ? (
                 <RNImage
                   source={{ uri: resolvedAvatarUri }}
@@ -139,7 +139,7 @@ export function WorkspaceOverviewCard({
                   onError={() => {}}
                 />
               ) : (
-                <Text className="text-primary text-[16px] font-bold">
+                <Text className="text-[16px] font-bold" style={{ color: colors.primary }}>
                   {String(userName || 'U')
                     .slice(0, 2)
                     .toUpperCase()}

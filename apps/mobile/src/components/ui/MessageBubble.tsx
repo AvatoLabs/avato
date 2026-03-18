@@ -559,7 +559,7 @@ const GroupTasksBlock = memo<{
   return (
     <View className="gap-2">
       <View className="flex-row items-center gap-2 mb-1">
-        <View className="rounded-full bg-primary/10 p-1.5">
+        <View className="rounded-full p-1.5" style={{ backgroundColor: colors.primarySubtle }}>
           <ListTodo color={colors.primary} size={14} strokeWidth={2} />
         </View>
         <Text className="text-[13px] font-medium text-foreground flex-1" numberOfLines={1}>
@@ -1329,8 +1329,8 @@ const MessageBubble = memo<MessageBubbleProps>(
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          className="px-3.5 py-1.5 rounded-full bg-primary"
-                          style={isUser ? { backgroundColor: colors.surface } : undefined}
+                          className="px-3.5 py-1.5 rounded-full"
+                          style={{ backgroundColor: isUser ? colors.surface : colors.primary }}
                           onPress={handleEditSubmit}
                         >
                           <Text
@@ -1476,6 +1476,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                           citations={message.search?.citations}
                           markdownRules={markdownRules}
                           markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
+                          model={!isUser ? message.model : undefined}
                           parts={multimodalContentParts}
                           onOpenLink={handleOpenLink}
                         />
@@ -1776,48 +1777,78 @@ const RichContentPartsBlock = memo<{
   citations?: CitationItem[] | null;
   markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
+  model?: string;
   onOpenLink: (url?: string) => void;
   parts: MessageContentPart[];
-}>(({ parts, markdownStyles, markdownRules, onOpenLink, citations }) => {
+}>(({ parts, markdownStyles, markdownRules, onOpenLink, citations, model }) => {
   const colors = useThemeColors();
+  const imageCount = parts.filter((p) => p.type === 'image').length;
+  const hasImageTags = model != null || imageCount > 0;
+
   return (
-  <View className="gap-2">
-    {parts.map((part, index) => {
-      if (part.type === 'image' && part.image) {
-        return (
-          <RNImage
-            key={`${part.image}-${index}`}
-            resizeMode="cover"
-            source={{ uri: part.image }}
-            style={{
-              backgroundColor: colors.fillTertiary,
-              borderRadius: 16,
-              height: 180,
-              width: '100%',
-            }}
-          />
-        );
-      }
+    <View className="gap-2">
+      {parts.map((part, index) => {
+        if (part.type === 'image' && part.image) {
+          const isFirstImage = index === parts.findIndex((p) => p.type === 'image');
+          return (
+            <View key={`${part.image}-${index}`}>
+              {isFirstImage && hasImageTags && (
+                <View className="flex-row flex-wrap gap-2 mb-2">
+                  {model != null && (
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{ backgroundColor: colors.primarySubtle }}
+                    >
+                      <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
+                        {model}
+                      </Text>
+                    </View>
+                  )}
+                  {imageCount > 0 && (
+                    <View
+                      className="rounded-full px-2.5 py-1"
+                      style={{ backgroundColor: colors.primarySubtle }}
+                    >
+                      <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
+                        ×{imageCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              <RNImage
+                resizeMode="cover"
+                source={{ uri: part.image }}
+                style={{
+                  backgroundColor: colors.fillTertiary,
+                  borderRadius: 16,
+                  height: 180,
+                  width: '100%',
+                }}
+              />
+            </View>
+          );
+        }
 
-      if (part.type === 'text' && part.text) {
-        return (
-          <Markdown
-            key={`${part.text.slice(0, 24)}-${index}`}
-            rules={markdownRules ?? codeInlineRules}
-            style={markdownStyles}
-            onLinkPress={(url) => {
-              onOpenLink(url);
-              return false;
-            }}
-          >
-            {injectCitationLinks(part.text, citations)}
-          </Markdown>
-        );
-      }
+        if (part.type === 'text' && part.text) {
+          return (
+            <Markdown
+              key={`${part.text.slice(0, 24)}-${index}`}
+              rules={markdownRules ?? codeInlineRules}
+              style={markdownStyles}
+              onLinkPress={(url) => {
+                onOpenLink(url);
+                return false;
+              }}
+            >
+              {injectCitationLinks(part.text, citations)}
+            </Markdown>
+          );
+        }
 
-      return null;
-    })}
-  </View>
+        return null;
+      })}
+    </View>
   );
 });
 
@@ -2813,7 +2844,7 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
             <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
           )}
           {thinking ? (
-            <Text className="text-primary text-[12px] font-medium ml-1">{t.chatThinking}</Text>
+            <Text className="text-[12px] font-medium ml-1" style={{ color: colors.primary }}>{t.chatThinking}</Text>
           ) : (
             <Text className="text-[12px] font-medium ml-1" style={{ color: chatAccent.badgeText }}>
               {durationLabel}

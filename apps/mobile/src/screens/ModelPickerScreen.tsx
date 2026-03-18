@@ -430,7 +430,8 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           </View>
           <View className="flex-1">
             <Text
-              className={`text-[15px] font-medium tracking-tight ${selected === item.id ? 'text-primary' : 'text-foreground'}`}
+              className="text-[15px] font-medium tracking-tight"
+              style={{ color: selected === item.id ? colors.primary : colors.foreground }}
             >
               {item.displayName || item.id}
             </Text>
@@ -450,7 +451,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         </PressableScale>
       );
     },
-    [handleSelect, selected],
+    [colors, handleSelect, selected],
   );
 
   const renderFallbackItem = useCallback(
@@ -467,7 +468,8 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         </View>
         <View className="flex-1">
           <Text
-            className={`text-[15px] font-medium tracking-tight ${selected === item.id ? 'text-primary' : 'text-foreground'}`}
+            className="text-[15px] font-medium tracking-tight"
+            style={{ color: selected === item.id ? colors.primary : colors.foreground }}
           >
             {item.displayName}
           </Text>
@@ -486,7 +488,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         )}
       </PressableScale>
     ),
-    [handleSelect, selected],
+    [colors, handleSelect, selected],
   );
 
   return (
