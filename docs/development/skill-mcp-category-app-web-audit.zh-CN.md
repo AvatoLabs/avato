@@ -2,6 +2,8 @@
 
 本文档审计商店（Store）中 Skill 与 MCP 分类在移动端 App 与 Web 端的实现差距，分析 App 分类「总是处理不好」的根因。
 
+**延伸审计**：[explore-store-category-audit.zh-CN.md](./explore-store-category-audit.zh-CN.md) — 「全部 OK、分类时有时无」的根因与修复方向。
+
 **审计范围**：
 
 - **App**：`apps/mobile/src/screens/StoreScreen.tsx`、`api.ts` 中的 `marketSkillApi`

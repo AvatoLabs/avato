@@ -47,15 +47,16 @@ export const useToast = create<ToastStore>((set, get) => ({
   mute: (durationMs) => set({ mutedUntil: Date.now() + Math.max(durationMs, 0) }),
   show: (type, message, options) => {
     if (get().mutedUntil > Date.now()) return;
+    const safeMessage = (typeof message === 'string' && message.trim()) || 'Something went wrong.';
     _toastId += 1;
     const duration =
       options?.duration ??
-      (type === 'error' ? Math.max(4000, Math.min(message.length * 60, 8000)) : DURATION);
+      (type === 'error' ? Math.max(4000, Math.min(safeMessage.length * 60, 8000)) : DURATION);
     set({
       current: {
         id: _toastId,
         type,
-        message,
+        message: safeMessage,
         duration,
         onRetry: options?.onRetry,
         retryLabel: options?.retryLabel,
@@ -159,7 +160,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
             accessibilityLabel={retryLabel}
             accessibilityRole="button"
             activeOpacity={0.8}
-            style={{ marginLeft: 8, paddingVertical: 4, paddingHorizontal: 8 }}
+            className="ml-2 py-1 px-2"
             onPress={handleRetry}
           >
             <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>

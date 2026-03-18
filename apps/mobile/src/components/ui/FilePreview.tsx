@@ -1,9 +1,10 @@
 /**
  * FilePreview — Horizontal strip showing pending file attachments.
  */
+import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
 import React, { memo } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { useI18n } from '../../lib/i18n';
 import { useFileStore } from '../../store/file';
@@ -30,7 +31,7 @@ const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
             ? 'border border-red-300'
             : file.status === 'done'
               ? 'border border-emerald-300'
-              : 'border border-black/10';
+              : 'border border-foreground/10';
 
         return (
           <View
@@ -38,7 +39,12 @@ const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
             key={file.id}
           >
             {isImage ? (
-              <Image className="w-full h-full" resizeMode="cover" source={{ uri: file.uri }} />
+              <Image
+                cachePolicy="memory-disk"
+                className="w-full h-full"
+                contentFit="cover"
+                source={{ uri: file.uri }}
+              />
             ) : (
               <View className="flex-1 items-center justify-center">
                 <Text

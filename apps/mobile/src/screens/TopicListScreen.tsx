@@ -13,11 +13,12 @@ import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
-import { semanticColors } from '../constants/colors';
+import { topicApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useChatStore } from '../store/chat';
 import { useTopicStore } from '../store/topic';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 export default function TopicListScreen({ route, navigation }: any) {
@@ -25,6 +26,7 @@ export default function TopicListScreen({ route, navigation }: any) {
   const sessionKey = sessionId ?? '__invalid_session__';
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
   const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
@@ -36,6 +38,25 @@ export default function TopicListScreen({ route, navigation }: any) {
   const favoriteTopic = useTopicStore((s) => s.favoriteTopic);
   const updateTopic = useTopicStore((s) => s.updateTopic);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
+
+  const handleSmartRename = useCallback(
+    async (topicId: string) => {
+      if (!sessionId) return;
+      try {
+        const newTitle = await topicApi.generateTitle(topicId);
+        if (newTitle?.trim()) {
+          await updateTopic(topicId, sessionId, newTitle.trim());
+          haptics.success();
+          toast.show('success', t.topicRenamed);
+        } else {
+          toast.show('error', t.toastTitleGenerationFailed || 'Failed to generate title');
+        }
+      } catch {
+        toast.show('error', t.toastTitleGenerationFailed || 'Failed to generate title');
+      }
+    },
+    [sessionId, t, toast, updateTopic],
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -100,14 +121,10 @@ export default function TopicListScreen({ route, navigation }: any) {
         rightAccessibilityLabel={t.accessibilityAddTopic}
         title={t.topicTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         rightElement={
-          <Plus color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          <Plus color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={handleCreateTopic}
         onPressLeft={() => {
@@ -121,7 +138,7 @@ export default function TopicListScreen({ route, navigation }: any) {
           <TextInput
             className="flex-1 text-foreground text-[15px]"
             placeholder={t.topicSearch}
-            placeholderTextColor={semanticColors.muted}
+            placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -137,7 +154,7 @@ export default function TopicListScreen({ route, navigation }: any) {
           onPress={() => handleSwitchTopic(null)}
         >
           <MessageCircle
-            color={activeTopic === null ? semanticColors.primary : semanticColors.secondaryText}
+            color={activeTopic === null ? colors.primary : colors.secondaryText}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -164,9 +181,9 @@ export default function TopicListScreen({ route, navigation }: any) {
         }
         refreshControl={
           <RefreshControl
-            colors={[semanticColors.primary]}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor={semanticColors.primary}
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -178,6 +195,7 @@ export default function TopicListScreen({ route, navigation }: any) {
             onFavorite={() => favoriteTopic(item.id)}
             onPress={() => handleSwitchTopic(item.id)}
             onRename={(newTitle) => updateTopic(item.id, sessionId, newTitle)}
+            onSmartRename={() => handleSmartRename(item.id)}
           />
         )}
       />

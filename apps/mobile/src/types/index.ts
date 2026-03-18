@@ -212,8 +212,6 @@ export interface ChatMessage {
   role: MessageRole;
   search?: GroundingSearch | null;
   sessionId: string;
-  /** For groupTasks: aggregated task messages from multiple agents */
-  tasks?: ChatMessage[];
   /** For task messages: execution detail (status, threadId, etc.) */
   taskDetail?: {
     duration?: number;
@@ -224,6 +222,8 @@ export interface ChatMessage {
     totalToolCalls?: number;
     [key: string]: unknown;
   };
+  /** For groupTasks: aggregated task messages from multiple agents */
+  tasks?: ChatMessage[];
   toolCallId?: string | null;
   tools?: ChatToolPayload[] | null;
   traceId?: string | null;
@@ -298,6 +298,26 @@ export interface SessionTag {
 }
 
 // ---- Topic ----
+
+/** Recent topic from topic.recentTopics (cross-session). sessionId for ChatDetail navigation. */
+export interface RecentTopic {
+  agent: {
+    avatar?: string | null;
+    backgroundColor?: string | null;
+    id: string;
+    title?: string | null;
+  } | null;
+  group: {
+    id: string;
+    members: Array<{ avatar?: string | null; backgroundColor?: string | null }>;
+    title?: string | null;
+  } | null;
+  id: string;
+  sessionId?: string | null;
+  title: string | null;
+  type: 'agent' | 'group';
+  updatedAt: string;
+}
 
 export interface Topic {
   createdAt: string;

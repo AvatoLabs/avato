@@ -317,7 +317,9 @@ export const topicRouter = router({
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const messages = await messageModel.query({ topicId: input.id });
       const userMessage = messages.find((message) => message.role === 'user');
-      const assistantMessage = [...messages].reverse().find((message) => message.role === 'assistant');
+      const assistantMessage = [...messages]
+        .reverse()
+        .find((message) => message.role === 'assistant');
 
       if (!userMessage || !assistantMessage) return null;
 
@@ -490,6 +492,7 @@ export const topicRouter = router({
             agent: null,
             group: groupInfo ?? null,
             id: topic.id,
+            sessionId: topic.groupId,
             title: topic.title,
             type: 'group' as const,
             updatedAt: topic.updatedAt,
@@ -508,6 +511,7 @@ export const topicRouter = router({
           agent: validAgent,
           group: null,
           id: topic.id,
+          sessionId: topic.sessionId ?? null,
           title: topic.title,
           type: 'agent' as const,
           updatedAt: topic.updatedAt,

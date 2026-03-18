@@ -1,19 +1,20 @@
 import * as Clipboard from 'expo-clipboard';
 import { ArrowLeft, Copy, RotateCcw, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
-import { clearAppLogs, formatAppLogs, getAppLogs, type AppLogEntry } from '../lib/logger';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { type AppLogEntry, clearAppLogs, formatAppLogs, getAppLogs } from '../lib/logger';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 export default function AppLogsScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const [logs, setLogs] = useState<AppLogEntry[]>([]);
 
   const loadLogs = useCallback(async () => {
@@ -40,7 +41,9 @@ export default function AppLogsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         title={t.logsTitle}
         onPressLeft={() => {
           haptics.light();
@@ -54,7 +57,7 @@ export default function AppLogsScreen({ navigation }: any) {
           className="mr-2 flex-row items-center rounded-full bg-foreground/[0.05] px-3.5 py-2"
           onPress={() => void loadLogs()}
         >
-          <RotateCcw color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <RotateCcw color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="ml-2 text-[13px] font-medium text-foreground">{t.errorRetry}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -62,7 +65,7 @@ export default function AppLogsScreen({ navigation }: any) {
           className="mr-2 flex-row items-center rounded-full bg-foreground/[0.05] px-3.5 py-2"
           onPress={() => void handleCopy()}
         >
-          <Copy color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Copy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="ml-2 text-[13px] font-medium text-foreground">{t.logsCopy}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -70,34 +73,33 @@ export default function AppLogsScreen({ navigation }: any) {
           className="flex-row items-center rounded-full bg-red-500/10 px-3.5 py-2"
           onPress={() => void handleClear()}
         >
-          <Trash2 color={semanticColors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Trash2 color={colors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="ml-2 text-[13px] font-medium text-red-500">{t.logsClear}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <FlatList
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 20 }}
+        data={logs}
+        keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-      >
-        {logs.length === 0 ? (
+        ListEmptyComponent={
           <View className="items-center px-4 pt-12">
-            <Text className="text-center text-[15px] font-semibold text-foreground">{t.logsEmpty}</Text>
+            <Text className="text-center text-[15px] font-semibold text-foreground">
+              {t.logsEmpty}
+            </Text>
           </View>
-        ) : (
-          logs.map((entry) => (
-            <View
-              className="mb-3 rounded-2xl bg-foreground/[0.03] px-4 py-3"
-              key={entry.id}
-            >
-              <Text className="text-[11px] font-semibold uppercase tracking-wider text-secondary/55">
-                {entry.level} · {entry.timestamp}
-              </Text>
-              <Text className="mt-2 text-[13px] leading-5 text-foreground">{entry.message}</Text>
-            </View>
-          ))
+        }
+        renderItem={({ item: entry }) => (
+          <View className="mb-3 rounded-2xl bg-foreground/[0.03] px-4 py-3">
+            <Text className="text-[11px] font-semibold uppercase tracking-wider text-secondary/55">
+              {entry.level} · {entry.timestamp}
+            </Text>
+            <Text className="mt-2 text-[13px] leading-5 text-foreground">{entry.message}</Text>
+          </View>
         )}
-      </ScrollView>
+      />
     </View>
   );
 }

@@ -5,9 +5,8 @@ import React from 'react';
 import { ActivityIndicator, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
-import { themeColors } from '../../theme/colors';
+import { useThemeColors } from '../../theme/colors';
 
 function SectionCard({ children, title }: { children: React.ReactNode; title: string }) {
   return (
@@ -33,6 +32,7 @@ function Field({
   placeholder?: string;
   value: string;
 }) {
+  const colors = useThemeColors();
   return (
     <View className="mb-3 last:mb-0">
       <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">{label}</Text>
@@ -40,7 +40,7 @@ function Field({
         className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
         multiline={multiline}
         placeholder={placeholder}
-        placeholderTextColor={semanticColors.secondaryText}
+        placeholderTextColor={colors.secondaryText}
         style={multiline ? { minHeight: 96, textAlignVertical: 'top' } : undefined}
         value={value}
         onChangeText={onChangeText}
@@ -60,6 +60,7 @@ function ToggleRowSwitch({
   onValueChange: (value: boolean) => void;
   value: boolean;
 }) {
+  const colors = useThemeColors();
   return (
     <View className="mb-3 flex-row items-center rounded-2xl bg-foreground/[0.04] px-4 py-3 last:mb-0">
       <View className="flex-1 pr-4">
@@ -69,11 +70,11 @@ function ToggleRowSwitch({
         ) : null}
       </View>
       <Switch
-        trackColor={{
-          false: themeColors.switchTrackOffAlt,
-          true: `${themeColors.switchTrackOn}66`,
-        }}
         value={value}
+        trackColor={{
+          false: colors.switchTrackOffAlt,
+          true: `${colors.switchTrackOn}66`,
+        }}
         onValueChange={onValueChange}
       />
     </View>
@@ -110,6 +111,7 @@ export function GroupSettingsSection({
   revealDM,
 }: GroupSettingsSectionProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <>
@@ -117,7 +119,7 @@ export function GroupSettingsSection({
         <SectionCard title={t.chatSettingsGroup}>
           {loading ? (
             <View className="items-center justify-center py-6">
-              <ActivityIndicator color={semanticColors.primary} />
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
             <>
@@ -142,7 +144,7 @@ export function GroupSettingsSection({
         <SectionCard title={t.chatSettingsSystemPrompt}>
           {loading ? (
             <View className="items-center justify-center py-6">
-              <ActivityIndicator color={semanticColors.primary} />
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
             <Field
@@ -160,7 +162,7 @@ export function GroupSettingsSection({
         <SectionCard title={t.agentConfigOpening}>
           {loading ? (
             <View className="items-center justify-center py-6">
-              <ActivityIndicator color={semanticColors.primary} />
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : (
             <>

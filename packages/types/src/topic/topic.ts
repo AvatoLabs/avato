@@ -103,6 +103,8 @@ export interface RecentTopic {
   agent: RecentTopicAgent | null;
   group: RecentTopicGroup | null;
   id: string;
+  /** Session or group ID for navigation (ChatDetail). For groups, equals group.id. */
+  sessionId?: string | null;
   title: string | null;
   type: 'agent' | 'group';
   updatedAt: Date;

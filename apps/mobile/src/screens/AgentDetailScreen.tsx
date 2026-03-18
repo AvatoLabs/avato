@@ -61,7 +61,7 @@ export default function AgentDetailScreen({ route, navigation }: any) {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(300)}>
-        <View className="flex-row items-center px-4 py-2.5">
+        <View className="flex-row items-center px-5 py-3">
           <PressableScale
             accessibilityLabel={t.accessibilityGoBack}
             accessibilityRole="button"

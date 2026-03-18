@@ -5,6 +5,7 @@ import debug from 'debug';
 
 import { UserModel } from '@/database/models/user';
 import { type LobeChatDatabase } from '@/database/type';
+import { getServerGlobalConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 const log = debug('lobe-server:system-agent-service');
@@ -89,21 +90,25 @@ export class SystemAgentService {
 
   /**
    * Get the model/provider config for a specific systemAgent task type.
-   * Falls back to DEFAULT_SYSTEM_AGENT_CONFIG when user has no custom settings.
+   * Merge order (aligned with Web): DEFAULT -> env SYSTEM_AGENT -> user settings.
+   * This ensures App session.generateSessionTitle uses the same model source as Web topic summary.
    */
   private async getTaskModelConfig(
     taskKey: UserSystemAgentConfigKey,
   ): Promise<{ model: string; provider: string }> {
     const userModel = new UserModel(this.db, this.userId);
     const settings = await userModel.getUserSettings();
-    const systemAgent = settings?.systemAgent as Partial<UserSystemAgentConfig> | undefined;
+    const userConfig = (settings?.systemAgent as Partial<UserSystemAgentConfig> | undefined)?.[
+      taskKey
+    ];
 
-    const taskConfig = systemAgent?.[taskKey];
     const defaults = DEFAULT_SYSTEM_AGENT_CONFIG[taskKey];
+    const serverConfig = await getServerGlobalConfig();
+    const envConfig = serverConfig.systemAgent?.[taskKey];
 
     return {
-      model: taskConfig?.model || defaults.model,
-      provider: taskConfig?.provider || defaults.provider,
+      model: userConfig?.model || envConfig?.model || defaults.model,
+      provider: userConfig?.provider || envConfig?.provider || defaults.provider,
     };
   }
 

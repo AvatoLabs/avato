@@ -2,7 +2,7 @@
  * AgentListScreen — Manage user agents (assistants).
  * Lists agents from agentApi.queryAgents, tap to open chat or create new.
  */
-import { ArrowLeft, Bot, MessageCircle, Plus } from 'lucide-react-native';
+import { ArrowLeft, Bot, MessageCircle, Plus, Settings2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,14 +18,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { agentApi, type AgentQueryItem } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useSessionStore } from '../store/session';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
+  const colors = useThemeColors();
   const avatar = agent.avatar?.trim();
   if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
     return (
@@ -39,7 +40,7 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
   }
   return (
     <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-      <Bot color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+      <Bot color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
     </View>
   );
 }
@@ -48,6 +49,7 @@ export default function AgentListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const sessions = useSessionStore((s) => s.sessions);
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
 
@@ -123,6 +125,19 @@ export default function AgentListScreen({ navigation }: any) {
     ],
   );
 
+  const handleConfigureAgent = useCallback(
+    (agent: AgentQueryItem) => {
+      haptics.light();
+      const session = getSessionForAgent(agent.id);
+      if (session) {
+        navigation?.navigate?.('AgentConfig', { sessionId: session.id });
+      } else {
+        toast.show('info', t.meAgentConfigureFirst);
+      }
+    },
+    [getSessionForAgent, navigation, toast, t.meAgentConfigureFirst],
+  );
+
   const handleCreateAgent = useCallback(async () => {
     haptics.light();
     try {
@@ -156,14 +171,19 @@ export default function AgentListScreen({ navigation }: any) {
             </Text>
           ) : null}
         </View>
-        <MessageCircle
-          color={semanticColors.primary}
-          size={18}
-          strokeWidth={tokens.icon.strokeWidth}
-        />
+        <TouchableOpacity
+          accessible
+          accessibilityLabel={t.agentConfigTitle}
+          className="mr-3 p-2 -m-2"
+          hitSlop={{ bottom: 8, left: 8, right: 8, top: 8 }}
+          onPress={() => handleConfigureAgent(item)}
+        >
+          <Settings2 color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        </TouchableOpacity>
+        <MessageCircle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
       </PressableScale>
     ),
-    [handleAgentPress, t.agentConfigNamePlaceholder],
+    [handleAgentPress, handleConfigureAgent, t.agentConfigNamePlaceholder, t.agentConfigTitle],
   );
 
   if (loading) {
@@ -172,11 +192,7 @@ export default function AgentListScreen({ navigation }: any) {
         <ScreenHeader
           title={t.meAgents}
           leftElement={
-            <ArrowLeft
-              color={semanticColors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
           }
           onPressLeft={() => {
             haptics.light();
@@ -184,7 +200,7 @@ export default function AgentListScreen({ navigation }: any) {
           }}
         />
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       </View>
     );
@@ -195,11 +211,7 @@ export default function AgentListScreen({ navigation }: any) {
       <ScreenHeader
         title={t.meAgents}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => {
           haptics.light();
@@ -215,7 +227,7 @@ export default function AgentListScreen({ navigation }: any) {
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center px-8 py-16">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-              <Bot color={semanticColors.primary} size={28} strokeWidth={1.6} />
+              <Bot color={colors.primary} size={28} strokeWidth={1.6} />
             </View>
             <Text className="mt-5 text-center text-[18px] font-semibold text-foreground">
               {t.agentsEmpty}
@@ -239,9 +251,9 @@ export default function AgentListScreen({ navigation }: any) {
         }
         refreshControl={
           <RefreshControl
-            colors={[semanticColors.primary]}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor={semanticColors.primary}
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }

@@ -3,17 +3,17 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { useThemeStore } from '../../store/theme';
+import { useThemeColors } from '../../theme/colors';
 
 interface ScreenHeaderProps {
   children?: React.ReactNode;
   leftElement?: React.ReactNode;
   onPressLeft?: () => void;
   onPressRight?: () => void;
-  rightAccessibilityLabel?: string;
   rightAccessibilityHint?: string;
+  rightAccessibilityLabel?: string;
   rightActions?: React.ReactNode;
   rightElement?: React.ReactNode;
   subtitle?: string;
@@ -36,6 +36,7 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const isSubScreen = !!leftElement;
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
@@ -116,7 +117,7 @@ export function ScreenHeader({
                 <Text
                   className="mt-0.5 text-[12px] font-medium"
                   numberOfLines={1}
-                  style={{ color: semanticColors.muted }}
+                  style={{ color: colors.muted }}
                 >
                   {subtitle}
                 </Text>

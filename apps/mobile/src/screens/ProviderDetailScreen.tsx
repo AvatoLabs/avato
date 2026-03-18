@@ -33,11 +33,11 @@ import ContentSkeleton from '../components/ui/ContentSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
-import { semanticColors } from '../constants/colors';
 import { aiModelApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AiProviderDetailItem, AiProviderModelItem } from '../types';
 
@@ -87,6 +87,7 @@ function SecureInputRow({
   placeholder?: string;
   value: string;
 }) {
+  const colors = useThemeColors();
   const [visible, setVisible] = useState(false);
   return (
     <>
@@ -94,30 +95,22 @@ function SecureInputRow({
         {label}
       </Text>
       <View className="flex-row items-center bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3">
-        <Key color={semanticColors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
+        <Key color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}
           className="flex-1 ml-2 text-foreground text-[14px]"
           placeholder={placeholder}
-          placeholderTextColor={semanticColors.muted}
+          placeholderTextColor={colors.muted}
           secureTextEntry={!visible}
           value={value}
           onChangeText={onChangeText}
         />
         <TouchableOpacity onPress={() => setVisible(!visible)}>
           {visible ? (
-            <EyeOff
-              color={semanticColors.secondaryText}
-              size={16}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <EyeOff color={colors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
           ) : (
-            <Eye
-              color={semanticColors.secondaryText}
-              size={16}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <Eye color={colors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
           )}
         </TouchableOpacity>
       </View>
@@ -236,6 +229,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   const providerId: string = route.params?.providerId ?? '';
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const refreshModelStore = useModelStore((s) => s.fetchModels);
 
   const [detail, setDetail] = useState<AiProviderDetailItem | null>(null);
@@ -462,14 +456,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          leftElement={
-            <ArrowLeft
-              color={semanticColors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          }
           title={t.providerDetailTitle}
+          leftElement={
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          }
           onPressLeft={() => navigation.goBack()}
         />
         <ContentSkeleton />
@@ -480,14 +470,10 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
         title={detail?.name || providerId}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         onPressLeft={() => navigation.goBack()}
       />
 
@@ -498,9 +484,9 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={[semanticColors.primary]}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor={semanticColors.primary}
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -575,7 +561,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                         autoCorrect={false}
                         className="flex-1 text-foreground text-[14px]"
                         placeholder={meta.placeholder}
-                        placeholderTextColor={semanticColors.muted}
+                        placeholderTextColor={colors.muted}
                         value={vaults[fieldKey] || ''}
                         onChangeText={(v) => setVaults((prev) => ({ ...prev, [fieldKey]: v }))}
                       />
@@ -626,7 +612,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                 </View>
                 <Switch
                   thumbColor="#fff"
-                  trackColor={{ false: '#e0e0e0', true: semanticColors.primary }}
+                  trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
                   value={fetchOnClient}
                   onValueChange={handleToggleFetchOnClient}
                 />
@@ -654,22 +640,18 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   </Text>
                 </View>
                 {checking ? (
-                  <ActivityIndicator color={semanticColors.primary} size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : checkResult === 'success' ? (
                   <View className="w-7 h-7 rounded-full bg-green-500/15 items-center justify-center">
                     <Check color="#4caf50" size={16} strokeWidth={2.5} />
                   </View>
                 ) : checkResult === 'failed' ? (
                   <View className="w-7 h-7 rounded-full bg-red-500/15 items-center justify-center">
-                    <X color={semanticColors.danger} size={16} strokeWidth={2.5} />
+                    <X color={colors.danger} size={16} strokeWidth={2.5} />
                   </View>
                 ) : (
                   <View className="w-7 h-7 rounded-full bg-blue-500/15 items-center justify-center">
-                    <Wifi
-                      color={semanticColors.primary}
-                      size={16}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
+                    <Wifi color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -692,11 +674,11 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           {models.length > 5 && (
             <View className="px-5 mb-3">
               <View className="flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-                <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+                <Search color={colors.muted} size={16} strokeWidth={2} />
                 <TextInput
                   className="flex-1 text-foreground text-[14px] ml-2.5"
                   placeholder={t.search}
-                  placeholderTextColor={semanticColors.muted}
+                  placeholderTextColor={colors.muted}
                   returnKeyType="search"
                   value={modelSearch}
                   onChangeText={setModelSearch}
@@ -713,7 +695,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
             <View className="mx-5 bg-foreground/[0.02] rounded-2xl overflow-hidden">
               {filteredModels.map((model) => (
                 <View
-                  className="flex-row items-center px-4 py-3 border-b border-black/[0.03]"
+                  className="flex-row items-center px-4 py-3 border-b border-border"
                   key={model.id}
                 >
                   <View className="flex-1">
@@ -729,7 +711,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   </View>
                   <Switch
                     thumbColor="#fff"
-                    trackColor={{ false: '#e0e0e0', true: semanticColors.primary }}
+                    trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
                     value={model.enabled}
                     onValueChange={() => handleToggleModel(model.id, model.enabled)}
                   />

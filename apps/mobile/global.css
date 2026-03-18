@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Sync with src/theme/colors.ts — single source of truth for theming */
+/* Sync with src/theme/colors.ts + palettes.ts — single source of truth for theming */
 @layer base {
   :root {
     --color-background: #ffffff;
@@ -20,5 +20,21 @@
     --color-secondary: #8e8e93;
     --color-border: rgba(255, 255, 255, 0.08);
     --color-card: #1c1c1e;
+  }
+
+  /* Color scheme: violet */
+  .theme-violet {
+    --color-primary: #8b5cf6;
+  }
+  .dark.theme-violet {
+    --color-primary: #a78bfa;
+  }
+
+  /* Color scheme: green */
+  .theme-green {
+    --color-primary: #10b981;
+  }
+  .dark.theme-green {
+    --color-primary: #34d399;
   }
 }

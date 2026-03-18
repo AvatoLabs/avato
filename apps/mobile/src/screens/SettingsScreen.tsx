@@ -33,6 +33,7 @@ import {
   setCachedUserMemorySettings,
 } from '../store/user';
 import { useThemeColors } from '../theme/colors';
+import type { ColorSchemeId } from '../theme/palettes';
 import { tokens } from '../theme/tokens';
 import type { MobileMemoryEffort } from '../types';
 
@@ -41,6 +42,21 @@ const THEME_OPTIONS: { icon: typeof Sun; value: ThemePreference }[] = [
   { icon: Moon, value: 'dark' },
   { icon: Monitor, value: 'system' },
 ];
+
+const COLOR_SCHEME_OPTIONS: { color: string; value: ColorSchemeId }[] = [
+  { color: '#007aff', value: 'blue' },
+  { color: '#8b5cf6', value: 'violet' },
+  { color: '#10b981', value: 'green' },
+];
+
+const getColorSchemeLabel = (
+  value: ColorSchemeId,
+  t: { themeColorBlue: string; themeColorViolet: string; themeColorGreen: string },
+) => {
+  if (value === 'blue') return t.themeColorBlue;
+  if (value === 'violet') return t.themeColorViolet;
+  return t.themeColorGreen;
+};
 
 const getThemeLabel = (
   value: ThemePreference,
@@ -56,6 +72,8 @@ export default function SettingsScreen({ navigation }: any) {
   const toast = useToast();
   const themePreference = useThemeStore((s) => s.preference);
   const setThemePreference = useThemeStore((s) => s.setPreference);
+  const colorScheme = useThemeStore((s) => s.colorScheme);
+  const setColorScheme = useThemeStore((s) => s.setColorScheme);
   const themeColors = useThemeColors();
   const [memoryEnabled, setMemoryEnabled] = useState(DEFAULT_USER_MEMORY_SETTINGS.enabled);
   const [memoryEffort, setMemoryEffort] = useState<MobileMemoryEffort>(
@@ -179,6 +197,43 @@ export default function SettingsScreen({ navigation }: any) {
                     className={`text-[14px] font-medium ${active ? 'text-primary' : 'text-secondary/70'}`}
                   >
                     {getThemeLabel(option.value, t)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </SettingsSection>
+
+        <SettingsSection delay={40} title={t.themeColorScheme}>
+          <View className="flex-row gap-2">
+            {COLOR_SCHEME_OPTIONS.map((option) => {
+              const active = colorScheme === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-3 py-3 ${
+                    active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
+                  }`}
+                  onPress={() => {
+                    haptics.selection();
+                    setColorScheme(option.value);
+                  }}
+                >
+                  {active ? (
+                    <Check
+                      color={themeColors.primary}
+                      size={16}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  ) : null}
+                  <View
+                    className="h-4 w-4 rounded-full"
+                    style={{ backgroundColor: option.color }}
+                  />
+                  <Text
+                    className={`text-[14px] font-medium ${active ? 'text-primary' : 'text-secondary/70'}`}
+                  >
+                    {getColorSchemeLabel(option.value, t)}
                   </Text>
                 </Pressable>
               );

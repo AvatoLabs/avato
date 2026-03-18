@@ -2,6 +2,11 @@
  * ChatListScreen → AI Command Surface backed by server sessions.
  *
  * Shows: HeroComposer, pinned sessions, and recent sessions.
+ *
+ * Session vs Topic (per topic-chat-conversation-semantic-audit):
+ * - Session: 会话容器，对应 Agent 或 session-only，可含多个 Topic
+ * - Topic: 一次对话/话题，含消息序列，属于 Session
+ * - 双视图：会话（Session 列表）| 话题（跨 Session 最近 Topic，含「最近」伪 tag）
  */
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -56,7 +61,6 @@ import SkillsSheet from '../components/ui/SkillsSheet';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
-import { semanticColors } from '../constants/colors';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import { resolveTagColor, withAlpha } from '../constants/tags';
@@ -83,12 +87,14 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { getUserMemorySettings } from '../store/user';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
   AgentSkillItem,
   ChatSession,
   InstalledPlugin,
   MobileMemoryEffort,
+  RecentTopic,
   SessionTag,
 } from '../types';
 
@@ -119,6 +125,9 @@ interface ChatFilterPill {
 
 const ALL_CHATS_PILL_KEY = 'all';
 const TAG_PILL_PREFIX = 'tag:';
+const VIEW_SESSION = 'session';
+const VIEW_TOPIC = 'topic';
+type ViewMode = typeof VIEW_SESSION | typeof VIEW_TOPIC;
 
 const getTagPillKey = (tagId: string) => `${TAG_PILL_PREFIX}${tagId}`;
 
@@ -250,6 +259,7 @@ export default function ChatListScreen({ navigation }: any) {
   const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   // Dynamic greeting based on time of day + active chat count
   const greeting = useMemo(() => {
@@ -312,6 +322,9 @@ export default function ChatListScreen({ navigation }: any) {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [renameTarget, setRenameTarget] = useState<ChatSession | null>(null);
   const [selectedPillKey, setSelectedPillKey] = useState<string>(ALL_CHATS_PILL_KEY);
+  const [viewMode, setViewMode] = useState<ViewMode>(VIEW_SESSION);
+  const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([]);
+  const [recentTopicsLoading, setRecentTopicsLoading] = useState(false);
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
@@ -418,8 +431,31 @@ export default function ChatListScreen({ navigation }: any) {
       }
       void fetchSessionTags();
       void loadGlobalMemorySettings();
+      topicApi
+        .recentTopics(24)
+        .then(setRecentTopics)
+        .catch(() => setRecentTopics([]));
     }, [fetchSessionTags, initialized, fetchSessions, loadGlobalMemorySettings]),
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (viewMode === VIEW_TOPIC) setRecentTopicsLoading(true);
+    topicApi
+      .recentTopics(24)
+      .then((data) => {
+        if (!cancelled) setRecentTopics(data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentTopics([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecentTopicsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, initialized]);
 
   useEffect(() => {
     if (!selectedPillKey.startsWith(TAG_PILL_PREFIX)) return;
@@ -809,15 +845,15 @@ export default function ChatListScreen({ navigation }: any) {
           closeActionSheet();
         } else {
           closeActionSheet();
-          setTimeout(() => {
-            useToast.getState().show('error', `${failMsg} ${failHint}`.trim());
-          }, 350);
+          const msg =
+            `${failMsg} ${failHint}`.trim() ||
+            'Failed to generate title. Ensure the chat has messages and the title model is configured.';
+          setTimeout(() => useToast.getState().show('error', msg), 350);
         }
       } catch (err) {
         closeActionSheet();
-        setTimeout(() => {
-          useToast.getState().show('error', failMsg);
-        }, 350);
+        const msg = failMsg || 'Failed to generate title';
+        setTimeout(() => useToast.getState().show('error', msg), 350);
       } finally {
         setSmartRenamingId(null);
       }
@@ -983,6 +1019,24 @@ export default function ChatListScreen({ navigation }: any) {
     [matchesSelectedPill, searchResults],
   );
 
+  /** sessionId -> latest topic (from recentTopics) for Session row weak preview */
+  const latestTopicBySessionId = useMemo(() => {
+    const map = new Map<string, { title: string; updatedAt: string }>();
+    for (const t of recentTopics) {
+      const sid = t.sessionId;
+      if (!sid) continue;
+      const existing = map.get(sid);
+      const ts =
+        typeof t.updatedAt === 'string'
+          ? t.updatedAt
+          : ((t.updatedAt as Date)?.toISOString?.() ?? '');
+      if (!existing || new Date(ts).getTime() > new Date(existing.updatedAt).getTime()) {
+        map.set(sid, { title: t.title ?? '', updatedAt: ts });
+      }
+    }
+    return map;
+  }, [recentTopics]);
+
   const handleCreateAgent = useCallback(async () => {
     setCreateMenuVisible(false);
 
@@ -1090,7 +1144,7 @@ export default function ChatListScreen({ navigation }: any) {
     [removeSession, t.cancel, t.delete, t.deleteSessionConfirm, t.deleteSessionDesc],
   );
 
-  const renderSessionRow = (item: ChatSession) => {
+  const renderSessionRow = (item: ChatSession, showTopicPreview?: boolean) => {
     const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
 
@@ -1101,7 +1155,7 @@ export default function ChatListScreen({ navigation }: any) {
         activeOpacity={0.8}
         className="items-center justify-center px-5"
         style={{
-          backgroundColor: semanticColors.danger,
+          backgroundColor: colors.danger,
           minWidth: 72,
         }}
         onPress={() => handleSwipeDelete(item)}
@@ -1112,11 +1166,7 @@ export default function ChatListScreen({ navigation }: any) {
     );
 
     return (
-      <Swipeable
-        friction={2}
-        key={item.id}
-        renderRightActions={renderRightActions}
-      >
+      <Swipeable friction={2} key={item.id} renderRightActions={renderRightActions}>
         <TouchableOpacity
           accessibilityLabel={item.title}
           accessibilityRole="button"
@@ -1137,7 +1187,7 @@ export default function ChatListScreen({ navigation }: any) {
             <View className="flex-row items-center mb-0.5 flex-wrap">
               {item.pinned && (
                 <Pin
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={11}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 4 }}
@@ -1152,7 +1202,14 @@ export default function ChatListScreen({ navigation }: any) {
               {renderTagChip(item.tagId)}
             </View>
             <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
-              {item.description}
+              {showTopicPreview
+                ? (() => {
+                    const latest = latestTopicBySessionId.get(item.id);
+                    if (latest?.title)
+                      return `${latest.title} · ${formatTimeAgo(latest.updatedAt, t)}`;
+                    return item.description ?? '';
+                  })()
+                : (item.description ?? '')}
             </Text>
           </View>
           <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
@@ -1242,7 +1299,7 @@ export default function ChatListScreen({ navigation }: any) {
               }}
             >
               <MessageSquarePlus
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -1250,78 +1307,133 @@ export default function ChatListScreen({ navigation }: any) {
           </View>
         }
         titleIcon={
-          <MessageCircle
-            color={semanticColors.primary}
-            size={20}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <MessageCircle color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
       >
+        {/* View mode: Sessions | Topics (with "Recent" pseudo-tag) */}
         <ScrollView
           horizontal
-          className="pb-3"
+          className="pb-2"
           contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
           showsHorizontalScrollIndicator={false}
         >
-          {pillItems.map((pill) => {
-            const selected = pill.key === selectedPillKey;
-            const resolvedColor = pill.tagId ? resolveTagColor(pill.color) : semanticColors.primary;
-            const selectedBackground = pill.tagId ? resolvedColor : semanticColors.primary;
-            const unselectedBackground = pill.tagId
-              ? withAlpha(pill.color, '16')
-              : semanticColors.fillTertiary;
-            const countBackground = selected
-              ? withAlpha(selectedBackground, '33')
-              : withAlpha(pill.color, '20');
-            const editableTag = pill.tagId ? tagById[pill.tagId] : undefined;
-
-            return (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                className="flex-row items-center rounded-full px-4 py-2"
-                key={pill.key}
-                style={{
-                  backgroundColor: selected ? selectedBackground : unselectedBackground,
-                }}
-                onLongPress={editableTag ? () => openEditTag(editableTag) : undefined}
-                onPress={() => {
-                  haptics.selection();
-                  setSelectedPillKey(pill.key);
-                }}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="flex-row items-center rounded-full px-4 py-2"
+            style={{
+              backgroundColor: viewMode === VIEW_SESSION ? colors.primary : colors.fillTertiary,
+            }}
+            onPress={() => {
+              haptics.selection();
+              setViewMode(VIEW_SESSION);
+            }}
+          >
+            <Text
+              className="text-[13px] font-semibold"
+              style={{ color: viewMode === VIEW_SESSION ? '#fff' : colors.foreground }}
+            >
+              {t.chatListViewSession}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="flex-row items-center rounded-full px-4 py-2"
+            style={{
+              backgroundColor: viewMode === VIEW_TOPIC ? colors.primary : colors.fillTertiary,
+            }}
+            onPress={() => {
+              haptics.selection();
+              setViewMode(VIEW_TOPIC);
+            }}
+          >
+            <Text
+              className="text-[13px] font-semibold"
+              style={{ color: viewMode === VIEW_TOPIC ? '#fff' : colors.foreground }}
+            >
+              {t.chatListViewTopic}
+            </Text>
+            <View
+              className="ml-1.5 rounded-full px-2 py-0.5"
+              style={{
+                backgroundColor:
+                  viewMode === VIEW_TOPIC
+                    ? withAlpha('#fff', '33')
+                    : withAlpha(colors.primary, '20'),
+              }}
+            >
+              <Text
+                className="text-[10px] font-semibold"
+                style={{ color: viewMode === VIEW_TOPIC ? '#fff' : colors.secondaryText }}
               >
-                <Text
-                  className="text-[13px] font-semibold"
+                {t.chatListTopicRecent}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </ScrollView>
+        {/* Tag pills (session view only) */}
+        {viewMode === VIEW_SESSION && (
+          <ScrollView
+            horizontal
+            className="pb-3"
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}
+            showsHorizontalScrollIndicator={false}
+          >
+            {pillItems.map((pill) => {
+              const selected = pill.key === selectedPillKey;
+              const resolvedColor = pill.tagId ? resolveTagColor(pill.color) : colors.primary;
+              const selectedBackground = pill.tagId ? resolvedColor : colors.primary;
+              const unselectedBackground = pill.tagId
+                ? withAlpha(pill.color, '16')
+                : colors.fillTertiary;
+              const countBackground = selected
+                ? withAlpha(selectedBackground, '33')
+                : withAlpha(pill.color, '20');
+              const editableTag = pill.tagId ? tagById[pill.tagId] : undefined;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  className="flex-row items-center rounded-full px-4 py-2"
+                  key={pill.key}
                   style={{
-                    color: selected
-                      ? '#fff'
-                      : pill.tagId
-                        ? resolvedColor
-                        : semanticColors.foreground,
+                    backgroundColor: selected ? selectedBackground : unselectedBackground,
+                  }}
+                  onLongPress={editableTag ? () => openEditTag(editableTag) : undefined}
+                  onPress={() => {
+                    haptics.selection();
+                    setSelectedPillKey(pill.key);
                   }}
                 >
-                  {pill.label}
-                </Text>
-                <View
-                  className="ml-2 rounded-full px-2 py-0.5"
-                  style={{ backgroundColor: countBackground }}
-                >
                   <Text
-                    className="text-[11px] font-semibold"
+                    className="text-[13px] font-semibold"
                     style={{
-                      color: selected
-                        ? '#fff'
-                        : pill.tagId
-                          ? resolvedColor
-                          : semanticColors.secondaryText,
+                      color: selected ? '#fff' : pill.tagId ? resolvedColor : colors.foreground,
                     }}
                   >
-                    {pill.count}
+                    {pill.label}
                   </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <View
+                    className="ml-2 rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: countBackground }}
+                  >
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{
+                        color: selected
+                          ? '#fff'
+                          : pill.tagId
+                            ? resolvedColor
+                            : colors.secondaryText,
+                      }}
+                    >
+                      {pill.count}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
       </ScreenHeader>
 
       <ScrollView
@@ -1330,9 +1442,9 @@ export default function ChatListScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={[semanticColors.primary]}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor={semanticColors.primary}
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -1375,16 +1487,12 @@ export default function ChatListScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(75).duration(350)}>
           <View className="px-5 mt-3 mb-2">
             <View className="flex-row items-center bg-foreground/5 rounded-xl px-3.5 py-2.5">
-              <Search
-                color={semanticColors.muted}
-                size={16}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <Search color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
               <TextInput
                 className="flex-1 ml-2.5 text-foreground text-[14px]"
                 clearButtonMode="while-editing"
                 placeholder={t.chatListSearch}
-                placeholderTextColor={semanticColors.muted}
+                placeholderTextColor={colors.muted}
                 returnKeyType="search"
                 value={searchText}
                 onChangeText={setSearchText}
@@ -1413,13 +1521,86 @@ export default function ChatListScreen({ navigation }: any) {
               </View>
             )}
           </Animated.View>
+        ) : viewMode === VIEW_TOPIC ? (
+          /* Topic view: recent topics across sessions */
+          <Animated.View entering={FadeInDown.delay(100).duration(350)}>
+            {recentTopicsLoading ? (
+              <ListSkeleton />
+            ) : recentTopics.length > 0 ? (
+              <SectionBlock title={t.chatListTopicRecent}>
+                {recentTopics.map((topic) => {
+                  const navSessionId = topic.sessionId ?? topic.group?.id ?? null;
+                  if (!navSessionId) return null;
+                  const session = sessions.find((s) => s.id === navSessionId);
+                  const providerId =
+                    session?.provider ||
+                    (session?.model ? modelToProvider[session.model] : undefined);
+                  const providerLogo = providerId ? providerLogoById[providerId] : undefined;
+                  return (
+                    <TouchableOpacity
+                      accessibilityLabel={topic.title ?? t.chatListNewConversation}
+                      accessibilityRole="button"
+                      activeOpacity={0.65}
+                      className="flex-row items-start px-5 py-3 active:bg-foreground/10 bg-background"
+                      key={topic.id}
+                      onPress={() =>
+                        navigation.navigate('ChatDetail', {
+                          sessionId: navSessionId,
+                          topicId: topic.id,
+                        })
+                      }
+                    >
+                      <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
+                        <SessionLogo
+                          avatar={session?.avatar ?? topic.agent?.avatar}
+                          provider={providerId}
+                          providerLogo={providerLogo}
+                          size={36}
+                        />
+                      </View>
+                      <View className="flex-1 mr-3 mt-0.5">
+                        <Text
+                          className="text-foreground text-[15px] font-medium tracking-tight"
+                          numberOfLines={1}
+                        >
+                          {topic.title || t.chatListNewConversation}
+                        </Text>
+                        <Text
+                          className="text-secondary/40 text-[12px] font-medium"
+                          numberOfLines={1}
+                        >
+                          {topic.type === 'group'
+                            ? topic.group?.title
+                            : (topic.agent?.title ?? session?.title ?? '')}
+                        </Text>
+                      </View>
+                      <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
+                        {formatTimeAgo(
+                          typeof topic.updatedAt === 'string'
+                            ? topic.updatedAt
+                            : ((topic.updatedAt as Date)?.toISOString?.() ?? ''),
+                          t,
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </SectionBlock>
+            ) : (
+              <EmptyState
+                description={t.chatListTopicEmptyDesc}
+                icon="💬"
+                title={t.chatListTopicEmpty}
+              />
+            )}
+          </Animated.View>
         ) : (
           <>
             {/* Pinned Sessions */}
             {pinnedSessions.length > 0 && (
               <Animated.View entering={FadeInDown.delay(100).duration(350)}>
                 <SectionBlock title={t.groupPinned}>
-                  {pinnedSessions.map(renderSessionRow)}
+                  {pinnedSessions.map((s) => renderSessionRow(s, true))}
                 </SectionBlock>
               </Animated.View>
             )}
@@ -1428,7 +1609,7 @@ export default function ChatListScreen({ navigation }: any) {
             {filteredSessions.length > 0 && (
               <Animated.View entering={FadeInDown.delay(150).duration(350)}>
                 <SectionBlock title={t.homeRecents}>
-                  {filteredSessions.slice(0, 20).map(renderSessionRow)}
+                  {filteredSessions.slice(0, 20).map((s) => renderSessionRow(s, true))}
                 </SectionBlock>
               </Animated.View>
             )}
@@ -1488,7 +1669,7 @@ export default function ChatListScreen({ navigation }: any) {
               onPress={handleCreateChat}
             >
               <MessageSquarePlus
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -1501,7 +1682,7 @@ export default function ChatListScreen({ navigation }: any) {
               className="flex-row items-center px-4 py-3"
               onPress={handleCreateAgent}
             >
-              <Bot color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Bot color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-3 text-[15px] font-medium text-foreground">
                 {t.chatListCreateAgent}
               </Text>
@@ -1511,11 +1692,7 @@ export default function ChatListScreen({ navigation }: any) {
               className="flex-row items-center px-4 py-3"
               onPress={handleCreateGroup}
             >
-              <UsersRound
-                color={semanticColors.primary}
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <UsersRound color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-3 text-[15px] font-medium text-foreground">
                 {t.chatListCreateGroup}
               </Text>
@@ -1528,7 +1705,7 @@ export default function ChatListScreen({ navigation }: any) {
                 openCreateTag();
               }}
             >
-              <Tag color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Tag color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-3 text-[15px] font-medium text-foreground">
                 {t.chatListCreateTag}
               </Text>
@@ -1584,11 +1761,7 @@ export default function ChatListScreen({ navigation }: any) {
                     closeActionSheet();
                   }}
                 >
-                  <Pin
-                    color={semanticColors.muted}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Pin color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-foreground">
                     {actionSession?.pinned ? t.actionUnpin : t.actionPin}
                   </Text>
@@ -1598,11 +1771,7 @@ export default function ChatListScreen({ navigation }: any) {
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => actionSession && handleRename(actionSession)}
                 >
-                  <Pencil
-                    color={semanticColors.muted}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                 </Pressable>
 
@@ -1611,14 +1780,8 @@ export default function ChatListScreen({ navigation }: any) {
                   disabled={!!smartRenamingId}
                   onPress={() => actionSession && handleSmartRename(actionSession)}
                 >
-                  <Wand2
-                    color={semanticColors.muted}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                  <Text className="ml-3 text-base text-foreground">
-                    {t.actionSmartRename}
-                  </Text>
+                  <Wand2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.actionSmartRename}</Text>
                 </Pressable>
 
                 {actionSession?.type !== 'group' ? (
@@ -1630,15 +1793,11 @@ export default function ChatListScreen({ navigation }: any) {
                     }}
                   >
                     <View className="flex-row items-center">
-                      <Tag
-                        color={semanticColors.muted}
-                        size={18}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
+                      <Tag color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                       <Text className="ml-3 text-base text-foreground">{t.tagMoveSession}</Text>
                     </View>
                     <ChevronRight
-                      color={semanticColors.secondaryText}
+                      color={colors.secondaryText}
                       size={16}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -1664,11 +1823,7 @@ export default function ChatListScreen({ navigation }: any) {
                     }
                   }}
                 >
-                  <Trash2
-                    color={semanticColors.danger}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
                 </Pressable>
               </View>
@@ -1695,7 +1850,7 @@ export default function ChatListScreen({ navigation }: any) {
                       onPress={() => setActionPanel('root')}
                     >
                       <ArrowLeft
-                        color={semanticColors.primary}
+                        color={colors.primary}
                         size={18}
                         strokeWidth={tokens.icon.strokeWidth}
                       />
@@ -1714,13 +1869,13 @@ export default function ChatListScreen({ navigation }: any) {
                       <View className="flex-row items-center">
                         <View
                           className="mr-3 h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: semanticColors.secondaryText }}
+                          style={{ backgroundColor: colors.secondaryText }}
                         />
                         <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                       </View>
                       {!actionSession?.tagId ? (
                         <Check
-                          color={semanticColors.primary}
+                          color={colors.primary}
                           size={18}
                           strokeWidth={tokens.icon.strokeWidth}
                         />
@@ -1744,7 +1899,7 @@ export default function ChatListScreen({ navigation }: any) {
                         </View>
                         {actionSession?.tagId === tag.id ? (
                           <Check
-                            color={semanticColors.primary}
+                            color={colors.primary}
                             size={18}
                             strokeWidth={tokens.icon.strokeWidth}
                           />
@@ -1758,11 +1913,7 @@ export default function ChatListScreen({ navigation }: any) {
                         openCreateTag(actionSession?.id);
                       }}
                     >
-                      <Tag
-                        color={semanticColors.primary}
-                        size={18}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
+                      <Tag color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                       <Text className="ml-3 text-[15px] font-medium text-primary">
                         {t.tagCreate}
                       </Text>

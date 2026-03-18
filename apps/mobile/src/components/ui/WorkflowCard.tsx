@@ -30,7 +30,7 @@ export function WorkflowCard({
       className="w-[220px] rounded-xl overflow-hidden mr-3 shadow-sm active:opacity-80"
       onPress={onPress}
     >
-      <BlurView className="flex-1 p-4 border border-black/5" intensity={40} tint="light">
+      <BlurView className="flex-1 p-4 border border-border" intensity={40} tint="light">
         <View className="flex-row items-center justify-between mb-3">
           <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
             <IconComp color={themeColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />

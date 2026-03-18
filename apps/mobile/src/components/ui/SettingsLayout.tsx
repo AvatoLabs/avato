@@ -7,7 +7,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 export interface SettingsRowProps {
@@ -22,15 +22,17 @@ export interface SettingsRowProps {
 export function SettingsRow({
   icon: IconComp,
   iconBg = 'bg-primary/10',
-  iconColor = semanticColors.primary,
+  iconColor,
   label,
   onPress,
   subtitle,
 }: SettingsRowProps) {
+  const colors = useThemeColors();
+  const effectiveIconColor = iconColor ?? colors.primary;
   const content = (
     <>
       <View className={`w-8 h-8 rounded-full ${iconBg} items-center justify-center mr-4`}>
-        <IconComp color={iconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
+        <IconComp color={effectiveIconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
       </View>
       <View className="flex-1">
         <Text className="text-foreground text-[15.5px] font-medium tracking-tight">{label}</Text>
@@ -39,13 +41,17 @@ export function SettingsRow({
         )}
       </View>
       {onPress ? (
-        <ChevronRight color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        <ChevronRight color={effectiveIconColor} size={18} strokeWidth={tokens.icon.strokeWidth} />
       ) : null}
     </>
   );
 
   if (!onPress) {
-    return <View className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02]">{content}</View>;
+    return (
+      <View className="flex-row items-center px-5 py-3.5 mb-2 rounded-2xl bg-foreground/[0.02]">
+        {content}
+      </View>
+    );
   }
 
   return (

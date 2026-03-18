@@ -529,7 +529,9 @@ const GroupTasksBlock = memo<{
       </View>
       <View className="gap-2">
         {tasks.map((task) => {
-          const agentName = task.agentId ? groupMembersById?.[task.agentId]?.title ?? task.agentId : '';
+          const agentName = task.agentId
+            ? (groupMembersById?.[task.agentId]?.title ?? task.agentId)
+            : '';
           const taskTitle =
             (task.metadata as Record<string, unknown>)?.taskTitle ??
             task.taskDetail?.title ??
@@ -537,12 +539,16 @@ const GroupTasksBlock = memo<{
             t.chatToolRunning;
           const status = task.taskDetail?.status;
           const isDone = status === 'completed' || status === 'Completed';
-          const isError = status === 'failed' || status === 'Failed' || status === 'cancel' || status === 'Cancel';
+          const isError =
+            status === 'failed' ||
+            status === 'Failed' ||
+            status === 'cancel' ||
+            status === 'Cancel';
 
           return (
             <View
-              key={task.id}
               className="rounded-xl px-3 py-2.5"
+              key={task.id}
               style={{
                 backgroundColor: themeColors.overlay,
                 borderColor: themeColors.primaryBorder,
@@ -1068,58 +1074,61 @@ const MessageBubble = memo<MessageBubbleProps>(
           )}
 
           <View className={isUser ? 'items-end min-w-0 flex-1' : 'flex-1 min-w-0'}>
-            {!isUser &&
-              (shouldShowGroupSpeaker ? (
-                <View className="mb-1.5 flex-row items-center">
-                  <View className="min-w-0 flex-1 flex-row items-center">
-                    <Text
-                      className="text-[12px] font-semibold text-foreground/75"
-                      numberOfLines={1}
-                    >
-                      {groupSpeakerName || t.settingsDefaultAgent}
-                    </Text>
-                    {isSupervisorSpeaker ? (
-                      <View className="ml-2 rounded-full bg-primary/10 px-2 py-0.5">
-                        <Text className="text-[10px] font-semibold text-primary">
-                          {t.groupSettingsSupervisor}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {message.model ? (
+            {!isUser && (
+              <>
+                {shouldShowGroupSpeaker ? (
+                  <View className="mb-1.5 flex-row items-center">
+                    <View className="min-w-0 flex-1 flex-row items-center">
                       <Text
-                        className="ml-2 flex-1 text-[11px] text-foreground/35"
+                        className="text-[12px] font-semibold text-foreground/75"
                         numberOfLines={1}
                       >
-                        {message.model}
+                        {groupSpeakerName || t.settingsDefaultAgent}
+                      </Text>
+                      {isSupervisorSpeaker ? (
+                        <View className="ml-2 rounded-full bg-primary/10 px-2 py-0.5">
+                          <Text className="text-[10px] font-semibold text-primary">
+                            {t.groupSettingsSupervisor}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {message.model ? (
+                        <Text
+                          className="ml-2 flex-1 text-[11px] text-foreground/35"
+                          numberOfLines={1}
+                        >
+                          {message.model}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {message.createdAt ? (
+                      <Text className="ml-2 text-[10px] text-foreground/20">
+                        {getTimeAgo(message.createdAt)}
                       </Text>
                     ) : null}
                   </View>
-                  {message.createdAt ? (
-                    <Text className="ml-2 text-[10px] text-foreground/20">
+                ) : message.role === 'groupTasks' && message.createdAt ? (
+                  <View className="mb-1.5 flex-row justify-end">
+                    <Text className="text-[10px] text-foreground/20">
                       {getTimeAgo(message.createdAt)}
                     </Text>
-                  ) : null}
-                </View>
-              ) : message.role === 'groupTasks' && message.createdAt ? (
-                <View className="mb-1.5 flex-row justify-end">
-                  <Text className="text-[10px] text-foreground/20">
-                    {getTimeAgo(message.createdAt)}
-                  </Text>
-                </View>
-              ) : (
-                <View className="mb-1.5 flex-row items-center">
-                  {message.model ? (
-                    <Text className="text-[11px] text-foreground/35 flex-1" numberOfLines={1}>
-                      {message.model}
-                    </Text>
-                  ) : null}
-                  {message.createdAt ? (
-                    <Text className="text-[10px] text-foreground/20 ml-2">
-                      {getTimeAgo(message.createdAt)}
-                    </Text>
-                  ) : null}
-                </View>
-              )}
+                  </View>
+                ) : (
+                  <View className="mb-1.5 flex-row items-center">
+                    {message.model ? (
+                      <Text className="text-[11px] text-foreground/35 flex-1" numberOfLines={1}>
+                        {message.model}
+                      </Text>
+                    ) : null}
+                    {message.createdAt ? (
+                      <Text className="text-[10px] text-foreground/20 ml-2">
+                        {getTimeAgo(message.createdAt)}
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
+              </>
+            )}
 
             <View style={isUser ? userContentWidth : assistantContentWidth}>
               {showStandaloneUserAttachments ? (

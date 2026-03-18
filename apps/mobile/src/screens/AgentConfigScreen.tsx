@@ -29,7 +29,6 @@ import { ModelDrawer } from '../components/ui/ModelDrawer';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
-import { semanticColors } from '../constants/colors';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import { useAgentConfig } from '../hooks/useAgentConfig';
@@ -38,6 +37,7 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin, MobileMemoryEffort } from '../types';
 
@@ -154,7 +154,7 @@ function CollapsibleSection({
     <SectionCard title={title}>
       <TouchableOpacity activeOpacity={0.8} className="flex-row items-center" onPress={onToggle}>
         <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-          <Icon color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <Icon color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
         <View className="flex-1">
           <Text className="text-[15px] font-semibold tracking-tight text-foreground">{title}</Text>
@@ -164,13 +164,13 @@ function CollapsibleSection({
         </View>
         {expanded ? (
           <ChevronDown
-            color={semanticColors.secondaryText}
+            color={colors.secondaryText}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />
         ) : (
           <ChevronRight
-            color={semanticColors.secondaryText}
+            color={colors.secondaryText}
             size={18}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -202,7 +202,7 @@ function Field({
         className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
         multiline={multiline}
         placeholder={placeholder}
-        placeholderTextColor={semanticColors.secondaryText}
+        placeholderTextColor={colors.secondaryText}
         style={multiline ? { minHeight: 96, textAlignVertical: 'top' } : undefined}
         value={value}
         onChangeText={onChangeText}
@@ -231,7 +231,7 @@ function ToggleRow({
         ) : null}
       </View>
       <Switch
-        trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${semanticColors.primary}66` }}
+        trackColor={{ false: 'rgba(120,120,128,0.18)', true: `${colors.primary}66` }}
         value={value}
         onValueChange={onValueChange}
       />
@@ -252,12 +252,12 @@ function ChoicePill({
     <TouchableOpacity
       activeOpacity={0.85}
       className="rounded-full px-4 py-2"
-      style={{ backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary }}
+      style={{ backgroundColor: active ? colors.primary : colors.fillTertiary }}
       onPress={onPress}
     >
       <Text
         className="text-[12px] font-semibold"
-        style={{ color: active ? '#fff' : semanticColors.foreground }}
+        style={{ color: active ? '#fff' : colors.foreground }}
       >
         {label}
       </Text>
@@ -272,7 +272,7 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
   if (!providerId) {
     return (
       <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-        <Cpu color={semanticColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        <Cpu color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
       </View>
     );
   }
@@ -330,6 +330,7 @@ function SkillRow({
 
 function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <View className="flex-1 bg-background">
@@ -337,14 +338,10 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
         rightAccessibilityLabel={t.accessibilityOpenStore}
         title={t.agentConfigTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         rightElement={
-          <Save color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Save color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => navigation.goBack()}
         onPressRight={() => navigation.navigate('Store')}
@@ -376,6 +373,7 @@ function SessionAgentConfigScreen({
 }) {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const modelProviders = useModelStore((s) => s.providers);
@@ -633,11 +631,7 @@ function SessionAgentConfigScreen({
         <ScreenHeader
           title={t.agentConfigTitle}
           leftElement={
-            <ArrowLeft
-              color={semanticColors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
           }
           onPressLeft={() => navigation.goBack()}
         />
@@ -653,17 +647,13 @@ function SessionAgentConfigScreen({
         rightAccessibilityLabel={t.accessibilitySave}
         title={t.agentConfigTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         rightElement={
           saving ? (
-            <ActivityIndicator color={semanticColors.primary} />
+            <ActivityIndicator color={colors.primary} />
           ) : (
-            <Save color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <Save color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
           )
         }
         onPressLeft={() => navigation.goBack()}
@@ -690,7 +680,7 @@ function SessionAgentConfigScreen({
               </Text>
             </View>
             <ChevronRight
-              color={semanticColors.secondaryText}
+              color={colors.secondaryText}
               size={18}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -707,11 +697,7 @@ function SessionAgentConfigScreen({
             }}
           >
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
-              <Puzzle
-                color={semanticColors.primary}
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <Puzzle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="ml-3 flex-1">
               <Text className="text-[15px] font-semibold tracking-tight text-foreground">
@@ -722,7 +708,7 @@ function SessionAgentConfigScreen({
               </Text>
             </View>
             <ChevronRight
-              color={semanticColors.secondaryText}
+              color={colors.secondaryText}
               size={18}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -951,7 +937,7 @@ function SessionAgentConfigScreen({
             <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 28 }}>
               {loadingSkills ? (
                 <View className="items-center py-10">
-                  <ActivityIndicator color={semanticColors.primary} />
+                  <ActivityIndicator color={colors.primary} />
                 </View>
               ) : builtinSkillItems.length === 0 &&
                 agentSkillItems.length === 0 &&
@@ -972,7 +958,7 @@ function SessionAgentConfigScreen({
                               value={selectedSkills.has(item.identifier)}
                               trackColor={{
                                 false: 'rgba(120,120,128,0.18)',
-                                true: `${semanticColors.primary}66`,
+                                true: `${colors.primary}66`,
                               }}
                               onValueChange={() => toggleSkill(item.identifier)}
                             />
@@ -1004,7 +990,7 @@ function SessionAgentConfigScreen({
                                 value={selectedSkills.has(identifier)}
                                 trackColor={{
                                   false: 'rgba(120,120,128,0.18)',
-                                  true: `${semanticColors.primary}66`,
+                                  true: `${colors.primary}66`,
                                 }}
                                 onValueChange={() => toggleSkill(identifier)}
                               />
@@ -1026,7 +1012,7 @@ function SessionAgentConfigScreen({
                               value={selectedSkills.has(plugin.identifier)}
                               trackColor={{
                                 false: 'rgba(120,120,128,0.18)',
-                                true: `${semanticColors.primary}66`,
+                                true: `${colors.primary}66`,
                               }}
                               onValueChange={() => toggleSkill(plugin.identifier)}
                             />

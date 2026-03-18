@@ -23,7 +23,7 @@ export function AssistantCard({ name, description, icon: IconComp, onPress }: As
       className="w-[140px] rounded-xl overflow-hidden mr-3 shadow-sm active:opacity-80"
       onPress={onPress}
     >
-      <BlurView className="flex-1 p-3.5 border border-black/5" intensity={40} tint="light">
+      <BlurView className="flex-1 p-3.5 border border-border" intensity={40} tint="light">
         <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center mb-3">
           <IconComp color={themeColors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>

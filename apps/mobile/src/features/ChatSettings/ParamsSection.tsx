@@ -8,8 +8,8 @@ import { Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { SliderWithInput } from '../../components/ui/SliderWithInput';
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 const PARAM_DEFAULTS = {
@@ -61,6 +61,7 @@ interface ParamsSectionProps {
 
 export function ParamsSection({ delay = 0, params, onParamsChange }: ParamsSectionProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
@@ -71,11 +72,7 @@ export function ParamsSection({ delay = 0, params, onParamsChange }: ParamsSecti
         <View className="rounded-2xl bg-foreground/[0.02] p-4">
           <View className="mb-4 flex-row items-center">
             <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-              <Sliders
-                color={semanticColors.primary}
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <Sliders color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <Text className="text-[15px] font-semibold text-foreground">
               {t.chatSettingsModelParams}

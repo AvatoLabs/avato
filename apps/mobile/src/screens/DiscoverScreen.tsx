@@ -14,9 +14,9 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { semanticColors } from '../constants/colors';
-import { tokens } from '../theme/tokens';
 import { useDiscoverStore } from '../store/discover';
+import { useThemeColors } from '../theme/colors';
+import { tokens } from '../theme/tokens';
 
 type Tab = 'agents' | 'models' | 'providers';
 
@@ -32,6 +32,7 @@ function SectionHeader({ title }: { title: string }) {
 
 export default function DiscoverScreen({ navigation }: any) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState<Tab>('agents');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -122,7 +123,9 @@ export default function DiscoverScreen({ navigation }: any) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t.discoverTitle}
-        titleIcon={<Compass color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />}
+        titleIcon={
+          <Compass color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        }
       />
       {activeTab === 'agents' ? (
         <FlatList

@@ -1,14 +1,13 @@
 /**
- * DangerZoneSection — Clear history and delete conversation.
+ * DangerZoneSection — Clear history and delete session (with all its topics).
  */
 import { MessageSquare, Trash2 } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
-import { themeColors } from '../../theme/colors';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 interface DangerZoneSectionProps {
@@ -23,6 +22,7 @@ export function DangerZoneSection({
   onDeleteChat,
 }: DangerZoneSectionProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
@@ -36,12 +36,13 @@ export function DangerZoneSection({
             className="flex-row items-center px-5 py-4 active:bg-foreground/[0.04]"
             onPress={onClearHistory}
           >
-            <MessageSquare
-              color={themeColors.iconWarning}
-              size={17}
-              strokeWidth={tokens.icon.strokeWidth}
-              style={{ marginRight: 12 }}
-            />
+            <View className="mr-3">
+              <MessageSquare
+                color={colors.iconWarning}
+                size={17}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </View>
             <Text className="flex-1 text-[15px] font-medium text-foreground">
               {t.chatSettingsClearHistory}
             </Text>
@@ -51,16 +52,10 @@ export function DangerZoneSection({
             className="flex-row items-center px-5 py-4 active:bg-foreground/[0.04]"
             onPress={onDeleteChat}
           >
-            <Trash2
-              color={semanticColors.danger}
-              size={17}
-              strokeWidth={tokens.icon.strokeWidth}
-              style={{ marginRight: 12 }}
-            />
-            <Text
-              className="flex-1 text-[15px] font-medium"
-              style={{ color: semanticColors.danger }}
-            >
+            <View className="mr-3">
+              <Trash2 color={colors.danger} size={17} strokeWidth={tokens.icon.strokeWidth} />
+            </View>
+            <Text className="flex-1 text-[15px] font-medium" style={{ color: colors.danger }}>
               {t.chatSettingsDeleteConversation}
             </Text>
           </TouchableOpacity>

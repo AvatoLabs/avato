@@ -5,39 +5,30 @@
  */
 import { Users } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  FlatList,
-  Image as RNImage,
-  Modal,
-  Pressable,
-  Text,
-  TextInput,
-  TextInput as RNTextInput,
-  View,
-} from 'react-native';
+import type { TextInput as RNTextInput } from 'react-native';
+import { FlatList, Image as RNImage, Modal, Pressable, Text, TextInput, View } from 'react-native';
 
-import { semanticColors } from '../constants/colors';
-import { useI18n } from '../lib/i18n';
-import { themeColors } from '../theme/colors';
+import { useI18n } from '../../lib/i18n';
+import { semanticColors, themeColors } from '../../theme/colors';
 
 const MENTION_FORMAT = (name: string, id: string) => `<mention name="${name}" id="${id}" />`;
 
 export interface MentionMember {
+  avatar?: string;
   id: string;
   title?: string;
-  avatar?: string;
 }
 
 interface GroupMentionInputProps {
+  accessibilityLabel?: string;
+  className?: string;
+  editable?: boolean;
   members: MentionMember[];
-  placeholder?: string;
-  value: string;
   onChangeText: (text: string) => void;
   onMentionTargetIdChange?: (targetId: string | null) => void;
-  editable?: boolean;
-  accessibilityLabel?: string;
+  placeholder?: string;
   style?: object;
-  className?: string;
+  value: string;
 }
 
 export function GroupMentionInput({
@@ -103,7 +94,9 @@ export function GroupMentionInput({
     (id: string, title: string) => {
       const before = value.slice(0, mentionStartIndex);
       const afterAt = value.slice(mentionStartIndex);
-      const restAfter = afterAt.slice(afterAt.indexOf(' ') >= 0 ? afterAt.indexOf(' ') : afterAt.length);
+      const restAfter = afterAt.slice(
+        afterAt.includes(' ') ? afterAt.indexOf(' ') : afterAt.length,
+      );
       const mentionText = MENTION_FORMAT(title, id);
       const newText = `${before}${mentionText} ${restAfter}`.trim();
       onChangeText(newText);
@@ -122,13 +115,13 @@ export function GroupMentionInput({
   return (
     <View>
       <TextInput
-        ref={inputRef}
+        multiline
         accessibilityLabel={accessibilityLabel}
         className={className}
         editable={editable}
-        multiline
         placeholder={placeholder}
         placeholderTextColor={themeColors.secondaryText}
+        ref={inputRef}
         style={[{ paddingVertical: 0, textAlignVertical: 'top' }, style]}
         underlineColorAndroid="transparent"
         value={value}
@@ -141,10 +134,7 @@ export function GroupMentionInput({
         visible={showPicker}
         onRequestClose={handleClosePicker}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={handleClosePicker}
-        >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={handleClosePicker}>
           <Pressable
             className="mx-4 mb-8 max-h-64 rounded-2xl bg-card"
             onPress={(e) => e.stopPropagation()}
@@ -166,19 +156,12 @@ export function GroupMentionInput({
                   >
                     {item.isAll ? (
                       <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-                        <Users
-                          color={semanticColors.primary}
-                          size={18}
-                          strokeWidth={2}
-                        />
+                        <Users color={semanticColors.primary} size={18} strokeWidth={2} />
                       </View>
                     ) : (
                       <View className="mr-3 h-9 w-9 overflow-hidden rounded-full bg-primary/10">
                         {item.avatar ? (
-                          <RNImage
-                            source={{ uri: item.avatar }}
-                            style={{ width: 36, height: 36 }}
-                          />
+                          <RNImage className="h-9 w-9" source={{ uri: item.avatar }} />
                         ) : (
                           <View className="h-full w-full items-center justify-center">
                             <Text className="text-[14px] font-semibold text-primary">

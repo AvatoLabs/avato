@@ -6,8 +6,8 @@ import React from 'react';
 import { Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 
 interface SessionHeaderSectionProps {
   delay?: number;
@@ -27,6 +27,7 @@ export function SessionHeaderSection({
   title,
 }: SessionHeaderSectionProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
@@ -40,12 +41,12 @@ export function SessionHeaderSection({
               <TextInput
                 className="text-[16px] font-semibold tracking-tight text-foreground"
                 placeholder={t.chatListNewConversation}
-                placeholderTextColor={semanticColors.secondaryText}
+                placeholderTextColor={colors.secondaryText}
                 value={title}
                 onChangeText={onTitleChange}
               />
             </View>
-            <Pencil color={semanticColors.secondaryText} size={14} strokeWidth={1.5} />
+            <Pencil color={colors.secondaryText} size={14} strokeWidth={1.5} />
           </View>
           {isGroupSession && onDescriptionChange ? (
             <View className="mt-4 border-t border-foreground/5 pt-4">
@@ -56,7 +57,7 @@ export function SessionHeaderSection({
                 multiline
                 className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
                 placeholder={t.agentConfigDescriptionPlaceholder}
-                placeholderTextColor={semanticColors.secondaryText}
+                placeholderTextColor={colors.secondaryText}
                 style={{ minHeight: 88, textAlignVertical: 'top' }}
                 value={description}
                 onChangeText={onDescriptionChange}

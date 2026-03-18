@@ -4,7 +4,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
+import { useThemeColors } from '../../theme/colors';
 
 interface EmptyStateProps {
   /** Optional CTA element (button, link) */
@@ -26,6 +26,7 @@ export default function EmptyState({
   action,
   className = '',
 }: EmptyStateProps) {
+  const colors = useThemeColors();
   return (
     <View
       accessibilityLabel={`${title}${description ? `. ${description}` : ''}`}
@@ -37,14 +38,14 @@ export default function EmptyState({
       </Text>
       <Text
         className="text-center text-[16px] font-semibold mb-1.5"
-        style={{ color: semanticColors.foreground }}
+        style={{ color: colors.foreground }}
       >
         {title}
       </Text>
       {description ? (
         <Text
           className="text-center text-[14px] mb-4"
-          style={{ color: semanticColors.secondaryText + '99' }}
+          style={{ color: colors.secondaryText + '99' }}
         >
           {description}
         </Text>

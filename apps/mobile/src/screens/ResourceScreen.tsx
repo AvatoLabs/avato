@@ -54,12 +54,12 @@ import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
 import { useConnectionStore } from '../store/connection';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { FileListItem } from '../types';
 
@@ -87,64 +87,66 @@ function isMarkdownFile(fileType: string, name?: string): boolean {
   return !!(name && /\.(?:md|mdx)$/i.test(name));
 }
 
-const resourcePreviewMdStyles = {
-  body: { color: semanticColors.foreground, fontSize: 15, lineHeight: 24 },
-  heading1: {
-    color: semanticColors.foreground,
-    fontSize: 22,
-    fontWeight: '700' as const,
-    marginBottom: 10,
-    marginTop: 18,
-  },
-  heading2: {
-    color: semanticColors.foreground,
-    fontSize: 18,
-    fontWeight: '700' as const,
-    marginBottom: 8,
-    marginTop: 14,
-  },
-  heading3: {
-    color: semanticColors.foreground,
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  paragraph: { marginBottom: 10 },
-  bullet_list: { marginBottom: 10 },
-  ordered_list: { marginBottom: 10 },
-  list_item: { marginBottom: 4 },
-  code_inline: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 4,
-    color: '#e11d48',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  fence: {
-    backgroundColor: '#1e1e2e',
-    borderRadius: 8,
-    color: '#cdd6f4',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 10,
-    padding: 12,
-  },
-  blockquote: {
-    backgroundColor: '#f8fafc',
-    borderColor: semanticColors.primary,
-    borderLeftWidth: 3,
-    marginBottom: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  hr: { backgroundColor: '#e5e7eb', height: 1, marginVertical: 12 },
-  link: { color: semanticColors.primary },
-  strong: { fontWeight: '600' as const },
-};
+function getResourcePreviewMdStyles(colors: { foreground: string; primary: string }) {
+  return {
+    body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
+    heading1: {
+      color: colors.foreground,
+      fontSize: 22,
+      fontWeight: '700' as const,
+      marginBottom: 10,
+      marginTop: 18,
+    },
+    heading2: {
+      color: colors.foreground,
+      fontSize: 18,
+      fontWeight: '700' as const,
+      marginBottom: 8,
+      marginTop: 14,
+    },
+    heading3: {
+      color: colors.foreground,
+      fontSize: 16,
+      fontWeight: '600' as const,
+      marginBottom: 6,
+      marginTop: 12,
+    },
+    paragraph: { marginBottom: 10 },
+    bullet_list: { marginBottom: 10 },
+    ordered_list: { marginBottom: 10 },
+    list_item: { marginBottom: 4 },
+    code_inline: {
+      backgroundColor: '#f3f4f6',
+      borderRadius: 4,
+      color: '#e11d48',
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 13,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    fence: {
+      backgroundColor: '#1e1e2e',
+      borderRadius: 8,
+      color: '#cdd6f4',
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 13,
+      lineHeight: 20,
+      marginBottom: 10,
+      padding: 12,
+    },
+    blockquote: {
+      backgroundColor: '#f8fafc',
+      borderColor: colors.primary,
+      borderLeftWidth: 3,
+      marginBottom: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    hr: { backgroundColor: '#e5e7eb', height: 1, marginVertical: 12 },
+    link: { color: colors.primary },
+    strong: { fontWeight: '600' as const },
+  };
+}
 
 function isAudio(fileType: string): boolean {
   return fileType.startsWith('audio/');
@@ -234,6 +236,7 @@ const FilePreviewModal = memo(
     const insets = useSafeAreaInsets();
     const { t } = useI18n();
     const toast = useToast();
+    const colors = useThemeColors();
     const [imgLoading, setImgLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const [previewIndex, setPreviewIndex] = useState(0);
@@ -415,7 +418,7 @@ const FilePreviewModal = memo(
               onPress={onClose}
             >
               <ArrowLeft
-                color={imageFile ? '#fff' : semanticColors.foreground}
+                color={imageFile ? '#fff' : colors.foreground}
                 size={22}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -423,14 +426,14 @@ const FilePreviewModal = memo(
                 <Text
                   className="text-[15px] font-semibold"
                   numberOfLines={1}
-                  style={{ color: imageFile ? '#fff' : semanticColors.foreground }}
+                  style={{ color: imageFile ? '#fff' : colors.foreground }}
                 >
                   {item.name}
                 </Text>
                 <Text
                   className="text-[11px] mt-0.5"
                   style={{
-                    color: imageFile ? 'rgba(255,255,255,0.6)' : semanticColors.secondaryText,
+                    color: imageFile ? 'rgba(255,255,255,0.6)' : colors.secondaryText,
                   }}
                 >
                   {formatBytes(item.size)}
@@ -445,11 +448,7 @@ const FilePreviewModal = memo(
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={handleShare}
               >
-                <Share2
-                  color={imageFile ? '#fff' : semanticColors.primary}
-                  size={20}
-                  strokeWidth={1.8}
-                />
+                <Share2 color={imageFile ? '#fff' : colors.primary} size={20} strokeWidth={1.8} />
               </TouchableOpacity>
               <TouchableOpacity
                 disabled={downloading}
@@ -457,13 +456,10 @@ const FilePreviewModal = memo(
                 onPress={() => void handleDownload()}
               >
                 {downloading ? (
-                  <ActivityIndicator
-                    color={imageFile ? '#fff' : semanticColors.primary}
-                    size="small"
-                  />
+                  <ActivityIndicator color={imageFile ? '#fff' : colors.primary} size="small" />
                 ) : (
                   <Download
-                    color={imageFile ? '#fff' : semanticColors.primary}
+                    color={imageFile ? '#fff' : colors.primary}
                     size={20}
                     strokeWidth={1.8}
                   />
@@ -519,7 +515,7 @@ const FilePreviewModal = memo(
                   className="flex-1 items-center justify-center"
                   style={{ backgroundColor: '#f8f8fa' }}
                 >
-                  <ActivityIndicator color={semanticColors.primary} size="large" />
+                  <ActivityIndicator color={colors.primary} size="large" />
                 </View>
               ) : pdfFile && previewLoadFailed ? (
                 <View className="flex-1 items-center justify-center px-8">
@@ -532,7 +528,7 @@ const FilePreviewModal = memo(
                   className="flex-1 items-center justify-center"
                   style={{ backgroundColor: '#f8f8fa' }}
                 >
-                  <ActivityIndicator color={semanticColors.primary} size="large" />
+                  <ActivityIndicator color={colors.primary} size="large" />
                 </View>
               ) : textFile && previewLoadFailed ? (
                 <View className="flex-1 items-center justify-center px-8">
@@ -547,14 +543,14 @@ const FilePreviewModal = memo(
                   style={{ backgroundColor: '#fff' }}
                 >
                   {markdownFile ? (
-                    <Markdown rules={codeInlineRules} style={resourcePreviewMdStyles}>
+                    <Markdown rules={codeInlineRules} style={getResourcePreviewMdStyles(colors)}>
                       {textContent}
                     </Markdown>
                   ) : (
                     <Text
                       selectable
                       className="text-[15px] leading-6"
-                      style={{ color: semanticColors.foreground }}
+                      style={{ color: colors.foreground }}
                     >
                       {textContent}
                     </Text>
@@ -578,7 +574,7 @@ const FilePreviewModal = memo(
                         backgroundColor: '#f8f8fa',
                       }}
                     >
-                      <ActivityIndicator color={semanticColors.primary} size="large" />
+                      <ActivityIndicator color={colors.primary} size="large" />
                     </View>
                   )}
                   source={
@@ -599,11 +595,7 @@ const FilePreviewModal = memo(
                   className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
                   style={{ width: 96, height: 96 }}
                 >
-                  <FileTypeIcon
-                    color={semanticColors.secondaryText}
-                    fileType={item.fileType}
-                    size={44}
-                  />
+                  <FileTypeIcon color={colors.secondaryText} fileType={item.fileType} size={44} />
                 </View>
                 <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
                   {item.name}
@@ -618,7 +610,7 @@ const FilePreviewModal = memo(
                 </Text>
                 <TouchableOpacity
                   className="flex-row items-center rounded-2xl px-8 py-3.5"
-                  style={{ backgroundColor: semanticColors.primary }}
+                  style={{ backgroundColor: colors.primary }}
                   onPress={() => void handleDownload()}
                 >
                   {downloading ? (
@@ -649,7 +641,8 @@ interface FileRowProps {
 }
 
 function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
-  const iconColor = semanticColors.secondaryText;
+  const colors = useThemeColors();
+  const iconColor = colors.secondaryText;
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const thumbnailCandidates = isImage(item.fileType)
     ? buildRemoteFileCandidates(apiBaseUrl, item)
@@ -672,16 +665,13 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
         onDelete(item.id, item.name);
       }}
     >
-      <View
-        className="items-center justify-center rounded-xl bg-foreground/5"
-        style={{ width: 48, height: 48, marginRight: 12 }}
-      >
+      <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
         {thumbnailUrl ? (
           <ExpoImage
             cachePolicy="memory-disk"
+            className="h-12 w-12 rounded-xl"
             contentFit="cover"
             source={thumbnailUrl}
-            style={{ width: 48, height: 48, borderRadius: 12 }}
             transition={100}
             onError={() => {
               if (thumbnailIndex < thumbnailCandidates.length - 1) {
@@ -694,7 +684,7 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
         )}
       </View>
 
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View className="min-w-0 flex-1">
         <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
           {item.name}
         </Text>
@@ -705,12 +695,9 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
         </Text>
       </View>
 
-      <Eye
-        color={semanticColors.secondaryText}
-        size={16}
-        strokeWidth={1.5}
-        style={{ marginLeft: 8 }}
-      />
+      <View className="ml-2">
+        <Eye color={colors.secondaryText} size={16} strokeWidth={1.5} />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -721,6 +708,7 @@ export default function ResourceScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const colors = useThemeColors();
   const isConnected = useConnectionStore((s) => s.isConnected);
 
   const [files, setFiles] = useState<FileListItem[]>([]);
@@ -871,14 +859,10 @@ export default function ResourceScreen() {
         rightAccessibilityLabel={t.accessibilityAddResource}
         title={t.resourceTitle}
         rightElement={
-          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         titleIcon={
-          <FolderOpen
-            color={semanticColors.primary}
-            size={20}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <FolderOpen color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={() => setAttachmentSheetVisible(true)}
       />
@@ -886,11 +870,11 @@ export default function ResourceScreen() {
       <View className="pb-2">
         {/* Search */}
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-          <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+          <Search color={colors.muted} size={16} strokeWidth={2} />
           <TextInput
             className="ml-2.5 flex-1 text-[14px] text-foreground"
             placeholder={t.search}
-            placeholderTextColor={semanticColors.muted}
+            placeholderTextColor={colors.muted}
             ref={searchRef}
             returnKeyType="search"
             value={searchText}
@@ -899,7 +883,7 @@ export default function ResourceScreen() {
           />
           {searchText.length > 0 && (
             <TouchableOpacity hitSlop={8} onPress={() => setSearchText('')}>
-              <X color={semanticColors.muted} size={16} strokeWidth={2} />
+              <X color={colors.muted} size={16} strokeWidth={2} />
             </TouchableOpacity>
           )}
         </View>
@@ -919,7 +903,7 @@ export default function ResourceScreen() {
                 className="rounded-full px-4 py-1.5"
                 key={tab.key}
                 style={{
-                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                  backgroundColor: active ? colors.primary : colors.fillTertiary,
                 }}
                 onPress={() => {
                   haptics.selection();
@@ -928,7 +912,7 @@ export default function ResourceScreen() {
               >
                 <Text
                   className="text-[13px] font-semibold"
-                  style={{ color: active ? '#fff' : semanticColors.muted }}
+                  style={{ color: active ? '#fff' : colors.muted }}
                 >
                   {tab.label}
                 </Text>
@@ -963,9 +947,9 @@ export default function ResourceScreen() {
           }
           refreshControl={
             <RefreshControl
-              colors={[semanticColors.primary]}
+              colors={[colors.primary]}
               refreshing={refreshing}
-              tintColor={semanticColors.primary}
+              tintColor={colors.primary}
               onRefresh={onRefresh}
             />
           }
@@ -988,7 +972,7 @@ export default function ResourceScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           className="items-center justify-center rounded-full shadow-lg"
-          style={{ width: 56, height: 56, elevation: 6, backgroundColor: semanticColors.primary }}
+          style={{ width: 56, height: 56, elevation: 6, backgroundColor: colors.primary }}
           onPress={uploading ? undefined : handleUpload}
         >
           {uploading ? (

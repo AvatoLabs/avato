@@ -9,14 +9,15 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import ModelCard from '../components/ui/ModelCard';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useDiscoverStore } from '../store/discover';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 export default function ModelListScreen({ navigation }: any) {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   const models = useDiscoverStore((s) => s.models);
   const fetchModels = useDiscoverStore((s) => s.fetchModels);
@@ -56,14 +57,10 @@ export default function ModelListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
         title={t.discoverModels}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         onPressLeft={() => {
           haptics.light();
           navigation.goBack();
@@ -76,7 +73,7 @@ export default function ModelListScreen({ navigation }: any) {
             <TextInput
               className="text-foreground text-[15px]"
               placeholder={t.modelPickerSearch}
-              placeholderTextColor={semanticColors.muted}
+              placeholderTextColor={colors.muted}
               value={search}
               onChangeText={setSearch}
             />
@@ -95,15 +92,15 @@ export default function ModelListScreen({ navigation }: any) {
           keyExtractor={([provider]) => provider}
           ListEmptyComponent={
             <View className="items-center pt-16">
-              <Brain color={semanticColors.secondaryText} size={48} strokeWidth={1} />
+              <Brain color={colors.secondaryText} size={48} strokeWidth={1} />
               <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
             </View>
           }
           refreshControl={
             <RefreshControl
-              colors={[semanticColors.primary]}
+              colors={[colors.primary]}
               refreshing={refreshing}
-              tintColor={semanticColors.primary}
+              tintColor={colors.primary}
               onRefresh={onRefresh}
             />
           }

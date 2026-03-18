@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 
 interface PromptModalProps {
   defaultValue?: string;
@@ -26,6 +26,7 @@ export default function PromptModal({
   onCancel,
 }: PromptModalProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<TextInput>(null);
   const finalSubmitLabel = submitLabel || t.confirm;
@@ -33,7 +34,8 @@ export default function PromptModal({
   useEffect(() => {
     if (visible) {
       setValue(defaultValue);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const id = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(id);
     }
   }, [visible, defaultValue]);
 
@@ -61,12 +63,12 @@ export default function PromptModal({
               {title}
             </Text>
             <TextInput
-              accessibilityLabel={placeholder ?? title}
               autoFocus
+              accessibilityLabel={placeholder ?? title}
               className="bg-foreground/5 rounded-xl px-3.5 py-2.5 text-foreground text-[15px]"
               keyboardType={keyboardType}
               placeholder={placeholder}
-              placeholderTextColor={semanticColors.muted}
+              placeholderTextColor={colors.muted}
               ref={inputRef}
               returnKeyType="done"
               value={value}

@@ -1,5 +1,5 @@
 /**
- * ChatSettingsScreen — conversation-level settings only.
+ * ChatSettingsScreen — session-level settings only.
  * Agent management is handled in Agent screens.
  */
 import { ArrowLeft, Check, ChevronRight, Tag } from 'lucide-react-native';

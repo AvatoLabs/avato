@@ -56,7 +56,7 @@ const fetchMessagesKey = (sessionId: string, topicId?: string) =>
 
 /** Parse targetId for DM from message content: first <mention id="X" /> where X !== 'ALL_MEMBERS' */
 function parseTargetIdFromMentions(text: string): string | null {
-  const re = /<mention\s+[^>]*id="([^"]+)"[^>]*\s*\/>/g;
+  const re = /<mention\s[^>]*id="([^"]+)"[^>]*\/>/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const id = m[1];
@@ -412,6 +412,7 @@ const syncTopicsForSession = (
   }));
 };
 
+/** Topic 默认标题（对话=Topic）。含 legacy 值以兼容已有数据。 */
 const DEFAULT_TOPIC_TITLES = [
   '',
   'New Chat',
@@ -437,15 +438,17 @@ const isDefaultTopicTitle = (title?: string | null) => {
   );
 };
 
-// Align with server session.ts DEFAULT_SESSION_TITLES for cross-end title sync
+/** Session 默认标题。含 legacy 值以兼容已有数据。 */
 const DEFAULT_SESSION_TITLES = [
   '',
   'New Chat',
   'New Conversation',
   'New conversation',
   'New Group Chat',
+  'New Session',
   '新对话',
   '新對話',
+  '新会话',
   'Untitled',
 ];
 
@@ -1174,7 +1177,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const { messageKey, type } = classifyError(err);
         const t = useI18n.getState().t;
         useToast.getState().show('error', t[messageKey], {
-          onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchMessages(sessionId, topicId),
+          onRetry:
+            type === 'auth' ? navigateToLogin : () => void get().fetchMessages(sessionId, topicId),
           retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
         });
       } finally {
@@ -1488,12 +1492,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   if (newTitle) {
                     useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
                   } else {
-                    useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                    useToast
+                      .getState()
+                      .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                   }
                 })
                 .catch((err) => {
                   console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                  useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                  useToast
+                    .getState()
+                    .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                 });
             }
             didSettle = true;
@@ -1518,7 +1526,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   })
                   .catch((err) => {
                     console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                    useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                    useToast
+                      .getState()
+                      .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                   });
               }
               didSettle = true;
@@ -1601,12 +1611,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                       if (newTitle) {
                         useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
                       } else {
-                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                        useToast
+                          .getState()
+                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                       }
                     })
                     .catch((err) => {
                       console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                      useToast
+                        .getState()
+                        .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                     });
                 }
                 didSettle = true;
@@ -1627,12 +1641,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         if (newTitle) {
                           useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
                         } else {
-                          useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                          useToast
+                            .getState()
+                            .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                         }
                       })
                       .catch((err) => {
                         console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                        useToast
+                          .getState()
+                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                       });
                   }
                   didSettle = true;
@@ -1711,12 +1729,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
                       if (newTitle) {
                         useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
                       } else {
-                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                        useToast
+                          .getState()
+                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                       }
                     })
                     .catch((err) => {
                       console.warn('[ChatStore] generateSessionTitle failed:', err);
-                      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                      useToast
+                        .getState()
+                        .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                     });
                 }
 
@@ -2185,7 +2207,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
                   // Do NOT fetchSessions here — it can overwrite with stale data before server propagates
                 } else {
-                  useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                  useToast
+                    .getState()
+                    .show('error', useI18n.getState().t.toastTitleGenerationFailed);
                 }
               })
               .catch((err) => {

@@ -2,10 +2,11 @@ import { DefaultTheme } from '@react-navigation/native';
 
 import { getThemeTokens } from './colors';
 
-const lightTokens = getThemeTokens('light');
-const darkTokens = getThemeTokens('dark');
+const lightTokens = getThemeTokens('light', 'blue');
+const darkTokens = getThemeTokens('dark', 'blue');
 
-export { themeColors as colorTokens } from './colors';
+export { themeColors as colorTokens, getChatAccent, getThemeTokens } from './colors';
+export { COLOR_SCHEMES, type ColorSchemeId, getColorSchemePalette } from './palettes';
 
 export const AvatoLightTheme = {
   ...DefaultTheme,

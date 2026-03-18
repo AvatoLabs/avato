@@ -138,7 +138,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       tagId: inputConfig.tagId,
       title: inputConfig.title,
     };
-    const title = requestConfig.title || 'New Conversation';
+    const title = requestConfig.title || 'New Session';
 
     try {
       const newId = await sessionApi.create(requestConfig);

@@ -3,9 +3,10 @@ import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
 import { Image as RNImage, Platform, Text, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
+import { useThemeStore } from '../../store/theme';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
@@ -39,16 +40,19 @@ export function WorkspaceOverviewCard({
   onPressProviders,
 }: WorkspaceOverviewCardProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const useNativeBlur = Platform.OS !== 'android';
   const resolvedAvatarUri = useResolvedRemoteAsset(userAvatar);
+  const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
 
   return (
     <View
       className="mx-5 mb-6 rounded-2xl overflow-hidden bg-foreground/[0.04]"
-      style={{ borderWidth: 1, borderColor: semanticColors.border }}
+      style={{ borderWidth: 1, borderColor: colors.border }}
     >
       {useNativeBlur ? (
-        <BlurView className="rounded-2xl overflow-hidden p-5" intensity={80} tint="light">
+        <BlurView className="rounded-2xl overflow-hidden p-5" intensity={80} tint={blurTint}>
           {/* Identity — tap → ProfileEdit */}
           <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
             <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-3.5 overflow-hidden">
@@ -79,11 +83,7 @@ export function WorkspaceOverviewCard({
                 </Text>
               </View>
             </View>
-            <ChevronRight
-              color={semanticColors.primary}
-              size={20}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ChevronRight color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
           </PressableScale>
 
           {/* Sub-cards — each independently tappable */}
@@ -94,7 +94,7 @@ export function WorkspaceOverviewCard({
             >
               <Text
                 className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                style={{ color: semanticColors.primary }}
+                style={{ color: colors.primary }}
               >
                 {t.settingsDefaultModel}
               </Text>
@@ -111,7 +111,7 @@ export function WorkspaceOverviewCard({
             >
               <Text
                 className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                style={{ color: semanticColors.primary }}
+                style={{ color: colors.primary }}
               >
                 {t.workspaceProviders}
               </Text>
@@ -156,11 +156,7 @@ export function WorkspaceOverviewCard({
                 </Text>
               </View>
             </View>
-            <ChevronRight
-              color={semanticColors.primary}
-              size={20}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ChevronRight color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
           </PressableScale>
 
           {/* Sub-cards — each independently tappable */}
@@ -171,7 +167,7 @@ export function WorkspaceOverviewCard({
             >
               <Text
                 className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                style={{ color: semanticColors.primary }}
+                style={{ color: colors.primary }}
               >
                 {t.settingsDefaultModel}
               </Text>
@@ -188,7 +184,7 @@ export function WorkspaceOverviewCard({
             >
               <Text
                 className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                style={{ color: semanticColors.primary }}
+                style={{ color: colors.primary }}
               >
                 {t.workspaceProviders}
               </Text>

@@ -32,9 +32,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { semanticColors } from '../constants/colors';
 import { memoryApi } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
   MemoryActivityDetail,
@@ -157,24 +157,13 @@ function EditableField({
   );
 }
 
-function MetaChip({
-  color,
-  label,
-  subtle,
-}: {
-  color: string;
-  label: string;
-  subtle?: boolean;
-}) {
+function MetaChip({ color, label, subtle }: { color: string; label: string; subtle?: boolean }) {
   return (
     <View
       className="mr-2 rounded-full px-2.5 py-1"
       style={{ backgroundColor: subtle ? '#f3f4f6' : `${color}15` }}
     >
-      <Text
-        className="text-xs font-semibold"
-        style={{ color: subtle ? '#6b7280' : color }}
-      >
+      <Text className="text-xs font-semibold" style={{ color: subtle ? '#6b7280' : color }}>
         {label}
       </Text>
     </View>
@@ -240,6 +229,7 @@ function SourceCard({
   sourceLabel: string;
   subtitle?: string;
 }) {
+  const colors = useThemeColors();
   if (!source) return null;
 
   const title = source.title || source.id;
@@ -254,10 +244,10 @@ function SourceCard({
       >
         <View className="mr-3 h-9 w-9 items-center justify-center rounded-xl bg-white">
           {canOpen ? (
-            <Link2 color={semanticColors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <Link2 color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
           ) : (
             <ExternalLink
-              color={semanticColors.secondaryText}
+              color={colors.secondaryText}
               size={16}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -275,7 +265,7 @@ function SourceCard({
         </View>
         {canOpen ? (
           <ExternalLink
-            color={semanticColors.secondaryText}
+            color={colors.secondaryText}
             size={14}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -290,6 +280,7 @@ export default function MemoryDetailScreen() {
   const nav = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   const initialItem = route.params?.item as AnyMemoryItem | undefined;
   const layer = route.params?.layer as MemoryLayer | undefined;
@@ -640,7 +631,9 @@ export default function MemoryDetailScreen() {
       <View className="mb-4 flex-row flex-wrap items-center">
         <MetaChip
           color={layerColor}
-          label={(t as any)[`memory${layer?.charAt(0).toUpperCase()}${layer?.slice(1)}`] || layer || ''}
+          label={
+            (t as any)[`memory${layer?.charAt(0).toUpperCase()}${layer?.slice(1)}`] || layer || ''
+          }
         />
         {resolvedType ? <MetaChip subtle color={layerColor} label={resolvedType} /> : null}
       </View>
@@ -787,7 +780,9 @@ export default function MemoryDetailScreen() {
               {activity.startsAt ? (
                 <View className="flex-row items-center">
                   <Calendar color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs text-gray-500">{formatDate(activity.startsAt)}</Text>
+                  <Text className="ml-1 text-xs text-gray-500">
+                    {formatDate(activity.startsAt)}
+                  </Text>
                 </View>
               ) : null}
               {activity.endsAt ? (
@@ -906,7 +901,9 @@ export default function MemoryDetailScreen() {
               multiline
               editing={editing}
               label={t.memoryConclusion}
-              value={editing ? editState.conclusionDirectives : preference.conclusionDirectives || ''}
+              value={
+                editing ? editState.conclusionDirectives : preference.conclusionDirectives || ''
+              }
               onChangeText={setField('conclusionDirectives')}
             />
             <EditableField
@@ -950,7 +947,7 @@ export default function MemoryDetailScreen() {
   if (!itemState || !layer) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
-        <ActivityIndicator color={semanticColors.primary} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }

@@ -31,7 +31,6 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { WorkspaceOverviewCard } from '../components/ui/WorkspaceOverviewCard';
-import { semanticColors } from '../constants/colors';
 import { aiProviderApi, statsApi } from '../lib/api';
 import { APP_NAME, APP_VERSION } from '../lib/appInfo';
 import { clearTransientAppState } from '../lib/appState';
@@ -43,11 +42,13 @@ import { useAgentStore } from '../store/agent';
 import { useConnectionStore } from '../store/connection';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 export default function ProfileScreen({ navigation }: any) {
   const { t, locale } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const sessionCount = useSessionStore((s) => s.sessions.length);
   const isConnected = useConnectionStore((s) => s.isConnected);
   const checkConnection = useConnectionStore((s) => s.checkConnection);
@@ -138,11 +139,7 @@ export default function ProfileScreen({ navigation }: any) {
       <ScreenHeader
         title={t.settingsTitle ?? 'Settings'}
         titleIcon={
-          <Settings
-            color={semanticColors.primary}
-            size={20}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <Settings color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
       />
 
@@ -152,9 +149,9 @@ export default function ProfileScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={[semanticColors.primary]}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor={semanticColors.primary}
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -185,7 +182,7 @@ export default function ProfileScreen({ navigation }: any) {
               <View className="flex-row items-center mb-4">
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-primary/10">
                   <BarChart3
-                    color={semanticColors.primary}
+                    color={colors.primary}
                     size={16}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -199,7 +196,7 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <ChevronRight
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -208,7 +205,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <View className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.04]">
                   <Text
                     className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                    style={{ color: semanticColors.primary }}
+                    style={{ color: colors.primary }}
                   >
                     {t.statsMessages}
                   </Text>
@@ -219,7 +216,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <View className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.04]">
                   <Text
                     className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                    style={{ color: semanticColors.primary }}
+                    style={{ color: colors.primary }}
                   >
                     {t.statsSessions}
                   </Text>
@@ -230,7 +227,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <View className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.04]">
                   <Text
                     className="text-[10px] font-semibold uppercase tracking-widest mb-1"
-                    style={{ color: semanticColors.primary }}
+                    style={{ color: colors.primary }}
                   >
                     {t.statsTotalTopics}
                   </Text>
@@ -252,7 +249,7 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
                 <BrainCircuit
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -266,7 +263,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               <ChevronRight
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -282,11 +279,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('AgentList')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Bot
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Bot color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -297,7 +290,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               <ChevronRight
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -313,11 +306,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('Discover')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Compass
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Compass color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -328,7 +317,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               <ChevronRight
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -344,11 +333,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('Notebook', {})}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <FileText
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <FileText color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -359,7 +344,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               <ChevronRight
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -377,11 +362,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => navigation?.navigate?.('ServerConfig')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Server
-                    color={semanticColors.primary}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Server color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -392,7 +373,7 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <ChevronRight
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -404,11 +385,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => navigation?.navigate?.('AIProviders')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Key
-                    color={semanticColors.primary}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Key color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -419,7 +396,7 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <ChevronRight
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -431,11 +408,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => navigation?.navigate?.('ModelPicker')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Brain
-                    color={semanticColors.primary}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Brain color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -446,7 +419,7 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <ChevronRight
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -458,11 +431,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => navigation?.navigate?.('LanguagePicker')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                  <Globe
-                    color={semanticColors.primary}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Globe color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -475,7 +444,7 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <ChevronRight
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -492,11 +461,7 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('Settings')}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Settings
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Settings color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <View className="flex-1">
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
@@ -507,7 +472,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               <ChevronRight
-                color={semanticColors.primary}
+                color={colors.primary}
                 size={18}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -523,15 +488,8 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={handleSignOut}
             >
               <View className="flex-row items-center gap-2">
-                <LogOut
-                  color={semanticColors.danger}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text
-                  className="font-medium text-[14.5px]"
-                  style={{ color: semanticColors.danger }}
-                >
+                <LogOut color={colors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="font-medium text-[14.5px]" style={{ color: colors.danger }}>
                   {t.meSignOut}
                 </Text>
               </View>

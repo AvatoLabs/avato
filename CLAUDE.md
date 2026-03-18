@@ -112,6 +112,20 @@ cd packages/database && bunx vitest run --silent='passed-only' '[file]'
 - Tests must pass type check: `bun run type-check`
 - After 2 failed fix attempts, stop and ask for help
 
+### Session vs Topic (App 语义)
+
+| 实体        | 含义                                                 | 用户概念    |
+| ----------- | ---------------------------------------------------- | ----------- |
+| **Session** | 会话容器，对应 Agent 或 session-only，可含多个 Topic | 会话        |
+| **Topic**   | 一次对话 / 话题，含消息序列，属于 Session            | 话题 / 对话 |
+| **Message** | 单条消息                                             | -           |
+
+- ChatList 主列表展示 **Session**，用「会话」
+- Topic 用「话题」或「对话」；Topic 为对话容器
+- 删除 Session 时用「删除会话（含话题）」；避免混用「对话」指代 Session
+
+详见 `docs/development/topic-chat-conversation-semantic-audit.zh-CN.md`。
+
 ### i18n
 
 - Add keys to `src/locales/default/namespace.ts`

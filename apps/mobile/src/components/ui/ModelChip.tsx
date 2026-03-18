@@ -16,7 +16,7 @@ export function ModelChip({ name, provider, active = false, onPress }: ModelChip
     <TouchableOpacity
       activeOpacity={0.7}
       className={`px-4 py-2 rounded-xl mr-2.5 border ${
-        active ? 'bg-primary/10 border-primary/20' : 'bg-foreground/5 border-black/5'
+        active ? 'bg-primary/10 border-primary/20' : 'bg-foreground/5 border-border'
       } active:opacity-80`}
       onPress={onPress}
     >

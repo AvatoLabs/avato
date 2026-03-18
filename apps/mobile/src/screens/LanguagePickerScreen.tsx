@@ -1,12 +1,13 @@
 /**
  * LanguagePickerScreen — Select app language with i18n.
  */
-import { ArrowLeft, Check, Globe } from 'lucide-react-native';
+import { ArrowLeft, Check } from 'lucide-react-native';
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { type Locale, useI18n } from '../lib/i18n';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const LANGUAGES: { code: Locale; label: string; name: string }[] = [
@@ -17,6 +18,7 @@ const LANGUAGES: { code: Locale; label: string; name: string }[] = [
 
 export default function LanguagePickerScreen({ navigation }: any) {
   const { locale, setLocale, t } = useI18n();
+  const colors = useThemeColors();
 
   const handleSelect = async (code: Locale) => {
     await setLocale(code);
@@ -26,7 +28,9 @@ export default function LanguagePickerScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         title={t.languageTitle}
         onPressLeft={() => navigation.goBack()}
       />

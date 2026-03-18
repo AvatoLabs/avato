@@ -15,13 +15,13 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
-import { semanticColors } from '../constants/colors';
 import { agentApi, agentGroupApi, aiProviderApi, sessionApi, userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
 
@@ -230,6 +230,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
   const sessionId: string | undefined = route.params?.sessionId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const colors = useThemeColors();
   const sessionType = useSessionStore(
     (s) => s.sessions.find((item) => item.id === sessionId)?.type,
   );
@@ -441,7 +442,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
             )}
           </View>
           {selected === item.id && (
-            <Check color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <Check color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
           )}
         </PressableScale>
       );
@@ -478,7 +479,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           )}
         </View>
         {selected === item.id && (
-          <Check color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Check color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         )}
       </PressableScale>
     ),
@@ -490,11 +491,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       <ScreenHeader
         title={t.modelPickerTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => navigation.canGoBack() && navigation.goBack()}
       />
@@ -510,7 +507,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
           <Text className="text-secondary/50 text-[13px] mt-3 font-medium">{t.loading}</Text>
         </View>
       ) : serverModels ? (
@@ -561,11 +558,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                 {t.modelPickerOffline}
               </Text>
               <PressableScale onPress={fetchModels}>
-                <RefreshCw
-                  color={semanticColors.primary}
-                  size={14}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <RefreshCw color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
               </PressableScale>
             </View>
           }

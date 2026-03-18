@@ -1,7 +1,7 @@
 /**
  * TopicItem — A single topic row for TopicListScreen.
  */
-import { Heart, MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
+import { Heart, MoreHorizontal, Pencil, Trash2, Wand2 } from 'lucide-react-native';
 import React, { memo, useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
@@ -19,11 +19,12 @@ interface TopicItemProps {
   onFavorite: () => void;
   onPress: () => void;
   onRename?: (newTitle: string) => void;
+  onSmartRename?: () => void;
   topic: Topic;
 }
 
 const TopicItem = memo<TopicItemProps>(
-  ({ topic, isActive, onPress, onFavorite, onDelete, onRename }) => {
+  ({ topic, isActive, onPress, onFavorite, onDelete, onRename, onSmartRename }) => {
     const { t } = useI18n();
     const toast = useToast();
     const [menuVisible, setMenuVisible] = useState(false);
@@ -146,6 +147,22 @@ const TopicItem = memo<TopicItemProps>(
                     {topic.favorite ? t.actionUnfavorite : t.actionFavorite}
                   </Text>
                 </Pressable>
+                {onSmartRename && (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onSmartRename();
+                    }}
+                  >
+                    <Wand2
+                      color={semanticColors.muted}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text className="ml-3 text-base text-foreground">{t.actionSmartRename}</Text>
+                  </Pressable>
+                )}
                 {onRename && (
                   <Pressable
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"

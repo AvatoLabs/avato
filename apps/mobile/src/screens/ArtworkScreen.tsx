@@ -45,11 +45,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
   GenerationBatch,
@@ -204,7 +204,8 @@ function getAspectRatioSelection(
 
 // Proper aspect ratio preview matching web version
 function RatioIcon({ ratio, active }: { ratio: string; active: boolean }) {
-  const borderColor = active ? '#fff' : semanticColors.muted;
+  const colors = useThemeColors();
+  const borderColor = active ? '#fff' : colors.muted;
 
   if (ratio === 'auto' || !ratio.includes(':')) {
     return (
@@ -242,6 +243,7 @@ function RatioIcon({ ratio, active }: { ratio: string; active: boolean }) {
 }
 
 function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }) {
+  const colors = useThemeColors();
   return (
     <View
       style={{
@@ -254,7 +256,7 @@ function SidebarLabel({ text, right }: { right?: React.ReactNode; text: string }
     >
       <Text
         style={{
-          color: semanticColors.foreground,
+          color: colors.foreground,
           fontSize: 15,
           fontWeight: '600',
           letterSpacing: -0.2,
@@ -306,8 +308,8 @@ function SidebarOptionGrid<T extends string | number>({
             <TouchableOpacity
               style={{
                 alignItems: 'center',
-                backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
-                borderColor: active ? semanticColors.primary : 'transparent',
+                backgroundColor: active ? colors.primary : colors.fillTertiary,
+                borderColor: active ? colors.primary : 'transparent',
                 borderRadius: 12,
                 borderWidth: active ? 1 : 0,
                 justifyContent: 'center',
@@ -358,8 +360,8 @@ function SidebarOptionStrip<T extends string | number>({
             key={getKey(item)}
             style={{
               alignItems: 'center',
-              backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
-              borderColor: active ? semanticColors.primary : 'transparent',
+              backgroundColor: active ? colors.primary : colors.fillTertiary,
+              borderColor: active ? colors.primary : 'transparent',
               borderRadius: 12,
               borderWidth: active ? 1 : 0,
               justifyContent: 'center',
@@ -401,6 +403,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function ArtworkScreen() {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isConnected = useConnectionStore((s) => s.isConnected);
@@ -888,7 +891,7 @@ export default function ArtworkScreen() {
       <ScreenHeader
         title={t.artworkTitle}
         titleIcon={
-          <Palette color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Palette color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
       />
 
@@ -916,7 +919,7 @@ export default function ArtworkScreen() {
                 </Text>
               </View>
               <ChevronDown
-                color={semanticColors.secondaryText}
+                color={colors.secondaryText}
                 size={16}
                 strokeWidth={tokens.icon.strokeWidth}
                 style={{ marginLeft: 10 }}
@@ -1003,7 +1006,7 @@ export default function ArtworkScreen() {
               className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
               style={{ width: 80, height: 80 }}
             >
-              <ImageIcon color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
+              <ImageIcon color={colors.secondaryText} size={36} strokeWidth={1.5} />
             </View>
             <Text className="text-center text-[17px] font-semibold text-foreground">
               {t.artworkEmpty}
@@ -1031,7 +1034,7 @@ export default function ArtworkScreen() {
             className="flex-1 rounded-2xl bg-foreground/5 px-4 py-3 text-[14px] text-foreground"
             maxLength={2000}
             placeholder={t.artworkPromptPlaceholder}
-            placeholderTextColor={semanticColors.secondaryText}
+            placeholderTextColor={colors.secondaryText}
             style={{ maxHeight: 100, minHeight: 44 }}
             value={prompt}
             onChangeText={setPrompt}
@@ -1050,7 +1053,7 @@ export default function ArtworkScreen() {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Sparkles
-                color={prompt.trim() && model ? '#fff' : semanticColors.secondaryText}
+                color={prompt.trim() && model ? '#fff' : colors.secondaryText}
                 size={20}
                 strokeWidth={2}
               />
@@ -1082,7 +1085,7 @@ export default function ArtworkScreen() {
               right: 0,
               bottom: 0,
               width: sidebarWidth,
-              backgroundColor: semanticColors.surface,
+              backgroundColor: colors.surface,
               borderTopLeftRadius: 20,
               borderBottomLeftRadius: 20,
               shadowColor: '#000',
@@ -1118,7 +1121,7 @@ export default function ArtworkScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: semanticColors.fillTertiary,
+                  backgroundColor: colors.fillTertiary,
                   borderRadius: 16,
                   paddingHorizontal: 16,
                   paddingVertical: 12,
@@ -1144,7 +1147,7 @@ export default function ArtworkScreen() {
                 <Animated.View
                   entering={FadeInDown.duration(350)}
                   style={{
-                    backgroundColor: semanticColors.fillTertiary,
+                    backgroundColor: colors.fillTertiary,
                     borderRadius: 12,
                     marginTop: 8,
                     maxHeight: 208,
@@ -1188,7 +1191,7 @@ export default function ArtworkScreen() {
                                 width: 8,
                                 height: 8,
                                 borderRadius: 4,
-                                backgroundColor: semanticColors.primary,
+                                backgroundColor: colors.primary,
                               }}
                             />
                           )}
@@ -1206,7 +1209,7 @@ export default function ArtworkScreen() {
                   />
                   <TouchableOpacity
                     style={{
-                      backgroundColor: semanticColors.fillTertiary,
+                      backgroundColor: colors.fillTertiary,
                       borderRadius: 16,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1267,7 +1270,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : semanticColors.muted,
+                          color: active ? '#fff' : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1295,7 +1298,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : semanticColors.muted,
+                          color: active ? '#fff' : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1323,7 +1326,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : semanticColors.muted,
+                          color: active ? '#fff' : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1354,7 +1357,7 @@ export default function ArtworkScreen() {
                         </View>
                         <Text
                           style={{
-                            color: active ? '#fff' : semanticColors.muted,
+                            color: active ? '#fff' : colors.muted,
                             fontSize: 10,
                             fontWeight: '500',
                           }}
@@ -1402,7 +1405,7 @@ export default function ArtworkScreen() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: semanticColors.fillTertiary,
+                      backgroundColor: colors.fillTertiary,
                       borderRadius: 14,
                       paddingHorizontal: 14,
                       paddingVertical: 12,
@@ -1434,7 +1437,7 @@ export default function ArtworkScreen() {
                 renderContent={(item, active) => (
                   <Text
                     style={{
-                      color: active ? '#fff' : semanticColors.muted,
+                      color: active ? '#fff' : colors.muted,
                       fontSize: 12,
                       fontWeight: '500',
                     }}

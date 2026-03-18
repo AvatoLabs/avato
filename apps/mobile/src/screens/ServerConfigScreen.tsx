@@ -27,7 +27,6 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { clearTransientAppState } from '../lib/appState';
 import { clearStoredAuthSession } from '../lib/auth';
 import { haptics } from '../lib/haptics';
@@ -40,7 +39,7 @@ import {
   testConnection,
 } from '../lib/server';
 import { useConnectionStore } from '../store/connection';
-import { themeColors } from '../theme/colors';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 interface Props {
@@ -51,6 +50,7 @@ interface Props {
 export default function ServerConfigScreen({ navigation, route }: Props) {
   const isFirstLaunch = route?.params?.firstLaunch ?? false;
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   const [url, setUrl] = useState('');
   const [initialUrl, setInitialUrl] = useState('');
@@ -59,12 +59,16 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     getApiUrl().then((saved) => {
-      if (saved) {
+      if (!cancelled && saved) {
         setInitialUrl(saved);
         setUrl(formatApiUrlForInput(saved));
       }
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleTest = async () => {
@@ -133,11 +137,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
         title={t.serverTitle}
         leftElement={
           !isFirstLaunch ? (
-            <ArrowLeft
-              color={semanticColors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
           ) : undefined
         }
         onPressLeft={!isFirstLaunch ? () => navigation.goBack() : undefined}
@@ -159,16 +159,12 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               <View
                 className="mb-4 items-center justify-center rounded-2xl"
                 style={{
-                  backgroundColor: themeColors.primarySubtle,
+                  backgroundColor: colors.primarySubtle,
                   width: 64,
                   height: 64,
                 }}
               >
-                <Server
-                  color={semanticColors.primary}
-                  size={28}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Server color={colors.primary} size={28} strokeWidth={tokens.icon.strokeWidth} />
               </View>
               <Text className="text-foreground text-center text-[18px] font-semibold tracking-tight">
                 {t.serverSubtitle}
@@ -187,15 +183,15 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
             <View
               className="mx-5 mb-4 overflow-hidden rounded-2xl"
               style={{
-                backgroundColor: themeColors.surface,
+                backgroundColor: colors.surface,
                 borderWidth: 1,
-                borderColor: themeColors.borderSubtle,
+                borderColor: colors.borderSubtle,
               }}
             >
               <View className="px-4 pt-4 pb-2">
                 <Text
                   className="text-foreground text-[12px] font-semibold uppercase tracking-widest"
-                  style={{ color: themeColors.secondaryText }}
+                  style={{ color: colors.secondaryText }}
                 >
                   {t.serverUrlLabel}
                 </Text>
@@ -203,13 +199,9 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               <View className="flex-row items-center px-4 pb-4">
                 <View
                   className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: themeColors.fillTertiary }}
+                  style={{ backgroundColor: colors.fillTertiary }}
                 >
-                  <Globe
-                    color={themeColors.muted}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Globe color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 </View>
                 <TextInput
                   autoCapitalize="none"
@@ -217,7 +209,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
                   className="flex-1 text-foreground text-[16px] py-2"
                   keyboardType="url"
                   placeholder={t.serverUrlPlaceholder}
-                  placeholderTextColor={themeColors.placeholder}
+                  placeholderTextColor={colors.placeholder}
                   returnKeyType="done"
                   value={url}
                   onChangeText={setUrl}
@@ -232,22 +224,22 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               className="mx-5 mb-4 flex-row items-center justify-center rounded-2xl py-3.5"
               disabled={testing}
               style={{
-                backgroundColor: themeColors.primarySubtle,
+                backgroundColor: colors.primarySubtle,
                 borderWidth: 1,
-                borderColor: themeColors.primaryBorder,
+                borderColor: colors.primaryBorder,
               }}
               onPress={handleTest}
             >
               {testing ? (
                 <Loader2
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 8 }}
                 />
               ) : (
                 <Wifi
-                  color={semanticColors.primary}
+                  color={colors.primary}
                   size={18}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 8 }}
@@ -265,21 +257,18 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               <View
                 className="mx-5 mb-4 flex-row items-center rounded-2xl p-4"
                 style={{
-                  backgroundColor: themeColors.successSubtle,
+                  backgroundColor: colors.successSubtle,
                   borderWidth: 1,
-                  borderColor: themeColors.successMuted,
+                  borderColor: colors.successMuted,
                 }}
               >
                 <CheckCircle2
-                  color={themeColors.success}
+                  color={colors.success}
                   size={22}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 12 }}
                 />
-                <Text
-                  className="flex-1 text-[14px] font-medium"
-                  style={{ color: themeColors.success }}
-                >
+                <Text className="flex-1 text-[14px] font-medium" style={{ color: colors.success }}>
                   {t.serverSuccess}
                 </Text>
               </View>
@@ -292,25 +281,22 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
               <View
                 className="mx-5 mb-4 flex-row items-start rounded-2xl p-4"
                 style={{
-                  backgroundColor: themeColors.dangerSubtle,
+                  backgroundColor: colors.dangerSubtle,
                   borderWidth: 1,
-                  borderColor: themeColors.dangerMuted,
+                  borderColor: colors.dangerMuted,
                 }}
               >
                 <AlertCircle
-                  color={themeColors.danger}
+                  color={colors.danger}
                   size={22}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ marginRight: 12, marginTop: 1 }}
                 />
                 <View className="flex-1">
-                  <Text className="text-[14px] font-semibold" style={{ color: themeColors.danger }}>
+                  <Text className="text-[14px] font-semibold" style={{ color: colors.danger }}>
                     {t.serverFailed}
                   </Text>
-                  <Text
-                    className="mt-1.5 text-[13px] leading-5"
-                    style={{ color: themeColors.danger }}
-                  >
+                  <Text className="mt-1.5 text-[13px] leading-5" style={{ color: colors.danger }}>
                     {errorMsg}
                   </Text>
                 </View>
@@ -322,7 +308,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           <Animated.View entering={FadeInDown.delay(240).duration(350)}>
             <PressableScale
               className="mx-5 mt-4 items-center justify-center rounded-2xl py-4"
-              style={{ backgroundColor: semanticColors.primary }}
+              style={{ backgroundColor: colors.primary }}
               onPress={handleSave}
             >
               <Text className="text-white font-semibold text-[16px]">
@@ -335,7 +321,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           <Animated.View entering={FadeInDown.delay(300).duration(350)}>
             <View
               className="mx-5 mt-6 rounded-xl px-4 py-3"
-              style={{ backgroundColor: themeColors.fillQuaternary }}
+              style={{ backgroundColor: colors.fillQuaternary }}
             >
               <Text className="text-secondary/60 text-[12px] leading-5">{t.serverTips}</Text>
             </View>

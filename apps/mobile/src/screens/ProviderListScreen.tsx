@@ -38,7 +38,7 @@ export default function ProviderListScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <Animated.View entering={FadeInDown.duration(300)}>
-        <View className="flex-row items-center justify-between px-4 py-2.5">
+        <View className="flex-row items-center justify-between px-5 py-3">
           <PressableScale
             className="w-9 h-9 items-center justify-center rounded-full"
             onPress={() => {

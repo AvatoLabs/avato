@@ -429,6 +429,8 @@ const InstalledRow = memo<{
 ));
 InstalledRow.displayName = 'InstalledRow';
 
+const InstalledSeparator = () => <View className="mx-5 h-px bg-foreground/[0.04]" />;
+
 function SimpleImportModal({
   buttonText,
   onClose,
@@ -1783,20 +1785,31 @@ export default function StoreScreen() {
   const isEmpty = isExplore ? marketItems.length === 0 : filteredInstalled.length === 0;
 
   const renderMarketItem = useCallback(
-    ({ item, index }: { index: number; item: MarketListItem }) => (
-      <Animated.View entering={FadeInDown.delay(index * 30).duration(350)}>
-        <ItemCard
-          installed={installedIds.has(item.identifier)}
-          item={item}
-          onInstall={(marketItem) => void handleInstall(marketItem)}
-          onPress={(marketItem) => {
-            haptics.light();
-            setSelectedEntry({ item: marketItem, source: 'market' });
-          }}
-        />
-      </Animated.View>
+    ({ item }: { item: MarketListItem }) => (
+      <ItemCard
+        installed={installedIds.has(item.identifier)}
+        item={item}
+        onInstall={(marketItem) => void handleInstall(marketItem)}
+        onPress={(marketItem) => {
+          haptics.light();
+          setSelectedEntry({ item: marketItem, source: 'market' });
+        }}
+      />
     ),
     [handleInstall, installedIds],
+  );
+
+  const renderInstalledItem = useCallback(
+    ({ item }: { item: StoreInstalledItem }) => (
+      <InstalledRow
+        item={item}
+        onPress={() => {
+          haptics.light();
+          setSelectedEntry({ item, source: 'installed' });
+        }}
+      />
+    ),
+    [],
   );
 
   return (
@@ -1986,9 +1999,11 @@ export default function StoreScreen() {
         />
       ) : (
         <FlatList
+          ItemSeparatorComponent={InstalledSeparator}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 80 }}
           data={filteredInstalled}
           keyExtractor={(item) => `${item.kind}-${item.id}`}
+          renderItem={renderInstalledItem}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -1997,20 +2012,6 @@ export default function StoreScreen() {
               onRefresh={fetchInstalled}
             />
           }
-          renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 30).duration(350)}>
-              <InstalledRow
-                item={item}
-                onPress={() => {
-                  haptics.light();
-                  setSelectedEntry({ item, source: 'installed' });
-                }}
-              />
-              {index < filteredInstalled.length - 1 ? (
-                <View className="mx-5 h-px bg-foreground/[0.04]" />
-              ) : null}
-            </Animated.View>
-          )}
         />
       )}
 

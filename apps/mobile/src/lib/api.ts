@@ -47,6 +47,7 @@ import type {
   MobileMemoryEffort,
   MobileUserState,
   ModelRankItem,
+  RecentTopic,
   SessionRankItem,
   SessionTag,
   Topic,
@@ -597,13 +598,16 @@ const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) =>
   return '';
 };
 
+/** Session 默认标题（用于 resolveDisplaySessionTitle 判断）。含 legacy 值以兼容已有数据。 */
 const DEFAULT_SESSION_TITLES = new Set([
   '',
   'New Chat',
   'New Conversation',
   'New conversation',
+  'New Session',
   '新对话',
   '新對話',
+  '新会话',
   'Untitled',
 ]);
 
@@ -709,7 +713,7 @@ export const sessionApi = {
         plugins: config?.plugins,
         provider: config?.provider,
         systemRole: config?.systemPrompt,
-        title: config?.title || 'New Conversation',
+        title: config?.title || 'New Session',
       },
       session: { tagId: config?.tagId },
       sessionOnly: true,
@@ -1704,6 +1708,9 @@ export const topicApi = {
   update: (id: string, title: string) =>
     trpcMutate('topic.updateTopic', { id, value: { title } }),
   search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),
+  /** Cross-session recent topics for "继续工作" / topic view. Returns sessionId for ChatDetail navigation. */
+  recentTopics: (limit?: number) =>
+    trpcQuery<RecentTopic[]>('topic.recentTopics', limit != null ? { limit } : undefined),
 };
 
 // ── Session Tag API ────────────────────────────────────────────────

@@ -12,24 +12,23 @@ import { ArrowLeft, ChevronRight, Search, Server } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image as RNImage,
   RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
-import { semanticColors } from '../constants/colors';
 import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AiProviderListItem } from '../types';
 
@@ -71,6 +70,7 @@ function ProviderLogo({
 export default function AIProvidersScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
   const refreshModelStore = useModelStore((s) => s.fetchModels);
 
   const [providers, setProviders] = useState<AiProviderListItem[]>([]);
@@ -145,28 +145,56 @@ export default function AIProvidersScreen({ navigation }: any) {
 
   const enabledCount = providers.filter((p) => p.enabled).length;
 
+  const renderProviderItem = useCallback(
+    ({ item: provider }: { item: AiProviderListItem }) => (
+      <PressableScale
+        className="mx-5 mb-2 bg-foreground/[0.02] rounded-2xl overflow-hidden"
+        onPress={() => navigation.navigate('ProviderDetail', { providerId: provider.id })}
+      >
+        <View className="flex-row items-center px-4 py-3.5">
+          <ProviderLogo logo={provider.logo} providerId={provider.id} size={36} />
+          <View className="flex-1 ml-3">
+            <Text className="text-foreground font-medium text-[15px] tracking-tight">
+              {provider.name || provider.id}
+            </Text>
+            <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
+              {provider.source === 'custom' ? 'Custom' : 'Built-in'}
+            </Text>
+          </View>
+          <View
+            className="w-2 h-2 rounded-full mr-1"
+            style={{ backgroundColor: provider.enabled ? '#34c759' : '#d1d5db' }}
+          />
+          <ChevronRight
+            color={colors.secondaryText}
+            size={18}
+            strokeWidth={tokens.icon.strokeWidth}
+            style={{ marginLeft: 8 }}
+          />
+        </View>
+      </PressableScale>
+    ),
+    [colors.secondaryText, navigation],
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-        }
         title={t.aiProvidersTitle}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         onPressLeft={() => navigation.goBack()}
       />
 
       {/* Search */}
       <View className="px-5 py-2 bg-background z-10">
         <View className="flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-          <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+          <Search color={colors.muted} size={16} strokeWidth={2} />
           <TextInput
             className="flex-1 text-foreground text-[14px] ml-2.5"
             placeholder={t.search}
-            placeholderTextColor={semanticColors.muted}
+            placeholderTextColor={colors.muted}
             returnKeyType="search"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -183,63 +211,31 @@ export default function AIProvidersScreen({ navigation }: any) {
 
       {loading ? (
         <View className="flex-1 items-center pt-20">
-          <ActivityIndicator color={semanticColors.primary} size="small" />
+          <ActivityIndicator color={colors.primary} size="small" />
         </View>
       ) : (
-        <ScrollView
+        <FlatList
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={renderProviderItem}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              colors={[semanticColors.primary]}
-              refreshing={refreshing}
-              tintColor={semanticColors.primary}
-              onRefresh={onRefresh}
-            />
-          }
-        >
-          {filtered.length === 0 ? (
+          ListEmptyComponent={
             <View className="items-center pt-16">
               <Server color="#ccc" size={48} strokeWidth={1} />
               <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
             </View>
-          ) : (
-            filtered.map((provider, index) => (
-              <Animated.View
-                entering={FadeInDown.delay(index * 30).duration(200)}
-                key={provider.id}
-              >
-                <PressableScale
-                  className="mx-5 mb-2 bg-foreground/[0.02] rounded-2xl overflow-hidden"
-                  onPress={() => navigation.navigate('ProviderDetail', { providerId: provider.id })}
-                >
-                  <View className="flex-row items-center px-4 py-3.5">
-                    <ProviderLogo logo={provider.logo} providerId={provider.id} size={36} />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-foreground font-medium text-[15px] tracking-tight">
-                        {provider.name || provider.id}
-                      </Text>
-                      <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
-                        {provider.source === 'custom' ? 'Custom' : 'Built-in'}
-                      </Text>
-                    </View>
-                    <View
-                      className="w-2 h-2 rounded-full mr-1"
-                      style={{ backgroundColor: provider.enabled ? '#34c759' : '#d1d5db' }}
-                    />
-                    <ChevronRight
-                      color={semanticColors.secondaryText}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginLeft: 8 }}
-                    />
-                  </View>
-                </PressableScale>
-              </Animated.View>
-            ))
-          )}
-        </ScrollView>
+          }
+          refreshControl={
+            <RefreshControl
+              colors={[colors.primary]}
+              refreshing={refreshing}
+              tintColor={colors.primary}
+              onRefresh={onRefresh}
+            />
+          }
+        />
       )}
     </View>
   );

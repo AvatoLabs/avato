@@ -182,7 +182,7 @@ function BottomTabs() {
       }}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007aff',
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text + '60',
         tabBarItemStyle: {
           paddingTop: 4,

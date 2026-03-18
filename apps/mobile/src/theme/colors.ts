@@ -1,25 +1,27 @@
 /**
  * Unified color tokens for theming.
- * All UI colors should reference these tokens — no hardcoded hex/rgba in components.
- * Add new theme variants (e.g. dark) by extending this structure.
+ * All UI colors reference these tokens — no hardcoded hex/rgba in components.
+ * Combines base (light/dark) + color scheme palette.
  */
 import { useThemeStore } from '../store/theme';
+import { type ColorSchemeId, getColorSchemePalette } from './palettes';
 
 export interface ColorTokens {
   activeTabBg: string;
+  artworkError: string;
+  artworkPending: string;
+  artworkProcessing: string;
+  artworkSuccess: string;
   assistantBubbleBg: string;
   assistantBubbleBorder: string;
   assistantBubbleText: string;
-  // ── Base ─────────────────────────────────────────────────────────────
   background: string;
-
-  // ── Borders & Dividers ────────────────────────────────────────────────
   border: string;
   borderDefault: string;
   borderSubtle: string;
+  cachedToken: string;
   card: string;
   chatAccentBadgeBg: string;
-
   chatAccentBadgeText: string;
   chatAccentChipBg: string;
   chatAccentChipBorder: string;
@@ -27,77 +29,74 @@ export interface ColorTokens {
   chatAccentSectionBg: string;
   chatAccentSectionBorder: string;
   chatAccentSubtleBg: string;
+  codeBlockLight: string;
   danger: string;
   dangerMuted: string;
   dangerSubtle: string;
   divider: string;
+  fileArchive: string;
   fillQuaternary: string;
-
-  // ── Surfaces (overlays, chips) ────────────────────────────────────────
   fillTertiary: string;
   foreground: string;
   iconDanger: string;
   iconMuted: string;
-
-  // ── Icons (on light/dark surfaces) ────────────────────────────────────
   iconOnPrimary: string;
   iconOnSurface: string;
   iconSuccess: string;
   iconWarning: string;
-
   inactiveTabBg: string;
   info: string;
   infoMuted: string;
   infoSubtle: string;
-
+  // ── UI pattern tokens (abstracted from hardcoded values) ─────────────────
+  inputBg: string;
   markdownCodeBlockBg: string;
   markdownCodeInlineBg: string;
   markdownCodeInlineColor: string;
   markdownHeading: string;
   markdownLink: string;
-
-  // ── Markdown / Code ───────────────────────────────────────────────────
   markdownText: string;
-  // ── Neutral / Text ───────────────────────────────────────────────────
+  modalDarkBg: string;
+  modalOverlay: string;
   muted: string;
   overlay: string;
   overlayDark: string;
   placeholder: string;
-  // ── Primary / Brand ──────────────────────────────────────────────────
   primary: string;
-
   primaryBorder: string;
   primaryFocused: string;
   primaryMuted: string;
   primarySubtle: string;
+  progressBarTrack: string;
   secondaryText: string;
-  // ── Source badges (builtin, market, custom) ────────────────────────────
+  shadow: string;
+  sliderThumb: string;
+  sliderTrack: string;
+  sliderTrackDisabled: string;
   sourceBuiltin: string;
   sourceBuiltinMuted: string;
   sourceCustom: string;
   sourceCustomMuted: string;
   sourceMarket: string;
   sourceMarketMuted: string;
-  // ── Semantic ─────────────────────────────────────────────────────────
   success: string;
   successMuted: string;
   successSubtle: string;
   surface: string;
   surfaceElevated: string;
-  // ── Interactive states ────────────────────────────────────────────────
   switchTrackOff: string;
   switchTrackOffAlt: string;
   switchTrackOn: string;
   tertiaryText: string;
-
-  // ── Chat / Message bubble ─────────────────────────────────────────────
+  textDark: string;
+  textGray: string;
+  typingIndicator: string;
   userBubbleBg: string;
   userBubbleCodeBg: string;
   userBubbleHr: string;
   userBubbleLink: string;
   userBubbleSubtleBg: string;
   userBubbleTableBg: string;
-
   userBubbleTableBorder: string;
   userBubbleText: string;
   userBubbleTextMuted: string;
@@ -106,19 +105,125 @@ export interface ColorTokens {
   warningSubtle: string;
 }
 
-const lightTokens: ColorTokens = {
+type EffectiveTheme = 'light' | 'dark';
+
+// ── Base neutral tokens (no accent colors) ────────────────────────────────
+interface BaseTokens {
+  artworkError: string;
+  artworkPending: string;
+  artworkProcessing: string;
+  artworkSuccess: string;
+  assistantBubbleBg: string;
+  assistantBubbleBorder: string;
+  assistantBubbleText: string;
+  background: string;
+  border: string;
+  borderDefault: string;
+  borderSubtle: string;
+  cachedToken: string;
+  card: string;
+  chatAccentSectionBg: string;
+  chatAccentSectionBorder: string;
+  chatAccentSubtleBg: string;
+  codeBlockLight: string;
+  danger: string;
+  dangerMuted: string;
+  dangerSubtle: string;
+  divider: string;
+  fileArchive: string;
+  fillQuaternary: string;
+  fillTertiary: string;
+  foreground: string;
+  iconDanger: string;
+  iconMuted: string;
+  iconOnPrimary: string;
+  iconOnSurface: string;
+  iconSuccess: string;
+  iconWarning: string;
+  info: string;
+  infoMuted: string;
+  infoSubtle: string;
+  inputBg: string;
+  markdownCodeBlockBg: string;
+  markdownCodeInlineBg: string;
+  markdownCodeInlineColor: string;
+  markdownHeading: string;
+  markdownText: string;
+  modalDarkBg: string;
+  modalOverlay: string;
+  muted: string;
+  overlay: string;
+  overlayDark: string;
+  placeholder: string;
+  progressBarTrack: string;
+  secondaryText: string;
+  shadow: string;
+  sliderTrack: string;
+  sliderTrackDisabled: string;
+  sourceBuiltin: string;
+  sourceBuiltinMuted: string;
+  sourceCustom: string;
+  sourceCustomMuted: string;
+  success: string;
+  successMuted: string;
+  successSubtle: string;
+  surface: string;
+  surfaceElevated: string;
+  switchTrackOff: string;
+  switchTrackOffAlt: string;
+  tertiaryText: string;
+  textDark: string;
+  textGray: string;
+  typingIndicator: string;
+  userBubbleCodeBg: string;
+  userBubbleHr: string;
+  userBubbleSubtleBg: string;
+  userBubbleTableBg: string;
+  userBubbleTableBorder: string;
+  userBubbleText: string;
+  userBubbleTextMuted: string;
+  warning: string;
+  warningMuted: string;
+  warningSubtle: string;
+}
+
+const lightBase: BaseTokens = {
   background: '#ffffff',
   foreground: '#111111',
   surface: '#ffffff',
   surfaceElevated: '#ffffff',
   card: '#ffffff',
-
-  primary: '#007aff',
-  primaryBorder: 'rgba(0,122,255,0.16)',
-  primaryFocused: '#4DA3FF',
-  primaryMuted: 'rgba(0,122,255,0.35)',
-  primarySubtle: 'rgba(0,122,255,0.08)',
-
+  muted: '#8c8c8c',
+  secondaryText: '#9ca3af',
+  tertiaryText: '#8E8E93',
+  placeholder: '#8c8c8c',
+  border: 'rgba(0,0,0,0.05)',
+  borderDefault: '#d9d9d9',
+  borderSubtle: 'rgba(0,0,0,0.04)',
+  divider: 'rgba(0,0,0,0.05)',
+  fillTertiary: 'rgba(0,0,0,0.04)',
+  fillQuaternary: 'rgba(0,0,0,0.02)',
+  overlay: 'rgba(255,255,255,0.92)',
+  overlayDark: 'rgba(0,0,0,0.6)',
+  switchTrackOff: '#e5e5e5',
+  switchTrackOffAlt: 'rgba(120,120,128,0.18)',
+  markdownText: '#1a1a1a',
+  markdownHeading: '#111111',
+  markdownCodeInlineBg: 'rgba(0,0,0,0.05)',
+  markdownCodeInlineColor: '#e83e8c',
+  markdownCodeBlockBg: '#f5f5f5',
+  assistantBubbleBg: '#ffffff',
+  assistantBubbleBorder: 'rgba(15,23,42,0.06)',
+  assistantBubbleText: '#1a1a1a',
+  chatAccentSectionBg: '#ffffff',
+  chatAccentSectionBorder: 'rgba(15,23,42,0.06)',
+  chatAccentSubtleBg: 'rgba(15,23,42,0.035)',
+  iconOnPrimary: '#ffffff',
+  iconOnSurface: '#111111',
+  iconMuted: '#999999',
+  iconSuccess: '#34C759',
+  iconDanger: '#FF3B30',
+  iconWarning: '#f5a623',
   success: '#34C759',
   successMuted: 'rgba(52,199,89,0.1)',
   successSubtle: 'rgba(52,199,89,0.04)',
@@ -131,165 +236,18 @@ const lightTokens: ColorTokens = {
   info: '#0A84FF',
   infoMuted: 'rgba(10,132,255,0.1)',
   infoSubtle: 'rgba(10,132,255,0.04)',
-
-  muted: '#8c8c8c',
-  secondaryText: '#9ca3af',
-  tertiaryText: '#8E8E93',
-  placeholder: '#8c8c8c',
-
-  border: 'rgba(0,0,0,0.05)',
-  borderDefault: '#d9d9d9',
-  borderSubtle: 'rgba(0,0,0,0.04)',
-  divider: 'rgba(0,0,0,0.05)',
-
-  fillTertiary: 'rgba(0,0,0,0.04)',
-  fillQuaternary: 'rgba(0,0,0,0.02)',
-  overlay: 'rgba(255,255,255,0.92)',
-  overlayDark: 'rgba(0,0,0,0.6)',
-
-  switchTrackOff: '#e5e5e5',
-  switchTrackOffAlt: 'rgba(120,120,128,0.18)',
-  switchTrackOn: '#007aff',
-  activeTabBg: '#007aff',
-  inactiveTabBg: 'rgba(0,122,255,0.1)',
-
-  markdownText: '#1a1a1a',
-  markdownHeading: '#111111',
-  markdownCodeInlineBg: 'rgba(0,0,0,0.05)',
-  markdownCodeInlineColor: '#e83e8c',
-  markdownCodeBlockBg: '#f5f5f5',
-  markdownLink: '#007aff',
-
-  userBubbleBg: '#0A84FF',
+  sourceBuiltin: '#059669',
+  sourceBuiltinMuted: 'rgba(5,150,105,0.12)',
+  sourceCustom: '#ea580c',
+  sourceCustomMuted: 'rgba(234,88,12,0.12)',
   userBubbleText: '#ffffff',
   userBubbleTextMuted: 'rgba(255,255,255,0.7)',
   userBubbleCodeBg: 'rgba(255,255,255,0.2)',
-  userBubbleLink: '#b3d9ff',
   userBubbleSubtleBg: 'rgba(255,255,255,0.14)',
   userBubbleTableBg: 'rgba(255,255,255,0.12)',
   userBubbleTableBorder: 'rgba(255,255,255,0.1)',
   userBubbleHr: 'rgba(255,255,255,0.15)',
-  assistantBubbleBg: '#ffffff',
-  assistantBubbleBorder: 'rgba(15,23,42,0.06)',
-  assistantBubbleText: '#1a1a1a',
-  chatAccentBadgeBg: 'rgba(37,99,235,0.1)',
-  chatAccentBadgeText: '#2563eb',
-  chatAccentChipBg: 'rgba(37,99,235,0.08)',
-  chatAccentChipBorder: 'rgba(37,99,235,0.16)',
-  chatAccentQuoteBorder: '#3b82f6',
-  chatAccentSectionBg: '#ffffff',
-  chatAccentSectionBorder: 'rgba(15,23,42,0.06)',
-  chatAccentSubtleBg: 'rgba(15,23,42,0.035)',
-
-  iconOnPrimary: '#ffffff',
-  iconOnSurface: '#111111',
-  iconMuted: '#999999',
-  iconSuccess: '#34C759',
-  iconDanger: '#FF3B30',
-  iconWarning: '#f5a623',
-
-  sourceBuiltin: '#059669',
-  sourceBuiltinMuted: 'rgba(5,150,105,0.12)',
-  sourceMarket: '#007aff',
-  sourceMarketMuted: 'rgba(0,122,255,0.1)',
-  sourceCustom: '#ea580c',
-  sourceCustomMuted: 'rgba(234,88,12,0.12)',
-};
-
-const darkTokens: ColorTokens = {
-  background: '#000000',
-  foreground: '#f5f5f7',
-  surface: '#1c1c1e',
-  surfaceElevated: '#2c2c2e',
-  card: '#1c1c1e',
-
-  primary: '#0a84ff',
-  primaryBorder: 'rgba(10,132,255,0.3)',
-  primaryFocused: '#409cff',
-  primaryMuted: 'rgba(10,132,255,0.4)',
-  primarySubtle: 'rgba(10,132,255,0.15)',
-
-  success: '#30d158',
-  successMuted: 'rgba(48,209,88,0.2)',
-  successSubtle: 'rgba(48,209,88,0.08)',
-  danger: '#ff453a',
-  dangerMuted: 'rgba(255,69,58,0.2)',
-  dangerSubtle: 'rgba(255,69,58,0.1)',
-  warning: '#ff9f0a',
-  warningMuted: 'rgba(255,159,10,0.2)',
-  warningSubtle: 'rgba(255,159,10,0.1)',
-  info: '#64d2ff',
-  infoMuted: 'rgba(100,210,255,0.2)',
-  infoSubtle: 'rgba(100,210,255,0.1)',
-
-  muted: '#8e8e93',
-  secondaryText: '#98989f',
-  tertiaryText: '#636366',
-  placeholder: '#8e8e93',
-
-  border: 'rgba(255,255,255,0.08)',
-  borderDefault: '#38383a',
-  borderSubtle: 'rgba(255,255,255,0.06)',
-  divider: 'rgba(255,255,255,0.08)',
-
-  fillTertiary: 'rgba(255,255,255,0.06)',
-  fillQuaternary: 'rgba(255,255,255,0.04)',
-  overlay: 'rgba(28,28,30,0.95)',
-  overlayDark: 'rgba(0,0,0,0.7)',
-
-  switchTrackOff: '#38383a',
-  switchTrackOffAlt: 'rgba(120,120,128,0.32)',
-  switchTrackOn: '#0a84ff',
-  activeTabBg: '#0a84ff',
-  inactiveTabBg: 'rgba(10,132,255,0.2)',
-
-  markdownText: '#f5f5f7',
-  markdownHeading: '#ffffff',
-  markdownCodeInlineBg: 'rgba(255,255,255,0.12)',
-  markdownCodeInlineColor: '#ff7eb6',
-  markdownCodeBlockBg: '#2c2c2e',
-  markdownLink: '#64d2ff',
-
-  userBubbleBg: '#0a84ff',
-  userBubbleText: '#ffffff',
-  userBubbleTextMuted: 'rgba(255,255,255,0.8)',
-  userBubbleCodeBg: 'rgba(255,255,255,0.2)',
-  userBubbleLink: '#7fc8ff',
-  userBubbleSubtleBg: 'rgba(255,255,255,0.15)',
-  userBubbleTableBg: 'rgba(255,255,255,0.1)',
-  userBubbleTableBorder: 'rgba(255,255,255,0.12)',
-  userBubbleHr: 'rgba(255,255,255,0.2)',
-  assistantBubbleBg: '#2c2c2e',
-  assistantBubbleBorder: 'rgba(255,255,255,0.08)',
-  assistantBubbleText: '#f5f5f7',
-  chatAccentBadgeBg: 'rgba(100,210,255,0.2)',
-  chatAccentBadgeText: '#64d2ff',
-  chatAccentChipBg: 'rgba(100,210,255,0.15)',
-  chatAccentChipBorder: 'rgba(100,210,255,0.3)',
-  chatAccentQuoteBorder: '#64d2ff',
-  chatAccentSectionBg: '#2c2c2e',
-  chatAccentSectionBorder: 'rgba(255,255,255,0.08)',
-  chatAccentSubtleBg: 'rgba(255,255,255,0.06)',
-
-  iconOnPrimary: '#ffffff',
-  iconOnSurface: '#f5f5f7',
-  iconMuted: '#8e8e93',
-  iconSuccess: '#30d158',
-  iconDanger: '#ff453a',
-  iconWarning: '#ff9f0a',
-
-  sourceBuiltin: '#30d158',
-  sourceBuiltinMuted: 'rgba(48,209,88,0.2)',
-  sourceMarket: '#0a84ff',
-  sourceMarketMuted: 'rgba(10,132,255,0.2)',
-  sourceCustom: '#ff9f0a',
-  sourceCustomMuted: 'rgba(255,159,10,0.2)',
-};
-
-// Additional tokens for specific UI patterns
-export const uiColors = {
   inputBg: '#f8f8fa',
-  sliderThumb: '#007aff',
   sliderTrack: '#e0e0e0',
   sliderTrackDisabled: '#ccc',
   shadow: '#000000',
@@ -306,38 +264,141 @@ export const uiColors = {
   modalOverlay: 'rgba(0,0,0,0.4)',
   modalDarkBg: '#1c1c1e',
   progressBarTrack: '#333333',
-} as const;
+};
+
+const darkBase: BaseTokens = {
+  ...lightBase,
+  background: '#000000',
+  foreground: '#f5f5f7',
+  surface: '#1c1c1e',
+  surfaceElevated: '#2c2c2e',
+  card: '#1c1c1e',
+  muted: '#8e8e93',
+  secondaryText: '#98989f',
+  tertiaryText: '#636366',
+  placeholder: '#8e8e93',
+  border: 'rgba(255,255,255,0.08)',
+  borderDefault: '#38383a',
+  borderSubtle: 'rgba(255,255,255,0.06)',
+  divider: 'rgba(255,255,255,0.08)',
+  fillTertiary: 'rgba(255,255,255,0.06)',
+  fillQuaternary: 'rgba(255,255,255,0.04)',
+  overlay: 'rgba(28,28,30,0.95)',
+  overlayDark: 'rgba(0,0,0,0.7)',
+  switchTrackOff: '#38383a',
+  switchTrackOffAlt: 'rgba(120,120,128,0.32)',
+  markdownText: '#f5f5f7',
+  markdownHeading: '#ffffff',
+  markdownCodeInlineBg: 'rgba(255,255,255,0.12)',
+  markdownCodeInlineColor: '#ff7eb6',
+  markdownCodeBlockBg: '#2c2c2e',
+  assistantBubbleBg: '#2c2c2e',
+  assistantBubbleBorder: 'rgba(255,255,255,0.08)',
+  assistantBubbleText: '#f5f5f7',
+  chatAccentSectionBg: '#2c2c2e',
+  chatAccentSectionBorder: 'rgba(255,255,255,0.08)',
+  chatAccentSubtleBg: 'rgba(255,255,255,0.06)',
+  iconOnSurface: '#f5f5f7',
+  iconMuted: '#8e8e93',
+  success: '#30d158',
+  successMuted: 'rgba(48,209,88,0.2)',
+  successSubtle: 'rgba(48,209,88,0.08)',
+  danger: '#ff453a',
+  dangerMuted: 'rgba(255,69,58,0.2)',
+  dangerSubtle: 'rgba(255,69,58,0.1)',
+  warning: '#ff9f0a',
+  warningMuted: 'rgba(255,159,10,0.2)',
+  warningSubtle: 'rgba(255,159,10,0.1)',
+  info: '#64d2ff',
+  infoMuted: 'rgba(100,210,255,0.2)',
+  infoSubtle: 'rgba(100,210,255,0.1)',
+  sourceBuiltin: '#30d158',
+  sourceBuiltinMuted: 'rgba(48,209,88,0.2)',
+  sourceCustom: '#ff9f0a',
+  sourceCustomMuted: 'rgba(255,159,10,0.2)',
+  userBubbleText: '#ffffff',
+  userBubbleTextMuted: 'rgba(255,255,255,0.8)',
+  userBubbleSubtleBg: 'rgba(255,255,255,0.15)',
+  userBubbleTableBg: 'rgba(255,255,255,0.1)',
+  userBubbleTableBorder: 'rgba(255,255,255,0.12)',
+  userBubbleHr: 'rgba(255,255,255,0.2)',
+  inputBg: '#1c1c1e',
+  sliderTrack: '#38383a',
+  sliderTrackDisabled: '#636366',
+  typingIndicator: '#8e8e93',
+  textDark: '#f5f5f7',
+  textGray: '#98989f',
+  progressBarTrack: '#38383a',
+};
+
+function mergeTokens(
+  base: BaseTokens,
+  palette: ReturnType<typeof getColorSchemePalette>,
+): ColorTokens {
+  return {
+    ...base,
+    primary: palette.primary,
+    primaryBorder: palette.primaryBorder,
+    primaryFocused: palette.primaryFocused,
+    primaryMuted: palette.primaryMuted,
+    primarySubtle: palette.primarySubtle,
+    switchTrackOn: palette.switchTrackOn,
+    activeTabBg: palette.activeTabBg,
+    inactiveTabBg: palette.inactiveTabBg,
+    userBubbleBg: palette.userBubbleBg,
+    userBubbleLink: palette.userBubbleLink,
+    markdownLink: palette.markdownLink,
+    chatAccentBadgeBg: palette.chatAccentBadgeBg,
+    chatAccentBadgeText: palette.chatAccentBadgeText,
+    chatAccentChipBg: palette.chatAccentChipBg,
+    chatAccentChipBorder: palette.chatAccentChipBorder,
+    chatAccentQuoteBorder: palette.chatAccentQuoteBorder,
+    sourceMarket: palette.sourceMarket,
+    sourceMarketMuted: palette.sourceMarketMuted,
+    sliderThumb: palette.primary,
+  };
+}
+
+const baseMap: Record<EffectiveTheme, BaseTokens> = {
+  light: lightBase,
+  dark: darkBase,
+};
 
 export type EffectiveTheme = 'light' | 'dark';
 
-const themeMap: Record<EffectiveTheme, ColorTokens> = {
-  light: lightTokens,
-  dark: darkTokens,
-};
-
-export function getThemeTokens(theme: EffectiveTheme): ColorTokens {
-  return themeMap[theme];
+export function getThemeTokens(
+  theme: EffectiveTheme,
+  colorScheme: ColorSchemeId = 'blue',
+): ColorTokens {
+  const base = baseMap[theme];
+  const palette = getColorSchemePalette(colorScheme);
+  return mergeTokens(base, palette);
 }
 
-/** Current theme — defaults to light when used outside ThemeProvider. Use useThemeColors() for reactive theme. */
-export const themeColors: ColorTokens = lightTokens;
+/** @deprecated Use useThemeColors() for reactive theme. Defaults to light+blue. */
+export const themeColors: ColorTokens = getThemeTokens('light', 'blue');
 
-/** Chat accent group — convenience object for MessageBubble etc. */
-export const chatAccent = {
-  badgeBg: lightTokens.chatAccentBadgeBg,
-  badgeText: lightTokens.chatAccentBadgeText,
-  bubbleBg: lightTokens.chatAccentSectionBg,
-  bubbleBorder: lightTokens.chatAccentSectionBorder,
-  chipBg: lightTokens.chatAccentChipBg,
-  chipBorder: lightTokens.chatAccentChipBorder,
-  elevatedBg: lightTokens.chatAccentSectionBg,
-  quoteBorder: lightTokens.chatAccentQuoteBorder,
-  sectionBg: lightTokens.chatAccentSectionBg,
-  sectionBorder: lightTokens.chatAccentSectionBorder,
-  subtleBg: lightTokens.chatAccentSubtleBg,
-} as const;
+/** Chat accent group — convenience object. Use useThemeColors() for reactive. */
+export function getChatAccent(tokens: ColorTokens) {
+  return {
+    badgeBg: tokens.chatAccentBadgeBg,
+    badgeText: tokens.chatAccentBadgeText,
+    bubbleBg: tokens.chatAccentSectionBg,
+    bubbleBorder: tokens.chatAccentSectionBorder,
+    chipBg: tokens.chatAccentChipBg,
+    chipBorder: tokens.chatAccentChipBorder,
+    elevatedBg: tokens.chatAccentSectionBg,
+    quoteBorder: tokens.chatAccentQuoteBorder,
+    sectionBg: tokens.chatAccentSectionBg,
+    sectionBorder: tokens.chatAccentSectionBorder,
+    subtleBg: tokens.chatAccentSubtleBg,
+  } as const;
+}
 
-/** @deprecated Use useThemeColors().semanticColors instead. Kept for backward compatibility. */
+/** @deprecated Use useThemeColors(). Kept for backward compatibility. */
+export const chatAccent = getChatAccent(themeColors);
+
+/** @deprecated Use useThemeColors(). Kept for backward compatibility. */
 export const semanticColors = {
   border: themeColors.border,
   danger: themeColors.danger,
@@ -349,13 +410,35 @@ export const semanticColors = {
   surface: themeColors.surface,
 } as const;
 
-/** Hook for reactive theme colors. Use when component needs to re-render on theme change. */
+/** @deprecated Use useThemeColors() which includes these. Prefer tokens.inputBg etc. */
+export const uiColors = {
+  inputBg: themeColors.inputBg,
+  sliderThumb: themeColors.sliderThumb,
+  sliderTrack: themeColors.sliderTrack,
+  sliderTrackDisabled: themeColors.sliderTrackDisabled,
+  shadow: themeColors.shadow,
+  codeBlockLight: themeColors.codeBlockLight,
+  typingIndicator: themeColors.typingIndicator,
+  artworkPending: themeColors.artworkPending,
+  artworkProcessing: themeColors.artworkProcessing,
+  artworkSuccess: themeColors.artworkSuccess,
+  artworkError: themeColors.artworkError,
+  fileArchive: themeColors.fileArchive,
+  textDark: themeColors.textDark,
+  textGray: themeColors.textGray,
+  cachedToken: themeColors.cachedToken,
+  modalOverlay: themeColors.modalOverlay,
+  modalDarkBg: themeColors.modalDarkBg,
+  progressBarTrack: themeColors.progressBarTrack,
+} as const;
+
+/** Hook for reactive theme colors. Re-renders on theme or color scheme change. */
 export function useThemeColors(): ColorTokens {
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
-  return getThemeTokens(effectiveTheme);
+  const colorScheme = useThemeStore((s) => s.colorScheme);
+  return getThemeTokens(effectiveTheme, colorScheme);
 }
 
-/** Semantic colors derived from current theme tokens. Use useSemanticColors() for reactive version. */
 export function getSemanticColors(tokens: ColorTokens) {
   return {
     border: tokens.border,
@@ -367,4 +450,9 @@ export function getSemanticColors(tokens: ColorTokens) {
     secondaryText: tokens.secondaryText,
     surface: tokens.surface,
   } as const;
+}
+
+export function useSemanticColors() {
+  const tokens = useThemeColors();
+  return getSemanticColors(tokens);
 }

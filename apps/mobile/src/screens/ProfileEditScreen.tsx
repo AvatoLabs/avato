@@ -35,12 +35,12 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { userApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { useUserStore } from '../store/user';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const INTEREST_AREAS: {
@@ -72,6 +72,7 @@ const INTEREST_LABEL_MAP = {
 export default function ProfileEditScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   const storeProfile = useUserStore((s) => s.profile);
   const fetchUser = useUserStore((s) => s.fetchUser);
@@ -220,11 +221,7 @@ export default function ProfileEditScreen({ navigation }: any) {
           rightAccessibilityLabel={t.accessibilitySave}
           title={t.profileTitle}
           leftElement={
-            <ArrowLeft
-              color={semanticColors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
           }
           rightElement={
             <Text
@@ -251,11 +248,7 @@ export default function ProfileEditScreen({ navigation }: any) {
         rightAccessibilityLabel={t.accessibilitySave}
         title={t.profileTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         rightElement={
           <Text
@@ -287,7 +280,7 @@ export default function ProfileEditScreen({ navigation }: any) {
             {/* Avatar Row */}
             <TouchableOpacity
               activeOpacity={0.7}
-              className="flex-row items-center justify-between px-4 py-4 border-b border-black/[0.03]"
+              className="flex-row items-center justify-between px-4 py-4 border-b border-border"
               disabled={savingAvatar}
               onPress={handlePickAvatar}
             >
@@ -301,10 +294,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                 {savingAvatar ? (
                   <ActivityIndicator color="#007aff" size="small" />
                 ) : resolvedAvatarUri ? (
-                  <RNImage
-                    source={{ uri: resolvedAvatarUri }}
-                    style={{ width: 40, height: 40, borderRadius: 8 }}
-                  />
+                  <RNImage className="h-10 w-10 rounded-lg" source={{ uri: resolvedAvatarUri }} />
                 ) : (
                   <View className="w-10 h-10 rounded-lg bg-foreground/10 items-center justify-center">
                     <Text className="text-foreground/60 text-[14px] font-semibold">{initials}</Text>
@@ -314,19 +304,21 @@ export default function ProfileEditScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* Full Name Row */}
-            <View className="flex-row items-center justify-between px-4 py-1.5 border-b border-black/[0.03]">
+            <View className="flex-row items-center justify-between px-5 py-2 border-b border-border">
               <Text className="text-foreground text-[15px] font-medium tracking-tight mr-4">
                 {t.profileFullName}
               </Text>
               <View className="flex-row items-center flex-1 justify-end">
                 {savingName && (
-                  <ActivityIndicator color="#007aff" size="small" style={{ marginRight: 6 }} />
+                  <View className="mr-1.5">
+                    <ActivityIndicator color="#007aff" size="small" />
+                  </View>
                 )}
                 <TextInput
                   autoCapitalize="words"
                   className="text-foreground text-[15px] text-right flex-1"
                   placeholder={t.profileFullName}
-                  placeholderTextColor={semanticColors.muted}
+                  placeholderTextColor={colors.muted}
                   returnKeyType="done"
                   value={fullName}
                   onChangeText={setFullName}
@@ -336,7 +328,7 @@ export default function ProfileEditScreen({ navigation }: any) {
             </View>
 
             {/* Interests Row */}
-            <View className="px-4 py-4 border-b border-black/[0.03]">
+            <View className="px-5 py-4 border-b border-border">
               <Text className="text-foreground text-[15px] font-medium tracking-tight mb-3">
                 {t.profileInterests}
               </Text>
@@ -356,12 +348,13 @@ export default function ProfileEditScreen({ navigation }: any) {
                       }`}
                       onPress={() => !savingInterests && handleToggleInterest(label)}
                     >
-                      <IconComp
-                        color={isSelected ? '#007aff' : '#999'}
-                        size={13}
-                        strokeWidth={tokens.icon.strokeWidth}
-                        style={{ marginRight: 5 }}
-                      />
+                      <View className="mr-1.5">
+                        <IconComp
+                          color={isSelected ? '#007aff' : '#999'}
+                          size={13}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
+                      </View>
                       <Text
                         className={`text-[13px] font-medium ${
                           isSelected ? 'text-primary' : 'text-foreground/70'
@@ -390,12 +383,13 @@ export default function ProfileEditScreen({ navigation }: any) {
                   }`}
                   onPress={() => setShowCustomInput(!showCustomInput)}
                 >
-                  <Briefcase
-                    color={showCustomInput ? '#007aff' : '#999'}
-                    size={13}
-                    strokeWidth={tokens.icon.strokeWidth}
-                    style={{ marginRight: 5 }}
-                  />
+                  <View className="mr-1.5">
+                    <Briefcase
+                      color={showCustomInput ? '#007aff' : '#999'}
+                      size={13}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </View>
                   <Text
                     className={`text-[13px] font-medium ${
                       showCustomInput ? 'text-primary' : 'text-foreground/70'
@@ -411,7 +405,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                     autoFocus
                     className="flex-1 text-foreground text-[14px]"
                     placeholder={t.profileInterestsCustomPlaceholder}
-                    placeholderTextColor={semanticColors.muted}
+                    placeholderTextColor={colors.muted}
                     returnKeyType="done"
                     value={customInterest}
                     onChangeText={setCustomInterest}

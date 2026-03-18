@@ -40,9 +40,9 @@ import {
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { memoryApi, type MemoryExtractionTask } from '../lib/api';
 import { useI18n } from '../lib/i18n';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
   MemoryActivityItem,
@@ -154,6 +154,7 @@ function formatDate(dateStr?: string): string {
 // ── Home Tab Component ──────────────────────────────────────────────
 function HomeTab() {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const toast = useToast();
   const [persona, setPersona] = useState<MemoryPersona | null>(null);
   const [roles, setRoles] = useState<Array<{ count: number; role: string }>>([]);
@@ -305,7 +306,7 @@ function HomeTab() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center py-20">
-        <ActivityIndicator color={semanticColors.primary} size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -351,7 +352,7 @@ function HomeTab() {
           </View>
         ) : (
           <View className="bg-foreground/[0.02] rounded-2xl p-6 items-center">
-            <Brain color={semanticColors.secondaryText} size={32} strokeWidth={1.5} />
+            <Brain color={colors.secondaryText} size={32} strokeWidth={1.5} />
             <Text className="text-sm text-secondary/60 mt-3 text-center">
               {t.memoryPersonaEmpty}
             </Text>
@@ -381,8 +382,8 @@ function HomeTab() {
                 requestingExtraction ||
                 extractionTask?.status === 'Pending' ||
                 extractionTask?.status === 'Processing'
-                  ? semanticColors.fillTertiary
-                  : semanticColors.primary,
+                  ? colors.fillTertiary
+                  : colors.primary,
               minHeight: 44,
               paddingHorizontal: 14,
               paddingVertical: 10,
@@ -401,7 +402,7 @@ function HomeTab() {
       {/* Empty state if nothing at all */}
       {!persona?.content && !persona?.summary && roles.length === 0 && (
         <View className="items-center py-10">
-          <Brain color={semanticColors.secondaryText} size={48} strokeWidth={1.2} />
+          <Brain color={colors.secondaryText} size={48} strokeWidth={1.2} />
           <Text className="text-base font-medium text-secondary/60 mt-4">{t.memoryEmpty}</Text>
           <Text className="text-sm text-secondary/45 mt-1 text-center px-8">
             {t.memoryEmptyDesc}
@@ -415,6 +416,7 @@ function HomeTab() {
 // ── Memory List Tab Component ────────────────────────────────────────
 function MemoryListTab({ layer }: { layer: MemoryLayer }) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const nav = useNavigation<any>();
   const [items, setItems] = useState<AnyMemoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -574,7 +576,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
               onPress={() => handleDelete(item)}
             >
-              <Trash2 color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
+              <Trash2 color={colors.secondaryText} size={16} strokeWidth={1.5} />
             </TouchableOpacity>
           </View>
 
@@ -625,7 +627,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity onPress={() => setShowSearch((prev) => !prev)}>
-            <Search color={semanticColors.secondaryText} size={18} strokeWidth={1.5} />
+            <Search color={colors.secondaryText} size={18} strokeWidth={1.5} />
           </TouchableOpacity>
         </View>
       </View>
@@ -657,7 +659,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                   hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                   onPress={() => setShowCreateModal(false)}
                 >
-                  <X color={semanticColors.secondaryText} size={20} strokeWidth={1.5} />
+                  <X color={colors.secondaryText} size={20} strokeWidth={1.5} />
                 </TouchableOpacity>
               </View>
               <Text className="text-sm font-medium text-foreground/80 mb-1">
@@ -666,7 +668,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
               <TextInput
                 className="mb-4 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] px-3 py-2.5 text-base text-foreground"
                 placeholder={t.memoryCreateTitlePlaceholder}
-                placeholderTextColor={semanticColors.muted}
+                placeholderTextColor={colors.muted}
                 value={createTitle}
                 onChangeText={setCreateTitle}
               />
@@ -678,7 +680,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                 className="mb-5 rounded-xl border border-foreground/[0.08] bg-foreground/[0.04] px-3 py-2.5 text-base text-foreground"
                 numberOfLines={3}
                 placeholder={t.memoryCreateSummaryPlaceholder}
-                placeholderTextColor={semanticColors.muted}
+                placeholderTextColor={colors.muted}
                 value={createSummary}
                 onChangeText={setCreateSummary}
               />
@@ -687,9 +689,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                 disabled={!createTitle.trim() || createSubmitting}
                 style={{
                   backgroundColor:
-                    createTitle.trim() && !createSubmitting
-                      ? semanticColors.primary
-                      : semanticColors.fillTertiary,
+                    createTitle.trim() && !createSubmitting ? colors.primary : colors.fillTertiary,
                 }}
                 onPress={handleCreateSubmit}
               >
@@ -703,18 +703,18 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
       {/* Search bar */}
       {showSearch && (
         <View className="flex-row items-center mx-5 mb-2 bg-foreground/[0.04] rounded-xl px-3 py-2">
-          <Search color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
+          <Search color={colors.secondaryText} size={16} strokeWidth={1.5} />
           <TextInput
             autoFocus
             className="flex-1 ml-2 text-sm text-foreground"
             placeholder={t.memorySearch}
-            placeholderTextColor={semanticColors.muted}
+            placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
+              <X color={colors.secondaryText} size={16} strokeWidth={1.5} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -729,7 +729,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View className="items-center py-16">
-            <Brain color={semanticColors.secondaryText} size={40} strokeWidth={1.2} />
+            <Brain color={colors.secondaryText} size={40} strokeWidth={1.2} />
             <Text className="text-base font-medium text-secondary/60 mt-4">{t.memoryEmpty}</Text>
             <Text className="text-sm text-secondary/45 mt-1 text-center">{t.memoryEmptyDesc}</Text>
           </View>
@@ -746,6 +746,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
 export default function MemoryScreen() {
   const { t } = useI18n();
   const nav = useNavigation<any>();
+  const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState<MemoryLayer | 'home'>('home');
   const scrollRef = useRef<ScrollView>(null);
 
@@ -754,11 +755,7 @@ export default function MemoryScreen() {
       <ScreenHeader
         title={t.memoryTitle}
         leftElement={
-          <ArrowLeft
-            color={semanticColors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => nav.goBack()}
       >
@@ -778,18 +775,18 @@ export default function MemoryScreen() {
                 className="flex-row items-center px-3 py-1.5 rounded-full"
                 key={tab.key}
                 style={{
-                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                  backgroundColor: active ? colors.primary : colors.fillTertiary,
                 }}
                 onPress={() => setActiveTab(tab.key as any)}
               >
                 <Icon
-                  color={active ? '#fff' : semanticColors.muted}
+                  color={active ? '#fff' : colors.muted}
                   size={15}
                   strokeWidth={active ? 2 : 1.5}
                 />
                 <Text
                   className="ml-1.5 text-sm font-medium"
-                  style={{ color: active ? '#fff' : semanticColors.muted }}
+                  style={{ color: active ? '#fff' : colors.muted }}
                 >
                   {(t as any)[tab.labelKey]}
                 </Text>

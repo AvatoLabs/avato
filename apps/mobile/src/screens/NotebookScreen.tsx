@@ -11,9 +11,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -430,6 +430,7 @@ export default function NotebookScreen({ route, navigation }: any) {
     <View className="flex-1 bg-background">
       <View style={{ zIndex: 1 }}>
         <ScreenHeader
+          title={t.notebookTitle}
           leftElement={
             <ArrowLeft
               color={semanticColors.primary}
@@ -437,7 +438,6 @@ export default function NotebookScreen({ route, navigation }: any) {
               strokeWidth={tokens.icon.strokeWidth}
             />
           }
-          title={t.notebookTitle}
           onPressLeft={() => navigation.goBack()}
         />
       </View>
@@ -481,51 +481,50 @@ export default function NotebookScreen({ route, navigation }: any) {
           </PressableScale>
         </Animated.View>
       ) : (
-        <ScrollView
+        <FlatList
+          ItemSeparatorComponent={() => <View className="mx-5 h-px bg-foreground/5" />}
           className="flex-1"
+          data={documents}
+          keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: 40 + insets.bottom,
             paddingTop: 12,
           }}
-        >
-          {documents.map((doc, index) => (
-            <Animated.View entering={FadeInDown.delay(index * 40).duration(300)} key={doc.id}>
-              <TouchableOpacity
-                activeOpacity={0.6}
-                className="flex-row items-center px-5 py-4 bg-background"
-                onPress={() => handleOpenDoc(doc)}
-                onLongPress={() => {
-                  haptics.medium();
-                  handleDelete(doc);
-                }}
+          renderItem={({ item: doc }) => (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              className="flex-row items-center px-5 py-4 bg-background"
+              onPress={() => handleOpenDoc(doc)}
+              onLongPress={() => {
+                haptics.medium();
+                handleDelete(doc);
+              }}
+            >
+              <View
+                className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
+                style={{ width: 44, height: 44 }}
               >
-                <View
-                  className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
-                  style={{ width: 44, height: 44 }}
-                >
-                  <FileText color={semanticColors.primary} size={20} strokeWidth={1.5} />
-                </View>
+                <FileText color={semanticColors.primary} size={20} strokeWidth={1.5} />
+              </View>
 
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text className="text-foreground text-[15px] font-semibold" numberOfLines={1}>
-                    {doc.title || 'Untitled'}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text className="text-foreground text-[15px] font-semibold" numberOfLines={1}>
+                  {doc.title || 'Untitled'}
+                </Text>
+                {doc.content ? (
+                  <Text className="text-secondary/40 text-[13px] mt-0.5" numberOfLines={1}>
+                    {doc.content.slice(0, 80).replaceAll('\n', ' ')}
                   </Text>
-                  {doc.content ? (
-                    <Text className="text-secondary/40 text-[13px] mt-0.5" numberOfLines={1}>
-                      {doc.content.slice(0, 80).replaceAll('\n', ' ')}
-                    </Text>
-                  ) : null}
-                  <Text className="text-secondary/30 text-[11px] mt-1">
-                    {formatDate(doc.updatedAt || doc.createdAt)}
-                    {doc.totalCharCount ? `  ·  ${doc.totalCharCount} chars` : ''}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              {index < documents.length - 1 && <View className="mx-5 h-px bg-foreground/5" />}
-            </Animated.View>
-          ))}
-        </ScrollView>
+                ) : null}
+                <Text className="text-secondary/30 text-[11px] mt-1">
+                  {formatDate(doc.updatedAt || doc.createdAt)}
+                  {doc.totalCharCount ? `  ·  ${doc.totalCharCount} chars` : ''}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
       )}
     </View>
   );
