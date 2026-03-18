@@ -123,11 +123,12 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         onRequestClose={onClose}
       >
         <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-          <Animated.View
-            entering={enteringModalContent()}
-            style={{ paddingBottom: Math.max(insets.bottom, 16), maxHeight: '72%' }}
-          >
-            <Pressable className="bg-card rounded-t-2xl" onPress={(e) => e.stopPropagation()}>
+          <Animated.View entering={enteringModalContent()} style={{ maxHeight: '72%' }}>
+            <Pressable
+              className="bg-card rounded-t-2xl"
+              style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+              onPress={(e) => e.stopPropagation()}
+            >
               <View className="items-center pt-3 pb-1">
                 <View className="w-9 h-1 rounded-full bg-foreground/10" />
               </View>

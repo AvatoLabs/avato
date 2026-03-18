@@ -105,7 +105,7 @@ export interface ColorTokens {
   warningSubtle: string;
 }
 
-type EffectiveTheme = 'light' | 'dark';
+export type EffectiveTheme = 'light' | 'dark';
 
 // ── Base neutral tokens (no accent colors) ────────────────────────────────
 interface BaseTokens {
@@ -363,8 +363,6 @@ const baseMap: Record<EffectiveTheme, BaseTokens> = {
   light: lightBase,
   dark: darkBase,
 };
-
-export type EffectiveTheme = 'light' | 'dark';
 
 export function getThemeTokens(
   theme: EffectiveTheme,

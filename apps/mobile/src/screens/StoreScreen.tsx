@@ -37,7 +37,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CardSkeleton from '../components/ui/CardSkeleton';
@@ -45,7 +44,6 @@ import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import {
   ALL_CATEGORY_KEY,
   FALLBACK_MCP_CATEGORY_KEYS,
@@ -66,6 +64,7 @@ import {
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
 import { useSessionStore } from '../store/session';
+import { type ColorTokens, useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
 
@@ -214,6 +213,10 @@ const matchesStoreQuery = (query: string, values: Array<string | undefined>) => 
 const buildInstalledPluginItem = (
   plugin: InstalledPlugin,
   t: I18nStore['t'],
+  colors: Pick<
+    ColorTokens,
+    'primary' | 'fillTertiary' | 'secondaryText' | 'muted' | 'danger' | 'foreground'
+  >,
 ): StoreInstalledItem => {
   const isCustom = plugin.type === 'customPlugin';
   const name = plugin.manifest?.meta?.title || plugin.customParams?.name || plugin.identifier;
@@ -226,7 +229,7 @@ const buildInstalledPluginItem = (
   return {
     avatar,
     badgeBackgroundColor: isCustom ? 'rgba(234, 88, 12, 0.12)' : 'rgba(0, 122, 255, 0.1)',
-    badgeColor: isCustom ? '#ea580c' : semanticColors.primary,
+    badgeColor: isCustom ? '#ea580c' : colors.primary,
     description,
     id: plugin.identifier,
     identifier: plugin.identifier,
@@ -236,7 +239,14 @@ const buildInstalledPluginItem = (
   };
 };
 
-const buildInstalledSkillItem = (skill: AgentSkillItem, t: I18nStore['t']): StoreInstalledItem => {
+const buildInstalledSkillItem = (
+  skill: AgentSkillItem,
+  t: I18nStore['t'],
+  colors: Pick<
+    ColorTokens,
+    'primary' | 'fillTertiary' | 'secondaryText' | 'muted' | 'danger' | 'foreground'
+  >,
+): StoreInstalledItem => {
   const source = skill.source || 'user';
   const label =
     source === 'builtin'
@@ -245,7 +255,7 @@ const buildInstalledSkillItem = (skill: AgentSkillItem, t: I18nStore['t']): Stor
         ? t.storeFromStore
         : t.storeImported;
   const badgeColor =
-    source === 'builtin' ? '#059669' : source === 'market' ? semanticColors.primary : '#ea580c';
+    source === 'builtin' ? '#059669' : source === 'market' ? colors.primary : '#ea580c';
   const badgeBackgroundColor =
     source === 'builtin'
       ? 'rgba(5, 150, 105, 0.12)'
@@ -271,144 +281,151 @@ const ItemCard = memo<{
   item: MarketListItem;
   onInstall: (item: MarketListItem) => void;
   onPress: (item: MarketListItem) => void;
-}>(({ item, installed, onPress, onInstall }) => (
-  <PressableScale
-    accessibilityLabel={item.name || item.identifier}
-    accessibilityRole="button"
-    className="bg-foreground/[0.02] rounded-xl p-3.5 mb-2.5 mx-5"
-    onPress={() => onPress(item)}
-  >
-    <View className="flex-row items-start">
+}>(({ item, installed, onPress, onInstall }) => {
+  const colors = useThemeColors();
+  return (
+    <PressableScale
+      accessibilityLabel={item.name || item.identifier}
+      accessibilityRole="button"
+      className="bg-foreground/[0.02] rounded-xl p-3.5 mb-2.5 mx-5"
+      onPress={() => onPress(item)}
+    >
+      <View className="flex-row items-start">
+        <View
+          className="w-10 h-10 rounded-xl items-center justify-center mr-3 overflow-hidden"
+          style={{ backgroundColor: colors.fillTertiary }}
+        >
+          {item.avatar && !isEmojiAvatar(item.avatar) ? (
+            <RNImage
+              resizeMode="cover"
+              source={{ uri: item.avatar }}
+              style={{ borderRadius: 10, height: 40, width: 40 }}
+            />
+          ) : isEmojiAvatar(item.avatar) ? (
+            <Text style={{ fontSize: 20 }}>{item.avatar}</Text>
+          ) : (
+            <Box color={colors.secondaryText} size={18} strokeWidth={1.5} />
+          )}
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View className="flex-row items-center">
+            <Text className="text-foreground text-[14px] font-semibold flex-1" numberOfLines={1}>
+              {item.name || item.identifier}
+            </Text>
+            <View
+              className="ml-2 rounded-md px-1.5 py-0.5"
+              style={{
+                backgroundColor:
+                  item._source === 'mcp' || item._source === 'legacy'
+                    ? 'rgba(0, 122, 255, 0.08)'
+                    : 'rgba(5, 150, 105, 0.12)',
+              }}
+            >
+              <Text
+                className="text-[9px] font-bold tracking-wide"
+                style={{
+                  color:
+                    item._source === 'mcp' || item._source === 'legacy' ? '#007aff' : '#059669',
+                }}
+              >
+                {item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'SKILL'}
+              </Text>
+            </View>
+          </View>
+
+          {item.description ? (
+            <Text className="text-secondary/45 text-[12px] mt-0.5 leading-4" numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+
+          {item.author ? (
+            <View className="flex-row items-center mt-1.5">
+              <Text className="text-secondary/30 text-[11px]">{item.author}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {installed ? (
+          <View
+            className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
+          >
+            <Check color={colors.primary} size={14} strokeWidth={2.5} />
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.6}
+            className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
+            style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
+            onPress={(e) => {
+              e.stopPropagation();
+              onInstall(item);
+            }}
+          >
+            <Download color={colors.primary} size={14} strokeWidth={2.5} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </PressableScale>
+  );
+});
+ItemCard.displayName = 'ItemCard';
+
+const InstalledRow = memo<{
+  item: StoreInstalledItem;
+  onPress: () => void;
+}>(({ item, onPress }) => {
+  const colors = useThemeColors();
+  return (
+    <PressableScale className="flex-row items-center px-5 py-3 bg-background" onPress={onPress}>
       <View
-        className="w-10 h-10 rounded-xl items-center justify-center mr-3 overflow-hidden"
-        style={{ backgroundColor: semanticColors.fillTertiary }}
+        className="w-9 h-9 rounded-xl items-center justify-center mr-3 overflow-hidden"
+        style={{ backgroundColor: colors.fillTertiary }}
       >
         {item.avatar && !isEmojiAvatar(item.avatar) ? (
           <RNImage
             resizeMode="cover"
             source={{ uri: item.avatar }}
-            style={{ borderRadius: 10, height: 40, width: 40 }}
+            style={{ borderRadius: 8, height: 36, width: 36 }}
           />
         ) : isEmojiAvatar(item.avatar) ? (
-          <Text style={{ fontSize: 20 }}>{item.avatar}</Text>
+          <Text style={{ fontSize: 18 }}>{item.avatar}</Text>
         ) : (
-          <Box color={semanticColors.secondaryText} size={18} strokeWidth={1.5} />
+          <Box color={colors.secondaryText} size={16} strokeWidth={1.5} />
         )}
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <View className="flex-row items-center">
           <Text className="text-foreground text-[14px] font-semibold flex-1" numberOfLines={1}>
-            {item.name || item.identifier}
+            {item.name}
           </Text>
           <View
             className="ml-2 rounded-md px-1.5 py-0.5"
-            style={{
-              backgroundColor:
-                item._source === 'mcp' || item._source === 'legacy'
-                  ? 'rgba(0, 122, 255, 0.08)'
-                  : 'rgba(5, 150, 105, 0.12)',
-            }}
+            style={{ backgroundColor: item.badgeBackgroundColor }}
           >
-            <Text
-              className="text-[9px] font-bold tracking-wide"
-              style={{
-                color: item._source === 'mcp' || item._source === 'legacy' ? '#007aff' : '#059669',
-              }}
-            >
-              {item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'SKILL'}
+            <Text className="text-[9px] font-bold tracking-wide" style={{ color: item.badgeColor }}>
+              {item.label}
             </Text>
           </View>
         </View>
-
         {item.description ? (
-          <Text className="text-secondary/45 text-[12px] mt-0.5 leading-4" numberOfLines={2}>
+          <Text className="text-secondary/40 text-[11px] mt-0.5" numberOfLines={1}>
             {item.description}
           </Text>
-        ) : null}
-
-        {item.author ? (
-          <View className="flex-row items-center mt-1.5">
-            <Text className="text-secondary/30 text-[11px]">{item.author}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {installed ? (
-        <View
-          className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
-          style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
-        >
-          <Check color={semanticColors.primary} size={14} strokeWidth={2.5} />
-        </View>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.6}
-          className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
-          style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
-          onPress={(e) => {
-            e.stopPropagation();
-            onInstall(item);
-          }}
-        >
-          <Download color="#007aff" size={14} strokeWidth={2.5} />
-        </TouchableOpacity>
-      )}
-    </View>
-  </PressableScale>
-));
-ItemCard.displayName = 'ItemCard';
-
-const InstalledRow = memo<{
-  item: StoreInstalledItem;
-  onPress: () => void;
-}>(({ item, onPress }) => (
-  <PressableScale className="flex-row items-center px-5 py-3 bg-background" onPress={onPress}>
-    <View
-      className="w-9 h-9 rounded-xl items-center justify-center mr-3 overflow-hidden"
-      style={{ backgroundColor: semanticColors.fillTertiary }}
-    >
-      {item.avatar && !isEmojiAvatar(item.avatar) ? (
-        <RNImage
-          resizeMode="cover"
-          source={{ uri: item.avatar }}
-          style={{ borderRadius: 8, height: 36, width: 36 }}
-        />
-      ) : isEmojiAvatar(item.avatar) ? (
-        <Text style={{ fontSize: 18 }}>{item.avatar}</Text>
-      ) : (
-        <Box color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
-      )}
-    </View>
-
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <View className="flex-row items-center">
-        <Text className="text-foreground text-[14px] font-semibold flex-1" numberOfLines={1}>
-          {item.name}
-        </Text>
-        <View
-          className="ml-2 rounded-md px-1.5 py-0.5"
-          style={{ backgroundColor: item.badgeBackgroundColor }}
-        >
-          <Text className="text-[9px] font-bold tracking-wide" style={{ color: item.badgeColor }}>
-            {item.label}
+        ) : (
+          <Text className="text-secondary/30 text-[11px] mt-0.5" numberOfLines={1}>
+            {item.identifier}
           </Text>
-        </View>
+        )}
       </View>
-      {item.description ? (
-        <Text className="text-secondary/40 text-[11px] mt-0.5" numberOfLines={1}>
-          {item.description}
-        </Text>
-      ) : (
-        <Text className="text-secondary/30 text-[11px] mt-0.5" numberOfLines={1}>
-          {item.identifier}
-        </Text>
-      )}
-    </View>
 
-    <ChevronRight color={semanticColors.secondaryText} size={16} strokeWidth={1.5} />
-  </PressableScale>
-));
+      <ChevronRight color={colors.secondaryText} size={16} strokeWidth={1.5} />
+    </PressableScale>
+  );
+});
 InstalledRow.displayName = 'InstalledRow';
 
 const InstalledSeparator = () => <View className="mx-5 h-px bg-foreground/[0.04]" />;
@@ -429,6 +446,7 @@ function SimpleImportModal({
   visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const [value, setValue] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -475,7 +493,7 @@ function SimpleImportModal({
               className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-4"
               editable={!importing}
               placeholder={placeholder}
-              placeholderTextColor={semanticColors.muted}
+              placeholderTextColor={colors.muted}
               value={value}
               onChangeText={setValue}
             />
@@ -554,6 +572,7 @@ function AddCustomMcpModal({
   visible: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const [identifier, setIdentifier] = useState('');
   const [url, setUrl] = useState('');
   const [authType, setAuthType] = useState<'none' | 'bearer'>('none');
@@ -746,7 +765,7 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[13px] mb-2"
                     numberOfLines={8}
                     placeholder={t.skillsCustomMcpQuickImportPlaceholder}
-                    placeholderTextColor={semanticColors.muted}
+                    placeholderTextColor={colors.muted}
                     style={{ minHeight: 160, textAlignVertical: 'top' }}
                     value={quickImportText}
                     onChangeText={(value) => {
@@ -809,7 +828,7 @@ function AddCustomMcpModal({
                 className={`bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-1 ${errors.identifier ? 'border border-red-500' : ''}`}
                 editable={!saving}
                 placeholder={t.skillsCustomMcpIdentifierPlaceholder}
-                placeholderTextColor={semanticColors.muted}
+                placeholderTextColor={colors.muted}
                 value={identifier}
                 onChangeText={(value) => {
                   setIdentifier(value);
@@ -833,7 +852,7 @@ function AddCustomMcpModal({
                 editable={!saving}
                 keyboardType="url"
                 placeholder={t.skillsCustomMcpUrlPlaceholder}
-                placeholderTextColor={semanticColors.muted}
+                placeholderTextColor={colors.muted}
                 value={url}
                 onChangeText={(value) => {
                   setUrl(value);
@@ -885,7 +904,7 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
                     editable={!saving}
                     placeholder={t.skillsCustomMcpTokenPlaceholder}
-                    placeholderTextColor={semanticColors.muted}
+                    placeholderTextColor={colors.muted}
                     value={token}
                     onChangeText={setToken}
                   />
@@ -935,7 +954,7 @@ function AddCustomMcpModal({
                   {t.skillsCustomMcpAdvanced}
                 </Text>
                 <ChevronRight
-                  color={showAdvanced ? semanticColors.primary : semanticColors.muted}
+                  color={showAdvanced ? colors.primary : colors.muted}
                   size={16}
                   strokeWidth={tokens.icon.strokeWidth}
                   style={{ transform: [{ rotate: showAdvanced ? '90deg' : '0deg' }] }}
@@ -954,7 +973,7 @@ function AddCustomMcpModal({
                         autoCorrect={false}
                         className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
                         placeholder={t.skillsCustomMcpHeaderKey}
-                        placeholderTextColor={semanticColors.muted}
+                        placeholderTextColor={colors.muted}
                         value={header.key}
                         onChangeText={(value) => {
                           const nextHeaders = [...headers];
@@ -967,7 +986,7 @@ function AddCustomMcpModal({
                         autoCorrect={false}
                         className="flex-1 bg-foreground/5 rounded-xl px-3 py-2.5 text-foreground text-[13px]"
                         placeholder={t.skillsCustomMcpHeaderValue}
-                        placeholderTextColor={semanticColors.muted}
+                        placeholderTextColor={colors.muted}
                         value={header.value}
                         onChangeText={(value) => {
                           const nextHeaders = [...headers];
@@ -982,7 +1001,7 @@ function AddCustomMcpModal({
                         }
                       >
                         <Trash2
-                          color={semanticColors.danger}
+                          color={colors.danger}
                           size={16}
                           strokeWidth={tokens.icon.strokeWidth}
                         />
@@ -1007,7 +1026,7 @@ function AddCustomMcpModal({
                     className="bg-foreground/5 rounded-xl px-4 py-3 text-foreground text-[14px] mb-3"
                     editable={!saving}
                     placeholder={t.skillsCustomMcpDescPlaceholder}
-                    placeholderTextColor={semanticColors.muted}
+                    placeholderTextColor={colors.muted}
                     value={description}
                     onChangeText={setDescription}
                   />
@@ -1022,7 +1041,7 @@ function AddCustomMcpModal({
                     editable={!saving}
                     keyboardType="url"
                     placeholder={t.skillsCustomMcpAvatarPlaceholder}
-                    placeholderTextColor={semanticColors.muted}
+                    placeholderTextColor={colors.muted}
                     value={avatar}
                     onChangeText={setAvatar}
                   />
@@ -1068,6 +1087,7 @@ function StoreItemModal({
   t: I18nStore['t'];
 }) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   if (!detail) return null;
 
@@ -1096,7 +1116,7 @@ function StoreItemModal({
           <View className="flex-row items-start">
             <View
               className="w-12 h-12 rounded-2xl items-center justify-center mr-3 overflow-hidden"
-              style={{ backgroundColor: semanticColors.fillTertiary }}
+              style={{ backgroundColor: colors.fillTertiary }}
             >
               {detail.avatar && !isEmojiAvatar(detail.avatar) ? (
                 <RNImage
@@ -1107,11 +1127,7 @@ function StoreItemModal({
               ) : isEmojiAvatar(detail.avatar) ? (
                 <Text style={{ fontSize: 20 }}>{detail.avatar}</Text>
               ) : (
-                <Package
-                  color={semanticColors.primary}
-                  size={20}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Package color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
               )}
             </View>
 
@@ -1171,7 +1187,7 @@ function StoreItemModal({
                 onPress={onUninstall}
               >
                 {actionLoading ? (
-                  <ActivityIndicator color={semanticColors.danger} size="small" />
+                  <ActivityIndicator color={colors.danger} size="small" />
                 ) : (
                   <Text className="text-red-500 text-[14px] font-semibold">{t.storeRemove}</Text>
                 )}
@@ -1186,6 +1202,7 @@ function StoreItemModal({
 
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { t } = useI18n();
   const locale = useI18n((s) => s.locale);
   const toast = useToast();
@@ -1210,7 +1227,6 @@ export default function StoreScreen() {
 
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [installedSkills, setInstalledSkills] = useState<AgentSkillItem[]>([]);
-  const [builtinSkillsCatalog, setBuiltinSkillsCatalog] = useState<AgentSkillItem[]>([]);
   const [uninstalledBuiltinTools, setUninstalledBuiltinTools] = useState<string[]>([]);
   const [installedLoading, setInstalledLoading] = useState(false);
 
@@ -1257,7 +1273,6 @@ export default function StoreScreen() {
       });
 
       setInstalledPlugins(Array.isArray(plugins) ? plugins : []);
-      setBuiltinSkillsCatalog(builtinSkillList);
       setInstalledSkills(
         mergeSkillLists(Array.isArray(skills) ? skills : [], installedBuiltinSkills),
       );
@@ -1479,10 +1494,10 @@ export default function StoreScreen() {
 
   const allInstalled = useMemo(
     () => [
-      ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t)),
-      ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t)),
+      ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
+      ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
     ],
-    [installedPlugins, installedSkills, t],
+    [colors, installedPlugins, installedSkills, t],
   );
 
   const filteredInstalled = useMemo(() => {
@@ -1789,26 +1804,26 @@ export default function StoreScreen() {
         rightAccessibilityLabel={t.accessibilityAddStore}
         title={t.tabStore}
         rightElement={
-          <Plus color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         titleIcon={
-          <Package color={semanticColors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <Package color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={() => setShowCreateMenu(true)}
       >
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-          <Search color={semanticColors.muted} size={16} strokeWidth={2} />
+          <Search color={colors.muted} size={16} strokeWidth={2} />
           <TextInput
             className="flex-1 text-foreground text-[14px] ml-2.5"
             placeholder={t.storeSearch}
-            placeholderTextColor={semanticColors.muted}
+            placeholderTextColor={colors.muted}
             returnKeyType="search"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery ? (
             <TouchableOpacity hitSlop={8} onPress={() => setSearchQuery('')}>
-              <X color={semanticColors.muted} size={16} strokeWidth={2} />
+              <X color={colors.muted} size={16} strokeWidth={2} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -1827,7 +1842,7 @@ export default function StoreScreen() {
                 className="rounded-full px-4 py-1.5"
                 key={tab.key}
                 style={{
-                  backgroundColor: active ? semanticColors.primary : semanticColors.fillTertiary,
+                  backgroundColor: active ? colors.primary : colors.fillTertiary,
                 }}
                 onPress={() => {
                   haptics.selection();
@@ -1836,7 +1851,7 @@ export default function StoreScreen() {
               >
                 <Text
                   className="text-[13px] font-semibold"
-                  style={{ color: active ? '#fff' : semanticColors.muted }}
+                  style={{ color: active ? '#fff' : colors.muted }}
                 >
                   {tab.label}
                   {tab.key === 'installed' && allInstalled.length > 0
@@ -1866,9 +1881,7 @@ export default function StoreScreen() {
                     className="rounded-full px-4 py-1.5"
                     key={source.key}
                     style={{
-                      backgroundColor: active
-                        ? 'rgba(0, 122, 255, 0.1)'
-                        : semanticColors.fillTertiary,
+                      backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
                       minWidth: 72,
                     }}
                     onPress={() => {
@@ -1880,7 +1893,7 @@ export default function StoreScreen() {
                     <Text
                       className="text-[12px] font-semibold"
                       style={{
-                        color: active ? semanticColors.primary : semanticColors.muted,
+                        color: active ? colors.primary : colors.muted,
                         flexShrink: 0,
                       }}
                     >
@@ -1910,9 +1923,7 @@ export default function StoreScreen() {
                     className="rounded-full px-4 py-1.5"
                     key={`${activeExploreSource}-${category.key}`}
                     style={{
-                      backgroundColor: active
-                        ? 'rgba(0, 122, 255, 0.12)'
-                        : semanticColors.fillTertiary,
+                      backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
                       minWidth: 72,
                     }}
                     onPress={() => {
@@ -1923,7 +1934,7 @@ export default function StoreScreen() {
                     <Text
                       className="text-[12px] font-semibold"
                       style={{
-                        color: active ? semanticColors.primary : semanticColors.muted,
+                        color: active ? colors.primary : colors.muted,
                         flexShrink: 0,
                       }}
                     >
@@ -1941,7 +1952,7 @@ export default function StoreScreen() {
       {loading && isEmpty ? (
         <CardSkeleton />
       ) : isEmpty && !loading ? (
-        <Animated.View className="flex-1" entering={FadeInDown.duration(350)}>
+        <View className="flex-1">
           <EmptyState
             icon={marketFetchError ? '⚠️' : '📦'}
             title={marketFetchError ? t.storeLoadFailed : t.storeEmpty}
@@ -1951,7 +1962,7 @@ export default function StoreScreen() {
                   accessibilityLabel={t.errorRetry}
                   accessibilityRole="button"
                   className="rounded-xl px-5 py-2.5"
-                  style={{ backgroundColor: semanticColors.primary }}
+                  style={{ backgroundColor: colors.primary }}
                   onPress={() => refreshMarket()}
                 >
                   <Text className="font-semibold text-white text-[14px]">{t.errorRetry}</Text>
@@ -1959,7 +1970,7 @@ export default function StoreScreen() {
               ) : undefined
             }
           />
-        </Animated.View>
+        </View>
       ) : isExplore ? (
         <FlatList
           contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 80 }}
@@ -1970,14 +1981,14 @@ export default function StoreScreen() {
           ListFooterComponent={
             marketLoadingMore ? (
               <View className="py-4 items-center">
-                <ActivityIndicator color={semanticColors.primary} size="small" />
+                <ActivityIndicator color={colors.primary} size="small" />
               </View>
             ) : null
           }
           refreshControl={
             <RefreshControl
               refreshing={marketLoading}
-              tintColor={semanticColors.primary}
+              tintColor={colors.primary}
               onRefresh={refreshMarket}
             />
           }
@@ -1995,7 +2006,7 @@ export default function StoreScreen() {
           refreshControl={
             <RefreshControl
               refreshing={installedLoading}
-              tintColor={semanticColors.primary}
+              tintColor={colors.primary}
               onRefresh={fetchInstalled}
             />
           }
@@ -2030,11 +2041,7 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <LinkIcon
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <LinkIcon color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="text-foreground text-[14px] font-medium ml-3">
                   {t.storeImportUrl}
                 </Text>
@@ -2050,11 +2057,7 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Github
-                  color={semanticColors.foreground}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Github color={colors.foreground} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="text-foreground text-[14px] font-medium ml-3">
                   {t.storeImportGithub}
                 </Text>
@@ -2086,11 +2089,7 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <Plus
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
+                <Plus color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="text-foreground text-[14px] font-medium ml-3">
                   {t.storeAddCustomMcp}
                 </Text>

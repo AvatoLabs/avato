@@ -45,7 +45,7 @@ import {
   View,
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
@@ -865,10 +865,7 @@ export default function ResourceScreen() {
           <FolderOpen color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressRight={() => setAttachmentSheetVisible(true)}
-      />
-
-      <View className="pb-2">
-        {/* Search */}
+      >
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
           <Search color={colors.muted} size={16} strokeWidth={2} />
           <TextInput
@@ -888,10 +885,9 @@ export default function ResourceScreen() {
           )}
         </View>
 
-        {/* Category pills */}
         <ScrollView
           horizontal
-          className="mx-4"
+          className="mx-4 mb-2"
           contentContainerStyle={{ gap: 4 }}
           showsHorizontalScrollIndicator={false}
         >
@@ -920,7 +916,7 @@ export default function ResourceScreen() {
             );
           })}
         </ScrollView>
-      </View>
+      </ScreenHeader>
 
       {/* Content */}
       {loading && files.length === 0 ? (
@@ -931,9 +927,7 @@ export default function ResourceScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
-            <Animated.View className="flex-1" entering={FadeInDown.duration(350)}>
-              <EmptyState description={t.resourceEmptyDesc} icon="📁" title={t.resourceEmpty} />
-            </Animated.View>
+            <EmptyState description={t.resourceEmptyDesc} icon="📁" title={t.resourceEmpty} />
           }
           contentContainerStyle={
             filtered.length === 0
