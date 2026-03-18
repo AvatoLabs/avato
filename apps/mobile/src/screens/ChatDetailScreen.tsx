@@ -49,6 +49,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import EmptyState from '../components/ui/EmptyState';
 import FilePreview from '../components/ui/FilePreview';
 import { GroupMentionInput } from '../components/ui/GroupMentionInput';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
@@ -932,48 +933,42 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             renderItem={renderMessage}
             scrollEventThrottle={16}
             ListEmptyComponent={
-              <View className="flex-1 items-center justify-center pt-16">
-                <Animated.View entering={FadeInUp.delay(100).duration(400).springify()}>
-                  <RNImage
-                    className="w-20 h-20 rounded-3xl mb-6"
-                    source={require('../../assets/avato-logo.png')}
-                  />
-                </Animated.View>
-                <Animated.View entering={FadeInUp.delay(200).duration(400).springify()}>
-                  <Text className="text-foreground font-semibold text-xl tracking-tighter">
-                    {emptyStateTitle}
-                  </Text>
-                </Animated.View>
-                <Animated.View entering={FadeInUp.delay(300).duration(400).springify()}>
-                  <Text className="text-secondary/50 text-[13px] mt-2 text-center px-10 leading-6">
-                    {emptyStateDescription}
-                  </Text>
-                </Animated.View>
-                {/* Suggestion chips */}
-                <Animated.View
-                  className="flex-row flex-wrap justify-center gap-2 mt-6 px-6"
-                  entering={FadeInDown.delay(450).duration(350)}
-                >
-                  {emptyStateSuggestions.map((label) => (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
-                      key={label}
-                      onPress={() => {
-                        haptics.light();
-                        setInputText(label);
-                      }}
-                    >
-                      <Text className="text-secondary text-[13px] font-medium">{label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </Animated.View>
-              </View>
+              <EmptyState
+                description={emptyStateDescription}
+                iconVariant="chat"
+                title={emptyStateTitle}
+                action={
+                  <Animated.View
+                    className="flex-row flex-wrap justify-center gap-2 mt-4 px-6"
+                    entering={FadeInDown.delay(200).duration(350)}
+                  >
+                    {emptyStateSuggestions.map((label) => (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
+                        key={label}
+                        onPress={() => {
+                          haptics.light();
+                          setInputText(label);
+                        }}
+                      >
+                        <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </Animated.View>
+                }
+              />
             }
-            contentContainerStyle={{
-              paddingBottom: 12,
-              paddingTop: 12,
-            }}
+            contentContainerStyle={
+              messages.length === 0
+                ? {
+                    flexGrow: 1,
+                    justifyContent: 'center',
+                    paddingBottom: 12,
+                    paddingTop: 12,
+                  }
+                : { paddingBottom: 12, paddingTop: 12 }
+            }
             onContentSizeChange={autoScrollToEnd}
             onLayout={autoScrollToEnd}
             onScroll={(e) => {

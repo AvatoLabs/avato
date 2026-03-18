@@ -169,15 +169,19 @@ export default function TopicListScreen({ route, navigation }: any) {
       </Animated.View>
 
       <FlatList
-        contentContainerStyle={{ paddingBottom: 30 }}
         data={sortedTopics}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           loading ? (
             <ListSkeleton />
           ) : (
-            <EmptyState description={t.topicEmptyDesc} icon="📋" title={t.topicEmpty} />
+            <EmptyState description={t.topicEmptyDesc} iconVariant="topic" title={t.topicEmpty} />
           )
+        }
+        contentContainerStyle={
+          sortedTopics.length === 0
+            ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+            : { paddingBottom: 30 }
         }
         refreshControl={
           <RefreshControl

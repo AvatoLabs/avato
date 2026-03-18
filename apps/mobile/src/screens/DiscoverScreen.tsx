@@ -7,6 +7,7 @@ import { FlatList, LayoutAnimation, RefreshControl, ScrollView, Text, View } fro
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import AgentCard from '../components/ui/AgentCard';
+import EmptyState from '../components/ui/EmptyState';
 import ModelCard from '../components/ui/ModelCard';
 import PressableScale from '../components/ui/PressableScale';
 import ProviderCard from '../components/ui/ProviderCard';
@@ -129,17 +130,12 @@ export default function DiscoverScreen({ navigation }: any) {
       />
       {activeTab === 'agents' ? (
         <FlatList
-          contentContainerStyle={{ paddingBottom: 30 }}
           data={filteredAgents}
           keyExtractor={(item) => item.identifier}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           windowSize={8}
-          ListEmptyComponent={
-            <View className="items-center py-8">
-              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState iconVariant="discover" title={t.discoverNoResults} />}
           ListHeaderComponent={
             <>
               {listHeader}
@@ -168,6 +164,11 @@ export default function DiscoverScreen({ navigation }: any) {
                 <SectionHeader title={t.discoverAll} />
               </Animated.View>
             </>
+          }
+          contentContainerStyle={
+            filteredAgents.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+              : { paddingBottom: 30 }
           }
           refreshControl={
             <RefreshControl
@@ -201,18 +202,13 @@ export default function DiscoverScreen({ navigation }: any) {
         />
       ) : activeTab === 'models' ? (
         <FlatList
-          contentContainerStyle={{ paddingBottom: 30 }}
           data={filteredModels}
           keyExtractor={(item) => `${item.providerId}-${item.id}`}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => <ModelCard model={item} />}
           showsVerticalScrollIndicator={false}
           windowSize={8}
-          ListEmptyComponent={
-            <View className="items-center py-8">
-              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState iconVariant="discover" title={t.discoverNoResults} />}
           ListHeaderComponent={
             <>
               {listHeader}
@@ -220,6 +216,11 @@ export default function DiscoverScreen({ navigation }: any) {
                 <SectionHeader title={t.discoverModels} />
               </Animated.View>
             </>
+          }
+          contentContainerStyle={
+            filteredModels.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+              : { paddingBottom: 30 }
           }
           refreshControl={
             <RefreshControl
@@ -232,18 +233,13 @@ export default function DiscoverScreen({ navigation }: any) {
         />
       ) : (
         <FlatList
-          contentContainerStyle={{ paddingBottom: 30 }}
           data={filteredProviders}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => <ProviderCard provider={item} />}
           showsVerticalScrollIndicator={false}
           windowSize={8}
-          ListEmptyComponent={
-            <View className="items-center py-8">
-              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState iconVariant="discover" title={t.discoverNoResults} />}
           ListHeaderComponent={
             <>
               {listHeader}
@@ -251,6 +247,11 @@ export default function DiscoverScreen({ navigation }: any) {
                 <SectionHeader title={t.discoverProviders} />
               </Animated.View>
             </>
+          }
+          contentContainerStyle={
+            filteredProviders.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+              : { paddingBottom: 30 }
           }
           refreshControl={
             <RefreshControl

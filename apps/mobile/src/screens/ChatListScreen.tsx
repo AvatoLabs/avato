@@ -1589,7 +1589,7 @@ export default function ChatListScreen({ navigation }: any) {
             ) : (
               <EmptyState
                 description={t.chatListTopicEmptyDesc}
-                icon="💬"
+                iconVariant="chat"
                 title={t.chatListTopicEmpty}
               />
             )}
@@ -1639,7 +1639,11 @@ export default function ChatListScreen({ navigation }: any) {
             {/* Empty state when no sessions at all (and not loading) */}
             {visibleSessions.length === 0 && !sessionErrorMessage && !loading && (
               <Animated.View entering={FadeInDown.delay(150).duration(350)}>
-                <EmptyState description={t.chatListEmptyDesc} icon="💬" title={t.chatListEmpty} />
+                <EmptyState
+                  description={t.chatListEmptyDesc}
+                  iconVariant="chat"
+                  title={t.chatListEmpty}
+                />
               </Animated.View>
             )}
           </>

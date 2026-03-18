@@ -669,6 +669,16 @@ export const agentApi = {
       { sessionId },
     ),
 
+  /** Get agent config by agent ID (for editing without session). */
+  getConfigByAgentId: (agentId: string) =>
+    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+      'agent.getAgentConfigById',
+      { agentId },
+    ),
+
+  /** Remove an agent and its associated session. */
+  removeAgent: (agentId: string) => trpcMutate('agent.removeAgent', { agentId }),
+
   /** Update agent config (e.g. plugins). */
   updateConfig: (agentId: string, value: Record<string, any>) =>
     trpcMutate('agent.updateAgentConfig', { agentId, value }),
@@ -2150,9 +2160,8 @@ export const marketSkillApi = {
           totalCount: resolveMarketTotalCount(mcpResult),
         };
       }
-    } catch (error) {
-      console.error('[marketSkillApi.getMcpList] failed:', error);
-      throw error;
+    } catch {
+      return { items: [], totalCount: 0 };
     }
 
     return { items: [], totalCount: 0 };
@@ -2189,9 +2198,8 @@ export const marketSkillApi = {
           totalCount: resolveMarketTotalCount(result),
         };
       }
-    } catch (error) {
-      console.error('[marketSkillApi.getSkillList] failed:', error);
-      throw error;
+    } catch {
+      return { items: [], totalCount: 0 };
     }
 
     return { items: [], totalCount: 0 };

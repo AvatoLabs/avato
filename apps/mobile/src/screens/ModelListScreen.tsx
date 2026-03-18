@@ -2,11 +2,12 @@
  * ModelListScreen — Full list of available AI models.
  * Aligned with Memory/Settings subpage style: ScreenHeader + consistent content padding.
  */
-import { ArrowLeft, Brain } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import EmptyState from '../components/ui/EmptyState';
 import ModelCard from '../components/ui/ModelCard';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { haptics } from '../lib/haptics';
@@ -87,14 +88,13 @@ export default function ModelListScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          contentContainerStyle={{ paddingBottom: 30 }}
           data={sections}
           keyExtractor={([provider]) => provider}
-          ListEmptyComponent={
-            <View className="items-center pt-16">
-              <Brain color={colors.secondaryText} size={48} strokeWidth={1} />
-              <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
-            </View>
+          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
+          contentContainerStyle={
+            sections.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 30 }
+              : { paddingBottom: 30 }
           }
           refreshControl={
             <RefreshControl

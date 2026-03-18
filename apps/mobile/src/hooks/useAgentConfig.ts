@@ -67,3 +67,48 @@ export function useAgentConfig(sessionId: string | undefined, enabled = true) {
     ),
   };
 }
+
+const AGENT_KEY_PREFIX = 'agent:';
+
+/** Load agent config by agent ID (for editing without session). */
+export function useAgentConfigByAgentId(agentId: string | undefined, enabled = true) {
+  const fetchConfigByAgentId = useAgentConfigStore((s) => s.fetchConfigByAgentId);
+  const configMap = useAgentConfigStore((s) => s.configMap);
+  const setConfig = useAgentConfigStore((s) => s.setConfig);
+
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+
+  const cacheKey = agentId ? `${AGENT_KEY_PREFIX}${agentId}` : undefined;
+  const config: AgentConfigCacheItem | undefined =
+    cacheKey !== undefined ? configMap[cacheKey] : undefined;
+
+  useEffect(() => {
+    if (!agentId || !enabled) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchConfigByAgentId(agentId)
+      .catch((err) => {
+        if (!cancelled) setError(err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId, enabled, fetchConfigByAgentId]);
+
+  return {
+    config: config === undefined && agentId && enabled ? undefined : config,
+    error,
+    loading,
+    setConfig: useCallback(
+      (value: AgentConfigCacheItem) => {
+        if (cacheKey) setConfig(cacheKey, value);
+      },
+      [cacheKey, setConfig],
+    ),
+  };
+}

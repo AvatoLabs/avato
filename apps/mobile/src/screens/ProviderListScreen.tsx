@@ -1,12 +1,13 @@
 /**
  * ProviderListScreen — Full list of AI providers.
  */
-import { ArrowLeft, Server } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import ProviderCard from '../components/ui/ProviderCard';
 import { haptics } from '../lib/haptics';
@@ -59,15 +60,14 @@ export default function ProviderListScreen({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 30 }}
           data={providers}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ProviderCard provider={item} />}
-          ListEmptyComponent={
-            <View className="items-center pt-16">
-              <Server color="#ccc" size={48} strokeWidth={1} />
-              <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
-            </View>
+          ListEmptyComponent={<EmptyState iconVariant="provider" title={t.discoverNoResults} />}
+          contentContainerStyle={
+            providers.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingTop: 8, paddingBottom: 30 }
+              : { paddingTop: 8, paddingBottom: 30 }
           }
           refreshControl={
             <RefreshControl

@@ -77,7 +77,7 @@ export function ScreenHeader({
 
         <View className="ml-1 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
           {titleIcon ? (
-            <View className="mr-2 items-center justify-center" style={{ minHeight: 28 }}>
+            <View className="mr-2.5 h-[28px] w-[28px] items-center justify-center">
               {titleIcon}
             </View>
           ) : null}
@@ -116,12 +116,9 @@ export function ScreenHeader({
     <>
       <View className="px-5 py-3" style={{ minHeight: 72 }}>
         <View className="flex-row items-center justify-between">
-          <View className="flex-1 mr-3 flex-row items-center min-h-[34px]">
+          <View className="mr-3 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
             {titleIcon ? (
-              <View
-                className="mr-2 items-center justify-center self-start"
-                style={{ minHeight: 28, paddingTop: subtitle ? 0 : 0 }}
-              >
+              <View className="mr-2.5 h-[28px] w-[28px] items-center justify-center">
                 {titleIcon}
               </View>
             ) : null}

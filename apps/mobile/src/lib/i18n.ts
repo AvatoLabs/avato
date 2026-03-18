@@ -122,6 +122,9 @@ type TranslationKeys = {
   meAgents: string;
   meAgentsDesc: string;
   meAgentConfigureFirst: string;
+  agentDeleteConfirm: string;
+  agentDeleteDesc: string;
+  agentDeleteDefaultForbidden: string;
   meDiscover: string;
   meDiscoverDesc: string;
   meMoreSettings: string;
@@ -286,6 +289,12 @@ type TranslationKeys = {
   settingsPrivacyPolicy: string;
   settingsAboutAvato: string;
   settingsAboutAvatoDesc: string;
+  settingsGroupWorkspace: string;
+  settingsGroupConnection: string;
+  settingsGroupAppearance: string;
+  settingsGroupMemory: string;
+  settingsGroupData: string;
+  settingsGroupAccount: string;
 
   // AI Providers
   aiProvidersTitle: string;
@@ -1053,6 +1062,9 @@ const en: TranslationKeys = {
   meAgents: 'Agents',
   meAgentsDesc: 'Manage and configure your assistants',
   meAgentConfigureFirst: 'Start a chat first to configure this agent',
+  agentDeleteConfirm: 'Delete Assistant',
+  agentDeleteDesc: 'This assistant and its chat history will be permanently removed.',
+  agentDeleteDefaultForbidden: 'The default assistant cannot be deleted.',
   meDiscover: 'Discover',
   meDiscoverDesc: 'Browse agents, models & providers',
   meAiProviders: 'AI Providers',
@@ -1219,6 +1231,12 @@ const en: TranslationKeys = {
   settingsPrivacyPolicy: 'Privacy Policy',
   settingsAboutAvato: 'About Avato',
   settingsAboutAvatoDesc: 'v1.0.0 • Avato mobile app',
+  settingsGroupWorkspace: 'Workspace',
+  settingsGroupConnection: 'Connection & AI',
+  settingsGroupAppearance: 'Appearance',
+  settingsGroupMemory: 'Memory',
+  settingsGroupData: 'Data & Voice',
+  settingsGroupAccount: 'Account',
 
   aiProvidersTitle: 'AI Providers',
   aiProvidersDesc: 'Configure your AI service providers and API keys.',
@@ -1964,6 +1982,9 @@ const zh_tw: TranslationKeys = {
   meAgents: '助手',
   meAgentsDesc: '管理並配置你的助手',
   meAgentConfigureFirst: '請先開始對話以配置此助手',
+  agentDeleteConfirm: '刪除助手',
+  agentDeleteDesc: '此助手及其聊天記錄將被永久刪除。',
+  agentDeleteDefaultForbidden: '預設助手不可刪除。',
   meDiscover: '發現',
   meDiscoverDesc: '瀏覽助手、模型與服務商',
   meAiProviders: 'AI 服務商',
@@ -2127,6 +2148,12 @@ const zh_tw: TranslationKeys = {
   settingsPrivacyPolicy: '隱私權政策',
   settingsAboutAvato: '關於 Avato',
   settingsAboutAvatoDesc: 'v1.0.0 • Avato 行動應用',
+  settingsGroupWorkspace: '工作區',
+  settingsGroupConnection: '連接與 AI',
+  settingsGroupAppearance: '外觀',
+  settingsGroupMemory: '記憶',
+  settingsGroupData: '資料與語音',
+  settingsGroupAccount: '帳戶',
 
   aiProvidersTitle: 'AI 服務商',
   aiProvidersDesc: '設定你的 AI 服務商和 API 金鑰。',
@@ -2868,6 +2895,9 @@ const zh: TranslationKeys = {
   meAgents: '助手',
   meAgentsDesc: '管理并配置你的助手',
   meAgentConfigureFirst: '请先开始对话以配置此助手',
+  agentDeleteConfirm: '删除助手',
+  agentDeleteDesc: '此助手及其聊天记录将被永久删除。',
+  agentDeleteDefaultForbidden: '默认助手不可删除。',
   meDiscover: '发现',
   meDiscoverDesc: '浏览助手、模型与服务商',
   meAiProviders: 'AI 服务商',
@@ -3031,6 +3061,12 @@ const zh: TranslationKeys = {
   settingsPrivacyPolicy: '隐私政策',
   settingsAboutAvato: '关于 Avato',
   settingsAboutAvatoDesc: 'v1.0.0 • Avato 移动应用',
+  settingsGroupWorkspace: '工作区',
+  settingsGroupConnection: '连接与 AI',
+  settingsGroupAppearance: '外观',
+  settingsGroupMemory: '记忆',
+  settingsGroupData: '数据与语音',
+  settingsGroupAccount: '账户',
 
   aiProvidersTitle: 'AI 服务商',
   aiProvidersDesc: '配置你的 AI 服务商和 API 密钥。',

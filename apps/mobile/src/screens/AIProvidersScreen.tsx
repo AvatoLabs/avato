@@ -8,7 +8,7 @@
  * Aligned with web: /settings/provider/all
  */
 import { useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, ChevronRight, Search, Server } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Search } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 
+import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -216,16 +217,15 @@ export default function AIProvidersScreen({ navigation }: any) {
       ) : (
         <FlatList
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 40 }}
           data={filtered}
           keyExtractor={(item) => item.id}
           renderItem={renderProviderItem}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View className="items-center pt-16">
-              <Server color="#ccc" size={48} strokeWidth={1} />
-              <Text className="text-secondary/50 text-[14px] mt-4">{t.discoverNoResults}</Text>
-            </View>
+          ListEmptyComponent={<EmptyState iconVariant="provider" title={t.discoverNoResults} />}
+          contentContainerStyle={
+            filtered.length === 0
+              ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 40 }
+              : { paddingBottom: 40 }
           }
           refreshControl={
             <RefreshControl

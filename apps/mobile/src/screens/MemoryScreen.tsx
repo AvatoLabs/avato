@@ -38,6 +38,7 @@ import {
   View,
 } from 'react-native';
 
+import EmptyState from '../components/ui/EmptyState';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { memoryApi, type MemoryExtractionTask } from '../lib/api';
@@ -722,17 +723,23 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
 
       {/* List */}
       <FlatList
-        contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20, paddingTop: 8 }}
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Brain color={colors.secondaryText} size={40} strokeWidth={1.2} />
-            <Text className="text-base font-medium text-secondary/60 mt-4">{t.memoryEmpty}</Text>
-            <Text className="text-sm text-secondary/45 mt-1 text-center">{t.memoryEmptyDesc}</Text>
-          </View>
+          <EmptyState description={t.memoryEmptyDesc} iconVariant="memory" title={t.memoryEmpty} />
+        }
+        contentContainerStyle={
+          filtered.length === 0
+            ? {
+                flexGrow: 1,
+                justifyContent: 'center',
+                paddingBottom: 100,
+                paddingHorizontal: 20,
+                paddingTop: 8,
+              }
+            : { paddingBottom: 100, paddingHorizontal: 20, paddingTop: 8 }
         }
         refreshControl={
           <RefreshControl refreshing={refreshing} tintColor={layerColor} onRefresh={onRefresh} />

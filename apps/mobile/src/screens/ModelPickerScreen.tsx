@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image as RNImage, SectionList, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
@@ -513,7 +514,6 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       ) : serverModels ? (
         <SectionList
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           renderItem={renderServerItem}
@@ -521,10 +521,16 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           windowSize={8}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-            </View>
+          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
+          contentContainerStyle={
+            serverSections.length === 0
+              ? {
+                  flexGrow: 1,
+                  justifyContent: 'center',
+                  paddingBottom: Math.max(insets.bottom, 24),
+                  paddingTop: 8,
+                }
+              : { paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }
           }
           renderSectionHeader={({ section }) => (
             <View className="flex-row items-center px-5 mt-4 mb-2">
@@ -538,7 +544,6 @@ export default function ModelPickerScreen({ navigation, route }: any) {
       ) : (
         <SectionList
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           renderItem={renderFallbackItem}
@@ -546,11 +551,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           windowSize={8}
-          ListEmptyComponent={
-            <View className="items-center py-16">
-              <Text className="text-secondary/50 text-[14px]">{t.discoverNoResults}</Text>
-            </View>
-          }
+          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           ListHeaderComponent={
             <View className="mx-5 mb-3 flex-row items-center bg-foreground/5 rounded-xl px-4 py-3">
               <WifiOff color="#999" size={14} strokeWidth={tokens.icon.strokeWidth} />
@@ -561,6 +562,16 @@ export default function ModelPickerScreen({ navigation, route }: any) {
                 <RefreshCw color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
               </PressableScale>
             </View>
+          }
+          contentContainerStyle={
+            fallbackSections.length === 0
+              ? {
+                  flexGrow: 1,
+                  justifyContent: 'center',
+                  paddingBottom: Math.max(insets.bottom, 24),
+                  paddingTop: 8,
+                }
+              : { paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }
           }
           renderSectionHeader={({ section }) => (
             <View className="flex-row items-center px-5 mt-4 mb-2">

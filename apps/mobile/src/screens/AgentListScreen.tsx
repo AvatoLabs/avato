@@ -2,10 +2,11 @@
  * AgentListScreen — Manage user agents (assistants).
  * Lists agents from agentApi.queryAgents, tap to open chat or create new.
  */
-import { ArrowLeft, Bot, MessageCircle, Plus, Settings2 } from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Plus, Settings2, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image as RNImage,
   RefreshControl,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -132,10 +134,51 @@ export default function AgentListScreen({ navigation }: any) {
       if (session) {
         navigation?.navigate?.('AgentConfig', { sessionId: session.id });
       } else {
-        toast.show('info', t.meAgentConfigureFirst);
+        navigation?.navigate?.('AgentConfig', { agentId: agent.id });
       }
     },
-    [getSessionForAgent, navigation, toast, t.meAgentConfigureFirst],
+    [getSessionForAgent, navigation],
+  );
+
+  const handleDeleteAgent = useCallback(
+    (agent: AgentQueryItem) => {
+      if (agents.length <= 1) {
+        toast.show('info', t.agentDeleteDefaultForbidden);
+        return;
+      }
+      haptics.light();
+      Alert.alert(t.agentDeleteConfirm, t.agentDeleteDesc, [
+        { style: 'cancel', text: t.cancel },
+        {
+          style: 'destructive',
+          text: t.delete,
+          onPress: async () => {
+            try {
+              await agentApi.removeAgent(agent.id);
+              haptics.success();
+              toast.show('success', t.toastSessionDeleted);
+              await loadAgents();
+              await fetchSessions();
+            } catch {
+              toast.show('error', t.errorDeleteFailed);
+            }
+          },
+        },
+      ]);
+    },
+    [
+      agents.length,
+      fetchSessions,
+      loadAgents,
+      t.agentDeleteConfirm,
+      t.agentDeleteDefaultForbidden,
+      t.agentDeleteDesc,
+      t.cancel,
+      t.delete,
+      t.errorDeleteFailed,
+      toast,
+      t.toastSessionDeleted,
+    ],
   );
 
   const handleCreateAgent = useCallback(async () => {
@@ -180,10 +223,30 @@ export default function AgentListScreen({ navigation }: any) {
         >
           <Settings2 color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
-        <MessageCircle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        {agents.length > 1 ? (
+          <TouchableOpacity
+            accessible
+            accessibilityLabel={t.delete}
+            className="p-2 -m-2"
+            hitSlop={{ bottom: 8, left: 8, right: 8, top: 8 }}
+            onPress={() => handleDeleteAgent(item)}
+          >
+            <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
+        ) : (
+          <MessageCircle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        )}
       </PressableScale>
     ),
-    [handleAgentPress, handleConfigureAgent, t.agentConfigNamePlaceholder, t.agentConfigTitle],
+    [
+      agents.length,
+      handleAgentPress,
+      handleConfigureAgent,
+      handleDeleteAgent,
+      t.agentConfigNamePlaceholder,
+      t.agentConfigTitle,
+      t.delete,
+    ],
   );
 
   if (loading) {
@@ -220,34 +283,34 @@ export default function AgentListScreen({ navigation }: any) {
       />
 
       <FlatList
-        contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
         data={agents}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={
-          <View className="flex-1 items-center justify-center px-8 py-16">
-            <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-              <Bot color={colors.primary} size={28} strokeWidth={1.6} />
-            </View>
-            <Text className="mt-5 text-center text-[18px] font-semibold text-foreground">
-              {t.agentsEmpty}
-            </Text>
-            <Text className="mt-2 text-center text-[14px] leading-6 text-secondary/65">
-              {t.agentsEmptyDesc}
-            </Text>
-            <PressableScale
-              className="mt-6 rounded-2xl bg-primary px-5 py-3"
-              disabled={creating}
-              onPress={handleCreateAgent}
-            >
-              <View className="flex-row items-center gap-2">
-                <Plus color="#fff" size={18} strokeWidth={2} />
-                <Text className="text-[14px] font-semibold text-white">
-                  {t.chatListNewConversation}
-                </Text>
-              </View>
-            </PressableScale>
-          </View>
+          <EmptyState
+            description={t.agentsEmptyDesc}
+            iconVariant="agent"
+            title={t.agentsEmpty}
+            action={
+              <PressableScale
+                className="rounded-2xl bg-primary px-5 py-3"
+                disabled={creating}
+                onPress={handleCreateAgent}
+              >
+                <View className="flex-row items-center gap-2">
+                  <Plus color="#fff" size={18} strokeWidth={2} />
+                  <Text className="text-[14px] font-semibold text-white">
+                    {t.chatListNewConversation}
+                  </Text>
+                </View>
+              </PressableScale>
+            }
+          />
+        }
+        contentContainerStyle={
+          agents.length === 0
+            ? { flexGrow: 1, justifyContent: 'center', paddingBottom: 100, paddingTop: 8 }
+            : { paddingBottom: 100, paddingTop: 8 }
         }
         refreshControl={
           <RefreshControl

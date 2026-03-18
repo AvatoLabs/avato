@@ -42,6 +42,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import EmptyState from '../components/ui/EmptyState';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -1001,19 +1002,12 @@ export default function ArtworkScreen() {
             />
           ))
         ) : (
-          <View className="items-center px-8">
-            <View
-              className="mb-4 items-center justify-center rounded-3xl bg-foreground/5"
-              style={{ width: 80, height: 80 }}
-            >
-              <ImageIcon color={colors.secondaryText} size={36} strokeWidth={1.5} />
-            </View>
-            <Text className="text-center text-[17px] font-semibold text-foreground">
-              {t.artworkEmpty}
-            </Text>
-            <Text className="mt-2 text-center text-[14px] text-secondary/40">
-              {t.artworkEmptyDesc}
-            </Text>
+          <View className="flex-1 items-center justify-center px-8">
+            <EmptyState
+              description={t.artworkEmptyDesc}
+              iconVariant="artwork"
+              title={t.artworkEmpty}
+            />
           </View>
         )}
       </ScrollView>

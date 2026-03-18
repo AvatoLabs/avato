@@ -3,6 +3,7 @@ import { ArrowLeft, Copy, RotateCcw, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 
+import EmptyState from '../components/ui/EmptyState';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { haptics } from '../lib/haptics';
@@ -41,10 +42,10 @@ export default function AppLogsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.logsTitle}
         leftElement={
           <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.logsTitle}
         onPressLeft={() => {
           haptics.light();
           navigation.goBack();
@@ -80,16 +81,19 @@ export default function AppLogsScreen({ navigation }: any) {
 
       <FlatList
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 20 }}
         data={logs}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View className="items-center px-4 pt-12">
-            <Text className="text-center text-[15px] font-semibold text-foreground">
-              {t.logsEmpty}
-            </Text>
-          </View>
+        ListEmptyComponent={<EmptyState iconVariant="logs" title={t.logsEmpty} />}
+        contentContainerStyle={
+          logs.length === 0
+            ? {
+                flexGrow: 1,
+                justifyContent: 'center',
+                paddingBottom: 40,
+                paddingHorizontal: 20,
+              }
+            : { paddingBottom: 40, paddingHorizontal: 20 }
         }
         renderItem={({ item: entry }) => (
           <View className="mb-3 rounded-2xl bg-foreground/[0.03] px-4 py-3">

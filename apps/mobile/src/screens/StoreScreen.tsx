@@ -1952,9 +1952,9 @@ export default function StoreScreen() {
       {loading && isEmpty ? (
         <CardSkeleton />
       ) : isEmpty && !loading ? (
-        <View className="flex-1">
+        <View className="flex-1 items-center justify-center">
           <EmptyState
-            icon={marketFetchError ? '⚠️' : '📦'}
+            iconVariant={marketFetchError ? 'warning' : 'store'}
             title={marketFetchError ? t.storeLoadFailed : t.storeEmpty}
             action={
               marketFetchError ? (

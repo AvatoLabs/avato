@@ -27,6 +27,8 @@ interface AgentConfigState {
   configMap: Record<string, AgentConfigCacheItem>;
   /** Fetch config for session, populate cache, return result. */
   fetchConfig: (sessionId: string) => Promise<AgentConfigCacheItem>;
+  /** Fetch config by agent ID (for editing without session). Key: `agent:${agentId}` */
+  fetchConfigByAgentId: (agentId: string) => Promise<AgentConfigCacheItem>;
   /** Invalidate cache for session (e.g. after save). */
   invalidate: (sessionId: string) => void;
   /** Update cache after save (optimistic merge). */
@@ -49,6 +51,24 @@ export const useAgentConfigStore = create<AgentConfigState>((set, get) => ({
       return value;
     } catch (error) {
       console.warn('[AgentConfigStore] fetchConfig error:', error);
+      throw error;
+    }
+  },
+
+  fetchConfigByAgentId: async (agentId: string) => {
+    const key = `agent:${agentId}`;
+    const cached = get().configMap[key];
+    if (cached !== undefined) return cached;
+
+    try {
+      const config = await agentApi.getConfigByAgentId(agentId);
+      const value: AgentConfigCacheItem = config ?? null;
+      set((s) => ({
+        configMap: { ...s.configMap, [key]: value },
+      }));
+      return value;
+    } catch (error) {
+      console.warn('[AgentConfigStore] fetchConfigByAgentId error:', error);
       throw error;
     }
   },

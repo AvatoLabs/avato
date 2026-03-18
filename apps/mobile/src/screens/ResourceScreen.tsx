@@ -927,7 +927,11 @@ export default function ResourceScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
-            <EmptyState description={t.resourceEmptyDesc} icon="📁" title={t.resourceEmpty} />
+            <EmptyState
+              description={t.resourceEmptyDesc}
+              iconVariant="resource"
+              title={t.resourceEmpty}
+            />
           }
           contentContainerStyle={
             filtered.length === 0

@@ -11,6 +11,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -43,7 +44,6 @@ import ProviderDetailScreen from '../screens/ProviderDetailScreen';
 import ProviderListScreen from '../screens/ProviderListScreen';
 import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
-import SettingsScreen from '../screens/SettingsScreen';
 import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import TopicListScreen from '../screens/TopicListScreen';
@@ -62,26 +62,43 @@ function MeTabIcon({
   trigger: number;
 }) {
   const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
+  const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
 
   useEffect(() => {
     if (trigger === 0) return;
 
+    rotation.value = 0;
     scale.value = 1;
-    scale.value = withSequence(
-      withTiming(1.08, { duration: 120, easing: Easing.out(Easing.quad) }),
-      withSpring(1, { damping: 12, stiffness: 200 }),
+
+    rotation.value = withTiming(360, {
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+    });
+    scale.value = withDelay(
+      700,
+      withSequence(
+        withTiming(1.12, {
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+        }),
+        withSpring(1, {
+          damping: 10,
+          stiffness: 220,
+        }),
+      ),
     );
-  }, [scale, trigger]);
+  }, [rotation, scale, trigger]);
 
   useEffect(() => {
     if (!focused) {
+      rotation.value = 0;
       scale.value = 1;
     }
-  }, [focused, scale]);
+  }, [focused, rotation, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ rotate: `${rotation.value}deg` }, { scale: scale.value }],
   }));
 
   return (
@@ -106,17 +123,28 @@ function AnimatedTabLabel({
   focused: boolean;
   label: string;
 }) {
-  const opacity = useSharedValue(focused ? 1 : 0.72);
+  const opacity = useSharedValue(focused ? 1 : 0.7);
+  const scale = useSharedValue(focused ? 1 : 0.94);
+  const translateY = useSharedValue(focused ? 0 : 1.5);
 
   useEffect(() => {
-    opacity.value = withTiming(focused ? 1 : 0.72, {
-      duration: 150,
+    opacity.value = withTiming(focused ? 1 : 0.7, {
+      duration: 180,
       easing: Easing.out(Easing.quad),
     });
-  }, [focused, opacity]);
+    scale.value = withTiming(focused ? 1 : 0.94, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+    translateY.value = withTiming(focused ? 0 : 1.5, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [focused, opacity, scale, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
   }));
 
   return (
@@ -288,11 +316,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       />
 
       {/* Settings */}
-      <Stack.Screen
-        component={SettingsScreen}
-        name="Settings"
-        options={{ animation: 'slide_from_right' }}
-      />
       <Stack.Screen
         component={AIProvidersScreen}
         name="AIProviders"
