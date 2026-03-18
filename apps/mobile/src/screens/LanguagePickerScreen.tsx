@@ -53,7 +53,7 @@ export default function LanguagePickerScreen({ navigation }: any) {
                 {lang.name}
               </Text>
               {locale === lang.code && (
-                <Check color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <Check color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
               )}
             </TouchableOpacity>
           ))}

@@ -256,7 +256,7 @@ export default function LoginScreen({ navigation }: any) {
             onPress={() => void handlePrimaryPress()}
           >
             {isBusy ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={colors.iconOnPrimary} size="small" />
             ) : (
               <Text className="text-[16px] font-semibold text-white">{primaryLabel}</Text>
             )}

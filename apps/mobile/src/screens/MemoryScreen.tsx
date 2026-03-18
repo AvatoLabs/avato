@@ -392,7 +392,7 @@ function HomeTab() {
             onPress={handleRunExtraction}
           >
             {requestingExtraction ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.iconOnPrimary} />
             ) : (
               <Text className="text-sm font-semibold text-white">{extractionButtonLabel}</Text>
             )}
@@ -787,13 +787,13 @@ export default function MemoryScreen() {
                 onPress={() => setActiveTab(tab.key as any)}
               >
                 <Icon
-                  color={active ? '#fff' : colors.muted}
+                  color={active ? colors.iconOnPrimary : colors.muted}
                   size={15}
                   strokeWidth={active ? 2 : 1.5}
                 />
                 <Text
                   className="ml-1.5 text-sm font-medium"
-                  style={{ color: active ? '#fff' : colors.muted }}
+                  style={{ color: active ? colors.iconOnPrimary : colors.muted }}
                 >
                   {(t as any)[tab.labelKey]}
                 </Text>

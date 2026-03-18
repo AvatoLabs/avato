@@ -3,10 +3,16 @@
  */
 import React from 'react';
 import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
+
+import { enteringSkeleton } from '../../theme/motion';
 
 export default function MessageListSkeleton() {
   return (
-    <View className="flex-1 px-4 pt-4 gap-4">
+    <Animated.View
+      entering={enteringSkeleton()}
+      className="flex-1 px-4 pt-4 gap-4"
+    >
       {/* User bubble skeleton */}
       <View className="flex-row justify-end">
         <View
@@ -27,6 +33,6 @@ export default function MessageListSkeleton() {
           style={{ width: '60%', height: 80, maxWidth: 240 }}
         />
       </View>
-    </View>
+    </Animated.View>
   );
 }

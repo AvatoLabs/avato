@@ -73,21 +73,21 @@ export default function DataManagementScreen({ navigation }: any) {
   const items = [
     {
       icon: Trash2,
-      color: '#f5a623',
+      color: colors.warning,
       label: t.dataManageClearCache,
       subtitle: t.dataClearCacheSubtitle,
       onPress: handleClearCache,
     },
     {
       icon: Download,
-      color: '#007aff',
+      color: colors.primary,
       label: t.dataManageExport,
       subtitle: t.dataManageComingSoon,
       onPress: handleExport,
     },
     {
       icon: RotateCcw,
-      color: '#ff3b30',
+      color: colors.danger,
       label: t.dataManageResetApp,
       subtitle: t.dataResetSubtitle,
       onPress: handleReset,

@@ -19,6 +19,8 @@ import {
   ActivityIndicator,
   Image as RNImage,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   RefreshControl,
   ScrollView,
   Switch,
@@ -27,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import ContentSkeleton from '../components/ui/ContentSkeleton';
@@ -227,6 +230,7 @@ const FIELD_ORDER = [
 // ── Main Screen ──────────────────────────────────────────────────────
 export default function ProviderDetailScreen({ navigation, route }: any) {
   const providerId: string = route.params?.providerId ?? '';
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -468,7 +472,11 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         title={detail?.name || providerId}
         leftElement={
@@ -513,8 +521,8 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               )}
             </View>
             <Switch
-              thumbColor="#fff"
-              trackColor={{ false: '#e0e0e0', true: '#4caf50' }}
+              thumbColor={colors.iconOnPrimary}
+              trackColor={{ false: colors.sliderTrack, true: colors.success }}
               value={enabled}
               onValueChange={handleToggleProvider}
             />
@@ -578,11 +586,11 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                 onPress={handleSave}
               >
                 {saving ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
                   <>
                     <Save
-                      color="#fff"
+                      color={colors.iconOnPrimary}
                       size={16}
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginRight: 6 }}
@@ -611,7 +619,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   </Text>
                 </View>
                 <Switch
-                  thumbColor="#fff"
+                  thumbColor={colors.iconOnPrimary}
                   trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
                   value={fetchOnClient}
                   onValueChange={handleToggleFetchOnClient}
@@ -710,7 +718,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                     </Text>
                   </View>
                   <Switch
-                    thumbColor="#fff"
+                    thumbColor={colors.iconOnPrimary}
                     trackColor={{ false: colors.switchTrackOff, true: colors.switchTrackOn }}
                     value={model.enabled}
                     onValueChange={() => handleToggleModel(model.id, model.enabled)}
@@ -721,6 +729,6 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
           )}
         </Animated.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

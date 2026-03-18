@@ -263,12 +263,26 @@ export const topicRouter = router({
         effectiveAgentId = await resolveAgentIdFromSession(sessionId, ctx.serverDB, ctx.userId);
       }
 
-      const result = await ctx.topicModel.query({
-        ...rest,
-        agentId: effectiveAgentId,
-        excludeTriggers,
-        isInbox,
-      });
+      const queryParams = effectiveAgentId
+        ? {
+            ...rest,
+            agentId: effectiveAgentId,
+            excludeTriggers,
+            isInbox,
+          }
+        : sessionId
+          ? {
+              ...rest,
+              containerId: sessionId,
+              excludeTriggers,
+            }
+          : {
+              ...rest,
+              excludeTriggers,
+              isInbox,
+            };
+
+      const result = await ctx.topicModel.query(queryParams);
 
       // Runtime migration: backfill agentId for ALL legacy topics and messages under this agent
       const runMigration = async () => {

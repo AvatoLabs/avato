@@ -158,12 +158,13 @@ function EditableField({
 }
 
 function MetaChip({ color, label, subtle }: { color: string; label: string; subtle?: boolean }) {
+  const colors = useThemeColors();
   return (
     <View
       className="mr-2 rounded-full px-2.5 py-1"
-      style={{ backgroundColor: subtle ? '#f3f4f6' : `${color}15` }}
+      style={{ backgroundColor: subtle ? colors.fillTertiary : `${color}15` }}
     >
-      <Text className="text-xs font-semibold" style={{ color: subtle ? '#6b7280' : color }}>
+      <Text className="text-xs font-semibold" style={{ color: subtle ? colors.secondaryText : color }}>
         {label}
       </Text>
     </View>
@@ -954,8 +955,9 @@ export default function MemoryDetailScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-gray-50"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 48 : 0}
       style={{ paddingTop: insets.top }}
     >
       <View className="flex-row items-center justify-between px-5 py-3">
@@ -992,7 +994,7 @@ export default function MemoryDetailScreen() {
           ) : (
             <>
               <TouchableOpacity onPress={startEdit}>
-                <Edit3 color="#6b7280" size={18} strokeWidth={1.8} />
+                <Edit3 color={colors.iconMuted} size={18} strokeWidth={1.8} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleDelete}>
                 <Trash2 color="#ef4444" size={18} strokeWidth={1.8} />

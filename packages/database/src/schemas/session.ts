@@ -105,7 +105,7 @@ export const sessions = pgTable(
     clientId: text('client_id'),
     pinned: boolean('pinned').default(false),
 
-    /** Session-level agent config when no agent is linked (sessionOnly flow). */
+    /** Legacy agent snapshot for historical migration only. */
     config: jsonb('config').$type<Record<string, unknown>>(),
 
     ...timestamps,

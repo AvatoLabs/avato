@@ -215,13 +215,11 @@ export class SessionModel {
     type = 'agent',
     session = {},
     config = {},
-    sessionOnly = false,
     slug,
   }: {
     config?: Partial<NewAgent>;
     id?: string;
     session?: Partial<NewSession>;
-    sessionOnly?: boolean;
     slug?: string;
     type: 'agent' | 'group';
   }): Promise<SessionItem> => {
@@ -276,38 +274,6 @@ export class SessionModel {
           })
           .returning();
 
-        return result[0];
-      }
-
-      if (sessionOnly) {
-        // Session-only: store config in session, no agent created
-        const sessionConfig: Record<string, unknown> = {
-          avatar,
-          backgroundColor,
-          chatConfig: chatConfig || {},
-          description,
-          model: typeof model === 'string' ? model : undefined,
-          params: params || {},
-          plugins,
-          provider,
-          systemRole,
-          title,
-        };
-        const result = await trx
-          .insert(sessions)
-          .values({
-            ...session,
-            config: Object.keys(sessionConfig).some((k) => sessionConfig[k] !== undefined)
-              ? sessionConfig
-              : undefined,
-            createdAt: new Date(),
-            id,
-            slug,
-            type,
-            updatedAt: new Date(),
-            userId: this.userId,
-          })
-          .returning();
         return result[0];
       }
 
@@ -397,7 +363,18 @@ export class SessionModel {
     const { agent, clientId, ...session } = result;
     const sessionId = this.genId();
 
-    const { id: _a, slug: _s, virtual, ...config } = agent;
+    if (!agent) {
+      return this.create({
+        id: sessionId,
+        session: {
+          ...session,
+          title: newTitle || session.title,
+        },
+        type: 'agent',
+      });
+    }
+
+    const { id: _a, slug: _s, ...config } = agent;
 
     return this.create({
       config,
@@ -406,7 +383,6 @@ export class SessionModel {
         ...session,
         title: newTitle || session.title,
       },
-      sessionOnly: Boolean(virtual),
       type: 'agent',
     });
   };
@@ -535,13 +511,9 @@ export class SessionModel {
     if (!session) return;
 
     if (!session.agent) {
-      // Session-only: update session.config instead of agent
-      const existing = ((session as any).config as Record<string, unknown>) ?? {};
-      const merged = merge(existing, data);
-      return this.db
-        .update(sessions)
-        .set({ config: merged, updatedAt: new Date() })
-        .where(and(eq(sessions.id, sessionId), eq(sessions.userId, this.userId)));
+      throw new Error(
+        'this session is not assign with agent, please contact with admin to fix this issue.',
+      );
     }
 
     // First process the params field: undefined means delete, null means disable flag
@@ -648,31 +620,20 @@ export class SessionModel {
     // For agent sessions, include agent-specific fields
     // TODO: Need a better implementation in the future, currently only taking the first one
     const agent = agentsToSessions?.[0]?.agent;
-    const sessionConfig = (res as { config?: Record<string, unknown> }).config as
-      | Record<string, unknown>
-      | undefined;
-    const effectiveConfig = agent ? (agent as any) : sessionConfig;
+    const effectiveConfig = agent ? (agent as any) : { model: '', plugins: [] };
     return {
       ...res,
-      config: effectiveConfig ?? { model: '', plugins: [] }, // Agent or session-level config
+      config: effectiveConfig,
       group: groupId,
       meta: {
-        avatar: agent?.avatar ?? (sessionConfig?.avatar as string) ?? avatar ?? undefined,
-        backgroundColor:
-          agent?.backgroundColor ??
-          (sessionConfig?.backgroundColor as string) ??
-          backgroundColor ??
-          undefined,
-        description:
-          agent?.description ?? (sessionConfig?.description as string) ?? description ?? undefined,
+        avatar: agent?.avatar ?? avatar ?? undefined,
+        backgroundColor: agent?.backgroundColor ?? backgroundColor ?? undefined,
+        description: agent?.description ?? description ?? undefined,
         marketIdentifier: agent?.marketIdentifier ?? undefined,
         tags: agent?.tags ?? undefined,
-        title: agent?.title ?? (sessionConfig?.title as string) ?? title ?? undefined,
+        title: agent?.title ?? title ?? undefined,
       },
-      model:
-        (agent?.model as string | undefined) ??
-        (typeof sessionConfig?.model === 'string' ? sessionConfig.model : '') ??
-        '',
+      model: (agent?.model as string | undefined) ?? '',
       tagId,
       type: 'agent',
     } as LobeAgentSession;

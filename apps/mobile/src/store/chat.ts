@@ -982,7 +982,7 @@ interface ChatState {
   fetchMessages: (
     sessionId: string,
     topicId?: string,
-    options?: { preserveOnEmpty?: boolean },
+    options?: { preferPopulatedTopic?: boolean; preserveOnEmpty?: boolean },
   ) => Promise<void>;
   /** Whether a message is currently being generated */
   generating: boolean;
@@ -1075,7 +1075,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   fetchMessages: async (
     sessionId: string,
     topicId?: string,
-    options?: { preserveOnEmpty?: boolean },
+    options?: { preferPopulatedTopic?: boolean; preserveOnEmpty?: boolean },
   ) => {
     const key = fetchMessagesKey(sessionId, topicId);
     const existing = fetchMessagesInFlight.get(key);
@@ -1091,39 +1091,66 @@ export const useChatStore = create<ChatState>((set, get) => ({
       try {
         const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
         const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
-        let effectiveTopicId = topicId;
-        let messages =
+        const fetchByTopic = (nextTopicId?: string) =>
           sessionType === 'group'
-            ? await aiAgentApi.getGroupMessages({ groupId: sessionId, topicId: effectiveTopicId })
-            : await messageApi.list(sessionId, effectiveTopicId, { sessionType });
+            ? aiAgentApi.getGroupMessages({ groupId: sessionId, topicId: nextTopicId })
+            : messageApi.list(sessionId, nextTopicId, { sessionType });
+
+        let effectiveTopicId = topicId;
+        let messages = await fetchByTopic(effectiveTopicId);
+
+        let knownTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
+        const ensureKnownTopics = async () => {
+          if (sessionType === 'group' || knownTopics.length > 0) return;
+
+          const fetchedTopics = await topicApi.list(sessionId, { sessionType }).catch(() => []);
+          knownTopics = fetchedTopics;
+          if (fetchedTopics.length > 0) {
+            useTopicStore.setState((s) => ({
+              topicsBySession: {
+                ...s.topicsBySession,
+                [sessionId]: fetchedTopics,
+              },
+            }));
+          }
+        };
 
         if (!effectiveTopicId && (!messages || messages.length === 0)) {
-          const knownTopics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
-          let fallbackTopics = knownTopics;
-
-          if (fallbackTopics.length === 0) {
-            fallbackTopics = await topicApi.list(sessionId, { sessionType }).catch(() => []);
-            if (fallbackTopics.length > 0) {
-              useTopicStore.setState((s) => ({
-                topicsBySession: {
-                  ...s.topicsBySession,
-                  [sessionId]: fallbackTopics,
-                },
-              }));
-            }
-          }
-
-          const fallbackTopicId = fallbackTopics[0]?.id;
+          await ensureKnownTopics();
+          const fallbackTopicId = knownTopics[0]?.id;
           if (fallbackTopicId) {
             effectiveTopicId = fallbackTopicId;
             useTopicStore.getState().switchTopic(sessionId, fallbackTopicId);
-            messages =
-              sessionType === 'group'
-                ? await aiAgentApi.getGroupMessages({
-                    groupId: sessionId,
-                    topicId: fallbackTopicId,
-                  })
-                : await messageApi.list(sessionId, fallbackTopicId, { sessionType });
+            messages = await fetchByTopic(fallbackTopicId);
+          }
+        }
+
+        if (
+          options?.preferPopulatedTopic &&
+          sessionType !== 'group' &&
+          (!messages || messages.length === 0)
+        ) {
+          await ensureKnownTopics();
+          const currentTopic = effectiveTopicId
+            ? knownTopics.find((topic) => topic.id === effectiveTopicId)
+            : undefined;
+          const allowFallback = !effectiveTopicId || isDefaultTopicTitle(currentTopic?.title);
+
+          if (allowFallback) {
+            const candidateTopicIds = knownTopics
+              .map((topic) => topic.id)
+              .filter((id) => id && id !== effectiveTopicId)
+              .slice(0, 8);
+
+            for (const candidateTopicId of candidateTopicIds) {
+              const candidateMessages = await fetchByTopic(candidateTopicId);
+              if (candidateMessages.length === 0) continue;
+
+              effectiveTopicId = candidateTopicId;
+              useTopicStore.getState().switchTopic(sessionId, candidateTopicId);
+              messages = candidateMessages;
+              break;
+            }
           }
         }
         const {
@@ -1791,7 +1818,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const rawMessage = err instanceof Error ? err.message : String(err);
         console.warn('[ChatStore] group send error:', rawMessage, err);
         const t = useI18n.getState().t;
-        const errorMessage = rawMessage || t.errorSendFailed;
+        const { messageKey } = classifyError(err);
+        const errorMessage =
+          messageKey === 'errorProviderOverloaded' ? t.errorProviderOverloaded : rawMessage || t.errorSendFailed;
         useToast.getState().show('error', errorMessage);
 
         set((s) => ({
@@ -2243,7 +2272,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       console.warn('[ChatStore] AI streaming error:', err);
       const t = useI18n.getState().t;
       const rawMessage = err instanceof Error ? err.message : '';
-      const errorMessage = rawMessage || t.errorNetwork;
+      const { messageKey } = classifyError(err);
+      const errorMessage =
+        messageKey === 'errorProviderOverloaded' ? t.errorProviderOverloaded : rawMessage || t.errorNetwork;
       useToast.getState().show('error', errorMessage);
       set((s) => ({
         messagesBySession: {

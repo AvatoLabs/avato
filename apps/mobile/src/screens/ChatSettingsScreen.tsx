@@ -7,7 +7,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -458,7 +460,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   ]);
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
@@ -490,7 +496,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         }}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
+        keyboardShouldPersistTaps="handled"
+      >
         <SessionHeaderSection
           delay={50}
           description={groupDescription}
@@ -789,6 +799,6 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
           onSelect={handleSupervisorModelSelect}
         />
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }

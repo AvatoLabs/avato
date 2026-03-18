@@ -178,8 +178,15 @@ export class MessageModel {
     }
 
     // Standard query with session/topic/group filters
+    // If topicId is explicitly provided for an agent session, prefer topic scope.
+    // This protects old/orphan sessions where agents_to_sessions is missing but topic/message still exists.
+    const shouldUseTopicAsPrimaryScope = !!topicId && !!sessionId && !agentId && !groupId;
+    const messageScope = shouldUseTopicAsPrimaryScope
+      ? undefined
+      : (agentCondition ?? this.matchSession(sessionId));
+
     const whereCondition = and(
-      agentCondition ?? this.matchSession(sessionId),
+      messageScope,
       this.matchTopic(topicId),
       this.matchGroup(groupId),
       this.matchThread(threadId),

@@ -7,6 +7,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -23,8 +24,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image as RNImage,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
   Text,
@@ -49,7 +51,9 @@ import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useArtworkStore } from '../store/artwork';
 import { useConnectionStore } from '../store/connection';
+import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
@@ -206,7 +210,7 @@ function getAspectRatioSelection(
 // Proper aspect ratio preview matching web version
 function RatioIcon({ ratio, active }: { ratio: string; active: boolean }) {
   const colors = useThemeColors();
-  const borderColor = active ? '#fff' : colors.muted;
+  const borderColor = active ? colors.iconOnPrimary : colors.muted;
 
   if (ratio === 'auto' || !ratio.includes(':')) {
     return (
@@ -289,6 +293,7 @@ function SidebarOptionGrid<T extends string | number>({
   renderContent,
   selectedValue,
 }: SidebarOptionGridProps<T>) {
+  const colors = useThemeColors();
   const itemWidth = (containerWidth - SIDEBAR_OPTION_GAP * (columns - 1)) / columns;
 
   return (
@@ -347,6 +352,7 @@ function SidebarOptionStrip<T extends string | number>({
   renderContent,
   selectedValue,
 }: SidebarOptionStripProps<T>) {
+  const colors = useThemeColors();
   return (
     <ScrollView
       horizontal
@@ -405,6 +411,7 @@ export default function ArtworkScreen() {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isConnected = useConnectionStore((s) => s.isConnected);
@@ -424,10 +431,14 @@ export default function ArtworkScreen() {
   const [generating, setGenerating] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
-  // Generation state
+  // Generation state — topicId only for createImage + polling (ephemeral, not persisted)
   const [topicId, setTopicId] = useState<string | null>(null);
-  const [batches, setBatches] = useState<GenerationBatch[]>([]);
+  const batches = useArtworkStore((s) => s.batches);
+  const addBatch = useArtworkStore((s) => s.addBatch);
+  const removeBatch = useArtworkStore((s) => s.removeBatch);
+  const updateBatch = useArtworkStore((s) => s.updateBatch);
   const [baseUrl, setBaseUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollSessionRef = useRef(0);
@@ -572,6 +583,12 @@ export default function ArtworkScreen() {
   // ── Init ──
   useFocusEffect(
     useCallback(() => {
+      void useArtworkStore.getState().hydrate();
+    }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       let alive = true;
       hasHydratedRef.current = false;
 
@@ -629,6 +646,53 @@ export default function ArtworkScreen() {
 
   useEffect(() => stopPolling, [stopPolling]);
 
+  // ── Keyboard lift: use screenY for accurate offset, add paddingBottom so input sticks to keyboard ──
+  const inputPaddingBottom = Math.max(insets.bottom, 8);
+  useEffect(() => {
+    const handleKeyboardShow = (event: any) => {
+      const coords = event?.endCoordinates;
+      const windowHeight = Dimensions.get('window').height;
+      const screenY = Number(coords?.screenY ?? windowHeight);
+      // Distance from screen bottom to keyboard top = how much to translate
+      const offsetFromBottom = windowHeight - screenY;
+      if (offsetFromBottom > 0) {
+        // Add input's paddingBottom so BlurView bottom sits flush with keyboard top
+        setKeyboardOffset(offsetFromBottom + inputPaddingBottom);
+      } else {
+        setKeyboardOffset(0);
+      }
+    };
+    const handleKeyboardHide = () => {
+      setKeyboardOffset(0);
+    };
+
+    const subscriptions =
+      Platform.OS === 'ios'
+        ? [
+            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
+            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
+              const windowHeight = Dimensions.get('window').height;
+              const screenY = Number(event?.endCoordinates?.screenY ?? windowHeight);
+              if (screenY >= windowHeight - 1) {
+                handleKeyboardHide();
+              } else {
+                handleKeyboardShow(event);
+              }
+            }),
+          ]
+        : [
+            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
+          ];
+
+    return () => {
+      for (const subscription of subscriptions) {
+        subscription.remove();
+      }
+    };
+  }, [inputPaddingBottom]);
+
   // ── Pick reference images ──
   const handlePickRef = useCallback(async () => {
     const allowMultiple = Boolean(getParamDefinition(paramsSchema, 'imageUrls'));
@@ -648,21 +712,18 @@ export default function ArtworkScreen() {
     }
   }, [paramsSchema]);
 
-  // ── Load batches for topic ──
-  const loadBatches = useCallback(async (tid: string) => {
+  // ── Fetch batches from remote (for polling only — history is local) ──
+  const fetchBatchesFromRemote = useCallback(async (tid: string) => {
     try {
-      const data = await artworkApi.getBatches(tid);
-      if (data) setBatches(data);
-      return data;
+      return await artworkApi.getBatches(tid);
     } catch {
-      /* */
+      return undefined;
     }
-    return undefined;
   }, []);
 
-  // ── Poll generation status ──
+  // ── Poll generation status (updates local batch from remote, no remote sync for history) ──
   const startPolling = useCallback(
-    (tid: string, batchGenerations: GenerationItem[]) => {
+    (tid: string, batchId: string, batchGenerations: GenerationItem[]) => {
       stopPolling();
       const pendingGenerationIds = new Set(
         batchGenerations
@@ -685,8 +746,13 @@ export default function ArtworkScreen() {
         try {
           attempt += 1;
 
-          const latestBatches = await loadBatches(tid);
+          const latestBatches = await fetchBatchesFromRemote(tid);
           if (sessionId !== pollSessionRef.current) return;
+
+          const remoteBatch = (latestBatches || []).find((b) => b.id === batchId);
+          if (remoteBatch) {
+            updateBatch(batchId, () => remoteBatch);
+          }
 
           const latestPending = (latestBatches || [])
             .flatMap((batch) => batch.generations)
@@ -720,7 +786,7 @@ export default function ArtworkScreen() {
 
       pollRef.current = setTimeout(tick, 0);
     },
-    [loadBatches, stopPolling],
+    [fetchBatchesFromRemote, stopPolling, updateBatch],
   );
 
   // ── Generate ──
@@ -799,11 +865,16 @@ export default function ArtworkScreen() {
       });
 
       if (result?.data?.generations) {
-        // Load batches (with task/status) and use those for polling; createImage returns raw DB records without task
-        const loadedBatches = await loadBatches(tid);
+        // Fetch batch with task/status for polling; add to local history (no remote sync)
+        const loadedBatches = await fetchBatchesFromRemote(tid);
         const newBatch = loadedBatches?.find((b) => b.id === result.data.batch.id);
-        const generationsToPoll = newBatch?.generations ?? result.data.generations;
-        startPolling(tid, generationsToPoll);
+        const batchToAdd = newBatch ?? {
+          ...result.data.batch,
+          generations: result.data.generations,
+        };
+        addBatch(batchToAdd);
+        const generationsToPoll = batchToAdd.generations;
+        startPolling(tid, batchToAdd.id, generationsToPoll);
       }
 
       setPrompt('');
@@ -822,7 +893,8 @@ export default function ArtworkScreen() {
     refImages,
     topicId,
     imgCount,
-    loadBatches,
+    addBatch,
+    fetchBatchesFromRemote,
     startPolling,
     t,
     toast,
@@ -883,11 +955,7 @@ export default function ArtworkScreen() {
       : '';
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-background"
-      keyboardVerticalOffset={0}
-    >
+    <View className="flex-1 bg-background">
       {/* ── Header ── */}
       <ScreenHeader
         title={t.artworkTitle}
@@ -910,7 +978,7 @@ export default function ArtworkScreen() {
             }}
           >
             <View className="flex-row items-center">
-              <Sparkles color="#007aff" size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <Sparkles color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               <View className="ml-2 flex-1">
                 <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
                   {modelName || t.artworkSelectModel}
@@ -934,7 +1002,7 @@ export default function ArtworkScreen() {
               setShowSidebar(true);
             }}
           >
-            <SlidersHorizontal color="#007aff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <SlidersHorizontal color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </View>
       </View>
@@ -942,6 +1010,7 @@ export default function ArtworkScreen() {
       {/* ── Generation Feed ── */}
       <ScrollView
         className="flex-1"
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={
           batches.length === 0
@@ -972,9 +1041,8 @@ export default function ArtworkScreen() {
                   {
                     text: t.delete,
                     style: 'destructive',
-                    onPress: async () => {
-                      await artworkApi.deleteBatch(batch.id);
-                      if (topicId) loadBatches(topicId);
+                    onPress: () => {
+                      removeBatch(batch.id);
                     },
                   },
                 ]);
@@ -1012,49 +1080,61 @@ export default function ArtworkScreen() {
         )}
       </ScrollView>
 
-      {/* ── Sticky Prompt Bar ── */}
-      <View
+      {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
+      <Animated.View
         className="absolute bottom-0 left-0 right-0"
         style={{
-          paddingBottom: Math.max(insets.bottom, 8) + 4,
-          paddingTop: 4,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingHorizontal: 16,
-          backgroundColor: 'rgba(255,255,255,0.96)',
+          paddingTop: 4,
+          transform: [{ translateY: -keyboardOffset }],
         }}
       >
-        <View className="flex-row items-end gap-2">
-          <TextInput
-            multiline
-            className="flex-1 rounded-2xl bg-foreground/5 px-4 py-3 text-[14px] text-foreground"
-            maxLength={2000}
-            placeholder={t.artworkPromptPlaceholder}
-            placeholderTextColor={colors.secondaryText}
-            style={{ maxHeight: 100, minHeight: 44 }}
-            value={prompt}
-            onChangeText={setPrompt}
-          />
-          <TouchableOpacity
-            className={`rounded-2xl items-center justify-center ${prompt.trim() && model ? '' : 'bg-foreground/10'}`}
-            disabled={!prompt.trim() || !model || generating}
-            style={{
-              width: 48,
-              height: 48,
-              ...(prompt.trim() && model ? { backgroundColor: '#007aff' } : {}),
-            }}
-            onPress={handleGenerate}
-          >
-            {generating ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Sparkles
-                color={prompt.trim() && model ? '#fff' : colors.secondaryText}
-                size={20}
-                strokeWidth={2}
-              />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+        <BlurView
+          className="rounded-2xl overflow-hidden"
+          intensity={80}
+          tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
+          style={{
+            backgroundColor: colors.overlay,
+            borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
+            borderWidth: keyboardOffset > 0 ? 3 : 1,
+          }}
+        >
+          <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
+            <TextInput
+              multiline
+              className="flex-1 text-foreground text-[16px] leading-[22px] min-h-[36px]"
+              maxLength={2000}
+              placeholder={t.artworkPromptPlaceholder}
+              placeholderTextColor={colors.muted}
+              style={{ maxHeight: 112, paddingVertical: 0, textAlignVertical: 'top' }}
+              underlineColorAndroid="transparent"
+              value={prompt}
+              onChangeText={setPrompt}
+            />
+            <TouchableOpacity
+              className="rounded-full items-center justify-center"
+              disabled={!prompt.trim() || !model || generating}
+              style={{
+                width: 36,
+                height: 36,
+                backgroundColor: prompt.trim() && model ? colors.primary : colors.fillTertiary,
+              }}
+              onPress={handleGenerate}
+            >
+              {generating ? (
+                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+              ) : (
+                <Sparkles
+                  color={prompt.trim() && model ? colors.iconOnPrimary : colors.muted}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </Animated.View>
 
       {/* ── Config Sidebar Overlay ── */}
       {showSidebar && (
@@ -1066,7 +1146,7 @@ export default function ArtworkScreen() {
           >
             <TouchableOpacity
               activeOpacity={1}
-              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+              style={{ flex: 1, backgroundColor: colors.overlayDark }}
               onPress={() => setShowSidebar(false)}
             />
           </Animated.View>
@@ -1082,7 +1162,7 @@ export default function ArtworkScreen() {
               backgroundColor: colors.surface,
               borderTopLeftRadius: 20,
               borderBottomLeftRadius: 20,
-              shadowColor: '#000',
+              shadowColor: colors.shadow,
               shadowOffset: { width: -4, height: 0 },
               shadowOpacity: 0.08,
               shadowRadius: 16,
@@ -1100,12 +1180,12 @@ export default function ArtworkScreen() {
               {/* Sidebar header */}
               <View className="flex-row items-center justify-between mb-2">
                 <Text
-                  style={{ color: '#1a1a1a', fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}
+                  style={{ color: colors.foreground, fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}
                 >
                   {t.artworkTitle}
                 </Text>
                 <TouchableOpacity hitSlop={8} onPress={() => setShowSidebar(false)}>
-                  <X color="#999" size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <X color={colors.iconMuted} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 </TouchableOpacity>
               </View>
 
@@ -1122,11 +1202,11 @@ export default function ArtworkScreen() {
                 }}
                 onPress={() => setShowPicker(!showPicker)}
               >
-                <Sparkles color="#007aff" size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Sparkles color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 <Text
                   numberOfLines={1}
                   style={{
-                    color: '#1a1a1a',
+                    color: colors.foreground,
                     fontSize: 14,
                     fontWeight: '600',
                     marginLeft: 8,
@@ -1135,7 +1215,7 @@ export default function ArtworkScreen() {
                 >
                   {modelName || t.artworkSelectModel}
                 </Text>
-                <ChevronDown color="#999" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronDown color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
               </TouchableOpacity>
               {showPicker && (
                 <Animated.View
@@ -1151,8 +1231,8 @@ export default function ArtworkScreen() {
                   <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
                     {allModels.length === 0 ? (
                       <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                        <Text style={{ color: '#999', fontSize: 14 }}>{t.artworkNoModels}</Text>
-                        <Text style={{ color: '#bbb', fontSize: 12, marginTop: 4 }}>
+                        <Text style={{ color: colors.muted, fontSize: 14 }}>{t.artworkNoModels}</Text>
+                        <Text style={{ color: colors.secondaryText, fontSize: 12, marginTop: 4 }}>
                           {t.artworkNoModelsDesc}
                         </Text>
                       </View>
@@ -1165,7 +1245,7 @@ export default function ArtworkScreen() {
                             paddingVertical: 10,
                             flexDirection: 'row',
                             alignItems: 'center',
-                            backgroundColor: model === m.id ? '#e8e8e8' : 'transparent',
+                            backgroundColor: model === m.id ? colors.fillTertiary : 'transparent',
                           }}
                           onPress={() => {
                             haptics.selection();
@@ -1174,10 +1254,10 @@ export default function ArtworkScreen() {
                           }}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: '#1a1a1a', fontSize: 13, fontWeight: '500' }}>
+                            <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '500' }}>
                               {m.displayName || m.id}
                             </Text>
-                            <Text style={{ color: '#999', fontSize: 10 }}>{m.providerName}</Text>
+                            <Text style={{ color: colors.muted, fontSize: 10 }}>{m.providerName}</Text>
                           </View>
                           {model === m.id && (
                             <View
@@ -1228,22 +1308,22 @@ export default function ArtworkScreen() {
                                 position: 'absolute',
                                 top: -5,
                                 right: -5,
-                                backgroundColor: '#e0e0e0',
+                                backgroundColor: colors.sliderTrack,
                                 borderRadius: 10,
                                 padding: 2,
                               }}
                               onPress={() => setRefImages((p) => p.filter((_, idx) => idx !== i))}
                             >
-                              <X color="#666" size={10} />
+                              <X color={colors.iconMuted} size={10} />
                             </TouchableOpacity>
                           </View>
                         ))}
                       </ScrollView>
                     ) : (
                       <>
-                        <ImageIcon color="#bbb" size={28} strokeWidth={1.5} />
+                        <ImageIcon color={colors.secondaryText} size={28} strokeWidth={1.5} />
                         <Text
-                          style={{ color: '#999', fontSize: 12, marginTop: 6, textAlign: 'center' }}
+                          style={{ color: colors.muted, fontSize: 12, marginTop: 6, textAlign: 'center' }}
                         >
                           {t.artworkReferenceImagesDesc}
                         </Text>
@@ -1264,7 +1344,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : colors.muted,
+                          color: active ? colors.iconOnPrimary : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1292,7 +1372,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : colors.muted,
+                          color: active ? colors.iconOnPrimary : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1320,7 +1400,7 @@ export default function ArtworkScreen() {
                     renderContent={(option, active) => (
                       <Text
                         style={{
-                          color: active ? '#fff' : colors.muted,
+                          color: active ? colors.iconOnPrimary : colors.muted,
                           fontSize: 12,
                           fontWeight: '500',
                         }}
@@ -1351,7 +1431,7 @@ export default function ArtworkScreen() {
                         </View>
                         <Text
                           style={{
-                            color: active ? '#fff' : colors.muted,
+                            color: active ? colors.iconOnPrimary : colors.muted,
                             fontSize: 10,
                             fontWeight: '500',
                           }}
@@ -1406,12 +1486,12 @@ export default function ArtworkScreen() {
                     }}
                     onPress={() => setEditingParamKey(key)}
                   >
-                    <Text style={{ color: '#1a1a1a', fontSize: 14, fontWeight: '600' }}>
+                    <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
                       {generationParams[key] === null || generationParams[key] === undefined
                         ? 'Auto'
                         : String(generationParams[key])}
                     </Text>
-                    <Text style={{ color: '#999', fontSize: 12 }}>
+                    <Text style={{ color: colors.muted, fontSize: 12 }}>
                       {typeof getParamDefinition(paramsSchema, key)?.min === 'number' &&
                       typeof getParamDefinition(paramsSchema, key)?.max === 'number'
                         ? `${getParamDefinition(paramsSchema, key)?.min}-${getParamDefinition(paramsSchema, key)?.max}`
@@ -1431,7 +1511,7 @@ export default function ArtworkScreen() {
                 renderContent={(item, active) => (
                   <Text
                     style={{
-                      color: active ? '#fff' : colors.muted,
+                      color: active ? colors.iconOnPrimary : colors.muted,
                       fontSize: 12,
                       fontWeight: '500',
                     }}
@@ -1506,7 +1586,7 @@ export default function ArtworkScreen() {
           setEditingParamKey(null);
         }}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1571,6 +1651,7 @@ function BatchCard({
   resolveUrl: (url?: string) => string | undefined;
 }) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const gap = 6;
   const cols = batch.generations.length === 1 ? 1 : 2;
   const cardInnerPadding = 24;
@@ -1621,7 +1702,7 @@ function BatchCard({
                 width: imgW,
                 height: imgH,
                 borderRadius: 12,
-                backgroundColor: 'rgba(255,255,255,0.05)',
+                backgroundColor: colors.fillTertiary,
                 overflow: 'hidden',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1641,7 +1722,7 @@ function BatchCard({
                 </View>
               ) : (
                 <View className="items-center">
-                  <ActivityIndicator color="#666" size="small" />
+                  <ActivityIndicator color={colors.iconMuted} size="small" />
                   <StatusBadge status={status} />
                 </View>
               )}
@@ -1653,13 +1734,13 @@ function BatchCard({
       {/* Actions */}
       <View className="flex-row items-center justify-end mt-2 gap-3">
         <TouchableOpacity hitSlop={8} onPress={onReuseSettings}>
-          <Sparkles color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Sparkles color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <TouchableOpacity hitSlop={8} onPress={onCopyPrompt}>
-          <Copy color="#666" size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Copy color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
         <TouchableOpacity hitSlop={8} onPress={onDelete}>
-          <Trash2 color="#ef4444" size={16} strokeWidth={tokens.icon.strokeWidth} />
+          <Trash2 color={colors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
       </View>
     </Animated.View>

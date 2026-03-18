@@ -215,7 +215,17 @@ const buildInstalledPluginItem = (
   t: I18nStore['t'],
   colors: Pick<
     ColorTokens,
-    'primary' | 'fillTertiary' | 'secondaryText' | 'muted' | 'danger' | 'foreground'
+    | 'primary'
+    | 'fillTertiary'
+    | 'secondaryText'
+    | 'muted'
+    | 'danger'
+    | 'foreground'
+    | 'sourceBuiltin'
+    | 'sourceBuiltinMuted'
+    | 'sourceCustom'
+    | 'sourceCustomMuted'
+    | 'sourceMarketMuted'
   >,
 ): StoreInstalledItem => {
   const isCustom = plugin.type === 'customPlugin';
@@ -228,8 +238,8 @@ const buildInstalledPluginItem = (
 
   return {
     avatar,
-    badgeBackgroundColor: isCustom ? 'rgba(234, 88, 12, 0.12)' : 'rgba(0, 122, 255, 0.1)',
-    badgeColor: isCustom ? '#ea580c' : colors.primary,
+    badgeBackgroundColor: isCustom ? colors.sourceCustomMuted : colors.sourceMarketMuted,
+    badgeColor: isCustom ? colors.sourceCustom : colors.primary,
     description,
     id: plugin.identifier,
     identifier: plugin.identifier,
@@ -244,7 +254,17 @@ const buildInstalledSkillItem = (
   t: I18nStore['t'],
   colors: Pick<
     ColorTokens,
-    'primary' | 'fillTertiary' | 'secondaryText' | 'muted' | 'danger' | 'foreground'
+    | 'primary'
+    | 'fillTertiary'
+    | 'secondaryText'
+    | 'muted'
+    | 'danger'
+    | 'foreground'
+    | 'sourceBuiltin'
+    | 'sourceBuiltinMuted'
+    | 'sourceCustom'
+    | 'sourceCustomMuted'
+    | 'sourceMarketMuted'
   >,
 ): StoreInstalledItem => {
   const source = skill.source || 'user';
@@ -255,13 +275,17 @@ const buildInstalledSkillItem = (
         ? t.storeFromStore
         : t.storeImported;
   const badgeColor =
-    source === 'builtin' ? '#059669' : source === 'market' ? colors.primary : '#ea580c';
+    source === 'builtin'
+      ? colors.sourceBuiltin
+      : source === 'market'
+        ? colors.primary
+        : colors.sourceCustom;
   const badgeBackgroundColor =
     source === 'builtin'
-      ? 'rgba(5, 150, 105, 0.12)'
+      ? colors.sourceBuiltinMuted
       : source === 'market'
-        ? 'rgba(0, 122, 255, 0.1)'
-        : 'rgba(234, 88, 12, 0.12)';
+        ? colors.sourceMarketMuted
+        : colors.sourceCustomMuted;
 
   return {
     avatar: getSkillAvatar(skill),
@@ -318,15 +342,17 @@ const ItemCard = memo<{
               style={{
                 backgroundColor:
                   item._source === 'mcp' || item._source === 'legacy'
-                    ? 'rgba(0, 122, 255, 0.08)'
-                    : 'rgba(5, 150, 105, 0.12)',
+                    ? colors.sourceMarketMuted
+                    : colors.sourceBuiltinMuted,
               }}
             >
               <Text
                 className="text-[9px] font-bold tracking-wide"
                 style={{
                   color:
-                    item._source === 'mcp' || item._source === 'legacy' ? '#007aff' : '#059669',
+                    item._source === 'mcp' || item._source === 'legacy'
+                      ? colors.sourceMarket
+                      : colors.sourceBuiltin,
                 }}
               >
                 {item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'SKILL'}
@@ -350,7 +376,7 @@ const ItemCard = memo<{
         {installed ? (
           <View
             className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
-            style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
+            style={{ backgroundColor: colors.primarySubtle }}
           >
             <Check color={colors.primary} size={14} strokeWidth={2.5} />
           </View>
@@ -358,7 +384,7 @@ const ItemCard = memo<{
           <TouchableOpacity
             activeOpacity={0.6}
             className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
-            style={{ backgroundColor: 'rgba(0, 122, 255, 0.08)' }}
+            style={{ backgroundColor: colors.primarySubtle }}
             onPress={(e) => {
               e.stopPropagation();
               onInstall(item);
@@ -504,7 +530,7 @@ function SimpleImportModal({
               onPress={handleImport}
             >
               {importing ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
               ) : (
                 <Text
                   className={`font-semibold text-[15px] ${value.trim() ? 'text-white' : 'text-secondary/40'}`}
@@ -777,7 +803,7 @@ function AddCustomMcpModal({
                   <View className="flex-row gap-2">
                     <Pressable
                       className="flex-1 py-2.5 px-4 rounded-lg items-center"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.04)' }}
+                      style={{ backgroundColor: colors.fillTertiary }}
                       onPress={() => setShowQuickImport(false)}
                     >
                       <Text className="text-secondary/60 text-[13px] font-semibold">
@@ -918,7 +944,7 @@ function AddCustomMcpModal({
                   onPress={handleTestConnection}
                 >
                   {testing ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                   ) : (
                     <Text
                       className={`text-[13px] font-semibold ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
@@ -945,7 +971,7 @@ function AddCustomMcpModal({
 
               <Pressable
                 className="flex-row items-center justify-between px-3 py-3 rounded-xl mb-2 active:opacity-80"
-                style={{ backgroundColor: 'rgba(0,0,0,0.03)' }}
+                style={{ backgroundColor: colors.fillQuaternary }}
                 onPress={() => setShowAdvanced((value) => !value)}
               >
                 <Text
@@ -1054,7 +1080,7 @@ function AddCustomMcpModal({
                 onPress={handleSave}
               >
                 {saving ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
                   <Text
                     className={`font-semibold text-[15px] ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
@@ -1173,7 +1199,7 @@ function StoreItemModal({
                 onPress={onInstall}
               >
                 {actionLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
                   <Text className="text-white text-[14px] font-semibold">{t.storeInstall}</Text>
                 )}
@@ -1851,7 +1877,7 @@ export default function StoreScreen() {
               >
                 <Text
                   className="text-[13px] font-semibold"
-                  style={{ color: active ? '#fff' : colors.muted }}
+                  style={{ color: active ? colors.iconOnPrimary : colors.muted }}
                 >
                   {tab.label}
                   {tab.key === 'installed' && allInstalled.length > 0

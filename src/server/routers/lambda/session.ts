@@ -5,6 +5,7 @@ import { ChatGroupModel } from '@/database/models/chatGroup';
 import { MessageModel } from '@/database/models/message';
 import { SessionModel } from '@/database/models/session';
 import { SessionGroupModel } from '@/database/models/sessionGroup';
+import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
 import { insertAgentSchema, insertSessionSchema } from '@/database/schemas';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -147,12 +148,6 @@ export const sessionRouter = router({
           .passthrough()
           .partial(),
         session: insertSessionSchema.omit({ createdAt: true, updatedAt: true }).partial(),
-        /**
-         * When true, creates a session-only chat (virtual agent).
-         * Virtual agents are excluded from the sidebar "assistants" list.
-         * Use for "new conversation" flows; use agent.createAgent for creating assistants.
-         */
-        sessionOnly: z.boolean().optional(),
         type: z.enum(['agent', 'group']),
       }),
     )
@@ -170,11 +165,30 @@ export const sessionRouter = router({
 
       const sessionModel = new SessionModel(ctx.serverDB, userId);
       const chatGroupModel = new ChatGroupModel(ctx.serverDB, userId);
+      const agentMigrationRepo = new AgentMigrationRepo(ctx.serverDB, userId);
+      const chatGroupsPromise = chatGroupModel.queryWithMemberDetails();
 
-      const [{ sessions, sessionGroups }, chatGroups] = await Promise.all([
-        sessionModel.queryWithGroups(),
-        chatGroupModel.queryWithMemberDetails(),
-      ]);
+      let { sessions, sessionGroups } = await sessionModel.queryWithGroups();
+
+      const orphanAgentSessionIds = sessions
+        .filter(
+          (session) =>
+            session.type === 'agent' &&
+            !((session as { config?: { id?: string } }).config?.id),
+        )
+        .map((session) => session.id);
+
+      if (orphanAgentSessionIds.length > 0) {
+        const migrated =
+          await agentMigrationRepo.migrateSessionOnlyAgentBindings(orphanAgentSessionIds);
+        if (migrated > 0) {
+          const refreshed = await sessionModel.queryWithGroups();
+          sessions = refreshed.sessions;
+          sessionGroups = refreshed.sessionGroups;
+        }
+      }
+
+      const chatGroups = await chatGroupsPromise;
 
       const groupSessions: LobeGroupSession[] = chatGroups.map((group) => {
         const { title, description, avatar, backgroundColor, groupId, ...rest } = group;
@@ -261,6 +275,11 @@ export const sessionRouter = router({
       if (sess.type === 'group') {
         await ctx.sessionModel.update(sessionId, { title });
       } else {
+        if (!sess.agent) {
+          await new AgentMigrationRepo(ctx.serverDB, ctx.userId).migrateSessionOnlyAgentBindings([
+            sessionId,
+          ]);
+        }
         await ctx.sessionModel.updateConfig(sessionId, { title });
       }
       log('session title updated:', title);
@@ -318,6 +337,9 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      await new AgentMigrationRepo(ctx.serverDB, ctx.userId).migrateSessionOnlyAgentBindings([
+        input.id,
+      ]);
       return ctx.sessionModel.updateConfig(input.id, {
         chatConfig: input.value,
       });
@@ -330,6 +352,9 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      await new AgentMigrationRepo(ctx.serverDB, ctx.userId).migrateSessionOnlyAgentBindings([
+        input.id,
+      ]);
       return ctx.sessionModel.updateConfig(input.id, input.value);
     }),
 });

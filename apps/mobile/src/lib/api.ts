@@ -710,9 +710,8 @@ export const sessionApi = {
   },
   /**
    * Create a new session (simple chat).
-   * Uses sessionOnly: true — no Agent entity is created; config lives in session.config.
-   * Session-only sessions do not appear in the sidebar "assistants" list.
-   * For creating assistants (with Agent record), use agentApi.create instead.
+   * Always creates an Agent-bound session (no session-only virtual session).
+   * This keeps App/Web session semantics aligned.
    */
   create: (config?: CreateSessionConfig) =>
     trpcMutate<string>('session.createSession', {
@@ -726,7 +725,6 @@ export const sessionApi = {
         title: config?.title || 'New Session',
       },
       session: { tagId: config?.tagId },
-      sessionOnly: true,
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),

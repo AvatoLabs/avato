@@ -2,7 +2,9 @@ import { Check, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -10,14 +12,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 
-import { semanticColors } from '../../constants/colors';
 import { agentApi, type AgentQueryItem } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useModelStore } from '../../store/model';
+import { useThemeColors } from '../../theme/colors';
+import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
 import { ModelDrawer } from './ModelDrawer';
+
+const EMPTY_AGENT_IDS: string[] = [];
 
 export interface AgentSelectionSheetSubmitPayload {
   agentIds: string[];
@@ -64,8 +70,8 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
 export default function AgentSelectionSheet({
   allowEmptySelection = false,
   confirmLabel,
-  excludedAgentIds = [],
-  initialSelectedAgentIds = [],
+  excludedAgentIds = EMPTY_AGENT_IDS,
+  initialSelectedAgentIds = EMPTY_AGENT_IDS,
   initialTitle = '',
   onClose,
   onSubmit,
@@ -77,11 +83,14 @@ export default function AgentSelectionSheet({
   visible,
 }: AgentSelectionSheetProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [agents, setAgents] = useState<AgentQueryItem[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelectedAgentIds));
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(initialSelectedAgentIds),
+  );
   const [draftTitle, setDraftTitle] = useState(initialTitle);
   const [supervisorModel, setSupervisorModel] = useState<string>('');
   const [supervisorProvider, setSupervisorProvider] = useState<string>('');
@@ -150,11 +159,15 @@ export default function AgentSelectionSheet({
       onRequestClose={onClose}
     >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
-          className="rounded-t-2xl bg-card"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ maxHeight: '80%' }}
-          onPress={(event) => event.stopPropagation()}
         >
+          <Animated.View entering={enteringModalContent()} style={{ maxHeight: '80%' }}>
+            <Pressable
+            className="rounded-t-2xl bg-card"
+            onPress={(event) => event.stopPropagation()}
+          >
           <View className="items-center pb-2 pt-3">
             <View className="h-1 w-9 rounded-full bg-foreground/10" />
           </View>
@@ -183,12 +196,12 @@ export default function AgentSelectionSheet({
               }}
             >
               {submitting ? (
-                <ActivityIndicator color={semanticColors.primary} />
+                <ActivityIndicator color={colors.primary} />
               ) : (
                 <Text
                   className="text-[15px] font-semibold"
                   style={{
-                    color: submitDisabled ? semanticColors.secondaryText : semanticColors.primary,
+                    color: submitDisabled ? colors.secondaryText : colors.primary,
                   }}
                 >
                   {confirmLabel}
@@ -197,7 +210,11 @@ export default function AgentSelectionSheet({
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
+          <ScrollView
+              className="px-5"
+              contentContainerStyle={{ paddingBottom: 24 }}
+              keyboardShouldPersistTaps="handled"
+            >
             {showTitleInput ? (
               <View className="mb-4">
                 <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
@@ -206,7 +223,7 @@ export default function AgentSelectionSheet({
                 <TextInput
                   className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
                   placeholder={titleInputPlaceholder}
-                  placeholderTextColor={semanticColors.secondaryText}
+                  placeholderTextColor={colors.secondaryText}
                   value={draftTitle}
                   onChangeText={setDraftTitle}
                 />
@@ -234,7 +251,7 @@ export default function AgentSelectionSheet({
                     {supervisorModelLabel}
                   </Text>
                   <ChevronRight
-                    color={semanticColors.secondaryText}
+                    color={colors.secondaryText}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -249,7 +266,7 @@ export default function AgentSelectionSheet({
               <TextInput
                 className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
                 placeholder={t.search}
-                placeholderTextColor={semanticColors.secondaryText}
+                placeholderTextColor={colors.secondaryText}
                 value={keyword}
                 onChangeText={setKeyword}
               />
@@ -257,7 +274,7 @@ export default function AgentSelectionSheet({
 
             {loading ? (
               <View className="items-center justify-center py-8">
-                <ActivityIndicator color={semanticColors.primary} />
+                <ActivityIndicator color={colors.primary} />
               </View>
             ) : filteredAgents.length === 0 ? (
               <View className="rounded-2xl bg-foreground/[0.03] px-4 py-5">
@@ -278,9 +295,9 @@ export default function AgentSelectionSheet({
                     }`}
                     style={{
                       backgroundColor: selected
-                        ? `${semanticColors.primary}12`
+                        ? `${colors.primary}12`
                         : 'rgba(15,23,42,0.03)',
-                      borderColor: selected ? `${semanticColors.primary}36` : 'transparent',
+                      borderColor: selected ? `${colors.primary}36` : 'transparent',
                       borderWidth: 1,
                     }}
                     onPress={() => {
@@ -311,12 +328,12 @@ export default function AgentSelectionSheet({
                         width: 22,
                         height: 22,
                         backgroundColor: selected
-                          ? semanticColors.primary
-                          : 'rgba(120,120,128,0.18)',
+                          ? colors.primary
+                          : colors.switchTrackOffAlt,
                       }}
                     >
                       {selected ? (
-                        <Check color="#fff" size={13} strokeWidth={tokens.icon.strokeWidth + 0.3} />
+                        <Check color={colors.iconOnPrimary} size={13} strokeWidth={tokens.icon.strokeWidth + 0.3} />
                       ) : null}
                     </View>
                   </TouchableOpacity>
@@ -324,7 +341,9 @@ export default function AgentSelectionSheet({
               })
             )}
           </ScrollView>
-        </Pressable>
+            </Pressable>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </Pressable>
 
       {showSupervisorModelPicker ? (

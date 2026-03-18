@@ -8,6 +8,7 @@ import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'rea
 
 import { useI18n } from '../../lib/i18n';
 import { useFileStore } from '../../store/file';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 interface FilePreviewProps {
@@ -16,6 +17,7 @@ interface FilePreviewProps {
 
 const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const removeFile = useFileStore((s) => s.removeFile);
   const uploadFile = useFileStore((s) => s.uploadFile);
@@ -59,7 +61,7 @@ const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
             {/* Status overlay */}
             {file.status === 'uploading' && (
               <View className="absolute inset-0 bg-black/40 items-center justify-center">
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 <Text className="text-[9px] text-white/90 font-medium mt-1">
                   {file.progress > 0 ? `${Math.round(file.progress)}%` : t.fileUploading}
                 </Text>
@@ -80,7 +82,7 @@ const FilePreview = memo<FilePreviewProps>(({ sessionId }) => {
               className="absolute top-0 right-0 w-5 h-5 bg-black/60 rounded-full items-center justify-center"
               onPress={() => removeFile(file.id)}
             >
-              <X color="#fff" size={10} strokeWidth={tokens.icon.strokeWidth} />
+              <X color={colors.iconOnPrimary} size={10} strokeWidth={tokens.icon.strokeWidth} />
             </TouchableOpacity>
           </View>
         );

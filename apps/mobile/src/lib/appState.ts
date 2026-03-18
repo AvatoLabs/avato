@@ -5,8 +5,14 @@ import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
+import { clearStoredAuthSession } from './auth';
 
 export const ONBOARDING_KEY = 'avato_onboarding_complete';
+
+const isAuthInvalidReason = (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason ?? '');
+  return /\b401\b|user not found|unauthorized|forbidden|invalid token/i.test(message);
+};
 
 export const syncMobileBootstrapState = async () => {
   const [sessionsResult, userResult, agentsResult] = await Promise.allSettled([
@@ -15,15 +21,24 @@ export const syncMobileBootstrapState = async () => {
     useAgentStore.getState().loadAgents(),
   ]);
 
+  let requiresReauth = false;
+
   if (sessionsResult.status === 'rejected') {
     console.warn('[appState] bootstrap sessions sync failed:', sessionsResult.reason);
   }
   if (userResult.status === 'rejected') {
     console.warn('[appState] bootstrap user sync failed:', userResult.reason);
+    if (isAuthInvalidReason(userResult.reason)) {
+      requiresReauth = true;
+      await clearStoredAuthSession().catch(() => {});
+      await clearTransientAppState().catch(() => {});
+    }
   }
   if (agentsResult.status === 'rejected') {
     console.warn('[appState] bootstrap agents sync failed:', agentsResult.reason);
   }
+
+  return { requiresReauth };
 };
 
 /** One-time migration: remove deprecated avato_default_model / avato_chat_settings_* keys */

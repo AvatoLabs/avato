@@ -122,8 +122,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   /**
-   * Create a session. When called from Home chatbox, creates session-only (no Agent).
-   * Session-only = virtual agent, config in session.config, excluded from assistants list.
+   * Create a session. Home chatbox also creates a regular Agent-bound session.
    */
   createSession: async (titleOrConfig) => {
     const inputConfig: CreateSessionConfig =

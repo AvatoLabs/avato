@@ -6,6 +6,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import type { MobileRecommendedBuiltinIcon } from '../../constants/recommendedBuiltins';
+import { useThemeColors } from '../../theme/colors';
 
 const ICON_MAP: Record<MobileRecommendedBuiltinIcon, string> = {
   artifacts: '🎨',
@@ -22,6 +23,7 @@ interface BuiltinSkillIconProps {
 }
 
 export function BuiltinSkillIcon({ icon, size = 36 }: BuiltinSkillIconProps) {
+  const colors = useThemeColors();
   const emoji = ICON_MAP[icon] ?? '🔧';
 
   return (
@@ -30,7 +32,7 @@ export function BuiltinSkillIcon({ icon, size = 36 }: BuiltinSkillIconProps) {
       style={{
         width: size,
         height: size,
-        backgroundColor: 'rgba(0,0,0,0.04)',
+        backgroundColor: colors.fillTertiary,
       }}
     >
       <Text style={{ fontSize: size * 0.55 }}>{emoji}</Text>

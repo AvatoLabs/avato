@@ -23,7 +23,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -45,15 +45,14 @@ import { WebView } from 'react-native-webview';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import { getProviderIconUrl } from '../../constants/cdn';
-import { semanticColors } from '../../constants/colors';
 import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
-import { useI18n } from '../../lib/i18n';
+import { I18nStore, useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
 import { useSessionStore } from '../../store/session';
-import { chatAccent, themeColors, uiColors } from '../../theme/colors';
+import { getChatAccent, useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import type {
   ChatMessage,
@@ -68,6 +67,7 @@ import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
 
 const StreamingCursor = memo(() => {
+  const colors = useThemeColors();
   const [visible, setVisible] = useState(true);
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   useEffect(() => {
@@ -79,7 +79,7 @@ const StreamingCursor = memo(() => {
       {visible && (
         <View
           style={{
-            backgroundColor: themeColors.userBubbleBg,
+            backgroundColor: colors.userBubbleBg,
             borderRadius: 1,
             height: 16,
             width: 3,
@@ -104,6 +104,7 @@ const getTimeAgo = (date?: string | Date): string => {
 };
 
 const CodeCopyButton = memo<{ code: string }>(({ code }) => {
+  const colors = useThemeColors();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -120,9 +121,9 @@ const CodeCopyButton = memo<{ code: string }>(({ code }) => {
       onPress={handleCopy}
     >
       {copied ? (
-        <Check color={themeColors.iconSuccess} size={14} strokeWidth={2} />
+        <Check color={colors.iconSuccess} size={14} strokeWidth={2} />
       ) : (
-        <Copy color={themeColors.iconMuted} size={14} strokeWidth={2} />
+        <Copy color={colors.iconMuted} size={14} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );
@@ -278,6 +279,7 @@ const ArtifactBlock = memo<{
   language?: string;
   title?: string;
 }>(({ title, artifactType, content, language: _language }) => {
+  const colors = useThemeColors();
   const [height, setHeight] = useState(300);
   const [expanded, setExpanded] = useState(false);
 
@@ -293,7 +295,7 @@ const ArtifactBlock = memo<{
         {title ? (
           <Text
             style={{
-              color: semanticColors.muted,
+              color: colors.muted,
               fontSize: 12,
               fontWeight: '600',
               marginBottom: 4,
@@ -313,7 +315,7 @@ const ArtifactBlock = memo<{
 
   const htmlContent = isSvg
     ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0;padding:8px;background:${themeColors.surface};display:flex;justify-content:center;align-items:center}
+<style>body{margin:0;padding:8px;background:${colors.surface};display:flex;justify-content:center;align-items:center}
 svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
     : isHtml
       ? content.includes('<html')
@@ -327,7 +329,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
   return (
     <View
       style={{
-        backgroundColor: themeColors.fillQuaternary,
+        backgroundColor: colors.fillQuaternary,
         borderRadius: 12,
         marginVertical: 6,
         overflow: 'hidden',
@@ -338,7 +340,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           activeOpacity={0.7}
           style={{
             alignItems: 'center',
-            backgroundColor: themeColors.fillTertiary,
+            backgroundColor: colors.fillTertiary,
             flexDirection: 'row',
             justifyContent: 'space-between',
             paddingHorizontal: 12,
@@ -348,14 +350,14 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
         >
           <Text
             numberOfLines={1}
-            style={{ color: uiColors.textDark, fontSize: 13, fontWeight: '600' }}
+            style={{ color: colors.textDark, fontSize: 13, fontWeight: '600' }}
           >
             {title}
           </Text>
           {expanded ? (
-            <ChevronDown color={themeColors.iconMuted} size={14} />
+            <ChevronDown color={colors.iconMuted} size={14} />
           ) : (
-            <ChevronRight color={themeColors.iconMuted} size={14} />
+            <ChevronRight color={colors.iconMuted} size={14} />
           )}
         </TouchableOpacity>
       ) : null}
@@ -365,7 +367,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
           originWhitelist={['*']}
           scrollEnabled={false}
           source={{ html: htmlContent }}
-          style={{ backgroundColor: themeColors.surface, height, width: '100%' }}
+          style={{ backgroundColor: colors.surface, height, width: '100%' }}
           onMessage={(e) => {
             try {
               const data = JSON.parse(e.nativeEvent.data);
@@ -418,13 +420,14 @@ const CompareGroupBlock = memo<{
   groupSupervisorId?: string;
   markdownStyles: Record<string, unknown>;
   onOpenLink: (url?: string) => void;
-  t: ReturnType<typeof useI18n.getState>['t'];
+  t: I18nStore['t'];
 }>(({ childrenMessages, groupMembersById, groupSupervisorId, markdownStyles, onOpenLink, t }) => {
+  const colors = useThemeColors();
   return (
     <View className="gap-2">
       {childrenMessages.map((child) => {
         const speakerId = child.agentId || groupSupervisorId;
-        const speaker = speakerId ? groupMembersById?.[speakerId] : undefined;
+        const speaker = speakerId != null && groupMembersById ? groupMembersById[speakerId] : undefined;
         const isSupervisor = Boolean(
           speaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
         );
@@ -475,7 +478,7 @@ const CompareGroupBlock = memo<{
                 {child.reasoning.content}
               </Text>
             ) : (
-              <TypingIndicator color={uiColors.typingIndicator} />
+              <TypingIndicator color={colors.typingIndicator} />
             )}
           </View>
         );
@@ -489,10 +492,11 @@ CompareGroupBlock.displayName = 'CompareGroupBlock';
 const GroupTasksBlock = memo<{
   groupMembersById?: Record<string, GroupMessageSpeaker>;
   message: ChatMessage;
-  t: ReturnType<typeof useI18n>['t'];
+  t: I18nStore['t'];
 }>(({ groupMembersById, message, t }) => {
+  const colors = useThemeColors();
   const tasks = message.tasks ?? [];
-  const taskAgentIds = [...new Set(tasks.map((task) => task.agentId).filter(Boolean))];
+  const taskAgentIds = [...new Set(tasks.map((task) => task.agentId).filter((id): id is string => id != null))];
   const agentNames = taskAgentIds
     .map((id) => groupMembersById?.[id]?.title ?? id)
     .filter(Boolean)
@@ -513,16 +517,16 @@ const GroupTasksBlock = memo<{
     <View className="gap-2">
       <View className="flex-row items-center gap-2 mb-1">
         <View className="rounded-full bg-primary/10 p-1.5">
-          <ListTodo color={themeColors.primary} size={14} strokeWidth={2} />
+          <ListTodo color={colors.primary} size={14} strokeWidth={2} />
         </View>
         <Text className="text-[13px] font-medium text-foreground flex-1" numberOfLines={1}>
           {title}
         </Text>
         <View
           className="rounded-full px-2 py-0.5"
-          style={{ backgroundColor: themeColors.primary + '15' }}
+          style={{ backgroundColor: colors.primary + '15' }}
         >
-          <Text className="text-[11px] font-medium" style={{ color: themeColors.primary }}>
+          <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
             {tagLabel}
           </Text>
         </View>
@@ -533,10 +537,7 @@ const GroupTasksBlock = memo<{
             ? (groupMembersById?.[task.agentId]?.title ?? task.agentId)
             : '';
           const taskTitle =
-            (task.metadata as Record<string, unknown>)?.taskTitle ??
-            task.taskDetail?.title ??
-            task.content?.slice(0, 60) ??
-            t.chatToolRunning;
+            String((task.metadata as Record<string, unknown>)?.taskTitle ?? task.taskDetail?.title ?? task.content?.slice(0, 60) ?? t.chatToolRunning ?? '');
           const status = task.taskDetail?.status;
           const isDone = status === 'completed' || status === 'Completed';
           const isError =
@@ -550,8 +551,8 @@ const GroupTasksBlock = memo<{
               className="rounded-xl px-3 py-2.5"
               key={task.id}
               style={{
-                backgroundColor: themeColors.overlay,
-                borderColor: themeColors.primaryBorder,
+                backgroundColor: colors.overlay,
+                borderColor: colors.primaryBorder,
                 borderWidth: 0.5,
               }}
             >
@@ -565,9 +566,9 @@ const GroupTasksBlock = memo<{
                   {taskTitle}
                 </Text>
                 {isDone ? (
-                  <Check color={themeColors.success} size={14} strokeWidth={2.5} />
+                  <Check color={colors.success} size={14} strokeWidth={2.5} />
                 ) : isError ? (
-                  <X color={themeColors.error} size={14} strokeWidth={2.5} />
+                  <X color={colors.danger} size={14} strokeWidth={2.5} />
                 ) : null}
               </View>
             </View>
@@ -585,6 +586,8 @@ const MessageBubble = memo<MessageBubbleProps>(
     const isToolMessage = message.role === 'tool';
     const { t } = useI18n();
     const toast = useToast();
+    const colors = useThemeColors();
+    const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
 
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content);
@@ -703,7 +706,18 @@ const MessageBubble = memo<MessageBubbleProps>(
       [downloadingFileId, t, toast],
     );
 
-    const mc = tokens.markdownColors;
+    const mc = useMemo(
+      () => ({
+        text: colors.markdownText,
+        heading: colors.markdownHeading,
+        codeInlineBg: colors.markdownCodeInlineBg,
+        codeInlineColor: colors.markdownCodeInlineColor,
+        codeBlockBg: colors.markdownCodeBlockBg,
+        codeBlockBorder: colors.border,
+        link: colors.markdownLink,
+      }),
+      [colors],
+    );
 
     const reasoningMarkdownStyles = {
       body: {
@@ -726,14 +740,14 @@ const MessageBubble = memo<MessageBubbleProps>(
     const tableStyles = {
       tableWrapper: { marginVertical: 8 },
       table: {
-        borderColor: themeColors.borderSubtle,
+        borderColor: colors.borderSubtle,
         borderRadius: 8,
         borderWidth: 0.5,
         overflow: 'hidden' as const,
       },
-      thead: { backgroundColor: themeColors.fillTertiary },
+      thead: { backgroundColor: colors.fillTertiary },
       th: {
-        borderColor: themeColors.borderSubtle,
+        borderColor: colors.borderSubtle,
         borderWidth: 0.5,
         color: mc.heading,
         flex: 1,
@@ -741,9 +755,9 @@ const MessageBubble = memo<MessageBubbleProps>(
         fontWeight: '600' as const,
         padding: 8,
       },
-      tr: { borderColor: themeColors.borderSubtle, borderBottomWidth: 0.5 },
+      tr: { borderColor: colors.borderSubtle, borderBottomWidth: 0.5 },
       td: {
-        borderColor: themeColors.borderSubtle,
+        borderColor: colors.borderSubtle,
         borderWidth: 0.5,
         color: mc.text,
         flex: 1,
@@ -816,7 +830,7 @@ const MessageBubble = memo<MessageBubbleProps>(
         marginTop: 6,
       },
       list_item: { marginBottom: 4 },
-      hr: { backgroundColor: themeColors.divider, height: 1, marginVertical: 12 },
+      hr: { backgroundColor: colors.divider, height: 1, marginVertical: 12 },
       ...tableStyles,
     };
 
@@ -824,7 +838,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       ...markdownStyles,
       body: {
         ...markdownStyles.body,
-        color: themeColors.userBubbleText,
+        color: colors.userBubbleText,
         flexShrink: 1,
         fontSize: 15,
         lineHeight: 20,
@@ -832,44 +846,44 @@ const MessageBubble = memo<MessageBubbleProps>(
       paragraph: { marginBottom: 2, marginTop: 2 },
       blockquote: {
         ...markdownStyles.blockquote,
-        borderLeftColor: themeColors.userBubbleTextMuted,
+        borderLeftColor: colors.userBubbleTextMuted,
       },
       blockquote_content: {
         ...markdownStyles.blockquote_content,
-        color: themeColors.userBubbleText,
+        color: colors.userBubbleText,
       },
       code_inline: {
         ...markdownStyles.code_inline,
-        backgroundColor: themeColors.userBubbleCodeBg,
-        color: themeColors.userBubbleText,
+        backgroundColor: colors.userBubbleCodeBg,
+        color: colors.userBubbleText,
       },
       fence: {
         ...markdownStyles.fence,
-        backgroundColor: themeColors.userBubbleTableBg,
-        borderColor: themeColors.userBubbleTableBorder,
+        backgroundColor: colors.userBubbleTableBg,
+        borderColor: colors.userBubbleTableBorder,
       },
       code_block: {
         ...markdownStyles.code_block,
-        backgroundColor: themeColors.userBubbleTableBg,
-        color: themeColors.userBubbleText,
+        backgroundColor: colors.userBubbleTableBg,
+        color: colors.userBubbleText,
       },
-      link: { color: themeColors.userBubbleLink },
-      heading1: { ...markdownStyles.heading1, color: themeColors.userBubbleText },
-      heading2: { ...markdownStyles.heading2, color: themeColors.userBubbleText },
-      heading3: { ...markdownStyles.heading3, color: themeColors.userBubbleText },
-      hr: { ...markdownStyles.hr, backgroundColor: themeColors.userBubbleHr },
-      table: { ...tableStyles.table, borderColor: themeColors.userBubbleTableBorder },
-      thead: { backgroundColor: themeColors.userBubbleTableBorder },
+      link: { color: colors.userBubbleLink },
+      heading1: { ...markdownStyles.heading1, color: colors.userBubbleText },
+      heading2: { ...markdownStyles.heading2, color: colors.userBubbleText },
+      heading3: { ...markdownStyles.heading3, color: colors.userBubbleText },
+      hr: { ...markdownStyles.hr, backgroundColor: colors.userBubbleHr },
+      table: { ...tableStyles.table, borderColor: colors.userBubbleTableBorder },
+      thead: { backgroundColor: colors.userBubbleTableBorder },
       th: {
         ...tableStyles.th,
-        borderColor: themeColors.userBubbleHr,
-        color: themeColors.userBubbleText,
+        borderColor: colors.userBubbleHr,
+        color: colors.userBubbleText,
       },
-      tr: { ...tableStyles.tr, borderColor: themeColors.userBubbleTableBg },
+      tr: { ...tableStyles.tr, borderColor: colors.userBubbleTableBg },
       td: {
         ...tableStyles.td,
-        borderColor: themeColors.userBubbleTableBorder,
-        color: themeColors.userBubbleText,
+        borderColor: colors.userBubbleTableBorder,
+        color: colors.userBubbleText,
       },
     };
 
@@ -1050,7 +1064,7 @@ const MessageBubble = memo<MessageBubbleProps>(
             <View className="mr-2.5 w-7 items-center pt-0.5">
               <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-foreground/[0.04]">
                 {message.role === 'groupTasks' ? (
-                  <ListTodo color={themeColors.primary} size={16} strokeWidth={2} />
+                  <ListTodo color={colors.primary} size={16} strokeWidth={2} />
                 ) : shouldShowGroupSpeaker ? (
                   <GroupSpeakerAvatar
                     fallbackLabel={groupSpeakerFallbackLabel}
@@ -1154,7 +1168,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                   style={
                     isUser
                       ? {
-                          shadowColor: semanticColors.primary,
+                          shadowColor: colors.primary,
                           shadowOffset: { width: 0, height: 1 },
                           shadowOpacity: 0.08,
                           shadowRadius: 4,
@@ -1169,7 +1183,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         isUser
                           ? undefined
                           : {
-                              backgroundColor: uiColors.codeBlockLight,
+                              backgroundColor: colors.codeBlockLight,
                               borderRadius: 16,
                               padding: 14,
                             }
@@ -1179,7 +1193,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         autoFocus
                         multiline
                         className="text-[15px] leading-6 min-h-[40px]"
-                        style={{ color: isUser ? themeColors.userBubbleText : mc.text }}
+                        style={{ color: isUser ? colors.userBubbleText : mc.text }}
                         value={editText}
                         onBlur={handleEditSubmit}
                         onChangeText={setEditText}
@@ -1190,14 +1204,14 @@ const MessageBubble = memo<MessageBubbleProps>(
                           className="px-3.5 py-1.5 rounded-full"
                           style={{
                             backgroundColor: isUser
-                              ? themeColors.userBubbleCodeBg
-                              : themeColors.markdownCodeInlineBg,
+                              ? colors.userBubbleCodeBg
+                              : colors.markdownCodeInlineBg,
                           }}
                           onPress={() => setIsEditing(false)}
                         >
                           <Text
                             style={{
-                              color: isUser ? themeColors.userBubbleText : mc.text,
+                              color: isUser ? colors.userBubbleText : mc.text,
                               fontSize: 12,
                               fontWeight: '500',
                             }}
@@ -1207,12 +1221,12 @@ const MessageBubble = memo<MessageBubbleProps>(
                         </TouchableOpacity>
                         <TouchableOpacity
                           className="px-3.5 py-1.5 rounded-full bg-primary"
-                          style={isUser ? { backgroundColor: themeColors.surface } : undefined}
+                          style={isUser ? { backgroundColor: colors.surface } : undefined}
                           onPress={handleEditSubmit}
                         >
                           <Text
                             style={{
-                              color: isUser ? themeColors.foreground : themeColors.userBubbleText,
+                              color: isUser ? colors.foreground : colors.userBubbleText,
                               fontSize: 12,
                               fontWeight: '500',
                             }}
@@ -1296,7 +1310,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[12px] font-medium"
-                                style={{ color: themeColors.info }}
+                                style={{ color: colors.info }}
                               >
                                 {t.chatShowLess}
                               </Text>
@@ -1330,7 +1344,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[13px] font-medium"
-                                style={{ color: themeColors.info }}
+                                style={{ color: colors.info }}
                               >
                                 {t.chatShowMore}
                               </Text>
@@ -1341,7 +1355,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <ToolResultBlock message={message} />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
-                          <TypingIndicator color={uiColors.typingIndicator} />
+                          <TypingIndicator color={colors.typingIndicator} />
                         )
                       ) : multimodalContentParts?.length ? (
                         <RichContentPartsBlock
@@ -1384,7 +1398,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[12px] font-medium"
-                                style={{ color: themeColors.info }}
+                                style={{ color: colors.info }}
                               >
                                 {contentCollapsed ? t.chatShowMore : t.chatShowLess}
                               </Text>
@@ -1433,10 +1447,10 @@ const MessageBubble = memo<MessageBubbleProps>(
                       accessibilityLabel={t.msgActionRegenerate}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: themeColors.fillTertiary }}
+                      style={{ backgroundColor: colors.fillTertiary }}
                       onPress={handleRegenerate}
                     >
-                      <RefreshCw color={semanticColors.muted} size={14} strokeWidth={2} />
+                      <RefreshCw color={colors.muted} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
                   {isUser && (
@@ -1444,49 +1458,49 @@ const MessageBubble = memo<MessageBubbleProps>(
                       accessibilityLabel={t.msgActionEdit}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: themeColors.fillTertiary }}
+                      style={{ backgroundColor: colors.fillTertiary }}
                       onPress={handleEdit}
                     >
-                      <Pencil color={semanticColors.muted} size={14} strokeWidth={2} />
+                      <Pencil color={colors.muted} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
                     accessibilityLabel={t.msgActionCopy}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: themeColors.fillTertiary }}
+                    style={{ backgroundColor: colors.fillTertiary }}
                     onPress={handleCopy}
                   >
-                    <Copy color={semanticColors.muted} size={14} strokeWidth={2} />
+                    <Copy color={colors.muted} size={14} strokeWidth={2} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     accessibilityLabel={t.msgActionShare}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: themeColors.fillTertiary }}
+                    style={{ backgroundColor: colors.fillTertiary }}
                     onPress={handleShare}
                   >
-                    <Share2 color={semanticColors.muted} size={14} strokeWidth={2} />
+                    <Share2 color={colors.muted} size={14} strokeWidth={2} />
                   </TouchableOpacity>
                   {!isUser && onSaveToTopic && (
                     <TouchableOpacity
                       accessibilityLabel={t.msgActionSaveToTopic}
                       activeOpacity={0.5}
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{ backgroundColor: themeColors.fillTertiary }}
+                      style={{ backgroundColor: colors.fillTertiary }}
                       onPress={handleSaveToTopic}
                     >
-                      <Bookmark color={semanticColors.muted} size={14} strokeWidth={2} />
+                      <Bookmark color={colors.muted} size={14} strokeWidth={2} />
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
                     accessibilityLabel={t.msgActionDelete}
                     activeOpacity={0.5}
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: themeColors.fillTertiary }}
+                    style={{ backgroundColor: colors.fillTertiary }}
                     onPress={handleDelete}
                   >
-                    <Trash2 color={semanticColors.danger} size={14} strokeWidth={2} />
+                    <Trash2 color={colors.danger} size={14} strokeWidth={2} />
                   </TouchableOpacity>
                 </Animated.View>
               )}
@@ -1648,7 +1662,9 @@ const RichContentPartsBlock = memo<{
   markdownStyles: Record<string, any>;
   onOpenLink: (url?: string) => void;
   parts: MessageContentPart[];
-}>(({ parts, markdownStyles, onOpenLink, citations }) => (
+}>(({ parts, markdownStyles, onOpenLink, citations }) => {
+  const colors = useThemeColors();
+  return (
   <View className="gap-2">
     {parts.map((part, index) => {
       if (part.type === 'image' && part.image) {
@@ -1658,7 +1674,7 @@ const RichContentPartsBlock = memo<{
             resizeMode="cover"
             source={{ uri: part.image }}
             style={{
-              backgroundColor: themeColors.fillTertiary,
+              backgroundColor: colors.fillTertiary,
               borderRadius: 16,
               height: 180,
               width: '100%',
@@ -1686,7 +1702,8 @@ const RichContentPartsBlock = memo<{
       return null;
     })}
   </View>
-));
+  );
+});
 
 RichContentPartsBlock.displayName = 'RichContentPartsBlock';
 
@@ -1697,7 +1714,17 @@ const AttachmentBlock = memo<{
   isUser: boolean;
   onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenImage: (url: string) => void;
-}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId }) => (
+}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId }) => {
+  const colors = useThemeColors();
+  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
+  const mc = useMemo(
+    () => ({
+      heading: colors.markdownHeading,
+      text: colors.markdownText,
+    }),
+    [colors],
+  );
+  return (
   <View className="gap-2">
     {imageList?.length ? (
       <ScrollView
@@ -1714,7 +1741,7 @@ const AttachmentBlock = memo<{
             <RNImage
               source={{ uri: image.url }}
               style={{
-                backgroundColor: isUser ? themeColors.userBubbleSubtleBg : chatAccent.subtleBg,
+                backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
                 borderRadius: 14,
                 height: 120,
                 width: 120,
@@ -1733,7 +1760,7 @@ const AttachmentBlock = memo<{
             className="rounded-2xl px-3 py-2"
             key={file.id}
             style={{
-              backgroundColor: isUser ? themeColors.userBubbleSubtleBg : chatAccent.subtleBg,
+              backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
             }}
             onPress={() => onOpenFile(file)}
           >
@@ -1742,7 +1769,7 @@ const AttachmentBlock = memo<{
                 <Text
                   numberOfLines={1}
                   style={{
-                    color: isUser ? themeColors.userBubbleText : tokens.markdownColors.heading,
+                    color: isUser ? colors.userBubbleText : mc.heading,
                     fontSize: 13,
                     fontWeight: '600',
                   }}
@@ -1753,8 +1780,8 @@ const AttachmentBlock = memo<{
                   numberOfLines={1}
                   style={{
                     color: isUser
-                      ? themeColors.userBubbleTextMuted
-                      : tokens.markdownColors.text + '88',
+                      ? colors.userBubbleTextMuted
+                      : mc.text + '88',
                     fontSize: 12,
                     marginTop: 2,
                   }}
@@ -1764,12 +1791,12 @@ const AttachmentBlock = memo<{
               </View>
               {downloadingFileId === file.id ? (
                 <ActivityIndicator
-                  color={isUser ? themeColors.userBubbleText : chatAccent.badgeText}
+                  color={isUser ? colors.userBubbleText : chatAccent.badgeText}
                   size="small"
                 />
               ) : (
                 <Download
-                  color={isUser ? themeColors.userBubbleText : chatAccent.badgeText}
+                  color={isUser ? colors.userBubbleText : chatAccent.badgeText}
                   size={16}
                   strokeWidth={1.9}
                 />
@@ -1780,7 +1807,8 @@ const AttachmentBlock = memo<{
       </View>
     ) : null}
   </View>
-));
+  );
+});
 
 AttachmentBlock.displayName = 'AttachmentBlock';
 
@@ -1789,6 +1817,8 @@ const CitationFootnotesBlock = memo<{
   onOpenLink: (url?: string) => void;
 }>(({ citations, onOpenLink }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
+  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const visibleCitations = citations.filter((item) => !!item.url);
 
   if (visibleCitations.length === 0) return null;
@@ -1848,6 +1878,8 @@ CitationFootnotesBlock.displayName = 'CitationFootnotesBlock';
 const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
+  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const [expanded, setExpanded] = useState(true);
 
   const webCount = search.citations?.length ?? 0;
@@ -1887,7 +1919,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
         onPress={() => setExpanded((value) => !value)}
       >
         <View className="flex-row items-center flex-1">
-          <Globe color={semanticColors.primary} size={14} strokeWidth={2} />
+          <Globe color={colors.primary} size={14} strokeWidth={2} />
           <Text className="ml-2 text-[12px] font-medium text-foreground/65">
             {title} {count > 0 ? `(${count})` : ''}
           </Text>
@@ -1898,7 +1930,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                   key={`${uri}-${index}`}
                   source={{ uri }}
                   style={{
-                    backgroundColor: themeColors.surface,
+                    backgroundColor: colors.surface,
                     borderRadius: 8,
                     height: 16,
                     marginLeft: index === 0 ? 0 : -4,
@@ -1911,9 +1943,9 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
           ) : null}
         </View>
         {expanded ? (
-          <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+          <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
         ) : (
-          <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+          <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
         )}
       </TouchableOpacity>
 
@@ -2087,27 +2119,28 @@ const ToolStatusIcon = memo<{
   resultReady?: boolean;
   status?: 'aborted' | 'pending' | 'rejected' | string | null;
 }>(({ status, resultReady, error }) => {
+  const colors = useThemeColors();
   if (status === 'aborted') {
-    return <Pause color={themeColors.tertiaryText} size={12} strokeWidth={2.25} />;
+    return <Pause color={colors.tertiaryText} size={12} strokeWidth={2.25} />;
   }
 
   if (status === 'rejected') {
-    return <Ban color={themeColors.tertiaryText} size={12} strokeWidth={2.25} />;
+    return <Ban color={colors.tertiaryText} size={12} strokeWidth={2.25} />;
   }
 
   if (status === 'pending') {
-    return <Hand color={themeColors.info} size={12} strokeWidth={2.1} />;
+    return <Hand color={colors.info} size={12} strokeWidth={2.1} />;
   }
 
   if (error) {
-    return <X color={themeColors.danger} size={12} strokeWidth={2.4} />;
+    return <X color={colors.danger} size={12} strokeWidth={2.4} />;
   }
 
   if (resultReady) {
-    return <Check color={themeColors.iconSuccess} size={12} strokeWidth={2.4} />;
+    return <Check color={colors.iconSuccess} size={12} strokeWidth={2.4} />;
   }
 
-  return <ActivityIndicator color={semanticColors.muted} size="small" />;
+  return <ActivityIndicator color={colors.muted} size="small" />;
 });
 
 ToolStatusIcon.displayName = 'ToolStatusIcon';
@@ -2130,6 +2163,7 @@ const ToolStatusLabel = memo<{
 ToolStatusLabel.displayName = 'ToolStatusLabel';
 
 const ToolContentCopyButton = memo<{ text: string }>(({ text }) => {
+  const colors = useThemeColors();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -2147,9 +2181,9 @@ const ToolContentCopyButton = memo<{ text: string }>(({ text }) => {
       onPress={handleCopy}
     >
       {copied ? (
-        <Check color={themeColors.iconSuccess} size={12} strokeWidth={2} />
+        <Check color={colors.iconSuccess} size={12} strokeWidth={2} />
       ) : (
-        <Copy color={themeColors.iconMuted} size={12} strokeWidth={2} />
+        <Copy color={colors.iconMuted} size={12} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );
@@ -2180,6 +2214,8 @@ const ToolCard = memo<{
     onReject,
   }) => {
     const { t } = useI18n();
+    const colors = useThemeColors();
+    const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
     const isPending = status === 'pending';
     const isRejected = status === 'rejected';
     const isAborted = status === 'aborted';
@@ -2196,7 +2232,7 @@ const ToolCard = memo<{
         className="rounded-2xl px-3 py-3"
         disabled={!collapsible}
         style={{
-          backgroundColor: isPending ? themeColors.infoSubtle : chatAccent.elevatedBg,
+          backgroundColor: isPending ? colors.infoSubtle : chatAccent.elevatedBg,
         }}
         onPress={() => {
           if (collapsible) setExpanded((value) => !value);
@@ -2206,7 +2242,7 @@ const ToolCard = memo<{
           <View
             className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg"
             style={{
-              backgroundColor: isPending ? themeColors.infoMuted : chatAccent.badgeBg,
+              backgroundColor: isPending ? colors.infoMuted : chatAccent.badgeBg,
             }}
           >
             <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
@@ -2221,9 +2257,9 @@ const ToolCard = memo<{
               </Text>
               {collapsible ? (
                 expanded ? (
-                  <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.3} />
+                  <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.3} />
                 ) : (
-                  <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.3} />
+                  <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.3} />
                 )
               ) : null}
             </View>
@@ -2240,22 +2276,22 @@ const ToolCard = memo<{
                   <TouchableOpacity
                     activeOpacity={0.7}
                     className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: themeColors.infoMuted }}
+                    style={{ backgroundColor: colors.infoMuted }}
                     onPress={onApprove}
                   >
-                    <Text className="text-[12px] font-semibold" style={{ color: themeColors.info }}>
+                    <Text className="text-[12px] font-semibold" style={{ color: colors.info }}>
                       {t.chatToolApprove}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: themeColors.dangerMuted }}
+                    style={{ backgroundColor: colors.dangerMuted }}
                     onPress={onReject}
                   >
                     <Text
                       className="text-[12px] font-semibold"
-                      style={{ color: themeColors.danger }}
+                      style={{ color: colors.danger }}
                     >
                       {t.chatToolReject}
                     </Text>
@@ -2267,7 +2303,7 @@ const ToolCard = memo<{
             {showDetail && isRejected && (
               <Text
                 className="mt-2 text-[11px] leading-4"
-                style={{ color: themeColors.tertiaryText }}
+                style={{ color: colors.tertiaryText }}
               >
                 {t.chatToolRejectedDesc}
               </Text>
@@ -2276,7 +2312,7 @@ const ToolCard = memo<{
             {showDetail && isAborted && (
               <Text
                 className="mt-2 text-[11px] leading-4"
-                style={{ color: themeColors.tertiaryText }}
+                style={{ color: colors.tertiaryText }}
               >
                 {t.chatToolAbortedDesc}
               </Text>
@@ -2331,7 +2367,7 @@ const ToolCard = memo<{
                       setContentExpanded((v) => !v);
                     }}
                   >
-                    <Text className="text-[11px] font-medium" style={{ color: themeColors.info }}>
+                    <Text className="text-[11px] font-medium" style={{ color: colors.info }}>
                       {contentExpanded ? t.chatShowLess : t.chatShowMore}
                     </Text>
                   </TouchableOpacity>
@@ -2339,7 +2375,7 @@ const ToolCard = memo<{
               </>
             ) : null}
             {showDetail && error ? (
-              <Text className="mt-2 text-[11px] leading-4" style={{ color: themeColors.danger }}>
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: colors.danger }}>
                 {typeof error === 'string' ? error : t.chatToolFailed}
               </Text>
             ) : null}
@@ -2359,6 +2395,8 @@ ToolCard.displayName = 'ToolCard';
 
 const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
+  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
   const allCompleted = tools.every((tool) => tool.result_content || tool.result_msg_id);
   const [expanded, setExpanded] = useState(true);
@@ -2367,7 +2405,7 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
     <View
       className="mb-2 rounded-2xl px-3 py-2"
       style={{
-        backgroundColor: hasPending ? themeColors.infoSubtle : chatAccent.sectionBg,
+        backgroundColor: hasPending ? colors.infoSubtle : chatAccent.sectionBg,
       }}
     >
       <TouchableOpacity
@@ -2381,10 +2419,10 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
             strokeWidth={2}
             color={
               hasPending
-                ? themeColors.info
+                ? colors.info
                 : allCompleted
-                  ? themeColors.iconSuccess
-                  : uiColors.textGray
+                  ? colors.iconSuccess
+                  : colors.textGray
             }
           />
           <Text className="ml-2 text-[12px] font-medium text-foreground/65">
@@ -2393,9 +2431,9 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
           {hasPending && (
             <View
               className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: themeColors.infoMuted }}
+              style={{ backgroundColor: colors.infoMuted }}
             >
-              <Text className="text-[9px] font-semibold" style={{ color: themeColors.info }}>
+              <Text className="text-[9px] font-semibold" style={{ color: colors.info }}>
                 {t.chatToolPending}
               </Text>
             </View>
@@ -2403,18 +2441,18 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
           {allCompleted && !hasPending && (
             <View
               className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: themeColors.successMuted }}
+              style={{ backgroundColor: colors.successMuted }}
             >
-              <Text className="text-[9px] font-semibold" style={{ color: themeColors.iconSuccess }}>
+              <Text className="text-[9px] font-semibold" style={{ color: colors.iconSuccess }}>
                 {t.chatToolCompleted || 'Done'}
               </Text>
             </View>
           )}
         </View>
         {expanded ? (
-          <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+          <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
         ) : (
-          <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+          <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
         )}
       </TouchableOpacity>
 
@@ -2492,6 +2530,7 @@ interface UsageStatsModalProps {
 
 const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model, onClose }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
 
   const uncached =
     usage.inputCacheMissTokens ?? (usage.totalInputTokens ?? 0) - (usage.inputCachedTokens ?? 0);
@@ -2502,9 +2541,9 @@ const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model,
   const ttft = performance?.ttft;
 
   const rows: [string, string, string?][] = [
-    [t.msgStatUncachedInput, uncached.toLocaleString(), themeColors.tertiaryText],
-    [t.msgStatCachedInput, cached.toLocaleString(), uiColors.cachedToken],
-    [t.msgStatOutput, output.toLocaleString(), themeColors.iconSuccess],
+    [t.msgStatUncachedInput, uncached.toLocaleString(), colors.tertiaryText],
+    [t.msgStatCachedInput, cached.toLocaleString(), colors.cachedToken],
+    [t.msgStatOutput, output.toLocaleString(), colors.iconSuccess],
   ];
 
   return (
@@ -2518,39 +2557,39 @@ const UsageStatsModal = memo<UsageStatsModalProps>(({ usage, performance, model,
       <TouchableOpacity
         activeOpacity={1}
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: uiColors.modalOverlay }}
+        style={{ backgroundColor: colors.modalOverlay }}
         onPress={onClose}
       >
         <TouchableOpacity activeOpacity={1} onPress={() => {}}>
           <View
             className="rounded-2xl p-5 mx-8"
-            style={{ minWidth: 280, backgroundColor: uiColors.modalDarkBg }}
+            style={{ minWidth: 280, backgroundColor: colors.modalDarkBg }}
           >
             {/* Progress bar */}
             <View
               className="h-2 rounded-full overflow-hidden flex-row mb-4"
-              style={{ backgroundColor: uiColors.progressBarTrack }}
+              style={{ backgroundColor: colors.progressBarTrack }}
             >
               {total > 0 && (
                 <>
                   <View
                     style={{
                       flex: uncached / total,
-                      backgroundColor: themeColors.tertiaryText,
+                      backgroundColor: colors.tertiaryText,
                       borderRadius: 4,
                     }}
                   />
                   <View
                     style={{
                       flex: cached / total,
-                      backgroundColor: uiColors.cachedToken,
+                      backgroundColor: colors.cachedToken,
                       borderRadius: 4,
                     }}
                   />
                   <View
                     style={{
                       flex: output / total,
-                      backgroundColor: themeColors.iconSuccess,
+                      backgroundColor: colors.iconSuccess,
                       borderRadius: 4,
                     }}
                   />
@@ -2623,6 +2662,8 @@ interface ThinkingBlockProps {
 const ThinkingBlock = memo<ThinkingBlockProps>(
   ({ content, duration, isMultimodal, markdownStyles, tempDisplayContent, thinking }) => {
     const { t } = useI18n();
+    const colors = useThemeColors();
+    const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
     const [expanded, setExpanded] = useState(thinking ?? false);
 
     useEffect(() => {
@@ -2644,14 +2685,14 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
         >
           {thinking ? (
             <ActivityIndicator
-              color={semanticColors.primary}
+              color={colors.primary}
               size={12}
               style={{ marginRight: 4 }}
             />
           ) : expanded ? (
-            <ChevronDown color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+            <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
           ) : (
-            <ChevronRight color={themeColors.iconMuted} size={14} strokeWidth={2.5} />
+            <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
           )}
           {thinking ? (
             <Text className="text-primary text-[12px] font-medium ml-1">{t.chatThinking}</Text>
@@ -2704,6 +2745,7 @@ const ErrorBlock = memo<{
   onRetry?: () => void;
 }>(({ error, onRetry }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [showBody, setShowBody] = useState(false);
 
   const errorBody = error.body
@@ -2724,13 +2766,13 @@ const ErrorBlock = memo<{
   return (
     <View
       className="mt-2 rounded-2xl px-3 py-3"
-      style={{ backgroundColor: themeColors.dangerMuted }}
+      style={{ backgroundColor: colors.dangerMuted }}
     >
       <View className="flex-row items-center mb-1">
-        <AlertTriangle color={themeColors.danger} size={14} strokeWidth={2} />
+        <AlertTriangle color={colors.danger} size={14} strokeWidth={2} />
         <Text
           className="ml-1.5 text-[13px] font-semibold flex-1"
-          style={{ color: themeColors.danger }}
+          style={{ color: colors.danger }}
         >
           {errorTypeLabel}
         </Text>
@@ -2745,7 +2787,7 @@ const ErrorBlock = memo<{
             className="mt-1.5"
             onPress={() => setShowBody((v) => !v)}
           >
-            <Text className="text-[11px] font-medium" style={{ color: themeColors.danger }}>
+            <Text className="text-[11px] font-medium" style={{ color: colors.danger }}>
               {showBody ? t.chatShowLess : t.chatShowMore}
             </Text>
           </TouchableOpacity>
@@ -2755,7 +2797,7 @@ const ErrorBlock = memo<{
                 selectable
                 className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/50"
                 style={{
-                  backgroundColor: themeColors.dangerSubtle,
+                  backgroundColor: colors.dangerSubtle,
                   fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                 }}
               >
@@ -2769,10 +2811,10 @@ const ErrorBlock = memo<{
         <TouchableOpacity
           activeOpacity={0.7}
           className="mt-2 self-start rounded-full px-4 py-1.5"
-          style={{ backgroundColor: themeColors.dangerMuted }}
+          style={{ backgroundColor: colors.dangerMuted }}
           onPress={onRetry}
         >
-          <Text className="text-[12px] font-semibold" style={{ color: themeColors.danger }}>
+          <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>
             {t.retry}
           </Text>
         </TouchableOpacity>

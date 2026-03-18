@@ -13,7 +13,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -37,6 +39,7 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin, MobileMemoryEffort } from '../types';
@@ -261,7 +264,7 @@ function ChoicePill({
     >
       <Text
         className="text-[12px] font-semibold"
-        style={{ color: active ? '#fff' : colors.foreground }}
+        style={{ color: active ? colors.iconOnPrimary : colors.foreground }}
       >
         {label}
       </Text>
@@ -336,9 +339,24 @@ function SkillRow({
 function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
   const { t } = useI18n();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const openStore = useCallback(() => {
+    const routeNames: string[] = navigation?.getState?.()?.routeNames ?? [];
+
+    if (routeNames.includes('Store')) {
+      navigation?.navigate?.('Store');
+      return;
+    }
+
+    navigation?.navigate?.('MainTabs', { screen: 'Store' });
+  }, [navigation]);
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         rightAccessibilityLabel={t.accessibilityOpenStore}
         title={t.agentConfigTitle}
@@ -349,9 +367,13 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
           <Save color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
         onPressLeft={() => navigation.goBack()}
-        onPressRight={() => navigation.navigate('Store')}
+        onPressRight={openStore}
       />
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 48, paddingTop: 16 }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 48, paddingTop: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionCard title={t.agentConfigSessionOnlyTitle}>
           <Text className="text-[15px] leading-6 text-foreground/78">
             {t.agentConfigSessionOnlyDesc}
@@ -359,13 +381,13 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
           <TouchableOpacity
             activeOpacity={0.85}
             className="mt-4 self-start rounded-xl bg-primary px-4 py-2.5"
-            onPress={() => navigation.navigate('Store')}
+            onPress={openStore}
           >
             <Text className="text-[13px] font-semibold text-white">{t.agentConfigOpenStore}</Text>
           </TouchableOpacity>
         </SectionCard>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -379,6 +401,7 @@ function SessionAgentConfigScreen({
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const modelProviders = useModelStore((s) => s.providers);
@@ -646,7 +669,11 @@ function SessionAgentConfigScreen({
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
@@ -665,7 +692,11 @@ function SessionAgentConfigScreen({
         onPressRight={() => void handleSave()}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionCard title={t.agentConfigModal}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -1041,10 +1072,10 @@ function SessionAgentConfigScreen({
                 </>
               )}
             </ScrollView>
-          </Pressable>
         </Pressable>
-      </Modal>
-    </View>
+      </Pressable>
+    </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1052,6 +1083,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const modelProviders = useModelStore((s) => s.providers);
   const fetchModels = useModelStore((s) => s.fetchModels);
@@ -1306,7 +1338,11 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
@@ -1325,7 +1361,11 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
         onPressRight={() => void handleSave()}
       />
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 56, paddingTop: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionCard title={t.agentConfigModal}>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -1683,7 +1723,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

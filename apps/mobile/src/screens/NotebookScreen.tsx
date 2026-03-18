@@ -14,6 +14,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -26,78 +27,87 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { semanticColors } from '../constants/colors';
 import { notebookApi, type NotebookDocument, topicApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const PERSONAL_TOPIC_KEY = 'avato_personal_notebook_topic_id';
 
-// ── Markdown Styles ──────────────────────────────────────────────────
-
-const mdStyles = {
-  body: { color: '#1a1a1a', fontSize: 15, lineHeight: 24 },
-  heading1: {
-    color: semanticColors.foreground,
-    fontSize: 24,
-    fontWeight: '700' as const,
-    marginBottom: 12,
-    marginTop: 20,
-  },
-  heading2: {
-    color: semanticColors.foreground,
-    fontSize: 20,
-    fontWeight: '700' as const,
-    marginBottom: 10,
-    marginTop: 18,
-  },
-  heading3: {
-    color: semanticColors.foreground,
-    fontSize: 17,
-    fontWeight: '600' as const,
-    marginBottom: 8,
-    marginTop: 14,
-  },
-  paragraph: { marginBottom: 12 },
-  bullet_list: { marginBottom: 12 },
-  ordered_list: { marginBottom: 12 },
-  list_item: { marginBottom: 4 },
-  code_inline: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 4,
-    color: '#e11d48',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  fence: {
-    backgroundColor: '#1e1e2e',
-    borderRadius: 12,
-    color: '#cdd6f4',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 12,
-    padding: 14,
-  },
-  blockquote: {
-    backgroundColor: '#f8fafc',
-    borderColor: semanticColors.primary,
-    borderLeftWidth: 3,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  hr: { backgroundColor: '#e5e7eb', height: 1, marginVertical: 16 },
-  link: { color: semanticColors.primary },
-  strong: { fontWeight: '600' as const },
-  table: { borderColor: '#e5e7eb', borderWidth: 0.5 },
-  th: { backgroundColor: '#f9fafb', padding: 8 },
-  td: { borderColor: '#e5e7eb', borderWidth: 0.5, padding: 8 },
-};
+function getMdStyles(colors: {
+  foreground: string;
+  primary: string;
+  markdownCodeInlineBg: string;
+  markdownCodeInlineColor: string;
+  markdownCodeBlockBg: string;
+  markdownText: string;
+  fillTertiary: string;
+  divider: string;
+}) {
+  return {
+    body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
+    heading1: {
+      color: colors.foreground,
+      fontSize: 24,
+      fontWeight: '700' as const,
+      marginBottom: 12,
+      marginTop: 20,
+    },
+    heading2: {
+      color: colors.foreground,
+      fontSize: 20,
+      fontWeight: '700' as const,
+      marginBottom: 10,
+      marginTop: 18,
+    },
+    heading3: {
+      color: colors.foreground,
+      fontSize: 17,
+      fontWeight: '600' as const,
+      marginBottom: 8,
+      marginTop: 14,
+    },
+    paragraph: { marginBottom: 12 },
+    bullet_list: { marginBottom: 12 },
+    ordered_list: { marginBottom: 12 },
+    list_item: { marginBottom: 4 },
+    code_inline: {
+      backgroundColor: colors.markdownCodeInlineBg,
+      borderRadius: 4,
+      color: colors.markdownCodeInlineColor,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 13,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+    },
+    fence: {
+      backgroundColor: colors.markdownCodeBlockBg,
+      borderRadius: 12,
+      color: colors.markdownText,
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 13,
+      lineHeight: 20,
+      marginBottom: 12,
+      padding: 14,
+    },
+    blockquote: {
+      backgroundColor: colors.fillTertiary,
+      borderColor: colors.primary,
+      borderLeftWidth: 3,
+      marginBottom: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    hr: { backgroundColor: colors.divider, height: 1, marginVertical: 16 },
+    link: { color: colors.primary },
+    strong: { fontWeight: '600' as const },
+    table: { borderColor: colors.divider, borderWidth: 0.5 },
+    th: { backgroundColor: colors.fillTertiary, padding: 8 },
+    td: { borderColor: colors.divider, borderWidth: 0.5, padding: 8 },
+  };
+}
 
 // ── Document Editor ──────────────────────────────────────────────────
 
@@ -113,6 +123,7 @@ function DocEditor({
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   const [title, setTitle] = useState(doc.title || '');
   const [content, setContent] = useState(doc.content || '');
@@ -165,8 +176,9 @@ function DocEditor({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
     >
       {/* Header */}
       <View
@@ -179,7 +191,7 @@ function DocEditor({
           onPress={handleBack}
         >
           <ArrowLeft
-            color={semanticColors.foreground}
+            color={colors.foreground}
             size={22}
             strokeWidth={tokens.icon.strokeWidth}
           />
@@ -189,22 +201,22 @@ function DocEditor({
           {/* Preview / Edit toggle */}
           <TouchableOpacity
             className="flex-row items-center rounded-full px-3 py-1.5"
-            style={{ backgroundColor: previewing ? `${semanticColors.primary}10` : '#f3f4f6' }}
+            style={{ backgroundColor: previewing ? `${colors.primary}10` : colors.fillTertiary }}
             onPress={() => setPreviewing(!previewing)}
           >
             {previewing ? (
               <>
-                <Edit3 color={semanticColors.primary} size={14} strokeWidth={2} />
+                <Edit3 color={colors.primary} size={14} strokeWidth={2} />
                 <Text
                   className="text-[12px] font-semibold ml-1.5"
-                  style={{ color: semanticColors.primary }}
+                  style={{ color: colors.primary }}
                 >
                   {t.notebookEdit}
                 </Text>
               </>
             ) : (
               <>
-                <Eye color={semanticColors.muted} size={14} strokeWidth={2} />
+                <Eye color={colors.muted} size={14} strokeWidth={2} />
                 <Text className="text-[12px] font-semibold text-secondary/60 ml-1.5">
                   {t.notebookPreview}
                 </Text>
@@ -216,7 +228,7 @@ function DocEditor({
           <TouchableOpacity disabled={saving || !hasChanges} onPress={handleSave}>
             <Text
               className="text-[15px] font-semibold"
-              style={{ color: hasChanges ? semanticColors.primary : semanticColors.secondaryText }}
+              style={{ color: hasChanges ? colors.primary : colors.secondaryText }}
             >
               {t.save}
             </Text>
@@ -241,7 +253,7 @@ function DocEditor({
             <TextInput
               className="text-[22px] font-bold text-foreground tracking-tight"
               placeholder={t.notebookDocTitlePlaceholder}
-              placeholderTextColor={semanticColors.secondaryText}
+              placeholderTextColor={colors.secondaryText}
               value={title}
               onChangeText={setTitle}
             />
@@ -252,7 +264,7 @@ function DocEditor({
         <View className="px-5 pt-2">
           {previewing ? (
             content.trim() ? (
-              <Markdown rules={codeInlineRules} style={mdStyles}>
+              <Markdown rules={codeInlineRules} style={getMdStyles(colors)}>
                 {content}
               </Markdown>
             ) : (
@@ -265,7 +277,7 @@ function DocEditor({
               multiline
               className="text-foreground text-[15px] leading-6"
               placeholder={t.notebookDocContentPlaceholder}
-              placeholderTextColor={semanticColors.secondaryText}
+              placeholderTextColor={colors.secondaryText}
               style={{ minHeight: 400, textAlignVertical: 'top' }}
               value={content}
               onChangeText={setContent}
@@ -285,6 +297,7 @@ export default function NotebookScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
+  const colors = useThemeColors();
 
   const [topicId, setTopicId] = useState<string | null>(initialTopicId || null);
   const [documents, setDocuments] = useState<NotebookDocument[]>([]);
@@ -433,7 +446,7 @@ export default function NotebookScreen({ route, navigation }: any) {
           title={t.notebookTitle}
           leftElement={
             <ArrowLeft
-              color={semanticColors.primary}
+              color={colors.primary}
               size={22}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -445,7 +458,7 @@ export default function NotebookScreen({ route, navigation }: any) {
       {/* Content */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={semanticColors.primary} size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : documents.length === 0 ? (
         <Animated.View
@@ -463,7 +476,7 @@ export default function NotebookScreen({ route, navigation }: any) {
             className="items-center justify-center rounded-3xl bg-foreground/5 mb-5"
             style={{ width: 80, height: 80 }}
           >
-            <NotebookPen color={semanticColors.secondaryText} size={36} strokeWidth={1.5} />
+            <NotebookPen color={colors.secondaryText} size={36} strokeWidth={1.5} />
           </View>
           <Text className="text-foreground text-[17px] font-semibold text-center">
             {t.notebookEmpty}
@@ -473,10 +486,10 @@ export default function NotebookScreen({ route, navigation }: any) {
           </Text>
           <PressableScale
             className="flex-row items-center gap-2 px-6 py-3.5 rounded-xl"
-            style={{ backgroundColor: semanticColors.primary }}
+            style={{ backgroundColor: colors.primary }}
             onPress={handleCreate}
           >
-            <Plus color="#fff" size={18} strokeWidth={2.5} />
+            <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
             <Text className="text-white text-[15px] font-semibold">{t.notebookNewDoc}</Text>
           </PressableScale>
         </Animated.View>
@@ -505,7 +518,7 @@ export default function NotebookScreen({ route, navigation }: any) {
                 className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
                 style={{ width: 44, height: 44 }}
               >
-                <FileText color={semanticColors.primary} size={20} strokeWidth={1.5} />
+                <FileText color={colors.primary} size={20} strokeWidth={1.5} />
               </View>
 
               <View style={{ flex: 1, minWidth: 0 }}>

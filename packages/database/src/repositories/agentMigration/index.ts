@@ -223,4 +223,107 @@ export class AgentMigrationRepo {
         .where(and(eq(agents.id, item.agentId), eq(agents.userId, this.userId)));
     }
   };
+
+  /**
+   * Runtime migration: bind legacy session-only chats to real agents.
+   *
+   * Legacy data may have:
+   * - sessions.type = 'agent'
+   * - no agents_to_sessions relation
+   * - session.config stores agent-like fields
+   *
+   * This method creates a non-virtual agent for each orphan session, links it,
+   * and backfills topic/message agentId for that session.
+   */
+  migrateSessionOnlyAgentBindings = async (sessionIds?: string[]): Promise<number> => {
+    const baseConditions = [eq(sessions.userId, this.userId), eq(sessions.type, 'agent')];
+    if (sessionIds && sessionIds.length > 0) {
+      baseConditions.push(inArray(sessions.id, sessionIds));
+    }
+
+    const orphanSessions = await this.db
+      .select({
+        avatar: sessions.avatar,
+        backgroundColor: sessions.backgroundColor,
+        config: sessions.config,
+        description: sessions.description,
+        groupId: sessions.groupId,
+        id: sessions.id,
+        title: sessions.title,
+      })
+      .from(sessions)
+      .leftJoin(agentsToSessions, eq(agentsToSessions.sessionId, sessions.id))
+      .where(and(...baseConditions, isNull(agentsToSessions.agentId)));
+
+    if (orphanSessions.length === 0) return 0;
+
+    let migratedCount = 0;
+
+    for (const session of orphanSessions) {
+      const created = await this.db.transaction(async (tx) => {
+        const [existingRelation] = await tx
+          .select({ agentId: agentsToSessions.agentId })
+          .from(agentsToSessions)
+          .where(
+            and(
+              eq(agentsToSessions.userId, this.userId),
+              eq(agentsToSessions.sessionId, session.id),
+            ),
+          )
+          .limit(1);
+
+        if (existingRelation?.agentId) return false;
+
+        const rawConfig =
+          session.config && typeof session.config === 'object'
+            ? (session.config as Record<string, unknown>)
+            : {};
+
+        const readString = (value: unknown) =>
+          typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+        const readStringArray = (value: unknown) =>
+          Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
+        const readObject = (value: unknown) =>
+          value && typeof value === 'object' && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : undefined;
+
+        const [createdAgent] = await tx
+          .insert(agents)
+          .values({
+            avatar: readString(rawConfig.avatar) ?? session.avatar ?? undefined,
+            backgroundColor:
+              readString(rawConfig.backgroundColor) ?? session.backgroundColor ?? undefined,
+            chatConfig: readObject(rawConfig.chatConfig) ?? {},
+            createdAt: new Date(),
+            description: readString(rawConfig.description) ?? session.description ?? undefined,
+            model: readString(rawConfig.model) ?? null,
+            params: readObject(rawConfig.params) ?? {},
+            plugins: readStringArray(rawConfig.plugins),
+            provider: readString(rawConfig.provider) ?? null,
+            sessionGroupId: session.groupId ?? undefined,
+            systemRole: readString(rawConfig.systemRole),
+            title: readString(rawConfig.title) ?? session.title ?? 'New Session',
+            updatedAt: new Date(),
+            userId: this.userId,
+            virtual: false,
+          })
+          .returning({ id: agents.id });
+
+        await tx.insert(agentsToSessions).values({
+          agentId: createdAgent.id,
+          sessionId: session.id,
+          userId: this.userId,
+        });
+
+        await this.migrateBySession(tx, { agentId: createdAgent.id, sessionId: session.id });
+
+        return true;
+      });
+
+      if (created) migratedCount += 1;
+    }
+
+    return migratedCount;
+  };
 }

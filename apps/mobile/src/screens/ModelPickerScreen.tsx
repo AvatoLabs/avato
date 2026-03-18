@@ -554,7 +554,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           ListHeaderComponent={
             <View className="mx-5 mb-3 flex-row items-center bg-foreground/5 rounded-xl px-4 py-3">
-              <WifiOff color="#999" size={14} strokeWidth={tokens.icon.strokeWidth} />
+              <WifiOff color={colors.iconMuted} size={14} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-2 text-secondary/60 text-[12px] font-medium flex-1">
                 {t.modelPickerOffline}
               </Text>

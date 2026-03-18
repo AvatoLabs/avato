@@ -6,6 +6,7 @@ import React, { memo } from 'react';
 import { Image, Modal, Pressable, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
 interface ImageViewerProps {
@@ -16,6 +17,7 @@ interface ImageViewerProps {
 
 const ImageViewer = memo<ImageViewerProps>(({ visible, uri, onClose }) => {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   return (
     <Modal
@@ -32,7 +34,7 @@ const ImageViewer = memo<ImageViewerProps>(({ visible, uri, onClose }) => {
           style={{ top: insets.top + 8 }}
           onPress={onClose}
         >
-          <X color="#fff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+          <X color={colors.iconOnPrimary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
 
         {/* Image */}

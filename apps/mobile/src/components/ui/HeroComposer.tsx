@@ -12,10 +12,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
-import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
-import { themeColors } from '../../theme/colors';
+import { useThemeStore } from '../../store/theme';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import PressableScale from './PressableScale';
 
@@ -61,6 +61,8 @@ export function HeroComposer({
   hasAttachment = false,
 }: HeroComposerProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const placeholder = placeholderProp ?? t.homeHeroPlaceholder;
   const [_isFocused, setIsFocused] = useState(false);
   const focusProgress = useSharedValue(0);
@@ -76,14 +78,17 @@ export function HeroComposer({
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
-  const containerAnimStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(
-      focusProgress.value,
-      [0, 1],
-      [themeColors.primaryBorder, themeColors.primaryFocused],
-    ),
-    borderWidth: 1.5 + focusProgress.value,
-  }));
+  const containerAnimStyle = useAnimatedStyle(
+    () => ({
+      borderColor: interpolateColor(
+        focusProgress.value,
+        [0, 1],
+        [colors.primaryBorder, colors.primaryFocused],
+      ),
+      borderWidth: 1.5 + focusProgress.value,
+    }),
+    [colors.primaryBorder, colors.primaryFocused],
+  );
 
   const handleSend = useCallback(() => {
     haptics.light();
@@ -113,10 +118,14 @@ export function HeroComposer({
   return (
     <Animated.View
       className="mx-5 mb-4 rounded-2xl overflow-hidden"
-      style={[{ backgroundColor: themeColors.overlay }, containerAnimStyle]}
+      style={[{ backgroundColor: colors.overlay }, containerAnimStyle]}
     >
       {useNativeBlur ? (
-        <BlurView className="rounded-2xl overflow-hidden" intensity={80} tint="light">
+        <BlurView
+          className="rounded-2xl overflow-hidden"
+          intensity={80}
+          tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
+        >
           {/* Text input area */}
           <View className="px-3 pt-3">
             <TextInput
@@ -124,7 +133,7 @@ export function HeroComposer({
               multiline
               className="text-foreground text-[16px] leading-[22px] min-h-[60px] max-h-28 font-medium"
               placeholder={placeholder}
-              placeholderTextColor={themeColors.secondaryText}
+              placeholderTextColor={colors.muted}
               style={{ textAlignVertical: 'top' }}
               value={value}
               onBlur={handleBlur}
@@ -151,7 +160,7 @@ export function HeroComposer({
                   onError={() => setProviderLogoError(true)}
                 />
               ) : (
-                <Cpu color={semanticColors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <Cpu color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
               )}
             </TouchableOpacity>
 
@@ -163,7 +172,7 @@ export function HeroComposer({
               onPress={onToggleSearch}
             >
               <Globe
-                color={searchEnabled ? themeColors.primary : semanticColors.muted}
+                color={searchEnabled ? colors.primary : colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -177,7 +186,7 @@ export function HeroComposer({
               onPress={onToggleMemory}
             >
               <MemoryIcon
-                color={memoryEnabled ? themeColors.primary : semanticColors.muted}
+                color={memoryEnabled ? colors.primary : colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -192,7 +201,7 @@ export function HeroComposer({
             >
               <View className="relative items-center justify-center">
                 <Paperclip
-                  color={hasAttachedFile ? themeColors.primary : semanticColors.muted}
+                  color={hasAttachedFile ? colors.primary : colors.muted}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -217,7 +226,7 @@ export function HeroComposer({
               onPress={onPluginsPress}
             >
               <Puzzle
-                color={semanticColors.muted}
+                color={colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -234,7 +243,7 @@ export function HeroComposer({
                   onPress={handleSend}
                 >
                   <Send
-                    color={themeColors.iconOnPrimary}
+                    color={colors.iconOnPrimary}
                     size={16}
                     strokeWidth={tokens.icon.strokeWidth}
                     style={{ marginLeft: 1 }}
@@ -255,7 +264,7 @@ export function HeroComposer({
               multiline
               className="text-foreground text-[16px] leading-[22px] min-h-[60px] max-h-28 font-medium"
               placeholder={placeholder}
-              placeholderTextColor={themeColors.secondaryText}
+              placeholderTextColor={colors.muted}
               style={{ textAlignVertical: 'top' }}
               value={value}
               onBlur={handleBlur}
@@ -282,7 +291,7 @@ export function HeroComposer({
                   onError={() => setProviderLogoError(true)}
                 />
               ) : (
-                <Cpu color={semanticColors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                <Cpu color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
               )}
             </TouchableOpacity>
 
@@ -294,7 +303,7 @@ export function HeroComposer({
               onPress={onToggleSearch}
             >
               <Globe
-                color={searchEnabled ? themeColors.primary : semanticColors.muted}
+                color={searchEnabled ? colors.primary : colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -308,7 +317,7 @@ export function HeroComposer({
               onPress={onToggleMemory}
             >
               <MemoryIcon
-                color={memoryEnabled ? themeColors.primary : semanticColors.muted}
+                color={memoryEnabled ? colors.primary : colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -323,7 +332,7 @@ export function HeroComposer({
             >
               <View className="relative items-center justify-center">
                 <Paperclip
-                  color={hasAttachedFile ? themeColors.primary : semanticColors.muted}
+                  color={hasAttachedFile ? colors.primary : colors.muted}
                   size={20}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
@@ -348,7 +357,7 @@ export function HeroComposer({
               onPress={onPluginsPress}
             >
               <Puzzle
-                color={semanticColors.muted}
+                color={colors.muted}
                 size={20}
                 strokeWidth={tokens.icon.strokeWidth}
               />
@@ -365,7 +374,7 @@ export function HeroComposer({
                   onPress={handleSend}
                 >
                   <Send
-                    color={themeColors.iconOnPrimary}
+                    color={colors.iconOnPrimary}
                     size={16}
                     strokeWidth={tokens.icon.strokeWidth}
                     style={{ marginLeft: 1 }}

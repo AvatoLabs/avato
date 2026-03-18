@@ -4,7 +4,7 @@
  * Shows: HeroComposer, pinned sessions, and recent sessions.
  *
  * Session vs Topic (per topic-chat-conversation-semantic-audit):
- * - Session: 会话容器，对应 Agent 或 session-only，可含多个 Topic
+ * - Session: 会话容器，对应 Agent 或群组，可含多个 Topic
  * - Topic: 一次对话/话题，含消息序列，属于 Session
  * - 双视图：会话（Session 列表）| 话题（跨 Session 最近 Topic，含「最近」伪 tag）
  */
@@ -38,7 +38,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -256,7 +255,6 @@ function SessionLogo({
 
 export default function ChatListScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -569,17 +567,78 @@ export default function ChatListScreen({ navigation }: any) {
     setRefreshing(false);
   }, [fetchSessionTags, fetchSessions, toast, t]);
 
+  const pickLatestAgentSession = useCallback(
+    (tagId?: string) => {
+      let latest: ChatSession | null = null;
+
+      for (const session of sessions) {
+        if (session.type === 'group') continue;
+        if (tagId && session.tagId !== tagId) continue;
+
+        if (!latest) {
+          latest = session;
+          continue;
+        }
+
+        const currentTs = new Date(session.updatedAt).getTime();
+        const latestTs = new Date(latest.updatedAt).getTime();
+        if (currentTs > latestTs) latest = session;
+      }
+
+      return latest;
+    },
+    [sessions],
+  );
+
+  const resolveQuickChatSession = useCallback(
+    async (options?: { includeComposerConfig?: boolean; plugins?: string[] }) => {
+      const taggedSession = activeTagId ? pickLatestAgentSession(activeTagId) : null;
+      const fallbackSession = pickLatestAgentSession();
+      const existing = taggedSession ?? fallbackSession;
+      if (existing) return { created: false as const, sessionId: existing.id };
+
+      const includeComposerConfig = options?.includeComposerConfig === true;
+      const newId = await createSession({
+        tagId: activeTagId,
+        ...(includeComposerConfig
+          ? {
+              model: selectedModel || undefined,
+              plugins: options?.plugins,
+              provider: selectedProvider || undefined,
+            }
+          : {}),
+      });
+
+      return { created: true as const, sessionId: newId };
+    },
+    [
+      activeTagId,
+      createSession,
+      pickLatestAgentSession,
+      selectedModel,
+      selectedProvider,
+    ],
+  );
+
+  const createQuickTopic = useCallback(
+    async (sessionId: string) => {
+      try {
+        return await topicApi.create(sessionId, t.chatListNewConversation);
+      } catch {
+        return null;
+      }
+    },
+    [t.chatListNewConversation],
+  );
+
   const handleCreateChat = async () => {
     setCreateMenuVisible(false);
     try {
-      const newId =
-        draftSessionId ||
-        (await createSession({
-          tagId: activeTagId,
-        }));
+      const { sessionId } = await resolveQuickChatSession();
       setDraftSessionId(null);
+      const topicId = await createQuickTopic(sessionId);
       haptics.success();
-      navigation.navigate('ChatDetail', { sessionId: newId });
+      navigation.navigate('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
     } catch {
       toast.show('error', t.errorNetwork);
     }
@@ -591,44 +650,44 @@ export default function ChatListScreen({ navigation }: any) {
     if (!prompt && !hasAttachment) return;
 
     try {
-      const newId =
-        draftSessionId ||
-        (await createSession({
-          tagId: activeTagId,
-          model: selectedModel || undefined,
-          provider: selectedProvider || undefined,
-          plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
-        }));
+      const { created, sessionId } = await resolveQuickChatSession({
+        includeComposerConfig: true,
+        plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
+      });
       setDraftSessionId(null);
+      const topicId = await createQuickTopic(sessionId);
 
-      const agentConfig = await agentApi.getConfigBySession(newId);
-      const chatConfigUpdate = {
-        chatConfig: {
-          memory: { effort: memoryEffort, enabled: memoryEnabled },
-          searchMode: searchEnabled ? 'on' : 'off',
-        },
-      };
-      if (agentConfig?.id) {
-        try {
-          await agentApi.updateConfig(agentConfig.id, chatConfigUpdate);
-        } catch {
-          /* best-effort */
-        }
-      } else {
-        try {
-          await sessionApi.updateSessionConfig(newId, chatConfigUpdate);
-        } catch {
-          /* best-effort */
+      if (created) {
+        const agentConfig = await agentApi.getConfigBySession(sessionId);
+        const chatConfigUpdate = {
+          chatConfig: {
+            memory: { effort: memoryEffort, enabled: memoryEnabled },
+            searchMode: searchEnabled ? 'on' : 'off',
+          },
+        };
+        if (agentConfig?.id) {
+          try {
+            await agentApi.updateConfig(agentConfig.id, chatConfigUpdate);
+          } catch {
+            /* best-effort */
+          }
+        } else {
+          try {
+            await sessionApi.updateSessionConfig(sessionId, chatConfigUpdate);
+          } catch {
+            /* best-effort */
+          }
         }
       }
 
-      void sendMessage(newId, prompt, undefined, {
+      void sendMessage(sessionId, prompt, topicId ?? undefined, {
         memoryEffort,
         memoryEnabled,
+        plugins: enabledSkills.size > 0 ? [...enabledSkills] : undefined,
         searchEnabled,
       });
       setHeroText('');
-      navigation.navigate('ChatDetail', { sessionId: newId });
+      navigation.navigate('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
     } catch {
       toast.show('error', t.errorNetwork);
     }
@@ -850,7 +909,7 @@ export default function ChatListScreen({ navigation }: any) {
             'Failed to generate title. Ensure the chat has messages and the title model is configured.';
           setTimeout(() => useToast.getState().show('error', msg), 350);
         }
-      } catch (err) {
+      } catch {
         closeActionSheet();
         const msg = failMsg || 'Failed to generate title';
         setTimeout(() => useToast.getState().show('error', msg), 350);
@@ -1019,6 +1078,17 @@ export default function ChatListScreen({ navigation }: any) {
     [matchesSelectedPill, searchResults],
   );
 
+  const handleOpenStore = useCallback(() => {
+    const routeNames: string[] = navigation?.getState?.()?.routeNames ?? [];
+
+    if (routeNames.includes('Store')) {
+      navigation?.navigate?.('Store');
+      return;
+    }
+
+    navigation?.navigate?.('MainTabs', { screen: 'Store' });
+  }, [navigation]);
+
   /** sessionId -> latest topic (from recentTopics) for Session row weak preview */
   const latestTopicBySessionId = useMemo(() => {
     const map = new Map<string, { title: string; updatedAt: string }>();
@@ -1160,7 +1230,7 @@ export default function ChatListScreen({ navigation }: any) {
         }}
         onPress={() => handleSwipeDelete(item)}
       >
-        <Trash2 color="#fff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+        <Trash2 color={colors.iconOnPrimary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         <Text className="mt-1 text-[12px] font-semibold text-white">{t.delete}</Text>
       </TouchableOpacity>
     );
@@ -1330,7 +1400,7 @@ export default function ChatListScreen({ navigation }: any) {
           >
             <Text
               className="text-[13px] font-semibold"
-              style={{ color: viewMode === VIEW_SESSION ? '#fff' : colors.foreground }}
+              style={{ color: viewMode === VIEW_SESSION ? colors.iconOnPrimary : colors.foreground }}
             >
               {t.chatListViewSession}
             </Text>
@@ -1348,7 +1418,7 @@ export default function ChatListScreen({ navigation }: any) {
           >
             <Text
               className="text-[13px] font-semibold"
-              style={{ color: viewMode === VIEW_TOPIC ? '#fff' : colors.foreground }}
+              style={{ color: viewMode === VIEW_TOPIC ? colors.iconOnPrimary : colors.foreground }}
             >
               {t.chatListViewTopic}
             </Text>
@@ -1357,13 +1427,13 @@ export default function ChatListScreen({ navigation }: any) {
               style={{
                 backgroundColor:
                   viewMode === VIEW_TOPIC
-                    ? withAlpha('#fff', '33')
+                    ? withAlpha(colors.iconOnPrimary, '33')
                     : withAlpha(colors.primary, '20'),
               }}
             >
               <Text
                 className="text-[10px] font-semibold"
-                style={{ color: viewMode === VIEW_TOPIC ? '#fff' : colors.secondaryText }}
+                style={{ color: viewMode === VIEW_TOPIC ? colors.iconOnPrimary : colors.secondaryText }}
               >
                 {t.chatListTopicRecent}
               </Text>
@@ -1407,7 +1477,7 @@ export default function ChatListScreen({ navigation }: any) {
                   <Text
                     className="text-[13px] font-semibold"
                     style={{
-                      color: selected ? '#fff' : pill.tagId ? resolvedColor : colors.foreground,
+                      color: selected ? colors.iconOnPrimary : pill.tagId ? resolvedColor : colors.foreground,
                     }}
                   >
                     {pill.label}
@@ -1420,7 +1490,7 @@ export default function ChatListScreen({ navigation }: any) {
                       className="text-[11px] font-semibold"
                       style={{
                         color: selected
-                          ? '#fff'
+                          ? colors.iconOnPrimary
                           : pill.tagId
                             ? resolvedColor
                             : colors.secondaryText,
@@ -1439,6 +1509,7 @@ export default function ChatListScreen({ navigation }: any) {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 80 }}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1678,7 +1749,7 @@ export default function ChatListScreen({ navigation }: any) {
                 strokeWidth={tokens.icon.strokeWidth}
               />
               <Text className="ml-3 text-[15px] font-medium text-foreground">
-                {t.chatListNewConversation}
+                {t.topicCreate}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -2007,7 +2078,7 @@ export default function ChatListScreen({ navigation }: any) {
         skillsTitle={t.skillsTitle}
         visible={skillsVisible}
         onClose={() => setSkillsVisible(false)}
-        onOpenStore={() => navigation.getParent()?.navigate('Store')}
+        onOpenStore={handleOpenStore}
         onToggle={handleToggleSkill}
       />
     </View>

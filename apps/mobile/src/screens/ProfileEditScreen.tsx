@@ -24,6 +24,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -41,6 +43,7 @@ import { useI18n } from '../lib/i18n';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { useUserStore } from '../store/user';
 import { useThemeColors } from '../theme/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens } from '../theme/tokens';
 
 const INTEREST_AREAS: {
@@ -73,6 +76,7 @@ export default function ProfileEditScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const storeProfile = useUserStore((s) => s.profile);
   const fetchUser = useUserStore((s) => s.fetchUser);
@@ -226,7 +230,7 @@ export default function ProfileEditScreen({ navigation }: any) {
           rightElement={
             <Text
               className="text-[15px] font-medium"
-              style={{ color: canSaveProfile ? '#007aff' : 'rgba(0,122,255,0.35)' }}
+              style={{ color: canSaveProfile ? colors.primary : colors.primaryMuted }}
             >
               {t.save}
             </Text>
@@ -235,14 +239,18 @@ export default function ProfileEditScreen({ navigation }: any) {
           onPressRight={canSaveProfile ? handleSaveProfile : undefined}
         />
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#007aff" size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
       <ScreenHeader
         rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
@@ -253,7 +261,7 @@ export default function ProfileEditScreen({ navigation }: any) {
         rightElement={
           <Text
             className="text-[15px] font-medium"
-            style={{ color: canSaveProfile ? '#007aff' : 'rgba(0,122,255,0.35)' }}
+            style={{ color: canSaveProfile ? colors.primary : colors.primaryMuted }}
           >
             {t.save}
           </Text>
@@ -292,7 +300,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                   {t.profileChangePhoto}
                 </Text>
                 {savingAvatar ? (
-                  <ActivityIndicator color="#007aff" size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : resolvedAvatarUri ? (
                   <RNImage className="h-10 w-10 rounded-lg" source={{ uri: resolvedAvatarUri }} />
                 ) : (
@@ -311,7 +319,7 @@ export default function ProfileEditScreen({ navigation }: any) {
               <View className="flex-row items-center flex-1 justify-end">
                 {savingName && (
                   <View className="mr-1.5">
-                    <ActivityIndicator color="#007aff" size="small" />
+                    <ActivityIndicator color={colors.primary} size="small" />
                   </View>
                 )}
                 <TextInput
@@ -350,7 +358,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                     >
                       <View className="mr-1.5">
                         <IconComp
-                          color={isSelected ? '#007aff' : '#999'}
+                          color={isSelected ? colors.primary : colors.muted}
                           size={13}
                           strokeWidth={tokens.icon.strokeWidth}
                         />
@@ -385,7 +393,7 @@ export default function ProfileEditScreen({ navigation }: any) {
                 >
                   <View className="mr-1.5">
                     <Briefcase
-                      color={showCustomInput ? '#007aff' : '#999'}
+                      color={showCustomInput ? colors.primary : colors.muted}
                       size={13}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -417,6 +425,6 @@ export default function ProfileEditScreen({ navigation }: any) {
           </View>
         </Animated.View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -2,7 +2,7 @@
  * AgentListScreen — Manage user agents (assistants).
  * Lists agents from agentApi.queryAgents, tap to open chat or create new.
  */
-import { ArrowLeft, MessageCircle, Plus, Settings2, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Bot, MessageCircle, Plus, Settings2, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
@@ -48,7 +47,6 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
 }
 
 export default function AgentListScreen({ navigation }: any) {
-  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -240,6 +238,8 @@ export default function AgentListScreen({ navigation }: any) {
     ),
     [
       agents.length,
+      colors.danger,
+      colors.primary,
       handleAgentPress,
       handleConfigureAgent,
       handleDeleteAgent,
@@ -270,7 +270,7 @@ export default function AgentListScreen({ navigation }: any) {
   }
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View className="flex-1 bg-background">
       <ScreenHeader
         title={t.meAgents}
         leftElement={
@@ -298,9 +298,9 @@ export default function AgentListScreen({ navigation }: any) {
                 onPress={handleCreateAgent}
               >
                 <View className="flex-row items-center gap-2">
-                  <Plus color="#fff" size={18} strokeWidth={2} />
+                  <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2} />
                   <Text className="text-[14px] font-semibold text-white">
-                    {t.chatListNewConversation}
+                    {t.chatListCreateAgent}
                   </Text>
                 </View>
               </PressableScale>
@@ -330,7 +330,7 @@ export default function AgentListScreen({ navigation }: any) {
           style={{ elevation: 4, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25 }}
           onPress={handleCreateAgent}
         >
-          <Plus color="#fff" size={24} strokeWidth={2} />
+          <Plus color={colors.iconOnPrimary} size={24} strokeWidth={2} />
         </TouchableOpacity>
       )}
     </View>

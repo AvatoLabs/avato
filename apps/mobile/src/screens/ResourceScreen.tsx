@@ -87,7 +87,16 @@ function isMarkdownFile(fileType: string, name?: string): boolean {
   return !!(name && /\.(?:md|mdx)$/i.test(name));
 }
 
-function getResourcePreviewMdStyles(colors: { foreground: string; primary: string }) {
+function getResourcePreviewMdStyles(colors: {
+  foreground: string;
+  primary: string;
+  markdownCodeInlineBg: string;
+  markdownCodeInlineColor: string;
+  markdownCodeBlockBg: string;
+  markdownText: string;
+  fillTertiary: string;
+  divider: string;
+}) {
   return {
     body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
     heading1: {
@@ -116,18 +125,18 @@ function getResourcePreviewMdStyles(colors: { foreground: string; primary: strin
     ordered_list: { marginBottom: 10 },
     list_item: { marginBottom: 4 },
     code_inline: {
-      backgroundColor: '#f3f4f6',
+      backgroundColor: colors.markdownCodeInlineBg,
       borderRadius: 4,
-      color: '#e11d48',
+      color: colors.markdownCodeInlineColor,
       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
       fontSize: 13,
       paddingHorizontal: 4,
       paddingVertical: 2,
     },
     fence: {
-      backgroundColor: '#1e1e2e',
+      backgroundColor: colors.markdownCodeBlockBg,
       borderRadius: 8,
-      color: '#cdd6f4',
+      color: colors.markdownText,
       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
       fontSize: 13,
       lineHeight: 20,
@@ -135,14 +144,14 @@ function getResourcePreviewMdStyles(colors: { foreground: string; primary: strin
       padding: 12,
     },
     blockquote: {
-      backgroundColor: '#f8fafc',
+      backgroundColor: colors.fillTertiary,
       borderColor: colors.primary,
       borderLeftWidth: 3,
       marginBottom: 10,
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    hr: { backgroundColor: '#e5e7eb', height: 1, marginVertical: 12 },
+    hr: { backgroundColor: colors.divider, height: 1, marginVertical: 12 },
     link: { color: colors.primary },
     strong: { fontWeight: '600' as const },
   };
@@ -390,7 +399,7 @@ const FilePreviewModal = memo(
         <Animated.View
           entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(150)}
-          style={{ flex: 1, backgroundColor: imageFile ? '#000' : '#f8f8fa' }}
+          style={{ flex: 1, backgroundColor: imageFile ? '#000' : colors.inputBg }}
         >
           <StatusBar barStyle={imageFile ? 'light-content' : 'dark-content'} />
 
@@ -400,11 +409,11 @@ const FilePreviewModal = memo(
             style={{
               paddingTop: insets.top + 8,
               paddingBottom: 10,
-              backgroundColor: imageFile ? 'rgba(0,0,0,0.6)' : '#fff',
+              backgroundColor: imageFile ? colors.overlayDark : colors.background,
               ...(imageFile
                 ? {}
                 : {
-                    shadowColor: '#000',
+                    shadowColor: colors.shadow,
                     shadowOffset: { width: 0, height: 1 },
                     shadowOpacity: 0.03,
                     shadowRadius: 4,
@@ -481,7 +490,7 @@ const FilePreviewModal = memo(
                 <View className="flex-1 items-center justify-center">
                   {imgLoading && (
                     <ActivityIndicator
-                      color="#fff"
+                      color={colors.iconOnPrimary}
                       size="large"
                       style={{ position: 'absolute', zIndex: 1 }}
                     />
@@ -513,7 +522,7 @@ const FilePreviewModal = memo(
               ) : pdfFile && fileUrl && !pdfDataUrl && !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
-                  style={{ backgroundColor: '#f8f8fa' }}
+                  style={{ backgroundColor: colors.inputBg }}
                 >
                   <ActivityIndicator color={colors.primary} size="large" />
                 </View>
@@ -526,7 +535,7 @@ const FilePreviewModal = memo(
               ) : textFile && fileUrl && !textContent && !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
-                  style={{ backgroundColor: '#f8f8fa' }}
+                  style={{ backgroundColor: colors.inputBg }}
                 >
                   <ActivityIndicator color={colors.primary} size="large" />
                 </View>
@@ -540,7 +549,7 @@ const FilePreviewModal = memo(
                 <ScrollView
                   className="flex-1"
                   contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-                  style={{ backgroundColor: '#fff' }}
+                  style={{ backgroundColor: colors.background }}
                 >
                   {markdownFile ? (
                     <Markdown rules={codeInlineRules} style={getResourcePreviewMdStyles(colors)}>
@@ -571,7 +580,7 @@ const FilePreviewModal = memo(
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundColor: '#f8f8fa',
+                        backgroundColor: colors.inputBg,
                       }}
                     >
                       <ActivityIndicator color={colors.primary} size="large" />
@@ -908,7 +917,7 @@ export default function ResourceScreen() {
               >
                 <Text
                   className="text-[13px] font-semibold"
-                  style={{ color: active ? '#fff' : colors.muted }}
+                  style={{ color: active ? colors.iconOnPrimary : colors.muted }}
                 >
                   {tab.label}
                 </Text>
@@ -974,9 +983,9 @@ export default function ResourceScreen() {
           onPress={uploading ? undefined : handleUpload}
         >
           {uploading ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={colors.iconOnPrimary} size="small" />
           ) : (
-            <Plus color="#fff" size={26} strokeWidth={2.5} />
+            <Plus color={colors.iconOnPrimary} size={26} strokeWidth={2.5} />
           )}
         </TouchableOpacity>
       </View>

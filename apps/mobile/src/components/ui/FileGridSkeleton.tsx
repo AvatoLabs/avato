@@ -3,10 +3,16 @@
  */
 import React from 'react';
 import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
+
+import { enteringSkeleton } from '../../theme/motion';
 
 export default function FileGridSkeleton() {
   return (
-    <View className="flex-1 px-4 pt-4">
+    <Animated.View
+      entering={enteringSkeleton()}
+      className="flex-1 px-4 pt-4"
+    >
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <View className="flex-row items-center py-4" key={i}>
           <View className="w-10 h-10 rounded-lg bg-foreground/8 mr-3" />
@@ -19,6 +25,6 @@ export default function FileGridSkeleton() {
           </View>
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }

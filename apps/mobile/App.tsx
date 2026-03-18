@@ -23,6 +23,7 @@ import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
 import { useConnectionStore } from './src/store/connection';
 import { useThemeStore } from './src/store/theme';
+import { useThemeColors } from './src/theme/colors';
 
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -54,12 +55,13 @@ function OfflineBanner() {
 function AppCrashFallback() {
   const insets = useSafeAreaInsets();
   const t = useI18n((s) => s.t);
+  const { background, foreground, secondaryText } = useThemeColors();
 
   return (
     <View
       style={{
         alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: background,
         flex: 1,
         justifyContent: 'center',
         paddingBottom: insets.bottom,
@@ -67,10 +69,10 @@ function AppCrashFallback() {
         paddingTop: insets.top,
       }}
     >
-      <Text style={{ color: '#111827', fontSize: 22, fontWeight: '700', marginBottom: 12 }}>
+      <Text style={{ color: foreground, fontSize: 22, fontWeight: '700', marginBottom: 12 }}>
         {t.errorUnknown}
       </Text>
-      <Text style={{ color: '#6b7280', fontSize: 14, textAlign: 'center' }}>{t.logsCrashHint}</Text>
+      <Text style={{ color: secondaryText, fontSize: 14, textAlign: 'center' }}>{t.logsCrashHint}</Text>
     </View>
   );
 }
@@ -93,7 +95,11 @@ export default function App() {
       setIsOffline(offline);
       if (wasOffline.current && !offline) {
         useToast.getState().show('success', t.toastConnectionRestored);
-        void syncMobileBootstrapState();
+        void syncMobileBootstrapState().then(({ requiresReauth }) => {
+          if (requiresReauth) {
+            setInitialRoute('Login');
+          }
+        });
       }
       wasOffline.current = offline;
     });
@@ -104,7 +110,11 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return;
 
-      void syncMobileBootstrapState();
+      void syncMobileBootstrapState().then(({ requiresReauth }) => {
+        if (requiresReauth) {
+          setInitialRoute('Login');
+        }
+      });
       useConnectionStore.getState().checkConnection();
     });
 
@@ -145,10 +155,10 @@ export default function App() {
         const authConfig = await fetchMobileAuthConfig(baseUrl);
 
         if (authConfig.enableNoAuth) {
-          await syncMobileBootstrapState();
+          const { requiresReauth } = await syncMobileBootstrapState();
           void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
-            setInitialRoute('MainTabs');
+            setInitialRoute(requiresReauth ? 'Login' : 'MainTabs');
           }
           return;
         }
@@ -156,10 +166,10 @@ export default function App() {
         const authSession = authConfig.enableOIDC ? await getValidAuthSession(baseUrl) : null;
 
         if (authSession) {
-          await syncMobileBootstrapState();
+          const { requiresReauth } = await syncMobileBootstrapState();
           void migrateDeprecatedStorageKeys();
           if (!isCancelled) {
-            setInitialRoute('MainTabs');
+            setInitialRoute(requiresReauth ? 'Login' : 'MainTabs');
           }
           return;
         }

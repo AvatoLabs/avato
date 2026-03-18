@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -76,6 +77,7 @@ const DURATION = 2200;
 
 const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDone }) => {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const translateY = useRef(new Animated.Value(-24)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.92)).current;
@@ -126,7 +128,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
           flexDirection: 'row',
           paddingHorizontal: 16,
           paddingVertical: isError ? 12 : 10,
-          shadowColor: '#000',
+          shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.15,
           shadowRadius: 12,
@@ -134,7 +136,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
         }}
       >
         <Icon
-          color="#fff"
+          color={colors.iconOnPrimary}
           size={15}
           strokeWidth={2.5}
           style={isError ? { marginTop: 2 } : undefined}
@@ -142,7 +144,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
         <Text
           numberOfLines={isError ? 6 : 1}
           style={{
-            color: '#fff',
+            color: colors.iconOnPrimary,
             flex: 1,
             fontSize: isError ? 13 : 14,
             fontWeight: '600',
@@ -163,7 +165,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
             className="ml-2 py-1 px-2"
             onPress={handleRetry}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>
+            <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>
           </TouchableOpacity>
         ) : null}
       </View>

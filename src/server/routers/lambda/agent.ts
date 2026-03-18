@@ -10,6 +10,7 @@ import { FileModel } from '@/database/models/file';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
+import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
 import { insertAgentSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -250,12 +251,14 @@ export const agentRouter = router({
       const agentConfig = await ctx.agentModel.findBySessionId(sessionId);
       if (agentConfig) return agentConfig;
 
-      // Session-only or group-type session: no agent linked, return config from session.config
-      const sessionConfig = (session as { config?: Record<string, unknown> }).config;
-      return mergeConfigWithoutForcingModelProvider(
-        DEFAULT_AGENT_CONFIG,
-        sessionConfig ?? {},
-      ) as typeof DEFAULT_AGENT_CONFIG;
+      await new AgentMigrationRepo(ctx.serverDB, ctx.userId).migrateSessionOnlyAgentBindings([
+        sessionId,
+      ]);
+
+      const migratedConfig = await ctx.agentModel.findBySessionId(sessionId);
+      if (migratedConfig) return migratedConfig;
+
+      throw new Error(`Session [${input.sessionId}] has no bound agent`);
     }),
 
   getAgentConfigById: agentProcedure

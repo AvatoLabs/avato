@@ -510,6 +510,7 @@ type TranslationKeys = {
   errorAuth: string;
   errorAuthGoToLogin: string;
   errorTimeout: string;
+  errorProviderOverloaded: string;
   errorUnknown: string;
   errorRetry: string;
   errorOffline: string;
@@ -1436,6 +1437,7 @@ const en: TranslationKeys = {
   errorAuth: 'Authentication failed. Please go to Settings or Login to reconfigure.',
   errorAuthGoToLogin: 'Go to Login',
   errorTimeout: 'Request timed out. Please try again.',
+  errorProviderOverloaded: 'The provider is currently overloaded, please try again later.',
   errorUnknown: 'Something went wrong.',
   errorRetry: 'Retry',
   errorOffline: 'You are offline',
@@ -2352,6 +2354,7 @@ const zh_tw: TranslationKeys = {
   errorAuth: '驗證失敗，請前往設定或登入頁重新配置。',
   errorAuthGoToLogin: '前往登入',
   errorTimeout: '要求逾時，請重試。',
+  errorProviderOverloaded: '服務繁忙，請稍後重試。',
   errorUnknown: '發生了一些問題。',
   errorRetry: '重試',
   errorOffline: '目前處於離線狀態',
@@ -3265,6 +3268,7 @@ const zh: TranslationKeys = {
   errorAuth: '认证失败，请前往设置或登录页重新配置。',
   errorAuthGoToLogin: '前往登录',
   errorTimeout: '请求超时，请重试。',
+  errorProviderOverloaded: '服务繁忙，请稍后重试。',
   errorUnknown: '出了点问题。',
   errorRetry: '重试',
   errorOffline: '当前处于离线状态',

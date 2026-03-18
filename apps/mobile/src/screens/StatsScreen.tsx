@@ -35,8 +35,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../constants/cdn';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { semanticColors } from '../constants/colors';
 import { statsApi } from '../lib/api';
+import { useThemeColors } from '../theme/colors';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type {
@@ -76,13 +76,12 @@ function formatDate(iso?: string): string {
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-const BLUE = '#007aff';
-const BLUE_BG = 'rgba(0,122,255,0.08)';
-const STAT_ICONS: Record<string, { bg: string; color: string; icon: any }> = {
-  messages: { icon: MessageSquare, color: BLUE, bg: BLUE_BG },
-  sessions: { icon: Sparkles, color: BLUE, bg: BLUE_BG },
-  topics: { icon: BookOpen, color: BLUE, bg: BLUE_BG },
-  words: { icon: Zap, color: BLUE, bg: BLUE_BG },
+const STAT_ICON_KEYS = ['messages', 'sessions', 'topics', 'words'] as const;
+const STAT_ICONS: Record<string, { icon: any }> = {
+  messages: { icon: MessageSquare },
+  sessions: { icon: Sparkles },
+  topics: { icon: BookOpen },
+  words: { icon: Zap },
 };
 
 function StatCard({
@@ -98,25 +97,28 @@ function StatCard({
   title: string;
   value: number;
 }) {
+  const colors = useThemeColors();
   const pct = prevValue !== undefined ? percentChange(value, prevValue) : null;
   const isPositive = pct?.startsWith('+');
   const meta = STAT_ICONS[iconKey] || STAT_ICONS.messages;
   const IconComp = meta.icon;
+  const iconColor = colors.primary;
+  const iconBg = colors.primarySubtle;
 
   return (
     <View
       className="flex-1 items-center rounded-2xl py-3 mx-1"
-      style={{ backgroundColor: meta.bg }}
+      style={{ backgroundColor: iconBg }}
     >
       {loading ? (
-        <ActivityIndicator color={BLUE} size="small" />
+        <ActivityIndicator color={colors.primary} size="small" />
       ) : (
         <>
           <View
             className="rounded-full items-center justify-center mb-2"
-            style={{ backgroundColor: meta.bg, width: 32, height: 32 }}
+            style={{ backgroundColor: iconBg, width: 32, height: 32 }}
           >
-            <IconComp color={meta.color} size={16} strokeWidth={tokens.icon.strokeWidth} />
+            <IconComp color={iconColor} size={16} strokeWidth={tokens.icon.strokeWidth} />
           </View>
           <Text className="text-foreground text-[20px] font-bold tracking-tight">
             {formatNumber(value)}
@@ -135,18 +137,24 @@ function StatCard({
   );
 }
 
-const HEATMAP_COLORS = ['#ebedf0', '#b3d9ff', '#66b3ff', '#3399ff', '#007aff'];
-
 function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const { width: screenWidth } = useWindowDimensions();
   const SECTION_PX = 20;
   const containerWidth = screenWidth - SECTION_PX * 2;
+  const heatmapColors = [
+    colors.fillTertiary,
+    colors.primarySubtle,
+    colors.primaryMuted,
+    colors.primaryFocused,
+    colors.primary,
+  ];
 
   if (loading) {
     return (
       <View className="h-24 items-center justify-center">
-        <ActivityIndicator color={BLUE} size="small" />
+        <ActivityIndicator color={colors.primary} size="small" />
       </View>
     );
   }
@@ -169,7 +177,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
     <View>
       <View className="flex-row items-center justify-between mb-3">
         <View className="flex-row items-center gap-1.5">
-          <CalendarDays color={BLUE} size={15} strokeWidth={tokens.icon.strokeWidth} />
+          <CalendarDays color={colors.primary} size={15} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="text-foreground text-[15px] font-semibold tracking-tight">
             {t.statsActivity}
           </Text>
@@ -180,9 +188,12 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
               {t.statsActiveDays.replace('{count}', String(activeDays))}
             </Text>
           </View>
-          <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-[#34c759]/10">
-            <Flame color="#34c759" size={11} strokeWidth={tokens.icon.strokeWidth} />
-            <Text className="text-[#34c759] text-[11px] font-medium">
+          <View
+            className="flex-row items-center gap-1 px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: colors.successSubtle }}
+          >
+            <Flame color={colors.success} size={11} strokeWidth={tokens.icon.strokeWidth} />
+            <Text className="text-[11px] font-medium" style={{ color: colors.success }}>
               {t.statsHotDays.replace('{count}', String(hotDays))}
             </Text>
           </View>
@@ -197,7 +208,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
                 <View
                   key={`${wi}-${di}`}
                   style={{
-                    backgroundColor: HEATMAP_COLORS[day.level] || HEATMAP_COLORS[0],
+                    backgroundColor: heatmapColors[day.level] || heatmapColors[0],
                     borderRadius: 3,
                     height: cellSize,
                     width: cellSize,
@@ -208,7 +219,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
                 <View
                   key={`pad-${wi}-${pi}`}
                   style={{
-                    backgroundColor: '#ebedf0',
+                    backgroundColor: colors.fillTertiary,
                     borderRadius: 3,
                     height: cellSize,
                     width: cellSize,
@@ -222,8 +233,6 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
     </View>
   );
 }
-
-const RANK_MEDALS = ['#007aff', '#3399ff', '#66b3ff'];
 
 function getProviderFromModelId(modelId: string): string | undefined {
   if (modelId.includes('/')) return modelId.split('/')[0];
@@ -262,7 +271,9 @@ function RankSection({
   modelLogos?: Array<{ providerId?: string }>;
 }) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const maxCount = data.length > 0 ? data[0].count : 1;
+  const rankMedals = [colors.primary, colors.primaryFocused, colors.primaryMuted];
 
   return (
     <View className="mb-6">
@@ -272,7 +283,7 @@ function RankSection({
       </View>
       {loading ? (
         <View className="h-20 items-center justify-center">
-          <ActivityIndicator color={BLUE} size="small" />
+          <ActivityIndicator color={colors.primary} size="small" />
         </View>
       ) : data.length === 0 ? (
         <View className="py-8 items-center rounded-2xl bg-foreground/[0.02]">
@@ -289,7 +300,7 @@ function RankSection({
                   {providerId ? (
                     <ModelLogo providerId={providerId} />
                   ) : i < 3 ? (
-                    <Crown color={RANK_MEDALS[i]} fill={RANK_MEDALS[i]} size={14} />
+                    <Crown color={rankMedals[i]} fill={rankMedals[i]} size={14} />
                   ) : (
                     <Text className="text-secondary/40 text-[12px] font-bold">{i + 1}</Text>
                   )}
@@ -342,6 +353,7 @@ interface StatsData {
 
 export default function StatsScreen({ navigation }: any) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<StatsData>({
@@ -428,7 +440,7 @@ export default function StatsScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={semanticColors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={<ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
         title={t.statsTitle}
         onPressLeft={() => navigation.goBack()}
       />
@@ -439,9 +451,9 @@ export default function StatsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            colors={['#007aff']}
+            colors={[colors.primary]}
             refreshing={refreshing}
-            tintColor="#007aff"
+            tintColor={colors.primary}
             onRefresh={onRefresh}
           />
         }
@@ -456,7 +468,7 @@ export default function StatsScreen({ navigation }: any) {
               <View className="flex-row gap-4 mt-2">
                 {data.registration?.createdAt && (
                   <View className="flex-row items-center gap-1">
-                    <Clock3 color={semanticColors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <Clock3 color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="text-secondary/50 text-[11px] font-medium">
                       {formatDate(data.registration.createdAt)}
                     </Text>
@@ -464,7 +476,7 @@ export default function StatsScreen({ navigation }: any) {
                 )}
                 {data.registration?.updatedAt && (
                   <View className="flex-row items-center gap-1">
-                    <ClockArrowUp color={semanticColors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
+                    <ClockArrowUp color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="text-secondary/50 text-[11px] font-medium">
                       {formatDate(data.registration.updatedAt)}
                     </Text>
@@ -523,7 +535,7 @@ export default function StatsScreen({ navigation }: any) {
           <View className="px-5">
             <RankSection
               data={data.modelRank.map((m) => ({ count: m.count, name: m.id }))}
-              icon={<Trophy color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              icon={<Trophy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
               loading={loading}
               modelLogos={data.modelRank.map((m) => {
                 const pid = getProviderFromModelId(m.id);
@@ -538,7 +550,7 @@ export default function StatsScreen({ navigation }: any) {
                 count: s.count,
                 name: s.title || 'Untitled',
               }))}
-              icon={<MessageSquare color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              icon={<MessageSquare color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
             <RankSection
               loading={loading}
@@ -547,7 +559,7 @@ export default function StatsScreen({ navigation }: any) {
                 count: tp.count,
                 name: tp.title || 'Untitled',
               }))}
-              icon={<BookOpen color={BLUE} size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              icon={<BookOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
           </View>
         </Animated.View>

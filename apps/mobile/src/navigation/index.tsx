@@ -20,7 +20,6 @@ import Animated, {
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
-import AgentDetailScreen from '../screens/AgentDetailScreen';
 import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
 import AppLogsScreen from '../screens/AppLogsScreen';
@@ -29,19 +28,16 @@ import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
-import DiscoverScreen from '../screens/DiscoverScreen';
 import LanguagePickerScreen from '../screens/LanguagePickerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
-import ModelListScreen from '../screens/ModelListScreen';
 import ModelPickerScreen from '../screens/ModelPickerScreen';
 import NotebookScreen from '../screens/NotebookScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
-import ProviderListScreen from '../screens/ProviderListScreen';
 import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import StatsScreen from '../screens/StatsScreen';
@@ -178,6 +174,7 @@ function BottomTabs() {
         },
       }}
       screenOptions={{
+        animation: 'fade',
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text + '60',
@@ -291,7 +288,11 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen component={LoginScreen} name="Login" options={{ animation: 'fade' }} />
-      <Stack.Screen component={BottomTabs} name="MainTabs" />
+      <Stack.Screen
+        component={BottomTabs}
+        name="MainTabs"
+        options={{ animation: 'fade' }}
+      />
 
       {/* Chat */}
       <Stack.Screen
@@ -367,17 +368,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
 
-      {/* Discover */}
-      <Stack.Screen
-        component={DiscoverScreen}
-        name="Discover"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={AgentDetailScreen}
-        name="AgentDetail"
-        options={{ animation: 'slide_from_right' }}
-      />
       <Stack.Screen
         component={AgentListScreen}
         name="AgentList"
@@ -386,16 +376,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen
         component={AgentConfigScreen}
         name="AgentConfig"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ModelListScreen}
-        name="ModelList"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ProviderListScreen}
-        name="ProviderList"
         options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>

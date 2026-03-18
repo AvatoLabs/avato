@@ -224,3 +224,91 @@ export const enteringModalContent = () => FadeInUp.duration(tokens.motion.durati
 | 首路径             | WelcomeScreen / LoginScreen / ServerConfigScreen 时长收敛至 220–420ms，使用 tokens                                                    |
 | 空态与骨架         | EmptyState 使用 `enteringEmptyState()`；CardSkeleton 使用 `enteringSkeleton()`                                                        |
 | Sheet/Modal 内容层 | PromptModal、SkillsSheet、ModelDrawer、AttachmentSheet 增加内容容器 `enteringModalContent()` / `enteringDialogContent()`              |
+
+---
+
+## 十、全面动效缺口审计（2026-03-18）
+
+> 用户反馈：Tab 之前的过渡动画、弹出、过渡等都没了，需全面审计并保证系统丝滑。
+
+### 10.1 Tab 切换动画（缺口）
+
+| 位置           | 文件:行              | 现状                         | 建议                                                                 |
+| -------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
+| Tab.Navigator  | `navigation/index.tsx` 179 | 无 `animation`，切换时内容硬切 | `screenOptions: { animation: 'fade' }` 或 `animation: 'shift'`        |
+| Tab 栏动画     | 同上 116–165, 54–114 | 已有 AnimatedTabLabel、MeTabIcon | 保持                                                               |
+
+**API 支持**：`@react-navigation/bottom-tabs` 7.x 支持 `animation: 'none' | 'fade' | 'shift'` 和 `sceneStyleInterpolator`。
+
+### 10.2 Stack 过渡
+
+| Screen           | 现状                     | 建议                                      |
+| ---------------- | ------------------------ | ----------------------------------------- |
+| MainTabs         | 无 options，默认 slide   | 从 Login 进入时用 `animation: 'fade'` 更顺滑 |
+| 其他 Stack.Screen | 均已配置 slide/fade/modal | 保持                                      |
+
+### 10.3 屏幕级 entering
+
+| 屏幕             | 根内容 entering | 说明                                                         |
+| ---------------- | --------------- | ------------------------------------------------------------ |
+| ChatListScreen   | 分段有          | Hero、Section 等有 FadeInDown，根无                           |
+| ArtworkScreen    | 局部有          | 侧边栏、GenerationBatchCard 有 entering                     |
+| ResourceScreen  | 无              | 主内容无 entering，仅 FilePreviewModal 有                     |
+| StoreScreen     | 无              | 主内容无 entering                                            |
+| ProfileScreen   | 分段有          | WorkspaceOverviewCard 有，SettingsSection 有                  |
+| DiscoverScreen  | ListHeader 有   | 主内容无，ListHeader 有 FadeInDown                            |
+
+**建议**：Tab 主屏（ChatList、Artwork、Resource、Store、Profile）可用 `useIsFocused` + 根容器 `entering` 实现切换时的淡入，或依赖 Tab `animation: 'fade'` 统一处理。
+
+### 10.4 Modal / Sheet 内容层
+
+| 组件                 | animationType | 内容 entering | 缺口 |
+| -------------------- | ------------- | ------------- | ---- |
+| PromptModal          | fade          | ✅ enteringDialogContent | 无   |
+| SkillsSheet          | slide         | ✅ enteringModalContent  | 无   |
+| ModelDrawer          | slide         | ✅ enteringModalContent  | 无   |
+| AttachmentSheet      | slide         | ✅ enteringModalContent  | 无   |
+| **AgentSelectionSheet** | slide      | ❌ 无         | **需补** |
+| MemoryToolSheet      | slide         | 未审计       | 可选 |
+| GroupMentionInput    | fade          | 未审计       | 可选 |
+
+### 10.5 骨架屏 entering
+
+| 组件               | 现状   | 建议                    |
+| ------------------ | ------ | ----------------------- |
+| CardSkeleton       | ✅ 有  | 保持                    |
+| **FileGridSkeleton** | ❌ 无 | 加 `enteringSkeleton()` |
+| **ListSkeleton**   | ❌ 无  | 加 `enteringSkeleton()` |
+| **MessageListSkeleton** | ❌ 无 | 加 `enteringSkeleton()` |
+
+### 10.6 列表项 entering
+
+| 位置                 | 现状   | 建议                                      |
+| -------------------- | ------ | ----------------------------------------- |
+| ChatListScreen 搜索结果 | ✅ SlideInRight | 保持                                      |
+| DiscoverScreen renderItem | 无   | 可选 `enteringListItem(index)`            |
+| StoreScreen renderItem   | 无   | 可选 `enteringListItem(index)`            |
+| TopicListScreen TopicItem | 无 | 可选 entering                             |
+| FlatList itemLayoutAnimation | 未使用 | P1：`LinearTransition` 等（需评估性能） |
+
+### 10.7 实施优先级汇总
+
+| 优先级 | 项                         | 文件                         | 动作                                      |
+| ------ | -------------------------- | ---------------------------- | ----------------------------------------- |
+| **P0** | Tab 切换动画               | `navigation/index.tsx`       | `screenOptions: { animation: 'fade' }`    |
+| **P0** | MainTabs 栈过渡           | `navigation/index.tsx`       | `options={{ animation: 'fade' }}`         |
+| **P0** | AgentSelectionSheet 内容   | `AgentSelectionSheet.tsx`     | 内容包 `Animated.View entering={enteringModalContent()}` |
+| **P0** | 骨架屏 entering            | FileGridSkeleton, ListSkeleton, MessageListSkeleton | 加 `enteringSkeleton()` |
+| P1     | 列表项 entering            | 各 FlatList renderItem       | 按需加 `enteringListItem(index)`          |
+| P1     | Tab 内屏根 entering        | ChatList, Store, Resource 等 | 可选，Tab fade 已覆盖大部分体感            |
+
+### 10.8 P0 实施记录（2026-03-18）
+
+| 项                     | 实现                                                                 |
+| ---------------------- | -------------------------------------------------------------------- |
+| Tab 切换动画           | `Tab.Navigator screenOptions: { animation: 'fade' }`                 |
+| MainTabs 栈过渡        | `Stack.Screen MainTabs options={{ animation: 'fade' }}`               |
+| AgentSelectionSheet    | 内容包 `Animated.View entering={enteringModalContent()}`             |
+| FileGridSkeleton       | 根包 `Animated.View entering={enteringSkeleton()}`                   |
+| ListSkeleton           | 根包 `Animated.View entering={enteringSkeleton()}`                   |
+| MessageListSkeleton    | 根包 `Animated.View entering={enteringSkeleton()}`                   |

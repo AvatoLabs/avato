@@ -3,7 +3,7 @@
  *
  * Layout:
  *  - WorkspaceOverviewCard: Identity, Model, Providers
- *  - Usage Stats, Memory, Agents, Discover, Notebook
+ *  - Usage Stats, Memory, Agents, Notebook
  *  - Settings: Server, AI Providers, Model, Language, Theme, Color, Memory config, Data, Voice
  *  - Sign Out
  */
@@ -16,7 +16,6 @@ import {
   Check,
   ChevronRight,
   Cloud,
-  Compass,
   Database,
   FileText,
   Globe,
@@ -299,7 +298,7 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
-        {/* Workspace — Stats, Memory, Agents, Discover, Notebook */}
+        {/* Workspace — Stats, Memory, Agents, Notebook */}
         <SettingsSection delay={80} title={t.settingsGroupWorkspace}>
           <View className="mb-4">
             <PressableScale
@@ -408,30 +407,6 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
                 <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
                   {t.meAgentsDesc}
-                </Text>
-              </View>
-              <ChevronRight
-                color={colors.primary}
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            </PressableScale>
-          </View>
-
-          <View className="mb-4">
-            <PressableScale
-              className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
-              onPress={() => navigation?.navigate?.('Discover')}
-            >
-              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-                <Compass color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                  {t.meDiscover}
-                </Text>
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                  {t.meDiscoverDesc}
                 </Text>
               </View>
               <ChevronRight

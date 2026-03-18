@@ -27,14 +27,15 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Dimensions,
   Image as RNImage,
   Keyboard,
-  KeyboardAvoidingView,
   LayoutAnimation,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -81,6 +82,7 @@ import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
@@ -95,10 +97,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const initialTopicId = route.params?.topicId ?? null;
   const focusMessageId = route.params?.messageId;
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const primaryColor = colors.primary;
+
+  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
+  const fetchSessions = useSessionStore((s) => s.fetchSessions);
+  const isGroupSession = isGroupSessionLike(sessionId, session?.type);
 
   const rawMessages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
   const messages = useMemo(
@@ -111,9 +119,6 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGenerating = useChatStore((s) => s.stopGenerating);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
-  const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
-  const fetchSessions = useSessionStore((s) => s.fetchSessions);
-  const isGroupSession = isGroupSessionLike(sessionId, session?.type);
 
   const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
@@ -137,6 +142,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const lastAutoScrollAt = useRef(0);
   const hasObservedTopicChange = useRef(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   // Skills drawer
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
@@ -220,7 +226,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       if (state.generating && state.activeStreamingSessionId === sessionId) return;
       const topicId = useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
       void fetchSessions();
-      fetchMessages(sessionId, topicId);
+      fetchMessages(sessionId, topicId, { preferPopulatedTopic: true });
       fetchTopics(sessionId);
     }, [sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics]),
   );
@@ -239,6 +245,50 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       disposed = true;
     };
   }, []);
+
+  const inputPaddingBottom = Math.max(insets.bottom, 8);
+  useEffect(() => {
+    const handleKeyboardShow = (event: any) => {
+      const coords = event?.endCoordinates;
+      const windowHeight = Dimensions.get('window').height;
+      const screenY = Number(coords?.screenY ?? windowHeight);
+      const offsetFromBottom = windowHeight - screenY;
+      if (offsetFromBottom > 0) {
+        setKeyboardOffset(offsetFromBottom + inputPaddingBottom);
+      } else {
+        setKeyboardOffset(0);
+      }
+    };
+    const handleKeyboardHide = () => {
+      setKeyboardOffset(0);
+    };
+
+    const subscriptions =
+      Platform.OS === 'ios'
+        ? [
+            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
+            Keyboard.addListener('keyboardWillChangeFrame', (event) => {
+              const windowHeight = Dimensions.get('window').height;
+              const screenY = Number(event?.endCoordinates?.screenY ?? windowHeight);
+              if (screenY >= windowHeight - 1) {
+                handleKeyboardHide();
+              } else {
+                handleKeyboardShow(event);
+              }
+            }),
+          ]
+        : [
+            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
+          ];
+
+    return () => {
+      for (const subscription of subscriptions) {
+        subscription.remove();
+      }
+    };
+  }, [inputPaddingBottom]);
 
   // Rotating placeholder hints
   const hints = useMemo(
@@ -284,7 +334,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       void Promise.allSettled([
         fetchSessions(),
         fetchTopics(sessionId),
-        fetchMessages(sessionId, topicId, { preserveOnEmpty: true }),
+        fetchMessages(sessionId, topicId, { preferPopulatedTopic: true, preserveOnEmpty: true }),
       ]);
     });
 
@@ -794,7 +844,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       {/* Header */}
-      <BlurView className="z-10" intensity={90} style={{ paddingTop: insets.top }} tint="light">
+      <BlurView
+        className="z-10"
+        intensity={90}
+        style={{ paddingTop: insets.top }}
+        tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
+      >
         <View className="flex-row items-center justify-between px-4 py-2.5">
           <View className="flex-row items-center flex-1">
             <PressableScale
@@ -915,60 +970,21 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         </View>
       </BlurView>
 
-      {/* Message List */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-        keyboardVerticalOffset={0}
-      >
+      {/* Message List + Input */}
+      <View className="flex-1">
         {fetchingMessages && messages.length === 0 ? (
           <MessageListSkeleton />
         ) : (
           <FlashList
             accessibilityLiveRegion="polite"
+            contentContainerStyle={{ paddingBottom: 12, paddingTop: 12 }}
             data={messages}
             estimatedItemSize={120}
             keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
             ref={listRef}
             renderItem={renderMessage}
             scrollEventThrottle={16}
-            ListEmptyComponent={
-              <EmptyState
-                description={emptyStateDescription}
-                iconVariant="chat"
-                title={emptyStateTitle}
-                action={
-                  <Animated.View
-                    className="flex-row flex-wrap justify-center gap-2 mt-4 px-6"
-                    entering={FadeInDown.delay(200).duration(350)}
-                  >
-                    {emptyStateSuggestions.map((label) => (
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
-                        key={label}
-                        onPress={() => {
-                          haptics.light();
-                          setInputText(label);
-                        }}
-                      >
-                        <Text className="text-secondary text-[13px] font-medium">{label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </Animated.View>
-                }
-              />
-            }
-            contentContainerStyle={
-              messages.length === 0
-                ? {
-                    flexGrow: 1,
-                    justifyContent: 'center',
-                    paddingBottom: 12,
-                    paddingTop: 12,
-                  }
-                : { paddingBottom: 12, paddingTop: 12 }
-            }
             onContentSizeChange={autoScrollToEnd}
             onLayout={autoScrollToEnd}
             onScroll={(e) => {
@@ -978,6 +994,40 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               isScrolledToBottom.current = atBottom;
               setShowScrollToTop(!atBottom && contentOffset.y > 200);
             }}
+            ListEmptyComponent={
+              <View
+                style={{
+                  justifyContent: 'center',
+                  minHeight: windowHeight * 0.5,
+                }}
+              >
+                <EmptyState
+                  description={emptyStateDescription}
+                  iconVariant="chat"
+                  title={emptyStateTitle}
+                  action={
+                    <Animated.View
+                      className="flex-row flex-wrap justify-center gap-2 mt-4 px-6"
+                      entering={FadeInDown.delay(200).duration(350)}
+                    >
+                      {emptyStateSuggestions.map((label) => (
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
+                          key={label}
+                          onPress={() => {
+                            haptics.light();
+                            setInputText(label);
+                          }}
+                        >
+                          <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </Animated.View>
+                  }
+                />
+              </View>
+            }
           />
         )}
 
@@ -1001,22 +1051,23 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           </Animated.View>
         )}
 
-        {/* Input Area — Floating Pill */}
-        <View
+        {/* Input Area — Floating Pill. Move by keyboard height for stable cross-platform lift. */}
+        <Animated.View
           style={{
             paddingBottom: Math.max(insets.bottom, 8),
             paddingHorizontal: 16,
             paddingTop: 4,
+            transform: [{ translateY: -keyboardOffset }],
           }}
         >
-          <BlurView
+            <BlurView
             className="rounded-2xl overflow-hidden"
             intensity={80}
-            tint="light"
+            tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
             style={{
               backgroundColor: colors.overlay,
-              borderColor: colors.primaryBorder,
-              borderWidth: 1,
+              borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
+              borderWidth: keyboardOffset > 0 ? 3 : 1,
             }}
           >
             {pendingFiles.length > 0 && (
@@ -1206,8 +1257,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               )}
             </View>
           </BlurView>
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
 
       <ModelDrawer
         sessionId={sessionId}

@@ -25,6 +25,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import PressableScale from '../components/ui/PressableScale';
@@ -56,6 +57,7 @@ interface Props {
 
 export default function ServerConfigScreen({ navigation, route }: Props) {
   const isFirstLaunch = route?.params?.firstLaunch ?? false;
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const colors = useThemeColors();
 
@@ -170,6 +172,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
       >
         <ScrollView
           className="flex-1"
