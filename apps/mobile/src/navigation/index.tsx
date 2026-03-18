@@ -19,6 +19,7 @@ import Animated, {
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { useThemeStore } from '../store/theme';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
@@ -28,7 +29,6 @@ import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
-import LanguagePickerScreen from '../screens/LanguagePickerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
 import MemoryScreen from '../screens/MemoryScreen';
@@ -57,6 +57,7 @@ function MeTabIcon({
   size: number;
   trigger: number;
 }) {
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -103,7 +104,11 @@ function MeTabIcon({
         <RNImage
           resizeMode="contain"
           source={require('../../assets/avato-logo.png')}
-          style={{ height: logoSize, width: logoSize }}
+          style={{
+            height: logoSize,
+            width: logoSize,
+            ...(effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : {}),
+          }}
         />
       </Animated.View>
     </View>
@@ -331,11 +336,6 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         component={ModelPickerScreen}
         name="ModelPicker"
         options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={LanguagePickerScreen}
-        name="LanguagePicker"
-        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
       />
       <Stack.Screen
         component={ProfileEditScreen}

@@ -48,6 +48,8 @@ function getMdStyles(colors: {
 }) {
   return {
     body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
+    text: { color: colors.foreground },
+    textgroup: { color: colors.foreground },
     heading1: {
       color: colors.foreground,
       fontSize: 24,

@@ -15,6 +15,7 @@ import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { useUserStore } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -101,6 +102,7 @@ export default function LoginScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [authConfig, setAuthConfig] = useState<MobileAuthConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
@@ -222,7 +224,8 @@ export default function LoginScreen({ navigation }: any) {
             .mass(0.9)}
         >
           <View
-            className="h-32 w-32 items-center justify-center rounded-[34px] bg-white"
+            className="h-32 w-32 items-center justify-center rounded-[34px]"
+            style={{ backgroundColor: colors.surface }}
             style={{
               elevation: 12,
               shadowColor: colors.shadow,
@@ -231,7 +234,11 @@ export default function LoginScreen({ navigation }: any) {
               shadowRadius: 36,
             }}
           >
-            <RNImage className="h-28 w-28" source={require('../../assets/avato-logo.png')} />
+            <RNImage
+              className="h-28 w-28"
+              source={require('../../assets/avato-logo.png')}
+              style={effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined}
+            />
           </View>
 
           <Text className="mt-8 text-center text-[36px] font-bold tracking-tight text-foreground">

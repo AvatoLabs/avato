@@ -22,6 +22,22 @@
     --color-card: #1c1c1e;
   }
 
+  /* Color scheme: blue (default, explicit for consistency) */
+  .theme-blue {
+    --color-primary: #007aff;
+  }
+  .dark.theme-blue {
+    --color-primary: #0a84ff;
+  }
+
+  /* Color scheme: amber */
+  .theme-amber {
+    --color-primary: #f59e0b;
+  }
+  .dark.theme-amber {
+    --color-primary: #fbbf24;
+  }
+
   /* Color scheme: violet */
   .theme-violet {
     --color-primary: #8b5cf6;
@@ -44,5 +60,29 @@
   }
   .dark.theme-slate {
     --color-primary: #94a3b8;
+  }
+
+  /* Morandi: rose */
+  .theme-rose {
+    --color-primary: #c9a9a6;
+  }
+  .dark.theme-rose {
+    --color-primary: #c9a9a6;
+  }
+
+  /* Morandi: sage */
+  .theme-sage {
+    --color-primary: #9ca88f;
+  }
+  .dark.theme-sage {
+    --color-primary: #9ca88f;
+  }
+
+  /* Morandi: dusty blue */
+  .theme-dustBlue {
+    --color-primary: #8b9dc3;
+  }
+  .dark.theme-dustBlue {
+    --color-primary: #8b9dc3;
   }
 }

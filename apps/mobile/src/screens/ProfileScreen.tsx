@@ -43,6 +43,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import LanguageSheet from '../components/ui/LanguageSheet';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SettingsSection } from '../components/ui/SettingsLayout';
@@ -78,24 +79,37 @@ const THEME_OPTIONS: { icon: typeof Sun; value: ThemePreference }[] = [
 
 const COLOR_SCHEME_OPTIONS: { color: string; value: ColorSchemeId }[] = [
   { color: '#007aff', value: 'blue' },
+  { color: '#f59e0b', value: 'amber' },
   { color: '#8b5cf6', value: 'violet' },
   { color: '#10b981', value: 'green' },
   { color: '#475569', value: 'slate' },
+  { color: '#c9a9a6', value: 'rose' },
+  { color: '#9ca88f', value: 'sage' },
+  { color: '#8b9dc3', value: 'dustBlue' },
 ];
 
 const getColorSchemeLabel = (
   value: ColorSchemeId,
   t: {
+    themeColorAmber: string;
     themeColorBlue: string;
+    themeColorDustBlue: string;
     themeColorGreen: string;
+    themeColorRose: string;
+    themeColorSage: string;
     themeColorSlate: string;
     themeColorViolet: string;
   },
 ) => {
   if (value === 'blue') return t.themeColorBlue;
+  if (value === 'amber') return t.themeColorAmber;
   if (value === 'violet') return t.themeColorViolet;
   if (value === 'green') return t.themeColorGreen;
-  return t.themeColorSlate;
+  if (value === 'slate') return t.themeColorSlate;
+  if (value === 'rose') return t.themeColorRose;
+  if (value === 'sage') return t.themeColorSage;
+  if (value === 'dustBlue') return t.themeColorDustBlue;
+  return t.themeColorBlue;
 };
 
 const getThemeLabel = (
@@ -117,6 +131,8 @@ export default function ProfileScreen({ navigation }: any) {
   const setColorScheme = useThemeStore((s) => s.setColorScheme);
   const sessionCount = useSessionStore((s) => s.sessions.length);
   const isConnected = useConnectionStore((s) => s.isConnected);
+  const serverUrl = useConnectionStore((s) => s.serverUrl);
+  const checking = useConnectionStore((s) => s.checking);
   const checkConnection = useConnectionStore((s) => s.checkConnection);
 
   const userAvatar = useUserStore((s) => s.avatar);
@@ -136,6 +152,16 @@ export default function ProfileScreen({ navigation }: any) {
   );
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [memorySaving, setMemorySaving] = useState(false);
+  const [languageSheetVisible, setLanguageSheetVisible] = useState(false);
+  const [displayServerUrl, setDisplayServerUrl] = useState('');
+
+  useEffect(() => {
+    if (serverUrl) {
+      setDisplayServerUrl(serverUrl);
+    } else {
+      getApiUrl().then(setDisplayServerUrl);
+    }
+  }, [serverUrl]);
 
   const memoryEffortOptions = useMemo<Array<{ label: string; value: MobileMemoryEffort }>>(
     () => [
@@ -146,11 +172,17 @@ export default function ProfileScreen({ navigation }: any) {
     [t.memoryToolEffortHigh, t.memoryToolEffortLow, t.memoryToolEffortMedium],
   );
 
-  const currentAgent = useAgentStore((s) => {
-    if (!s.initialized) return null;
-    return s.getCurrentAgent();
-  });
-  const defaultModel = currentAgent?.model ?? '';
+  const [defaultModel, setDefaultModel] = useState<string>('');
+
+  const loadDefaultModel = useCallback(async () => {
+    try {
+      const userState = await userApi.getState();
+      const model = userState?.settings?.defaultAgent?.config?.model;
+      setDefaultModel(typeof model === 'string' ? model : '');
+    } catch {
+      setDefaultModel('');
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     const [msgs, topics, providers] = await Promise.all([
@@ -166,6 +198,17 @@ export default function ProfileScreen({ navigation }: any) {
     setProviderCount(providers as number);
   }, []);
 
+  const loadMemorySettings = useCallback(async () => {
+    setMemoryLoading(true);
+    try {
+      const settings = await getUserMemorySettings({ force: true });
+      setMemoryEnabled(settings.enabled);
+      setMemoryEffort(settings.effort);
+    } finally {
+      setMemoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStats();
     if (!isUserLoaded) fetchUser();
@@ -179,29 +222,25 @@ export default function ProfileScreen({ navigation }: any) {
       checkConnection();
       void fetchUser();
       void loadMemorySettings();
+      void loadDefaultModel();
       if (!useAgentStore.getState().initialized) {
         void useAgentStore.getState().loadAgents();
       }
-    }, [checkConnection, fetchUser, loadMemorySettings]),
+    }, [checkConnection, fetchUser, loadMemorySettings, loadDefaultModel]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     haptics.light();
-    await Promise.all([loadStats(), checkConnection(), fetchUser(), loadMemorySettings()]);
+    await Promise.all([
+      loadStats(),
+      checkConnection(),
+      fetchUser(),
+      loadMemorySettings(),
+      loadDefaultModel(),
+    ]);
     setRefreshing(false);
-  }, [loadStats, checkConnection, fetchUser, loadMemorySettings]);
-
-  const loadMemorySettings = useCallback(async () => {
-    setMemoryLoading(true);
-    try {
-      const settings = await getUserMemorySettings({ force: true });
-      setMemoryEnabled(settings.enabled);
-      setMemoryEffort(settings.effort);
-    } finally {
-      setMemoryLoading(false);
-    }
-  }, []);
+  }, [loadStats, checkConnection, fetchUser, loadMemorySettings, loadDefaultModel]);
 
   useEffect(() => {
     void loadMemorySettings();
@@ -317,7 +356,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.statsTitle}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.statsOverview}
                   </Text>
                 </View>
@@ -381,7 +420,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.memoryTitle}
                 </Text>
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                   {t.memoryDesc}
                 </Text>
               </View>
@@ -405,7 +444,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.meAgents}
                 </Text>
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                   {t.meAgentsDesc}
                 </Text>
               </View>
@@ -429,7 +468,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.notebookTitle}
                 </Text>
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                   {t.notebookDesc}
                 </Text>
               </View>
@@ -440,6 +479,49 @@ export default function ProfileScreen({ navigation }: any) {
               />
             </PressableScale>
           </View>
+        </SettingsSection>
+
+        {/* Server Info */}
+        <SettingsSection delay={102} title={t.settingsGroupServerInfo}>
+          <TouchableOpacity
+            activeOpacity={0.6}
+            className="mb-4 flex-row items-center rounded-xl bg-foreground/[0.03] px-5 py-4"
+            onPress={() => navigation?.navigate?.('ServerConfig')}
+          >
+            <View className="mr-4 h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <Server color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <Text className="text-foreground text-[15px] font-medium tracking-tight" numberOfLines={1}>
+                {displayServerUrl || t.settingsNotConfigured}
+              </Text>
+              <View className="mt-1.5 flex-row items-center gap-2">
+                {checking ? (
+                  <>
+                    <ActivityIndicator color={colors.primary} size="small" />
+                    <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+                      {t.serverTesting}
+                    </Text>
+                  </>
+                ) : (
+                  <View
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: isConnected ? colors.primary : colors.tertiaryText }}
+                  />
+                )}
+                {!checking && (
+                  <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+                    {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <ChevronRight
+              color={colors.primary}
+              size={18}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          </TouchableOpacity>
         </SettingsSection>
 
         {/* Connection & AI — Server, Providers, Model */}
@@ -458,7 +540,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsServerConfig}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.settingsServerConfigDesc}
                   </Text>
                 </View>
@@ -481,7 +563,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsAiProviders}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.settingsAiProvidersDesc}
                   </Text>
                 </View>
@@ -504,7 +586,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsDefaultModel}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {defaultModel || t.settingsNotConfigured}
                   </Text>
                 </View>
@@ -518,40 +600,44 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </SettingsSection>
 
-        {/* Appearance — Language, Theme, Color */}
-        <SettingsSection delay={115} title={t.settingsGroupAppearance}>
-          <TouchableOpacity
-            activeOpacity={0.6}
-            className="flex-row items-center rounded-xl px-5 py-3.5 mb-2 bg-foreground/[0.03]"
-            onPress={() => navigation?.navigate?.('LanguagePicker')}
-          >
-            <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
-              <Globe color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-            </View>
-            <View className="flex-1">
-              <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                {t.settingsLanguage}
-              </Text>
-              <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                {LOCALE_DISPLAY_NAMES[locale as keyof typeof LOCALE_DISPLAY_NAMES] ??
-                  locale ??
-                  'en-US'}
-              </Text>
-            </View>
-            <ChevronRight color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-          </TouchableOpacity>
-
+        {/* Internationalization — Language */}
+        <SettingsSection delay={112} title={t.settingsGroupI18n}>
           <View className="mb-4">
-            <View className="rounded-xl bg-foreground/[0.03] overflow-hidden px-5 pt-4 pb-4">
-              <Text className="text-secondary/70 text-[12px] font-medium mb-3">{t.themeTitle}</Text>
-              <View className="flex-row gap-2 mb-4">
+            <TouchableOpacity
+              activeOpacity={0.6}
+              className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
+              onPress={() => setLanguageSheetVisible(true)}
+            >
+              <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
+                <Globe color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                  {t.settingsLanguage}
+                </Text>
+                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  {LOCALE_DISPLAY_NAMES[locale as keyof typeof LOCALE_DISPLAY_NAMES] ??
+                    locale ??
+                    'en-US'}
+                </Text>
+              </View>
+              <ChevronRight color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+            </TouchableOpacity>
+          </View>
+        </SettingsSection>
+
+        {/* Appearance — Theme, Color */}
+        <SettingsSection delay={115} title={t.settingsGroupAppearance}>
+          <View className="mb-4">
+            <View className="rounded-xl bg-foreground/[0.03] overflow-hidden px-5 py-4">
+              <View className="flex-row gap-2 mb-3">
                 {THEME_OPTIONS.map((opt) => {
                   const active = themePreference === opt.value;
                   const Icon = opt.icon;
                   return (
                     <Pressable
                       key={opt.value}
-                      className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-3 py-2.5 ${
+                      className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5 ${
                         active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
                       }`}
                       onPress={() => {
@@ -559,20 +645,21 @@ export default function ProfileScreen({ navigation }: any) {
                         setThemePreference(opt.value);
                       }}
                     >
-                      {active ? (
+                      {active && (
                         <Check
                           color={colors.primary}
-                          size={14}
+                          size={12}
                           strokeWidth={tokens.icon.strokeWidth}
                         />
-                      ) : null}
+                      )}
                       <Icon
                         color={active ? colors.primary : colors.muted}
-                        size={16}
+                        size={14}
                         strokeWidth={tokens.icon.strokeWidth}
                       />
                       <Text
-                        className={`text-[13px] font-medium ${active ? 'text-primary' : 'text-secondary/70'}`}
+                        className="text-[12px] font-medium"
+                        style={{ color: active ? colors.primary : colors.secondaryText }}
                       >
                         {getThemeLabel(opt.value, t)}
                       </Text>
@@ -580,16 +667,13 @@ export default function ProfileScreen({ navigation }: any) {
                   );
                 })}
               </View>
-              <Text className="text-secondary/70 text-[12px] font-medium mb-3">
-                {t.themeColorScheme}
-              </Text>
-              <View className="flex-row gap-2">
+              <View className="flex-row flex-wrap gap-2">
                 {COLOR_SCHEME_OPTIONS.map((opt) => {
                   const active = colorScheme === opt.value;
                   return (
                     <Pressable
                       key={opt.value}
-                      className={`flex-1 flex-row items-center justify-center gap-2 rounded-xl px-3 py-2.5 ${
+                      className={`flex-row items-center gap-1.5 rounded-lg py-2 px-3 ${
                         active ? 'bg-primary/10' : 'bg-foreground/[0.04]'
                       }`}
                       onPress={() => {
@@ -597,19 +681,13 @@ export default function ProfileScreen({ navigation }: any) {
                         setColorScheme(opt.value);
                       }}
                     >
-                      {active ? (
-                        <Check
-                          color={colors.primary}
-                          size={14}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      ) : null}
                       <View
-                        className="h-3.5 w-3.5 rounded-full"
+                        className="h-3 w-3 rounded-full"
                         style={{ backgroundColor: opt.color }}
                       />
                       <Text
-                        className={`text-[13px] font-medium ${active ? 'text-primary' : 'text-secondary/70'}`}
+                        className="text-[12px] font-medium"
+                        style={{ color: active ? colors.primary : colors.secondaryText }}
                       >
                         {getColorSchemeLabel(opt.value, t)}
                       </Text>
@@ -637,7 +715,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {memoryEnabled ? t.memoryToolOnTitle : t.memoryToolOffTitle}
                   </Text>
-                  <Text className="mt-0.5 text-secondary/70 text-[12px] font-medium">
+                  <Text className="mt-0.5 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
                     {memoryEnabled ? t.memoryToolOnDesc : t.memoryToolOffDesc}
                   </Text>
                 </View>
@@ -682,7 +760,8 @@ export default function ProfileScreen({ navigation }: any) {
                         />
                       ) : null}
                       <Text
-                        className={`text-[13px] font-medium ${active ? 'ml-1.5 text-primary' : 'text-secondary/70'}`}
+                        className="text-[13px] font-medium ml-1.5"
+                        style={{ color: active ? colors.primary : colors.secondaryText }}
                       >
                         {opt.label}
                       </Text>
@@ -714,7 +793,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsStorageManagement}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.settingsStorageManagementDesc}
                   </Text>
                 </View>
@@ -732,7 +811,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsSyncBackup}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -745,7 +824,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsSpeechRecognition}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -758,7 +837,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsTts}
                   </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -785,10 +864,12 @@ export default function ProfileScreen({ navigation }: any) {
         </SettingsSection>
 
         {/* Version */}
-        <Text className="text-center text-secondary/30 text-[11px] font-medium mt-2">
+        <Text className="text-center text-[11px] font-medium mt-2" style={{ color: colors.tertiaryText }}>
           {APP_NAME} v{APP_VERSION}
         </Text>
       </ScrollView>
+
+      <LanguageSheet onClose={() => setLanguageSheetVisible(false)} visible={languageSheetVisible} />
     </View>
   );
 }

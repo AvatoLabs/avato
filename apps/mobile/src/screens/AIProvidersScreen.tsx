@@ -29,6 +29,7 @@ import { aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
+import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AiProviderListItem } from '../types';
@@ -43,7 +44,9 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = logo || getProviderIconUrl(providerId);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const colors = useThemeColors();
+  const url = logo || getProviderIconUrl(providerId, effectiveTheme);
 
   if (imgError) {
     return (
@@ -51,7 +54,10 @@ function ProviderLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 text-[11px] font-semibold">
+        <Text
+          className="text-[11px] font-semibold"
+          style={{ color: colors.secondaryText }}
+        >
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -158,13 +164,16 @@ export default function AIProvidersScreen({ navigation }: any) {
             <Text className="text-foreground font-medium text-[15px] tracking-tight">
               {provider.name || provider.id}
             </Text>
-            <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
+            <Text
+              className="text-[11px] font-medium mt-0.5"
+              style={{ color: colors.secondaryText }}
+            >
               {provider.source === 'custom' ? 'Custom' : 'Built-in'}
             </Text>
           </View>
           <View
             className="w-2 h-2 rounded-full mr-1"
-            style={{ backgroundColor: provider.enabled ? '#34c759' : '#d1d5db' }}
+            style={{ backgroundColor: provider.enabled ? colors.success : colors.borderDefault }}
           />
           <ChevronRight
             color={colors.secondaryText}
@@ -175,7 +184,7 @@ export default function AIProvidersScreen({ navigation }: any) {
         </View>
       </PressableScale>
     ),
-    [colors.secondaryText, navigation],
+    [colors, navigation],
   );
 
   return (
@@ -205,7 +214,10 @@ export default function AIProvidersScreen({ navigation }: any) {
 
       {/* Summary */}
       <View className="px-5 pb-2">
-        <Text className="text-secondary/50 text-[12px] font-medium">
+        <Text
+          className="text-[12px] font-medium"
+          style={{ color: colors.secondaryText }}
+        >
           {t.providerCountActive.replace('{count}', String(enabledCount))}
         </Text>
       </View>

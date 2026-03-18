@@ -60,14 +60,6 @@ type AnyMemoryItem =
   | MemoryIdentityItem
   | MemoryPreferenceItem;
 
-const LAYER_COLORS: Record<MemoryLayer, string> = {
-  activity: '#f59e0b',
-  context: '#8b5cf6',
-  experience: '#10b981',
-  identity: '#3b82f6',
-  preference: '#ec4899',
-};
-
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
 
@@ -111,9 +103,13 @@ function getDetailEntity(detail: MemoryDetail): AnyMemoryItem {
 }
 
 function FieldSection({ children, label }: { children: React.ReactNode; label: string }) {
+  const colors = useThemeColors();
   return (
     <View className="mb-4">
-      <Text className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <Text
+        className="mb-1.5 text-xs font-semibold uppercase tracking-wider"
+        style={{ color: colors.secondaryText }}
+      >
         {label}
       </Text>
       {children}
@@ -122,9 +118,10 @@ function FieldSection({ children, label }: { children: React.ReactNode; label: s
 }
 
 function FieldText({ value }: { value?: string | null }) {
-  if (!value) return <Text className="text-sm text-gray-300">—</Text>;
+  const colors = useThemeColors();
+  if (!value) return <Text className="text-sm leading-5" style={{ color: colors.tertiaryText }}>—</Text>;
 
-  return <Text className="text-sm leading-5 text-gray-700">{value}</Text>;
+  return <Text className="text-sm leading-5" style={{ color: colors.foreground }}>{value}</Text>;
 }
 
 function EditableField({
@@ -140,13 +137,18 @@ function EditableField({
   onChangeText: (value: string) => void;
   value: string;
 }) {
+  const colors = useThemeColors();
   return (
     <FieldSection label={label}>
       {editing ? (
         <TextInput
-          className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700"
+          className="rounded-xl border px-3 py-2 text-sm"
           multiline={multiline}
-          style={multiline ? { minHeight: 80, textAlignVertical: 'top' } : undefined}
+          placeholderTextColor={colors.muted}
+          style={[
+            { borderColor: colors.borderDefault, color: colors.foreground },
+            multiline ? { minHeight: 80, textAlignVertical: 'top' } : undefined,
+          ]}
           value={value}
           onChangeText={onChangeText}
         />
@@ -201,6 +203,7 @@ function ScoreBadge({
   label: string;
   value?: number | null;
 }) {
+  const colors = useThemeColors();
   const formatted = formatScore(value);
   if (!formatted) return null;
 
@@ -212,7 +215,7 @@ function ScoreBadge({
       <Text className="text-lg font-bold" style={{ color }}>
         {formatted}
       </Text>
-      <Text className="mt-0.5 text-[10px] text-gray-400">{label}</Text>
+      <Text className="mt-0.5 text-[10px]" style={{ color: colors.secondaryText }}>{label}</Text>
     </View>
   );
 }
@@ -239,11 +242,15 @@ function SourceCard({
     <FieldSection label={sourceLabel}>
       <TouchableOpacity
         activeOpacity={canOpen ? 0.7 : 1}
-        className="flex-row items-center rounded-xl bg-gray-100 px-4 py-3"
+        className="flex-row items-center rounded-xl px-4 py-3"
         disabled={!canOpen}
         onPress={onPress}
+        style={{ backgroundColor: colors.fillTertiary }}
       >
-        <View className="mr-3 h-9 w-9 items-center justify-center rounded-xl bg-white">
+        <View
+          className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+          style={{ backgroundColor: colors.surface }}
+        >
           {canOpen ? (
             <Link2 color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
           ) : (
@@ -255,11 +262,11 @@ function SourceCard({
           )}
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-semibold text-gray-800" numberOfLines={1}>
+          <Text className="text-sm font-semibold" numberOfLines={1} style={{ color: colors.foreground }}>
             {title}
           </Text>
           {subtitle ? (
-            <Text className="mt-0.5 text-xs text-gray-500" numberOfLines={1}>
+            <Text className="mt-0.5 text-xs" numberOfLines={1} style={{ color: colors.secondaryText }}>
               {subtitle}
             </Text>
           ) : null}
@@ -287,7 +294,17 @@ export default function MemoryDetailScreen() {
   const layer = route.params?.layer as MemoryLayer | undefined;
   const itemId = initialItem?.id;
 
-  const layerColor = layer ? LAYER_COLORS[layer] : '#6b7280';
+  const layerColors = useMemo(
+    () => ({
+      activity: colors.artworkPending,
+      context: colors.primary,
+      experience: colors.artworkSuccess,
+      identity: colors.info,
+      preference: colors.markdownCodeInlineColor,
+    }),
+    [colors],
+  );
+  const layerColor = layer ? layerColors[layer] : colors.muted;
 
   const [editing, setEditing] = useState(false);
   const [itemState, setItemState] = useState<AnyMemoryItem | undefined>(initialItem);
@@ -717,8 +734,8 @@ export default function MemoryDetailScreen() {
               onChangeText={setField('currentStatus')}
             />
             <View className="flex-row flex-wrap">
-              <ScoreBadge color="#f59e0b" label={t.memoryImpact} value={context.scoreImpact} />
-              <ScoreBadge color="#ef4444" label={t.memoryUrgency} value={context.scoreUrgency} />
+              <ScoreBadge color={colors.artworkPending} label={t.memoryImpact} value={context.scoreImpact} />
+              <ScoreBadge color={colors.danger} label={t.memoryUrgency} value={context.scoreUrgency} />
             </View>
             {context.associatedSubjects?.length ? (
               <FieldSection label={t.memoryAssociatedSubjects}>
@@ -780,22 +797,22 @@ export default function MemoryDetailScreen() {
             <View className="mb-4 flex-row flex-wrap gap-4">
               {activity.startsAt ? (
                 <View className="flex-row items-center">
-                  <Calendar color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs text-gray-500">
+                  <Calendar color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>
                     {formatDate(activity.startsAt)}
                   </Text>
                 </View>
               ) : null}
               {activity.endsAt ? (
                 <View className="flex-row items-center">
-                  <Clock color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs text-gray-500">{formatDate(activity.endsAt)}</Text>
+                  <Clock color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>{formatDate(activity.endsAt)}</Text>
                 </View>
               ) : null}
               {activity.timezone ? (
                 <View className="flex-row items-center">
-                  <MapPin color="#9ca3af" size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs text-gray-500">{activity.timezone}</Text>
+                  <MapPin color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>{activity.timezone}</Text>
                 </View>
               ) : null}
             </View>
@@ -866,7 +883,7 @@ export default function MemoryDetailScreen() {
             ) : null}
             <View className="flex-row flex-wrap">
               <ScoreBadge
-                color="#10b981"
+                color={colors.artworkSuccess}
                 label={t.memoryConfidence}
                 value={experience.scoreConfidence}
               />
@@ -916,7 +933,7 @@ export default function MemoryDetailScreen() {
             />
             <View className="flex-row flex-wrap">
               <ScoreBadge
-                color="#ec4899"
+                color={colors.markdownCodeInlineColor}
                 label={t.memoryPriority}
                 value={preference.scorePriority}
               />
@@ -947,7 +964,10 @@ export default function MemoryDetailScreen() {
 
   if (!itemState || !layer) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: colors.background }}
+      >
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -956,23 +976,25 @@ export default function MemoryDetailScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-gray-50"
+      className="flex-1"
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 48 : 0}
-      style={{ paddingTop: insets.top }}
+      style={{ paddingTop: insets.top, backgroundColor: colors.background }}
     >
       <View className="flex-row items-center justify-between px-5 py-3">
         <View className="flex-1 flex-row items-center">
           <TouchableOpacity className="mr-3" onPress={() => nav.goBack()}>
-            <ChevronLeft color="#111" size={24} strokeWidth={1.8} />
+            <ChevronLeft color={colors.foreground} size={24} strokeWidth={1.8} />
           </TouchableOpacity>
           {editing && (layer === 'identity' || layer === 'context') ? (
             <TextInput
-              className="flex-1 text-lg font-bold text-gray-900"
+              className="flex-1 text-lg font-bold"
+              placeholderTextColor={colors.muted}
+              style={{ color: colors.foreground }}
               value={editState.title}
               onChangeText={setField('title')}
             />
           ) : (
-            <Text className="flex-1 text-lg font-bold text-gray-900" numberOfLines={1}>
+            <Text className="flex-1 text-lg font-bold" numberOfLines={1} style={{ color: colors.foreground }}>
               {getHeaderTitle()}
             </Text>
           )}
@@ -985,7 +1007,7 @@ export default function MemoryDetailScreen() {
           {editing ? (
             <>
               <TouchableOpacity onPress={() => setEditing(false)}>
-                <X color="#9ca3af" size={20} strokeWidth={1.8} />
+                <X color={colors.secondaryText} size={20} strokeWidth={1.8} />
               </TouchableOpacity>
               <TouchableOpacity disabled={saving} onPress={handleSave}>
                 <Save color={layerColor} size={20} strokeWidth={1.8} />
@@ -997,7 +1019,7 @@ export default function MemoryDetailScreen() {
                 <Edit3 color={colors.iconMuted} size={18} strokeWidth={1.8} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleDelete}>
-                <Trash2 color="#ef4444" size={18} strokeWidth={1.8} />
+                <Trash2 color={colors.danger} size={18} strokeWidth={1.8} />
               </TouchableOpacity>
             </>
           )}

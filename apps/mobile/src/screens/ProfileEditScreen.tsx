@@ -230,7 +230,9 @@ export default function ProfileEditScreen({ navigation }: any) {
           rightElement={
             <Text
               className="text-[15px] font-medium"
-              style={{ color: canSaveProfile ? colors.primary : colors.primaryMuted }}
+              style={{
+                color: canSaveProfile ? colors.primary : colors.secondaryText,
+              }}
             >
               {t.save}
             </Text>
@@ -261,7 +263,9 @@ export default function ProfileEditScreen({ navigation }: any) {
         rightElement={
           <Text
             className="text-[15px] font-medium"
-            style={{ color: canSaveProfile ? colors.primary : colors.primaryMuted }}
+            style={{
+              color: canSaveProfile ? colors.primary : colors.secondaryText,
+            }}
           >
             {t.save}
           </Text>
@@ -279,7 +283,10 @@ export default function ProfileEditScreen({ navigation }: any) {
         {/* Section: Account */}
         <Animated.View entering={FadeInDown.duration(250)}>
           <View className="px-5 pt-4 pb-2">
-            <Text className="text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+            <Text
+              className="text-[12px] font-medium uppercase tracking-wider"
+              style={{ color: colors.secondaryText }}
+            >
               {t.profileAccount}
             </Text>
           </View>
@@ -288,24 +295,26 @@ export default function ProfileEditScreen({ navigation }: any) {
             {/* Avatar Row */}
             <TouchableOpacity
               activeOpacity={0.7}
-              className="flex-row items-center justify-between px-4 py-4 border-b border-border"
+              className="flex-row items-center justify-between px-5 py-4 border-b border-border"
               disabled={savingAvatar}
               onPress={handlePickAvatar}
             >
-              <Text className="text-foreground text-[15px] font-medium tracking-tight">
+              <Text className="text-foreground text-[15px] font-medium tracking-tight mr-4">
                 {t.profileAvatar}
               </Text>
               <View className="flex-row items-center">
-                <Text className="text-primary text-[12px] font-medium mr-2">
-                  {t.profileChangePhoto}
-                </Text>
                 {savingAvatar ? (
                   <ActivityIndicator color={colors.primary} size="small" />
                 ) : resolvedAvatarUri ? (
                   <RNImage className="h-10 w-10 rounded-lg" source={{ uri: resolvedAvatarUri }} />
                 ) : (
                   <View className="w-10 h-10 rounded-lg bg-foreground/10 items-center justify-center">
-                    <Text className="text-foreground/60 text-[14px] font-semibold">{initials}</Text>
+                    <Text
+                    className="text-[14px] font-semibold"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {initials}
+                  </Text>
                   </View>
                 )}
               </View>
@@ -358,15 +367,16 @@ export default function ProfileEditScreen({ navigation }: any) {
                     >
                       <View className="mr-1.5">
                         <IconComp
-                          color={isSelected ? colors.primary : colors.muted}
+                          color={isSelected ? colors.primary : colors.secondaryText}
                           size={13}
                           strokeWidth={tokens.icon.strokeWidth}
                         />
                       </View>
                       <Text
-                        className={`text-[13px] font-medium ${
-                          isSelected ? 'text-primary' : 'text-foreground/70'
-                        }`}
+                        className="text-[13px] font-medium"
+                        style={{
+                          color: isSelected ? colors.primary : colors.secondaryText,
+                        }}
                       >
                         {label}
                       </Text>
@@ -393,15 +403,16 @@ export default function ProfileEditScreen({ navigation }: any) {
                 >
                   <View className="mr-1.5">
                     <Briefcase
-                      color={showCustomInput ? colors.primary : colors.muted}
+                      color={showCustomInput ? colors.primary : colors.secondaryText}
                       size={13}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
                   </View>
                   <Text
-                    className={`text-[13px] font-medium ${
-                      showCustomInput ? 'text-primary' : 'text-foreground/70'
-                    }`}
+                    className="text-[13px] font-medium"
+                    style={{
+                      color: showCustomInput ? colors.primary : colors.secondaryText,
+                    }}
                   >
                     {t.profileInterestsOther}
                   </Text>

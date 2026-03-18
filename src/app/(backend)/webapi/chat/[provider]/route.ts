@@ -1,4 +1,6 @@
 import { WebBrowsingExecutionRuntime } from '@lobechat/builtin-tool-web-browsing/executionRuntime';
+import { builtinTools } from '@lobechat/builtin-tools';
+import type { LobeToolManifest } from '@lobechat/context-engine';
 import { type ChatCompletionErrorPayload, type ModelRuntime } from '@lobechat/model-runtime';
 import { AGENT_RUNTIME_ERROR_SET } from '@lobechat/model-runtime';
 import { ChatErrorType } from '@lobechat/types';
@@ -15,6 +17,7 @@ import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
 import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
 import { SearchService } from '@/server/services/search';
+import { BuiltinToolsExecutor } from '@/server/services/toolExecution/builtin';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 import { createErrorResponse } from '@/utils/errorResponse';
 import { getTracePayload } from '@/utils/trace';
@@ -127,6 +130,7 @@ const resolvePluginTools = async (
   serverDB: LobeChatDatabase,
   userId: string,
 ): Promise<{
+  builtinManifestMap: Map<string, LobeToolManifest>;
   gatewayMap: Map<string, GatewayToolEntry>;
   mcpParamsMap: Map<string, { identifier: string; params: McpPluginConfig }>;
   tools: Array<{ function: { description?: string; name: string; parameters: any }; type: string }>;
@@ -137,6 +141,10 @@ const resolvePluginTools = async (
   }> = [];
   const mcpParamsMap = new Map<string, { identifier: string; params: McpPluginConfig }>();
   const gatewayMap = new Map<string, GatewayToolEntry>();
+  const builtinManifestMap = new Map<string, LobeToolManifest>();
+  const builtinManifestRegistry = new Map(
+    builtinTools.map((tool) => [tool.identifier, tool.manifest as LobeToolManifest]),
+  );
 
   try {
     const pluginModel = new PluginModel(serverDB, userId);
@@ -147,6 +155,27 @@ const resolvePluginTools = async (
     );
 
     for (const pluginId of pluginIds) {
+      const builtinManifest = builtinManifestRegistry.get(pluginId);
+      if (builtinManifest?.api?.length) {
+        for (const tool of builtinManifest.api) {
+          const toolKey = `${pluginId}${TOOL_SEPARATOR}${tool.name}`;
+          tools.push({
+            function: {
+              description: tool.description,
+              name: toolKey,
+              parameters: tool.parameters,
+            },
+            type: 'function',
+          });
+        }
+
+        builtinManifestMap.set(pluginId, builtinManifest);
+        console.info(
+          `[webapi/chat] loaded ${builtinManifest.api.length} builtin tools for "${pluginId}"`,
+        );
+        continue;
+      }
+
       const plugin = installedPlugins.find((p) => p.identifier === pluginId);
       if (!plugin) {
         console.warn(`[webapi/chat] plugin "${pluginId}" not found in installed plugins`);
@@ -255,7 +284,7 @@ const resolvePluginTools = async (
     console.error('[webapi/chat] failed to resolve plugin tools:', e);
   }
 
-  return { gatewayMap, mcpParamsMap, tools };
+  return { builtinManifestMap, gatewayMap, mcpParamsMap, tools };
 };
 
 /**
@@ -269,6 +298,9 @@ const executeToolCall = async (
   args: string,
   mcpParamsMap: Map<string, { identifier: string; params: McpPluginConfig }>,
   gatewayMap: Map<string, GatewayToolEntry>,
+  builtinManifestMap: Map<string, LobeToolManifest>,
+  builtinToolsExecutor: BuiltinToolsExecutor | undefined,
+  builtinContext: { serverDB: LobeChatDatabase; topicId?: string; userId: string },
   boundProcessContentBlocks?: (blocks: ToolCallContent[]) => Promise<ToolCallContent[]>,
 ): Promise<string> => {
   const separatorIdx = toolCallName.indexOf(TOOL_SEPARATOR);
@@ -276,6 +308,42 @@ const executeToolCall = async (
 
   const pluginId = toolCallName.slice(0, separatorIdx);
   const toolName = toolCallName.slice(separatorIdx + TOOL_SEPARATOR.length);
+
+  // Builtin tool execution (e.g. lobe-skills)
+  if (builtinManifestMap.has(pluginId)) {
+    if (!builtinToolsExecutor) {
+      return `Error: Builtin executor unavailable for "${pluginId}"`;
+    }
+
+    try {
+      const builtinResult = await builtinToolsExecutor.execute(
+        {
+          apiName: toolName,
+          arguments: args,
+          id: `${pluginId}_${toolName}_${Date.now()}`,
+          identifier: pluginId,
+          source: 'builtin',
+          type: 'builtin',
+        },
+        {
+          serverDB: builtinContext.serverDB,
+          toolManifestMap: { [pluginId]: builtinManifestMap.get(pluginId)! },
+          topicId: builtinContext.topicId,
+          userId: builtinContext.userId,
+        },
+      );
+
+      if (!builtinResult.success) {
+        return `Error executing builtin tool "${toolName}": ${builtinResult.content}`;
+      }
+
+      return typeof builtinResult.content === 'string'
+        ? builtinResult.content
+        : JSON.stringify(builtinResult.content);
+    } catch (e) {
+      return `Error executing builtin tool "${toolName}": ${(e as Error).message}`;
+    }
+  }
 
   // Gateway plugin execution (HTTP POST to tool URL)
   const gateway = gatewayMap.get(toolCallName);
@@ -366,7 +434,7 @@ export const POST = checkAuth(
           const memoryContext = buildMemoryContext(memories);
 
           if (memoryContext) {
-            data.messages = [{ content: memoryContext, role: 'system' }, ...data.messages];
+            data.messages = [{ content: memoryContext, role: 'system' }, ...(data.messages || [])];
           }
         } catch (error) {
           console.error('[webapi/chat] failed to inject memory context:', error);
@@ -449,18 +517,22 @@ export const POST = checkAuth(
       // Responses API returns a different structure (output[] vs choices[].message)
       // that would break tool_calls detection. This aligns with the web client
       // which also explicitly sets apiMode.
-      const originalMessages = [...data.messages];
+      const originalMessages = [...(data.messages || [])];
       let toolLoopSucceeded = false;
-
-      // Build processContentBlocks for image/audio handling (aligned with web's TRPC callTool)
-      const fileService = new FileService(serverDB, userId);
-      const boundProcessContentBlocks = async (blocks: ToolCallContent[]) => {
-        return processContentBlocks(blocks, fileService);
-      };
 
       if (mcpTools?.tools.length) {
         try {
-          let messages = [...data.messages];
+          // Build processContentBlocks for image/audio handling (aligned with web's TRPC callTool)
+          const fileService = new FileService(serverDB, userId);
+          const boundProcessContentBlocks = async (blocks: ToolCallContent[]) => {
+            return processContentBlocks(blocks, fileService);
+          };
+          const builtinToolsExecutor =
+            mcpTools.builtinManifestMap.size > 0
+              ? new BuiltinToolsExecutor(serverDB, userId)
+              : undefined;
+
+          let messages = [...(data.messages || [])];
           let toolsWereCalled = false;
 
           for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -526,6 +598,9 @@ export const POST = checkAuth(
                 tc.function.arguments,
                 mcpTools.mcpParamsMap,
                 mcpTools.gatewayMap,
+                mcpTools.builtinManifestMap,
+                builtinToolsExecutor,
+                { serverDB, topicId: data.topicId, userId },
                 boundProcessContentBlocks,
               );
               console.info(
@@ -569,7 +644,7 @@ export const POST = checkAuth(
       // This mirrors the Web client's `useApplicationBuiltinSearchTool` path.
       if (data.enabledSearch) {
         try {
-          const lastUserMsg = [...data.messages].reverse().find((m) => m.role === 'user');
+          const lastUserMsg = [...(data.messages || [])].reverse().find((m) => m.role === 'user');
           const searchQuery =
             typeof lastUserMsg?.content === 'string'
               ? lastUserMsg.content
@@ -594,7 +669,7 @@ export const POST = checkAuth(
               );
 
               data.messages = [
-                ...data.messages,
+                ...(data.messages || []),
                 {
                   content: `<web_search_results>\n${searchResult.content}\n</web_search_results>\n\nPlease answer the user's question based on the above search results. Cite sources when possible.`,
                   role: 'system',
@@ -612,7 +687,7 @@ export const POST = checkAuth(
       }
 
       console.info(
-        `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages.length}`,
+        `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages?.length ?? 0}`,
       );
 
       const streamResponse = await modelRuntime.chat(data, runtimeOptions);
@@ -627,7 +702,7 @@ export const POST = checkAuth(
         result: string;
       }> = [];
 
-      for (const msg of data.messages) {
+      for (const msg of data.messages || []) {
         if ((msg as any).role !== 'assistant' || !(msg as any).tool_calls?.length) continue;
         for (const tc of (msg as any).tool_calls) {
           const fullName: string = tc.function?.name || '';
@@ -635,7 +710,7 @@ export const POST = checkAuth(
           const identifier = sepIdx >= 0 ? fullName.slice(0, sepIdx) : fullName;
           const apiName = sepIdx >= 0 ? fullName.slice(sepIdx + TOOL_SEPARATOR.length) : fullName;
 
-          const resultMsg = data.messages.find(
+          const resultMsg = (data.messages || []).find(
             (m: any) => m.role === 'tool' && m.tool_call_id === tc.id,
           );
 

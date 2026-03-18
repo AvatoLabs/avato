@@ -36,6 +36,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getProviderIconUrl } from '../constants/cdn';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { statsApi } from '../lib/api';
+import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
@@ -123,10 +124,13 @@ function StatCard({
           <Text className="text-foreground text-[20px] font-bold tracking-tight">
             {formatNumber(value)}
           </Text>
-          <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">{title}</Text>
+          <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+            {title}
+          </Text>
           {pct && (
             <Text
-              className={`text-[10px] font-medium mt-0.5 ${isPositive ? 'text-primary' : 'text-secondary/70'}`}
+              className="text-[10px] font-medium mt-0.5"
+              style={{ color: isPositive ? colors.primary : colors.secondaryText }}
             >
               {pct}
             </Text>
@@ -184,7 +188,7 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
         </View>
         <View className="flex-row gap-2">
           <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-foreground/5">
-            <Text className="text-secondary/70 text-[11px] font-medium">
+            <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
               {t.statsActiveDays.replace('{count}', String(activeDays))}
             </Text>
           </View>
@@ -246,7 +250,8 @@ function getProviderFromModelId(modelId: string): string | undefined {
 
 function ModelLogo({ providerId }: { providerId: string }) {
   const [err, setErr] = React.useState(false);
-  const url = getProviderIconUrl(providerId);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const url = getProviderIconUrl(providerId, effectiveTheme);
   if (err) return <Text className="text-primary text-[10px] font-bold">{providerId.slice(0, 2)}</Text>;
   return (
     <RNImage
@@ -287,8 +292,12 @@ function RankSection({
         </View>
       ) : data.length === 0 ? (
         <View className="py-8 items-center rounded-2xl bg-foreground/[0.02]">
-          <Text className="text-secondary/40 text-[13px] font-medium">{t.statsEmpty}</Text>
-          <Text className="text-secondary/25 text-[11px] mt-1">{t.statsEmptyDesc}</Text>
+          <Text className="text-[13px] font-medium" style={{ color: colors.secondaryText }}>
+            {t.statsEmpty}
+          </Text>
+          <Text className="text-[11px] mt-1" style={{ color: colors.tertiaryText }}>
+            {t.statsEmptyDesc}
+          </Text>
         </View>
       ) : (
         <View className="rounded-2xl overflow-hidden bg-foreground/[0.02] px-3 py-2">
@@ -302,7 +311,9 @@ function RankSection({
                   ) : i < 3 ? (
                     <Crown color={rankMedals[i]} fill={rankMedals[i]} size={14} />
                   ) : (
-                    <Text className="text-secondary/40 text-[12px] font-bold">{i + 1}</Text>
+                    <Text className="text-[12px] font-bold" style={{ color: colors.secondaryText }}>
+                      {i + 1}
+                    </Text>
                   )}
                 </View>
                 <View className="flex-1">
@@ -313,9 +324,12 @@ function RankSection({
                     >
                       {item.name}
                     </Text>
-                    <Text className="text-secondary/50 text-[12px] font-semibold tabular-nums ml-2">
-                      {item.count}
-                    </Text>
+<Text
+                    className="text-[12px] font-semibold tabular-nums ml-2"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {item.count}
+                  </Text>
                   </View>
                   <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
                     <View
@@ -469,7 +483,7 @@ export default function StatsScreen({ navigation }: any) {
                 {data.registration?.createdAt && (
                   <View className="flex-row items-center gap-1">
                     <Clock3 color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="text-secondary/50 text-[11px] font-medium">
+                    <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
                       {formatDate(data.registration.createdAt)}
                     </Text>
                   </View>
@@ -477,7 +491,7 @@ export default function StatsScreen({ navigation }: any) {
                 {data.registration?.updatedAt && (
                   <View className="flex-row items-center gap-1">
                     <ClockArrowUp color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="text-secondary/50 text-[11px] font-medium">
+                    <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
                       {formatDate(data.registration.updatedAt)}
                     </Text>
                   </View>

@@ -85,6 +85,7 @@ import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -169,8 +170,11 @@ function SessionLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const colors = useThemeColors();
   const iconSize = size * 0.65;
-  const iconUrl = providerLogo || (provider ? getProviderIconUrl(provider) : undefined);
+  const iconUrl =
+    providerLogo || (provider ? getProviderIconUrl(provider, effectiveTheme) : undefined);
   const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
 
   useEffect(() => {
@@ -198,7 +202,10 @@ function SessionLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.35 }}>
+        <Text
+          className="font-semibold"
+          style={{ color: colors.secondaryText, fontSize: size * 0.35 }}
+        >
           {provider.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -234,7 +241,10 @@ function SessionLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.35 }}>
+        <Text
+          className="font-semibold"
+          style={{ color: colors.secondaryText, fontSize: size * 0.35 }}
+        >
           {avatar.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -246,7 +256,10 @@ function SessionLogo({
       className="rounded-full bg-foreground/5 items-center justify-center"
       style={{ width: size, height: size }}
     >
-      <Text className="text-foreground/60 font-semibold" style={{ fontSize: size * 0.55 }}>
+      <Text
+        className="font-semibold"
+        style={{ color: colors.secondaryText, fontSize: size * 0.55 }}
+      >
         #
       </Text>
     </View>
@@ -1271,7 +1284,7 @@ export default function ChatListScreen({ navigation }: any) {
               </Text>
               {renderTagChip(item.tagId)}
             </View>
-            <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
+            <Text className="text-[12px] font-medium" numberOfLines={1} style={{ color: colors.secondaryText }}>
               {showTopicPreview
                 ? (() => {
                     const latest = latestTopicBySessionId.get(item.id);
@@ -1282,7 +1295,7 @@ export default function ChatListScreen({ navigation }: any) {
                 : (item.description ?? '')}
             </Text>
           </View>
-          <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
+          <Text className="text-[10px] font-medium tracking-wide" style={{ color: colors.secondaryText }}>
             {formatTimeAgo(item.updatedAt, t)}
           </Text>
         </TouchableOpacity>
@@ -1333,7 +1346,10 @@ export default function ChatListScreen({ navigation }: any) {
             >
               {session.title || t.chatListNewConversation}
             </Text>
-            <Text className="ml-2 text-[11px] font-semibold uppercase tracking-wider text-secondary/35">
+            <Text
+              className="ml-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: colors.secondaryText }}
+            >
               {matchType === 'session'
                 ? t.chatSearchMatchSession
                 : matchType === 'topic'
@@ -1342,7 +1358,7 @@ export default function ChatListScreen({ navigation }: any) {
             </Text>
             {renderTagChip(session.tagId)}
           </View>
-          <Text className="text-[12px] font-medium leading-5 text-secondary/55" numberOfLines={2}>
+          <Text className="text-[12px] font-medium leading-5" numberOfLines={2} style={{ color: colors.secondaryText }}>
             {summary}
           </Text>
         </View>
@@ -1556,14 +1572,14 @@ export default function ChatListScreen({ navigation }: any) {
 
         {/* Search Bar */}
         <Animated.View entering={FadeInDown.delay(75).duration(350)}>
-          <View className="px-5 mt-3 mb-2">
+          <View className="px-5 mt-3 mb-1">
             <View className="flex-row items-center bg-foreground/5 rounded-xl px-3.5 py-2.5">
-              <Search color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              <Search color={colors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
               <TextInput
                 className="flex-1 ml-2.5 text-foreground text-[14px]"
                 clearButtonMode="while-editing"
                 placeholder={t.chatListSearch}
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={colors.secondaryText}
                 returnKeyType="search"
                 value={searchText}
                 onChangeText={setSearchText}
@@ -1645,7 +1661,7 @@ export default function ChatListScreen({ navigation }: any) {
                             : (topic.agent?.title ?? session?.title ?? '')}
                         </Text>
                       </View>
-                      <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
+                      <Text className="text-[10px] font-medium tracking-wide" style={{ color: colors.secondaryText }}>
                         {formatTimeAgo(
                           typeof topic.updatedAt === 'string'
                             ? topic.updatedAt
@@ -1908,7 +1924,7 @@ export default function ChatListScreen({ navigation }: any) {
                   className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
                   onPress={closeActionSheet}
                 >
-                  <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
+                  <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>{t.cancel}</Text>
                 </Pressable>
               </View>
 

@@ -291,7 +291,9 @@ type TranslationKeys = {
   settingsAboutAvatoDesc: string;
   settingsGroupWorkspace: string;
   settingsGroupConnection: string;
+  settingsGroupServerInfo: string;
   settingsGroupAppearance: string;
+  settingsGroupI18n: string;
   settingsGroupMemory: string;
   settingsGroupData: string;
   settingsGroupAccount: string;
@@ -321,10 +323,14 @@ type TranslationKeys = {
   themeSystem: string;
   themeDesc: string;
   themeColorScheme: string;
+  themeColorAmber: string;
   themeColorBlue: string;
   themeColorViolet: string;
   themeColorGreen: string;
   themeColorSlate: string;
+  themeColorRose: string;
+  themeColorSage: string;
+  themeColorDustBlue: string;
 
   // Home / Command Surface
   homeHeroPlaceholder: string;
@@ -1234,7 +1240,9 @@ const en: TranslationKeys = {
   settingsAboutAvatoDesc: 'v1.0.0 • Avato mobile app',
   settingsGroupWorkspace: 'Workspace',
   settingsGroupConnection: 'Connection & AI',
+  settingsGroupServerInfo: 'Server',
   settingsGroupAppearance: 'Appearance',
+  settingsGroupI18n: 'Internationalization',
   settingsGroupMemory: 'Memory',
   settingsGroupData: 'Data & Voice',
   settingsGroupAccount: 'Account',
@@ -1260,10 +1268,14 @@ const en: TranslationKeys = {
   themeSystem: 'System',
   themeDesc: 'The app uses the Light theme for the best visual experience.',
   themeColorScheme: 'Color',
+  themeColorAmber: 'Amber',
   themeColorBlue: 'Blue',
   themeColorViolet: 'Violet',
   themeColorGreen: 'Green',
   themeColorSlate: 'Slate',
+  themeColorRose: 'Rose',
+  themeColorSage: 'Sage',
+  themeColorDustBlue: 'Dust Blue',
 
   homeHeroPlaceholder: 'What do you want to do?',
   homeQuickWrite: 'New Session',
@@ -2152,7 +2164,9 @@ const zh_tw: TranslationKeys = {
   settingsAboutAvatoDesc: 'v1.0.0 • Avato 行動應用',
   settingsGroupWorkspace: '工作區',
   settingsGroupConnection: '連接與 AI',
+  settingsGroupServerInfo: '伺服器',
   settingsGroupAppearance: '外觀',
+  settingsGroupI18n: '國際化',
   settingsGroupMemory: '記憶',
   settingsGroupData: '資料與語音',
   settingsGroupAccount: '帳戶',
@@ -2178,10 +2192,14 @@ const zh_tw: TranslationKeys = {
   themeSystem: '跟隨系統',
   themeDesc: '應用程式使用淺色主題以提供最佳視覺體驗。',
   themeColorScheme: '色系',
+  themeColorAmber: '琥珀',
   themeColorBlue: '藍色',
   themeColorViolet: '紫色',
   themeColorGreen: '綠色',
   themeColorSlate: '灰藍',
+  themeColorRose: '玫瑰',
+  themeColorSage: '鼠尾草',
+  themeColorDustBlue: '霧藍',
 
   homeHeroPlaceholder: '你想做什麼？',
   homeQuickWrite: '新會話',
@@ -3066,7 +3084,9 @@ const zh: TranslationKeys = {
   settingsAboutAvatoDesc: 'v1.0.0 • Avato 移动应用',
   settingsGroupWorkspace: '工作区',
   settingsGroupConnection: '连接与 AI',
+  settingsGroupServerInfo: '服务器',
   settingsGroupAppearance: '外观',
+  settingsGroupI18n: '国际化',
   settingsGroupMemory: '记忆',
   settingsGroupData: '数据与语音',
   settingsGroupAccount: '账户',
@@ -3092,10 +3112,14 @@ const zh: TranslationKeys = {
   themeSystem: '跟随系统',
   themeDesc: '应用使用浅色主题以提供最佳视觉体验。',
   themeColorScheme: '色系',
+  themeColorAmber: '琥珀',
   themeColorBlue: '蓝色',
   themeColorViolet: '紫色',
   themeColorGreen: '绿色',
   themeColorSlate: '灰蓝',
+  themeColorRose: '玫瑰',
+  themeColorSage: '鼠尾草',
+  themeColorDustBlue: '雾蓝',
 
   homeHeroPlaceholder: '你想做什么？',
   homeQuickWrite: '新会话',

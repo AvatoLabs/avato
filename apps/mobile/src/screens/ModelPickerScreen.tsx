@@ -22,6 +22,7 @@ import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { ProviderWithModels, RuntimeEnabledModel } from '../types';
@@ -201,7 +202,8 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = logo || getProviderIconUrl(providerId);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const url = logo || getProviderIconUrl(providerId, effectiveTheme);
 
   if (imgError) {
     return (

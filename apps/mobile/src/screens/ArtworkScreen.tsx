@@ -20,7 +20,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -390,12 +390,32 @@ function SidebarOptionStrip<T extends string | number>({
 
 function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
-  const map: Record<ArtworkTaskStatus, { bg: string; fg: string; label: string }> = {
-    pending: { bg: '#f59e0b20', fg: '#f59e0b', label: t.artworkPending },
-    processing: { bg: '#3b82f620', fg: '#3b82f6', label: t.artworkProcessing },
-    success: { bg: '#10b98120', fg: '#10b981', label: t.artworkSuccess },
-    error: { bg: '#ef444420', fg: '#ef4444', label: t.artworkError },
-  };
+  const colors = useThemeColors();
+  const map: Record<ArtworkTaskStatus, { bg: string; fg: string; label: string }> = useMemo(
+    () => ({
+      pending: {
+        bg: `${colors.artworkPending}20`,
+        fg: colors.artworkPending,
+        label: t.artworkPending,
+      },
+      processing: {
+        bg: `${colors.artworkProcessing}20`,
+        fg: colors.artworkProcessing,
+        label: t.artworkProcessing,
+      },
+      success: {
+        bg: `${colors.artworkSuccess}20`,
+        fg: colors.artworkSuccess,
+        label: t.artworkSuccess,
+      },
+      error: {
+        bg: `${colors.artworkError}20`,
+        fg: colors.artworkError,
+        label: t.artworkError,
+      },
+    }),
+    [colors, t],
+  );
   const s = map[normalizeGenerationTaskStatus(status)];
   return (
     <View

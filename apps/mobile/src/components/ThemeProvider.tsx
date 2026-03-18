@@ -36,7 +36,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     },
   };
 
-  const themeClass = colorScheme === 'blue' ? '' : `theme-${colorScheme}`;
+  const themeClass = `theme-${colorScheme}`;
   return (
     <View
       className={[isDark ? 'dark' : '', themeClass].filter(Boolean).join(' ')}

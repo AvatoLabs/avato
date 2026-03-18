@@ -361,14 +361,20 @@ const ItemCard = memo<{
           </View>
 
           {item.description ? (
-            <Text className="text-secondary/45 text-[12px] mt-0.5 leading-4" numberOfLines={2}>
+            <Text
+              className="text-[12px] mt-0.5 leading-4"
+              numberOfLines={2}
+              style={{ color: colors.secondaryText }}
+            >
               {item.description}
             </Text>
           ) : null}
 
           {item.author ? (
             <View className="flex-row items-center mt-1.5">
-              <Text className="text-secondary/30 text-[11px]">{item.author}</Text>
+              <Text className="text-[11px]" style={{ color: colors.tertiaryText }}>
+                {item.author}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -438,11 +444,15 @@ const InstalledRow = memo<{
           </View>
         </View>
         {item.description ? (
-          <Text className="text-secondary/40 text-[11px] mt-0.5" numberOfLines={1}>
+          <Text
+            className="text-[11px] mt-0.5"
+            numberOfLines={1}
+            style={{ color: colors.secondaryText }}
+          >
             {item.description}
           </Text>
         ) : (
-          <Text className="text-secondary/30 text-[11px] mt-0.5" numberOfLines={1}>
+          <Text className="text-[11px] mt-0.5" numberOfLines={1} style={{ color: colors.tertiaryText }}>
             {item.identifier}
           </Text>
         )}
@@ -533,7 +543,10 @@ function SimpleImportModal({
                 <ActivityIndicator color={colors.iconOnPrimary} size="small" />
               ) : (
                 <Text
-                  className={`font-semibold text-[15px] ${value.trim() ? 'text-white' : 'text-secondary/40'}`}
+                  className="font-semibold text-[15px]"
+                  style={{
+                    color: value.trim() ? colors.iconOnPrimary : colors.tertiaryText,
+                  }}
                 >
                   {buttonText}
                 </Text>
@@ -806,7 +819,7 @@ function AddCustomMcpModal({
                       style={{ backgroundColor: colors.fillTertiary }}
                       onPress={() => setShowQuickImport(false)}
                     >
-                      <Text className="text-secondary/60 text-[13px] font-semibold">
+                      <Text className="text-[13px] font-semibold" style={{ color: colors.secondaryText }}>
                         {t.cancel}
                       </Text>
                     </Pressable>
@@ -817,7 +830,10 @@ function AddCustomMcpModal({
                       onPress={handleQuickImport}
                     >
                       <Text
-                        className={`text-[13px] font-semibold ${isQuickImportReady ? 'text-white' : 'text-secondary/40'}`}
+                        className="text-[13px] font-semibold"
+                        style={{
+                          color: isQuickImportReady ? colors.iconOnPrimary : colors.tertiaryText,
+                        }}
                       >
                         {t.confirm}
                       </Text>
@@ -845,7 +861,7 @@ function AddCustomMcpModal({
                 </Pressable>
               )}
 
-              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+              <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                 {t.skillsCustomMcpIdentifier}
               </Text>
               <TextInput
@@ -868,7 +884,7 @@ function AddCustomMcpModal({
                 <View className="mb-2" />
               )}
 
-              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+              <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                 {t.skillsCustomMcpUrl}
               </Text>
               <TextInput
@@ -892,7 +908,7 @@ function AddCustomMcpModal({
                 <View className="mb-2" />
               )}
 
-              <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+              <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                 {t.skillsCustomMcpAuth}
               </Text>
               <View className="flex-row mb-3 bg-foreground/5 rounded-xl p-1">
@@ -901,7 +917,10 @@ function AddCustomMcpModal({
                   onPress={() => setAuthType('none')}
                 >
                   <Text
-                    className={`text-[13px] font-semibold ${authType === 'none' ? 'text-primary' : 'text-secondary/60'}`}
+                    className="text-[13px] font-semibold"
+                    style={{
+                      color: authType === 'none' ? colors.primary : colors.secondaryText,
+                    }}
                   >
                     {t.skillsCustomMcpAuthNone}
                   </Text>
@@ -911,7 +930,10 @@ function AddCustomMcpModal({
                   onPress={() => setAuthType('bearer')}
                 >
                   <Text
-                    className={`text-[13px] font-semibold ${authType === 'bearer' ? 'text-primary' : 'text-secondary/60'}`}
+                    className="text-[13px] font-semibold"
+                    style={{
+                      color: authType === 'bearer' ? colors.primary : colors.secondaryText,
+                    }}
                   >
                     {t.skillsCustomMcpAuthBearer}
                   </Text>
@@ -920,7 +942,7 @@ function AddCustomMcpModal({
 
               {authType === 'bearer' ? (
                 <>
-                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                     {t.skillsCustomMcpToken}
                   </Text>
                   <TextInput
@@ -947,7 +969,10 @@ function AddCustomMcpModal({
                     <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                   ) : (
                     <Text
-                      className={`text-[13px] font-semibold ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                      className="text-[13px] font-semibold"
+                      style={{
+                        color: isConnectionReady ? colors.iconOnPrimary : colors.tertiaryText,
+                      }}
                     >
                       {t.skillsCustomMcpTestConnection}
                     </Text>
@@ -975,7 +1000,10 @@ function AddCustomMcpModal({
                 onPress={() => setShowAdvanced((value) => !value)}
               >
                 <Text
-                  className={`text-[13px] font-semibold ${showAdvanced ? 'text-primary' : 'text-foreground/70'}`}
+                  className="text-[13px] font-semibold"
+                  style={{
+                    color: showAdvanced ? colors.primary : colors.foreground,
+                  }}
                 >
                   {t.skillsCustomMcpAdvanced}
                 </Text>
@@ -989,7 +1017,7 @@ function AddCustomMcpModal({
 
               {showAdvanced ? (
                 <>
-                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                     {t.skillsCustomMcpHeaders}
                   </Text>
                   {headers.map((header, index) => (
@@ -1043,7 +1071,7 @@ function AddCustomMcpModal({
                     </Text>
                   </Pressable>
 
-                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                     {t.skillsCustomMcpDesc}
                   </Text>
                   <TextInput
@@ -1057,7 +1085,7 @@ function AddCustomMcpModal({
                     onChangeText={setDescription}
                   />
 
-                  <Text className="text-foreground/70 text-[13px] font-medium mb-1.5">
+                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
                     {t.skillsCustomMcpAvatar}
                   </Text>
                   <TextInput
@@ -1083,7 +1111,10 @@ function AddCustomMcpModal({
                   <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
                   <Text
-                    className={`font-semibold text-[15px] ${isConnectionReady ? 'text-white' : 'text-secondary/40'}`}
+                    className="font-semibold text-[15px]"
+                    style={{
+                      color: isConnectionReady ? colors.iconOnPrimary : colors.tertiaryText,
+                    }}
                   >
                     {t.save}
                   </Text>
@@ -1160,7 +1191,10 @@ function StoreItemModal({
             <View style={{ flex: 1 }}>
               <Text className="text-foreground text-[17px] font-semibold">{detail.name}</Text>
               {detail.description ? (
-                <Text className="text-secondary/60 text-[13px] leading-5 mt-1">
+                <Text
+                  className="text-[13px] leading-5 mt-1"
+                  style={{ color: colors.secondaryText }}
+                >
                   {detail.description}
                 </Text>
               ) : null}
@@ -1169,7 +1203,9 @@ function StoreItemModal({
 
           <View className="flex-row flex-wrap gap-2 mt-4">
             <View className="px-2 py-0.5 rounded-full bg-foreground/5">
-              <Text className="text-secondary/50 text-[11px]">{detail.identifier}</Text>
+              <Text className="text-[11px]" style={{ color: colors.secondaryText }}>
+                {detail.identifier}
+              </Text>
             </View>
             <View className="px-2 py-0.5 rounded-full bg-primary/10">
               <Text className="text-primary text-[11px] font-medium">{detail.label}</Text>
@@ -1183,12 +1219,19 @@ function StoreItemModal({
 
           {detail.author ? (
             <View className="mt-3">
-              <Text className="text-secondary/45 text-[12px]">{detail.author}</Text>
+              <Text className="text-[12px]" style={{ color: colors.secondaryText }}>
+                {detail.author}
+              </Text>
             </View>
           ) : null}
 
           {detail.installedSkill?.source === 'builtin' ? (
-            <Text className="text-secondary/45 text-[12px] leading-5 mt-4">{t.storeBuiltIn}</Text>
+            <Text
+              className="text-[12px] leading-5 mt-4"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.storeBuiltIn}
+            </Text>
           ) : null}
 
           <View className="mt-5 gap-2">
@@ -2099,7 +2142,7 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <FileArchive color="#f97316" size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <FileArchive color={colors.fileArchive} size={16} strokeWidth={tokens.icon.strokeWidth} />
                 <Text className="text-foreground text-[14px] font-medium ml-3">
                   {t.storeUploadZip}
                 </Text>

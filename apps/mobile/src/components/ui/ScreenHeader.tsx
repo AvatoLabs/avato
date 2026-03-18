@@ -114,7 +114,7 @@ export function ScreenHeader({
 
   const mainScreenContent = (
     <>
-      <View className="px-5 py-3" style={{ minHeight: 72 }}>
+      <View className="px-5 pt-3 pb-2" style={{ minHeight: 56 }}>
         <View className="flex-row items-center justify-between">
           <View className="mr-3 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
             {titleIcon ? (

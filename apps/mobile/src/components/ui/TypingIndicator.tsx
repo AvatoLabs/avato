@@ -5,6 +5,8 @@
  */
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
+
+import { useThemeColors } from '../../theme/colors';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -69,7 +71,9 @@ function Dot({ color, delay, size }: { color: string; delay: number; size: numbe
   );
 }
 
-export default function TypingIndicator({ color = '#8e8e93', dotSize = 7 }: TypingIndicatorProps) {
+export default function TypingIndicator({ color, dotSize = 7 }: TypingIndicatorProps) {
+  const colors = useThemeColors();
+  const effectiveColor = color ?? colors.typingIndicator;
   return (
     <View
       style={{
@@ -81,7 +85,7 @@ export default function TypingIndicator({ color = '#8e8e93', dotSize = 7 }: Typi
       }}
     >
       {Array.from({ length: DOT_COUNT }).map((_, i) => (
-        <Dot color={color} delay={i * STAGGER} key={i} size={dotSize} />
+        <Dot color={effectiveColor} delay={i * STAGGER} key={i} size={dotSize} />
       ))}
     </View>
   );

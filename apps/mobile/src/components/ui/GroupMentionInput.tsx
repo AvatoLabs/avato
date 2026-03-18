@@ -9,7 +9,7 @@ import type { TextInput as RNTextInput } from 'react-native';
 import { FlatList, Image as RNImage, Modal, Pressable, Text, TextInput, View } from 'react-native';
 
 import { useI18n } from '../../lib/i18n';
-import { semanticColors, themeColors } from '../../theme/colors';
+import { useThemeColors } from '../../theme/colors';
 
 const MENTION_FORMAT = (name: string, id: string) => `<mention name="${name}" id="${id}" />`;
 
@@ -43,6 +43,7 @@ export function GroupMentionInput({
   className,
 }: GroupMentionInputProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const inputRef = useRef<RNTextInput>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [mentionStartIndex, setMentionStartIndex] = useState(0);
@@ -112,6 +113,16 @@ export function GroupMentionInput({
     setFilter('');
   }, []);
 
+  const parsedMentions = useMemo(() => {
+    const mentions: { id: string; name: string }[] = [];
+    const re = /<mention\s[^>]*name="([^"]*)"[^>]*id="([^"]+)"[^>]*\/>/g;
+    let m;
+    while ((m = re.exec(value)) !== null) {
+      mentions.push({ id: m[2], name: m[1] || m[2] });
+    }
+    return mentions;
+  }, [value]);
+
   return (
     <View>
       <TextInput
@@ -120,13 +131,28 @@ export function GroupMentionInput({
         className={className}
         editable={editable}
         placeholder={placeholder}
-        placeholderTextColor={themeColors.secondaryText}
+        placeholderTextColor={colors.secondaryText}
         ref={inputRef}
         style={[{ paddingVertical: 0, textAlignVertical: 'top' }, style]}
         underlineColorAndroid="transparent"
         value={value}
         onChangeText={handleChangeText}
       />
+      {parsedMentions.length > 0 ? (
+        <View className="mt-1 flex-row flex-wrap gap-1">
+          {parsedMentions.map((m, idx) => (
+            <View
+              key={`mention-${m.id}-${idx}`}
+              className="rounded-full px-2 py-0.5 flex-row items-center"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
+              <Text className="text-[12px] font-medium" style={{ color: colors.primary }}>
+                @{m.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       <Modal
         accessibilityViewIsModal
         transparent
@@ -141,9 +167,12 @@ export function GroupMentionInput({
           >
             <View className="max-h-64 rounded-2xl bg-card p-2">
               <View className="mb-2 px-2">
-                <Text className="text-[12px] font-medium text-secondary/60">
-                  {t.groupMentionTitle}
-                </Text>
+                <Text
+                className="text-[12px] font-medium"
+                style={{ color: colors.secondaryText }}
+              >
+                {t.groupMentionTitle}
+              </Text>
               </View>
               <FlatList
                 data={mentionOptions}
@@ -156,7 +185,7 @@ export function GroupMentionInput({
                   >
                     {item.isAll ? (
                       <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-                        <Users color={semanticColors.primary} size={18} strokeWidth={2} />
+                        <Users color={colors.primary} size={18} strokeWidth={2} />
                       </View>
                     ) : (
                       <View className="mr-3 h-9 w-9 overflow-hidden rounded-full bg-primary/10">

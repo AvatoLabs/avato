@@ -65,15 +65,6 @@ const TAB_DEFS: { icon: typeof Brain; key: MemoryLayer | 'home'; labelKey: strin
   { icon: BrainCircuit, key: 'preference', labelKey: 'memoryPreference' },
 ];
 
-// ── Layer colors ──────────────────────────────────────────────────────
-const LAYER_COLORS: Record<string, string> = {
-  activity: '#f59e0b',
-  context: '#8b5cf6',
-  experience: '#10b981',
-  identity: '#3b82f6',
-  preference: '#ec4899',
-};
-
 type AnyMemoryItem =
   | MemoryActivityItem
   | MemoryContextItem
@@ -327,9 +318,9 @@ function HomeTab() {
               <View
                 className="px-3 py-1.5 rounded-full"
                 key={`${r.role}-${i}`}
-                style={{ backgroundColor: `${LAYER_COLORS.identity}18` }}
+                style={{ backgroundColor: `${colors.info}18` }}
               >
-                <Text className="text-sm font-medium" style={{ color: LAYER_COLORS.identity }}>
+                <Text className="text-sm font-medium" style={{ color: colors.info }}>
                   {r.role}
                   {r.count > 1 ? ` (${r.count})` : ''}
                 </Text>
@@ -345,16 +336,16 @@ function HomeTab() {
         {persona?.content || persona?.summary ? (
           <View className="bg-foreground/[0.02] rounded-xl p-4">
             {persona.summary ? (
-              <Text className="text-sm text-foreground/80 leading-5 mb-2">{persona.summary}</Text>
+              <Text className="text-sm leading-5 mb-2" style={{ color: colors.foreground }}>{persona.summary}</Text>
             ) : null}
             {persona.content ? (
-              <Text className="text-sm text-secondary/60 leading-5">{persona.content}</Text>
+              <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>{persona.content}</Text>
             ) : null}
           </View>
         ) : (
           <View className="bg-foreground/[0.02] rounded-xl p-6 items-center">
             <Brain color={colors.secondaryText} size={32} strokeWidth={1.5} />
-            <Text className="text-sm text-secondary/60 mt-3 text-center">
+            <Text className="text-sm mt-3 text-center" style={{ color: colors.secondaryText }}>
               {t.memoryPersonaEmpty}
             </Text>
           </View>
@@ -367,9 +358,9 @@ function HomeTab() {
           <Text className="text-base font-semibold text-foreground mb-2">
             {t.memoryExtractTitle}
           </Text>
-          <Text className="text-sm text-secondary/60 leading-5">{extractionStatusText}</Text>
+          <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>{extractionStatusText}</Text>
           {extractionProgressText ? (
-            <Text className="text-xs text-secondary/45 mt-2">{extractionProgressText}</Text>
+            <Text className="text-xs mt-2" style={{ color: colors.secondaryText }}>{extractionProgressText}</Text>
           ) : null}
           <TouchableOpacity
             className="mt-4 rounded-xl items-center justify-center"
@@ -404,8 +395,8 @@ function HomeTab() {
       {!persona?.content && !persona?.summary && roles.length === 0 && (
         <View className="items-center py-10">
           <Brain color={colors.secondaryText} size={48} strokeWidth={1.2} />
-          <Text className="text-base font-medium text-secondary/60 mt-4">{t.memoryEmpty}</Text>
-          <Text className="text-sm text-secondary/45 mt-1 text-center px-8">
+          <Text className="text-base font-medium mt-4" style={{ color: colors.secondaryText }}>{t.memoryEmpty}</Text>
+          <Text className="text-sm mt-1 text-center px-8" style={{ color: colors.secondaryText }}>
             {t.memoryEmptyDesc}
           </Text>
         </View>
@@ -542,7 +533,17 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
     });
   }, [items, searchQuery, layer]);
 
-  const layerColor = LAYER_COLORS[layer] || '#6b7280';
+  const layerColors = useMemo(
+    () => ({
+      activity: colors.artworkPending,
+      context: colors.primary,
+      experience: colors.artworkSuccess,
+      identity: colors.info,
+      preference: colors.markdownCodeInlineColor,
+    }),
+    [colors],
+  );
+  const layerColor = layerColors[layer] ?? colors.muted;
 
   const renderItem = useCallback(
     ({ item }: { item: AnyMemoryItem }) => {
@@ -568,7 +569,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                 {title}
               </Text>
               {subtext && title !== subtext ? (
-                <Text className="text-sm text-secondary/60 mt-1 leading-5" numberOfLines={2}>
+                <Text className="text-sm mt-1 leading-5" numberOfLines={2} style={{ color: colors.secondaryText }}>
                   {subtext}
                 </Text>
               ) : null}
@@ -595,10 +596,10 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
             ) : null}
             {tags.slice(0, 3).map((tag, i) => (
               <View className="px-2 py-0.5 rounded-full bg-foreground/[0.06]" key={`${tag}-${i}`}>
-                <Text className="text-xs text-secondary/60">{tag}</Text>
+                <Text className="text-xs font-medium" style={{ color: colors.secondaryText }}>{tag}</Text>
               </View>
             ))}
-            {date ? <Text className="text-xs text-secondary/45 ml-auto">{date}</Text> : null}
+            {date ? <Text className="text-xs ml-auto" style={{ color: colors.secondaryText }}>{date}</Text> : null}
           </View>
         </TouchableOpacity>
       );
@@ -618,7 +619,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
     <View className="flex-1">
       {/* Search toggle + count + Create Identity (when identity tab) */}
       <View className="flex-row items-center justify-between px-5 py-2">
-        <Text className="text-sm text-secondary/60">
+        <Text className="text-sm" style={{ color: colors.secondaryText }}>
           {t.memoryTotalCount.replace('{count}', String(filtered.length))}
         </Text>
         <View className="flex-row items-center gap-3">
@@ -663,7 +664,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                   <X color={colors.secondaryText} size={20} strokeWidth={1.5} />
                 </TouchableOpacity>
               </View>
-              <Text className="text-sm font-medium text-foreground/80 mb-1">
+              <Text className="text-sm font-medium mb-1" style={{ color: colors.foreground }}>
                 {t.memoryCreateTitle}
               </Text>
               <TextInput
@@ -673,7 +674,7 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                 value={createTitle}
                 onChangeText={setCreateTitle}
               />
-              <Text className="text-sm font-medium text-foreground/80 mb-1">
+              <Text className="text-sm font-medium mb-1" style={{ color: colors.foreground }}>
                 {t.memoryCreateSummary}
               </Text>
               <TextInput

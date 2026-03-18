@@ -347,6 +347,16 @@ function mergeTokens(
     inactiveTabBg: palette.inactiveTabBg,
     userBubbleBg: palette.userBubbleBg,
     userBubbleLink: palette.userBubbleLink,
+    ...(palette.userBubbleText != null && { userBubbleText: palette.userBubbleText }),
+    ...(palette.userBubbleTextMuted != null && { userBubbleTextMuted: palette.userBubbleTextMuted }),
+    ...(palette.userBubbleCodeBg != null && { userBubbleCodeBg: palette.userBubbleCodeBg }),
+    ...(palette.userBubbleSubtleBg != null && { userBubbleSubtleBg: palette.userBubbleSubtleBg }),
+    ...(palette.userBubbleTableBg != null && { userBubbleTableBg: palette.userBubbleTableBg }),
+    ...(palette.userBubbleTableBorder != null && {
+      userBubbleTableBorder: palette.userBubbleTableBorder,
+    }),
+    ...(palette.userBubbleHr != null && { userBubbleHr: palette.userBubbleHr }),
+    ...(palette.iconOnPrimary != null && { iconOnPrimary: palette.iconOnPrimary }),
     markdownLink: palette.markdownLink,
     chatAccentBadgeBg: palette.chatAccentBadgeBg,
     chatAccentBadgeText: palette.chatAccentBadgeText,
@@ -369,7 +379,7 @@ export function getThemeTokens(
   colorScheme: ColorSchemeId = 'blue',
 ): ColorTokens {
   const base = baseMap[theme];
-  const palette = getColorSchemePalette(colorScheme);
+  const palette = getColorSchemePalette(colorScheme, theme);
   return mergeTokens(base, palette);
 }
 

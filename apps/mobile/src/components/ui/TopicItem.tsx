@@ -5,9 +5,9 @@ import { Heart, MoreHorizontal, Pencil, Trash2, Wand2 } from 'lucide-react-nativ
 import React, { memo, useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
-import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import type { Topic } from '../../types';
 import PromptModal from './PromptModal';
@@ -77,8 +77,8 @@ const TopicItem = memo<TopicItemProps>(
             <View className="flex-row items-center">
               {topic.favorite && (
                 <Heart
-                  color={semanticColors.danger}
-                  fill={semanticColors.danger}
+                  color={colors.danger}
+                  fill={colors.danger}
                   size={12}
                   style={{ marginRight: 4 }}
                 />
@@ -92,7 +92,10 @@ const TopicItem = memo<TopicItemProps>(
                 {topic.title}
               </Text>
             </View>
-            <Text className="text-secondary/50 text-[12px] mt-0.5 font-medium">
+            <Text
+              className="text-[12px] mt-0.5 font-medium"
+              style={{ color: colors.secondaryText }}
+            >
               {formatDate(topic.updatedAt)}
             </Text>
           </View>
@@ -105,7 +108,7 @@ const TopicItem = memo<TopicItemProps>(
             }}
           >
             <MoreHorizontal
-              color={semanticColors.muted}
+              color={colors.muted}
               size={18}
               strokeWidth={tokens.icon.strokeWidth}
             />
@@ -138,8 +141,8 @@ const TopicItem = memo<TopicItemProps>(
                   }}
                 >
                   <Heart
-                    color={topic.favorite ? semanticColors.danger : semanticColors.muted}
-                    fill={topic.favorite ? semanticColors.danger : 'none'}
+                    color={topic.favorite ? colors.danger : colors.muted}
+                    fill={topic.favorite ? colors.danger : 'none'}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -156,7 +159,7 @@ const TopicItem = memo<TopicItemProps>(
                     }}
                   >
                     <Wand2
-                      color={semanticColors.muted}
+                      color={colors.muted}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -169,7 +172,7 @@ const TopicItem = memo<TopicItemProps>(
                     onPress={handleRename}
                   >
                     <Pencil
-                      color={semanticColors.muted}
+                      color={colors.muted}
                       size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
@@ -181,7 +184,7 @@ const TopicItem = memo<TopicItemProps>(
                   onPress={handleDelete}
                 >
                   <Trash2
-                    color={semanticColors.danger}
+                    color={colors.danger}
                     size={18}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -193,7 +196,9 @@ const TopicItem = memo<TopicItemProps>(
                   className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
                   onPress={() => setMenuVisible(false)}
                 >
-                  <Text className="text-base font-medium text-foreground/50">{t.cancel}</Text>
+                  <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                    {t.cancel}
+                  </Text>
                 </Pressable>
               </View>
             </Pressable>

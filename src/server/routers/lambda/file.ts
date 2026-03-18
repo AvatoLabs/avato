@@ -1,3 +1,4 @@
+import { getMimeType } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -22,6 +23,15 @@ import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
  * Returns a unified proxy URL format: ${APP_URL}/f/:id
  */
 const getFileProxyUrl = (fileId: string): string => `${appEnv.APP_URL}/f/${fileId}`;
+
+const normalizeFileType = (fileType?: string | null, name?: string | null): string => {
+  if (!fileType || fileType.toLowerCase().includes('octet-stream')) {
+    const inferred = getMimeType(name || '');
+    if (inferred && inferred !== 'application/octet-stream') return inferred;
+  }
+
+  return fileType || 'application/octet-stream';
+};
 
 const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -67,13 +77,24 @@ export const fileRouter = router({
       }
 
       let actualSize = input.size;
+      let actualFileType = input.fileType;
       try {
-        const { contentLength } = await ctx.fileService.getFileMetadata(input.url);
+        const { contentLength, contentType } = await ctx.fileService.getFileMetadata(input.url);
         if (contentLength >= 1) {
           actualSize = contentLength;
         }
+        if (contentType && contentType !== 'application/octet-stream') {
+          actualFileType = contentType;
+        }
       } catch {
         // If metadata fetch fails, use original size from input
+      }
+
+      if (!actualFileType || actualFileType === 'application/octet-stream') {
+        const inferredType = getMimeType(input.name);
+        if (inferredType && inferredType !== 'application/octet-stream') {
+          actualFileType = inferredType;
+        }
       }
 
       await businessFileUploadCheck({
@@ -91,7 +112,7 @@ export const fileRouter = router({
       const { id } = await ctx.fileModel.create(
         {
           fileHash: input.hash,
-          fileType: input.fileType,
+          fileType: actualFileType,
           knowledgeBaseId: input.knowledgeBaseId,
           metadata: input.metadata,
           name: input.name,
@@ -121,7 +142,7 @@ export const fileRouter = router({
         createdAt: item.createdAt,
         embeddingTaskId: item.embeddingTaskId,
         fileHash: item.fileHash,
-        fileType: item.fileType,
+        fileType: normalizeFileType(item.fileType, item.name),
         id: item.id,
         metadata: item.metadata,
         name: item.name,
@@ -163,7 +184,7 @@ export const fileRouter = router({
         createdAt: item.createdAt,
         embeddingError: embeddingTask?.error,
         embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
-        fileType: item.fileType,
+        fileType: normalizeFileType(item.fileType, item.name),
         finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
         id: item.id,
         metadata: item.metadata as Record<string, any> | null | undefined,
@@ -207,6 +228,7 @@ export const fileRouter = router({
         chunkingStatus: chunkTask?.status as AsyncTaskStatus,
         embeddingError: embeddingTask?.error ?? null,
         embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+        fileType: normalizeFileType(item.fileType, item.name),
         finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
         sourceType: 'file' as const,
         url: getFileProxyUrl(item.id),
@@ -273,6 +295,7 @@ export const fileRouter = router({
           editorData: null,
           embeddingError: embeddingTask?.error ?? null,
           embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+          fileType: normalizeFileType(item.fileType, item.name),
           finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
           url: getFileProxyUrl(item.id),
         } as FileListItem);
@@ -348,6 +371,7 @@ export const fileRouter = router({
           chunkingStatus: chunkTask?.status as AsyncTaskStatus,
           embeddingError: embeddingTask?.error ?? null,
           embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+          fileType: normalizeFileType(item.fileType, item.name),
           finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
           sourceType: 'file' as const,
           url: getFileProxyUrl(item.id),

@@ -520,7 +520,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     [modelProviders, sessionProvider],
   );
   const toolbarProviderLogo =
-    selectedProviderLogo || (sessionProvider ? getProviderIconUrl(sessionProvider) : undefined);
+    selectedProviderLogo ||
+    (sessionProvider ? getProviderIconUrl(sessionProvider, effectiveTheme) : undefined);
 
   const groupMembersById = useMemo<Record<string, GroupMessageSpeaker> | undefined>(() => {
     if (!groupDetail?.agents?.length) return undefined;
@@ -888,7 +889,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     />
                   ) : (
                     <Cpu
-                      color={colors.muted}
+                      color={colors.secondaryText}
                       size={12}
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginRight: 5 }}
@@ -985,15 +986,6 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             ref={listRef}
             renderItem={renderMessage}
             scrollEventThrottle={16}
-            onContentSizeChange={autoScrollToEnd}
-            onLayout={autoScrollToEnd}
-            onScroll={(e) => {
-              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-              const atBottom =
-                layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
-              isScrolledToBottom.current = atBottom;
-              setShowScrollToTop(!atBottom && contentOffset.y > 200);
-            }}
             ListEmptyComponent={
               <View
                 style={{
@@ -1028,6 +1020,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 />
               </View>
             }
+            onContentSizeChange={autoScrollToEnd}
+            onLayout={autoScrollToEnd}
+            onScroll={(e) => {
+              const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+              const atBottom =
+                layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+              isScrolledToBottom.current = atBottom;
+              setShowScrollToTop(!atBottom && contentOffset.y > 200);
+            }}
           />
         )}
 
@@ -1099,7 +1100,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                   accessibilityLabel={generating ? t.chatGenerating : hints[hintIndex]}
                   className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
                   placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                  placeholderTextColor={colors.muted}
+                  placeholderTextColor={colors.secondaryText}
                   style={{ paddingVertical: 0, textAlignVertical: 'top' }}
                   underlineColorAndroid="transparent"
                   value={inputText}
@@ -1127,7 +1128,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                         onError={() => setProviderLogoError(true)}
                       />
                     ) : (
-                      <Cpu color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                      <Cpu color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
                     )}
                   </TouchableOpacity>
                   {/* Search */}

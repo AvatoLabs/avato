@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import TextType from '../../components/ui/TextType';
 import { useI18n } from '../../lib/i18n';
+import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 
@@ -15,6 +16,7 @@ export default function WelcomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [showCTA, setShowCTA] = useState(false);
 
   return (
@@ -32,7 +34,8 @@ export default function WelcomeScreen({ navigation }: any) {
             .mass(0.9)}
         >
           <View
-            className="w-32 h-32 rounded-[34px] bg-white items-center justify-center"
+            className="w-32 h-32 rounded-[34px] items-center justify-center"
+            style={{ backgroundColor: colors.surface }}
             style={{
               elevation: 12,
               shadowColor: colors.shadow,
@@ -41,7 +44,11 @@ export default function WelcomeScreen({ navigation }: any) {
               shadowRadius: 36,
             }}
           >
-            <RNImage className="w-28 h-28" source={require('../../../assets/avato-logo.png')} />
+            <RNImage
+            className="w-28 h-28"
+            source={require('../../../assets/avato-logo.png')}
+            style={effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined}
+          />
           </View>
 
           <Text className="text-foreground text-[36px] font-bold tracking-tight text-center mt-8">

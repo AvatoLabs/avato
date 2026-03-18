@@ -14,8 +14,9 @@ import {
 import Animated from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
-import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
+import { useThemeStore } from '../../store/theme';
+import { useThemeColors } from '../../theme/colors';
 import { useModelStore } from '../../store/model';
 import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
@@ -31,7 +32,9 @@ function ProviderLogo({
   size?: number;
 }) {
   const [err, setErr] = useState(false);
-  const url = logo || getProviderIconUrl(providerId);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const colors = useThemeColors();
+  const url = logo || getProviderIconUrl(providerId, effectiveTheme);
 
   if (err) {
     return (
@@ -39,7 +42,10 @@ function ProviderLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 text-[9px] font-semibold">
+        <Text
+          className="text-[9px] font-semibold"
+          style={{ color: colors.secondaryText }}
+        >
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -89,6 +95,7 @@ export function ModelDrawer({
   initialProvider,
 }: ModelDrawerProps) {
   const { t } = useI18n();
+  const colors = useThemeColors();
   const providers = useModelStore((s) => s.providers);
   const loading = useModelStore((s) => s.loading);
   const isLoaded = useModelStore((s) => s.isLoaded);
@@ -158,7 +165,7 @@ export function ModelDrawer({
             </View>
 
             {/* Header */}
-            <View className="px-5 pb-2 pt-1 flex-row items-center justify-between">
+            <View className="px-5 pb-1 pt-0 flex-row items-center justify-between">
               <Text className="text-foreground text-[18px] font-bold tracking-tight">
                 {t.modelPickerTitle}
               </Text>
@@ -168,10 +175,10 @@ export function ModelDrawer({
                 onPress={() => fetchModels(true)}
               >
                 {loading ? (
-                  <ActivityIndicator color={semanticColors.primary} size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                 ) : (
                   <RefreshCw
-                    color={semanticColors.primary}
+                    color={colors.primary}
                     size={16}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
@@ -185,7 +192,7 @@ export function ModelDrawer({
                 <TextInput
                   className="flex-1 text-foreground text-[14px]"
                   placeholder={t.modelPickerSearch}
-                  placeholderTextColor={semanticColors.muted}
+                  placeholderTextColor={colors.muted}
                   returnKeyType="search"
                   value={search}
                   onChangeText={setSearch}
@@ -201,11 +208,11 @@ export function ModelDrawer({
             >
               {!isLoaded && loading ? (
                 <View className="items-center py-16">
-                  <ActivityIndicator color={semanticColors.primary} size="large" />
+                  <ActivityIndicator color={colors.primary} size="large" />
                 </View>
               ) : filtered.length === 0 ? (
                 <View className="items-center py-16">
-                  <Text className="text-secondary/50 text-[14px]">
+                  <Text className="text-[14px]" style={{ color: colors.secondaryText }}>
                     {providers.length === 0 ? t.modelPickerOffline : t.discoverNoResults}
                   </Text>
                 </View>
@@ -214,7 +221,10 @@ export function ModelDrawer({
                   <View className="mb-3" key={provider.id}>
                     <View className="flex-row items-center mb-1.5 mt-1">
                       <ProviderLogo logo={provider.logo} providerId={provider.id} size={16} />
-                      <Text className="ml-1.5 text-secondary/50 text-[11px] font-semibold uppercase tracking-wider">
+                      <Text
+                        className="ml-1.5 text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: colors.secondaryText }}
+                      >
                         {provider.name}
                       </Text>
                     </View>
@@ -232,8 +242,9 @@ export function ModelDrawer({
                             <ProviderLogo logo={provider.logo} providerId={provider.id} size={24} />
                             <View className="flex-1 ml-2.5">
                               <Text
-                                className={`text-[14px] font-medium tracking-tight ${isSelected ? 'text-primary' : 'text-foreground'}`}
+                                className="text-[14px] font-medium tracking-tight"
                                 numberOfLines={1}
+                                style={{ color: isSelected ? colors.primary : colors.foreground }}
                               >
                                 {model.displayName || model.id}
                               </Text>
@@ -244,7 +255,10 @@ export function ModelDrawer({
                                       className="bg-foreground/5 px-1.5 py-px rounded-full"
                                       key={tag}
                                     >
-                                      <Text className="text-secondary/50 text-[9px] font-medium">
+                                      <Text
+                                        className="text-[9px] font-medium"
+                                        style={{ color: colors.secondaryText }}
+                                      >
                                         {tag}
                                       </Text>
                                     </View>
@@ -254,7 +268,7 @@ export function ModelDrawer({
                             </View>
                             {isSelected && (
                               <Check
-                                color={semanticColors.primary}
+                                color={colors.primary}
                                 size={18}
                                 strokeWidth={tokens.icon.strokeWidth}
                               />

@@ -55,6 +55,7 @@ import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { fileApi, getApiUrl } from '../lib/api';
+import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
@@ -66,6 +67,20 @@ import type { FileListItem } from '../types';
 // ── Helpers ──────────────────────────────────────────────────────────
 
 type FileCategory = 'all' | 'images' | 'documents' | 'others';
+const IMAGE_EXTENSIONS = new Set([
+  'avif',
+  'bmp',
+  'gif',
+  'heic',
+  'heif',
+  'jpeg',
+  'jpg',
+  'png',
+  'svg',
+  'tif',
+  'tiff',
+  'webp',
+]);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -74,9 +89,80 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
-function isImage(fileType: string): boolean {
-  return fileType.startsWith('image/');
+function hasImageExtension(fileName?: string): boolean {
+  if (!fileName) return false;
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return !!(ext && IMAGE_EXTENSIONS.has(ext));
 }
+
+function isImage(fileType: string, fileName?: string): boolean {
+  if (fileType.toLowerCase().startsWith('image/')) return true;
+  return hasImageExtension(fileName);
+}
+
+function isImageMimeType(mime?: string | null): boolean {
+  if (!mime) return false;
+  const normalized = mime.toLowerCase();
+  return normalized.startsWith('image/');
+}
+
+function hasKnownImageSignature(bytes: Uint8Array): boolean {
+  if (bytes.length < 4) return false;
+
+  // PNG
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 137 &&
+    bytes[1] === 80 &&
+    bytes[2] === 78 &&
+    bytes[3] === 71 &&
+    bytes[4] === 13 &&
+    bytes[5] === 10 &&
+    bytes[6] === 26 &&
+    bytes[7] === 10
+  )
+    return true;
+
+  // JPEG
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return true;
+
+  // GIF
+  if (
+    bytes.length >= 6 &&
+    bytes[0] === 71 &&
+    bytes[1] === 73 &&
+    bytes[2] === 70 &&
+    bytes[3] === 56
+  )
+    return true;
+
+  // WEBP: RIFF....WEBP
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 82 &&
+    bytes[1] === 73 &&
+    bytes[2] === 70 &&
+    bytes[3] === 70 &&
+    bytes[8] === 87 &&
+    bytes[9] === 69 &&
+    bytes[10] === 66 &&
+    bytes[11] === 80
+  )
+    return true;
+
+  // BMP: BM
+  if (bytes[0] === 66 && bytes[1] === 77) return true;
+
+  // TIFF: II*\0 or MM\0*
+  if (
+    (bytes[0] === 73 && bytes[1] === 73 && bytes[2] === 42 && bytes[3] === 0) ||
+    (bytes[0] === 77 && bytes[1] === 77 && bytes[2] === 0 && bytes[3] === 42)
+  )
+    return true;
+
+  return false;
+}
+
 function isDocument(fileType: string): boolean {
   const docs = ['application/pdf', 'text/', 'application/msword', 'application/vnd'];
   return docs.some((p) => fileType.startsWith(p));
@@ -99,6 +185,8 @@ function getResourcePreviewMdStyles(colors: {
 }) {
   return {
     body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
+    text: { color: colors.foreground },
+    textgroup: { color: colors.foreground },
     heading1: {
       color: colors.foreground,
       fontSize: 22,
@@ -166,22 +254,24 @@ function isVideo(fileType: string): boolean {
 
 function matchesCategory(item: FileListItem, category: FileCategory): boolean {
   if (category === 'all') return true;
-  if (category === 'images') return isImage(item.fileType);
+  if (category === 'images') return isImage(item.fileType, item.name);
   if (category === 'documents') return isDocument(item.fileType);
-  if (category === 'others') return !isImage(item.fileType) && !isDocument(item.fileType);
+  if (category === 'others') return !isImage(item.fileType, item.name) && !isDocument(item.fileType);
   return true;
 }
 
 function FileTypeIcon({
   fileType,
+  fileName,
   color,
   size = 28,
 }: {
   fileType: string;
+  fileName?: string;
   color: string;
   size?: number;
 }) {
-  if (isImage(fileType))
+  if (isImage(fileType, fileName))
     return <FileImage color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
   if (isAudio(fileType))
     return <FileAudio color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
@@ -220,10 +310,10 @@ function resolveRemoteFileUrl(apiBaseUrl: string, item: Pick<FileListItem, 'id' 
 }
 
 function buildRemoteFileCandidates(apiBaseUrl: string, item: Pick<FileListItem, 'id' | 'url'>) {
-  const resolved = resolveRemoteFileUrl(apiBaseUrl, item);
   const proxyUrl = apiBaseUrl ? `${apiBaseUrl.replace(/\/$/, '')}/f/${item.id}` : '';
-
-  return [...new Set([resolved, proxyUrl].filter(Boolean))];
+  const resolved = resolveRemoteFileUrl(apiBaseUrl, item);
+  // Prefer proxyUrl (user-configured server) over item.url (APP_URL from API)
+  return [...new Set([proxyUrl, resolved].filter(Boolean))];
 }
 
 // ── File Preview Modal ────────────────────────────────────────────────
@@ -255,7 +345,7 @@ const FilePreviewModal = memo(
 
     const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
     const fileUrl = previewCandidates[previewIndex] || '';
-    const imageFile = item ? isImage(item.fileType) : false;
+    const imageFile = item ? isImage(item.fileType, item.name) : false;
     const textFile = item
       ? item.fileType.startsWith('text/') || item.fileType === 'application/json'
       : false;
@@ -604,15 +694,20 @@ const FilePreviewModal = memo(
                   className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
                   style={{ width: 96, height: 96 }}
                 >
-                  <FileTypeIcon color={colors.secondaryText} fileType={item.fileType} size={44} />
+                  <FileTypeIcon
+                    color={colors.secondaryText}
+                    fileName={item.name}
+                    fileType={item.fileType}
+                    size={44}
+                  />
                 </View>
                 <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
                   {item.name}
                 </Text>
-                <Text className="text-secondary/40 text-[14px] text-center mb-1">
+                <Text className="text-[14px] text-center mb-1" style={{ color: colors.secondaryText }}>
                   {item.fileType}
                 </Text>
-                <Text className="text-secondary/40 text-[14px] text-center mb-8">
+                <Text className="text-[14px] text-center mb-8" style={{ color: colors.secondaryText }}>
                   {formatBytes(item.size)}
                   {'  ·  '}
                   {formatDate(item.createdAt)}
@@ -623,9 +718,9 @@ const FilePreviewModal = memo(
                   onPress={() => void handleDownload()}
                 >
                   {downloading ? (
-                    <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
+                    <ActivityIndicator color={colors.iconOnPrimary} size="small" style={{ marginRight: 8 }} />
                   ) : (
-                    <Download color="#fff" size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                    <Download color={colors.iconOnPrimary} size={18} strokeWidth={2} style={{ marginRight: 8 }} />
                   )}
                   <Text className="text-white text-[15px] font-semibold">{t.resourceDownload}</Text>
                 </TouchableOpacity>
@@ -653,14 +748,134 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
   const colors = useThemeColors();
   const iconColor = colors.secondaryText;
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
-  const thumbnailCandidates = isImage(item.fileType)
+  const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const isImageFile = isImage(item.fileType, item.name);
+  const thumbnailCandidates = isImageFile
     ? buildRemoteFileCandidates(apiBaseUrl, item)
     : [];
   const thumbnailUrl = thumbnailCandidates[thumbnailIndex] || null;
 
   useEffect(() => {
     setThumbnailIndex(0);
+    setThumbnailDataUrl(null);
+    setThumbnailFailed(false);
   }, [apiBaseUrl, item.id, item.url]);
+
+  const handleThumbnailError = useCallback(() => {
+    setThumbnailDataUrl(null);
+
+    if (thumbnailIndex < thumbnailCandidates.length - 1) {
+      setThumbnailIndex((current) => current + 1);
+      return;
+    }
+
+    setThumbnailFailed(true);
+  }, [thumbnailCandidates.length, thumbnailIndex]);
+
+  const isLikelyImageResponse = useCallback((res: Response) => {
+    if (!res.ok) return false;
+    const contentType = res.headers.get('content-type')?.toLowerCase() || '';
+    return (
+      !contentType || contentType.startsWith('image/') || contentType.includes('octet-stream')
+    );
+  }, []);
+
+  // Fetch image via redirect (native Image may not follow 302), convert to data URL
+  useEffect(() => {
+    if (!thumbnailUrl || !isImageFile) {
+      setThumbnailDataUrl(null);
+      setThumbnailFailed(false);
+      return;
+    }
+
+    setThumbnailFailed(false);
+    setThumbnailDataUrl(null);
+    let cancelled = false;
+
+    const loadThumbnail = async () => {
+      try {
+        // /f/:id is public and redirects to pre-signed URL. Try without auth headers first
+        // to avoid passing Authorization/OIDC headers to object storage on redirect.
+        let res = await fetch(thumbnailUrl, { redirect: 'follow' });
+        if (cancelled) return;
+        if (__DEV__ && !isLikelyImageResponse(res)) {
+          console.warn('[ResourceScreen] thumbnail non-image response, retry with auth', {
+            contentType: res.headers.get('content-type') || '',
+            status: res.status,
+            url: thumbnailUrl,
+          });
+        }
+
+        if (!isLikelyImageResponse(res) && apiBaseUrl) {
+          const authHeaders = await getAuthHeaders(apiBaseUrl);
+          if (cancelled) return;
+
+          if (Object.keys(authHeaders).length > 0) {
+            res = await fetch(thumbnailUrl, {
+              headers: authHeaders,
+              redirect: 'follow',
+            });
+          }
+        }
+        if (cancelled) return;
+
+        if (!isLikelyImageResponse(res)) {
+          if (__DEV__) {
+            console.warn('[ResourceScreen] thumbnail failed after retries', {
+              contentType: res.headers.get('content-type') || '',
+              status: res.status,
+              url: thumbnailUrl,
+            });
+          }
+          handleThumbnailError();
+          return;
+        }
+
+        const blob = await res.blob();
+        if (cancelled) return;
+
+        const blobType = blob.type?.toLowerCase() || '';
+        const maybeGenericBinary = !blobType || blobType.includes('octet-stream');
+        if (!maybeGenericBinary && !isImageMimeType(blobType)) {
+          handleThumbnailError();
+          return;
+        }
+
+        if (!isImageMimeType(blobType)) {
+          const header = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+          if (!hasKnownImageSignature(header)) {
+            handleThumbnailError();
+            return;
+          }
+        }
+
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        if (cancelled) return;
+
+        const preferredMime = isImageMimeType(blobType) ? blobType : item.fileType;
+        const normalizedDataUrl = dataUrl.startsWith('data:image/')
+          ? dataUrl
+          : dataUrl.replace(/^data:[^;]+;/, `data:${preferredMime};`);
+
+        setThumbnailDataUrl(normalizedDataUrl);
+      } catch {
+        if (!cancelled) handleThumbnailError();
+      }
+    };
+
+    void loadThumbnail();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, thumbnailUrl, isImageFile, item.fileType, handleThumbnailError, isLikelyImageResponse]);
+
+  const showThumbnail = thumbnailDataUrl && !thumbnailFailed;
 
   return (
     <TouchableOpacity
@@ -675,21 +890,17 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
       }}
     >
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
-        {thumbnailUrl ? (
+        {showThumbnail ? (
           <ExpoImage
             cachePolicy="memory-disk"
             className="h-12 w-12 rounded-xl"
             contentFit="cover"
-            source={thumbnailUrl}
+            source={thumbnailDataUrl!}
             transition={100}
-            onError={() => {
-              if (thumbnailIndex < thumbnailCandidates.length - 1) {
-                setThumbnailIndex((current) => current + 1);
-              }
-            }}
+            onError={handleThumbnailError}
           />
         ) : (
-          <FileTypeIcon color={iconColor} fileType={item.fileType} size={26} />
+          <FileTypeIcon color={iconColor} fileName={item.name} fileType={item.fileType} size={26} />
         )}
       </View>
 
@@ -697,7 +908,7 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
         <Text className="text-[15px] font-medium text-foreground" numberOfLines={1}>
           {item.name}
         </Text>
-        <Text className="mt-0.5 text-[12px] text-secondary/40">
+        <Text className="mt-0.5 text-[12px]" style={{ color: colors.secondaryText }}>
           {formatBytes(item.size)}
           {'  ·  '}
           {formatDate(item.createdAt)}
@@ -718,7 +929,6 @@ export default function ResourceScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const colors = useThemeColors();
-  const isConnected = useConnectionStore((s) => s.isConnected);
 
   const [files, setFiles] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -742,7 +952,6 @@ export default function ResourceScreen() {
 
   const loadFiles = useCallback(
     async (silent = false) => {
-      if (!isConnected) return;
       if (!silent) setLoading(true);
       try {
         const base = await getApiUrl();
@@ -753,14 +962,18 @@ export default function ResourceScreen() {
         });
         setFiles(result ?? []);
       } catch {
-        // silently ignore
+        setFiles([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [isConnected, category, searchText],
+    [category, searchText],
   );
+
+  useEffect(() => {
+    useConnectionStore.getState().checkConnection();
+  }, []);
 
   useEffect(() => {
     loadFiles();

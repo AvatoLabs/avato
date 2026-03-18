@@ -76,7 +76,10 @@ export function WorkspaceOverviewCard({
               </Text>
               <View className="flex-row items-center mt-1">
                 <View
-                  className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-primary' : 'bg-secondary/30'}`}
+                  className="w-2 h-2 rounded-full mr-2"
+                  style={{
+                  backgroundColor: isConnected ? colors.primary : colors.tertiaryText,
+                }}
                 />
                 <Text className="text-secondary/80 text-[12px] font-medium">
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
@@ -149,7 +152,10 @@ export function WorkspaceOverviewCard({
               </Text>
               <View className="flex-row items-center mt-1">
                 <View
-                  className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-primary' : 'bg-secondary/30'}`}
+                  className="w-2 h-2 rounded-full mr-2"
+                  style={{
+                  backgroundColor: isConnected ? colors.primary : colors.tertiaryText,
+                }}
                 />
                 <Text className="text-secondary/80 text-[12px] font-medium">
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}

@@ -39,6 +39,7 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -275,7 +276,8 @@ function ChoicePill({
 function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: string }) {
   const colors = useThemeColors();
   const [error, setError] = useState(false);
-  const uri = logo || (providerId ? getProviderIconUrl(providerId) : undefined);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const uri = logo || (providerId ? getProviderIconUrl(providerId, effectiveTheme) : undefined);
 
   if (!providerId) {
     return (

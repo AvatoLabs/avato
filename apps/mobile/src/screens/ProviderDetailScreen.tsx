@@ -40,6 +40,7 @@ import { aiModelApi, aiProviderApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
+import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AiProviderDetailItem, AiProviderModelItem } from '../types';
@@ -54,7 +55,8 @@ function ProviderLogo({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
-  const url = logo || getProviderIconUrl(providerId);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const url = logo || getProviderIconUrl(providerId, effectiveTheme);
 
   if (imgError) {
     return (
@@ -62,7 +64,7 @@ function ProviderLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text className="text-foreground/60 text-[13px] font-semibold">
+        <Text className="text-[13px] font-semibold" style={{ color: colors.secondaryText }}>
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -94,7 +96,7 @@ function SecureInputRow({
   const [visible, setVisible] = useState(false);
   return (
     <>
-      <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
+      <Text className="text-[12px] font-medium mb-2 uppercase tracking-wider" style={{ color: colors.secondaryText }}>
         {label}
       </Text>
       <View className="flex-row items-center bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3">
@@ -509,13 +511,15 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
               </Text>
               {detail?.description ? (
                 <Text
-                  className="text-secondary/50 text-[12px] font-medium mt-0.5"
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
                   numberOfLines={2}
                 >
                   {detail.description}
                 </Text>
               ) : (
-                <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
+                <Text className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}>
                   {enabled ? t.providerDetailEnabled : t.providerDetailDisabled}
                 </Text>
               )}
@@ -560,7 +564,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
                 return (
                   <View key={fieldKey}>
-                    <Text className="text-secondary/60 text-[12px] font-medium mb-2 uppercase tracking-wider">
+                    <Text className="text-[12px] font-medium mb-2 uppercase tracking-wider" style={{ color: colors.secondaryText }}>
                       {meta.label}
                     </Text>
                     <View className="bg-foreground/[0.04] rounded-xl px-3 h-11 mb-3 justify-center">
@@ -614,7 +618,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
                     {t.providerDetailFetchOnClient}
                   </Text>
-                  <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
+                  <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.providerDetailFetchOnClientDesc}
                   </Text>
                 </View>
@@ -643,22 +647,31 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                   <Text className="text-foreground font-medium text-[15px] tracking-tight">
                     {t.providerDetailChecking}
                   </Text>
-                  <Text className="text-secondary/50 text-[11px] font-medium mt-0.5">
+                  <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                     {t.providerDetailDescription}
                   </Text>
                 </View>
                 {checking ? (
                   <ActivityIndicator color={colors.primary} size="small" />
                 ) : checkResult === 'success' ? (
-                  <View className="w-7 h-7 rounded-full bg-green-500/15 items-center justify-center">
-                    <Check color="#4caf50" size={16} strokeWidth={2.5} />
+                  <View
+                    className="w-7 h-7 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.successSubtle }}
+                  >
+                    <Check color={colors.success} size={16} strokeWidth={2.5} />
                   </View>
                 ) : checkResult === 'failed' ? (
-                  <View className="w-7 h-7 rounded-full bg-red-500/15 items-center justify-center">
+                  <View
+                    className="w-7 h-7 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.dangerSubtle }}
+                  >
                     <X color={colors.danger} size={16} strokeWidth={2.5} />
                   </View>
                 ) : (
-                  <View className="w-7 h-7 rounded-full bg-blue-500/15 items-center justify-center">
+                  <View
+                    className="w-7 h-7 rounded-full items-center justify-center"
+                    style={{ backgroundColor: colors.primarySubtle }}
+                  >
                     <Wifi color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
                   </View>
                 )}
@@ -673,7 +686,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
             <Text className="text-foreground text-[16px] font-semibold tracking-tight">
               {t.providerDetailNoModels}
             </Text>
-            <Text className="text-secondary/50 text-[12px] font-medium">
+            <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
               {enabledModelCount}/{models.length}
             </Text>
           </View>
@@ -697,7 +710,7 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
 
           {filteredModels.length === 0 ? (
             <View className="items-center py-10">
-              <Text className="text-secondary/50 text-[14px]">{t.providerDetailNoModels}</Text>
+              <Text className="text-[14px]" style={{ color: colors.secondaryText }}>{t.providerDetailNoModels}</Text>
             </View>
           ) : (
             <View className="mx-5 bg-foreground/[0.02] rounded-xl overflow-hidden">
@@ -708,12 +721,13 @@ export default function ProviderDetailScreen({ navigation, route }: any) {
                 >
                   <View className="flex-1">
                     <Text
-                      className={`text-[14px] font-medium tracking-tight ${model.enabled ? 'text-foreground' : 'text-secondary/50'}`}
+                      className="text-[14px] font-medium tracking-tight"
+                    style={{ color: model.enabled ? colors.foreground : colors.secondaryText }}
                       numberOfLines={1}
                     >
                       {model.displayName || model.id}
                     </Text>
-                    <Text className="text-secondary/40 text-[11px] font-medium mt-0.5">
+                    <Text className="text-[11px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
                       {model.id}
                     </Text>
                   </View>

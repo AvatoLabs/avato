@@ -38,11 +38,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import Markdown, { openUrl } from 'react-native-markdown-display';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import SyntaxHighlighter from 'react-native-syntax-highlighter';
 import { WebView } from 'react-native-webview';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import { getProviderIconUrl } from '../../constants/cdn';
 import { fileApi } from '../../lib/api';
@@ -52,6 +50,7 @@ import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
 import { useSessionStore } from '../../store/session';
+import { useThemeStore } from '../../store/theme';
 import { getChatAccent, useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
 import type {
@@ -228,6 +227,22 @@ const preprocessMathBlocks = (content: string): string => {
   );
 };
 
+/** Escape [ ] for markdown link label */
+const escapeMentionLabel = (s: string) => s.replaceAll('[', '\\[').replaceAll(']', '\\]');
+
+/** Replace <mention name="X" id="Y" /> with [@X](mention:Y) for styled display in group chat */
+function preprocessMentionDisplay(content: string, allMembersLabel: string): string {
+  return content
+    .replace(
+      /<mention\s[^>]*id="ALL_MEMBERS"[^>]*\/>/g,
+      `[${escapeMentionLabel(`@${allMembersLabel}`)}](mention:ALL_MEMBERS) `,
+    )
+    .replace(
+      /<mention\s[^>]*name="([^"]*)"[^>]*id="([^"]*)"[^>]*\/>/g,
+      (_, name, id) => `[${escapeMentionLabel(`@${name || id}`)}](mention:${id}) `,
+    );
+}
+
 const ARTIFACT_TAG_REGEX = /<lobeArtifact\b([^>]*)>([\s\S]*?)(?:<\/lobeArtifact>|$)/g;
 const ARTIFACT_ATTR_REGEX = /(\w+)="([^"]*)"/g;
 
@@ -385,28 +400,42 @@ ArtifactBlock.displayName = 'ArtifactBlock';
 
 const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageSpeaker }>(
   ({ fallbackLabel, speaker }) => {
+    const colors = useThemeColors();
     const avatar = speaker?.avatar?.trim();
     const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
 
     if (avatar && avatar.length <= 4 && !resolvedAvatarUri) {
       return (
-        <View className="h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-          <Text className="text-[14px]">{avatar}</Text>
+        <View
+          className="h-7 w-7 items-center justify-center rounded-full"
+          style={{ backgroundColor: colors.primarySubtle }}
+        >
+          <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+            {avatar}
+          </Text>
         </View>
       );
     }
 
     if (resolvedAvatarUri) {
       return (
-        <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+        <View
+          className="h-7 w-7 items-center justify-center overflow-hidden rounded-full"
+          style={{ backgroundColor: colors.primarySubtle }}
+        >
           <RNImage source={{ uri: resolvedAvatarUri }} style={{ height: 28, width: 28 }} />
         </View>
       );
     }
 
     return (
-      <View className="h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-        <Text className="text-[12px] font-semibold text-primary">{fallbackLabel}</Text>
+      <View
+        className="h-7 w-7 items-center justify-center rounded-full"
+        style={{ backgroundColor: colors.primarySubtle }}
+      >
+        <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+          {fallbackLabel}
+        </Text>
       </View>
     );
   },
@@ -434,8 +463,11 @@ const CompareGroupBlock = memo<{
         const speakerName =
           speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
         const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
-        const childContent = preprocessMathBlocks(
-          injectCitationLinks(child.content, child.search?.citations),
+        const childContent = preprocessMentionDisplay(
+          preprocessMathBlocks(
+            injectCitationLinks(child.content, child.search?.citations),
+          ),
+          t.groupMentionAllMembers,
         );
 
         return (
@@ -446,17 +478,28 @@ const CompareGroupBlock = memo<{
             <View className="mb-2 flex-row items-center">
               <GroupSpeakerAvatar fallbackLabel={fallbackLabel} speaker={speaker} />
               <View className="ml-2 min-w-0 flex-1">
-                <Text className="text-[12px] font-semibold text-foreground/75" numberOfLines={1}>
+                <Text
+                  className="text-[12px] font-semibold"
+                  numberOfLines={1}
+                  style={{ color: colors.foreground }}
+                >
                   {speakerName}
                 </Text>
                 {child.model ? (
-                  <Text className="text-[11px] text-foreground/35" numberOfLines={1}>
-                    {child.model}
-                  </Text>
+                    <Text
+                      className="text-[11px]"
+                      numberOfLines={1}
+                      style={{ color: colors.foreground }}
+                    >
+                      {child.model}
+                    </Text>
                 ) : null}
               </View>
               {child.createdAt ? (
-                <Text className="ml-2 text-[10px] text-foreground/20">
+                <Text
+                  className="ml-2 text-[10px]"
+                  style={{ color: colors.tertiaryText }}
+                >
                   {getTimeAgo(child.createdAt)}
                 </Text>
               ) : null}
@@ -587,6 +630,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const { t } = useI18n();
     const toast = useToast();
     const colors = useThemeColors();
+    const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -735,6 +779,8 @@ const MessageBubble = memo<MessageBubbleProps>(
       },
       paragraph: { marginBottom: 2, marginTop: 2 },
       link: { color: mc.link + '99' },
+      text: { color: mc.text + '99' },
+      textgroup: { color: mc.text + '99' },
     };
 
     const tableStyles = {
@@ -769,6 +815,8 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const markdownStyles = {
       body: { color: mc.text, fontSize: 15, lineHeight: 22 },
+      text: { color: mc.text },
+      textgroup: { color: mc.text },
       blockquote: {
         backgroundColor: 'transparent',
         borderLeftColor: chatAccent.quoteBorder,
@@ -832,10 +880,20 @@ const MessageBubble = memo<MessageBubbleProps>(
       list_item: { marginBottom: 4 },
       hr: { backgroundColor: colors.divider, height: 1, marginVertical: 12 },
       ...tableStyles,
+      mention: {
+        backgroundColor: chatAccent.subtleBg,
+        borderRadius: 6,
+        color: chatAccent.badgeText,
+        fontWeight: '600' as const,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+      },
     };
 
     const userMarkdownStyles = {
       ...markdownStyles,
+      text: { color: colors.userBubbleText },
+      textgroup: { color: colors.userBubbleText },
       body: {
         ...markdownStyles.body,
         color: colors.userBubbleText,
@@ -885,10 +943,44 @@ const MessageBubble = memo<MessageBubbleProps>(
         borderColor: colors.userBubbleTableBorder,
         color: colors.userBubbleText,
       },
+      mention: {
+        backgroundColor: colors.userBubbleSubtleBg,
+        borderRadius: 6,
+        color: colors.userBubbleText,
+        fontWeight: '600' as const,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+      },
     };
 
     const markdownRules = {
       ...codeInlineRules,
+      link: (
+        node: { key?: string; attributes?: { href?: string }; children?: { content?: string }[] },
+        children: React.ReactNode,
+        _parent: unknown,
+        styles: Record<string, any>,
+        onLinkPress?: (url: string) => boolean | void,
+      ) => {
+        const href = node.attributes?.href || '';
+        if (href.startsWith('mention:')) {
+          const label = node.children?.[0]?.content ?? '@';
+          return (
+            <Text key={node.key} style={styles.mention ?? {}}>
+              {label}
+            </Text>
+          );
+        }
+        return (
+          <Text
+            key={node.key}
+            style={styles.link}
+            onPress={() => openUrl(href, onLinkPress)}
+          >
+            {children}
+          </Text>
+        );
+      },
       fence: (node: any, _children: any, _parent: any, styles: any) => {
         const code = node.content ?? '';
         const lang = (node.sourceInfo ?? '').toLowerCase();
@@ -929,29 +1021,17 @@ const MessageBubble = memo<MessageBubbleProps>(
                 <CodeCopyButton code={code} />
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {lang ? (
-                  <SyntaxHighlighter
-                    customStyle={{ backgroundColor: 'transparent', padding: 0, margin: 0 }}
-                    fontSize={13}
-                    highlighter="prism"
-                    language={lang}
-                    style={oneDark}
-                  >
-                    {code.replace(/\n$/, '')}
-                  </SyntaxHighlighter>
-                ) : (
-                  <Text
-                    selectable
-                    style={{
-                      color: mc.text,
-                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                      fontSize: 13,
-                      lineHeight: 20,
-                    }}
-                  >
-                    {code}
-                  </Text>
-                )}
+                <Text
+                  selectable
+                  style={{
+                    color: mc.text,
+                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                    fontSize: 13,
+                    lineHeight: 20,
+                  }}
+                >
+                  {code.replace(/\n$/, '')}
+                </Text>
               </ScrollView>
             </View>
           </View>
@@ -1007,8 +1087,11 @@ const MessageBubble = memo<MessageBubbleProps>(
         )
       : null;
     const CONTENT_COLLAPSE_THRESHOLD = 3000;
-    const fullContent = preprocessMathBlocks(
-      injectCitationLinks(message.content, message.search?.citations),
+    const fullContent = preprocessMentionDisplay(
+      preprocessMathBlocks(
+        injectCitationLinks(message.content, message.search?.citations),
+      ),
+      t.groupMentionAllMembers,
     );
     const hasArtifacts = !isUser && ARTIFACT_TAG_REGEX.test(fullContent);
     ARTIFACT_TAG_REGEX.lastIndex = 0;
@@ -1062,7 +1145,10 @@ const MessageBubble = memo<MessageBubbleProps>(
         >
           {!isUser && (
             <View className="mr-2.5 w-7 items-center pt-0.5">
-              <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-foreground/[0.04]">
+              <View
+                className="h-7 w-7 items-center justify-center overflow-hidden rounded-full"
+                style={{ backgroundColor: colors.fillTertiary }}
+              >
                 {message.role === 'groupTasks' ? (
                   <ListTodo color={colors.primary} size={16} strokeWidth={2} />
                 ) : shouldShowGroupSpeaker ? (
@@ -1075,13 +1161,16 @@ const MessageBubble = memo<MessageBubbleProps>(
                     className="w-4 h-4"
                     defaultSource={require('../../../assets/avato-icon.png')}
                     resizeMode="contain"
-                    source={{ uri: getProviderIconUrl(message.provider) }}
+                    source={{ uri: getProviderIconUrl(message.provider, effectiveTheme) }}
                   />
                 ) : (
-                  <RNImage
-                    className="w-5 h-5 rounded-md"
-                    source={require('../../../assets/avato-icon.png')}
-                  />
+<RNImage
+                  className="w-5 h-5 rounded-md"
+                  source={require('../../../assets/avato-icon.png')}
+                  style={
+                    effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined
+                  }
+                />
                 )}
               </View>
             </View>
@@ -1094,48 +1183,69 @@ const MessageBubble = memo<MessageBubbleProps>(
                   <View className="mb-1.5 flex-row items-center">
                     <View className="min-w-0 flex-1 flex-row items-center">
                       <Text
-                        className="text-[12px] font-semibold text-foreground/75"
+                        className="text-[12px] font-semibold"
                         numberOfLines={1}
+                        style={{ color: colors.foreground }}
                       >
                         {groupSpeakerName || t.settingsDefaultAgent}
                       </Text>
                       {isSupervisorSpeaker ? (
-                        <View className="ml-2 rounded-full bg-primary/10 px-2 py-0.5">
-                          <Text className="text-[10px] font-semibold text-primary">
+                        <View
+                          className="ml-2 rounded-full px-2 py-0.5"
+                          style={{ backgroundColor: colors.primarySubtle }}
+                        >
+                          <Text
+                            className="text-[10px] font-semibold"
+                            style={{ color: colors.primary }}
+                          >
                             {t.groupSettingsSupervisor}
                           </Text>
                         </View>
                       ) : null}
                       {message.model ? (
                         <Text
-                          className="ml-2 flex-1 text-[11px] text-foreground/35"
+                          className="ml-2 flex-1 text-[11px]"
                           numberOfLines={1}
+                          style={{ color: colors.foreground }}
                         >
                           {message.model}
                         </Text>
                       ) : null}
                     </View>
                     {message.createdAt ? (
-                      <Text className="ml-2 text-[10px] text-foreground/20">
+                      <Text
+                        className="ml-2 text-[10px]"
+                        style={{ color: colors.tertiaryText }}
+                      >
                         {getTimeAgo(message.createdAt)}
                       </Text>
                     ) : null}
                   </View>
                 ) : message.role === 'groupTasks' && message.createdAt ? (
                   <View className="mb-1.5 flex-row justify-end">
-                    <Text className="text-[10px] text-foreground/20">
+                    <Text
+                      className="text-[10px]"
+                      style={{ color: colors.tertiaryText }}
+                    >
                       {getTimeAgo(message.createdAt)}
                     </Text>
                   </View>
                 ) : (
                   <View className="mb-1.5 flex-row items-center">
                     {message.model ? (
-                      <Text className="text-[11px] text-foreground/35 flex-1" numberOfLines={1}>
+                      <Text
+                        className="text-[11px] flex-1"
+                        numberOfLines={1}
+                        style={{ color: colors.foreground }}
+                      >
                         {message.model}
                       </Text>
                     ) : null}
                     {message.createdAt ? (
-                      <Text className="text-[10px] text-foreground/20 ml-2">
+                      <Text
+                        className="text-[10px] ml-2"
+                        style={{ color: colors.tertiaryText }}
+                      >
                         {getTimeAgo(message.createdAt)}
                       </Text>
                     ) : null}
@@ -1162,17 +1272,16 @@ const MessageBubble = memo<MessageBubbleProps>(
               ) : null}
               {showMessageBubble ? (
                 <View
-                  className={
-                    isUser ? 'px-3.5 py-2 rounded-[18px] bg-primary rounded-tr-md' : 'py-0.5'
-                  }
+                  className={isUser ? 'px-3.5 py-2 rounded-[18px] rounded-tr-md' : 'py-0.5'}
                   style={
                     isUser
                       ? {
+                          backgroundColor: colors.userBubbleBg,
+                          elevation: 2,
                           shadowColor: colors.primary,
                           shadowOffset: { width: 0, height: 1 },
                           shadowOpacity: 0.08,
                           shadowRadius: 4,
-                          elevation: 2,
                         }
                       : undefined
                   }
@@ -1267,7 +1376,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                             content={renderedReasoning}
                             duration={message.reasoning?.duration}
                             isMultimodal={message.reasoning?.isMultimodal}
+                            markdownRules={markdownRules}
                             markdownStyles={reasoningMarkdownStyles}
+                            model={message.model}
                             tempDisplayContent={multimodalReasoningParts || undefined}
                             thinking={
                               generating && isReasoning && message.id.startsWith('assistant-')
@@ -1326,12 +1437,15 @@ const MessageBubble = memo<MessageBubbleProps>(
                                 return false;
                               }}
                             >
-                              {preprocessMathBlocks(
-                                injectCitationLinks(
-                                  (message.content || '').slice(0, 500) +
-                                    (message.content && message.content.length > 500 ? '...' : ''),
-                                  message.search?.citations,
+                              {preprocessMentionDisplay(
+                                preprocessMathBlocks(
+                                  injectCitationLinks(
+                                    (message.content || '').slice(0, 500) +
+                                      (message.content && message.content.length > 500 ? '...' : ''),
+                                    message.search?.citations,
+                                  ),
                                 ),
+                                t.groupMentionAllMembers,
                               )}
                             </Markdown>
                             <TouchableOpacity
@@ -1360,6 +1474,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       ) : multimodalContentParts?.length ? (
                         <RichContentPartsBlock
                           citations={message.search?.citations}
+                          markdownRules={markdownRules}
                           markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
                           parts={multimodalContentParts}
                           onOpenLink={handleOpenLink}
@@ -1659,10 +1774,11 @@ const parseMessageContentParts = (
 
 const RichContentPartsBlock = memo<{
   citations?: CitationItem[] | null;
+  markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
   onOpenLink: (url?: string) => void;
   parts: MessageContentPart[];
-}>(({ parts, markdownStyles, onOpenLink, citations }) => {
+}>(({ parts, markdownStyles, markdownRules, onOpenLink, citations }) => {
   const colors = useThemeColors();
   return (
   <View className="gap-2">
@@ -1687,7 +1803,7 @@ const RichContentPartsBlock = memo<{
         return (
           <Markdown
             key={`${part.text.slice(0, 24)}-${index}`}
-            rules={codeInlineRules}
+            rules={markdownRules ?? codeInlineRules}
             style={markdownStyles}
             onLinkPress={(url) => {
               onOpenLink(url);
@@ -2654,13 +2770,15 @@ interface ThinkingBlockProps {
   content?: string;
   duration?: number;
   isMultimodal?: boolean;
+  markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
   tempDisplayContent?: MessageContentPart[];
   thinking?: boolean;
+  model?: string;
 }
 
 const ThinkingBlock = memo<ThinkingBlockProps>(
-  ({ content, duration, isMultimodal, markdownStyles, tempDisplayContent, thinking }) => {
+  ({ content, duration, isMultimodal, markdownRules, markdownStyles, tempDisplayContent, thinking, model }) => {
     const { t } = useI18n();
     const colors = useThemeColors();
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
@@ -2701,6 +2819,15 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
               {durationLabel}
             </Text>
           )}
+          {model ? (
+            <Text
+              className="ml-2 text-[11px]"
+              numberOfLines={1}
+              style={{ color: colors.foreground }}
+            >
+              {model}
+            </Text>
+          ) : null}
         </TouchableOpacity>
 
         {showContent ? (
@@ -2712,6 +2839,7 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
           >
             {isMultimodal && tempDisplayContent?.length ? (
               <RichContentPartsBlock
+                markdownRules={markdownRules}
                 markdownStyles={markdownStyles}
                 parts={tempDisplayContent}
                 onOpenLink={(url) => {

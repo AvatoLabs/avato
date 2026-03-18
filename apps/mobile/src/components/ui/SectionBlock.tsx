@@ -1,6 +1,8 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { useThemeColors } from '../../theme/colors';
+
 interface SectionBlockProps {
   action?: string;
   children: React.ReactNode;
@@ -13,10 +15,14 @@ interface SectionBlockProps {
  * Provides visual grouping and rhythm to screen content.
  */
 export function SectionBlock({ title, action, onAction, children }: SectionBlockProps) {
+  const colors = useThemeColors();
   return (
     <View className="mb-6">
       <View className="flex-row items-center justify-between px-5 mb-3">
-        <Text className="text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+        <Text
+          className="text-[12px] font-medium uppercase tracking-wider"
+          style={{ color: colors.secondaryText }}
+        >
           {title}
         </Text>
         {action && (

@@ -37,7 +37,7 @@ export function SettingsRow({
       <View className="flex-1">
         <Text className="text-foreground text-[15.5px] font-medium tracking-tight">{label}</Text>
         {subtitle && (
-          <Text className="text-secondary/70 text-[12.5px] mt-0.5 font-medium">{subtitle}</Text>
+          <Text className="text-[12.5px] mt-0.5 font-medium" style={{ color: colors.secondaryText }}>{subtitle}</Text>
         )}
       </View>
       {onPress ? (
@@ -72,10 +72,11 @@ export interface SettingsSectionProps {
 }
 
 export function SettingsSection({ children, delay = 0, title }: SettingsSectionProps) {
+  const colors = useThemeColors();
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mb-5 px-5">
-        <Text className="px-2 mb-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
+        <Text className="px-2 mb-2 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
           {title}
         </Text>
         <View>{children}</View>
