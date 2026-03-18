@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TextType from '../../components/ui/TextType';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
+import { tokens } from '../../theme/tokens';
 
 export default function WelcomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -24,7 +25,11 @@ export default function WelcomeScreen({ navigation }: any) {
       <View className="flex-1 items-center justify-center">
         <Animated.View
           className="items-center"
-          entering={FadeInUp.delay(160).duration(860).springify().damping(15).mass(0.9)}
+          entering={FadeInUp.delay(80)
+            .duration(tokens.motion.duration.hero)
+            .springify()
+            .damping(15)
+            .mass(0.9)}
         >
           <View
             className="w-32 h-32 rounded-[34px] bg-white items-center justify-center"
@@ -46,7 +51,10 @@ export default function WelcomeScreen({ navigation }: any) {
 
         <Animated.View
           className="mt-6 w-full"
-          entering={FadeInDown.delay(520).duration(460).springify().damping(16)}
+          entering={FadeInDown.delay(220)
+            .duration(tokens.motion.duration.slow)
+            .springify()
+            .damping(16)}
         >
           <TextType
             showCursor
@@ -76,7 +84,10 @@ export default function WelcomeScreen({ navigation }: any) {
       {showCTA && (
         <Animated.View
           className="w-full pb-3"
-          entering={FadeInDown.delay(120).duration(420).springify().damping(16)}
+          entering={FadeInDown.delay(tokens.motion.stagger.normal)
+            .duration(tokens.motion.duration.hero)
+            .springify()
+            .damping(16)}
         >
           <TouchableOpacity
             activeOpacity={0.82}

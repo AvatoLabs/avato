@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
+import { enteringDialogContent } from '../../theme/motion';
 
 interface PromptModalProps {
   defaultValue?: string;
@@ -54,45 +56,47 @@ export default function PromptModal({
       onRequestClose={onCancel}
     >
       <Pressable className="flex-1 justify-center items-center bg-black/40" onPress={onCancel}>
-        <Pressable
-          className="bg-card rounded-2xl mx-10 w-[300px] overflow-hidden"
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View className="px-5 pt-5 pb-3">
-            <Text className="text-foreground text-[16px] font-semibold text-center mb-3">
-              {title}
-            </Text>
-            <TextInput
-              autoFocus
-              accessibilityLabel={placeholder ?? title}
-              className="bg-foreground/5 rounded-xl px-3.5 py-2.5 text-foreground text-[15px]"
-              keyboardType={keyboardType}
-              placeholder={placeholder}
-              placeholderTextColor={colors.muted}
-              ref={inputRef}
-              returnKeyType="done"
-              value={value}
-              onChangeText={setValue}
-              onSubmitEditing={handleSubmit}
-            />
-          </View>
-          <View className="flex-row mt-px bg-foreground/[0.04]" style={{ borderTopWidth: 0 }}>
-            <TouchableOpacity
-              activeOpacity={0.6}
-              className="flex-1 py-3.5 items-center"
-              onPress={onCancel}
-            >
-              <Text className="text-[16px] text-foreground/50 font-medium">{t.cancel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.6}
-              className="flex-1 py-3.5 items-center"
-              onPress={handleSubmit}
-            >
-              <Text className="text-[16px] text-primary font-semibold">{finalSubmitLabel}</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
+        <Animated.View entering={enteringDialogContent()}>
+          <Pressable
+            className="bg-card rounded-2xl mx-10 w-[300px] overflow-hidden"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="px-5 pt-5 pb-3">
+              <Text className="text-foreground text-[16px] font-semibold text-center mb-3">
+                {title}
+              </Text>
+              <TextInput
+                autoFocus
+                accessibilityLabel={placeholder ?? title}
+                className="bg-foreground/5 rounded-xl px-3.5 py-2.5 text-foreground text-[15px]"
+                keyboardType={keyboardType}
+                placeholder={placeholder}
+                placeholderTextColor={colors.muted}
+                ref={inputRef}
+                returnKeyType="done"
+                value={value}
+                onChangeText={setValue}
+                onSubmitEditing={handleSubmit}
+              />
+            </View>
+            <View className="flex-row mt-px bg-foreground/[0.04]" style={{ borderTopWidth: 0 }}>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-1 py-3.5 items-center"
+                onPress={onCancel}
+              >
+                <Text className="text-[16px] text-foreground/50 font-medium">{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-1 py-3.5 items-center"
+                onPress={handleSubmit}
+              >
+                <Text className="text-[16px] text-primary font-semibold">{finalSubmitLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );

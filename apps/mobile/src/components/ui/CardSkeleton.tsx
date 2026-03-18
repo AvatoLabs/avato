@@ -3,10 +3,13 @@
  */
 import React from 'react';
 import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
+
+import { enteringSkeleton } from '../../theme/motion';
 
 export default function CardSkeleton() {
   return (
-    <View className="flex-1 px-5 pt-4 gap-3">
+    <Animated.View className="flex-1 px-5 pt-4 gap-3" entering={enteringSkeleton()}>
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <View className="flex-row items-start rounded-xl p-3.5 bg-foreground/[0.02]" key={i}>
           <View className="w-10 h-10 rounded-xl bg-foreground/8 mr-3" />
@@ -23,6 +26,6 @@ export default function CardSkeleton() {
           </View>
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }

@@ -2,9 +2,11 @@
  * EmptyState — Unified empty state component with illustration and CTA.
  */
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { useThemeColors } from '../../theme/colors';
+import { enteringEmptyState } from '../../theme/motion';
 
 interface EmptyStateProps {
   /** Optional CTA element (button, link) */
@@ -28,9 +30,10 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const colors = useThemeColors();
   return (
-    <View
+    <Animated.View
       accessibilityLabel={`${title}${description ? `. ${description}` : ''}`}
       className={`items-center justify-center px-8 py-12 ${className}`}
+      entering={enteringEmptyState()}
       style={{ minHeight: 160 }}
     >
       <Text className="text-4xl mb-4" style={{ fontSize: 32 }}>
@@ -51,6 +54,6 @@ export default function EmptyState({
         </Text>
       ) : null}
       {action ?? null}
-    </View>
+    </Animated.View>
   );
 }

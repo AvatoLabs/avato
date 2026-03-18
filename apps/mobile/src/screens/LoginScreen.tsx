@@ -17,6 +17,7 @@ import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 import { useThemeColors } from '../theme/colors';
+import { tokens } from '../theme/tokens';
 
 const PASSWORD_SIGNIN_KEY = '__password__';
 
@@ -214,7 +215,11 @@ export default function LoginScreen({ navigation }: any) {
       <View className="flex-1 items-center justify-center">
         <Animated.View
           className="items-center"
-          entering={FadeInUp.delay(120).duration(720).springify().damping(15).mass(0.9)}
+          entering={FadeInUp.delay(80)
+            .duration(tokens.motion.duration.hero)
+            .springify()
+            .damping(15)
+            .mass(0.9)}
         >
           <View
             className="h-32 w-32 items-center justify-center rounded-[34px] bg-white"
@@ -239,7 +244,10 @@ export default function LoginScreen({ navigation }: any) {
 
         <Animated.View
           className="mt-10 w-full"
-          entering={FadeInDown.delay(320).duration(420).springify().damping(16)}
+          entering={FadeInDown.delay(180)
+            .duration(tokens.motion.duration.hero)
+            .springify()
+            .damping(16)}
         >
           <TouchableOpacity
             activeOpacity={0.82}

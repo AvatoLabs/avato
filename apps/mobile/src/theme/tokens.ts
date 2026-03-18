@@ -58,4 +58,14 @@ export const tokens = {
       semibold: '600',
     },
   },
+
+  // Motion (P0: unified params for animations)
+  motion: {
+    duration: { fast: 180, normal: 220, slow: 300, hero: 420 },
+    stagger: { none: 0, short: 24, normal: 40 },
+    spring: {
+      gentle: { damping: 18, stiffness: 130 },
+      snappy: { damping: 14, stiffness: 180 },
+    },
+  },
 };

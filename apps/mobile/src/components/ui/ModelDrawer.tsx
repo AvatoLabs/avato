@@ -11,11 +11,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
 import { semanticColors } from '../../constants/colors';
 import { useI18n } from '../../lib/i18n';
 import { useModelStore } from '../../store/model';
+import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
 import type { RuntimeEnabledModel } from '../../types';
 
@@ -148,127 +150,125 @@ export function ModelDrawer({
       onRequestClose={onClose}
     >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
-          className="bg-card rounded-t-2xl"
-          style={{ maxHeight: '75%' }}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {/* Handle */}
-          <View className="items-center pt-3 pb-1">
-            <View className="w-9 h-1 rounded-full bg-foreground/10" />
-          </View>
-
-          {/* Header */}
-          <View className="px-5 pb-2 pt-1 flex-row items-center justify-between">
-            <Text className="text-foreground text-[18px] font-bold tracking-tight">
-              {t.modelPickerTitle}
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              disabled={loading}
-              onPress={() => fetchModels(true)}
-            >
-              {loading ? (
-                <ActivityIndicator color={semanticColors.primary} size="small" />
-              ) : (
-                <RefreshCw
-                  color={semanticColors.primary}
-                  size={16}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Search */}
-          <View className="px-5 pb-3">
-            <View className="bg-foreground/5 rounded-xl px-3 h-9 flex-row items-center">
-              <TextInput
-                className="flex-1 text-foreground text-[14px]"
-                placeholder={t.modelPickerSearch}
-                placeholderTextColor={semanticColors.muted}
-                returnKeyType="search"
-                value={search}
-                onChangeText={setSearch}
-              />
+        <Animated.View entering={enteringModalContent()} style={{ maxHeight: '75%' }}>
+          <Pressable className="bg-card rounded-t-2xl" onPress={(e) => e.stopPropagation()}>
+            {/* Handle */}
+            <View className="items-center pt-3 pb-1">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
-          </View>
 
-          {/* Model list */}
-          <ScrollView
-            className="px-5"
-            contentContainerStyle={{ paddingBottom: 40 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {!isLoaded && loading ? (
-              <View className="items-center py-16">
-                <ActivityIndicator color={semanticColors.primary} size="large" />
+            {/* Header */}
+            <View className="px-5 pb-2 pt-1 flex-row items-center justify-between">
+              <Text className="text-foreground text-[18px] font-bold tracking-tight">
+                {t.modelPickerTitle}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={loading}
+                onPress={() => fetchModels(true)}
+              >
+                {loading ? (
+                  <ActivityIndicator color={semanticColors.primary} size="small" />
+                ) : (
+                  <RefreshCw
+                    color={semanticColors.primary}
+                    size={16}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Search */}
+            <View className="px-5 pb-3">
+              <View className="bg-foreground/5 rounded-xl px-3 h-9 flex-row items-center">
+                <TextInput
+                  className="flex-1 text-foreground text-[14px]"
+                  placeholder={t.modelPickerSearch}
+                  placeholderTextColor={semanticColors.muted}
+                  returnKeyType="search"
+                  value={search}
+                  onChangeText={setSearch}
+                />
               </View>
-            ) : filtered.length === 0 ? (
-              <View className="items-center py-16">
-                <Text className="text-secondary/50 text-[14px]">
-                  {providers.length === 0 ? t.modelPickerOffline : t.discoverNoResults}
-                </Text>
-              </View>
-            ) : (
-              filtered.map((provider) => (
-                <View className="mb-3" key={provider.id}>
-                  <View className="flex-row items-center mb-1.5 mt-1">
-                    <ProviderLogo logo={provider.logo} providerId={provider.id} size={16} />
-                    <Text className="ml-1.5 text-secondary/50 text-[11px] font-semibold uppercase tracking-wider">
-                      {provider.name}
-                    </Text>
-                  </View>
-                  <View className="bg-foreground/5 rounded-2xl overflow-hidden">
-                    {provider.children.map((model) => {
-                      const isSelected = selectedModel === model.id;
-                      const tags = getAbilityTags(model);
-                      return (
-                        <TouchableOpacity
-                          activeOpacity={0.6}
-                          className="flex-row items-center px-3.5 py-3"
-                          key={model.id}
-                          onPress={() => handleSelect(model.id, provider.id)}
-                        >
-                          <ProviderLogo logo={provider.logo} providerId={provider.id} size={24} />
-                          <View className="flex-1 ml-2.5">
-                            <Text
-                              className={`text-[14px] font-medium tracking-tight ${isSelected ? 'text-primary' : 'text-foreground'}`}
-                              numberOfLines={1}
-                            >
-                              {model.displayName || model.id}
-                            </Text>
-                            {tags.length > 0 && (
-                              <View className="flex-row flex-wrap gap-1 mt-0.5">
-                                {tags.map((tag) => (
-                                  <View
-                                    className="bg-foreground/5 px-1.5 py-px rounded-full"
-                                    key={tag}
-                                  >
-                                    <Text className="text-secondary/50 text-[9px] font-medium">
-                                      {tag}
-                                    </Text>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                          {isSelected && (
-                            <Check
-                              color={semanticColors.primary}
-                              size={18}
-                              strokeWidth={tokens.icon.strokeWidth}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+            </View>
+
+            {/* Model list */}
+            <ScrollView
+              className="px-5"
+              contentContainerStyle={{ paddingBottom: 40 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {!isLoaded && loading ? (
+                <View className="items-center py-16">
+                  <ActivityIndicator color={semanticColors.primary} size="large" />
                 </View>
-              ))
-            )}
-          </ScrollView>
-        </Pressable>
+              ) : filtered.length === 0 ? (
+                <View className="items-center py-16">
+                  <Text className="text-secondary/50 text-[14px]">
+                    {providers.length === 0 ? t.modelPickerOffline : t.discoverNoResults}
+                  </Text>
+                </View>
+              ) : (
+                filtered.map((provider) => (
+                  <View className="mb-3" key={provider.id}>
+                    <View className="flex-row items-center mb-1.5 mt-1">
+                      <ProviderLogo logo={provider.logo} providerId={provider.id} size={16} />
+                      <Text className="ml-1.5 text-secondary/50 text-[11px] font-semibold uppercase tracking-wider">
+                        {provider.name}
+                      </Text>
+                    </View>
+                    <View className="bg-foreground/5 rounded-2xl overflow-hidden">
+                      {provider.children.map((model) => {
+                        const isSelected = selectedModel === model.id;
+                        const tags = getAbilityTags(model);
+                        return (
+                          <TouchableOpacity
+                            activeOpacity={0.6}
+                            className="flex-row items-center px-3.5 py-3"
+                            key={model.id}
+                            onPress={() => handleSelect(model.id, provider.id)}
+                          >
+                            <ProviderLogo logo={provider.logo} providerId={provider.id} size={24} />
+                            <View className="flex-1 ml-2.5">
+                              <Text
+                                className={`text-[14px] font-medium tracking-tight ${isSelected ? 'text-primary' : 'text-foreground'}`}
+                                numberOfLines={1}
+                              >
+                                {model.displayName || model.id}
+                              </Text>
+                              {tags.length > 0 && (
+                                <View className="flex-row flex-wrap gap-1 mt-0.5">
+                                  {tags.map((tag) => (
+                                    <View
+                                      className="bg-foreground/5 px-1.5 py-px rounded-full"
+                                      key={tag}
+                                    >
+                                      <Text className="text-secondary/50 text-[9px] font-medium">
+                                        {tag}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+                            </View>
+                            {isSelected && (
+                              <Check
+                                color={semanticColors.primary}
+                                size={18}
+                                strokeWidth={tokens.icon.strokeWidth}
+                              />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );

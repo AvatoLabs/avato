@@ -690,6 +690,7 @@ type TranslationKeys = {
   storeSkills: string;
   storeInstalled: string;
   storeEmpty: string;
+  storeLoadFailed: string;
   storeInstall: string;
   storeManage: string;
   storeFeatured: string;
@@ -1602,6 +1603,7 @@ const en: TranslationKeys = {
   storeSkills: 'Skills',
   storeInstalled: 'Installed',
   storeEmpty: 'No extensions found',
+  storeLoadFailed: 'Failed to load. Check your connection.',
   storeInstall: 'Install',
   storeManage: 'Manage',
   storeFeatured: 'Featured',
@@ -2507,6 +2509,7 @@ const zh_tw: TranslationKeys = {
   storeSkills: '技能',
   storeInstalled: '已安裝',
   storeEmpty: '未找到擴充項目',
+  storeLoadFailed: '載入失敗，請檢查網路連線。',
   storeInstall: '安裝',
   storeManage: '管理',
   storeFeatured: '精選',
@@ -3411,6 +3414,7 @@ const zh: TranslationKeys = {
   storeSkills: '技能',
   storeInstalled: '已安装',
   storeEmpty: '未找到扩展',
+  storeLoadFailed: '加载失败，请检查网络连接。',
   storeInstall: '安装',
   storeManage: '管理',
   storeFeatured: '精选',

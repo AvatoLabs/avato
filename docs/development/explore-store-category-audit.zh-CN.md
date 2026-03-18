@@ -1,161 +1,146 @@
-# Explore（商店）分类加载审计（现状版）
+# Explore（商店）分类体验审计（App vs Web，定稿）
 
-> **审计日期**：2026-03-18\
-> **审计范围**：`apps/mobile` StoreScreen 的 Explore（MCP / Skills 分类筛选）\
-> **核心现象**：`全部` 基本稳定；切分类时偶发空列表或结果错位，用户体感为「看运气」
-
-**相关文档**：
-
-- [skill-mcp-category-app-web-audit.zh-CN.md](./skill-mcp-category-app-web-audit.zh-CN.md)
-- [mobile-app-issues-audit.zh-CN.md](./mobile-app-issues-audit.zh-CN.md)
+> **日期**：2026-03-18\
+> **范围**：`apps/mobile/src/screens/StoreScreen.tsx` 与 Web 社区商店（`/community/skill`、`/community/mcp`）\
+> **目标**：基于当前代码事实，给出移动端与 Web 对齐且符合移动端交互习惯的最佳方案
 
 ---
 
-## 一、结论（TL;DR）
+## 一、TL;DR
 
-当前问题已不是 “没有兜底分类”，而是 “**并发竞态 + 错误语义不透明 + 分类契约漂移**” 叠加：
+当前移动端 Store 分类问题，已经从 “没有分类兜底” 升级为 “**状态一致性与语义一致性**问题”：
 
-1. 前端已具备 fallback 分类和非法分类回退，但 `fetchMarket` 仍无请求序列保护，快速切分类时会被过时响应覆盖。
-2. 服务端 `getMcpList/getSkillList` 失败时返回空结构，App 无法区分 “真空数据” 和 “请求失败”。
-3. category key 仍由多方约定（App fallback、市场接口、上游数据），存在语义漂移风险。
-4. 缓存并非单一 6h TTL，而是 “6h 新鲜 + 7 天陈旧兜底”，会放大 “某些分类好像一直正常、某些一直空” 的体感差异。
+1. **并发竞态仍存在**：`fetchMarket` 没有请求序列保护，快速切分类时仍可能出现旧请求覆盖新结果。
+2. **失败语义不透明**：Skill 列表在服务端异常时会返回空列表结构，前端无法区分 “真空数据” 与 “请求失败”。
+3. **App/Web 分类契约仍双轨**：Web 使用 `useSkillCategory` / `useMCPCategory`，App 使用本地 `storeCategories.ts`，长期存在漂移风险。
+4. **列表语义与 Web 不完全一致**：App 在 Skill 的第一页会合并 builtin 条目，导致 “分类计数、总数、结果语义” 与 Web 社区列表不一致。
 
----
-
-## 二、现状快照（已落地 / 未落地）
-
-| 项目                             | 状态        | 说明                                              |
-| -------------------------------- | ----------- | ------------------------------------------------- |
-| 固定分类 fallback（MCP / Skill） | ✅ 已落地   | `fetchCategories` 先写 fallback，再请求 API       |
-| category 归一化映射              | ✅ 已落地   | `normalizeCategoryKey` + `NORMALIZE_CATEGORY_MAP` |
-| builtin 默认分类补全             | ✅ 已落地   | `BUILTIN_DEFAULT_CATEGORY`                        |
-| 非法分类自动回退 `all`           | ✅ 已落地   | `categoryOptions` 不包含当前 key 时回退           |
-| 请求取消 / 序列保护              | ❌ 未落地   | `fetchMarket` 无 `AbortController` / requestId    |
-| 失败与空结果语义区分             | ❌ 未落地   | 列表接口失败时返回空结构                          |
-| 分类契约统一（App/Web/Server）   | ⚠️ 部分落地 | 仍依赖多源 key，未形成单一契约                    |
+**结论**：现状可用但不稳。最佳方向不是继续 patch 单点，而是 “契约统一 + 请求一致性 + 错误语义清晰化”。
 
 ---
 
-## 三、调用链与风险点
+## 二、现状对比（Mobile vs Web）
 
-### 3.1 前端调用链
-
-```
-进入 Explore
-  -> fetchCategories(source)
-  -> fetchExploreTotals()
-  -> fetchMarket(source, page=1, append=false)
-
-点击分类 / 切换 MCP|Skill / 修改搜索词
-  -> 更新 activeExploreCategory | activeExploreSource | debouncedQuery
-  -> useEffect 触发 fetchMarket(source, 1, false)
-```
-
-### 3.2 仍在生效的主要风险
-
-1. **并发竞态**\
-   快速点击分类会并发发起多个 `fetchMarket`，后返回的旧请求可能覆盖新分类结果。
-
-2. **错误被 “伪装成空”**\
-   服务端列表接口 catch 后返回 `items: []`，App 只能显示空态，无法提示 “请求失败可重试”。
-
-3. **分类语义漂移**\
-   分类 key 来源包括 fallback、分类接口、列表接口 item.category、builtin manifest，任一侧变更都可能造成 “有分类但点进去空”。
-
-4. **缓存体感偏差**\
-   相同分类在不同时间 / 节点可能命中新鲜缓存、陈旧缓存或实时请求失败，用户感知为 “时有时无”。
+| 维度         | Mobile App（现状）                                   | Web（现状）                                                                   |
+| ------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 分类来源     | `fetchCategories` + fallback（`storeCategories.ts`） | 固定分类 hooks（`useSkillCategory` / `useMCPCategory`）+ categories API count |
+| 列表请求模型 | `useEffect` 驱动 + 本地 `setState`                   | URL Query + SWR key 驱动                                                      |
+| 并发安全     | 无 requestId /abort，旧请求可覆盖                    | 不同 query 对应不同 SWR key，天然弱化串线覆盖                                 |
+| 错误语义     | 失败常被映射为空（尤其 Skill）                       | 也受后端 “空结构兜底” 影响，但页面层状态分离更清晰                            |
+| 列表语义     | Skill page=1 合并 builtin + remote                   | 社区列表只展示社区数据                                                        |
+| 分类 UI      | 移动端双横向 chips（source + category）              | 左侧固定分类菜单（含 icon + count）                                           |
 
 ---
 
-## 四、证据链（代码现状）
+## 三、关键证据（代码事实）
 
-### 4.1 已落地能力
+### 3.1 已改进（确认有效）
 
-- fallback 分类先写入：`apps/mobile/src/screens/StoreScreen.tsx` `fetchCategories`
-- 非法分类回退 `all`：`apps/mobile/src/screens/StoreScreen.tsx` 分类校验 effect
-- 分类归一化与标签：`apps/mobile/src/constants/storeCategories.ts`
-- builtin 分类补全与过滤：`apps/mobile/src/screens/StoreScreen.tsx` `getSkillCategoryForFilter`
+1. App 已有固定 fallback 分类、归一化映射、非法分类回退。
+2. 切换 source 时会重置分类，基础流程可用。
 
-### 4.2 关键问题仍在
+对应：
 
-- `fetchMarket` 无请求取消 / 序列保护：`apps/mobile/src/screens/StoreScreen.tsx`
-- `market.getMcpList` 失败返回空结构：`src/server/routers/lambda/market/index.ts`
-- `market.skill.getSkillList` 失败返回空结构：`src/server/routers/lambda/market/skill.ts`
-- 分类接口行为不一致：`getMcpCategories` 抛错、`getSkillCategories` 返回 `[]`
-- MCP `all/discover` 会被省略 category（视为 “全部”）：`src/server/services/discover/index.ts`
-
-### 4.3 缓存语义（需在文档中明确）
-
-`communityMarketCacheService` 不是 “只缓存 6 小时”：
-
-1. **新鲜期**：6 小时内直接返回缓存
-2. **陈旧期**：缓存可保留到 7 天
-3. **刷新失败兜底**：若刷新失败且有陈旧缓存，返回陈旧缓存
-
-这会导致 “有的分类看起来稳定，有的分类经常空” 的非一致体验。
-
----
-
-## 五、最佳修复方案（移动端体验优先）
-
-### P0（本周应完成）
-
-1. **前端加请求序列保护（必做）**\
-   为 `fetchMarket` 增加 requestId/abort 机制，只允许最新请求落地 `setMarketItems`。
-
-2. **区分失败与空结果（必做）**\
-   列表接口失败时返回可识别错误语义（状态码或结构字段），App 按 “失败态” 展示重试，不再误判为空分类。
-
-3. **可观测性补齐（必做）**\
-   在 App 和服务端日志统一打印：`source/category/query/page/requestId/resultCount/errorType/cacheHit`。
-
-### P1（下个迭代）
-
-1. **统一 category 契约**\
-   明确 `getCategories/getMcpCategories` 与 `getSkillList/getMcpList` 的 key 集合和映射规则，输出契约文档。
-
-2. **分类来源收敛**\
-   减少 “fallback key /upstream key /manifest key” 并存，建立单一 canonical key。
-
-### P2（体验增强）
-
-1. **空态细分**：`暂无内容` / `加载失败` / `筛选条件过窄`
-2. **重试入口前置**：空态提供显式重试按钮
-3. **分类健康监控**：按分类统计失败率与空结果率
-
----
-
-## 六、验收清单（回归标准）
-
-1. 快速点击分类（A -> B -> A）30 次，列表不出现错位回跳。
-2. 弱网 / 高延迟下，分类切换不会把旧分类结果覆盖到当前分类。
-3. 上游故障时展示 “加载失败可重试”，而不是静默空列表。
-4. MCP 与 Skill 切换后，分类栏与列表语义一致。
-5. 在缓存命中与未命中场景下，行为可解释且日志可追踪。
-
----
-
-## 七、相关文件索引
-
-### App
-
-- `apps/mobile/src/screens/StoreScreen.tsx`
+- `apps/mobile/src/screens/StoreScreen.tsx`（`fetchCategories`、分类回退）
 - `apps/mobile/src/constants/storeCategories.ts`
-- `apps/mobile/src/lib/api.ts`
 
-### Server
+### 3.2 仍存在的核心问题
 
-- `src/server/routers/lambda/market/index.ts`
-- `src/server/routers/lambda/market/skill.ts`
-- `src/server/services/discover/index.ts`
-- `src/server/services/community/marketCache.ts`
-- `src/server/services/market/index.ts`
+1. `fetchMarket` 缺少请求序列保护（竞态风险）。
+2. Skill 列表接口失败语义在服务端被 “吞” 为空结构。
+3. App 与 Web 分类定义存在重复维护。
+4. App Skill 列表混入 builtin，造成与 Web 的 “社区商店” 语义不一致。
+
+对应：
+
+- `apps/mobile/src/screens/StoreScreen.tsx`（`fetchMarket`）
+- `src/server/routers/lambda/market/skill.ts`（`getSkillList` catch 返回空结构）
+- `src/hooks/useSkillCategory.tsx`、`src/hooks/useMCPCategory.tsx`
+- `apps/mobile/src/constants/storeCategories.ts`
 
 ---
 
-## 八、与 DiscoverScreen 的区分
+## 四、为什么 Web 体感更稳定
 
-| 屏幕           | 入口                       | 分类能力                                          | 是否本问题范围 |
-| -------------- | -------------------------- | ------------------------------------------------- | -------------- |
-| StoreScreen    | 底部 Tab「商店」-> Explore | MCP / Skill 分类筛选                              | 是             |
-| DiscoverScreen | Profile「发现」            | Agents / Models / Providers Tab（无同构分类筛选） | 否             |
+Web 并不是 “接口更强”，而是状态模型更稳：
+
+1. 分类与筛选参数写入 URL，页面状态可回放、可分享、可重建。
+2. SWR key 以 query 为维度，旧参数结果不会直接覆盖当前参数视图。
+3. 分类菜单有稳定的 canonical 列表，categories API 更像 “count 补充”，不是唯一真源。
+
+移动端当前仍偏 “命令式 setState + 异步回调覆盖”，在高频切换下更容易串线。
+
+---
+
+## 五、最佳方案（移动端体验优先，同时对齐 Web 语义）
+
+### 5.1 方案原则
+
+1. **分类契约单一真源**：Skill/MCP category key 与展示顺序在 App/Web 共用。
+2. **请求结果只允许最新落地**：任何旧请求不得覆盖当前筛选状态。
+3. **失败与空结果必须可区分**：UI 不再把失败伪装成空列表。
+4. **社区列表语义统一**：Explore 仅社区数据，builtin 归入 Installed 或独立分区。
+
+### 5.2 分阶段落地
+
+#### P0（必须先做）
+
+1. 给 `fetchMarket` 增加 requestId（或 abort）保护，仅最新请求可 `setMarketItems`。
+2. 服务端列表接口改为可识别错误（至少返回错误类型，不再一律空结构）。
+3. App 空态拆分为：`空结果` / `加载失败` / `筛选过窄`，并提供显式重试。
+
+#### P1（与 Web 彻底对齐）
+
+1. 将 Skill/MCP 分类定义提炼为共享契约（key/order/i18nKey）。
+2. App 侧移除本地重复分类字典，改为消费共享定义 + 本地文案映射。
+3. Skill Explore 列表移除 builtin 混入逻辑（保持与 Web 社区列表语义一致）。
+
+#### P2（体验增强）
+
+1. 增加分类级别健康指标（失败率、空结果率、平均加载时长）。
+2. 支持 “最近使用分类” 与 “上次筛选恢复”。
+
+---
+
+## 六、移动端专属交互建议（不照抄 Web）
+
+1. 保留移动端双层 chips（source + category），不强行做侧栏。
+2. category chips 建议加 `count` 与可滚动定位反馈，降低 “切了没生效” 的不确定感。
+3. 分类切换时提供轻量骨架占位，避免旧列表瞬闪造成 “错位” 体感。
+
+---
+
+## 七、验收标准
+
+1. 快速切分类 30 次，列表不出现旧分类回跳。
+2. 网络失败时出现失败态而非静默空列表。
+3. App 与 Web 在同分类、同查询下返回集合语义一致（不含 builtin 干扰）。
+4. 分类 key 在 App/Web/Server 三端只维护一套 canonical 定义。
+
+---
+
+## 八、最终结论
+
+移动端 Store 分类问题的最佳解不是继续堆兜底，而是把 “**数据契约、状态模型、错误语义**” 一次拉齐到 Web 同级别稳定性，再保留移动端自己的交互形态。
+
+---
+
+## 九、实施记录（2026-03-18）
+
+### P0 已完成
+
+| 项                          | 实现                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| 1. fetchMarket 请求序列保护 | `marketRequestIdRef` + 每次调用递增，仅 `requestId === current` 时应用结果              |
+| 2. 服务端可识别错误         | `getSkillList`、`getMcpList` catch 改为 `throw TRPCError`，不再返回空结构               |
+| 3. 空态拆分 + 重试          | `marketFetchError` 状态；失败时展示「加载失败」+ 重试按钮；成功空结果展示「未找到扩展」 |
+
+### P1 已完成
+
+| 项                              | 实现                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Skill Explore 移除 builtin 混入 | 列表仅展示社区数据；builtin 仅出现在 Installed Tab；移除 `builtinMarketItems`、`buildBuiltinMarketItem`、`getSkillCategoryForFilter` |
+
+### P1 未实施（需跨包重构）
+
+- 共享 Skill/MCP 分类契约：需在 `packages/types` 或 `src/constants` 提炼 canonical 定义，App/Web 共同消费

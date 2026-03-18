@@ -383,14 +383,11 @@ export const marketRouter = router({
         );
       } catch (error) {
         log('Error fetching mcp list: %O', error);
-        return {
-          categories: [],
-          currentPage: input?.page ?? 1,
-          items: [],
-          pageSize: input?.pageSize ?? 20,
-          totalCount: 0,
-          totalPages: 0,
-        };
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch mcp list',
+          cause: error,
+        });
       }
     }),
 

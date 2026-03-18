@@ -48,7 +48,6 @@ import { useToast } from '../components/ui/Toast';
 import { semanticColors } from '../constants/colors';
 import {
   ALL_CATEGORY_KEY,
-  BUILTIN_DEFAULT_CATEGORY,
   FALLBACK_MCP_CATEGORY_KEYS,
   FALLBACK_SKILL_CATEGORY_KEYS,
   getCategoryLabel,
@@ -120,13 +119,6 @@ const getSkillDescription = (skill: AgentSkillItem) => {
 const getSkillCategoryRaw = (skill: AgentSkillItem) => {
   const manifest = skill.manifest as Record<string, any> | undefined;
   return manifest?.meta?.category || manifest?.category;
-};
-
-/** Normalized category for builtin skill filtering (aligns with API keys) */
-const getSkillCategoryForFilter = (skill: AgentSkillItem): string | undefined => {
-  const raw = getSkillCategoryRaw(skill);
-  const withDefault = raw || BUILTIN_DEFAULT_CATEGORY[skill.identifier || skill.id];
-  return normalizeCategoryKey(withDefault, FALLBACK_SKILL_CATEGORY_KEYS);
 };
 
 /** Format large counts for display (e.g. 12345 → "1.2万" / "12.3k") */
@@ -218,16 +210,6 @@ const matchesStoreQuery = (query: string, values: Array<string | undefined>) => 
 
   return values.some((value) => value?.toLowerCase().includes(query));
 };
-
-const buildBuiltinMarketItem = (skill: AgentSkillItem): MarketListItem => ({
-  _source: 'builtin',
-  author: 'LobeHub',
-  avatar: getSkillAvatar(skill),
-  category: getSkillCategoryForFilter(skill) || getSkillCategoryRaw(skill),
-  description: getSkillDescription(skill),
-  identifier: skill.identifier || skill.id,
-  name: skill.name,
-});
 
 const buildInstalledPluginItem = (
   plugin: InstalledPlugin,
@@ -1223,6 +1205,8 @@ export default function StoreScreen() {
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketLoadingMore, setMarketLoadingMore] = useState(false);
+  const [marketFetchError, setMarketFetchError] = useState(false);
+  const marketRequestIdRef = useRef(0);
 
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [installedSkills, setInstalledSkills] = useState<AgentSkillItem[]>([]);
@@ -1291,24 +1275,6 @@ export default function StoreScreen() {
     }, []),
   );
 
-  const builtinMarketItems = useMemo(() => {
-    const query = debouncedQuery.trim().toLowerCase();
-
-    return builtinSkillsCatalog
-      .filter((skill) => {
-        const category = getSkillCategoryForFilter(skill);
-        const matchesCategory =
-          activeExploreCategory === ALL_CATEGORY_KEY ||
-          (category != null && category === activeExploreCategory);
-
-        return (
-          matchesCategory &&
-          matchesStoreQuery(query, [skill.name, skill.identifier, getSkillDescription(skill)])
-        );
-      })
-      .map(buildBuiltinMarketItem);
-  }, [activeExploreCategory, builtinSkillsCatalog, debouncedQuery]);
-
   const categoryOptions = useMemo(
     () => buildCategoryOptions(marketCategories, locale),
     [locale, marketCategories],
@@ -1372,10 +1338,13 @@ export default function StoreScreen() {
 
   const fetchMarket = useCallback(
     async (source: ExploreSource, page = 1, append = false) => {
+      const requestId = ++marketRequestIdRef.current;
+
       if (append) {
         setMarketLoadingMore(true);
       } else {
         setMarketLoading(true);
+        setMarketFetchError(false);
       }
 
       const categoryParam =
@@ -1397,6 +1366,8 @@ export default function StoreScreen() {
                 q: debouncedQuery || undefined,
               });
 
+        if (requestId !== marketRequestIdRef.current) return;
+
         const remoteItems = result.items || [];
         if (source === 'mcp') setMarketMcpTotal(result.totalCount ?? 0);
         if (source === 'skill') setMarketSkillTotal(result.totalCount ?? 0);
@@ -1408,10 +1379,8 @@ export default function StoreScreen() {
           );
         }
 
-        const nextItems =
-          source === 'skill' && page === 1
-            ? mergeMarketItems([...builtinMarketItems, ...remoteItems])
-            : remoteItems;
+        // Explore lists community data only; builtin skills stay in Installed tab (align with Web)
+        const nextItems = remoteItems;
 
         setMarketItems((prev) =>
           append ? mergeMarketItems([...prev, ...remoteItems]) : nextItems,
@@ -1419,14 +1388,18 @@ export default function StoreScreen() {
         setMarketPage(page);
         setMarketHasMore(remoteItems.length >= MARKET_PAGE_SIZE);
       } catch {
+        if (requestId !== marketRequestIdRef.current) return;
+        setMarketFetchError(true);
         if (!append) setMarketItems([]);
         toast.show('error', t.errorNetwork);
       } finally {
-        setMarketLoading(false);
-        setMarketLoadingMore(false);
+        if (requestId === marketRequestIdRef.current) {
+          setMarketLoading(false);
+          setMarketLoadingMore(false);
+        }
       }
     },
-    [activeExploreCategory, builtinMarketItems, debouncedQuery, t.errorNetwork, toast],
+    [activeExploreCategory, debouncedQuery, t.errorNetwork, toast],
   );
 
   useEffect(() => {
@@ -1444,8 +1417,6 @@ export default function StoreScreen() {
     void fetchExploreTotals();
   }, [activeTab, fetchExploreTotals]);
 
-  // Split to avoid loop: fetchMarket depends on builtinMarketItems, which changes when
-  // fetchInstalled updates builtinSkillsCatalog — that would retrigger fetchInstalled on installed tab
   useEffect(() => {
     if (activeTab === 'installed') void fetchInstalled();
   }, [activeTab, fetchInstalled]);
@@ -1971,7 +1942,23 @@ export default function StoreScreen() {
         <CardSkeleton />
       ) : isEmpty && !loading ? (
         <Animated.View className="flex-1" entering={FadeInDown.duration(350)}>
-          <EmptyState icon="📦" title={t.storeEmpty} />
+          <EmptyState
+            icon={marketFetchError ? '⚠️' : '📦'}
+            title={marketFetchError ? t.storeLoadFailed : t.storeEmpty}
+            action={
+              marketFetchError ? (
+                <TouchableOpacity
+                  accessibilityLabel={t.errorRetry}
+                  accessibilityRole="button"
+                  className="rounded-xl px-5 py-2.5"
+                  style={{ backgroundColor: semanticColors.primary }}
+                  onPress={() => refreshMarket()}
+                >
+                  <Text className="font-semibold text-white text-[14px]">{t.errorRetry}</Text>
+                </TouchableOpacity>
+              ) : undefined
+            }
+          />
         </Animated.View>
       ) : isExplore ? (
         <FlatList

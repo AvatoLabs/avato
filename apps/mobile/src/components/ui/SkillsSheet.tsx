@@ -16,10 +16,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { semanticColors } from '../../constants/colors';
 import type { MobileRecommendedBuiltinIcon } from '../../constants/recommendedBuiltins';
 import { themeColors } from '../../theme/colors';
+import { enteringModalContent } from '../../theme/motion';
 import type { AgentSkillItem, InstalledPlugin } from '../../types';
 import { BuiltinSkillIcon } from './BuiltinSkillIcon';
 
@@ -211,7 +213,11 @@ export default function SkillsSheet({
       <View className="flex-1 justify-end">
         <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
         {/* Content card: View (not Pressable) so scroll gestures work inside */}
-        <View className="rounded-t-2xl bg-card" style={{ maxHeight: windowHeight * 0.75 }}>
+        <Animated.View
+          className="rounded-t-2xl bg-card"
+          entering={enteringModalContent()}
+          style={{ maxHeight: windowHeight * 0.75 }}
+        >
           <View className="items-center pt-3 pb-1">
             <View className="h-1 w-9 rounded-full bg-foreground/10" />
           </View>
@@ -254,7 +260,7 @@ export default function SkillsSheet({
               </Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

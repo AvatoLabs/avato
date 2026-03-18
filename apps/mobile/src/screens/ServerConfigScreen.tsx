@@ -178,7 +178,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* Hero — welcoming intro */}
-          <Animated.View entering={FadeInDown.delay(50).duration(350)}>
+          <Animated.View entering={FadeInDown.delay(40).duration(tokens.motion.duration.normal)}>
             <View className="mx-5 mt-4 mb-6 items-center">
               <View
                 className="mb-4 items-center justify-center rounded-xl"
@@ -203,7 +203,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           </Animated.View>
 
           {/* URL Input Card */}
-          <Animated.View entering={FadeInDown.delay(120).duration(350)}>
+          <Animated.View entering={FadeInDown.delay(80).duration(tokens.motion.duration.normal)}>
             <View
               className="mx-5 mb-4 overflow-hidden rounded-xl"
               style={{
@@ -243,7 +243,7 @@ export default function ServerConfigScreen({ navigation, route }: Props) {
           </Animated.View>
 
           {/* Test Connection — secondary outline style */}
-          <Animated.View entering={FadeInDown.delay(180).duration(350)}>
+          <Animated.View entering={FadeInDown.delay(120).duration(tokens.motion.duration.normal)}>
             <PressableScale
               className="mx-5 mb-4 flex-row items-center justify-center rounded-xl py-3.5"
               disabled={testing}

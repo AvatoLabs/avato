@@ -1,11 +1,13 @@
 import { Camera, FileText, Image as ImageIcon } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { semanticColors } from '../../constants/colors';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
+import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
 
 interface AttachmentSheetProps {
@@ -121,37 +123,38 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         onRequestClose={onClose}
       >
         <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-          <Pressable
-            className="bg-card rounded-t-2xl"
+          <Animated.View
+            entering={enteringModalContent()}
             style={{ paddingBottom: Math.max(insets.bottom, 16), maxHeight: '72%' }}
-            onPress={(e) => e.stopPropagation()}
           >
-            <View className="items-center pt-3 pb-1">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-
-            <View className="px-5 pb-2 pt-2">
-              <Text className="text-foreground text-[18px] font-bold tracking-tight">
-                {t.fileAttach}
-              </Text>
-              <Text className="text-secondary/60 text-[13px] leading-5 mt-1">
-                Pick the source that fits the task. Everything lands in the same chat composer.
-              </Text>
-
-              <View className="mt-4 bg-foreground/5 rounded-2xl overflow-hidden">
-                {options.map((option, index) => (
-                  <AttachmentOption
-                    description={option.description}
-                    icon={option.icon}
-                    isLast={index === options.length - 1}
-                    key={option.key}
-                    title={option.title}
-                    onPress={option.onPress}
-                  />
-                ))}
+            <Pressable className="bg-card rounded-t-2xl" onPress={(e) => e.stopPropagation()}>
+              <View className="items-center pt-3 pb-1">
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
               </View>
-            </View>
-          </Pressable>
+
+              <View className="px-5 pb-2 pt-2">
+                <Text className="text-foreground text-[18px] font-bold tracking-tight">
+                  {t.fileAttach}
+                </Text>
+                <Text className="text-secondary/60 text-[13px] leading-5 mt-1">
+                  Pick the source that fits the task. Everything lands in the same chat composer.
+                </Text>
+
+                <View className="mt-4 bg-foreground/5 rounded-2xl overflow-hidden">
+                  {options.map((option, index) => (
+                    <AttachmentOption
+                      description={option.description}
+                      icon={option.icon}
+                      isLast={index === options.length - 1}
+                      key={option.key}
+                      title={option.title}
+                      onPress={option.onPress}
+                    />
+                  ))}
+                </View>
+              </View>
+            </Pressable>
+          </Animated.View>
         </Pressable>
       </Modal>
     );
