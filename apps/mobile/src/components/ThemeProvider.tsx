@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import React from 'react';
 import { View } from 'react-native';
 
+import { navigationRef } from '../lib/navigation';
 import { useThemeStore } from '../store/theme';
 import { AvatoDarkTheme, AvatoLightTheme } from '../theme';
 
@@ -16,7 +17,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <View className={isDark ? 'dark' : ''} style={{ flex: 1 }}>
-      <NavigationContainer theme={navTheme}>{children}</NavigationContainer>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
+        {children}
+      </NavigationContainer>
     </View>
   );
 }

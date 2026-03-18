@@ -120,6 +120,7 @@ export function HeroComposer({
           {/* Text input area */}
           <View className="px-3 pt-3">
             <TextInput
+              accessibilityLabel={placeholder}
               multiline
               className="text-foreground text-[16px] leading-[22px] min-h-[60px] max-h-28 font-medium"
               placeholder={placeholder}
@@ -250,6 +251,7 @@ export function HeroComposer({
           {/* Text input area */}
           <View className="px-3 pt-3">
             <TextInput
+              accessibilityLabel={placeholder}
               multiline
               className="text-foreground text-[16px] leading-[22px] min-h-[60px] max-h-28 font-medium"
               placeholder={placeholder}

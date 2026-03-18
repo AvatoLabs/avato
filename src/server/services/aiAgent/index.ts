@@ -698,6 +698,7 @@ export class AiAgentService {
 
     // 13. Create user message in database
     // Include groupId for Group Chat (required for getMessagesAndTopics to find messages)
+    // Include targetId for DM (private message to specific agent)
     // Include threadId if provided (for SubAgent task execution in isolated Thread)
     const userMessageRecord = await this.messageModel.create({
       agentId: resolvedAgentId,
@@ -705,6 +706,7 @@ export class AiAgentService {
       files: fileIds,
       groupId: appContext?.groupId ?? undefined,
       role: 'user',
+      targetId: appContext?.targetId ?? undefined,
       threadId: appContext?.threadId ?? undefined,
       topicId,
     });
@@ -874,7 +876,7 @@ export class AiAgentService {
    * 2. Delegate to execAgent for the rest
    */
   async execGroupAgent(params: ExecGroupAgentParams): Promise<ExecGroupAgentResult> {
-    const { agentId, files, groupId, message, topicId: inputTopicId, newTopic } = params;
+    const { agentId, files, groupId, message, topicId: inputTopicId, newTopic, targetId } = params;
 
     log(
       'execGroupAgent: agentId=%s, groupId=%s, message=%s',
@@ -905,10 +907,10 @@ export class AiAgentService {
       log('execGroupAgent: created new topic %s with groupId %s', topicId, groupId);
     }
 
-    // 2. Delegate to execAgent with groupId in appContext
+    // 2. Delegate to execAgent with groupId and targetId in appContext
     const result = await this.execAgent({
       agentId,
-      appContext: { groupId, topicId },
+      appContext: { groupId, targetId: targetId ?? undefined, topicId },
       autoStart: true,
       existingFileIds: files,
       prompt: message,

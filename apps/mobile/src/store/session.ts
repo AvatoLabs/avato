@@ -13,6 +13,7 @@ import { useToast } from '../components/ui/Toast';
 import { agentGroupApi, sessionApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import type { ChatSession, CreateSessionConfig } from '../types';
 
 type FetchSessionsOptions = {
@@ -102,10 +103,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         });
         return filtered;
       } catch (err) {
-        const { messageKey } = classifyError(err);
+        const { messageKey, type } = classifyError(err);
         const t = useI18n.getState().t;
         useToast.getState().show('error', t[messageKey], {
-          onRetry: () => void get().fetchSessions(),
+          onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchSessions(),
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
         });
         set({ errorMessage: t[messageKey], loading: false, initialized: true });
         if (options?.throwOnError) throw err;
@@ -119,6 +121,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return promise;
   },
 
+  /**
+   * Create a session. When called from Home chatbox, creates session-only (no Agent).
+   * Session-only = virtual agent, config in session.config, excluded from assistants list.
+   */
   createSession: async (titleOrConfig) => {
     const inputConfig: CreateSessionConfig =
       typeof titleOrConfig === 'string' ? { title: titleOrConfig } : (titleOrConfig ?? {});
@@ -161,9 +167,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       return newId;
     } catch (err) {
       console.warn('[SessionStore] createSession error:', err);
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
       throw err;
     }
   },

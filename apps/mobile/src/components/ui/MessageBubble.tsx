@@ -14,6 +14,7 @@ import {
   Download,
   Globe,
   Hand,
+  ListTodo,
   Pause,
   Pencil,
   RefreshCw,
@@ -485,6 +486,93 @@ const CompareGroupBlock = memo<{
 
 CompareGroupBlock.displayName = 'CompareGroupBlock';
 
+const GroupTasksBlock = memo<{
+  groupMembersById?: Record<string, GroupMessageSpeaker>;
+  message: ChatMessage;
+  t: ReturnType<typeof useI18n>['t'];
+}>(({ groupMembersById, message, t }) => {
+  const tasks = message.tasks ?? [];
+  const taskAgentIds = [...new Set(tasks.map((task) => task.agentId).filter(Boolean))];
+  const agentNames = taskAgentIds
+    .map((id) => groupMembersById?.[id]?.title ?? id)
+    .filter(Boolean)
+    .slice(0, 2);
+  const totalAgents = taskAgentIds.length;
+  const title =
+    totalAgents <= 2
+      ? t.taskGroupTasksTitleSimple
+          .replace('{{agents}}', agentNames.join(' / '))
+          .replace('{{count}}', String(tasks.length))
+      : t.taskGroupTasksTitle
+          .replace('{{agents}}', agentNames.join(' / '))
+          .replace('{{count}}', String(totalAgents))
+          .replace('{{taskCount}}', String(tasks.length));
+  const tagLabel = t.taskGroupTasks.replace('{{count}}', String(tasks.length));
+
+  return (
+    <View className="gap-2">
+      <View className="flex-row items-center gap-2 mb-1">
+        <View className="rounded-full bg-primary/10 p-1.5">
+          <ListTodo color={themeColors.primary} size={14} strokeWidth={2} />
+        </View>
+        <Text className="text-[13px] font-medium text-foreground flex-1" numberOfLines={1}>
+          {title}
+        </Text>
+        <View
+          className="rounded-full px-2 py-0.5"
+          style={{ backgroundColor: themeColors.primary + '15' }}
+        >
+          <Text className="text-[11px] font-medium" style={{ color: themeColors.primary }}>
+            {tagLabel}
+          </Text>
+        </View>
+      </View>
+      <View className="gap-2">
+        {tasks.map((task) => {
+          const agentName = task.agentId ? groupMembersById?.[task.agentId]?.title ?? task.agentId : '';
+          const taskTitle =
+            (task.metadata as Record<string, unknown>)?.taskTitle ??
+            task.taskDetail?.title ??
+            task.content?.slice(0, 60) ??
+            t.chatToolRunning;
+          const status = task.taskDetail?.status;
+          const isDone = status === 'completed' || status === 'Completed';
+          const isError = status === 'failed' || status === 'Failed' || status === 'cancel' || status === 'Cancel';
+
+          return (
+            <View
+              key={task.id}
+              className="rounded-xl px-3 py-2.5"
+              style={{
+                backgroundColor: themeColors.overlay,
+                borderColor: themeColors.primaryBorder,
+                borderWidth: 0.5,
+              }}
+            >
+              <View className="flex-row items-center gap-2">
+                {agentName ? (
+                  <Text className="text-[11px] font-medium text-foreground/60" numberOfLines={1}>
+                    {agentName}
+                  </Text>
+                ) : null}
+                <Text className="text-[13px] font-medium text-foreground flex-1" numberOfLines={2}>
+                  {taskTitle}
+                </Text>
+                {isDone ? (
+                  <Check color={themeColors.success} size={14} strokeWidth={2.5} />
+                ) : isError ? (
+                  <X color={themeColors.error} size={14} strokeWidth={2.5} />
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+GroupTasksBlock.displayName = 'GroupTasksBlock';
+
 const MessageBubble = memo<MessageBubbleProps>(
   ({ message, sessionId, generating, groupMembersById, groupSupervisorId, onSaveToTopic }) => {
     const isUser = message.role === 'user';
@@ -874,7 +962,8 @@ const MessageBubble = memo<MessageBubbleProps>(
       !isUser &&
       !isToolMessage &&
       message.role !== 'compareGroup' &&
-      message.role !== 'compressedGroup';
+      message.role !== 'compressedGroup' &&
+      message.role !== 'groupTasks';
     const groupSpeakerId = shouldShowGroupSpeaker
       ? message.agentId || groupSupervisorId
       : undefined;
@@ -926,6 +1015,8 @@ const MessageBubble = memo<MessageBubbleProps>(
       message.role === 'compressedGroup' && message.compressedMessages?.length
         ? message.compressedMessages
         : null;
+    const groupTasksMessages =
+      message.role === 'groupTasks' && message.tasks?.length ? message.tasks : null;
     const isCompressedGroupExpanded =
       message.role === 'compressedGroup' &&
       (message.metadata as Record<string, unknown>)?.expanded === true;
@@ -934,10 +1025,12 @@ const MessageBubble = memo<MessageBubbleProps>(
       !!renderedContent ||
       !!compareGroupChildren?.length ||
       !!compressedGroupMessages?.length ||
+      !!groupTasksMessages?.length ||
       !!multimodalContentParts?.length ||
       isToolMessage ||
       !!message.error ||
-      message.role === 'compressedGroup';
+      message.role === 'compressedGroup' ||
+      message.role === 'groupTasks';
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
@@ -950,7 +1043,9 @@ const MessageBubble = memo<MessageBubbleProps>(
           {!isUser && (
             <View className="mr-2.5 w-7 items-center pt-0.5">
               <View className="h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-foreground/[0.04]">
-                {shouldShowGroupSpeaker ? (
+                {message.role === 'groupTasks' ? (
+                  <ListTodo color={themeColors.primary} size={16} strokeWidth={2} />
+                ) : shouldShowGroupSpeaker ? (
                   <GroupSpeakerAvatar
                     fallbackLabel={groupSpeakerFallbackLabel}
                     speaker={groupSpeaker}
@@ -1005,6 +1100,12 @@ const MessageBubble = memo<MessageBubbleProps>(
                     </Text>
                   ) : null}
                 </View>
+              ) : message.role === 'groupTasks' && message.createdAt ? (
+                <View className="mb-1.5 flex-row justify-end">
+                  <Text className="text-[10px] text-foreground/20">
+                    {getTimeAgo(message.createdAt)}
+                  </Text>
+                </View>
               ) : (
                 <View className="mb-1.5 flex-row items-center">
                   {message.model ? (
@@ -1018,7 +1119,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     </Text>
                   ) : null}
                 </View>
-              ))}
+              )}
 
             <View style={isUser ? userContentWidth : assistantContentWidth}>
               {showStandaloneUserAttachments ? (
@@ -1158,6 +1259,12 @@ const MessageBubble = memo<MessageBubbleProps>(
                           markdownStyles={markdownStyles}
                           t={t}
                           onOpenLink={handleOpenLink}
+                        />
+                      ) : groupTasksMessages?.length ? (
+                        <GroupTasksBlock
+                          groupMembersById={groupMembersById}
+                          message={message}
+                          t={t}
                         />
                       ) : compressedGroupMessages?.length ? (
                         isCompressedGroupExpanded ? (

@@ -52,6 +52,9 @@ type TranslationKeys = {
   accessibilityGoBack: string;
   accessibilitySave: string;
   accessibilitySettings: string;
+  accessibilityHintGoBack: string;
+  accessibilityHintRetry: string;
+  accessibilityHintSave: string;
   chatListTapToContinue: string;
 
   // Chat Detail
@@ -178,6 +181,11 @@ type TranslationKeys = {
   groupAddMembers: string;
   groupCreateDefaultTitle: string;
   groupCreateSupervisorModel: string;
+  groupMentionAllMembers: string;
+  groupMentionTitle: string;
+  taskGroupTasks: string;
+  taskGroupTasksTitle: string;
+  taskGroupTasksTitleSimple: string;
 
   // Notebook
   notebookTitle: string;
@@ -469,6 +477,10 @@ type TranslationKeys = {
   toastTopicCreated: string;
   toastTopicDeleted: string;
   toastSaved: string;
+  toastTitleGenerationFailed: string;
+  toastTitleGenerationFailedHint: string;
+  toastTopicCreateFailed: string;
+  toastGenerationStopped: string;
   toastFilePicked: string;
   toastConnectionRestored: string;
 
@@ -476,6 +488,7 @@ type TranslationKeys = {
   errorNetwork: string;
   errorServer: string;
   errorAuth: string;
+  errorAuthGoToLogin: string;
   errorTimeout: string;
   errorUnknown: string;
   errorRetry: string;
@@ -580,6 +593,7 @@ type TranslationKeys = {
   relativeTimeDays: string;
 
   actionRename: string;
+  actionSmartRename: string;
   sessionRenamed: string;
   sessionRenameTitle: string;
   sessionRenamePlaceholder: string;
@@ -961,6 +975,9 @@ const en: TranslationKeys = {
   accessibilityGoBack: 'Go back',
   accessibilitySave: 'Save',
   accessibilitySettings: 'Chat settings',
+  accessibilityHintGoBack: 'Returns to the previous screen',
+  accessibilityHintRetry: 'Double tap to retry',
+  accessibilityHintSave: 'Saves changes and returns',
   chatListTapToContinue: 'Tap to continue the conversation',
 
   chatTitle: 'Chat',
@@ -1085,6 +1102,11 @@ const en: TranslationKeys = {
   groupAddMembers: 'Add Members',
   groupCreateDefaultTitle: 'New Group Chat',
   groupCreateSupervisorModel: 'Host model',
+  groupMentionAllMembers: 'All members',
+  groupMentionTitle: 'Mention',
+  taskGroupTasks: '{{count}} parallel tasks',
+  taskGroupTasksTitle: '{{agents}} and {{count}} agents tasks',
+  taskGroupTasksTitleSimple: '{{agents}} {{count}} tasks',
 
   notebookTitle: 'Notebook',
   notebookDesc: 'Your personal notes and documents',
@@ -1359,12 +1381,18 @@ const en: TranslationKeys = {
   toastTopicCreated: 'Topic created',
   toastTopicDeleted: 'Topic deleted',
   toastSaved: 'Saved',
+  toastTitleGenerationFailed: 'Failed to generate title',
+  toastTitleGenerationFailedHint:
+    'Ensure the chat has messages and the title model is configured.',
+  toastTopicCreateFailed: 'Failed to create topic',
+  toastGenerationStopped: 'Generation stopped',
   toastFilePicked: 'File added',
   toastConnectionRestored: 'Connection restored',
 
   errorNetwork: 'Network error. Please check your connection.',
   errorServer: 'Server error. Please try again later.',
-  errorAuth: 'Authentication failed. Please re-configure your server.',
+  errorAuth: 'Authentication failed. Please go to Settings or Login to reconfigure.',
+  errorAuthGoToLogin: 'Go to Login',
   errorTimeout: 'Request timed out. Please try again.',
   errorUnknown: 'Something went wrong.',
   errorRetry: 'Retry',
@@ -1468,6 +1496,7 @@ const en: TranslationKeys = {
   relativeTimeDays: '{count}d',
 
   actionRename: 'Rename',
+  actionSmartRename: 'Smart Rename',
   sessionRenamed: 'Conversation renamed',
   sessionRenameTitle: 'Rename Conversation',
   sessionRenamePlaceholder: 'Enter new name...',
@@ -1844,6 +1873,9 @@ const zh_tw: TranslationKeys = {
   accessibilityGoBack: '返回',
   accessibilitySave: '儲存',
   accessibilitySettings: '對話設定',
+  accessibilityHintGoBack: '返回上一頁',
+  accessibilityHintRetry: '雙擊重試',
+  accessibilityHintSave: '儲存變更並返回',
   chatListTapToContinue: '點擊繼續對話',
 
   chatTitle: '聊天',
@@ -1964,6 +1996,11 @@ const zh_tw: TranslationKeys = {
   groupAddMembers: '新增成員',
   groupCreateDefaultTitle: '新群組聊天',
   groupCreateSupervisorModel: '主持人模型',
+  groupMentionAllMembers: '全體成員',
+  groupMentionTitle: '提及',
+  taskGroupTasks: '{{count}} 個並行任務',
+  taskGroupTasksTitle: '{{agents}} 和 {{count}} 個代理任務',
+  taskGroupTasksTitleSimple: '{{agents}} {{count}} 個任務',
 
   notebookTitle: '筆記本',
   notebookDesc: '你的個人筆記和文檔',
@@ -2239,12 +2276,17 @@ const zh_tw: TranslationKeys = {
   toastTopicCreated: '話題已建立',
   toastTopicDeleted: '話題已刪除',
   toastSaved: '已儲存',
+  toastTitleGenerationFailed: '標題生成失敗',
+  toastTitleGenerationFailedHint: '請確保會話已有對話內容並已配置標題模型。',
+  toastTopicCreateFailed: '話題創建失敗',
+  toastGenerationStopped: '生成已停止',
   toastFilePicked: '檔案已新增',
   toastConnectionRestored: '連線已恢復',
 
   errorNetwork: '網路錯誤，請檢查連線。',
   errorServer: '伺服器錯誤，請稍後重試。',
-  errorAuth: '驗證失敗，請重新設定伺服器。',
+  errorAuth: '驗證失敗，請前往設定或登入頁重新配置。',
+  errorAuthGoToLogin: '前往登入',
   errorTimeout: '要求逾時，請重試。',
   errorUnknown: '發生了一些問題。',
   errorRetry: '重試',
@@ -2348,6 +2390,7 @@ const zh_tw: TranslationKeys = {
   relativeTimeDays: '{count} 天前',
 
   actionRename: '重新命名',
+  actionSmartRename: '智能重命名',
   sessionRenamed: '對話已重新命名',
   sessionRenameTitle: '重新命名對話',
   sessionRenamePlaceholder: '輸入新名稱...',
@@ -2721,6 +2764,9 @@ const zh: TranslationKeys = {
   accessibilityGoBack: '返回',
   accessibilitySave: '保存',
   accessibilitySettings: '对话设置',
+  accessibilityHintGoBack: '返回上一屏',
+  accessibilityHintRetry: '双击重试',
+  accessibilityHintSave: '保存更改并返回',
   chatListTapToContinue: '点击继续对话',
 
   chatTitle: '聊天',
@@ -2842,6 +2888,11 @@ const zh: TranslationKeys = {
   groupAddMembers: '添加成员',
   groupCreateDefaultTitle: '新群组聊天',
   groupCreateSupervisorModel: '主持人模型',
+  groupMentionAllMembers: '全体成员',
+  groupMentionTitle: '提及',
+  taskGroupTasks: '{{count}} 个并行任务',
+  taskGroupTasksTitle: '{{agents}} 和 {{count}} 个代理任务',
+  taskGroupTasksTitleSimple: '{{agents}} {{count}} 个任务',
 
   notebookTitle: '笔记本',
   notebookDesc: '你的个人笔记和文档',
@@ -3116,12 +3167,17 @@ const zh: TranslationKeys = {
   toastTopicCreated: '话题已创建',
   toastTopicDeleted: '话题已删除',
   toastSaved: '已保存',
+  toastTitleGenerationFailed: '标题生成失败',
+  toastTitleGenerationFailedHint: '请确保会话已有对话内容并已配置标题模型。',
+  toastTopicCreateFailed: '话题创建失败',
+  toastGenerationStopped: '生成已停止',
   toastFilePicked: '文件已添加',
   toastConnectionRestored: '连接已恢复',
 
   errorNetwork: '网络错误，请检查连接。',
   errorServer: '服务器错误，请稍后重试。',
-  errorAuth: '认证失败，请重新配置服务器。',
+  errorAuth: '认证失败，请前往设置或登录页重新配置。',
+  errorAuthGoToLogin: '前往登录',
   errorTimeout: '请求超时，请重试。',
   errorUnknown: '出了点问题。',
   errorRetry: '重试',
@@ -3225,6 +3281,7 @@ const zh: TranslationKeys = {
   relativeTimeDays: '{count} 天前',
 
   actionRename: '重命名',
+  actionSmartRename: '智能重命名',
   sessionRenamed: '对话已重命名',
   sessionRenameTitle: '重命名对话',
   sessionRenamePlaceholder: '输入新名称...',

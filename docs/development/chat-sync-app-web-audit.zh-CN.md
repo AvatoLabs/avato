@@ -2,6 +2,12 @@
 
 本文档全面审计移动端 App 与 Web 端在会话、消息、话题等聊天数据上的同步机制，分析「只有一部分同步」的原因。
 
+**相关文档**：
+
+- [chatlist-smart-rename-audit.zh-CN.md](./chatlist-smart-rename-audit.zh-CN.md) — ChatList 智能重命名与 Web 对比
+- [title-generation-and-home-flow-audit.zh-CN.md](./title-generation-and-home-flow-audit.zh-CN.md) — 标题生成与 Home 流程
+- [app-details-enhancement-audit.zh-CN.md](./app-details-enhancement-audit.zh-CN.md) — App 细节增强总览
+
 **审计范围**：
 
 - **数据层**：sessions、messages、topics、threads（群聊分支）
@@ -123,10 +129,51 @@ Web 与 App 均通过 tRPC 调用同一后端，写入同一数据库。**无 We
 
 | 数据类型                   | Web                   | App                                    | 同步情况 |
 | -------------------------- | --------------------- | -------------------------------------- | -------- |
-| Session 标题（含 AI 生成） | 写入 DB，SWR 刷新可见 | 写入 DB，需回到 ChatListScreen 才可见  | 部分     |
-| Topic 标题（含 AI 生成）   | 写入 DB，SWR 刷新可见 | 写入 DB，无 focus 刷新                 | 部分     |
+| Session 标题（含 AI 生成） | 写入 DB，SWR 刷新可见 | 写入 DB，focus ChatListScreen 时可见   | ✅ 已对齐 |
+| Topic 标题（含 AI 生成）   | 写入 DB，SWR 刷新可见 | 写入 DB，focus ChatDetailScreen 时可见 | ✅ 已对齐 |
 | 群组详情（groupDetail）    | -                     | `useFocusEffect` 中 `loadGroupDetail`  | 有       |
 | 模型 / Provider 选择       | 存 session meta       | 存 session meta，需 fetchSessions 更新 | 部分     |
+
+---
+
+## 六.1 标题生成与智能重命名（Web vs App 架构对比）
+
+> 详见 [chatlist-smart-rename-audit.zh-CN.md](./chatlist-smart-rename-audit.zh-CN.md)、[title-generation-and-home-flow-audit.zh-CN.md](./title-generation-and-home-flow-audit.zh-CN.md)
+
+### 6.1.1 自动标题生成（流式完成后）
+
+| 维度 | Web | App |
+|------|-----|-----|
+| **Session 标题** | 无独立流程，Session 标题多来自 Topic 或手动 | `sessionApi.generateTitle` → `session.generateSessionTitle`（服务端 tRPC） |
+| **Topic 标题** | `summaryTopicTitle` → `chatService.fetchPresetTaskResult`（**客户端** LLM 流式） | `topicApi.generateTitle` → `topic.generateTopicTitle`（**服务端** tRPC） |
+| **模型来源** | `systemAgentSelectors.topic(useUserStore)` | `SystemAgentService.getTaskModelConfig('topic')`（DB） |
+| **数据流** | 拉 messages → chainSummaryTitle → 流式生成 → onFinish 更新 store | 服务端拉 messages → pickLatestContext → LLM 生成 → 返回 string \| null |
+
+### 6.1.2 手动智能重命名
+
+| 维度 | Web | App |
+|------|-----|-----|
+| **操作对象** | Topic（侧边栏 Topic 列表项） | Session（ChatList 长按会话） |
+| **入口** | Topic 右键/下拉 → Smart Rename | ChatList 长按 → ActionSheet → 智能重命名 |
+| **实现** | `autoRenameTopicTitle(topicId)` → `summaryTopicTitle` → `fetchPresetTaskResult` | `handleSmartRename` → `sessionApi.generateTitle` → `session.generateSessionTitle` |
+| **API** | 客户端 chat API（流式） | 服务端 tRPC mutation（一次性） |
+
+### 6.1.3 关键差异与影响
+
+| 差异 | 说明 |
+|------|------|
+| **客户端 vs 服务端** | Web Topic 标题用客户端 LLM（fetchPresetTaskResult），App 用服务端 tRPC。Web 不依赖服务端 `topic.generateTopicTitle`。 |
+| **实体层级** | Web 智能重命名针对 Topic；App ChatList 针对 Session。两者不是同一功能的对齐实现。 |
+| **SystemAgent 依赖** | App 的 Session/Topic 标题生成均依赖 DB 中 `systemAgent.topic` 配置。若未配置或 provider 不可用，服务端返回 null。 |
+| **返回 null 时** | App 端 Toast `toastTitleGenerationFailed` + `toastTitleGenerationFailedHint`（引导检查消息与模型配置）；先 closeActionSheet 再延迟 350ms 显示，避免被 Modal 遮挡。 |
+
+### 6.1.4 同步可见性
+
+| 场景 | Web | App |
+|------|-----|-----|
+| Session 标题更新后 | SWR revalidateOnFocus 刷新 | focus ChatListScreen 时 fetchSessions |
+| Topic 标题更新后 | SWR 刷新 | focus ChatDetailScreen 时 fetchTopics |
+| 智能重命名成功 | 本地 store 更新 + SWR 刷新 | `updateSessionTitle` 本地更新，无需 fetch |
 
 ---
 
@@ -202,7 +249,7 @@ App 端在群聊中发送消息时，曾仅传递 `sessionId`（群聊场景下�
 
 ---
 
-## 十二、审计状态汇总（截至 2026-03）
+## 十二、审计状态汇总（截至 2026-03-18）
 
 | 项目                        | 状态      | 说明                                                                       |
 | --------------------------- | --------- | -------------------------------------------------------------------------- |
@@ -212,4 +259,7 @@ App 端在群聊中发送消息时，曾仅传递 `sessionId`（群聊场景下�
 | Skill/MCP 分类              | ✅ 已修复 | storeCategories.ts 固定兜底、builtin 归一化                                |
 | Session 列表刷新范围        | ✅ 已实施 | ChatListScreen、ChatDetailScreen、StoreScreen focus 时均调用 fetchSessions |
 | 网络重连刷新                | ✅ 已实施 | NetInfo 监听 `wasOffline && !offline` 时调用 syncMobileBootstrapState      |
+| 默认标题识别集              | ✅ 已对齐 | chat.ts DEFAULT_SESSION_TITLES 与 session.ts 一致（含 New Chat、New Group Chat、Untitled） |
+| ChatList 智能重命名         | ✅ 已实现 | Session 级，调用 session.generateSessionTitle；与 Web Topic 级不同，见 6.1 节 |
+| 标题生成 Web vs App 架构    | ⚠️ 差异   | Web 用客户端 fetchPresetTaskResult，App 用服务端 tRPC；依赖 SystemAgent 配置 |
 | 消息结构 parse ()           | ⏳ 待评估 | App 未使用 conversation-flow parse                                         |

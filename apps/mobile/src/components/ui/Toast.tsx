@@ -23,6 +23,7 @@ interface ToastItem {
   id: number;
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
   type: ToastType;
 }
 
@@ -34,7 +35,7 @@ interface ToastStore {
   show: (
     type: ToastType,
     message: string,
-    options?: { duration?: number; onRetry?: () => void },
+    options?: { duration?: number; onRetry?: () => void; retryLabel?: string },
   ) => void;
 }
 
@@ -50,7 +51,16 @@ export const useToast = create<ToastStore>((set, get) => ({
     const duration =
       options?.duration ??
       (type === 'error' ? Math.max(4000, Math.min(message.length * 60, 8000)) : DURATION);
-    set({ current: { id: _toastId, type, message, duration, onRetry: options?.onRetry } });
+    set({
+      current: {
+        id: _toastId,
+        type,
+        message,
+        duration,
+        onRetry: options?.onRetry,
+        retryLabel: options?.retryLabel,
+      },
+    });
   },
   dismiss: () => set({ current: null }),
 }));
@@ -92,6 +102,7 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
   const isError = item.type === 'error';
   const Icon = ICON_MAP[item.type];
   const showRetry = isError && item.onRetry;
+  const retryLabel = item.retryLabel ?? t.errorRetry;
 
   const handleRetry = useCallback(() => {
     onDone();
@@ -144,13 +155,14 @@ const ToastBubble = memo<{ item: ToastItem; onDone: () => void }>(({ item, onDon
         </Text>
         {showRetry ? (
           <TouchableOpacity
-            accessibilityLabel={t.errorRetry}
+            accessibilityHint={t.accessibilityHintRetry}
+            accessibilityLabel={retryLabel}
             accessibilityRole="button"
             activeOpacity={0.8}
             style={{ marginLeft: 8, paddingVertical: 4, paddingHorizontal: 8 }}
             onPress={handleRetry}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.errorRetry}</Text>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{retryLabel}</Text>
           </TouchableOpacity>
         ) : null}
       </View>

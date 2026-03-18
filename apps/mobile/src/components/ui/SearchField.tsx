@@ -19,6 +19,7 @@ export function SearchField({ containerClassName = '', ...props }: SearchFieldPr
         className="flex-1 ml-2 text-foreground text-[16px] font-medium"
         placeholderTextColor={themeColors.secondaryText}
         {...props}
+        accessibilityLabel={props.accessibilityLabel ?? props.placeholder ?? 'Search'}
       />
     </View>
   );

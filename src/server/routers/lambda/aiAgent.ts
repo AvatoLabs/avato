@@ -121,6 +121,8 @@ const ExecGroupAgentSchema = z.object({
       topicMessageIds: z.array(z.string()).optional(),
     })
     .optional(),
+  /** Target agent ID for DM (private message to specific member). Omit for group message. */
+  targetId: z.string().optional().nullable(),
   /** Existing topic ID */
   topicId: z.string().optional().nullable(),
 });
@@ -628,7 +630,7 @@ export const aiAgentRouter = router({
    * 5. Return operationId for SSE connection + messages for UI sync
    */
   execGroupAgent: aiAgentProcedure.input(ExecGroupAgentSchema).mutation(async ({ input, ctx }) => {
-    const { agentId, groupId, message, files, topicId, newTopic } = input;
+    const { agentId, groupId, message, files, topicId, newTopic, targetId } = input;
 
     log('execGroupAgent: agentId=%s, groupId=%s', agentId, groupId);
 
@@ -640,6 +642,7 @@ export const aiAgentRouter = router({
         groupId,
         message,
         newTopic,
+        targetId,
         topicId,
       });
 

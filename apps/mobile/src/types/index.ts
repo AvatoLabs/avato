@@ -73,7 +73,9 @@ export type MessageRole =
   | 'assistant'
   | 'compareGroup'
   | 'compressedGroup'
+  | 'groupTasks'
   | 'system'
+  | 'task'
   | 'tool'
   | 'user';
 
@@ -210,6 +212,18 @@ export interface ChatMessage {
   role: MessageRole;
   search?: GroundingSearch | null;
   sessionId: string;
+  /** For groupTasks: aggregated task messages from multiple agents */
+  tasks?: ChatMessage[];
+  /** For task messages: execution detail (status, threadId, etc.) */
+  taskDetail?: {
+    duration?: number;
+    status?: string;
+    threadId?: string;
+    title?: string;
+    totalSteps?: number;
+    totalToolCalls?: number;
+    [key: string]: unknown;
+  };
   toolCallId?: string | null;
   tools?: ChatToolPayload[] | null;
   traceId?: string | null;

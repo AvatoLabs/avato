@@ -1102,10 +1102,22 @@ export class MessageModel {
   };
 
   queryBySessionId = async (sessionId?: string | null) => {
-    const result = await this.db.query.messages.findMany({
-      orderBy: [asc(messages.createdAt)],
-      where: and(eq(messages.userId, this.userId), this.matchSession(sessionId)),
-    });
+    if (!sessionId || sessionId === INBOX_SESSION_ID) {
+      const result = await this.db.query.messages.findMany({
+        orderBy: [asc(messages.createdAt)],
+        where: and(eq(messages.userId, this.userId), this.matchSession(sessionId)),
+      });
+      return result as DBMessageItem[];
+    }
+
+    // For agent sessions, messages may be stored with agentId (Web flow) not sessionId.
+    // Use buildSessionCondition to match both sessionId and agentId via agents_to_sessions.
+    const sessionCondition = await this.buildSessionCondition(sessionId);
+    const result = await this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.userId, this.userId), sessionCondition))
+      .orderBy(asc(messages.createdAt));
 
     return result as DBMessageItem[];
   };

@@ -20,6 +20,7 @@ import {
   Tag,
   Trash2,
   UsersRound,
+  Wand2,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -35,6 +36,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeInDown, SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
@@ -73,6 +75,7 @@ import {
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { getStreak, recordUsage } from '../lib/streak';
 import { useChatStore } from '../store/chat';
@@ -279,6 +282,7 @@ export default function ChatListScreen({ navigation }: any) {
   const removeSession = useSessionStore((s) => s.removeSession);
   const pinSession = useSessionStore((s) => s.pinSession);
   const unpinSession = useSessionStore((s) => s.unpinSession);
+  const updateSessionTitle = useSessionStore((s) => s.updateSessionTitle);
   const renameSession = useSessionStore((s) => s.renameSession);
   const updateSessionTag = useSessionStore((s) => s.updateSessionTag);
   const sendMessage = useChatStore((s) => s.sendMessage);
@@ -787,6 +791,40 @@ export default function ChatListScreen({ navigation }: any) {
     [closeActionSheet],
   );
 
+  const [smartRenamingId, setSmartRenamingId] = useState<string | null>(null);
+  const handleSmartRename = useCallback(
+    async (session: ChatSession) => {
+      if (smartRenamingId) return;
+      haptics.light();
+      setSmartRenamingId(session.id);
+      const t = useI18n.getState().t;
+      const failMsg = t.toastTitleGenerationFailed || 'Failed to generate title';
+      const failHint =
+        t.toastTitleGenerationFailedHint ||
+        'Ensure the chat has messages and the title model is configured.';
+      try {
+        const newTitle = await sessionApi.generateTitle(session.id);
+        if (newTitle && newTitle.trim()) {
+          updateSessionTitle(session.id, newTitle.trim());
+          closeActionSheet();
+        } else {
+          closeActionSheet();
+          setTimeout(() => {
+            useToast.getState().show('error', `${failMsg} ${failHint}`.trim());
+          }, 350);
+        }
+      } catch (err) {
+        closeActionSheet();
+        setTimeout(() => {
+          useToast.getState().show('error', failMsg);
+        }, 350);
+      } finally {
+        setSmartRenamingId(null);
+      }
+    },
+    [closeActionSheet, smartRenamingId, updateSessionTitle],
+  );
+
   const closeTagEditor = useCallback(() => {
     setEditingTag(null);
     setTagDraftName('');
@@ -850,8 +888,11 @@ export default function ChatListScreen({ navigation }: any) {
       haptics.success();
       closeTagEditor();
     } catch (err) {
-      const { messageKey } = classifyError(err);
-      toast.show('error', t[messageKey]);
+      const { messageKey, type } = classifyError(err);
+      toast.show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   }, [
     closeActionSheet,
@@ -878,8 +919,11 @@ export default function ChatListScreen({ navigation }: any) {
       haptics.success();
       closeTagEditor();
     } catch (err) {
-      const { messageKey } = classifyError(err);
-      toast.show('error', t[messageKey]);
+      const { messageKey, type } = classifyError(err);
+      toast.show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   }, [activeTagId, closeTagEditor, editingTag, fetchSessionTags, fetchSessions, t, toast]);
 
@@ -892,8 +936,11 @@ export default function ChatListScreen({ navigation }: any) {
         haptics.success();
         closeActionSheet();
       } catch (err) {
-        const { messageKey } = classifyError(err);
-        toast.show('error', t[messageKey]);
+        const { messageKey, type } = classifyError(err);
+        toast.show('error', t[messageKey], {
+          onRetry: type === 'auth' ? navigateToLogin : undefined,
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
       }
     },
     [actionSession, closeActionSheet, t, toast, updateSessionTag],
@@ -1026,54 +1073,93 @@ export default function ChatListScreen({ navigation }: any) {
     [tagById],
   );
 
+  const handleSwipeDelete = useCallback(
+    (session: ChatSession) => {
+      Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
+        { text: t.cancel, style: 'cancel' },
+        {
+          text: t.delete,
+          style: 'destructive',
+          onPress: () => {
+            haptics.warning();
+            removeSession(session.id);
+          },
+        },
+      ]);
+    },
+    [removeSession, t.cancel, t.delete, t.deleteSessionConfirm, t.deleteSessionDesc],
+  );
+
   const renderSessionRow = (item: ChatSession) => {
     const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
 
-    return (
+    const renderRightActions = () => (
       <TouchableOpacity
-        accessibilityLabel={item.title}
+        accessibilityLabel={t.delete}
         accessibilityRole="button"
-        activeOpacity={0.4}
-        className="flex-row items-start px-5 py-3 active:bg-foreground/10"
-        key={item.id}
-        onLongPress={() => handleLongPress(item)}
-        onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
+        activeOpacity={0.8}
+        className="items-center justify-center px-5"
+        style={{
+          backgroundColor: semanticColors.danger,
+          minWidth: 72,
+        }}
+        onPress={() => handleSwipeDelete(item)}
       >
-        <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
-          <SessionLogo
-            avatar={item.avatar}
-            provider={providerId}
-            providerLogo={providerLogo}
-            size={36}
-          />
-        </View>
-        <View className="flex-1 mr-3 mt-0.5">
-          <View className="flex-row items-center mb-0.5 flex-wrap">
-            {item.pinned && (
-              <Pin
-                color={semanticColors.primary}
-                size={11}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginRight: 4 }}
-              />
-            )}
-            <Text
-              className="text-foreground text-[15px] font-medium tracking-tight"
-              numberOfLines={1}
-            >
-              {item.title || t.chatListNewConversation}
-            </Text>
-            {renderTagChip(item.tagId)}
-          </View>
-          <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
-            {item.description}
-          </Text>
-        </View>
-        <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
-          {formatTimeAgo(item.updatedAt, t)}
-        </Text>
+        <Trash2 color="#fff" size={20} strokeWidth={tokens.icon.strokeWidth} />
+        <Text className="mt-1 text-[12px] font-semibold text-white">{t.delete}</Text>
       </TouchableOpacity>
+    );
+
+    return (
+      <Swipeable
+        friction={2}
+        key={item.id}
+        renderRightActions={renderRightActions}
+      >
+        <TouchableOpacity
+          accessibilityLabel={item.title}
+          accessibilityRole="button"
+          activeOpacity={0.4}
+          className="flex-row items-start px-5 py-3 active:bg-foreground/10 bg-background"
+          onLongPress={() => handleLongPress(item)}
+          onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
+        >
+          <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
+            <SessionLogo
+              avatar={item.avatar}
+              provider={providerId}
+              providerLogo={providerLogo}
+              size={36}
+            />
+          </View>
+          <View className="flex-1 mr-3 mt-0.5">
+            <View className="flex-row items-center mb-0.5 flex-wrap">
+              {item.pinned && (
+                <Pin
+                  color={semanticColors.primary}
+                  size={11}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginRight: 4 }}
+                />
+              )}
+              <Text
+                className="text-foreground text-[15px] font-medium tracking-tight"
+                numberOfLines={1}
+              >
+                {item.title || t.chatListNewConversation}
+              </Text>
+              {renderTagChip(item.tagId)}
+            </View>
+            <Text className="text-secondary/40 text-[12px] font-medium" numberOfLines={1}>
+              {item.description}
+            </Text>
+          </View>
+          <Text className="text-secondary/40 text-[10px] font-medium tracking-wide">
+            {formatTimeAgo(item.updatedAt, t)}
+          </Text>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -1518,6 +1604,21 @@ export default function ChatListScreen({ navigation }: any) {
                     strokeWidth={tokens.icon.strokeWidth}
                   />
                   <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+                </Pressable>
+
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  disabled={!!smartRenamingId}
+                  onPress={() => actionSession && handleSmartRename(actionSession)}
+                >
+                  <Wand2
+                    color={semanticColors.muted}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-3 text-base text-foreground">
+                    {t.actionSmartRename}
+                  </Text>
                 </Pressable>
 
                 {actionSession?.type !== 'group' ? (

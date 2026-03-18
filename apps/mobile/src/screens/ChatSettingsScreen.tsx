@@ -46,6 +46,7 @@ import {
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike } from '../lib/session';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
@@ -405,8 +406,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         setTagSelectorVisible(false);
         haptics.success();
       } catch (err) {
-        const { messageKey } = classifyError(err);
-        toast.show('error', t[messageKey]);
+        const { messageKey, type } = classifyError(err);
+        toast.show('error', t[messageKey], {
+          onRetry: type === 'auth' ? navigateToLogin : undefined,
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
       }
     },
     [sessionId, t, toast, updateSessionTag],
@@ -435,8 +439,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       setTagSelectorVisible(false);
       haptics.success();
     } catch (err) {
-      const { messageKey } = classifyError(err);
-      toast.show('error', t[messageKey]);
+      const { messageKey, type } = classifyError(err);
+      toast.show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   }, [
     closeTagEditor,
@@ -453,6 +460,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
         title={t.chatSettingsTitle}
         leftElement={

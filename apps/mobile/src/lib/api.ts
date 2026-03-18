@@ -302,6 +302,9 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
       : null;
 
   const sessionId = String(message?.sessionId ?? parentSessionId ?? '');
+  const tasks = Array.isArray(message?.tasks)
+    ? (message.tasks as any[]).map((t) => normalizeMessage(t, sessionId))
+    : undefined;
   const children = Array.isArray(message?.children)
     ? (message.children as any[]).map((child) => normalizeMessage(child, sessionId))
     : undefined;
@@ -315,6 +318,7 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
     agentId: message?.agentId ?? message?.agent_id ?? undefined,
     ...(children?.length ? { children } : {}),
     ...(compressedMessages?.length ? { compressedMessages } : {}),
+    ...(tasks?.length ? { tasks } : {}),
     content: normalizedContent.content,
     createdAt: toIsoString(message?.createdAt),
     error: message?.error ?? null,
@@ -339,6 +343,7 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
     sessionId,
     toolCallId: message?.tool_call_id ?? undefined,
     tools: (message?.tools as ChatToolPayload[] | null | undefined) ?? null,
+    taskDetail: message?.taskDetail ?? message?.task_detail ?? undefined,
     traceId: message?.traceId ?? message?.trace_id ?? undefined,
     updatedAt: toIsoString(message?.updatedAt),
     usage: message?.usage ?? message?.metadata?.usage ?? null,
@@ -691,8 +696,9 @@ export const sessionApi = {
   },
   /**
    * Create a new session (simple chat).
-   * Uses sessionOnly: true so the session does not appear in the sidebar "assistants" list.
-   * For creating assistants, use agentApi.create instead.
+   * Uses sessionOnly: true — no Agent entity is created; config lives in session.config.
+   * Session-only sessions do not appear in the sidebar "assistants" list.
+   * For creating assistants (with Agent record), use agentApi.create instead.
    */
   create: (config?: CreateSessionConfig) =>
     trpcMutate<string>('session.createSession', {
@@ -818,6 +824,7 @@ export const aiAgentApi = {
     files?: string[];
     groupId: string;
     message: string;
+    targetId?: string;
     topicId?: string;
   }) =>
     trpcMutate<{
@@ -872,6 +879,42 @@ export const aiAgentApi = {
     trpcQuery<{ messages: any[] }>('aiChat.getMessagesAndTopics', params).then((r) =>
       (r?.messages ?? []).map((message) => normalizeMessage(message)),
     ),
+  /** Create Thread for client-side task execution in Group mode (task delegation) */
+  createClientGroupAgentTaskThread: (params: {
+    groupId: string;
+    instruction: string;
+    parentMessageId: string;
+    subAgentId: string;
+    title?: string;
+    topicId: string;
+  }) =>
+    trpcMutate<{
+      messages?: any[];
+      success: boolean;
+      threadId?: string;
+      threadMessages?: any[];
+      userMessageId?: string;
+    }>('aiAgent.createClientGroupAgentTaskThread', params).then((result) => ({
+      ...result,
+      messages: result.messages ? normalizeMessages(result.messages) : undefined,
+      threadMessages: result.threadMessages
+        ? normalizeMessages(result.threadMessages)
+        : undefined,
+    })),
+  /** Update Thread status after client-side task execution completes */
+  updateClientTaskThreadStatus: (params: {
+    completionReason: 'done' | 'error' | 'interrupted';
+    error?: string;
+    metadata?: {
+      totalCost?: number;
+      totalMessages?: number;
+      totalSteps?: number;
+      totalTokens?: number;
+      totalToolCalls?: number;
+    };
+    resultContent?: string;
+    threadId: string;
+  }) => trpcMutate('aiAgent.updateClientTaskThreadStatus', params),
 };
 
 // ── Message API ─────────────────────────────────────────────────────

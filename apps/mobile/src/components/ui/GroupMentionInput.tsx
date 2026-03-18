@@ -1,0 +1,203 @@
+/**
+ * GroupMentionInput — TextInput with @ mention support for group chat.
+ * When user types "@", shows a member picker (ALL_MEMBERS + individual members).
+ * Inserts <mention name="X" id="Y" /> format into the text.
+ */
+import { Users } from 'lucide-react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  FlatList,
+  Image as RNImage,
+  Modal,
+  Pressable,
+  Text,
+  TextInput,
+  TextInput as RNTextInput,
+  View,
+} from 'react-native';
+
+import { semanticColors } from '../constants/colors';
+import { useI18n } from '../lib/i18n';
+import { themeColors } from '../theme/colors';
+
+const MENTION_FORMAT = (name: string, id: string) => `<mention name="${name}" id="${id}" />`;
+
+export interface MentionMember {
+  id: string;
+  title?: string;
+  avatar?: string;
+}
+
+interface GroupMentionInputProps {
+  members: MentionMember[];
+  placeholder?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  onMentionTargetIdChange?: (targetId: string | null) => void;
+  editable?: boolean;
+  accessibilityLabel?: string;
+  style?: object;
+  className?: string;
+}
+
+export function GroupMentionInput({
+  members,
+  placeholder,
+  value,
+  onChangeText,
+  onMentionTargetIdChange,
+  editable = true,
+  accessibilityLabel,
+  style,
+  className,
+}: GroupMentionInputProps) {
+  const { t } = useI18n();
+  const inputRef = useRef<RNTextInput>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [mentionStartIndex, setMentionStartIndex] = useState(0);
+  const [filter, setFilter] = useState('');
+
+  const mentionOptions = useMemo(() => {
+    const filtered =
+      filter.trim().length > 0
+        ? members.filter(
+            (m) =>
+              m.title?.toLowerCase().includes(filter.toLowerCase()) ||
+              m.id.toLowerCase().includes(filter.toLowerCase()),
+          )
+        : members;
+
+    return [
+      { id: 'ALL_MEMBERS', title: t.groupMentionAllMembers, isAll: true, avatar: undefined },
+      ...filtered.map((m) => ({
+        avatar: m.avatar,
+        id: m.id,
+        isAll: false,
+        title: m.title || m.id,
+      })),
+    ];
+  }, [members, filter, t.groupMentionAllMembers]);
+
+  const handleChangeText = useCallback(
+    (text: string) => {
+      onChangeText(text);
+      const lastAt = text.lastIndexOf('@');
+      if (lastAt >= 0) {
+        const afterAt = text.slice(lastAt + 1);
+        const spaceIndex = afterAt.indexOf(' ');
+        const filterText = spaceIndex >= 0 ? afterAt.slice(0, spaceIndex) : afterAt;
+        const hasClosing = filterText.includes('>');
+        if (!hasClosing) {
+          setMentionStartIndex(lastAt);
+          setFilter(filterText);
+          setShowPicker(true);
+          return;
+        }
+      }
+      setShowPicker(false);
+    },
+    [onChangeText],
+  );
+
+  const handleSelectMention = useCallback(
+    (id: string, title: string) => {
+      const before = value.slice(0, mentionStartIndex);
+      const afterAt = value.slice(mentionStartIndex);
+      const restAfter = afterAt.slice(afterAt.indexOf(' ') >= 0 ? afterAt.indexOf(' ') : afterAt.length);
+      const mentionText = MENTION_FORMAT(title, id);
+      const newText = `${before}${mentionText} ${restAfter}`.trim();
+      onChangeText(newText);
+      setShowPicker(false);
+      setFilter('');
+      onMentionTargetIdChange?.(id === 'ALL_MEMBERS' ? null : id);
+    },
+    [value, mentionStartIndex, onChangeText, onMentionTargetIdChange],
+  );
+
+  const handleClosePicker = useCallback(() => {
+    setShowPicker(false);
+    setFilter('');
+  }, []);
+
+  return (
+    <View>
+      <TextInput
+        ref={inputRef}
+        accessibilityLabel={accessibilityLabel}
+        className={className}
+        editable={editable}
+        multiline
+        placeholder={placeholder}
+        placeholderTextColor={themeColors.secondaryText}
+        style={[{ paddingVertical: 0, textAlignVertical: 'top' }, style]}
+        underlineColorAndroid="transparent"
+        value={value}
+        onChangeText={handleChangeText}
+      />
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="fade"
+        visible={showPicker}
+        onRequestClose={handleClosePicker}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={handleClosePicker}
+        >
+          <Pressable
+            className="mx-4 mb-8 max-h-64 rounded-2xl bg-card"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="max-h-64 rounded-2xl bg-card p-2">
+              <View className="mb-2 px-2">
+                <Text className="text-[12px] font-medium text-secondary/60">
+                  {t.groupMentionTitle}
+                </Text>
+              </View>
+              <FlatList
+                data={mentionOptions}
+                keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <Pressable
+                    className="flex-row items-center rounded-xl px-3 py-2.5 active:bg-foreground/5"
+                    onPress={() => handleSelectMention(item.id, item.title || item.id)}
+                  >
+                    {item.isAll ? (
+                      <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-primary/15">
+                        <Users
+                          color={semanticColors.primary}
+                          size={18}
+                          strokeWidth={2}
+                        />
+                      </View>
+                    ) : (
+                      <View className="mr-3 h-9 w-9 overflow-hidden rounded-full bg-primary/10">
+                        {item.avatar ? (
+                          <RNImage
+                            source={{ uri: item.avatar }}
+                            style={{ width: 36, height: 36 }}
+                          />
+                        ) : (
+                          <View className="h-full w-full items-center justify-center">
+                            <Text className="text-[14px] font-semibold text-primary">
+                              {(item.title || '#').slice(0, 1).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    <Text className="flex-1 text-[15px] font-medium text-foreground">
+                      {item.title}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}

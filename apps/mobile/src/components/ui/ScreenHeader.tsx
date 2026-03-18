@@ -13,6 +13,7 @@ interface ScreenHeaderProps {
   onPressLeft?: () => void;
   onPressRight?: () => void;
   rightAccessibilityLabel?: string;
+  rightAccessibilityHint?: string;
   rightActions?: React.ReactNode;
   rightElement?: React.ReactNode;
   subtitle?: string;
@@ -28,6 +29,7 @@ export function ScreenHeader({
   rightElement,
   rightActions,
   rightAccessibilityLabel,
+  rightAccessibilityHint,
   titleIcon,
   onPressLeft,
   onPressRight,
@@ -43,6 +45,7 @@ export function ScreenHeader({
       <BlurView intensity={85} style={{ paddingTop: insets.top }} tint={blurTint}>
         <View className="flex-row items-center justify-between px-5 py-3" style={{ minHeight: 64 }}>
           <TouchableOpacity
+            accessibilityHint={t.accessibilityHintGoBack}
             accessibilityLabel={t.accessibilityGoBack}
             accessibilityRole="button"
             activeOpacity={0.6}
@@ -72,6 +75,7 @@ export function ScreenHeader({
             <View style={{ minWidth: 40 }}>{rightActions}</View>
           ) : rightElement ? (
             <TouchableOpacity
+              accessibilityHint={rightAccessibilityHint}
               accessibilityLabel={rightAccessibilityLabel}
               accessibilityRole="button"
               activeOpacity={0.6}
@@ -125,6 +129,7 @@ export function ScreenHeader({
             </View>
           ) : rightElement ? (
             <TouchableOpacity
+              accessibilityHint={rightAccessibilityHint}
               accessibilityLabel={rightAccessibilityLabel}
               accessibilityRole="button"
               activeOpacity={0.6}

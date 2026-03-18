@@ -50,6 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import FilePreview from '../components/ui/FilePreview';
+import { GroupMentionInput } from '../components/ui/GroupMentionInput';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble, { type GroupMessageSpeaker } from '../components/ui/MessageBubble';
 import MessageListSkeleton from '../components/ui/MessageListSkeleton';
@@ -74,6 +75,7 @@ import {
 } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { buildDisplayMessagesWithGroupTasks } from '../lib/groupTasksTransform';
 import { isGroupSessionLike } from '../lib/session';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
@@ -97,7 +99,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const toast = useToast();
   const primaryColor = themeColors.primary;
 
-  const messages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
+  const rawMessages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
+  const messages = useMemo(
+    () =>
+      isGroupSession ? buildDisplayMessagesWithGroupTasks(rawMessages) : rawMessages,
+    [rawMessages, isGroupSession],
+  );
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
   const generating = useChatStore((s) => s.generating && s.activeStreamingSessionId === sessionKey);
   const isReasoning = useChatStore((s) => s.isReasoning);
@@ -536,7 +543,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const handleStop = useCallback(() => {
     haptics.light();
     stopGenerating();
-  }, [stopGenerating]);
+    toast.show('info', t.toastGenerationStopped);
+  }, [stopGenerating, toast, t.toastGenerationStopped]);
 
   const handleSend = useCallback(async () => {
     if (!sessionId || (!inputText.trim() && pendingFiles.length === 0) || generating) return;
@@ -902,6 +910,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           <MessageListSkeleton />
         ) : (
           <FlashList
+            accessibilityLiveRegion="polite"
             data={messages}
             estimatedItemSize={120}
             keyExtractor={(item) => item.id}
@@ -1006,19 +1015,37 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 <FilePreview sessionId={sessionId} />
               </View>
             )}
-            {/* Text input — full width */}
+            {/* Text input — full width (GroupMentionInput for group chat @ mention) */}
             <View className="px-3 pt-2">
-              <TextInput
-                editable
-                multiline
-                className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
-                placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                placeholderTextColor={semanticColors.muted}
-                style={{ paddingVertical: 0, textAlignVertical: 'top' }}
-                underlineColorAndroid="transparent"
-                value={inputText}
-                onChangeText={setInputText}
-              />
+              {isGroupSession && groupDetail?.agents?.length ? (
+                <GroupMentionInput
+                  accessibilityLabel={generating ? t.chatGenerating : hints[hintIndex]}
+                  className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
+                  editable
+                  members={groupDetail.agents.map((a) => ({
+                    avatar: a.avatar,
+                    id: a.id,
+                    title: a.title,
+                  }))}
+                  placeholder={generating ? t.chatGenerating : hints[hintIndex]}
+                  style={{ paddingVertical: 0, textAlignVertical: 'top' }}
+                  value={inputText}
+                  onChangeText={setInputText}
+                />
+              ) : (
+                <TextInput
+                  accessibilityLabel={generating ? t.chatGenerating : hints[hintIndex]}
+                  editable
+                  multiline
+                  className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
+                  placeholder={generating ? t.chatGenerating : hints[hintIndex]}
+                  placeholderTextColor={semanticColors.muted}
+                  style={{ paddingVertical: 0, textAlignVertical: 'top' }}
+                  underlineColorAndroid="transparent"
+                  value={inputText}
+                  onChangeText={setInputText}
+                />
+              )}
             </View>
             {/* Action toolbar row */}
             <View className="flex-row items-center px-2 pb-1.5 pt-1">

@@ -7,6 +7,7 @@ import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, marketApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import type { AiProviderListItem, DiscoverModel, MarketAgent } from '../types';
 
 interface DiscoverState {
@@ -38,9 +39,12 @@ export const useDiscoverStore = create<DiscoverState>((set) => ({
       const result = await marketApi.getAgentList(locale);
       set({ agents: result?.agents ?? [], loading: false });
     } catch (err) {
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchAgents(locale),
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
       set({ loading: false });
     }
   },
@@ -58,9 +62,12 @@ export const useDiscoverStore = create<DiscoverState>((set) => ({
       }));
       set({ models: models as any });
     } catch (err) {
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchModels(),
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   },
 
@@ -69,9 +76,12 @@ export const useDiscoverStore = create<DiscoverState>((set) => ({
       const providers = await aiProviderApi.list();
       set({ providers: providers ?? [] });
     } catch (err) {
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchProviders(),
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   },
 
@@ -81,9 +91,12 @@ export const useDiscoverStore = create<DiscoverState>((set) => ({
       const detail = await marketApi.getAgentDetail(identifier);
       set({ agentDetail: detail });
     } catch (err) {
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
     }
   },
 

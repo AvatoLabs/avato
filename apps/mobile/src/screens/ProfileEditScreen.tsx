@@ -216,6 +216,7 @@ export default function ProfileEditScreen({ navigation }: any) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          rightAccessibilityHint={t.accessibilityHintSave}
           rightAccessibilityLabel={t.accessibilitySave}
           title={t.profileTitle}
           leftElement={
@@ -246,6 +247,7 @@ export default function ProfileEditScreen({ navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        rightAccessibilityHint={t.accessibilityHintSave}
         rightAccessibilityLabel={t.accessibilitySave}
         title={t.profileTitle}
         leftElement={

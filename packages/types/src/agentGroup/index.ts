@@ -143,6 +143,8 @@ export interface ExecAgentAppContext {
   scope?: string | null;
   /** Session ID */
   sessionId?: string;
+  /** Target agent ID for DM (private message in group chat) */
+  targetId?: string | null;
   /** Thread ID for threaded conversations */
   threadId?: string | null;
   /** Topic ID */
@@ -226,6 +228,8 @@ export interface ExecGroupAgentParams {
   message: string;
   /** Optional: Create a new topic */
   newTopic?: ExecGroupAgentNewTopicOptions;
+  /** Target agent ID for DM (private message). Omit for group message. */
+  targetId?: string | null;
   /** Existing topic ID */
   topicId?: string | null;
 }

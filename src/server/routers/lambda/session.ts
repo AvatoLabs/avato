@@ -1,3 +1,4 @@
+import debug from 'debug';
 import { z } from 'zod';
 
 import { ChatGroupModel } from '@/database/models/chatGroup';
@@ -195,44 +196,66 @@ export const sessionRouter = router({
   generateSessionTitle: sessionProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ input, ctx }) => {
+      const log = debug('lobe:session:generateSessionTitle');
       const { sessionId } = input;
       const session = await ctx.sessionModel.findByIdOrSlug(sessionId);
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
 
       if (!session) {
-        if (!sessionId.startsWith('cg_')) return null;
+        if (!sessionId.startsWith('cg_')) {
+          log('session not found, not a group id, return null');
+          return null;
+        }
 
         const chatGroupModel = new ChatGroupModel(ctx.serverDB, ctx.userId);
         const group = await chatGroupModel.findById(sessionId);
-        if (!group) return null;
+        if (!group) {
+          log('group not found for cg_ id, return null');
+          return null;
+        }
 
         if (!isDefaultSessionTitle(group.title)) {
+          log('group already has custom title, return as-is:', group.title);
           return group.title;
         }
 
         const messages = await messageModel.query({ groupId: sessionId });
         const titleContext = pickLatestSessionTitleContext(messages);
-        if (!titleContext) return null;
+        if (!titleContext) {
+          log('no titleContext (no user+assistant pair) for group, return null');
+          return null;
+        }
 
         const title = await systemAgent.generateTopicTitle(titleContext);
-        if (!title) return null;
+        if (!title) {
+          log('LLM returned empty title for group');
+          return null;
+        }
 
         await chatGroupModel.update(sessionId, { title });
+        log('group title updated:', title);
         return title;
       }
 
       const effectiveTitle = (session as any).title ?? (session as any).agent?.title ?? '';
       if (!isDefaultSessionTitle(effectiveTitle)) {
+        log('session already has custom title, return as-is:', effectiveTitle);
         return effectiveTitle;
       }
 
       const messages = await messageModel.queryBySessionId(sessionId);
       const titleContext = pickLatestSessionTitleContext(messages);
-      if (!titleContext) return null;
+      if (!titleContext) {
+        log('no titleContext (no user+assistant pair) for session, return null');
+        return null;
+      }
 
       const title = await systemAgent.generateTopicTitle(titleContext);
-      if (!title) return null;
+      if (!title) {
+        log('LLM returned empty title for session');
+        return null;
+      }
 
       const sess = session as { type?: string; agent?: unknown };
       if (sess.type === 'group') {
@@ -240,6 +263,7 @@ export const sessionRouter = router({
       } else {
         await ctx.sessionModel.updateConfig(sessionId, { title });
       }
+      log('session title updated:', title);
       return title;
     }),
 

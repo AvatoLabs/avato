@@ -61,6 +61,7 @@ export default function PromptModal({
               {title}
             </Text>
             <TextInput
+              accessibilityLabel={placeholder ?? title}
               autoFocus
               className="bg-foreground/5 rounded-xl px-3.5 py-2.5 text-foreground text-[15px]"
               keyboardType={keyboardType}

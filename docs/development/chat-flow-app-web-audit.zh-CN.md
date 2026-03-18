@@ -64,7 +64,7 @@
 | 能力              | Web                                  | App                                            | 对齐    |
 | ----------------- | ------------------------------------ | ---------------------------------------------- | ------- |
 | compareGroup      | ✅                                   | ✅ `MessageBubble` 支持 `compareGroupChildren` | ✅      |
-| compressedGroup   | ✅ 可展开 / 折叠                     | ✅ 展示逻辑有，但无展开 / 折叠                 | ⚠️ 部分 |
+| compressedGroup   | ✅ 可展开 / 折叠                     | ✅ 已实现 toggleMessageCollapsed               | ✅ 对齐 |
 | 群成员头像 / 名称 | ✅ `GroupAvatar`、`groupMembersById` | ✅ `groupMembersById`、`groupSupervisorId`     | ✅      |
 | 主持人标识        | ✅                                   | ✅ `groupSettingsSupervisor`                   | ✅      |
 
@@ -75,7 +75,7 @@
 | 任务委托 (execute_tasks)    | ✅ `createClientGroupAgentTaskThread`    | ❌ 未实现                                   | ❌ 缺失 |
 | GroupTasks                  | ✅ `GroupTasksMessage` 展示多 Agent 任务 | ❌ 无                                       | ❌ 缺失 |
 | compressedGroup 展开 / 折叠 | ✅ `toggleMessageGroupExpand`            | ❌ 无                                       | ❌ 缺失 |
-| 群聊重新生成                | ✅ 支持                                  | ❌ `regenerateMessage` 中 group 直接 return | ❌ 缺失 |
+| 群聊重新生成                | ✅ 支持                                  | ✅ 已实现（单条/compareGroup/compressedGroup） | ✅ 对齐 |
 
 ---
 
@@ -139,14 +139,14 @@ clearMessages: (sessionId: string) => {
 | 序号 | 问题               | 影响                                 | 状态                                                                                                                    |
 | ---- | ------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | 1    | 清空对话未持久化   | 用户点击清空后，重新进入会看到旧消息 | ✅ 已修复：`messageApi` 增加 `removeMessagesByAssistant`、`removeMessagesByGroup`，`clearMessages` 调用后端并删除 Topic |
-| 2    | 群聊重新生成不支持 | 群聊中无法重新生成                   | ⏳ 待评估：需后端支持                                                                                                   |
+| 2    | 群聊重新生成不支持 | 群聊中无法重新生成                   | ✅ 已修复：chat.ts regenerateMessage 支持 group 分支                                                                  |
 
 ### 4.2 中优先级（体验增强）
 
 | 序号 | 问题                          | 影响                 | 建议                                       |
 | ---- | ----------------------------- | -------------------- | ------------------------------------------ |
 | 3    | 群聊流式用轮询                | 延迟、请求多         | 若 RN 支持 EventSource/SSE，可考虑迁移 SSE |
-| 4    | compressedGroup 无展开 / 折叠 | 长对话压缩后无法展开 | 增加 `toggleMessageGroupExpand` 或类似逻辑 |
+| 4    | compressedGroup 无展开 / 折叠 | 长对话压缩后无法展开 | ✅ 已实现：chat.ts `toggleMessageCollapsed`，MessageBubble 展开/折叠 UI |
 
 ### 4.3 低优先级（功能增强）
 

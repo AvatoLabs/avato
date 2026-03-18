@@ -33,6 +33,7 @@ import {
 } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike, resolveSessionTypeWithFallback } from '../lib/session';
 import type {
   ChatMessage,
@@ -52,6 +53,17 @@ const fetchMessagesInFlight = new Map<string, Promise<void>>();
 
 const fetchMessagesKey = (sessionId: string, topicId?: string) =>
   `${sessionId}:${topicId ?? 'null'}`;
+
+/** Parse targetId for DM from message content: first <mention id="X" /> where X !== 'ALL_MEMBERS' */
+function parseTargetIdFromMentions(text: string): string | null {
+  const re = /<mention\s+[^>]*id="([^"]+)"[^>]*\s*\/>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const id = m[1];
+    if (id && id !== 'ALL_MEMBERS') return id;
+  }
+  return null;
+}
 
 const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayload[] =>
   executions.map((exec) => ({
@@ -73,13 +85,19 @@ async function getSessionChatOptions(sessionId: string): Promise<ChatRequestOpti
   const opts: ChatRequestOptions = {};
   const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
 
-  // 1. Backend agent config (source of truth)
-  if (!isGroupSessionLike(sessionId, session?.type)) {
+  // 1. Session meta first (user's explicit selection in ModelPicker overrides backend)
+  if (session?.model && session?.provider) {
+    opts.model = session.model;
+    opts.provider = session.provider;
+  }
+
+  // 2. Backend agent config (when session meta missing model/provider)
+  if ((!opts.model || !opts.provider) && !isGroupSessionLike(sessionId, session?.type)) {
     try {
       const config = await agentApi.getConfigBySession(sessionId);
       if (config) {
-        if (config.model) opts.model = config.model;
-        if (config.provider) opts.provider = config.provider;
+        if (!opts.model && config.model) opts.model = config.model;
+        if (!opts.provider && config.provider) opts.provider = config.provider;
         if (config.params?.temperature != null) opts.temperature = config.params.temperature;
         if (config.params?.top_p != null) opts.top_p = config.params.top_p;
         if (config.params?.frequency_penalty != null)
@@ -419,7 +437,17 @@ const isDefaultTopicTitle = (title?: string | null) => {
   );
 };
 
-const DEFAULT_SESSION_TITLES = ['', 'New Conversation', 'New conversation', '新对话', '新對話'];
+// Align with server session.ts DEFAULT_SESSION_TITLES for cross-end title sync
+const DEFAULT_SESSION_TITLES = [
+  '',
+  'New Chat',
+  'New Conversation',
+  'New conversation',
+  'New Group Chat',
+  '新对话',
+  '新對話',
+  'Untitled',
+];
 
 const isDefaultSessionTitle = (title?: string | null) => {
   const trimmedTitle = title?.trim() ?? '';
@@ -464,14 +492,14 @@ const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null)
   topicApi
     .generateTitle(topicId)
     .then((newTitle) => {
-      if (!newTitle) return;
-      return useTopicStore.getState().fetchTopics(sessionId);
-    })
-    .then(() => {
-      void useSessionStore.getState().fetchSessions();
+      if (newTitle) {
+        return useTopicStore.getState().fetchTopics(sessionId);
+      }
+      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
     })
     .catch((error) => {
       console.warn('[ChatStore] generateTopicTitle failed:', error);
+      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
     });
 };
 
@@ -1143,9 +1171,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set((s) => ({
           fetchingMessagesBySession: { ...s.fetchingMessagesBySession, [sessionId]: false },
         }));
-        const { messageKey } = classifyError(err);
+        const { messageKey, type } = classifyError(err);
         const t = useI18n.getState().t;
-        useToast.getState().show('error', t[messageKey]);
+        useToast.getState().show('error', t[messageKey], {
+          onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchMessages(sessionId, topicId),
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
       } finally {
         fetchMessagesInFlight.delete(key);
       }
@@ -1295,11 +1326,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           throw new Error('Group supervisor not found');
         }
 
+        const targetId = parseTargetIdFromMentions(textContent) ?? undefined;
         const result = await aiAgentApi.execGroupAgent({
           agentId: supervisorAgentId,
           ...(attachedFileIds.length > 0 ? { files: attachedFileIds } : {}),
           groupId: sessionId,
           message: buildAttachmentPromptText(textContent, uploadedAttachments),
+          targetId,
           topicId,
         });
 
@@ -1454,11 +1487,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 .then((newTitle) => {
                   if (newTitle) {
                     useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                    useSessionStore.getState().fetchSessions();
+                  } else {
+                    useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                   }
                 })
                 .catch((err) => {
                   console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                  useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                 });
             }
             didSettle = true;
@@ -1483,6 +1518,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   })
                   .catch((err) => {
                     console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                    useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                   });
               }
               didSettle = true;
@@ -1564,11 +1600,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     .then((newTitle) => {
                       if (newTitle) {
                         useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                        useSessionStore.getState().fetchSessions();
+                      } else {
+                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                       }
                     })
                     .catch((err) => {
                       console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                     });
                 }
                 didSettle = true;
@@ -1588,11 +1626,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
                       .then((newTitle) => {
                         if (newTitle) {
                           useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                          useSessionStore.getState().fetchSessions();
+                        } else {
+                          useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                         }
                       })
                       .catch((err) => {
                         console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
+                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                       });
                   }
                   didSettle = true;
@@ -1665,11 +1705,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 triggerTopicTitleGeneration(sessionId, resolvedTopicId);
                 const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
                 if (sess && isDefaultSessionTitle(sess.title)) {
-                  void sessionApi.generateTitle(sessionId).then((newTitle) => {
-                    if (newTitle) {
-                      useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                    }
-                  });
+                  void sessionApi
+                    .generateTitle(sessionId)
+                    .then((newTitle) => {
+                      if (newTitle) {
+                        useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
+                      } else {
+                        useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                      }
+                    })
+                    .catch((err) => {
+                      console.warn('[ChatStore] generateSessionTitle failed:', err);
+                      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+                    });
                 }
 
                 setTimeout(() => {
@@ -2135,12 +2183,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
               .then((newTitle) => {
                 if (newTitle) {
                   useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                  useSessionStore.getState().fetchSessions();
+                  // Do NOT fetchSessions here — it can overwrite with stale data before server propagates
+                } else {
+                  useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
                 }
               })
               .catch((err) => {
                 console.warn('[ChatStore] generateSessionTitle failed:', err);
-                useToast.getState().show('error', useI18n.getState().t.errorUnknown);
+                useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
               });
           }
 
@@ -2154,6 +2204,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
               useTopicStore.getState().switchTopic(sessionId, createdTopic.id);
               await useTopicStore.getState().fetchTopics(sessionId);
               await get().fetchMessages(sessionId, createdTopic.id);
+            } else {
+              useToast.getState().show('error', useI18n.getState().t.toastTopicCreateFailed);
             }
           }
 
@@ -2220,9 +2272,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       useTopicStore.getState().switchTopic(sessionId, null);
     } catch (err) {
       console.warn('[ChatStore] clearMessages failed:', err);
-      const { messageKey } = classifyError(err);
+      const { messageKey, type } = classifyError(err);
       const t = useI18n.getState().t;
-      useToast.getState().show('error', t[messageKey]);
+      useToast.getState().show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
       throw err;
     }
 
@@ -2501,9 +2556,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       } catch (err) {
         const t = useI18n.getState().t;
-        const { messageKey } = classifyError(err);
-        useToast.getState().show('error', t[messageKey] ?? t.errorUnknown);
-        await get().fetchMessages(sessionId, topicId);
+        const { messageKey, type } = classifyError(err);
+        useToast.getState().show('error', t[messageKey] ?? t.errorUnknown, {
+          onRetry: type === 'auth' ? navigateToLogin : undefined,
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
+        if (type !== 'auth') {
+          await get().fetchMessages(sessionId, topicId);
+        }
       } finally {
         set({
           activeOperationId: null,

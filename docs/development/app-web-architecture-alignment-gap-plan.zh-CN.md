@@ -96,14 +96,10 @@
 
 - 已实施：`isGroupAssistantSettled` 支持 compressedGroup.compressedMessages、compareGroup 递归；`findSettledGroupAssistant` 递归搜索；当 `operationStatus.isCompleted` 时信任后端，按 id 查找 assistant 视为 settled。详见 `group-chat-app-web-gap-audit.zh-CN.md` 4.5 节。
 
-3. **群聊 / 普通会话标题同步不一致**
+3. **群聊 / 普通会话标题同步不一致** —— ✅ 已修复（2026-03-18）
 
-- 现象：Web 有总结标题，App 仍显示默认标题；或跨端不同步。
-- 根因：App 端标题生成触发条件、刷新时机、后端错误处理不完全一致。
-- 需要对齐：
-  - 统一默认标题识别集
-  - 标题生成后强制刷新 session 列表与当前会话
-  - 失败日志与用户提示区分（不要吞错误）
+- 已实施：`chat.ts` 的 `DEFAULT_SESSION_TITLES` 与 `session.ts` 对齐（含 New Chat、New Group Chat、Untitled）；Focus 刷新、重连刷新、标题生成触发时机已对齐；标题生成成功后 `fetchSessions` 刷新。详见 `app-details-enhancement-audit.zh-CN.md` 7.3 节。
+- 待增强：生成失败时用户可感知（可选）。
 
 ## P1（结构对齐）
 
@@ -170,13 +166,13 @@
 
 1. ~~固化模型选择优先级链，移除隐式回落覆盖。~~ ✅ 已实施
 2. ~~群聊 settle 判定改为结构化判定，与 Web 同源。~~ ✅ 已实施
-3. 标题总结触发与同步全链路打通。
+3. ~~标题总结触发与同步全链路打通。~~ ✅ 已实施（2026-03-18）
 
 **验收**：
 
 - ~~新会话不再无故回落 Claude。~~ ✅
 - ~~群聊发送不再出现连续 settle failure。~~ ✅
-- Web 改标题后 App 在一次 focus 内可见，反之亦然。
+- ~~Web 改标题后 App 在一次 focus 内可见，反之亦然。~~ ✅（DEFAULT_SESSION_TITLES 对齐、Focus 刷新已落地）
 
 ## Milestone B（P1）
 

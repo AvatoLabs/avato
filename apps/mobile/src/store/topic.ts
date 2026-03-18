@@ -7,6 +7,7 @@ import { useToast } from '../components/ui/Toast';
 import { topicApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import { resolveSessionTypeWithFallback } from '../lib/session';
 import type { Topic } from '../types';
 import { useSessionStore } from './session';
@@ -68,10 +69,11 @@ export const useTopicStore = create<TopicState>((set, get) => ({
           };
         });
       } catch (err) {
-        const { messageKey } = classifyError(err);
+        const { messageKey, type } = classifyError(err);
         const t = useI18n.getState().t;
         useToast.getState().show('error', t[messageKey], {
-          onRetry: () => void get().fetchTopics(sessionId),
+          onRetry: type === 'auth' ? navigateToLogin : () => void get().fetchTopics(sessionId),
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
         });
         set((s) => ({
           loadingBySession: { ...s.loadingBySession, [sessionId]: false },
