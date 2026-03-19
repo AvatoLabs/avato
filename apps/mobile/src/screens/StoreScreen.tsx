@@ -115,11 +115,6 @@ const getSkillDescription = (skill: AgentSkillItem) => {
   return skill.description || manifest?.meta?.description || manifest?.description;
 };
 
-const getSkillCategoryRaw = (skill: AgentSkillItem) => {
-  const manifest = skill.manifest as Record<string, any> | undefined;
-  return manifest?.meta?.category || manifest?.category;
-};
-
 /** Format large counts for display (e.g. 12345 → "1.2万" / "12.3k") */
 const formatCount = (n: number, locale: Locale): string => {
   if (n >= 10000) {
@@ -161,7 +156,6 @@ const buildCategoryOptions = (
 ): Array<{ count?: number; key: string; label: string }> => {
   const normalized = categories
     .filter((item): item is MarketCategoryItem & { category: string } => Boolean(item?.category))
-    .sort((left, right) => (right.count ?? 0) - (left.count ?? 0))
     .map((item) => ({
       count: item.count,
       key: item.category,
@@ -178,6 +172,34 @@ const buildCategoryOptions = (
     },
     ...normalized,
   ];
+};
+
+const mergeCategoryBuckets = (
+  categories: MarketCategoryItem[],
+  source: ExploreSource,
+): MarketCategoryItem[] => {
+  const fallbackKeys =
+    source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
+  const categoryMap = new Map(
+    categories
+      .filter((item): item is MarketCategoryItem & { category: string } => Boolean(item?.category))
+      .map((item) => [item.category, item]),
+  );
+
+  const merged: MarketCategoryItem[] = [];
+
+  for (const key of fallbackKeys) {
+    if (key === ALL_CATEGORY_KEY) continue;
+    const matched = categoryMap.get(key);
+    merged.push({ category: key, count: matched?.count });
+    categoryMap.delete(key);
+  }
+
+  for (const item of categoryMap.values()) {
+    merged.push(item);
+  }
+
+  return merged;
 };
 
 const mergeSkillLists = (...groups: AgentSkillItem[][]): AgentSkillItem[] => {
@@ -202,12 +224,6 @@ const mergeMarketItems = (items: MarketListItem[]) => {
   }
 
   return [...map.values()];
-};
-
-const matchesStoreQuery = (query: string, values: Array<string | undefined>) => {
-  if (!query) return true;
-
-  return values.some((value) => value?.toLowerCase().includes(query));
 };
 
 const buildInstalledPluginItem = (
@@ -536,8 +552,8 @@ function SimpleImportModal({
 
             <Pressable
               className="rounded-xl py-3.5 items-center"
-              style={{ backgroundColor: value.trim() ? colors.primary : colors.fillTertiary }}
               disabled={!value.trim() || importing}
+              style={{ backgroundColor: value.trim() ? colors.primary : colors.fillTertiary }}
               onPress={handleImport}
             >
               {importing ? (
@@ -827,8 +843,8 @@ function AddCustomMcpModal({
 
                     <Pressable
                       className="flex-1 rounded-lg py-2.5 px-4 items-center active:opacity-80"
-                      style={{ backgroundColor: isQuickImportReady ? colors.primary : colors.fillTertiary }}
                       disabled={!isQuickImportReady}
+                      style={{ backgroundColor: isQuickImportReady ? colors.primary : colors.fillTertiary }}
                       onPress={handleQuickImport}
                     >
                       <Text
@@ -966,8 +982,8 @@ function AddCustomMcpModal({
               <View className="mb-3">
                 <Pressable
                   className="rounded-xl py-3 items-center active:opacity-80"
-                  style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                   disabled={!isConnectionReady || testing}
+                  style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                   onPress={handleTestConnection}
                 >
                   {testing ? (
@@ -1111,8 +1127,8 @@ function AddCustomMcpModal({
 
               <Pressable
                 className="rounded-xl py-3.5 items-center mt-2 active:opacity-80"
-                style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                 disabled={!isConnectionReady || saving}
+                style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
                 onPress={handleSave}
               >
                 {saving ? (
@@ -1246,8 +1262,8 @@ function StoreItemModal({
             {canInstall ? (
               <PressableScale
                 className="rounded-xl py-3 items-center"
-                style={{ backgroundColor: colors.primary }}
                 disabled={actionLoading}
+                style={{ backgroundColor: colors.primary }}
                 onPress={onInstall}
               >
                 {actionLoading ? (
@@ -1392,12 +1408,7 @@ export default function StoreScreen() {
   );
 
   const fetchCategories = useCallback(async (source: ExploreSource) => {
-    // Set fallback immediately so user never sees empty or wrong categories
-    const fallbackKeys =
-      source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
-    const fallback = fallbackKeys
-      .filter((k) => k !== ALL_CATEGORY_KEY)
-      .map((category) => ({ category, count: undefined }));
+    const fallback = mergeCategoryBuckets([], source);
     setMarketCategories(fallback);
 
     try {
@@ -1406,10 +1417,7 @@ export default function StoreScreen() {
           ? await marketSkillApi.getMcpCategories()
           : await marketSkillApi.getCategories();
       const items = Array.isArray(list) ? list : [];
-      if (items.length > 0) {
-        setMarketCategories(items);
-      }
-      // else keep fallback
+      setMarketCategories(mergeCategoryBuckets(items, source));
     } catch {
       // keep fallback
     }
@@ -1468,7 +1476,12 @@ export default function StoreScreen() {
         // Fallback: when categories API failed, derive from "all" items
         if (!append && page === 1 && !categoryParam && remoteItems.length > 0) {
           setMarketCategories((prev) =>
-            prev.length === 0 ? deriveCategoriesFromItems(remoteItems, source) : prev,
+            mergeCategoryBuckets(
+              prev.some((item) => item.count != null)
+                ? prev
+                : deriveCategoriesFromItems(remoteItems, source),
+              source,
+            ),
           );
         }
 
@@ -1876,6 +1889,9 @@ export default function StoreScreen() {
     [],
   );
 
+  const activeExploreTotalCount =
+    activeExploreSource === 'mcp' ? marketMcpTotal : marketSkillTotal;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -1960,7 +1976,6 @@ export default function StoreScreen() {
                     key={source.key}
                     style={{
                       backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
-                      minWidth: 72,
                     }}
                     onPress={() => {
                       haptics.selection();
@@ -2002,7 +2017,6 @@ export default function StoreScreen() {
                     key={`${activeExploreSource}-${category.key}`}
                     style={{
                       backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
-                      minWidth: 72,
                     }}
                     onPress={() => {
                       haptics.selection();
@@ -2057,11 +2071,27 @@ export default function StoreScreen() {
           renderItem={renderMarketItem}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={
-            marketLoadingMore ? (
-              <View className="py-4 items-center">
+            <View className="items-center pb-6 pt-3">
+              {activeExploreTotalCount > 0 ? (
+                <Text className="mb-2 text-[12px]" style={{ color: colors.secondaryText }}>
+                  {marketItems.length} / {activeExploreTotalCount}
+                </Text>
+              ) : null}
+              {marketLoadingMore ? (
                 <ActivityIndicator color={colors.primary} size="small" />
-              </View>
-            ) : null
+              ) : marketHasMore ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="rounded-full px-4 py-2"
+                  style={{ backgroundColor: colors.fillTertiary }}
+                  onPress={() => void loadMoreMarket()}
+                >
+                  <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
+                    {t.resourceLoadMore}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           }
           refreshControl={
             <RefreshControl

@@ -13,12 +13,14 @@
  *  • Image thumbnail preview inline
  */
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowDownUp,
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronRight,
   Download,
   Eye,
@@ -55,6 +57,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type ViewToken,
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -63,21 +66,28 @@ import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import EmptyState from '../components/ui/EmptyState';
-import PromptModal from '../components/ui/PromptModal';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
+import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import {
   fileApi,
+  type FolderCrumb,
   getApiUrl,
   knowledgeBaseApi,
   resourceApi,
-  type FolderCrumb,
 } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
+import {
+  clearResourceCacheEntry,
+  getResourceCacheEntry,
+  listResourceCacheEntries,
+  type ResourceCacheEntry,
+  saveResourceCacheEntry,
+} from '../lib/resourceCache';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -89,30 +99,45 @@ type FileCategory = 'all' | 'images' | 'documents' | 'others';
 type SorterType = 'createdAt' | 'name' | 'size';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'list' | 'grid';
+const ROOT_TREE_KEY = '__root__';
+
+interface ResourceTreeRow {
+  depth: number;
+  item: FileListItem;
+}
+
+type ResourceListRow = FileListItem | ResourceTreeRow;
+
+const isResourceTreeRow = (value: ResourceListRow): value is ResourceTreeRow =>
+  'depth' in value && 'item' in value;
 
 function sortFileList(
   list: FileListItem[],
   sorter: SorterType,
   sortOrder: SortOrder,
+  locale?: string,
 ): FileListItem[] {
   const sorted = [...list];
+  const collator = new Intl.Collator(locale ? [locale, 'zh-Hans-CN', 'en-US'] : ['zh-Hans-CN', 'en-US'], {
+    numeric: true,
+    sensitivity: 'base',
+    usage: 'sort',
+  });
   sorted.sort((a, b) => {
-    let aVal: string | number;
-    let bVal: string | number;
+    let cmp: number;
     switch (sorter) {
-      case 'name':
-        aVal = (a.name ?? '').toLowerCase();
-        bVal = (b.name ?? '').toLowerCase();
+      case 'name': {
+        cmp = collator.compare(a.name ?? '', b.name ?? '');
         break;
-      case 'size':
-        aVal = a.size ?? 0;
-        bVal = b.size ?? 0;
+      }
+      case 'size': {
+        cmp = (a.size ?? 0) - (b.size ?? 0);
         break;
-      default:
-        aVal = new Date(a.createdAt).getTime();
-        bVal = new Date(b.createdAt).getTime();
+      }
+      default: {
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
     }
-    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
     return sortOrder === 'asc' ? cmp : -cmp;
   });
   return sorted;
@@ -383,10 +408,12 @@ const FilePreviewModal = memo(
     apiBaseUrl,
     item,
     visible,
+    onCacheReady,
     onClose,
   }: {
     apiBaseUrl: string;
     item: FileListItem | null;
+    onCacheReady?: (fileId: string) => void;
     visible: boolean;
     onClose: () => void;
   }) => {
@@ -398,6 +425,9 @@ const FilePreviewModal = memo(
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [previewIndex, setPreviewIndex] = useState(0);
+    const [preparingPreview, setPreparingPreview] = useState(false);
+    const [previewCacheProgress, setPreviewCacheProgress] = useState(0);
+    const [cachedEntry, setCachedEntry] = useState<ResourceCacheEntry | null>(null);
     const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
     const [textContent, setTextContent] = useState<string | null>(null);
     const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
@@ -421,6 +451,9 @@ const FilePreviewModal = memo(
     useEffect(() => {
       setImgLoading(true);
       setPreviewIndex(0);
+      setPreparingPreview(false);
+      setPreviewCacheProgress(0);
+      setCachedEntry(null);
       setPdfDataUrl(null);
       setTextContent(null);
       setPreviewLoadFailed(false);
@@ -441,9 +474,78 @@ const FilePreviewModal = memo(
       setPreviewLoadFailed(true);
     }, [previewCandidates.length, previewIndex]);
 
+    useEffect(() => {
+      if (!item || !visible) return;
+
+      let cancelled = false;
+
+      const shouldWarmCache = imageFile || textFile || pdfFile;
+
+      const prepareCache = async () => {
+        const existing = await getResourceCacheEntry(item.id);
+        if (cancelled) return;
+
+        const itemUpdatedAt =
+          (item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined;
+        const isFresh =
+          existing &&
+          (!itemUpdatedAt || !existing.updatedAt || existing.updatedAt === itemUpdatedAt);
+
+        if (isFresh) {
+          setCachedEntry(existing);
+          onCacheReady?.(item.id);
+          return;
+        }
+
+        if (existing && !isFresh) {
+          await clearResourceCacheEntry(item.id);
+        }
+
+        if (!shouldWarmCache) return;
+
+        setPreparingPreview(true);
+        setPreviewCacheProgress(0);
+
+        try {
+          const { localUri } = await fileApi.download(item, {
+            onProgress: (progress) => {
+              if (!cancelled) setPreviewCacheProgress(progress);
+            },
+          });
+          if (cancelled) return;
+
+          const nextEntry: ResourceCacheEntry = {
+            cachedAt: Date.now(),
+            fileId: item.id,
+            localUri,
+            name: item.name,
+            updatedAt: itemUpdatedAt,
+          };
+          await saveResourceCacheEntry(nextEntry);
+          if (!cancelled) {
+            setCachedEntry(nextEntry);
+            onCacheReady?.(item.id);
+          }
+        } catch {
+          /* remote fallback still works */
+        } finally {
+          if (!cancelled) {
+            setPreparingPreview(false);
+            setPreviewCacheProgress(0);
+          }
+        }
+      };
+
+      void prepareCache();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [imageFile, item, onCacheReady, pdfFile, textFile, visible]);
+
     // PDF: fetch via redirect (WebView fails on 302), convert to data URL for reliable display
     useEffect(() => {
-      if (!pdfFile || !fileUrl || !visible) return;
+      if (!pdfFile || !fileUrl || !visible || cachedEntry?.localUri) return;
 
       let cancelled = false;
       const loadPdf = async () => {
@@ -474,15 +576,23 @@ const FilePreviewModal = memo(
       return () => {
         cancelled = true;
       };
-    }, [fileUrl, pdfFile, visible, handlePreviewError]);
+    }, [cachedEntry?.localUri, fileUrl, pdfFile, visible, handlePreviewError]);
 
     // Text/Markdown: fetch via redirect (WebView fails on 302), render with Markdown or Text
     useEffect(() => {
-      if (!textFile || !fileUrl || !visible) return;
+      if (!textFile || !visible) return;
 
       let cancelled = false;
       const loadText = async () => {
         try {
+          if (cachedEntry?.localUri) {
+            const text = await FileSystem.readAsStringAsync(cachedEntry.localUri);
+            if (!cancelled) setTextContent(text);
+            return;
+          }
+
+          if (!fileUrl) return;
+
           const res = await fetch(fileUrl, { redirect: 'follow' });
           if (cancelled) return;
           if (!res.ok) {
@@ -501,11 +611,29 @@ const FilePreviewModal = memo(
       return () => {
         cancelled = true;
       };
-    }, [fileUrl, textFile, visible, handlePreviewError]);
+    }, [cachedEntry?.localUri, fileUrl, textFile, visible, handlePreviewError]);
 
     if (!item) return null;
 
+    const itemUpdatedAt = (item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined;
     const markdownFile = textFile && isMarkdownFile(item.fileType, item.name);
+    const officeViewerUri =
+      officeFile && !cachedEntry?.localUri
+        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`
+        : undefined;
+    const documentSource = officeFile
+      ? cachedEntry?.localUri
+        ? { uri: cachedEntry.localUri }
+        : officeViewerUri
+          ? { uri: officeViewerUri }
+          : undefined
+      : cachedEntry?.localUri
+        ? { uri: cachedEntry.localUri }
+        : pdfFile && pdfDataUrl
+          ? { uri: pdfDataUrl }
+          : fileUrl
+            ? { uri: fileUrl }
+            : undefined;
 
     const handleShare = () => {
       void Share.share(
@@ -526,9 +654,17 @@ const FilePreviewModal = memo(
       setDownloading(true);
       setDownloadProgress(0);
       try {
-        await fileApi.download(item, {
+        const { localUri } = await fileApi.download(item, {
           onProgress: (p) => setDownloadProgress(p),
         });
+        await saveResourceCacheEntry({
+          cachedAt: Date.now(),
+          fileId: item.id,
+          localUri,
+          name: item.name,
+          updatedAt: itemUpdatedAt,
+        });
+        onCacheReady?.(item.id);
         haptics.success();
         toast.show('success', t.resourceDownloaded);
       } catch {
@@ -601,6 +737,18 @@ const FilePreviewModal = memo(
                   {'  ·  '}
                   {formatDate(item.createdAt)}
                 </Text>
+                {cachedEntry?.localUri || preparingPreview ? (
+                  <Text
+                    className="text-[10px] mt-1"
+                    style={{
+                      color: imageFile ? 'rgba(255,255,255,0.72)' : colors.secondaryText,
+                    }}
+                  >
+                    {cachedEntry?.localUri
+                      ? t.resourceCachedLocal
+                      : `${t.resourceCachingPreview} ${previewCacheProgress > 0 ? `${previewCacheProgress}%` : ''}`.trim()}
+                  </Text>
+                ) : null}
               </View>
             </TouchableOpacity>
 
@@ -654,7 +802,7 @@ const FilePreviewModal = memo(
                   <ExpoImage
                     cachePolicy="memory-disk"
                     contentFit="contain"
-                    source={fileUrl}
+                    source={cachedEntry?.localUri ? { uri: cachedEntry.localUri } : fileUrl}
                     style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
                     transition={120}
                     onError={handlePreviewError}
@@ -675,7 +823,7 @@ const FilePreviewModal = memo(
                     {t.resourcePreviewUnavailable}
                   </Text>
                 </View>
-              ) : pdfFile && fileUrl && !pdfDataUrl && !previewLoadFailed ? (
+              ) : pdfFile && !cachedEntry?.localUri && fileUrl && !pdfDataUrl && !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
                   style={{ backgroundColor: colors.inputBg }}
@@ -688,7 +836,7 @@ const FilePreviewModal = memo(
                     {t.resourcePreviewUnavailable}
                   </Text>
                 </View>
-              ) : textFile && fileUrl && !textContent && !previewLoadFailed ? (
+              ) : textFile && !textContent && !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
                   style={{ backgroundColor: colors.inputBg }}
@@ -721,10 +869,11 @@ const FilePreviewModal = memo(
                     </Text>
                   )}
                 </ScrollView>
-              ) : (
+              ) : documentSource ? (
                 <WebView
                   cacheEnabled
                   originWhitelist={['https://*', 'http://*', 'data:*']}
+                  source={documentSource}
                   startInLoadingState={!pdfFile}
                   style={{ flex: 1 }}
                   renderLoading={() => (
@@ -742,17 +891,14 @@ const FilePreviewModal = memo(
                       <ActivityIndicator color={colors.primary} size="large" />
                     </View>
                   )}
-                  source={
-                    officeFile
-                      ? {
-                          uri: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`,
-                        }
-                      : pdfFile && pdfDataUrl
-                        ? { uri: pdfDataUrl }
-                        : { uri: fileUrl }
-                  }
                   onError={handlePreviewError}
                 />
+              ) : (
+                <View className="flex-1 items-center justify-center px-8">
+                  <Text className="text-center text-foreground/70 text-[14px]">
+                    {t.resourcePreviewUnavailable}
+                  </Text>
+                </View>
               )
             ) : (
               <View className="flex-1 items-center justify-center px-8">
@@ -808,47 +954,27 @@ FilePreviewModal.displayName = 'FilePreviewModal';
 
 // ── File Row ─────────────────────────────────────────────────────────
 
-interface FileRowProps {
+function ResourceThumbnail({
+  apiBaseUrl,
+  item,
+  isVisible = true,
+  roundedClassName = 'rounded-xl',
+  size = 48,
+}: {
   apiBaseUrl: string;
-  isSelected?: boolean;
   isVisible?: boolean;
   item: FileListItem;
-  onDelete: (id: string, name: string, isFolder: boolean) => void;
-  onFolderPress?: (item: FileListItem) => void;
-  onLongPressItem?: (item: FileListItem) => void;
-  onMoveToFolder?: (item: FileListItem) => void;
-  onPress: (item: FileListItem) => void;
-  onSelect?: (item: FileListItem) => void;
-  selectMode?: boolean;
-  showFolderActions?: boolean;
-}
-
-function FileRow({
-  item,
-  isSelected,
-  isVisible = true,
-  onDelete,
-  onFolderPress,
-  onLongPressItem,
-  onMoveToFolder,
-  onPress,
-  onSelect,
-  apiBaseUrl,
-  selectMode,
-  showFolderActions,
-}: FileRowProps) {
+  roundedClassName?: string;
+  size?: number;
+}) {
   const colors = useThemeColors();
-  const { t } = useI18n();
-  const iconColor = colors.secondaryText;
+  const itemIsFolder = isFolder(item);
+  const isImageFile = !itemIsFolder && isImage(item.fileType, item.name);
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [tryDirectUrl, setTryDirectUrl] = useState(true);
-  const itemIsFolder = isFolder(item);
-  const isImageFile = !itemIsFolder && isImage(item.fileType, item.name);
-  const thumbnailCandidates = isImageFile
-    ? buildRemoteFileCandidates(apiBaseUrl, item)
-    : [];
+  const thumbnailCandidates = isImageFile ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
   const thumbnailUrl = thumbnailCandidates[thumbnailIndex] || null;
 
   useEffect(() => {
@@ -877,12 +1003,9 @@ function FileRow({
   const isLikelyImageResponse = useCallback((res: Response) => {
     if (!res.ok) return false;
     const contentType = res.headers.get('content-type')?.toLowerCase() || '';
-    return (
-      !contentType || contentType.startsWith('image/') || contentType.includes('octet-stream')
-    );
+    return !contentType || contentType.startsWith('image/') || contentType.includes('octet-stream');
   }, []);
 
-  // Fallback: fetch via redirect when direct URL fails (ExpoImage may not follow 302 on some platforms)
   useEffect(() => {
     if (!isVisible || !thumbnailUrl || !isImageFile || tryDirectUrl) {
       if (!tryDirectUrl && isVisible) {
@@ -900,6 +1023,7 @@ function FileRow({
       try {
         let res = await fetch(thumbnailUrl, { redirect: 'follow' });
         if (cancelled) return;
+
         if (__DEV__ && !isLikelyImageResponse(res)) {
           const authHeaders = await getAuthHeaders(apiBaseUrl);
           if (cancelled) return;
@@ -955,14 +1079,84 @@ function FileRow({
     return () => {
       cancelled = true;
     };
-  }, [isVisible, apiBaseUrl, thumbnailUrl, isImageFile, tryDirectUrl, item.fileType, handleThumbnailError, isLikelyImageResponse]);
+  }, [
+    apiBaseUrl,
+    handleThumbnailError,
+    isImageFile,
+    isLikelyImageResponse,
+    isVisible,
+    item.fileType,
+    thumbnailUrl,
+    tryDirectUrl,
+  ]);
+
+  if (itemIsFolder) {
+    return <Folder color={colors.secondaryText} size={size * 0.54} strokeWidth={tokens.icon.strokeWidth} />;
+  }
 
   const thumbnailSource = thumbnailDataUrl
     ? { uri: thumbnailDataUrl }
     : isVisible && tryDirectUrl && thumbnailUrl
       ? { uri: thumbnailUrl }
       : null;
-  const showThumbnail = !!thumbnailSource && !thumbnailFailed;
+
+  if (thumbnailSource && !thumbnailFailed) {
+    return (
+      <ExpoImage
+        cachePolicy="memory-disk"
+        className={`h-full w-full ${roundedClassName}`}
+        contentFit="cover"
+        source={thumbnailSource}
+        transition={100}
+        onError={tryDirectUrl ? handleDirectUrlError : handleThumbnailError}
+      />
+    );
+  }
+
+  return (
+    <FileTypeIcon
+      color={colors.secondaryText}
+      fileName={item.name}
+      fileType={item.fileType}
+      size={size * 0.54}
+    />
+  );
+}
+
+interface FileRowProps {
+  apiBaseUrl: string;
+  isCached?: boolean;
+  isSelected?: boolean;
+  isVisible?: boolean;
+  item: FileListItem;
+  onDelete: (id: string, name: string, isFolder: boolean) => void;
+  onFolderPress?: (item: FileListItem) => void;
+  onLongPressItem?: (item: FileListItem) => void;
+  onMoveToFolder?: (item: FileListItem) => void;
+  onPress: (item: FileListItem) => void;
+  onSelect?: (item: FileListItem) => void;
+  selectMode?: boolean;
+  showFolderActions?: boolean;
+}
+
+function FileRow({
+  item,
+  isCached,
+  isSelected,
+  isVisible = true,
+  onDelete,
+  onFolderPress,
+  onLongPressItem,
+  onMoveToFolder,
+  onPress,
+  onSelect,
+  apiBaseUrl,
+  selectMode,
+  showFolderActions,
+}: FileRowProps) {
+  const colors = useThemeColors();
+  const { t } = useI18n();
+  const itemIsFolder = isFolder(item);
 
   const handlePress = () => {
     if (selectMode && onSelect) {
@@ -1006,20 +1200,15 @@ function FileRow({
         </View>
       )}
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
-        {itemIsFolder ? (
-          <Folder color={iconColor} size={26} strokeWidth={tokens.icon.strokeWidth} />
-        ) : showThumbnail && thumbnailSource ? (
-          <ExpoImage
-            cachePolicy="memory-disk"
-            className="h-12 w-12 rounded-xl"
-            contentFit="cover"
-            source={thumbnailSource}
-            transition={100}
-            onError={tryDirectUrl ? handleDirectUrlError : handleThumbnailError}
-          />
-        ) : (
-          <FileTypeIcon color={iconColor} fileName={item.name} fileType={item.fileType} size={26} />
-        )}
+        <ResourceThumbnail apiBaseUrl={apiBaseUrl} isVisible={isVisible} item={item} />
+        {isCached && !itemIsFolder ? (
+          <View
+            className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+          </View>
+        ) : null}
       </View>
 
       <View className="min-w-0 flex-1">
@@ -1045,7 +1234,7 @@ function FileRow({
 // ── Main Screen ───────────────────────────────────────────────────────
 
 export default function ResourceScreen() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const colors = useThemeColors();
@@ -1057,11 +1246,13 @@ export default function ResourceScreen() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [category, setCategory] = useState<FileCategory>('all');
   const [searchText, setSearchText] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
   const [apiBase, setApiBase] = useState('');
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileListItem | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [libraryId, setLibraryId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentFolderSlug, setCurrentFolderSlug] = useState<string | null>(null);
   const [folderBreadcrumb, setFolderBreadcrumb] = useState<FolderCrumb[]>([]);
   const [libraries, setLibraries] = useState<KnowledgeBaseItem[]>([]);
@@ -1080,27 +1271,43 @@ export default function ResourceScreen() {
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [actionItem, setActionItem] = useState<FileListItem | null>(null);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [renameValue, setRenameValue] = useState('');
-  const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(() => new Set());
+  const [cachedResourceIds, setCachedResourceIds] = useState<Set<string>>(() => new Set());
+  const [treeChildrenByParent, setTreeChildrenByParent] = useState<Record<string, FileListItem[]>>(
+    {},
+  );
+  const [treeExpandedIds, setTreeExpandedIds] = useState<Set<string>>(() => new Set());
+  const [treeLoadingIds, setTreeLoadingIds] = useState<Set<string>>(() => new Set());
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 10, minimumViewTime: 100 }),
     [],
   );
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: FileListItem }> }) => {
-    setVisibleIds((prev) => {
-      const next = new Set(prev);
-      for (const { item } of viewableItems) {
-        next.add(item.id);
-      }
-      return next;
-    });
-  }, []);
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<ResourceListRow>> }) => {
+      setVisibleIds((prev) => {
+        const next = new Set(prev);
+        for (const token of viewableItems) {
+          if (!token.item || isResourceTreeRow(token.item)) continue;
+          next.add(token.item.id);
+        }
+        return next;
+      });
+    },
+    [],
+  );
   const nextOffsetRef = useRef(0);
   const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!searchVisible) return;
+    const timer = setTimeout(() => searchRef.current?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [searchVisible]);
 
   const toggleSelect = useCallback((item: FileListItem) => {
     setSelectedIds((prev) => {
@@ -1114,6 +1321,15 @@ export default function ResourceScreen() {
   const clearSelection = useCallback(() => {
     setSelectMode(false);
     setSelectedIds(new Set());
+  }, []);
+
+  const refreshCachedResources = useCallback(async () => {
+    try {
+      const entries = await listResourceCacheEntries();
+      setCachedResourceIds(new Set(entries.map((entry) => entry.fileId)));
+    } catch {
+      setCachedResourceIds(new Set());
+    }
   }, []);
 
   // ── Data (defined early for handleBatchDelete etc.) ──────────────────
@@ -1146,14 +1362,11 @@ export default function ResourceScreen() {
         const base = await getApiUrl();
         setApiBase(base);
         const result = await resourceApi.getKnowledgeItems({
-          category: category === 'all' ? undefined : category,
           knowledgeBaseId: libraryId ?? undefined,
           limit: 50,
           offset: loadOffset,
-          parentId: currentFolderSlug ?? null,
+          parentId: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
           q: searchText || undefined,
-          sorter,
-          sortType: sortOrder,
         });
         if (ticket !== loadRequestRef.current) return;
         const items = result?.items ?? [];
@@ -1171,8 +1384,64 @@ export default function ResourceScreen() {
         }
       }
     },
-    [category, searchText, libraryId, currentFolderSlug, sorter, sortOrder],
+    [searchText, libraryId, currentFolderId, currentFolderSlug],
   );
+
+  const loadTreeChildren = useCallback(
+    async (parentId: string | null, force = false) => {
+      if (!libraryId) return;
+
+      const treeKey = parentId ?? ROOT_TREE_KEY;
+
+      if (!force && treeChildrenByParent[treeKey]) return;
+
+      setTreeLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.add(treeKey);
+        return next;
+      });
+
+      try {
+        const result = await resourceApi.getKnowledgeItems({
+          knowledgeBaseId: libraryId,
+          limit: 200,
+          offset: 0,
+          parentId,
+        });
+
+        setTreeChildrenByParent((prev) => ({
+          ...prev,
+          [treeKey]: sortFileList(result?.items ?? [], sorter, sortOrder, locale),
+        }));
+      } catch {
+        setTreeChildrenByParent((prev) => ({
+          ...prev,
+          [treeKey]: [],
+        }));
+      } finally {
+        setTreeLoadingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(treeKey);
+          return next;
+        });
+      }
+    },
+    [libraryId, locale, sortOrder, sorter, treeChildrenByParent],
+  );
+
+  const refreshTreeData = useCallback(async () => {
+    if (!libraryId) {
+      setTreeChildrenByParent({});
+      setTreeExpandedIds(new Set());
+      return;
+    }
+
+    await loadTreeChildren(null, true);
+
+    if (currentFolderId) {
+      await loadTreeChildren(currentFolderId, true);
+    }
+  }, [currentFolderId, libraryId, loadTreeChildren]);
 
   const handleBatchDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -1200,15 +1469,16 @@ export default function ResourceScreen() {
             haptics.success();
             clearSelection();
             await loadFiles(true);
+            await refreshTreeData();
           } catch {
             toast.show('error', t.resourceDeleteFailed);
           }
         },
       },
     ]);
-  }, [selectedIds, files, clearSelection, loadFiles, t, toast]);
+  }, [selectedIds, files, clearSelection, loadFiles, refreshTreeData, t, toast]);
 
-  const [batchMoveIds, setBatchMoveIds] = useState<Set<string>>(new Set());
+  const [batchMoveIds, setBatchMoveIds] = useState<Set<string>>(() => new Set());
 
   const handleBatchMove = useCallback(() => {
     setBatchMoveIds(new Set(selectedIds));
@@ -1216,8 +1486,8 @@ export default function ResourceScreen() {
     setMoveFolderStack([null]);
   }, [selectedIds]);
 
-  const moveFolderParentId = moveFolderStack[moveFolderStack.length - 1]?.id ?? null;
-  const moveFolderCurrent = moveFolderStack.length > 1 ? moveFolderStack[moveFolderStack.length - 1] : null;
+  const moveFolderParentId = moveFolderStack.at(-1)?.id ?? null;
+  const moveFolderCurrent = moveFolderStack.length > 1 ? moveFolderStack.at(-1) : null;
 
   useEffect(() => {
     if (moveToFolderItem && libraryId) {
@@ -1249,7 +1519,8 @@ export default function ResourceScreen() {
 
   useEffect(() => {
     loadLibraries();
-  }, [loadLibraries]);
+    void refreshCachedResources();
+  }, [loadLibraries, refreshCachedResources]);
 
   useEffect(() => {
     if (currentFolderSlug) {
@@ -1259,9 +1530,23 @@ export default function ResourceScreen() {
     }
   }, [currentFolderSlug, loadFolderBreadcrumb]);
 
+  // 切换 library 时重置文件夹导航，避免跨库的 parentId 导致请求失败
   useEffect(() => {
+    setCurrentFolderId(null);
+    setCurrentFolderSlug(null);
+    setTreeChildrenByParent({});
+    setTreeExpandedIds(new Set());
+  }, [libraryId]);
+
+  useEffect(() => {
+    nextOffsetRef.current = 0;
     loadFiles();
   }, [loadFiles]);
+
+  useEffect(() => {
+    if (!libraryId) return;
+    void loadTreeChildren(null, true);
+  }, [libraryId, loadTreeChildren, sorter, sortOrder]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -1269,16 +1554,21 @@ export default function ResourceScreen() {
   }, [loadFiles]);
 
   const handleFolderPress = useCallback((item: FileListItem) => {
-    const slug = item.slug || item.id;
-    setCurrentFolderSlug(slug);
+    nextOffsetRef.current = 0;
+    setCurrentFolderId(item.id);
+    setCurrentFolderSlug(item.slug ?? item.id);
   }, []);
 
   const handleBreadcrumbPress = useCallback((item: FolderCrumb, index: number) => {
     if (index === folderBreadcrumb.length - 1) return;
+    nextOffsetRef.current = 0;
+    setCurrentFolderId(item.id);
     setCurrentFolderSlug(item.slug);
   }, [folderBreadcrumb.length]);
 
   const handleBackToRoot = useCallback(() => {
+    nextOffsetRef.current = 0;
+    setCurrentFolderId(null);
     setCurrentFolderSlug(null);
   }, []);
 
@@ -1290,15 +1580,16 @@ export default function ResourceScreen() {
     try {
       await resourceApi.createFolder({
         knowledgeBaseId: libraryId,
-        parentId: currentFolderSlug ?? undefined,
+        parentId: currentFolderId ?? currentFolderSlug ?? undefined,
         title: name,
       });
       haptics.success();
       await loadFiles(true);
+      await refreshTreeData();
     } catch {
       toast.show('error', t.resourceUploadFailed);
     }
-  }, [libraryId, currentFolderSlug, createFolderName, loadFiles, t.resourceNewFolder, t.resourceUploadFailed, toast]);
+  }, [libraryId, currentFolderId, currentFolderSlug, createFolderName, loadFiles, refreshTreeData, t.resourceNewFolder, t.resourceUploadFailed, toast]);
 
   const handleMoveToFolder = useCallback(
     async (targetFolderId: string | null) => {
@@ -1319,11 +1610,12 @@ export default function ResourceScreen() {
         toast.show('success', t.done);
         clearSelection();
         await loadFiles(true);
+        await refreshTreeData();
       } catch {
         toast.show('error', t.resourceUploadFailed);
       }
     },
-    [moveToFolderItem, batchMoveIds, files, clearSelection, loadFiles, t.done, t.resourceUploadFailed, toast],
+    [moveToFolderItem, batchMoveIds, files, clearSelection, loadFiles, refreshTreeData, t.done, t.resourceUploadFailed, toast],
   );
 
   // ── Upload ────────────────────────────────────────────────────────
@@ -1336,7 +1628,7 @@ export default function ResourceScreen() {
         const created = await fileApi.upload(uri, name, mimeType, {
           knowledgeBaseId: libraryId ?? undefined,
           onProgress: (p) => setUploadProgress(p),
-          parentId: currentFolderSlug ?? undefined,
+          parentId: currentFolderId ?? currentFolderSlug ?? undefined,
         });
         haptics.success();
         toast.show('success', t.resourceUploaded);
@@ -1361,6 +1653,8 @@ export default function ResourceScreen() {
         });
         await new Promise((r) => setTimeout(r, 200));
         await loadFiles(true);
+        await refreshTreeData();
+        await refreshCachedResources();
       } catch {
         toast.show('error', t.resourceUploadFailed);
       } finally {
@@ -1368,7 +1662,7 @@ export default function ResourceScreen() {
         setUploadProgress(0);
       }
     },
-    [loadFiles, libraryId, currentFolderSlug, t, toast],
+    [currentFolderId, currentFolderSlug, libraryId, loadFiles, refreshCachedResources, refreshTreeData, t, toast],
   );
 
   const handlePickPhoto = useCallback(async () => {
@@ -1428,6 +1722,8 @@ export default function ResourceScreen() {
               }
               haptics.success();
               setFiles((prev) => prev.filter((f) => f.id !== id));
+              await refreshTreeData();
+              await refreshCachedResources();
             } catch {
               toast.show('error', t.resourceDeleteFailed);
             }
@@ -1435,7 +1731,7 @@ export default function ResourceScreen() {
         },
       ]);
     },
-    [t, toast],
+    [refreshCachedResources, refreshTreeData, t, toast],
   );
 
   const closeActionSheet = useCallback(() => setActionItem(null), []);
@@ -1468,12 +1764,13 @@ export default function ResourceScreen() {
             f.id === actionItem.id ? { ...f, name: newName.trim() } : f,
           ),
         );
+        await refreshTreeData();
         toast.show('success', t.resourceRenamed);
       } catch {
         toast.show('error', t.resourceRenameFailed);
       }
     },
-    [actionItem, t, toast],
+    [actionItem, refreshTreeData, t, toast],
   );
 
   const handleShare = useCallback(
@@ -1497,11 +1794,108 @@ export default function ResourceScreen() {
 
   // ── Filtered & sorted files ────────────────────────────────────────
 
+  const treeMode = libraryId !== null && viewMode === 'list' && !searchText.trim();
+
+  const treeRows = useMemo(() => {
+    if (!treeMode) return [];
+
+    const rows: ResourceTreeRow[] = [];
+
+    const walk = (parentId: string | null, depth: number) => {
+      const treeKey = parentId ?? ROOT_TREE_KEY;
+      const children = sortFileList(treeChildrenByParent[treeKey] ?? [], sorter, sortOrder, locale);
+
+      for (const child of children) {
+        const includeRow = isFolder(child) || matchesCategory(child, category);
+        if (includeRow) {
+          rows.push({ depth, item: child });
+        }
+
+        if (isFolder(child) && treeExpandedIds.has(child.id)) {
+          walk(child.id, depth + 1);
+        }
+      }
+    };
+
+    walk(null, 0);
+    return rows;
+  }, [category, locale, sortOrder, sorter, treeChildrenByParent, treeExpandedIds, treeMode]);
+
   const filtered = sortFileList(
     files.filter((f) => matchesCategory(f, category)),
     sorter,
     sortOrder,
+    locale,
   );
+
+  const handleTreeFolderToggle = useCallback(
+    async (item: FileListItem) => {
+      if (!isFolder(item)) return;
+
+      const isExpanded = treeExpandedIds.has(item.id);
+
+      setCurrentFolderId(item.id);
+      setCurrentFolderSlug(item.slug ?? item.id);
+
+      if (isExpanded) {
+        setTreeExpandedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+        return;
+      }
+
+      setTreeExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+      await loadTreeChildren(item.id);
+    },
+    [loadTreeChildren, treeExpandedIds],
+  );
+
+  const handleExpandAllTree = useCallback(async () => {
+    if (!libraryId) return;
+
+    const nextChildren: Record<string, FileListItem[]> = {};
+    const expandedIds = new Set<string>();
+    const queue: Array<string | null> = [null];
+
+    while (queue.length > 0) {
+      const parentId = queue.shift() ?? null;
+      const treeKey = parentId ?? ROOT_TREE_KEY;
+
+      let children = treeChildrenByParent[treeKey];
+      if (!children) {
+        const result = await resourceApi.getKnowledgeItems({
+          knowledgeBaseId: libraryId,
+          limit: 200,
+          offset: 0,
+          parentId,
+        });
+        children = sortFileList(result?.items ?? [], sorter, sortOrder, locale);
+      }
+
+      nextChildren[treeKey] = children;
+
+      for (const child of children) {
+        if (!isFolder(child)) continue;
+        expandedIds.add(child.id);
+        queue.push(child.id);
+      }
+    }
+
+    setTreeChildrenByParent((prev) => ({ ...prev, ...nextChildren }));
+    setTreeExpandedIds(expandedIds);
+  }, [libraryId, locale, sortOrder, sorter, treeChildrenByParent]);
+
+  const handleCollapseAllTree = useCallback(() => {
+    setTreeExpandedIds(new Set());
+    setCurrentFolderId(null);
+    setCurrentFolderSlug(null);
+  }, []);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore) return;
@@ -1529,10 +1923,10 @@ export default function ResourceScreen() {
     <View className="flex-1 bg-background">
       {/* Header */}
       <ScreenHeader
+        title={selectMode ? t.resourceSelectCount.replace('{count}', String(selectedIds.size)) : t.resourceTitle}
         rightAccessibilityLabel={
           selectMode ? t.resourceCancelSelect : t.resourceViewModeToggle
         }
-        title={selectMode ? t.resourceSelectCount.replace('{count}', String(selectedIds.size)) : t.resourceTitle}
         rightActions={
           selectMode ? (
             <TouchableOpacity
@@ -1586,9 +1980,9 @@ export default function ResourceScreen() {
         {/* Breadcrumb when in folder */}
         {folderBreadcrumb.length > 0 && (
           <ScrollView
+            horizontal
             className="mx-4 mb-2"
             contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            horizontal
             showsHorizontalScrollIndicator={false}
           >
             <TouchableOpacity
@@ -1636,30 +2030,81 @@ export default function ResourceScreen() {
           </ScrollView>
         )}
 
-        <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-          <Search color={colors.muted} size={16} strokeWidth={2} />
-          <TextInput
-            className="ml-2.5 flex-1 text-[14px] text-foreground"
-            placeholder={t.search}
-            placeholderTextColor={colors.muted}
-            ref={searchRef}
-            returnKeyType="search"
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={() => loadFiles()}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity hitSlop={8} onPress={() => setSearchText('')}>
-              <X color={colors.muted} size={16} strokeWidth={2} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {libraryId && treeMode ? (
+          <View className="mx-4 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <FolderOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-2 text-[13px] font-semibold text-foreground">
+                  {t.resourceExplorer}
+                </Text>
+              </View>
+              <View className="flex-row items-center" style={{ gap: 8 }}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="rounded-full px-3 py-1.5"
+                  style={{ backgroundColor: colors.fillTertiary }}
+                  onPress={() => void handleExpandAllTree()}
+                >
+                  <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
+                    {t.resourceExpandAll}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="rounded-full px-3 py-1.5"
+                  style={{ backgroundColor: colors.fillTertiary }}
+                  onPress={handleCollapseAllTree}
+                >
+                  <Text className="text-[11px] font-semibold" style={{ color: colors.secondaryText }}>
+                    {t.resourceCollapseAll}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {currentFolderId && folderBreadcrumb.length > 0 ? (
+              <Text className="mt-2 text-[11px] font-medium" style={{ color: colors.secondaryText }}>
+                {t.resourceCurrentFolder}: {folderBreadcrumb.map((crumb) => crumb.name).join(' / ')}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {searchVisible ? (
+          <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
+            <Search color={colors.muted} size={16} strokeWidth={2} />
+            <TextInput
+              className="ml-2.5 flex-1 text-[14px] text-foreground"
+              placeholder={t.search}
+              placeholderTextColor={colors.muted}
+              ref={searchRef}
+              returnKeyType="search"
+              value={searchText}
+              onChangeText={setSearchText}
+              onSubmitEditing={() => loadFiles()}
+            />
+            {searchText.length > 0 ? (
+              <TouchableOpacity hitSlop={8} onPress={() => setSearchText('')}>
+                <X color={colors.muted} size={16} strokeWidth={2} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                hitSlop={8}
+                onPress={() => {
+                  setSearchVisible(false);
+                }}
+              >
+                <X color={colors.muted} size={16} strokeWidth={2} />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
 
         {/* Filter tabs + sort (single row) */}
         <View className="mx-4 mb-2 flex-row items-center justify-between">
           <ScrollView
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             horizontal
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             showsHorizontalScrollIndicator={false}
             style={{ flex: 1 }}
           >
@@ -1689,9 +2134,9 @@ export default function ResourceScreen() {
             })}
           </ScrollView>
           <TouchableOpacity
-            activeOpacity={0.7}
             accessibilityLabel={`${t.resourceSortBy}: ${getSortLabel()}`}
             accessibilityRole="button"
+            activeOpacity={0.7}
             className="ml-2 items-center justify-center rounded-full p-2"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ backgroundColor: colors.fillTertiary }}
@@ -1729,17 +2174,21 @@ export default function ResourceScreen() {
       {loading && files.length === 0 ? (
         <FileGridSkeleton />
       ) : (
-        <FlatList
-          key={viewMode}
-          columnWrapperStyle={viewMode === 'grid' ? { justifyContent: 'space-between', paddingHorizontal: 12 } : undefined}
+        <FlatList<ResourceListRow>
+          data={treeMode ? treeRows : filtered}
+          key={treeMode ? 'tree' : viewMode}
+          keyExtractor={(item) => (isResourceTreeRow(item) ? item.item.id : item.id)}
+          numColumns={!treeMode && viewMode === 'grid' ? 3 : 1}
+          viewabilityConfig={treeMode ? undefined : viewabilityConfig}
           ItemSeparatorComponent={
-            viewMode === 'list' ? () => <View className="mx-4 h-px bg-foreground/5" /> : undefined
+            !treeMode && viewMode === 'list'
+              ? () => <View className="mx-4 h-px bg-foreground/5" />
+              : undefined
           }
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          numColumns={viewMode === 'grid' ? 3 : 1}
           ListEmptyComponent={
             <EmptyState
+              iconVariant="resource"
+              title={currentFolderId || currentFolderSlug ? t.resourceFolderEmpty : t.resourceEmpty}
               action={
                 <View className="flex-row flex-wrap justify-center gap-3 mt-2">
                   <TouchableOpacity
@@ -1769,14 +2218,33 @@ export default function ResourceScreen() {
                 </View>
               }
               description={
-                currentFolderSlug ? t.resourceFolderEmptyDesc : t.resourceEmptyDesc
+                currentFolderId || currentFolderSlug ? t.resourceFolderEmptyDesc : t.resourceEmptyDesc
               }
-              iconVariant="resource"
-              title={currentFolderSlug ? t.resourceFolderEmpty : t.resourceEmpty}
             />
           }
+          ListFooterComponent={
+            !treeMode && hasMore ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="items-center justify-center py-4"
+                disabled={loadingMore}
+                onPress={handleLoadMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Text style={{ color: colors.primary }}>{t.resourceLoadMore}</Text>
+                )}
+              </TouchableOpacity>
+            ) : null
+          }
+          columnWrapperStyle={
+            !treeMode && viewMode === 'grid'
+              ? { justifyContent: 'space-between', paddingHorizontal: 12 }
+              : undefined
+          }
           contentContainerStyle={
-            filtered.length === 0
+            (treeMode ? treeRows.length === 0 : filtered.length === 0)
               ? {
                   flex: 1,
                   alignItems: 'center',
@@ -1793,45 +2261,134 @@ export default function ResourceScreen() {
               onRefresh={onRefresh}
             />
           }
-          ListFooterComponent={
-            hasMore ? (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                className="items-center justify-center py-4"
-                disabled={loadingMore}
-                onPress={handleLoadMore}
-              >
-                {loadingMore ? (
-                  <ActivityIndicator color={colors.primary} size="small" />
-                ) : (
-                  <Text style={{ color: colors.primary }}>{t.resourceLoadMore}</Text>
-                )}
-              </TouchableOpacity>
-            ) : null
-          }
-          onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
-          onEndReachedThreshold={0.3}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
           renderItem={({ item }) =>
-            viewMode === 'grid' ? (
+            isResourceTreeRow(item) ? (
+              (() => {
+                const row = item;
+                const entry = row.item;
+                const entryIsFolder = isFolder(entry);
+                const isExpanded = treeExpandedIds.has(entry.id);
+                const isLoadingChildren = treeLoadingIds.has(entry.id);
+                const isFocusedFolder = currentFolderId === entry.id;
+                const isCached = cachedResourceIds.has(entry.id);
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.72}
+                    className="px-4 py-2"
+                    onLongPress={() => {
+                      haptics.medium();
+                      if (selectMode) {
+                        toggleSelect(entry);
+                      } else if (libraryId) {
+                        handleLongPressItem(entry);
+                      } else {
+                        handleDelete(entry.id, entry.name, entryIsFolder);
+                      }
+                    }}
+                    onPress={() => {
+                      if (selectMode) {
+                        toggleSelect(entry);
+                        return;
+                      }
+
+                      if (entryIsFolder) {
+                        void handleTreeFolderToggle(entry);
+                        return;
+                      }
+
+                      handlePreview(entry);
+                    }}
+                  >
+                    <View
+                      className="flex-row items-center rounded-2xl px-3 py-2.5"
+                      style={{
+                        backgroundColor: isFocusedFolder ? colors.fillTertiary : 'transparent',
+                        marginLeft: row.depth * 16,
+                      }}
+                    >
+                      <View className="mr-2 h-6 w-6 items-center justify-center">
+                        {entryIsFolder ? (
+                          isLoadingChildren ? (
+                            <ActivityIndicator color={colors.primary} size="small" />
+                          ) : (
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              className="h-6 w-6 items-center justify-center"
+                              hitSlop={8}
+                              onPress={() => void handleTreeFolderToggle(entry)}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown color={colors.primary} size={16} strokeWidth={2.2} />
+                              ) : (
+                                <ChevronRight color={colors.primary} size={16} strokeWidth={2.2} />
+                              )}
+                            </TouchableOpacity>
+                          )
+                        ) : null}
+                      </View>
+
+                      {selectMode ? (
+                        <View
+                          className="mr-3 h-6 w-6 items-center justify-center rounded-full border-2"
+                          style={{
+                            borderColor: selectedIds.has(entry.id) ? colors.primary : colors.muted,
+                          }}
+                        >
+                          {selectedIds.has(entry.id) ? (
+                            <Check color={colors.primary} size={14} strokeWidth={2.5} />
+                          ) : null}
+                        </View>
+                      ) : null}
+
+                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-foreground/5">
+                        <ResourceThumbnail apiBaseUrl={apiBase} item={entry} roundedClassName="rounded-xl" />
+                        {isCached && !entryIsFolder ? (
+                          <View
+                            className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
+                            style={{ backgroundColor: colors.primary }}
+                          >
+                            <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+                          </View>
+                        ) : null}
+                      </View>
+
+                      <View className="min-w-0 flex-1">
+                        <Text className="text-[14px] font-medium text-foreground" numberOfLines={1}>
+                          {entry.name}
+                        </Text>
+                        <Text
+                          className="mt-0.5 text-[11px]"
+                          numberOfLines={1}
+                          style={{ color: colors.secondaryText }}
+                        >
+                          {entryIsFolder
+                            ? formatDate(entry.createdAt)
+                            : `${formatBytes(entry.size)}  ·  ${formatDate(entry.createdAt)}`}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })()
+            ) : viewMode === 'grid' ? (
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="flex-1 m-1 items-center rounded-xl bg-foreground/5 p-3"
                 style={viewMode === 'grid' ? { minWidth: 0 } : undefined}
-                onPress={() =>
-                  selectMode
-                    ? toggleSelect(item)
-                    : isFolder(item) && libraryId
-                      ? handleFolderPress(item)
-                      : handlePreview(item)
-                }
                 onLongPress={() =>
                   selectMode
                     ? toggleSelect(item)
                     : libraryId
                       ? handleLongPressItem(item)
                       : handleDelete(item.id, item.name, isFolder(item))
+                }
+                onPress={() =>
+                  selectMode
+                    ? toggleSelect(item)
+                    : isFolder(item) && libraryId
+                      ? handleFolderPress(item)
+                      : handlePreview(item)
                 }
               >
                 {selectMode && (
@@ -1843,25 +2400,23 @@ export default function ResourceScreen() {
                   </View>
                 )}
                 <View className="h-14 w-14 items-center justify-center">
-                  {isFolder(item) ? (
-                    <Folder color={colors.muted} size={28} strokeWidth={tokens.icon.strokeWidth} />
-                  ) : isImage(item.fileType, item.name) ? (
-                    (() => {
-                      const imgUrl = buildRemoteFileCandidates(apiBase, item)[0];
-                      return imgUrl ? (
-                        <ExpoImage
-                          cachePolicy="memory-disk"
-                          className="h-14 w-14 rounded-lg bg-foreground/5"
-                          contentFit="cover"
-                          source={{ uri: imgUrl }}
-                        />
-                      ) : (
-                        <FileTypeIcon color={colors.muted} fileName={item.name} fileType={item.fileType} size={28} />
-                      );
-                    })()
-                  ) : (
-                    <FileTypeIcon color={colors.muted} fileName={item.name} fileType={item.fileType} size={28} />
-                  )}
+                  <View className="h-14 w-14 items-center justify-center rounded-lg bg-foreground/5 overflow-hidden">
+                    <ResourceThumbnail
+                      isVisible
+                      apiBaseUrl={apiBase}
+                      item={item}
+                      roundedClassName="rounded-lg"
+                      size={56}
+                    />
+                    {cachedResourceIds.has(item.id) && !isFolder(item) ? (
+                      <View
+                        className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
+                        style={{ backgroundColor: colors.primary }}
+                      >
+                        <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
                 <Text className="mt-1 text-center text-[11px] text-foreground" numberOfLines={2}>
                   {item.name}
@@ -1877,12 +2432,17 @@ export default function ResourceScreen() {
             ) : (
               <FileRow
                 apiBaseUrl={apiBase}
+                isCached={cachedResourceIds.has(item.id)}
                 isSelected={selectedIds.has(item.id)}
                 isVisible={visibleIds.size === 0 || visibleIds.has(item.id)}
                 item={item}
+                selectMode={selectMode}
+                showFolderActions={!!libraryId}
                 onDelete={handleDelete}
                 onFolderPress={libraryId ? handleFolderPress : undefined}
                 onLongPressItem={libraryId ? handleLongPressItem : undefined}
+                onPress={handlePreview}
+                onSelect={selectMode ? toggleSelect : undefined}
                 onMoveToFolder={
                   libraryId
                     ? (i) => {
@@ -1892,22 +2452,40 @@ export default function ResourceScreen() {
                       }
                     : undefined
                 }
-                onPress={handlePreview}
-                onSelect={selectMode ? toggleSelect : undefined}
-                selectMode={selectMode}
-                showFolderActions={!!libraryId}
               />
             )
           }
+          onEndReached={!treeMode && hasMore && !loadingMore ? handleLoadMore : undefined}
+          onEndReachedThreshold={0.3}
+          onViewableItemsChanged={treeMode ? undefined : onViewableItemsChanged}
         />
       )}
 
       {/* Upload FAB — hidden in select mode to avoid confusion */}
       {!selectMode && (
         <View
-          className="absolute bottom-0 right-0"
-          style={{ paddingBottom: insets.bottom + 12, paddingRight: 20 }}
+          className="absolute bottom-0 right-0 flex-row items-center"
+          style={{ gap: 12, paddingBottom: insets.bottom + 12, paddingRight: 20 }}
         >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="items-center justify-center rounded-full shadow-lg"
+            style={{ width: 48, height: 48, elevation: 4, backgroundColor: colors.fillTertiary }}
+            onPress={() => {
+              haptics.light();
+              setSearchVisible((value) => {
+                const next = !value;
+                if (!next) setSearchText('');
+                return next;
+              });
+            }}
+          >
+            {searchVisible ? (
+              <X color={colors.primary} size={18} strokeWidth={2.3} />
+            ) : (
+              <Search color={colors.primary} size={18} strokeWidth={2.3} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
             className="items-center justify-center rounded-full shadow-lg"
@@ -1931,6 +2509,8 @@ export default function ResourceScreen() {
       )}
 
       <AttachmentSheet
+        visible={attachmentSheetVisible}
+        onClose={() => setAttachmentSheetVisible(false)}
         onDocument={() => void handlePickFile()}
         onGallery={() => void handlePickPhoto()}
         onNewFolder={
@@ -1941,8 +2521,6 @@ export default function ResourceScreen() {
               }
             : undefined
         }
-        onClose={() => setAttachmentSheetVisible(false)}
-        visible={attachmentSheetVisible}
       />
 
       <FilePreviewModal
@@ -1950,6 +2528,13 @@ export default function ResourceScreen() {
         item={previewItem}
         visible={previewVisible}
         onClose={() => setPreviewVisible(false)}
+        onCacheReady={(fileId) =>
+          setCachedResourceIds((prev) => {
+            const next = new Set(prev);
+            next.add(fileId);
+            return next;
+          })
+        }
       />
 
       {/* Item Action Sheet */}
@@ -2048,8 +2633,8 @@ export default function ResourceScreen() {
       {/* Library select modal */}
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
         transparent
+        animationType="slide"
         visible={librarySelectVisible}
         onRequestClose={() => setLibrarySelectVisible(false)}
       >
@@ -2077,6 +2662,7 @@ export default function ResourceScreen() {
                 }}
                 onPress={() => {
                   setLibraryId(null);
+                  setCurrentFolderId(null);
                   setCurrentFolderSlug(null);
                   setLibrarySelectVisible(false);
                 }}
@@ -2103,6 +2689,7 @@ export default function ResourceScreen() {
                   }}
                   onPress={() => {
                     setLibraryId(lib.id);
+                    setCurrentFolderId(null);
                     setCurrentFolderSlug(null);
                     setLibrarySelectVisible(false);
                   }}
@@ -2129,8 +2716,8 @@ export default function ResourceScreen() {
       {/* Move to folder modal */}
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
         transparent
+        animationType="slide"
         visible={!!moveToFolderItem || batchMoveIds.size > 0}
         onRequestClose={() => {
           setMoveToFolderItem(null);
@@ -2228,8 +2815,8 @@ export default function ResourceScreen() {
       {/* Sort menu — compact dropdown-style overlay */}
       <Modal
         accessibilityViewIsModal
-        animationType="fade"
         transparent
+        animationType="fade"
         visible={sortMenuVisible}
         onRequestClose={() => setSortMenuVisible(false)}
       >
@@ -2259,8 +2846,6 @@ export default function ResourceScreen() {
                   setSorter(opt.sorter);
                   setSortOrder(opt.order);
                   setSortMenuVisible(false);
-                  nextOffsetRef.current = 0;
-                  void loadFiles(false, false);
                 }}
               >
                 <Text
@@ -2283,8 +2868,8 @@ export default function ResourceScreen() {
       {/* Create folder modal */}
       <Modal
         accessibilityViewIsModal
-        animationType="fade"
         transparent
+        animationType="fade"
         visible={createFolderVisible}
         onRequestClose={() => setCreateFolderVisible(false)}
       >

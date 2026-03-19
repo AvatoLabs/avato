@@ -469,17 +469,22 @@ const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null)
 
   if (!isDefaultTopicTitle(topic?.title)) return;
 
+  const { t } = useI18n.getState();
+  const failMessage = [t.toastTitleGenerationFailed, t.toastTitleGenerationFailedHint]
+    .filter(Boolean)
+    .join(' ');
+
   topicApi
     .generateTitle(topicId)
     .then((newTitle) => {
       if (newTitle) {
         return useTopicStore.getState().fetchTopics(sessionId);
       }
-      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+      useToast.getState().show('error', failMessage);
     })
     .catch((error) => {
       console.warn('[ChatStore] generateTopicTitle failed:', error);
-      useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
+      useToast.getState().show('error', failMessage);
     });
 };
 
@@ -1131,29 +1136,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (
           options?.preferPopulatedTopic &&
           sessionType !== 'group' &&
+          !effectiveTopicId &&
           (!messages || messages.length === 0)
         ) {
           await ensureKnownTopics();
-          const currentTopic = effectiveTopicId
-            ? knownTopics.find((topic) => topic.id === effectiveTopicId)
-            : undefined;
-          const allowFallback = !effectiveTopicId || isDefaultTopicTitle(currentTopic?.title);
 
-          if (allowFallback) {
-            const candidateTopicIds = knownTopics
-              .map((topic) => topic.id)
-              .filter((id) => id && id !== effectiveTopicId)
-              .slice(0, 8);
+          const candidateTopicIds = knownTopics
+            .map((topic) => topic.id)
+            .filter(Boolean)
+            .slice(0, 8);
 
-            for (const candidateTopicId of candidateTopicIds) {
-              const candidateMessages = await fetchByTopic(candidateTopicId);
-              if (candidateMessages.length === 0) continue;
+          for (const candidateTopicId of candidateTopicIds) {
+            const candidateMessages = await fetchByTopic(candidateTopicId);
+            if (candidateMessages.length === 0) continue;
 
-              effectiveTopicId = candidateTopicId;
-              useTopicStore.getState().switchTopic(sessionId, candidateTopicId);
-              messages = candidateMessages;
-              break;
-            }
+            effectiveTopicId = candidateTopicId;
+            useTopicStore.getState().switchTopic(sessionId, candidateTopicId);
+            messages = candidateMessages;
+            break;
           }
         }
         const {

@@ -2,9 +2,19 @@
  * TopicListScreen — Lists topics for a session with search, create, and management.
  * Aligned with Memory/Settings subpage style: ScreenHeader + consistent content padding.
  */
-import { ArrowLeft, MessageCircle, Plus } from 'lucide-react-native';
+import { ArrowLeft, Check, MessageCircle, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import EmptyState from '../components/ui/EmptyState';
@@ -13,10 +23,14 @@ import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
-import { topicApi } from '../lib/api';
+import { resolveTagColor } from '../constants/tags';
+import { tagApi, topicApi } from '../lib/api';
+import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { navigateToLogin } from '../lib/navigation';
 import { useChatStore } from '../store/chat';
+import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -28,6 +42,8 @@ export default function TopicListScreen({ route, navigation }: any) {
   const toast = useToast();
   const colors = useThemeColors();
 
+  const session = useSessionStore((s) => s.sessions.find((x) => x.id === sessionId));
+  const isGroupSession = session?.type === 'group';
   const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
   const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
   const loading = useTopicStore((s) => s.loadingBySession[sessionKey] ?? false);
@@ -37,11 +53,22 @@ export default function TopicListScreen({ route, navigation }: any) {
   const switchTopic = useTopicStore((s) => s.switchTopic);
   const favoriteTopic = useTopicStore((s) => s.favoriteTopic);
   const updateTopic = useTopicStore((s) => s.updateTopic);
+  const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
+
+  const [tags, setTags] = useState<Array<{ id: string; name: string; color?: string | null }>>([]);
+  const [topicTagTarget, setTopicTagTarget] = useState<{
+    sessionId: string;
+    topicId: string;
+    currentTagId?: string | null;
+  } | null>(null);
 
   const handleSmartRename = useCallback(
     async (topicId: string) => {
       if (!sessionId) return;
+      const failMessage = [t.toastTitleGenerationFailed, t.toastTitleGenerationFailedHint]
+        .filter(Boolean)
+        .join(' ');
       try {
         const newTitle = await topicApi.generateTitle(topicId);
         if (newTitle?.trim()) {
@@ -49,10 +76,10 @@ export default function TopicListScreen({ route, navigation }: any) {
           haptics.success();
           toast.show('success', t.topicRenamed);
         } else {
-          toast.show('error', t.toastTitleGenerationFailed || 'Failed to generate title');
+          toast.show('error', failMessage || 'Failed to generate title');
         }
       } catch {
-        toast.show('error', t.toastTitleGenerationFailed || 'Failed to generate title');
+        toast.show('error', failMessage || 'Failed to generate title');
       }
     },
     [sessionId, t, toast, updateTopic],
@@ -73,6 +100,29 @@ export default function TopicListScreen({ route, navigation }: any) {
       toast.show('error', t.errorNetwork);
     });
   }, [fetchTopics, navigation, sessionId, t.errorNetwork, t.errorUnknown, toast]);
+
+  useEffect(() => {
+    tagApi.list().then((list) => setTags(list ?? [])).catch(() => setTags([]));
+  }, []);
+
+  const handleMoveTopicToTag = useCallback(
+    async (topicId: string, sid: string, tagId?: string | null) => {
+      try {
+        await updateTopicTag(topicId, sid, tagId);
+        haptics.success();
+        toast.show('success', t.topicRenamed);
+        setTopicTagTarget(null);
+        void fetchTopics(sessionId);
+      } catch (err) {
+        const { messageKey, type } = classifyError(err);
+        toast.show('error', t[messageKey], {
+          onRetry: type === 'auth' ? navigateToLogin : undefined,
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
+      }
+    },
+    [fetchTopics, sessionId, t, toast, updateTopicTag],
+  );
 
   const onRefresh = useCallback(async () => {
     if (!sessionId) return;
@@ -192,12 +242,23 @@ export default function TopicListScreen({ route, navigation }: any) {
         renderItem={({ item }) => (
           <TopicItem
             isActive={activeTopic === item.id}
+            isGroup={isGroupSession}
             topic={item}
             onDelete={() => removeTopic(item.id, sessionId)}
             onFavorite={() => favoriteTopic(item.id)}
             onPress={() => handleSwitchTopic(item.id)}
             onRename={(newTitle) => updateTopic(item.id, sessionId, newTitle)}
             onSmartRename={() => handleSmartRename(item.id)}
+            onMoveToTag={
+              !isGroupSession && sessionId
+                ? () =>
+                    setTopicTagTarget({
+                      sessionId,
+                      topicId: item.id,
+                      currentTagId: item.tagId ?? null,
+                    })
+                : undefined
+            }
           />
         )}
       />
@@ -220,6 +281,90 @@ export default function TopicListScreen({ route, navigation }: any) {
           }
         }}
       />
+
+      {/* Topic tag picker modal (for non-group topics) */}
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={!!topicTagTarget}
+        onRequestClose={() => setTopicTagTarget(null)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setTopicTagTarget(null)}
+        >
+          <Pressable
+            className="bg-card rounded-t-2xl pb-8 max-h-[70%]"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <Text className="px-5 pb-3 text-[16px] font-semibold text-foreground">
+              {t.tagMoveSession}
+            </Text>
+            <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
+              <Pressable
+                className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
+                onPress={() =>
+                  topicTagTarget &&
+                  sessionId &&
+                  void handleMoveTopicToTag(
+                    topicTagTarget.topicId,
+                    topicTagTarget.sessionId,
+                    null,
+                  )
+                }
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="mr-3 h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: colors.secondaryText }}
+                  />
+                  <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
+                </View>
+                {!topicTagTarget?.currentTagId ? (
+                  <Check
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                ) : null}
+              </Pressable>
+              {tags.map((tag) => (
+                <Pressable
+                  className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
+                  key={tag.id}
+                  onPress={() =>
+                    topicTagTarget &&
+                    void handleMoveTopicToTag(
+                      topicTagTarget.topicId,
+                      topicTagTarget.sessionId,
+                      tag.id,
+                    )
+                  }
+                >
+                  <View className="flex-row items-center">
+                    <View
+                      className="mr-3 h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: resolveTagColor(tag.color) }}
+                    />
+                    <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
+                  </View>
+                  {topicTagTarget?.currentTagId === tag.id ? (
+                    <Check
+                      color={colors.primary}
+                      size={18}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

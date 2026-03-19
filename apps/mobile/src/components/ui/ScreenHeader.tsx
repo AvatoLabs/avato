@@ -14,6 +14,7 @@ interface ScreenHeaderProps {
   children?: React.ReactNode;
   /** 'flat' for enterprise look (default); 'blur' for glassmorphic */
   headerStyle?: HeaderStyle;
+  leftActions?: React.ReactNode;
   leftElement?: React.ReactNode;
   onPressLeft?: () => void;
   onPressRight?: () => void;
@@ -30,6 +31,7 @@ export function ScreenHeader({
   title,
   subtitle,
   children,
+  leftActions,
   leftElement,
   rightElement,
   rightActions,
@@ -118,6 +120,9 @@ export function ScreenHeader({
       <View className="px-5 pt-3 pb-2" style={{ minHeight: 56 }}>
         <View className="flex-row items-center justify-between">
           <View className="mr-3 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
+            {leftActions ? (
+              <View className="mr-2.5 flex-row items-center justify-center">{leftActions}</View>
+            ) : null}
             {titleIcon ? (
               <View className="mr-2.5 h-[28px] w-[28px] items-center justify-center">
                 {titleIcon}

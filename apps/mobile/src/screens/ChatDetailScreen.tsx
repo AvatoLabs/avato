@@ -80,6 +80,7 @@ import { buildDisplayMessagesWithGroupTasks } from '../lib/groupTasksTransform';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
+import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
@@ -402,13 +403,19 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       setEnabledPlugins(new Set());
       return;
     }
-    agentApi
-      .getConfigBySession(sessionId)
-      .then((config) => {
+    Promise.all([
+      agentApi.getConfigBySession(sessionId).catch(() => null),
+      loadSkillPickerSelection(),
+    ])
+      .then(([config, persistedSelection]) => {
         if (config) {
           setAgentId(config.id);
-          setEnabledPlugins(new Set(config.plugins ?? []));
+          setEnabledPlugins(
+            new Set(Array.isArray(config.plugins) ? config.plugins : persistedSelection),
+          );
         } else {
+          setAgentId(null);
+          setEnabledPlugins(new Set(persistedSelection));
           console.warn('[ChatDetail] no agent config for session:', sessionId);
         }
       })
@@ -507,6 +514,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           next.add(identifier);
         }
         const pluginArr = [...next];
+        void saveSkillPickerSelection(pluginArr);
         if (agentId) {
           agentApi.updateConfig(agentId, { plugins: pluginArr }).catch(console.error);
         } else {
@@ -963,6 +971,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 activeTopic
                   ? async () => {
                       haptics.medium();
+                      const failMessage = [t.toastTitleGenerationFailed, t.toastTitleGenerationFailedHint]
+                        .filter(Boolean)
+                        .join(' ');
                       try {
                         const newTitle = await topicApi.generateTitle(activeTopic);
                         if (newTitle?.trim()) {
@@ -972,16 +983,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                           haptics.success();
                           toast.show('success', t.topicRenamed);
                         } else {
-                          toast.show(
-                            'error',
-                            t.toastTitleGenerationFailed || 'Failed to generate title',
-                          );
+                          toast.show('error', failMessage || 'Failed to generate title');
                         }
                       } catch {
-                        toast.show(
-                          'error',
-                          t.toastTitleGenerationFailed || 'Failed to generate title',
-                        );
+                        toast.show('error', failMessage || 'Failed to generate title');
                       }
                     }
                   : undefined

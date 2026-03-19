@@ -50,6 +50,7 @@ type TranslationKeys = {
   chatListCreateAgent: string;
   chatListCreateGroup: string;
   chatListCreateTag: string;
+  chatListGroupTag: string;
   chatListNewAssistant: string;
   chatListNewConversation: string;
   deleteTopicConfirm: string;
@@ -63,6 +64,7 @@ type TranslationKeys = {
   accessibilityAddResource: string;
   accessibilityAddStore: string;
   accessibilityAddTopic: string;
+  accessibilityChatDirectory: string;
   accessibilityOpenStore: string;
   accessibilityCreateMenu: string;
   accessibilityGoBack: string;
@@ -726,6 +728,12 @@ type TranslationKeys = {
   resourceDownload: string;
   resourceDownloaded: string;
   resourceDownloadFailed: string;
+  resourceCachedLocal: string;
+  resourceCachingPreview: string;
+  resourceCollapseAll: string;
+  resourceCurrentFolder: string;
+  resourceExpandAll: string;
+  resourceExplorer: string;
   resourceOpenExternal: string;
   resourcePreviewUnavailable: string;
   resourceDeleteFailed: string;
@@ -1062,12 +1070,13 @@ const en: TranslationKeys = {
   chatListTopicEmpty: 'No topics yet',
   chatListTopicEmptyDesc: 'Your recent conversations will appear here.',
   chatListEmpty: 'No sessions yet',
-  chatListEmptyDesc: 'Tap the + button above to create your first chat with Avato AI.',
+  chatListEmptyDesc: 'Tap the + button below to create your first topic or group.',
   chatListGroupEmpty: 'No groups yet',
-  chatListGroupEmptyDesc: 'Tap the + button to create a new group chat.',
+  chatListGroupEmptyDesc: 'Tap the + button below to create a new group chat.',
   chatListCreateAgent: 'New Agent',
   chatListCreateGroup: 'New Group Chat',
   chatListCreateTag: 'New Tag',
+  chatListGroupTag: 'Group Chat',
   chatListNewAssistant: 'New Assistant',
   chatListNewConversation: 'New Session',
   deleteTopicConfirm: 'Delete this topic?',
@@ -1081,8 +1090,9 @@ const en: TranslationKeys = {
   accessibilityAddResource: 'Add resource',
   accessibilityAddStore: 'Add to store',
   accessibilityAddTopic: 'Add topic',
+  accessibilityChatDirectory: 'Open chat directory',
   accessibilityOpenStore: 'Open store',
-  accessibilityCreateMenu: 'Create new session or agent',
+  accessibilityCreateMenu: 'Create topic or group',
   accessibilityGoBack: 'Go back',
   accessibilitySave: 'Save',
   accessibilitySettings: 'Session settings',
@@ -1374,7 +1384,7 @@ const en: TranslationKeys = {
   themeColorDustBlue: 'Dust Blue',
 
   homeHeroPlaceholder: 'What do you want to do?',
-  homeQuickWrite: 'New Session',
+  homeQuickWrite: 'New Topic',
   homeQuickCode: 'Agents',
   homeQuickAnalyze: 'Groups',
   homeQuickCreate: 'Art',
@@ -1442,7 +1452,7 @@ const en: TranslationKeys = {
   tagMoveSession: 'Move to Tag',
   tagNone: 'No Tag',
   tagDeleteConfirm: 'Delete Tag',
-  tagDeleteDesc: 'Delete this tag? Sessions using it will become untagged.',
+  tagDeleteDesc: 'Delete this tag? Topics using it will become untagged.',
 
   discoverUseAgent: 'Use Agent',
   discoverAgentDetail: 'Agent Detail',
@@ -1722,6 +1732,12 @@ const en: TranslationKeys = {
   resourceDownload: 'Download',
   resourceDownloaded: 'Saved to local files',
   resourceDownloadFailed: 'Download failed',
+  resourceCachedLocal: 'Available offline',
+  resourceCachingPreview: 'Caching preview',
+  resourceCollapseAll: 'Collapse all',
+  resourceCurrentFolder: 'Current folder',
+  resourceExpandAll: 'Expand all',
+  resourceExplorer: 'Explorer',
   resourceOpenExternal: 'Open in Browser',
   resourcePreviewUnavailable: 'Unable to load preview',
   resourceDeleteFailed: 'Delete failed',
@@ -2055,12 +2071,13 @@ const zh_tw: TranslationKeys = {
   chatListTopicEmpty: '暫無話題',
   chatListTopicEmptyDesc: '對話將顯示在這裡。',
   chatListEmpty: '暫無會話',
-  chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 會話。',
+  chatListEmptyDesc: '點擊下方 + 按鈕建立你的第一個話題或群聊。',
   chatListGroupEmpty: '暫無群聊',
-  chatListGroupEmptyDesc: '點擊上方 + 按鈕建立新的群組會話。',
+  chatListGroupEmptyDesc: '點擊下方 + 按鈕建立新的群組會話。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群組會話',
   chatListCreateTag: '新建標籤',
+  chatListGroupTag: '群聊',
   chatListNewAssistant: '新助理',
   chatListNewConversation: '新會話',
   deleteTopicConfirm: '刪除此話題？',
@@ -2074,8 +2091,9 @@ const zh_tw: TranslationKeys = {
   accessibilityAddResource: '新增資源',
   accessibilityAddStore: '新增至商店',
   accessibilityAddTopic: '新增話題',
+  accessibilityChatDirectory: '打開聊天目錄',
   accessibilityOpenStore: '開啟商店',
-  accessibilityCreateMenu: '建立新會話或助手',
+  accessibilityCreateMenu: '建立話題或群聊',
   accessibilityGoBack: '返回',
   accessibilitySave: '儲存',
   accessibilitySettings: '會話設定',
@@ -2364,7 +2382,7 @@ const zh_tw: TranslationKeys = {
   themeColorDustBlue: '霧藍',
 
   homeHeroPlaceholder: '你想做什麼？',
-  homeQuickWrite: '新會話',
+  homeQuickWrite: '新話題',
   homeQuickCode: '助手',
   homeQuickAnalyze: '群組',
   homeQuickCreate: '作圖',
@@ -2432,7 +2450,7 @@ const zh_tw: TranslationKeys = {
   tagMoveSession: '移動到標籤',
   tagNone: '無標籤',
   tagDeleteConfirm: '刪除標籤',
-  tagDeleteDesc: '刪除此標籤？使用中的會話會改成未標籤。',
+  tagDeleteDesc: '刪除此標籤？使用中的話題會改成未標籤。',
 
   discoverUseAgent: '使用助手',
   discoverAgentDetail: '助手詳情',
@@ -2710,6 +2728,12 @@ const zh_tw: TranslationKeys = {
   resourceDownload: '下載',
   resourceDownloaded: '已保存到本地檔案',
   resourceDownloadFailed: '下載失敗',
+  resourceCachedLocal: '已快取到本地',
+  resourceCachingPreview: '正在快取預覽',
+  resourceCollapseAll: '全部收合',
+  resourceCurrentFolder: '目前資料夾',
+  resourceExpandAll: '全部展開',
+  resourceExplorer: '資料總管',
   resourceOpenExternal: '在瀏覽器中打開',
   resourcePreviewUnavailable: '無法載入預覽',
   resourceDeleteFailed: '刪除失敗',
@@ -3041,12 +3065,13 @@ const zh: TranslationKeys = {
   chatListTopicEmpty: '暂无话题',
   chatListTopicEmptyDesc: '对话将显示在这里。',
   chatListEmpty: '暂无会话',
-  chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 会话。',
+  chatListEmptyDesc: '点击下方 + 按钮创建你的第一个话题或群聊。',
   chatListGroupEmpty: '暂无群聊',
-  chatListGroupEmptyDesc: '点击上方 + 按钮创建新的群组会话。',
+  chatListGroupEmptyDesc: '点击下方 + 按钮创建新的群组会话。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群组会话',
   chatListCreateTag: '新建标签',
+  chatListGroupTag: '群聊',
   chatListNewAssistant: '新助理',
   chatListNewConversation: '新会话',
   deleteTopicConfirm: '删除此话题？',
@@ -3060,8 +3085,9 @@ const zh: TranslationKeys = {
   accessibilityAddResource: '添加资源',
   accessibilityAddStore: '添加到商店',
   accessibilityAddTopic: '添加话题',
+  accessibilityChatDirectory: '打开聊天目录',
   accessibilityOpenStore: '打开商店',
-  accessibilityCreateMenu: '创建新会话或助手',
+  accessibilityCreateMenu: '创建话题或群聊',
   accessibilityGoBack: '返回',
   accessibilitySave: '保存',
   accessibilitySettings: '会话设置',
@@ -3350,7 +3376,7 @@ const zh: TranslationKeys = {
   themeColorDustBlue: '雾蓝',
 
   homeHeroPlaceholder: '你想做什么？',
-  homeQuickWrite: '新会话',
+  homeQuickWrite: '新话题',
   homeQuickCode: '助手',
   homeQuickAnalyze: '群组',
   homeQuickCreate: '作图',
@@ -3418,7 +3444,7 @@ const zh: TranslationKeys = {
   tagMoveSession: '移动到标签',
   tagNone: '无标签',
   tagDeleteConfirm: '删除标签',
-  tagDeleteDesc: '删除此标签？使用它的会话会变成未打标签。',
+  tagDeleteDesc: '删除此标签？使用它的话题会变成未打标签。',
 
   discoverUseAgent: '使用助手',
   discoverAgentDetail: '助手详情',
@@ -3697,6 +3723,12 @@ const zh: TranslationKeys = {
   resourceDownload: '下载',
   resourceDownloaded: '已保存到本地文件',
   resourceDownloadFailed: '下载失败',
+  resourceCachedLocal: '已缓存到本地',
+  resourceCachingPreview: '正在缓存预览',
+  resourceCollapseAll: '全部收拢',
+  resourceCurrentFolder: '当前文件夹',
+  resourceExpandAll: '全部展开',
+  resourceExplorer: '资源目录',
   resourceOpenExternal: '在浏览器中打开',
   resourcePreviewUnavailable: '无法加载预览',
   resourceDeleteFailed: '删除失败',
