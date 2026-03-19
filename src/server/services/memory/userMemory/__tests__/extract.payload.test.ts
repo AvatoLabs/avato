@@ -54,7 +54,9 @@ describe('normalizeMemoryExtractionPayload', () => {
       userIds: [],
     };
 
-    expect(() => normalizeMemoryExtractionPayload(payload)).toThrow('Missing baseUrl');
+    expect(() => normalizeMemoryExtractionPayload(payload)).toThrow(
+      'Missing baseUrl for memory extraction trigger',
+    );
   });
 });
 

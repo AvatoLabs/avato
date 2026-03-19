@@ -1,11 +1,9 @@
 'use client';
 
 import { useAnalytics } from '@lobehub/analytics/react';
-import { ActionIcon, Flexbox } from '@lobehub/ui';
-import { FlaskConical } from 'lucide-react';
+import { Flexbox } from '@lobehub/ui';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
 import ChangelogModal from '@/components/ChangelogModal';
 import HighlightNotification from '@/components/HighlightNotification';
@@ -14,8 +12,6 @@ import ThemeButton from '@/features/User/UserPanel/ThemeButton';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors/systemStatus';
-import { useUserStore } from '@/store/user';
-import { userGeneralSettingsSelectors } from '@/store/user/slices/settings/selectors';
 
 const PRODUCT_HUNT_NOTIFICATION = {
   actionHref: 'https://www.producthunt.com/products/lobehub?launch=lobehub',
@@ -29,7 +25,6 @@ const Footer = memo(() => {
   const { t } = useTranslation('common');
   const { analytics } = useAnalytics();
 
-  const isDevMode = useUserStore((s) => userGeneralSettingsSelectors.config(s).isDevMode);
   const [isLabsModalOpen, setIsLabsModalOpen] = useState(false);
   const [shouldLoadChangelog, setShouldLoadChangelog] = useState(false);
   const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
@@ -116,18 +111,10 @@ const Footer = memo(() => {
     });
   };
 
-
-
   return (
     <>
       <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={8}>
-        <Flexbox horizontal align={'center'} flex={1} gap={2}>
-          {isDevMode && (
-            <Link to="/eval">
-              <ActionIcon icon={FlaskConical} size={16} title="Evaluation Lab" />
-            </Link>
-          )}
-        </Flexbox>
+        <Flexbox horizontal align={'center'} flex={1} gap={2} />
         <ThemeButton placement={'topCenter'} size={16} />
       </Flexbox>
       <LabsModal open={isLabsModalOpen} onClose={handleCloseLabsModal} />

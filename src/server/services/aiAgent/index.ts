@@ -150,10 +150,9 @@ interface InternalExecAgentParams extends ExecAgentParams {
   userInterventionConfig?: UserInterventionConfig;
   /**
    * Webhook delivery method.
-   * - 'fetch': plain HTTP POST (default)
-   * - 'qstash': deliver via QStash publishJSON for guaranteed delivery
+   * - 'fetch': plain HTTP POST
    */
-  webhookDelivery?: 'fetch' | 'qstash';
+  webhookDelivery?: 'fetch';
 }
 
 /**

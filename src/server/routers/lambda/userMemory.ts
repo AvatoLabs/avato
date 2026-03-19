@@ -289,7 +289,7 @@ export const userMemoryRouter = router({
         };
       }
 
-      const { webhook, upstashWorkflowExtraHeaders } = parseMemoryExtractionConfig();
+      const { triggerExtraHeaders, webhook } = parseMemoryExtractionConfig();
       const baseUrl = webhook.baseUrl || appEnv.INTERNAL_APP_URL || appEnv.APP_URL;
 
       if (!baseUrl) {
@@ -297,14 +297,6 @@ export const userMemoryRouter = router({
           code: 'PRECONDITION_FAILED',
           message:
             'Memory extraction requires APP_URL or MEMORY_USER_MEMORY_WEBHOOK_BASE_URL to be configured',
-        });
-      }
-
-      if (!process.env.QSTASH_TOKEN) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message:
-            'Memory extraction requires QSTASH_TOKEN to be configured. See docs for Upstash QStash setup.',
         });
       }
 
@@ -317,21 +309,21 @@ export const userMemoryRouter = router({
               forceAll: false,
               forceTopics: false,
               fromDate: input.fromDate,
-              mode: 'workflow',
+              mode: 'direct',
               sources: [MemorySourceType.ChatTopic],
               toDate: input.toDate,
               userIds: [ctx.userId],
               userInitiated: true,
             }),
           ),
-          { extraHeaders: upstashWorkflowExtraHeaders },
+          { extraHeaders: triggerExtraHeaders },
         );
       } catch (error) {
         const causeMessage = error instanceof Error ? error.message : String(error);
         await ctx.asyncTaskModel.update(taskId, {
           error: new AsyncTaskError(
             AsyncTaskErrorType.TaskTriggerError,
-            'Failed to schedule memory extraction workflow',
+            'Failed to schedule memory extraction task',
           ),
           status: AsyncTaskStatus.Error,
         });

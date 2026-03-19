@@ -11,6 +11,7 @@ import { appEnv } from '@/envs/app';
 import { AiAgentService } from '@/server/services/aiAgent';
 import { isQueueAgentRuntimeEnabled } from '@/server/services/queue/impls';
 import { SystemAgentService } from '@/server/services/systemAgent';
+import { buildInternalServiceAuthHeaders } from '@/server/utils/internalServiceAuth';
 
 import { formatPrompt as formatPromptUtil } from './formatPrompt';
 import {
@@ -322,6 +323,7 @@ export class AgentBridgeService {
       throw new Error('APP_URL is required for queue mode bot webhooks');
     }
     const callbackUrl = urlJoin(baseURL, '/api/agent/webhooks/bot-callback');
+    buildInternalServiceAuthHeaders();
 
     // Shared webhook body with bot context
     // reactionChannelId: the Discord channel where the user message lives (for reaction removal).
@@ -362,7 +364,7 @@ export class AgentBridgeService {
       title: '',
       trigger,
       userInterventionConfig: { approvalMode: 'headless' },
-      webhookDelivery: 'qstash',
+      webhookDelivery: 'fetch',
     });
 
     log(

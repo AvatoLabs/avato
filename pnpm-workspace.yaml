@@ -19,4 +19,3 @@ overrides:
 
 patchedDependencies:
   '@swagger-api/apidom-reference': patches/@swagger-api__apidom-reference.patch
-  '@upstash/qstash': patches/@upstash__qstash.patch

@@ -20,14 +20,13 @@ import {
 import { MessageModel } from '@/database/models/message';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
-import { appEnv } from '@/envs/app';
 import { AgentService } from '@/server/services/agent';
 import { AgentRuntimeService } from '@/server/services/agentRuntime/AgentRuntimeService';
-import { AiAgentService } from '@/server/services/aiAgent';
-import { AgentEvalRunWorkflow } from '@/server/workflows/agentEvalRun';
 
 /** Round cost to at most 6 decimal places to avoid floating-point noise */
 const roundCost = (v: number): number => Math.round(v * 1e6) / 1e6;
+const AGENT_EVAL_EXECUTION_REMOVED_ERROR =
+  'Agent Eval execution has been removed from this deployment.';
 
 export class AgentEvalRunService {
   private readonly db: LobeChatDatabase;
@@ -238,7 +237,7 @@ export class AgentEvalRunService {
     return { envPrompt, run, testCase };
   }
 
-  async executeTrajectory(params: {
+  async executeTrajectory(_params: {
     envPrompt?: string;
     run: {
       config?: EvalRunConfig | null;
@@ -249,71 +248,14 @@ export class AgentEvalRunService {
     testCase: { content: { input?: string }; sortOrder?: number | null };
     testCaseId: string;
   }) {
-    const { envPrompt, run, runId, testCaseId } = params;
-
-    // Look up the pre-created RunTopic (created during createRun)
-    const runTopic = await this.runTopicModel.findByRunAndTestCase(runId, testCaseId);
-    if (!runTopic) {
-      throw new Error(`RunTopic not found for run=${runId} testCase=${testCaseId}`);
-    }
-
-    const topicId = runTopic.topicId;
-
-    // Update status from 'pending' to 'running'
-    await this.runTopicModel.updateByRunAndTopic(runId, topicId, { status: 'running' });
-
-    const aiAgentService = new AiAgentService(this.db, this.userId);
-    const webhookUrl = new URL(
-      '/api/workflows/agent-eval-run/on-trajectory-complete',
-      appEnv.APP_URL,
-    ).toString();
-
-    try {
-      const execResult = await aiAgentService.execAgent({
-        agentId: run.targetAgentId ?? undefined,
-        appContext: { topicId },
-        autoStart: true,
-        completionWebhook: {
-          body: { runId, testCaseId, userId: this.userId },
-          url: webhookUrl,
-        },
-        ...(envPrompt && { evalContext: { envPrompt } }),
-        maxSteps: run.config?.maxSteps,
-        prompt: params.testCase.content.input || '',
-        userInterventionConfig: { approvalMode: 'headless' },
-      });
-
-      if (execResult?.operationId) {
-        await this.runTopicModel.updateByRunAndTopic(runId, topicId, {
-          evalResult: { operationId: execResult.operationId, rubricScores: [] },
-        });
-      }
-
-      return { topicId };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Agent execution failed to start';
-      console.error(
-        `[run-agent-trajectory] execAgent failed for run=${runId} testCase=${testCaseId}:`,
-        error,
-      );
-
-      await this.runTopicModel.updateByRunAndTopic(runId, topicId, {
-        evalResult: { completionReason: 'error', error: errorMessage, rubricScores: [] },
-        passed: false,
-        score: 0,
-        status: 'error',
-      });
-
-      return { error: errorMessage, topicId };
-    }
+    throw new Error(AGENT_EVAL_EXECUTION_REMOVED_ERROR);
   }
 
   /**
    * Execute a test case with K threads (for pass@k).
    * Creates K threads in the pre-existing topic, then triggers K run-thread-trajectory workflows.
    */
-  async executeMultiThreadTrajectory(params: {
+  async executeMultiThreadTrajectory(_params: {
     k: number;
     run: {
       config?: EvalRunConfig | null;
@@ -323,49 +265,14 @@ export class AgentEvalRunService {
     runId: string;
     testCaseId: string;
   }) {
-    const { k, runId, testCaseId } = params;
-
-    const runTopic = await this.runTopicModel.findByRunAndTestCase(runId, testCaseId);
-    if (!runTopic) {
-      throw new Error(`RunTopic not found for run=${runId} testCase=${testCaseId}`);
-    }
-
-    const topicId = runTopic.topicId;
-
-    // Update status from 'pending' to 'running'
-    await this.runTopicModel.updateByRunAndTopic(runId, topicId, { status: 'running' });
-
-    // Create K threads in the topic
-    const threadIds: string[] = [];
-    for (let i = 0; i < k; i++) {
-      const thread = await this.threadModel.create({
-        topicId,
-        type: 'eval',
-      });
-      if (thread) threadIds.push(thread.id);
-    }
-
-    // Trigger K run-thread-trajectory workflows in parallel
-    await Promise.all(
-      threadIds.map((threadId) =>
-        AgentEvalRunWorkflow.triggerRunThreadTrajectory({
-          runId,
-          testCaseId,
-          threadId,
-          topicId,
-          userId: this.userId,
-        }),
-      ),
-    );
-
-    return { threadIds, topicId };
+    throw new Error(AGENT_EVAL_EXECUTION_REMOVED_ERROR);
   }
 
   /**
    * Execute a single thread trajectory (for pass@k).
    * Calls execAgent with topicId + threadId, webhook points to on-thread-complete.
    */
-  async executeThreadTrajectory(params: {
+  async executeThreadTrajectory(_params: {
     envPrompt?: string;
     run: {
       config?: EvalRunConfig | null;
@@ -377,58 +284,7 @@ export class AgentEvalRunService {
     threadId: string;
     topicId: string;
   }) {
-    const { envPrompt, run, runId, testCaseId, threadId, topicId } = params;
-
-    const aiAgentService = new AiAgentService(this.db, this.userId);
-    const webhookUrl = new URL(
-      '/api/workflows/agent-eval-run/on-thread-complete',
-      appEnv.APP_URL,
-    ).toString();
-
-    try {
-      const execResult = await aiAgentService.execAgent({
-        agentId: run.targetAgentId ?? undefined,
-        appContext: { threadId, topicId },
-        autoStart: true,
-        completionWebhook: {
-          body: { runId, testCaseId, threadId, topicId, userId: this.userId },
-          url: webhookUrl,
-        },
-        ...(envPrompt && { evalContext: { envPrompt } }),
-        maxSteps: run.config?.maxSteps,
-        prompt: params.testCase.content.input || '',
-        userInterventionConfig: { approvalMode: 'headless' },
-      });
-
-      // Write operationId to thread metadata
-      if (execResult?.operationId) {
-        await this.threadModel.update(threadId, {
-          metadata: { operationId: execResult.operationId, testCaseId },
-        } as any);
-      }
-
-      return { threadId, topicId };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Thread execution failed to start';
-      console.error(
-        `[run-thread-trajectory] execAgent failed for run=${runId} thread=${threadId}:`,
-        error,
-      );
-
-      // Write error to thread metadata so it counts as "completed" for aggregation
-      await this.threadModel.update(threadId, {
-        metadata: {
-          completedAt: new Date().toISOString(),
-          error: errorMessage,
-          passed: false,
-          score: 0,
-          testCaseId,
-        },
-      } as any);
-
-      return { error: errorMessage, threadId, topicId };
-    }
+    throw new Error(AGENT_EVAL_EXECUTION_REMOVED_ERROR);
   }
 
   /**

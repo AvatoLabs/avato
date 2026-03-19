@@ -6,38 +6,20 @@ import { type QueueServiceImpl } from './type';
 const log = debug('queue:local');
 
 /**
- * Callback type for local execution
- * This is set by AgentRuntimeService to avoid circular dependency
- */
-export type LocalExecutionCallback = (
-  operationId: string,
-  stepIndex: number,
-  context: any,
-) => Promise<void>;
-
-/**
  * Local queue service implementation
  *
- * Instead of scheduling HTTP requests (like QStashQueueServiceImpl),
- * this implementation uses setTimeout to schedule execution callbacks,
+ * Instead of scheduling external HTTP requests,
+ * this implementation uses setTimeout to schedule local execution,
  * allowing the event loop to continue between steps.
  *
- * Use case: Local development without QStash
+ * Use case: local development and single-process deployments
  */
 export class LocalQueueServiceImpl implements QueueServiceImpl {
-  private executionCallback: LocalExecutionCallback | null = null;
   private pendingExecutions: Set<string> = new Set();
-
-  /**
-   * Set the execution callback (called by AgentRuntimeService)
-   * This breaks the circular dependency by using callback injection
-   */
-  setExecutionCallback(callback: LocalExecutionCallback): void {
-    this.executionCallback = callback;
-  }
+  private scheduledExecutions: Map<string, NodeJS.Timeout> = new Map();
 
   async scheduleMessage(message: QueueMessage): Promise<string> {
-    const { operationId, stepIndex, context, delay = 50 } = message;
+    const { operationId, stepIndex, delay = 50 } = message;
 
     const taskId = `local-${operationId}-${stepIndex}-${Date.now()}`;
 
@@ -50,17 +32,24 @@ export class LocalQueueServiceImpl implements QueueServiceImpl {
 
     // Use setTimeout to allow the current call stack to complete
     // This is important for createOperation to return before execution starts
-    setTimeout(async () => {
-      if (!this.executionCallback) {
-        log('Warning: No execution callback set for local queue service');
-        return;
-      }
+    const timer = setTimeout(async () => {
+      this.scheduledExecutions.delete(taskId);
 
       this.pendingExecutions.add(taskId);
 
       try {
-        log('Starting local execution for step %d of operation %s', stepIndex, operationId);
-        await this.executionCallback(operationId, stepIndex, context);
+        const { executeQueuedMessage } = await import('../worker');
+        const result = await executeQueuedMessage(message);
+
+        if (result.locked) {
+          log('Step %d of operation %s is locked, rescheduling locally', stepIndex, operationId);
+          await this.scheduleMessage({
+            ...message,
+            delay: Math.max(message.delay ?? 1000, 1000),
+          });
+          return;
+        }
+
         log('Completed local execution for step %d of operation %s', stepIndex, operationId);
       } catch (error) {
         log(
@@ -73,6 +62,8 @@ export class LocalQueueServiceImpl implements QueueServiceImpl {
         this.pendingExecutions.delete(taskId);
       }
     }, delay);
+
+    this.scheduledExecutions.set(taskId, timer);
 
     return taskId;
   }
@@ -90,24 +81,27 @@ export class LocalQueueServiceImpl implements QueueServiceImpl {
   }
 
   async cancelScheduledTask(taskId: string): Promise<void> {
-    // Local execution doesn't support cancellation of scheduled tasks
-    // since they execute via setTimeout
-    log('Cancel requested for task %s (not supported in local mode)', taskId);
+    const timer = this.scheduledExecutions.get(taskId);
+
+    if (!timer) return;
+
+    clearTimeout(timer);
+    this.scheduledExecutions.delete(taskId);
   }
 
   async getQueueStats(): Promise<QueueStats> {
     return {
       completedCount: 0,
       failedCount: 0,
-      pendingCount: this.pendingExecutions.size,
-      processingCount: 0,
+      pendingCount: this.scheduledExecutions.size,
+      processingCount: this.pendingExecutions.size,
     };
   }
 
   async healthCheck(): Promise<HealthCheckResult> {
     return {
       healthy: true,
-      message: `Local queue service healthy, ${this.pendingExecutions.size} pending executions`,
+      message: `Local queue service healthy, ${this.scheduledExecutions.size} pending executions`,
     };
   }
 }

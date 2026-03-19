@@ -61,7 +61,7 @@ export interface MemoryExtractionPrivateConfig {
     region?: string;
     secretAccessKey?: string;
   };
-  upstashWorkflowExtraHeaders?: Record<string, string>;
+  triggerExtraHeaders?: Record<string, string>;
   webhook: {
     baseUrl?: string;
     headers?: Record<string, string>;
@@ -234,9 +234,7 @@ export const parseMemoryExtractionConfig = (): MemoryExtractionPrivateConfig => 
       return acc;
     }, {});
 
-  const upstashWorkflowExtraHeaders = process.env.MEMORY_USER_MEMORY_WORKFLOW_EXTRA_HEADERS?.split(
-    ',',
-  )
+  const triggerExtraHeaders = process.env.MEMORY_USER_MEMORY_WORKFLOW_EXTRA_HEADERS?.split(',')
     .filter(Boolean)
     .reduce<Record<string, string>>((acc, pair) => {
       const [key, value] = pair.split('=').map((s) => s.trim());
@@ -279,7 +277,7 @@ export const parseMemoryExtractionConfig = (): MemoryExtractionPrivateConfig => 
     embeddingPreferredProviders,
     featureFlags,
     observabilityS3: extractorObservabilityS3,
-    upstashWorkflowExtraHeaders,
+    triggerExtraHeaders,
     webhook: {
       baseUrl: process.env.MEMORY_USER_MEMORY_WEBHOOK_BASE_URL,
       headers: webhookHeaders,

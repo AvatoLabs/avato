@@ -13,7 +13,6 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentEvalRunService } from '@/server/services/agentEvalRun';
 import { FileService } from '@/server/services/file';
-import { AgentEvalRunWorkflow } from '@/server/workflows/agentEvalRun';
 
 const rubricTypeSchema = z.enum([
   'equals',
@@ -707,30 +706,11 @@ export const agentEvalRouter = router({
         force: z.boolean().default(false).optional(),
       }),
     )
-    .mutation(async ({ input, ctx }) => {
-      const { id: runId, force } = input;
-
-      // Get run to validate ownership and status
-      const run = await ctx.runModel.findById(runId);
-      if (!run) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Run not found' });
-      }
-
-      // Check run status
-      if (run.status === 'running' && !force) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Run is already running. Use force=true to restart.',
-        });
-      }
-
-      // Set status to pending immediately so frontend gets feedback
-      await ctx.runModel.update(runId, { status: 'pending' });
-
-      // Trigger workflow
-      await AgentEvalRunWorkflow.triggerRunBenchmark({ force, runId, userId: ctx.userId });
-
-      return { success: true, runId };
+    .mutation(async ({ input }) => {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Agent Eval is not available in this deployment. Cannot start run ${input.id}.`,
+      });
     }),
 
   /**
@@ -759,50 +739,20 @@ export const agentEvalRouter = router({
 
   retryRunErrors: agentEvalProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const run = await ctx.runModel.findById(input.id);
-      if (!run) throw new TRPCError({ code: 'NOT_FOUND', message: 'Run not found' });
-
-      if (!['completed', 'failed', 'aborted'].includes(run.status)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Cannot retry: status=${run.status}`,
-        });
-      }
-
-      const { retryCount } = await ctx.runService.retryErrorCases(input.id);
-
-      await AgentEvalRunWorkflow.triggerRunBenchmark({
-        force: true,
-        runId: input.id,
-        userId: ctx.userId,
+    .mutation(async ({ input }) => {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Agent Eval is not available in this deployment. Cannot retry run ${input.id}.`,
       });
-
-      return { retryCount, runId: input.id, success: true };
     }),
 
   retryRunCase: agentEvalProcedure
     .input(z.object({ runId: z.string(), testCaseId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const run = await ctx.runModel.findById(input.runId);
-      if (!run) throw new TRPCError({ code: 'NOT_FOUND', message: 'Run not found' });
-
-      if (!['completed', 'failed', 'aborted', 'running'].includes(run.status)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Cannot retry case: run status=${run.status}`,
-        });
-      }
-
-      await ctx.runService.retrySingleCase(input.runId, input.testCaseId);
-
-      await AgentEvalRunWorkflow.triggerExecuteTestCase({
-        runId: input.runId,
-        testCaseId: input.testCaseId,
-        userId: ctx.userId,
+    .mutation(async ({ input }) => {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Agent Eval is not available in this deployment. Cannot retry case ${input.testCaseId}.`,
       });
-
-      return { runId: input.runId, success: true, testCaseId: input.testCaseId };
     }),
 
   /**

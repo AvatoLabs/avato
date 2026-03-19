@@ -173,7 +173,6 @@ export function defineConfig() {
     '/api/file/upload',
     '/api/mobile-auth(.*)',
     '/api/webhooks(.*)',
-    '/api/workflows(.*)',
     '/api/agent(.*)',
     '/api/dev(.*)',
     '/webapi(.*)',

@@ -2,21 +2,8 @@ import debug from 'debug';
 
 import { AgentEvalRunTopicModel } from '@/database/models/agentEval';
 import type { LobeChatDatabase } from '@/database/type';
-import { workflowClient } from '@/libs/qstash';
 
 const log = debug('lobe-server:workflows:agent-eval-run');
-
-// Workflow paths
-const WORKFLOW_PATHS = {
-  executeTestCase: '/api/workflows/agent-eval-run/execute-test-case',
-  finalizeRun: '/api/workflows/agent-eval-run/finalize-run',
-  onThreadComplete: '/api/workflows/agent-eval-run/on-thread-complete',
-  onTrajectoryComplete: '/api/workflows/agent-eval-run/on-trajectory-complete',
-  paginateTestCases: '/api/workflows/agent-eval-run/paginate-test-cases',
-  runAgentTrajectory: '/api/workflows/agent-eval-run/run-agent-trajectory',
-  runBenchmark: '/api/workflows/agent-eval-run/run-benchmark',
-  runThreadTrajectory: '/api/workflows/agent-eval-run/run-thread-trajectory',
-} as const;
 
 // Workflow payload types
 export interface RunBenchmarkPayload {
@@ -93,14 +80,8 @@ export interface OnThreadCompletePayload {
   userId: string;
 }
 
-/**
- * Get workflow URL using APP_URL
- */
-const getWorkflowUrl = (path: string): string => {
-  const baseUrl = process.env.APP_URL;
-  if (!baseUrl) throw new Error('APP_URL is required to trigger workflows');
-  return new URL(path, baseUrl).toString();
-};
+const createUnavailableError = () =>
+  new Error('Agent Eval execution has been removed from this deployment.');
 
 /**
  * Agent Eval Run Workflow
@@ -112,67 +93,61 @@ export class AgentEvalRunWorkflow {
    * Trigger workflow to run benchmark (entry point)
    */
   static triggerRunBenchmark(payload: RunBenchmarkPayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.runBenchmark);
-    log('Triggering run-benchmark workflow for run: %s', payload.runId);
-    return workflowClient.trigger({ body: payload, url });
+    log('Agent Eval workflow trigger blocked for run: %s', payload.runId);
+    throw createUnavailableError();
   }
 
   /**
    * Trigger workflow to paginate test cases
    */
   static triggerPaginateTestCases(payload: PaginateTestCasesPayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.paginateTestCases);
-    log('Triggering paginate-test-cases workflow for run: %s', payload.runId);
-    return workflowClient.trigger({ body: payload, url });
+    log('Agent Eval pagination workflow blocked for run: %s', payload.runId);
+    throw createUnavailableError();
   }
 
   /**
    * Trigger workflow to execute a test case K times
    */
   static triggerExecuteTestCase(payload: ExecuteTestCasePayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.executeTestCase);
     log(
-      'Triggering execute-test-case workflow: run=%s, testCase=%s',
+      'Agent Eval case execution blocked: run=%s, testCase=%s',
       payload.runId,
       payload.testCaseId,
     );
-    return workflowClient.trigger({ body: payload, url });
+    throw createUnavailableError();
   }
 
   /**
    * Trigger workflow to run a single agent trajectory
    */
   static triggerRunAgentTrajectory(payload: RunAgentTrajectoryPayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.runAgentTrajectory);
     log(
-      'Triggering run-agent-trajectory workflow: run=%s, testCase=%s',
+      'Agent Eval trajectory workflow blocked: run=%s, testCase=%s',
       payload.runId,
       payload.testCaseId,
     );
-    return workflowClient.trigger({ body: payload, url });
+    throw createUnavailableError();
   }
 
   /**
    * Trigger workflow to run a single thread trajectory (for pass@k)
    */
   static triggerRunThreadTrajectory(payload: RunThreadTrajectoryPayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.runThreadTrajectory);
     log(
-      'Triggering run-thread-trajectory workflow: run=%s, testCase=%s, thread=%s',
+      'Agent Eval thread workflow blocked: run=%s, testCase=%s, thread=%s',
       payload.runId,
       payload.testCaseId,
       payload.threadId,
     );
-    return workflowClient.trigger({ body: payload, url });
+    throw createUnavailableError();
   }
 
   /**
    * Trigger workflow to finalize run
    */
   static triggerFinalizeRun(payload: FinalizeRunPayload) {
-    const url = getWorkflowUrl(WORKFLOW_PATHS.finalizeRun);
-    log('Triggering finalize-run workflow for run: %s', payload.runId);
-    return workflowClient.trigger({ body: payload, url });
+    log('Agent Eval finalize workflow blocked for run: %s', payload.runId);
+    throw createUnavailableError();
   }
 
   /**

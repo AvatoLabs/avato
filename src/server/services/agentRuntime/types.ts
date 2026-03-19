@@ -118,7 +118,7 @@ export interface AgentExecutionParams {
 export interface AgentExecutionResult {
   /**
    * When true, the step was already being executed by another instance (lock conflict).
-   * The caller should return 429 to force QStash to retry later.
+   * The caller should return 429 so the scheduler can retry later.
    */
   locked?: boolean;
   nextStepScheduled: boolean;
@@ -140,7 +140,7 @@ export interface OperationCreationParams {
   /**
    * Completion webhook configuration
    * When set, an HTTP POST will be fired when the operation completes (success or error).
-   * The webhook is persisted in Redis state so it survives across QStash step boundaries.
+   * The webhook is persisted in Redis state so it survives across queued step boundaries.
    */
   completionWebhook?: {
     body?: Record<string, unknown>;
@@ -164,7 +164,7 @@ export interface OperationCreationParams {
   /**
    * Step webhook configuration
    * When set, an HTTP POST will be fired after each step completes.
-   * Persisted in Redis state so it survives across QStash step boundaries.
+   * Persisted in Redis state so it survives across queued step boundaries.
    */
   stepWebhook?: {
     body?: Record<string, unknown>;
@@ -189,10 +189,9 @@ export interface OperationCreationParams {
   userTimezone?: string;
   /**
    * Webhook delivery method.
-   * - 'fetch': plain HTTP POST (default)
-   * - 'qstash': deliver via QStash publishJSON for guaranteed delivery
+   * - 'fetch': plain HTTP POST
    */
-  webhookDelivery?: 'fetch' | 'qstash';
+  webhookDelivery?: 'fetch';
 }
 
 export interface OperationCreationResult {

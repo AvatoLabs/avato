@@ -10,6 +10,26 @@ vi.mock('@/envs/app', () => ({
   appEnv: mockAppEnv,
 }));
 
+vi.mock('@/server/modules/AgentRuntime/redis', () => ({
+  getAgentRuntimeRedisClient: vi.fn(() => ({
+    hdel: vi.fn().mockResolvedValue(1),
+    hget: vi.fn().mockResolvedValue(null),
+    hset: vi.fn().mockResolvedValue(1),
+    multi: vi.fn(() => ({
+      exec: vi.fn().mockResolvedValue([]),
+      hdel: vi.fn().mockReturnThis(),
+      hset: vi.fn().mockReturnThis(),
+      zadd: vi.fn().mockReturnThis(),
+      zrem: vi.fn().mockReturnThis(),
+    })),
+    ping: vi.fn().mockResolvedValue('PONG'),
+    zadd: vi.fn().mockResolvedValue(1),
+    zcard: vi.fn().mockResolvedValue(0),
+    zrangebyscore: vi.fn().mockResolvedValue([]),
+    zrem: vi.fn().mockResolvedValue(0),
+  })),
+}));
+
 describe('QueueService', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -109,42 +129,22 @@ describe('QueueService', () => {
   });
 
   describe('Queue Mode (AGENT_RUNTIME_MODE=queue)', () => {
-    it('should throw error when QSTASH_TOKEN is not set', async () => {
+    it('should create RedisQueueServiceImpl when queue mode is enabled', async () => {
       mockAppEnv.enableQueueAgentRuntime = true;
-      delete process.env.QSTASH_TOKEN;
-
-      const { createQueueServiceModule } = await import('../impls');
-
-      expect(() => createQueueServiceModule()).toThrow(
-        'QSTASH_TOKEN is required when AGENT_RUNTIME_MODE=queue',
-      );
-    });
-
-    it('should create QStashQueueServiceImpl when QSTASH_TOKEN is set', async () => {
-      mockAppEnv.enableQueueAgentRuntime = true;
-      process.env.QSTASH_TOKEN = 'test-qstash-token';
-
       const { createQueueServiceModule } = await import('../impls');
       const impl = createQueueServiceModule();
 
       expect(impl).not.toBeNull();
-      expect(impl?.constructor.name).toBe('QStashQueueServiceImpl');
-
-      // Cleanup
-      delete process.env.QSTASH_TOKEN;
+      expect(impl?.constructor.name).toBe('RedisQueueServiceImpl');
     });
 
     it('should return false for isLocalExecution when in queue mode', async () => {
       mockAppEnv.enableQueueAgentRuntime = true;
-      process.env.QSTASH_TOKEN = 'test-qstash-token';
 
       const { QueueService } = await import('../QueueService');
       const service = new QueueService();
 
       expect(service.isLocalExecution()).toBe(false);
-
-      // Cleanup
-      delete process.env.QSTASH_TOKEN;
     });
   });
 

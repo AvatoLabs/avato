@@ -2,27 +2,26 @@ import debug from 'debug';
 import { NextResponse } from 'next/server';
 
 import { getServerDB } from '@/database/core/db-adaptor';
-import { verifyQStashSignature } from '@/libs/qstash';
 import { BotCallbackService } from '@/server/services/bot/BotCallbackService';
+import { isValidInternalServiceAuth } from '@/server/utils/internalServiceAuth';
 
 const log = debug('api-route:agent:bot-callback');
 
 /**
  * Bot callback endpoint for agent step/completion webhooks.
  *
- * In queue mode, AgentRuntimeService fires webhooks (via QStash) after each step
- * and on completion. This endpoint verifies the signature and delegates to BotCallbackService.
+ * In queue mode, AgentRuntimeService fires internal webhooks after each step
+ * and on completion. This endpoint verifies internal service auth and delegates
+ * to BotCallbackService.
  *
  * Route: POST /api/agent/webhooks/bot-callback
  */
 export async function POST(request: Request): Promise<Response> {
-  const rawBody = await request.text();
-
-  const isValid = await verifyQStashSignature(request, rawBody);
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  if (!isValidInternalServiceAuth(request.headers.get('authorization'))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const rawBody = await request.text();
   const body = JSON.parse(rawBody);
 
   const { type, applicationId, platformThreadId, progressMessageId } = body;

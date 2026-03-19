@@ -82,8 +82,8 @@ vi.mock('@/envs/app', () => ({
 
 vi.mock('@/server/globalConfig/parseMemoryExtractionConfig', () => ({
   parseMemoryExtractionConfig: vi.fn(() => ({
+    triggerExtraHeaders: { 'x-test': 'ok' },
     webhook: { baseUrl: 'https://internal.example.com' },
-    upstashWorkflowExtraHeaders: { 'x-test': 'ok' },
   })),
 }));
 
@@ -144,7 +144,10 @@ describe('userMemoryRouter.requestMemoryFromChatTopic', () => {
     expect(mockCreate).toHaveBeenCalledWith({
       metadata: {
         progress: { completedTopics: 0, totalTopics: 2 },
-        range: { from: new Date('2024-01-01').toISOString(), to: new Date('2024-02-01').toISOString() },
+        range: {
+          from: new Date('2024-01-01').toISOString(),
+          to: new Date('2024-02-01').toISOString(),
+        },
         source: 'chat_topic',
       },
       status: AsyncTaskStatus.Pending,

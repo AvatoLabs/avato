@@ -3,7 +3,6 @@ import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { getServerDB } from '@/database/core/db-adaptor';
-import { verifyQStashSignature } from '@/libs/qstash';
 import { AiAgentService } from '@/server/services/aiAgent';
 
 const log = debug('api-route:agent:exec');
@@ -34,18 +33,13 @@ function verifyApiKey(request: NextRequest): boolean {
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  // Read raw body for signature verification (must be done before parsing JSON)
+  // Read raw body before parsing JSON
   const rawBody = await request.text();
 
-  // Verify authentication - either QStash signature or API key
-  const isValidQStash = await verifyQStashSignature(request, rawBody);
   const isValidApiKey = verifyApiKey(request);
 
-  if (!isValidQStash && !isValidApiKey) {
-    return NextResponse.json(
-      { error: 'Unauthorized - Valid QStash signature or API key required' },
-      { status: 401 },
-    );
+  if (!isValidApiKey) {
+    return NextResponse.json({ error: 'Unauthorized - Valid API key required' }, { status: 401 });
   }
 
   // Parse body after verification

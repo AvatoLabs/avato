@@ -18,9 +18,9 @@ import { type IStreamEventManager } from '@/server/modules/AgentRuntime/types';
 import { mcpService } from '@/server/services/mcp';
 import { PluginGatewayService } from '@/server/services/pluginGateway';
 import { QueueService } from '@/server/services/queue';
-import { LocalQueueServiceImpl } from '@/server/services/queue/impls';
 import { ToolExecutionService } from '@/server/services/toolExecution';
 import { BuiltinToolsExecutor } from '@/server/services/toolExecution/builtin';
+import { buildInternalServiceAuthHeaders } from '@/server/utils/internalServiceAuth';
 
 import {
   type AgentExecutionParams,
@@ -42,6 +42,7 @@ if (process.env.VERCEL) {
 }
 
 const log = debug('lobe-server:agent-runtime-service');
+const INTERNAL_BOT_CALLBACK_PATH = '/api/agent/webhooks/bot-callback';
 
 const hasUsableAssistantContent = (content?: string) => {
   const trimmed = typeof content === 'string' ? content.trim() : '';
@@ -164,30 +165,6 @@ export class AgentRuntimeService {
       mcpService,
       pluginGatewayService,
     });
-
-    // Setup local execution callback for LocalQueueServiceImpl
-    this.setupLocalExecutionCallback();
-  }
-
-  /**
-   * Setup execution callback for LocalQueueServiceImpl
-   * This breaks the circular dependency by using callback injection
-   */
-  private setupLocalExecutionCallback(): void {
-    if (!this.queueService) return;
-
-    const impl = this.queueService.getImpl();
-    if (impl instanceof LocalQueueServiceImpl) {
-      log('Setting up local execution callback');
-      impl.setExecutionCallback(async (operationId, stepIndex, context) => {
-        log('[%s][%d] Local callback executing...', operationId, stepIndex);
-        await this.executeStep({
-          context,
-          operationId,
-          stepIndex,
-        });
-      });
-    }
   }
 
   // ==================== Step Lifecycle Callbacks ====================
@@ -356,8 +333,8 @@ export class AgentRuntimeService {
 
       if (autoStart && this.queueService) {
         // Both local and queue modes use scheduleMessage
-        // LocalQueueServiceImpl uses setTimeout + callback mechanism
-        // QStashQueueServiceImpl schedules HTTP requests
+        // Local mode uses setTimeout
+        // Queue mode uses the internal Redis-backed scheduler
         messageId = await this.queueService.scheduleMessage({
           context: initialContext,
           delay: 50, // Short delay for startup
@@ -390,7 +367,7 @@ export class AgentRuntimeService {
 
     const callbacks = this.getStepCallbacks(operationId);
 
-    // ===== Distributed lock: prevent duplicate execution from QStash retries =====
+    // ===== Distributed lock: prevent duplicate execution from worker retries =====
     const claimed = await this.coordinator.tryClaimStep(operationId, stepIndex, 35);
     if (!claimed) {
       log(
@@ -983,7 +960,7 @@ export class AgentRuntimeService {
     } finally {
       // Release lock so legitimate retries or next operations can proceed.
       // If Vercel force-kills the process, this won't execute — the lock
-      // auto-expires after TTL (35s), allowing QStash retries to self-heal.
+      // auto-expires after TTL (35s), allowing queued retries to self-heal.
       await this.coordinator.releaseStepLock(operationId, stepIndex);
     }
   }
@@ -1489,36 +1466,44 @@ export class AgentRuntimeService {
     return { newState: state, nextContext: undefined };
   }
 
+  private getWebhookHeaders(url: string): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+    let pathname: string | undefined;
+
+    try {
+      pathname = new URL(url).pathname;
+    } catch {
+      pathname = undefined;
+    }
+
+    if (pathname === INTERNAL_BOT_CALLBACK_PATH) {
+      Object.assign(headers, buildInternalServiceAuthHeaders());
+
+      if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+        headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+      }
+    }
+
+    return headers;
+  }
+
   /**
-   * Deliver a webhook payload via fetch or QStash.
+   * Deliver a webhook payload via fetch.
    * Fire-and-forget: errors are logged but never thrown.
    */
   private async deliverWebhook(
     url: string,
     payload: Record<string, unknown>,
-    delivery: 'fetch' | 'qstash' = 'fetch',
+    delivery: 'fetch' = 'fetch',
     operationId: string,
   ): Promise<void> {
     try {
-      if (delivery === 'qstash') {
-        const { Client } = await import('@upstash/qstash');
-        const client = new Client({ token: process.env.QSTASH_TOKEN! });
-        await client.publishJSON({
-          body: payload,
-          headers: {
-            ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET && {
-              'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-            }),
-          },
-          url,
-        });
-      } else {
-        await fetch(url, {
-          body: JSON.stringify(payload),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'POST',
-        });
-      }
+      await fetch(url, {
+        body: JSON.stringify(payload),
+        headers: this.getWebhookHeaders(url),
+        method: 'POST',
+      });
     } catch (error) {
       console.error('[%s] Webhook delivery failed (%s → %s):', operationId, delivery, url, error);
     }

@@ -31,14 +31,6 @@ import CommunityListMcpLayout from '@/routes/(main)/community/(list)/mcp/_layout
 import CommunityListModelPage from '@/routes/(main)/community/(list)/model';
 import CommunityListModelLayout from '@/routes/(main)/community/(list)/model/_layout';
 import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider';
-import EvalOverviewPage from '@/routes/(main)/eval';
-import EvalLayout from '@/routes/(main)/eval/_layout';
-import EvalHomeLayout from '@/routes/(main)/eval/(home)/_layout';
-import EvalBenchmarkDetailPage from '@/routes/(main)/eval/bench/[benchmarkId]';
-import EvalBenchLayout from '@/routes/(main)/eval/bench/[benchmarkId]/_layout';
-import EvalDatasetDetailPage from '@/routes/(main)/eval/bench/[benchmarkId]/datasets/[datasetId]';
-import EvalRunDetailPage from '@/routes/(main)/eval/bench/[benchmarkId]/runs/[runId]';
-import EvalCaseDetailPage from '@/routes/(main)/eval/bench/[benchmarkId]/runs/[runId]/cases/[caseId]';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
 import GroupProfilePage from '@/routes/(main)/group/profile';
@@ -347,53 +339,6 @@ export const desktopRoutes: RouteObject[] = [
       },
 
       ...BusinessDesktopRoutesWithMainLayout,
-
-      // Eval routes
-      {
-        children: [
-          // Home (overview)
-          {
-            children: [
-              {
-                element: <EvalOverviewPage />,
-                index: true,
-              },
-            ],
-            element: <EvalHomeLayout />,
-          },
-          // Bench routes (with dedicated sidebar)
-          {
-            children: [
-              {
-                element: <EvalBenchmarkDetailPage />,
-                index: true,
-              },
-              {
-                children: [
-                  {
-                    element: <EvalRunDetailPage />,
-                    index: true,
-                  },
-                  {
-                    element: <EvalCaseDetailPage />,
-                    path: 'cases/:caseId',
-                  },
-                ],
-                path: 'runs/:runId',
-              },
-              {
-                element: <EvalDatasetDetailPage />,
-                path: 'datasets/:datasetId',
-              },
-            ],
-            element: <EvalBenchLayout />,
-            path: 'bench/:benchmarkId',
-          },
-        ],
-        element: <EvalLayout />,
-        errorElement: <ErrorBoundary resetPath="/eval" />,
-        path: 'eval',
-      },
 
       // Pages routes
       {

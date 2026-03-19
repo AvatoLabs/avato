@@ -25,11 +25,11 @@ const normalizeUserPersonaPayload = (
   const parsed = userPersonaWebhookSchema.parse(payload);
   const baseUrl = parsed.baseUrl || fallbackBaseUrl;
 
-  if (!baseUrl) throw new Error('Missing baseUrl for workflow trigger');
+  if (!baseUrl) throw new Error('Missing baseUrl for user persona trigger');
 
   return {
     baseUrl,
-    mode: parsed.mode ?? 'workflow',
+    mode: parsed.mode ?? 'direct',
     userIds: Array.from(
       new Set([...(parsed.userIds || []), ...(parsed.userId ? [parsed.userId] : [])]),
     ).filter(Boolean),
@@ -37,7 +37,7 @@ const normalizeUserPersonaPayload = (
 };
 
 export const POST = async (req: Request) => {
-  const { upstashWorkflowExtraHeaders, webhook } = parseMemoryExtractionConfig();
+  const { triggerExtraHeaders, webhook } = parseMemoryExtractionConfig();
 
   if (webhook.headers && Object.keys(webhook.headers).length > 0) {
     for (const [key, value] of Object.entries(webhook.headers)) {
@@ -66,7 +66,7 @@ export const POST = async (req: Request) => {
           const { workflowRunId } = await MemoryExtractionWorkflowService.triggerPersonaUpdate(
             userId,
             params.baseUrl,
-            { extraHeaders: upstashWorkflowExtraHeaders },
+            { extraHeaders: triggerExtraHeaders },
           );
 
           return { userId, workflowRunId };
@@ -74,7 +74,7 @@ export const POST = async (req: Request) => {
       );
 
       return NextResponse.json(
-        { message: 'User persona update scheduled via workflow.', results },
+        { message: 'User persona update scheduled asynchronously.', results },
         { status: 202 },
       );
     }
