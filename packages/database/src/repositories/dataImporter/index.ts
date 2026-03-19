@@ -82,7 +82,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
     uniqueConstraints: [],
   },
   {
-    table: 'sessionTags',
+    table: 'tags',
     uniqueConstraints: [],
   },
   {
@@ -114,7 +114,7 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       },
       {
         field: 'tagId',
-        sourceTable: 'sessionTags',
+        sourceTable: 'tags',
       },
     ],
     table: 'topics',

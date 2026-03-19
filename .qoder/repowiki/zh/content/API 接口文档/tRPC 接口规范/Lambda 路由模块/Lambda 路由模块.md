@@ -11,6 +11,11 @@
 - [src/server/routers/lambda/topic.ts](file://src/server/routers/lambda/topic.ts)
 - [src/server/routers/lambda/session.ts](file://src/server/routers/lambda/session.ts)
 - [src/server/routers/lambda/user.ts](file://src/server/routers/lambda/user.ts)
+- [apps/mobile/src/lib/titleGeneration.ts](file://apps/mobile/src/lib/titleGeneration.ts)
+- [apps/mobile/src/lib/api.ts](file://apps/mobile/src/lib/api.ts)
+- [packages/context-engine/src/base/constants.ts](file://packages/context-engine/src/base/constants.ts)
+- [packages/memory-user-memory/src/extractors/context.ts](file://packages/memory-user-memory/src/extractors/context.ts)
+- [src/server/services/memory/userMemory/extract.ts](file://src/server/services/memory/userMemory/extract.ts)
 </cite>
 
 ## 目录
@@ -20,16 +25,19 @@
 3. [核心组件](#核心组件)
 4. [架构概览](#架构概览)
 5. [详细组件分析](#详细组件分析)
-6. [依赖关系分析](#依赖关系分析)
-7. [性能考虑](#性能考虑)
-8. [故障排除指南](#故障排除指南)
-9. [结论](#结论)
+6. [标题生成系统重构](#标题生成系统重构)
+7. [依赖关系分析](#依赖关系分析)
+8. [性能考虑](#性能考虑)
+9. [故障排除指南](#故障排除指南)
+10. [结论](#结论)
 
 ## 简介
 
 Lambda 路由模块是 LobeChat tRPC 后端的核心接口层，提供了完整的 AI 聊天和代理管理功能。该模块采用模块化设计，将不同的业务领域分离到独立的路由文件中，实现了高内聚、低耦合的架构。
 
 本模块支持多种 AI 代理模式，包括单代理对话、群组代理协作、批量代理执行等高级特性。通过 tRPC 的强类型系统和自动代码生成，确保了前后端接口的一致性和安全性。
+
+**更新** 本次更新重点关注标题生成系统的重大重构，包括集中式标题上下文提取系统、标题消毒器、移动端标题生成重构等关键变更。
 
 ## 项目结构
 
@@ -49,13 +57,14 @@ Message[message.ts<br/>消息管理]
 Topic[topic.ts<br/>话题管理]
 Session[session.ts<br/>会话管理]
 User[user.ts<br/>用户管理]
+GenerationTopic[generationTopic.ts<br/>生成主题管理]
 end
-subgraph "辅助模块"
-Config[config.ts<br/>配置管理]
-File[file.ts<br/>文件管理]
-Knowledge[knowledgeBase.ts<br/>知识库管理]
-Search[search.ts<br/>搜索服务]
-Upload[upload.ts<br/>上传服务]
+subgraph "标题生成系统"
+TitleGeneration[标题生成核心]
+ContextEngine[上下文引擎]
+ContextExtractor[上下文提取器]
+TitleSanitizer[标题消毒器]
+MobileTitle[移动端标题生成]
 end
 Root --> Agent
 Root --> AgentGroup
@@ -65,20 +74,21 @@ Root --> Message
 Root --> Topic
 Root --> Session
 Root --> User
-Root --> Config
-Root --> File
-Root --> Knowledge
-Root --> Search
-Root --> Upload
+Root --> GenerationTopic
+TitleGeneration --> ContextEngine
+ContextEngine --> ContextExtractor
+ContextEngine --> TitleSanitizer
+MobileTitle --> TitleGeneration
 ```
 
 **图表来源**
 
-- [src/server/routers/lambda/index.ts](file://src/server/routers/lambda/index.ts#L56-L107)
+- [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
+- [apps/mobile/src/lib/titleGeneration.ts:1-64](file://apps/mobile/src/lib/titleGeneration.ts#L1-L64)
 
 **章节来源**
 
-- [src/server/routers/lambda/index.ts](file://src/server/routers/lambda/index.ts#L1-L110)
+- [src/server/routers/lambda/index.ts:1-110](file://src/server/routers/lambda/index.ts#L1-L110)
 
 ## 核心组件
 
@@ -96,11 +106,15 @@ Lambda 路由模块包含以下核心组件：
 
 每个路由在初始化时注入相应的数据模型和服务类，实现依赖注入和解耦。
 
+### 标题生成中间件
+
+新增的标题生成中间件支持智能标题生成和上下文提取功能。
+
 **章节来源**
 
-- [src/server/routers/lambda/agent.ts](file://src/server/routers/lambda/agent.ts#L17-L30)
-- [src/server/routers/lambda/agentGroup.ts](file://src/server/routers/lambda/agentGroup.ts#L42-L54)
-- [src/server/routers/lambda/aiAgent.ts](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
+- [src/server/routers/lambda/agent.ts:17-30](file://src/server/routers/lambda/agent.ts#L17-L30)
+- [src/server/routers/lambda/agentGroup.ts:42-54](file://src/server/routers/lambda/agentGroup.ts#L42-L54)
+- [src/server/routers/lambda/aiAgent.ts:235-248](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
 
 ## 架构概览
 
@@ -111,9 +125,13 @@ graph TD
 subgraph "接口层"
 TRPC[tRPC 路由]
 Validation[输入验证]
+TitleGeneration[标题生成中间件]
 end
 subgraph "业务逻辑层"
 Service[业务服务类]
+ContextEngine[上下文引擎]
+ContextExtractor[上下文提取器]
+TitleSanitizer[标题消毒器]
 Model[数据模型]
 end
 subgraph "数据访问层"
@@ -121,22 +139,29 @@ Database[(数据库)]
 Cache[(缓存)]
 end
 TRPC --> Validation
-Validation --> Service
-Service --> Model
+Validation --> TitleGeneration
+TitleGeneration --> ContextEngine
+ContextEngine --> ContextExtractor
+ContextEngine --> TitleSanitizer
+ContextExtractor --> Model
+TitleSanitizer --> Model
 Model --> Database
 Model --> Cache
 subgraph "外部服务"
 AIProvider[AI 提供商]
 Storage[存储服务]
+MobileApp[移动端应用]
 end
 Service --> AIProvider
 Service --> Storage
+MobileApp --> TRPC
 ```
 
 **图表来源**
 
-- [src/server/routers/lambda/aiChat.ts](file://src/server/routers/lambda/aiChat.ts#L19-L32)
-- [src/server/routers/lambda/aiAgent.ts](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
+- [src/server/routers/lambda/aiChat.ts:19-32](file://src/server/routers/lambda/aiChat.ts#L19-L32)
+- [src/server/routers/lambda/aiAgent.ts:235-248](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
+- [packages/context-engine/src/base/constants.ts:1-21](file://packages/context-engine/src/base/constants.ts#L1-L21)
 
 ## 详细组件分析
 
@@ -162,7 +187,7 @@ Service --> Storage
 
 **章节来源**
 
-- [src/server/routers/lambda/agent.ts](file://src/server/routers/lambda/agent.ts#L32-L370)
+- [src/server/routers/lambda/agent.ts:32-370](file://src/server/routers/lambda/agent.ts#L32-L370)
 
 ### 代理组管理 (agentGroup.ts)
 
@@ -185,7 +210,7 @@ Service --> Storage
 
 **章节来源**
 
-- [src/server/routers/lambda/agentGroup.ts](file://src/server/routers/lambda/agentGroup.ts#L56-L326)
+- [src/server/routers/lambda/agentGroup.ts:56-326](file://src/server/routers/lambda/agentGroup.ts#L56-L326)
 
 ### AI 代理执行 (aiAgent.ts)
 
@@ -225,11 +250,11 @@ Note over Client,Runtime : 支持SSE流式响应
 
 **图表来源**
 
-- [src/server/routers/lambda/aiAgent.ts](file://src/server/routers/lambda/aiAgent.ts#L630-L671)
+- [src/server/routers/lambda/aiAgent.ts:630-671](file://src/server/routers/lambda/aiAgent.ts#L630-L671)
 
 **章节来源**
 
-- [src/server/routers/lambda/aiAgent.ts](file://src/server/routers/lambda/aiAgent.ts#L250-L800)
+- [src/server/routers/lambda/aiAgent.ts:250-800](file://src/server/routers/lambda/aiAgent.ts#L250-L800)
 
 ### AI 聊天服务 (aiChat.ts)
 
@@ -249,7 +274,7 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 
 **章节来源**
 
-- [src/server/routers/lambda/aiChat.ts](file://src/server/routers/lambda/aiChat.ts#L34-L190)
+- [src/server/routers/lambda/aiChat.ts:34-190](file://src/server/routers/lambda/aiChat.ts#L34-L190)
 
 ### 消息管理 (message.ts)
 
@@ -270,7 +295,7 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 
 **章节来源**
 
-- [src/server/routers/lambda/message.ts](file://src/server/routers/lambda/message.ts#L34-L495)
+- [src/server/routers/lambda/message.ts:34-495](file://src/server/routers/lambda/message.ts#L34-L495)
 
 ### 话题管理 (topic.ts)
 
@@ -282,6 +307,7 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 - **主题查询**: 分页查询和搜索
 - **主题克隆**: 复制现有主题
 - **分享功能**: 主题分享和权限管理
+- **智能标题生成**: 基于内容自动生成标题
 
 #### 主要接口
 
@@ -290,10 +316,11 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 - `cloneTopic`: 克隆主题
 - `enableSharing`: 启用分享
 - `disableSharing`: 禁用分享
+- `generateTopicTitle`: 生成主题标题
 
 **章节来源**
 
-- [src/server/routers/lambda/topic.ts](file://src/server/routers/lambda/topic.ts#L40-L528)
+- [src/server/routers/lambda/topic.ts:40-528](file://src/server/routers/lambda/topic.ts#L40-L528)
 
 ### 会话管理 (session.ts)
 
@@ -305,6 +332,7 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 - **会话查询**: 获取会话列表和详情
 - **会话克隆**: 复制现有会话
 - **配置管理**: 会话配置更新
+- **智能标题生成**: 自动生成会话标题
 
 #### 主要接口
 
@@ -313,10 +341,11 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 - `cloneSession`: 克隆会话
 - `updateSession`: 更新会话
 - `updateSessionChatConfig`: 更新聊天配置
+- `generateSessionTitle`: 生成会话标题
 
 **章节来源**
 
-- [src/server/routers/lambda/session.ts](file://src/server/routers/lambda/session.ts#L26-L197)
+- [src/server/routers/lambda/session.ts:26-197](file://src/server/routers/lambda/session.ts#L26-L197)
 
 ### 用户管理 (user.ts)
 
@@ -339,7 +368,156 @@ AI 聊天服务模块处理聊天消息的完整生命周期：
 
 **章节来源**
 
-- [src/server/routers/lambda/user.ts](file://src/server/routers/lambda/user.ts#L47-L230)
+- [src/server/routers/lambda/user.ts:47-230](file://src/server/routers/lambda/user.ts#L47-L230)
+
+### 生成主题管理 (generationTopic.ts)
+
+生成主题管理模块专门处理图像和视频生成主题：
+
+#### 核心功能
+
+- **主题创建**: 创建新的生成主题
+- **主题查询**: 获取所有生成主题
+- **主题更新**: 更新主题信息和封面
+- **主题删除**: 删除生成主题并清理文件
+
+#### 主要接口
+
+- `createTopic`: 创建生成主题
+- `getAllGenerationTopics`: 获取所有生成主题
+- `updateTopic`: 更新主题信息
+- `updateTopicCover`: 更新主题封面
+- `deleteTopic`: 删除主题
+
+**章节来源**
+
+- [src/server/routers/lambda/generationTopic.ts:1-98](file://src/server/routers/lambda/generationTopic.ts#L1-L98)
+
+## 标题生成系统重构
+
+### 集中式标题上下文提取系统
+
+**更新** 新增了集中式的标题上下文提取系统，提供统一的上下文处理能力。
+
+#### 核心组件
+
+##### 上下文引擎常量
+
+上下文引擎提供标准化的上下文注入标记和指令：
+
+```mermaid
+graph TB
+subgraph "上下文引擎"
+SystemContext[SYSTEM_CONTEXT_START<br/>SYSTEM_CONTEXT_END]
+ContextInstruction[CONTEXT_INSTRUCTION]
+ContextWrapper[上下文包装器]
+end
+subgraph "标题生成"
+TitleGeneration[标题生成器]
+ContextExtractor[上下文提取器]
+TitleSanitizer[标题消毒器]
+end
+SystemContext --> ContextWrapper
+ContextInstruction --> ContextExtractor
+ContextWrapper --> TitleGeneration
+ContextExtractor --> TitleSanitizer
+```
+
+**图表来源**
+
+- [packages/context-engine/src/base/constants.ts:1-21](file://packages/context-engine/src/base/constants.ts#L1-L21)
+
+##### 上下文提取器
+
+上下文提取器负责从用户对话中提取相关信息：
+
+- **提取约束**: 使用严格的 JSON Schema 约束提取结果
+- **内存类型**: 支持多种记忆类型的提取（身份、上下文、偏好等）
+- **去重机制**: 防止重复提取相同信息
+- **令牌限制**: 自动处理文本长度限制
+
+**章节来源**
+
+- [packages/memory-user-memory/src/extractors/context.ts:1-100](file://packages/memory-user-memory/src/extractors/context.ts#L1-L100)
+
+### 标题消毒器
+
+**更新** 新增了专门的标题消毒器，确保生成的标题符合规范和安全要求。
+
+#### 功能特性
+
+- **空白字符处理**: 自动去除标题前后的空白字符
+- **特殊字符过滤**: 移除可能引起安全问题的特殊字符
+- **长度验证**: 确保标题长度在合理范围内
+- **编码转换**: 统一标题编码格式
+
+### 移动端标题生成重构
+
+**更新** 移动端标题生成功能进行了全面重构，提供更好的用户体验。
+
+#### 移动端实现
+
+##### 标题生成函数
+
+移动端提供了统一的标题生成入口：
+
+```mermaid
+sequenceDiagram
+participant Mobile as 移动端
+participant API as 标题生成API
+participant Store as 状态管理
+participant Server as 服务器
+Mobile->>API : generateBestTitle()
+API->>Server : 调用后端接口
+Server-->>API : 返回生成的标题
+API->>Store : 更新本地状态
+API-->>Mobile : 返回结果
+Note over Mobile,Store : 支持会话和主题两种模式
+```
+
+**图表来源**
+
+- [apps/mobile/src/lib/titleGeneration.ts:1-64](file://apps/mobile/src/lib/titleGeneration.ts#L1-L64)
+
+##### API 接口
+
+移动端提供了简洁的 API 接口：
+
+- **generateTitle(sessionId)**: 生成会话标题
+- **generateTitle(topicId)**: 生成主题标题
+- **智能选择目标**: 自动判断生成目标类型
+- **错误处理**: 完善的错误捕获和提示
+
+**章节来源**
+
+- [apps/mobile/src/lib/api.ts:770-969](file://apps/mobile/src/lib/api.ts#L770-L969)
+- [apps/mobile/src/lib/api.ts:1780-1979](file://apps/mobile/src/lib/api.ts#L1780-L1979)
+
+### 标题生成流程
+
+**更新** 新增了完整的标题生成流程，从上下文提取到最终输出的完整链路。
+
+```mermaid
+flowchart TD
+A[用户触发标题生成] --> B{确定生成目标}
+B --> |会话| C[获取会话上下文]
+B --> |主题| D[获取主题上下文]
+C --> E[构建上下文提取器]
+D --> E
+E --> F[提取关键信息]
+F --> G[生成候选标题]
+G --> H[标题消毒处理]
+H --> I[返回最佳标题]
+I --> J[更新UI状态]
+```
+
+**图表来源**
+
+- [apps/mobile/src/lib/titleGeneration.ts:17-63](file://apps/mobile/src/lib/titleGeneration.ts#L17-L63)
+
+**章节来源**
+
+- [src/server/services/memory/userMemory/extract.ts:1200-2100](file://src/server/services/memory/userMemory/extract.ts#L1200-L2100)
 
 ## 依赖关系分析
 
@@ -356,6 +534,7 @@ MessageRouter[messageRouter]
 TopicRouter[topicRouter]
 SessionRouter[sessionRouter]
 UserRouter[userRouter]
+GenerationTopicRouter[generationTopicRouter]
 end
 subgraph "服务层"
 AgentService[AgentService]
@@ -366,6 +545,9 @@ MessageService[MessageService]
 TopicService[TopicService]
 SessionService[SessionService]
 UserService[UserService]
+GenerationTopicService[GenerationTopicService]
+ContextEngineService[ContextEngineService]
+TitleGenerationService[TitleGenerationService]
 end
 subgraph "数据层"
 AgentModel[AgentModel]
@@ -374,6 +556,8 @@ MessageModel[MessageModel]
 TopicModel[TopicModel]
 SessionModel[SessionModel]
 UserModel[UserModel]
+GenerationTopicModel[GenerationTopicModel]
+ContextExtractorModel[ContextExtractorModel]
 end
 subgraph "数据库"
 PostgreSQL[(PostgreSQL)]
@@ -387,6 +571,7 @@ MessageRouter --> MessageService
 TopicRouter --> TopicService
 SessionRouter --> SessionService
 UserRouter --> UserService
+GenerationTopicRouter --> GenerationTopicService
 AgentService --> AgentModel
 AgentGroupService --> GroupModel
 AiAgentService --> MessageModel
@@ -396,24 +581,29 @@ MessageService --> MessageModel
 TopicService --> TopicModel
 SessionService --> SessionModel
 UserService --> UserModel
+GenerationTopicService --> GenerationTopicModel
+ContextEngineService --> ContextExtractorModel
 AgentModel --> PostgreSQL
 GroupModel --> PostgreSQL
 MessageModel --> PostgreSQL
 TopicModel --> PostgreSQL
 SessionModel --> PostgreSQL
 UserModel --> PostgreSQL
+GenerationTopicModel --> PostgreSQL
 AiAgentService --> Redis
 AiChatService --> Redis
+ContextEngineService --> Redis
+TitleGenerationService --> Redis
 ```
 
 **图表来源**
 
-- [src/server/routers/lambda/agent.ts](file://src/server/routers/lambda/agent.ts#L17-L30)
-- [src/server/routers/lambda/aiAgent.ts](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
+- [src/server/routers/lambda/agent.ts:17-30](file://src/server/routers/lambda/agent.ts#L17-L30)
+- [src/server/routers/lambda/aiAgent.ts:235-248](file://src/server/routers/lambda/aiAgent.ts#L235-L248)
 
 **章节来源**
 
-- [src/server/routers/lambda/index.ts](file://src/server/routers/lambda/index.ts#L11-L55)
+- [src/server/routers/lambda/index.ts:11-55](file://src/server/routers/lambda/index.ts#L11-L55)
 
 ## 性能考虑
 
@@ -441,6 +631,13 @@ AiChatService --> Redis
 - 流式响应处理大体积数据
 - 并发控制和资源限制
 
+### 标题生成优化
+
+- **上下文缓存**: 缓存常用的上下文提取结果
+- **并发控制**: 限制同时进行的标题生成数量
+- **智能重试**: 失败时自动重试机制
+- **结果缓存**: 缓存生成的标题结果
+
 ## 故障排除指南
 
 ### 常见错误类型
@@ -460,26 +657,49 @@ AiChatService --> Redis
 - `NOT_FOUND`: 请求的资源不存在
 - `INTERNAL_SERVER_ERROR`: 服务器内部错误
 
+#### 标题生成错误
+
+- `TITLE_GENERATION_FAILED`: 标题生成失败
+- `CONTEXT_EXTRACTION_ERROR`: 上下文提取错误
+- `TITLE_SANITIZATION_ERROR`: 标题消毒失败
+
 ### 调试建议
 
 1. **启用调试日志**: 在开发环境中启用 debug 日志
 2. **检查数据库连接**: 确保数据库连接正常
 3. **验证输入参数**: 使用 Zod 验证器检查请求参数
 4. **监控性能指标**: 关注慢查询和高延迟操作
+5. **标题生成追踪**: 跟踪上下文提取和标题生成过程
 
 **章节来源**
 
-- [src/server/routers/lambda/user.ts](file://src/server/routers/lambda/user.ts#L219-L226)
+- [src/server/routers/lambda/user.ts:219-226](file://src/server/routers/lambda/user.ts#L219-L226)
 
 ## 结论
 
 Lambda 路由模块通过模块化设计和清晰的分层架构，为 LobeChat 提供了强大而灵活的后端接口层。该模块不仅支持基本的 CRUD 操作，还提供了高级的 AI 代理执行、群组协作、批量处理等企业级功能。
 
+**更新总结** 本次重大更新主要体现在标题生成系统的全面重构：
+
+### 主要改进
+
+1. **集中式上下文提取系统**: 提供统一的上下文处理能力
+2. **标题消毒器**: 确保生成标题的安全性和规范性
+3. **移动端重构**: 提供更好的移动端标题生成体验
+4. **智能标题生成**: 基于上下文自动提取关键信息生成标题
+
+### 技术优势
+
+- **模块化设计**: 清晰的组件分离和职责划分
+- **性能优化**: 缓存策略和并发控制
+- **安全性**: 标题消毒和输入验证
+- **可扩展性**: 支持新的标题生成模式和上下文类型
+
+### 未来发展方向
+
+- **AI 驱动的标题优化**: 利用更先进的 AI 模型提升标题质量
+- **多语言支持**: 扩展对更多语言的标题生成支持
+- **个性化定制**: 允许用户自定义标题生成规则
+- **实时协作**: 支持多人实时协作生成标题
+
 模块的设计充分考虑了可扩展性、性能和安全性，通过 tRPC 的强类型系统确保了前后端接口的一致性。同时，完善的错误处理和监控机制保证了系统的稳定运行。
-
-未来可以进一步优化的方向包括：
-
-- 增加更多的缓存策略
-- 实现更细粒度的权限控制
-- 扩展异步任务处理能力
-- 增强监控和可观测性

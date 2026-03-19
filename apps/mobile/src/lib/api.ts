@@ -1782,8 +1782,7 @@ export const topicApi = {
   /** Server has no `favoriteTopic` — use `updateTopic` with favorite flag */
   favorite: (id: string, favorite = true) =>
     trpcMutate('topic.updateTopic', { id, value: { favorite } }),
-  generateTitle: (id: string) =>
-    trpcMutate<string | null>('topic.generateTopicTitle', { id }),
+  generateTitle: (id: string) => trpcMutate<string | null>('topic.generateTopicTitle', { id }),
   update: (id: string, value: { favorite?: boolean; tagId?: string | null; title?: string }) =>
     trpcMutate('topic.updateTopic', { id, value }),
   search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),

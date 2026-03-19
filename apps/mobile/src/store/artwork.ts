@@ -13,12 +13,20 @@ import type { GenerationBatch } from '../types';
 const ARTWORK_HISTORY_KEY = 'avato_artwork_history';
 
 interface ArtworkState {
-  batches: GenerationBatch[];
   addBatch: (batch: GenerationBatch) => void;
+  batches: GenerationBatch[];
   hydrate: () => Promise<void>;
   removeBatch: (batchId: string) => void;
   updateBatch: (batchId: string, updater: (b: GenerationBatch) => GenerationBatch) => void;
 }
+
+const sortArtworkBatches = (batches: GenerationBatch[]) =>
+  [...batches].sort((left, right) => {
+    const leftTime = new Date(left.createdAt ?? left.updatedAt ?? 0).getTime();
+    const rightTime = new Date(right.createdAt ?? right.updatedAt ?? 0).getTime();
+
+    return leftTime - rightTime;
+  });
 
 const persistBatches = async (batches: GenerationBatch[]) => {
   try {
@@ -28,7 +36,7 @@ const persistBatches = async (batches: GenerationBatch[]) => {
   }
 };
 
-export const useArtworkStore = create<ArtworkState>((set, get) => ({
+export const useArtworkStore = create<ArtworkState>((set) => ({
   batches: [],
 
   hydrate: async () => {
@@ -37,7 +45,7 @@ export const useArtworkStore = create<ArtworkState>((set, get) => ({
       if (raw) {
         const parsed = JSON.parse(raw) as GenerationBatch[];
         if (Array.isArray(parsed)) {
-          set({ batches: parsed });
+          set({ batches: sortArtworkBatches(parsed) });
         }
       }
     } catch {
@@ -47,7 +55,7 @@ export const useArtworkStore = create<ArtworkState>((set, get) => ({
 
   addBatch: (batch) => {
     set((s) => {
-      const next = [batch, ...s.batches];
+      const next = sortArtworkBatches([...s.batches.filter((item) => item.id !== batch.id), batch]);
       void persistBatches(next);
       return { batches: next };
     });
@@ -55,7 +63,7 @@ export const useArtworkStore = create<ArtworkState>((set, get) => ({
 
   updateBatch: (batchId, updater) => {
     set((s) => {
-      const next = s.batches.map((b) => (b.id === batchId ? updater(b) : b));
+      const next = sortArtworkBatches(s.batches.map((b) => (b.id === batchId ? updater(b) : b)));
       void persistBatches(next);
       return { batches: next };
     });

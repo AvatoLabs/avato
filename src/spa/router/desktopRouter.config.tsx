@@ -172,6 +172,13 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/community/(list)/aggregator'),
+                  'Desktop > Discover > List > Aggregator',
+                ),
+                path: 'aggregator',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/community/(list)/(home)'),
                   'Desktop > Discover > List > Home',
                 ),

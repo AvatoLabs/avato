@@ -13,6 +13,7 @@ export interface CreateSessionConfig {
   model?: string;
   plugins?: string[];
   provider?: string;
+  slug?: string;
   systemPrompt?: string;
   title?: string;
 }
@@ -283,9 +284,9 @@ export interface MarketProvider {
   name: string;
 }
 
-// ---- Session Tags ----
+// ---- Tags (topic-level) ----
 
-export interface SessionTag {
+export interface Tag {
   color?: string | null;
   createdAt: string;
   id: string;

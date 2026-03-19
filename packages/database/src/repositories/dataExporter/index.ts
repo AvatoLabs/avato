@@ -59,7 +59,7 @@ export const DATA_EXPORT_CONFIG = {
     // { table: 'nextauthAuthenticators' },
     // { table: 'nextauthVerificationTokens' },
     { table: 'sessionGroups' },
-    { table: 'sessionTags' },
+    { table: 'tags' },
     { table: 'sessions' },
     { table: 'threads' },
     { table: 'topics' },

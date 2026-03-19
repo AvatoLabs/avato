@@ -109,6 +109,7 @@ export const sessionRouter = router({
           .passthrough()
           .partial(),
         session: insertSessionSchema.omit({ createdAt: true, updatedAt: true }).partial(),
+        slug: z.string().optional(),
         type: z.enum(['agent', 'group']),
       }),
     )
@@ -134,8 +135,7 @@ export const sessionRouter = router({
       const orphanAgentSessionIds = sessions
         .filter(
           (session) =>
-            session.type === 'agent' &&
-            !((session as { config?: { id?: string } }).config?.id),
+            session.type === 'agent' && !(session as { config?: { id?: string } }).config?.id,
         )
         .map((session) => session.id);
 

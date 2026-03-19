@@ -176,10 +176,19 @@ export const agentSkillsRouter = router({
     }),
 
   importFromUrl: skillProcedure
-    .input(z.object({ url: z.string().url() }))
+    .input(
+      z.object({
+        identifier: z.string().optional(),
+        source: z.enum(['market', 'user']).optional(),
+        url: z.string().url(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.skillImporter.importFromUrl(input);
+        return await ctx.skillImporter.importFromUrl(
+          { url: input.url },
+          { identifier: input.identifier, source: input.source },
+        );
       } catch (error) {
         handleSkillImportError(error);
       }

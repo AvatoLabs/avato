@@ -24,6 +24,7 @@ type TranslationKeys = {
   // Tabs
   tabChats: string;
   tabArtwork: string;
+  tabVideo: string;
   tabDiscover: string;
   tabMe: string;
 
@@ -671,6 +672,7 @@ type TranslationKeys = {
   chatClearTitle: string;
   chatClearMessage: string;
   chatClearConfirm: string;
+  chatJumpToLatest: string;
   chatScrollToTop: string;
   chatSearchOn: string;
   chatSearchOff: string;
@@ -1039,6 +1041,32 @@ type TranslationKeys = {
   artworkNoModelsDesc: string;
   artworkSelectModel: string;
   artworkImageCountCustom: string;
+
+  videoTitle: string;
+  videoPromptPlaceholder: string;
+  videoGenerate: string;
+  videoGenerating: string;
+  videoSelectModel: string;
+  videoNoModels: string;
+  videoNoModelsDesc: string;
+  videoDuration: string;
+  videoAspectRatio: string;
+  videoResolution: string;
+  videoGenerateAudio: string;
+  videoNewTopic: string;
+  videoTopicReset: string;
+  videoOpenPreview: string;
+  videoShare: string;
+  videoDownload: string;
+  videoDownloadFailed: string;
+  videoShareFailed: string;
+  videoCreateFailed: string;
+  videoHistoryEmpty: string;
+  videoHistoryEmptyDesc: string;
+  videoStatusPending: string;
+  videoStatusProcessing: string;
+  videoStatusSuccess: string;
+  videoStatusError: string;
 };
 
 const en: TranslationKeys = {
@@ -1050,7 +1078,8 @@ const en: TranslationKeys = {
   search: 'Search',
 
   tabChats: 'Chats',
-  tabArtwork: 'Artwork',
+  tabArtwork: 'Create',
+  tabVideo: 'Video',
   tabDiscover: 'Discover',
   tabMe: 'Me',
 
@@ -1676,6 +1705,7 @@ const en: TranslationKeys = {
   chatClearTitle: 'Clear Messages',
   chatClearMessage: 'This will clear all messages in this session. This action cannot be undone.',
   chatClearConfirm: 'Clear',
+  chatJumpToLatest: 'Jump to latest',
   chatScrollToTop: 'Scroll to top',
   chatSearchOn: 'Web search enabled',
   chatSearchOff: 'Web search disabled',
@@ -2040,6 +2070,31 @@ const en: TranslationKeys = {
   artworkNoModelsDesc: 'Enable an image generation provider in Settings.',
   artworkSelectModel: 'Select Model',
   artworkImageCountCustom: 'Custom',
+  videoTitle: 'Video',
+  videoPromptPlaceholder: 'Describe the video you want to generate...',
+  videoGenerate: 'Generate Video',
+  videoGenerating: 'Generating',
+  videoSelectModel: 'Select Video Model',
+  videoNoModels: 'No video models available',
+  videoNoModelsDesc: 'Enable a video generation provider in Settings.',
+  videoDuration: 'Duration',
+  videoAspectRatio: 'Aspect Ratio',
+  videoResolution: 'Resolution',
+  videoGenerateAudio: 'Audio',
+  videoNewTopic: 'New Topic',
+  videoTopicReset: 'Start a fresh video topic',
+  videoOpenPreview: 'Preview',
+  videoShare: 'Share',
+  videoDownload: 'Download',
+  videoDownloadFailed: 'Failed to download video',
+  videoShareFailed: 'Failed to share video',
+  videoCreateFailed: 'Video generation failed',
+  videoHistoryEmpty: 'No videos yet',
+  videoHistoryEmptyDesc: 'Generate your first video from the prompt below.',
+  videoStatusPending: 'Pending',
+  videoStatusProcessing: 'Processing',
+  videoStatusSuccess: 'Complete',
+  videoStatusError: 'Failed',
 };
 
 const zh_tw: TranslationKeys = {
@@ -2052,6 +2107,7 @@ const zh_tw: TranslationKeys = {
 
   tabChats: '聊天',
   tabArtwork: '創作',
+  tabVideo: '影片',
   tabDiscover: '發現',
   tabMe: '我的',
 
@@ -2673,6 +2729,7 @@ const zh_tw: TranslationKeys = {
   chatClearTitle: '清空訊息',
   chatClearMessage: '這將清空此會話中的所有訊息。此操作無法復原。',
   chatClearConfirm: '清空',
+  chatJumpToLatest: '回到最新',
   chatScrollToTop: '回到頂部',
   chatSearchOn: '網頁搜尋已開啟',
   chatSearchOff: '網頁搜尋已關閉',
@@ -3034,6 +3091,31 @@ const zh_tw: TranslationKeys = {
   artworkNoModelsDesc: '請在設定中啟用圖片產生服務商。',
   artworkSelectModel: '選擇模型',
   artworkImageCountCustom: '自訂',
+  videoTitle: '影片',
+  videoPromptPlaceholder: '描述你想生成的影片內容...',
+  videoGenerate: '生成影片',
+  videoGenerating: '生成中',
+  videoSelectModel: '選擇影片模型',
+  videoNoModels: '暫無影片模型',
+  videoNoModelsDesc: '請在設定中啟用影片生成服務商。',
+  videoDuration: '時長',
+  videoAspectRatio: '比例',
+  videoResolution: '解析度',
+  videoGenerateAudio: '音訊',
+  videoNewTopic: '新話題',
+  videoTopicReset: '開始新的影片話題',
+  videoOpenPreview: '預覽',
+  videoShare: '分享',
+  videoDownload: '下載',
+  videoDownloadFailed: '影片下載失敗',
+  videoShareFailed: '影片分享失敗',
+  videoCreateFailed: '影片生成失敗',
+  videoHistoryEmpty: '尚無影片',
+  videoHistoryEmptyDesc: '從下方提示詞開始生成第一支影片。',
+  videoStatusPending: '等待中',
+  videoStatusProcessing: '生成中',
+  videoStatusSuccess: '已完成',
+  videoStatusError: '失敗',
 };
 
 const zh: TranslationKeys = {
@@ -3046,6 +3128,7 @@ const zh: TranslationKeys = {
 
   tabChats: '聊天',
   tabArtwork: '创作',
+  tabVideo: '视频',
   tabDiscover: '发现',
   tabMe: '我的',
 
@@ -3667,6 +3750,7 @@ const zh: TranslationKeys = {
   chatClearTitle: '清空消息',
   chatClearMessage: '这将清空此会话中的所有消息。此操作无法撤销。',
   chatClearConfirm: '清空',
+  chatJumpToLatest: '回到最新',
   chatScrollToTop: '回到顶部',
   chatSearchOn: '网页搜索已开启',
   chatSearchOff: '网页搜索已关闭',
@@ -4029,6 +4113,31 @@ const zh: TranslationKeys = {
   artworkNoModelsDesc: '请在设置中启用图片生成服务商。',
   artworkSelectModel: '选择模型',
   artworkImageCountCustom: '自定义',
+  videoTitle: '视频',
+  videoPromptPlaceholder: '描述你想生成的视频内容...',
+  videoGenerate: '生成视频',
+  videoGenerating: '生成中',
+  videoSelectModel: '选择视频模型',
+  videoNoModels: '暂无视频模型',
+  videoNoModelsDesc: '请在设置中启用视频生成服务商。',
+  videoDuration: '时长',
+  videoAspectRatio: '比例',
+  videoResolution: '分辨率',
+  videoGenerateAudio: '音频',
+  videoNewTopic: '新话题',
+  videoTopicReset: '开始新的视频话题',
+  videoOpenPreview: '预览',
+  videoShare: '分享',
+  videoDownload: '下载',
+  videoDownloadFailed: '视频下载失败',
+  videoShareFailed: '视频分享失败',
+  videoCreateFailed: '视频生成失败',
+  videoHistoryEmpty: '还没有视频',
+  videoHistoryEmptyDesc: '从下方提示词开始生成第一条视频。',
+  videoStatusPending: '等待中',
+  videoStatusProcessing: '生成中',
+  videoStatusSuccess: '已完成',
+  videoStatusError: '失败',
 };
 
 const translations: Record<Locale, TranslationKeys> = {

@@ -46,7 +46,7 @@ const _reqAppProtocol = () => {
  * - Cache presigned URL in Redis to reduce S3 API calls
  * - Return 302 redirect
  */
-export const GET = async (_req: Request, segmentData: { params: Params }) => {
+export const GET = async (req: Request, segmentData: { params: Params }) => {
   try {
     const params = await segmentData.params;
     const { id } = params;
@@ -90,15 +90,40 @@ export const GET = async (_req: Request, segmentData: { params: Params }) => {
 
     if (shouldProxyFileResponse(redirectUrl)) {
       log('Proxying file content to avoid mixed content: %s', id);
-      const byteArray = await fileService.getFileByteArray(file.url);
+      const rangeHeader = req.headers.get('range');
+      const upstreamResponse = await fetch(redirectUrl, {
+        headers: rangeHeader ? { range: rangeHeader } : undefined,
+      });
 
-      return new Response(byteArray as unknown as BodyInit, {
-        headers: {
-          'Cache-Control': 'private, max-age=60',
-          'Content-Disposition': `inline; filename="${encodeURIComponent(file.name || id)}"`,
-          'Content-Type': file.fileType || 'application/octet-stream',
-        },
-        status: 200,
+      if (!upstreamResponse.ok && upstreamResponse.status !== 206) {
+        return new Response('Failed to fetch file from storage', {
+          status: upstreamResponse.status || 502,
+        });
+      }
+
+      const headers = new Headers();
+      headers.set('Cache-Control', 'private, max-age=60');
+      headers.set(
+        'Content-Disposition',
+        `inline; filename="${encodeURIComponent(file.name || id)}"`,
+      );
+      headers.set(
+        'Content-Type',
+        upstreamResponse.headers.get('content-type') || file.fileType || 'application/octet-stream',
+      );
+
+      const contentLength = upstreamResponse.headers.get('content-length');
+      if (contentLength) headers.set('Content-Length', contentLength);
+
+      const contentRange = upstreamResponse.headers.get('content-range');
+      if (contentRange) headers.set('Content-Range', contentRange);
+
+      const acceptRanges = upstreamResponse.headers.get('accept-ranges');
+      if (acceptRanges) headers.set('Accept-Ranges', acceptRanges);
+
+      return new Response(upstreamResponse.body, {
+        headers,
+        status: upstreamResponse.status,
       });
     }
 

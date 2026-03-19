@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useQueryRoute } from '@/hooks/useQueryRoute';
 import { usePathname, useQuery } from '@/libs/router/navigation';
+import { AggregatorKind, AggregatorSorts } from '@/types/aggregator';
 import {
   AssistantSorts,
   DiscoverTab,
@@ -15,19 +16,72 @@ import {
   ProviderSorts,
   SkillSorts,
 } from '@/types/discover';
+import { SkillAggregatorSorts } from '@/types/skillAggregator';
 
 const SortButton = memo(() => {
   const { t } = useTranslation('discover');
   const pathname = usePathname();
-  const { sort } = useQuery();
+  const { kind, sort } = useQuery();
   const router = useQueryRoute();
-  const activeTab = useMemo(() => pathname.split('community/')[1] as DiscoverTab, [pathname]);
+  const activeTab = useMemo(
+    () => pathname.split('community/')[1]?.split('/')[0] as DiscoverTab,
+    [pathname],
+  );
   type SortItem = Extract<DropdownItem, { type?: 'item' }> & {
     key: string;
   };
 
   const items = useMemo<SortItem[]>(() => {
     switch (activeTab) {
+      case DiscoverTab.Aggregator: {
+        if (kind === AggregatorKind.Skills) {
+          return [
+            {
+              key: SkillAggregatorSorts.Relevance,
+              label: t('aggregator.skills.sorts.relevance'),
+            },
+            {
+              key: SkillAggregatorSorts.Downloads,
+              label: t('aggregator.skills.sorts.downloads'),
+            },
+            {
+              key: SkillAggregatorSorts.InstallCount,
+              label: t('aggregator.skills.sorts.installCount'),
+            },
+            {
+              key: SkillAggregatorSorts.Stars,
+              label: t('aggregator.skills.sorts.stars'),
+            },
+            {
+              key: SkillAggregatorSorts.UpdatedAt,
+              label: t('aggregator.skills.sorts.updatedAt'),
+            },
+            {
+              key: SkillAggregatorSorts.Name,
+              label: t('aggregator.skills.sorts.name'),
+            },
+          ];
+        }
+
+        return [
+          {
+            key: AggregatorSorts.Relevance,
+            label: t('aggregator.sorts.relevance'),
+          },
+          {
+            key: AggregatorSorts.Popularity,
+            label: t('aggregator.sorts.popularity'),
+          },
+          {
+            key: AggregatorSorts.UpdatedAt,
+            label: t('aggregator.sorts.updatedAt'),
+          },
+          {
+            key: AggregatorSorts.Name,
+            label: t('aggregator.sorts.name'),
+          },
+        ];
+      }
       case DiscoverTab.Assistants: {
         return [
           {
@@ -168,7 +222,7 @@ const SortButton = memo(() => {
         return [];
       }
     }
-  }, [t, activeTab]);
+  }, [activeTab, kind, t]);
 
   const activeItem = useMemo<SortItem | undefined>(() => {
     if (sort) {

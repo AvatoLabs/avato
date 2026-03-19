@@ -26,7 +26,7 @@ const prefixes = {
   messages: 'msg',
   plugins: 'plg',
   sessionGroups: 'sg',
-  sessionTags: 'st',
+  tags: 'tag',
   sessions: 'ssn',
   threads: 'thd',
   topics: 'tpc',

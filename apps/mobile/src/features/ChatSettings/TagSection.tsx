@@ -7,13 +7,13 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { resolveTagColor, withAlpha } from '../../constants/tags';
-import { useThemeColors } from '../../theme/colors';
 import { useI18n } from '../../lib/i18n';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
-import type { SessionTag } from '../../types';
+import type { Tag } from '../../types';
 
 interface TagSectionProps {
-  currentTag?: SessionTag | null;
+  currentTag?: Tag | null;
   delay?: number;
   onPress: () => void;
 }
@@ -44,9 +44,7 @@ export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps)
           <View
             className="mr-3 rounded-full px-3 py-1"
             style={{
-              backgroundColor: currentTag
-                ? withAlpha(currentTag.color, '18')
-                : colors.fillTertiary,
+              backgroundColor: currentTag ? withAlpha(currentTag.color, '18') : colors.fillTertiary,
             }}
           >
             <Text

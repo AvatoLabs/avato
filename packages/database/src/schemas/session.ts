@@ -46,39 +46,6 @@ export const insertSessionGroupSchema = createInsertSchema(sessionGroups);
 export type NewSessionGroup = typeof sessionGroups.$inferInsert;
 export type SessionGroupItem = typeof sessionGroups.$inferSelect;
 
-//  ======= sessionTags ======= //
-
-export const sessionTags = pgTable(
-  'session_tags',
-  {
-    id: text('id')
-      .$defaultFn(() => idGenerator('sessionTags'))
-      .primaryKey(),
-    color: text('color'),
-    name: text('name').notNull(),
-    sort: integer('sort'),
-
-    userId: text('user_id')
-      .references(() => users.id, { onDelete: 'cascade' })
-      .notNull(),
-
-    clientId: text('client_id'),
-    ...timestamps,
-  },
-  (table) => ({
-    clientIdUnique: uniqueIndex('session_tags_client_id_user_id_unique').on(
-      table.clientId,
-      table.userId,
-    ),
-    userIdIdx: index('session_tags_user_id_idx').on(table.userId),
-  }),
-);
-
-export const insertSessionTagSchema = createInsertSchema(sessionTags);
-
-export type NewSessionTag = typeof sessionTags.$inferInsert;
-export type SessionTagItem = typeof sessionTags.$inferSelect;
-
 //  ======= sessions ======= //
 
 export const sessions = pgTable(

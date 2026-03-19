@@ -4,15 +4,14 @@
 **本文档引用的文件**
 - [apps/mobile/App.tsx](file://apps/mobile/App.tsx)
 - [apps/mobile/src/navigation/index.tsx](file://apps/mobile/src/navigation/index.tsx)
-- [apps/mobile/src/screens/ArtworkScreen.tsx](file://apps/mobile/src/screens/ArtworkScreen.tsx)
-- [apps/mobile/src/screens/ResourceScreen.tsx](file://apps/mobile/src/screens/ResourceScreen.tsx)
-- [apps/mobile/src/screens/SettingsScreen.tsx](file://apps/mobile/src/screens/SettingsScreen.tsx)
-- [apps/mobile/src/screens/ProfileScreen.tsx](file://apps/mobile/src/screens/ProfileScreen.tsx)
-- [apps/mobile/src/screens/DiscoverScreen.tsx](file://apps/mobile/src/screens/DiscoverScreen.tsx)
+- [apps/mobile/src/screens/CreateScreen.tsx](file://apps/mobile/src/screens/CreateScreen.tsx)
+- [apps/mobile/src/screens/StoreScreen.tsx](file://apps/mobile/src/screens/StoreScreen.tsx)
+- [apps/mobile/src/screens/AgentListScreen.tsx](file://apps/mobile/src/screens/AgentListScreen.tsx)
+- [apps/mobile/src/screens/AgentConfigScreen.tsx](file://apps/mobile/src/screens/AgentConfigScreen.tsx)
 - [apps/mobile/src/screens/ChatListScreen.tsx](file://apps/mobile/src/screens/ChatListScreen.tsx)
-- [apps/mobile/src/screens/ServerConfigScreen.tsx](file://apps/mobile/src/screens/ServerConfigScreen.tsx)
-- [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx)
-- [apps/mobile/src/screens/SkillSettingsScreen.tsx](file://apps/mobile/src/screens/SkillSettingsScreen.tsx)
+- [apps/mobile/src/screens/ChatDetailScreen.tsx](file://apps/mobile/src/screens/ChatDetailScreen.tsx)
+- [apps/mobile/src/components/ui/TopicItem.tsx](file://apps/mobile/src/components/ui/TopicItem.tsx)
+- [apps/mobile/src/lib/titleGeneration.ts](file://apps/mobile/src/lib/titleGeneration.ts)
 - [apps/mobile/src/store/session.ts](file://apps/mobile/src/store/session.ts)
 - [apps/mobile/src/store/connection.ts](file://apps/mobile/src/store/connection.ts)
 - [apps/mobile/src/lib/api.ts](file://apps/mobile/src/lib/api.ts)
@@ -25,14 +24,11 @@
 
 **所做更改**
 
-- 重构导航结构，新增 Artwork 标签页（带调色板图标）和 Resources 标签页
-- 新增 Skills 标签页，提供技能和 MCP 服务器管理功能
-- 将 Profile 标签页重命名为 Settings，创建更合理的创意工具、资源和技能管理导航流程
-- 新增 ResourceScreen 组件，提供文件资源管理功能
-- 新增 SettingsScreen 组件，提供完整设置管理界面
-- 新增 SkillSettingsScreen 组件，提供技能和 MCP 服务器管理功能
-- 更新底部标签导航器的标签配置，替换 Discover 标签为 Artwork 标签
-- 重新组织导航层级，优化用户体验流程
+- 新增助手中心导航系统，包含 AgentListScreen 和 AgentConfigScreen
+- 重构 Tab 界面，将 Artwork 标签替换为 Create 标签，新增 Store 标签
+- 新增智能重命名功能，支持对话主题的智能重命名
+- 新增视频创作功能，与图像生成并列的创作模式
+- 优化导航结构，提供更清晰的助手管理和技能商店入口
 
 ## 目录
 
@@ -75,9 +71,10 @@ Onboarding[引导流程导航]
 end
 subgraph "屏幕组件层"
 ChatList[聊天列表]
-Artwork[艺术作品生成]
-Resources[资源管理]
-Skills[技能设置]
+Create[创作中心]
+Store[技能商店]
+AgentList[助手列表]
+AgentConfig[助手配置]
 Settings[设置页面]
 end
 subgraph "状态管理层"
@@ -89,22 +86,26 @@ subgraph "服务层"
 ApiService[API服务]
 StorageService[存储服务]
 NetworkService[网络服务]
+TitleGenService[标题生成服务]
 end
 App --> RootNavigator
 RootNavigator --> BottomTabs
 RootNavigator --> NativeStack
 BottomTabs --> ChatList
-BottomTabs --> Artwork
-BottomTabs --> Resources
-BottomTabs --> Skills
-BottomTabs --> Settings
+BottomTabs --> Create
+BottomTabs --> Store
+BottomTabs --> AgentList
+BottomTabs --> AgentConfig
 NativeStack --> ServerConfig
 NativeStack --> Welcome
 ChatList --> SessionStore
-Artwork --> ConnectionStore
-Resources --> ConnectionStore
+Create --> ConnectionStore
+Store --> ConnectionStore
+AgentList --> SessionStore
+AgentConfig --> SessionStore
 SessionStore --> ApiService
 ConnectionStore --> NetworkService
+TitleGenService --> ApiService
 ```
 
 **图表来源**
@@ -137,11 +138,12 @@ ConnectionStore --> NetworkService
 导航层次结构：
 
 - 引导流程：欢迎页面 → 服务器配置 → 完成页面
-- 主应用：底部标签导航（聊天、艺术作品、资源、技能、设置）
+- 主应用：底部标签导航（聊天、创作、资源、技能商店、我的）
 - 设置页面：独立的导航栈
-- 艺术作品功能：独立的导航栈
+- 助手管理：独立的导航栈
+- 创作功能：独立的导航栈
 
-**更新** 新增了 Artwork、Resources 和 Skills 标签，替换了原有的 Discover 标签
+**更新** 新增了 Create、Store 和 AgentList 标签，替换了原有的 Discover 标签
 
 **章节来源**
 
@@ -245,175 +247,89 @@ API --> Server
 - [apps/mobile/src/screens/ChatListScreen.tsx:1-550](file://apps/mobile/src/screens/ChatListScreen.tsx#L1-L550)
 - [apps/mobile/src/store/session.ts:1-185](file://apps/mobile/src/store/session.ts#L1-L185)
 
-### 艺术作品生成屏幕组件
+### 创作中心屏幕组件
 
-**新增** 艺术作品生成屏幕是新增的导航标签，专门用于图像生成功能。该组件提供了完整的 AI 图像生成工作流程。
+**新增** 创作中心屏幕是新增的导航标签，专门用于 AI 内容创作功能。该组件提供了图像生成和视频创作的统一入口。
 
 #### 主要功能模块
 
-1. **模型选择器**：支持多种 AI 图像生成模型的选择和配置
-2. **参数配置**：分辨率、宽高比、图像数量等生成参数设置
-3. **参考图像上传**：支持多张参考图像的上传和管理
-4. **生成队列管理**：实时显示生成任务状态和结果
-5. **历史记录查看**：查看和管理之前的生成批次
+1. **创作模式切换**：支持图像生成和视频创作两种模式
+2. **智能重命名**：为对话主题提供智能重命名功能
+3. **创作历史管理**：查看和管理之前的创作记录
+4. **模型选择**：支持多种 AI 创作模型的选择和配置
+5. **参数配置**：分辨率、风格、质量等创作参数设置
 
-#### 生成流程
+#### 创作模式流程
 
 ```mermaid
 stateDiagram-v2
 [*] --> Idle : 应用启动
-Idle --> Loading : 加载模型配置
-Loading --> Configuring : 显示配置界面
-Configuring --> Generating : 开始生成
+Idle --> Loading : 加载创作配置
+Loading --> ImageMode : 图像模式
+Loading --> VideoMode : 视频模式
+ImageMode --> Generating : 开始图像生成
+VideoMode --> Generating : 开始视频生成
 Generating --> Polling : 轮询状态
 Polling --> Success : 生成成功
 Polling --> Error : 生成失败
 Success --> Viewing : 查看结果
-Error --> Configuring : 重新配置
-Viewing --> Generating : 继续生成
-Viewing --> Configuring : 修改配置
+Error --> ImageMode : 重新配置
+Viewing --> Generating : 继续创作
+Viewing --> ImageMode : 切换模式
 ```
 
 **图表来源**
 
-- [apps/mobile/src/screens/ArtworkScreen.tsx:375-453](file://apps/mobile/src/screens/ArtworkScreen.tsx#L375-L453)
+- [apps/mobile/src/screens/CreateScreen.tsx:15-87](file://apps/mobile/src/screens/CreateScreen.tsx#L15-L87)
 
 #### 技术特性
 
-- **实时状态轮询**：自动轮询生成任务状态，最长轮询时间为 15 秒
+- **双模式支持**：统一的界面管理图像和视频创作
+- **智能重命名**：集成对话主题的智能重命名功能
+- **实时状态轮询**：自动轮询创作任务状态
 - **配置持久化**：使用 AsyncStorage 保存用户配置
-- **异步任务处理**：支持多个并发生成任务
 - **错误处理机制**：完善的错误捕获和用户提示
 
 **章节来源**
 
-- [apps/mobile/src/screens/ArtworkScreen.tsx:1-1073](file://apps/mobile/src/screens/ArtworkScreen.tsx#L1-L1073)
+- [apps/mobile/src/screens/CreateScreen.tsx:1-87](file://apps/mobile/src/screens/CreateScreen.tsx#L1-L87)
 
-### 资源管理屏幕组件
+### 技能商店屏幕组件
 
-**新增** 资源管理屏幕提供了完整的文件资源管理功能，支持多种文件类型的上传、下载和管理。
-
-#### 主要功能模块
-
-1. **文件分类管理**：按类型（全部、图片、文档、其他）分类显示
-2. **文件上传功能**：支持相机相册和文件选择器上传
-3. **文件搜索过滤**：支持关键词搜索和实时过滤
-4. **文件预览功能**：支持图片缩略图预览
-5. **文件删除管理**：支持单个和批量文件删除
-
-#### 文件管理流程
-
-```mermaid
-stateDiagram-v2
-[*] --> Loading : 应用启动
-Loading --> Displaying : 显示文件列表
-Displaying --> Searching : 搜索文件
-Searching --> Filtering : 过滤分类
-Filtering --> Uploading : 上传文件
-Uploading --> Success : 上传成功
-Uploading --> Error : 上传失败
-Success --> Displaying : 刷新列表
-Error --> Displaying : 显示错误
-Displaying --> Deleting : 删除文件
-Deleting --> Confirming : 确认删除
-Confirming --> Success : 删除成功
-Confirming --> Canceling : 取消删除
-Canceling --> Displaying : 返回列表
-```
-
-**图表来源**
-
-- [apps/mobile/src/screens/ResourceScreen.tsx:172-469](file://apps/mobile/src/screens/ResourceScreen.tsx#L172-L469)
-
-#### 技术特性
-
-- **多平台支持**：支持 iOS 和 Android 平台的文件操作
-- **分类显示**：智能识别文件类型并分类显示
-- **搜索功能**：支持关键词搜索和实时过滤
-- **上传管理**：支持多文件同时上传和进度显示
-- **删除确认**：防止误删的重要文件
-
-**章节来源**
-
-- [apps/mobile/src/screens/ResourceScreen.tsx:1-469](file://apps/mobile/src/screens/ResourceScreen.tsx#L1-L469)
-
-### 设置屏幕组件
-
-**更新** 将原有的 Profile 标签页重命名为 Settings，提供完整的设置管理功能。
+**更新** Store 标签页提供了完整的技能和 MCP 服务器管理功能，支持 Agent 技能、社区 MCP 和自定义 MCP 的管理。
 
 #### 功能分类
 
-1. **工作区概览**：用户信息、默认模型、AI 提供商状态
-2. **使用统计**：消息数、会话数、话题数统计
-3. **快速设置**：服务器配置、AI 提供商、默认模型、语言设置
-4. **更多设置**：高级设置、数据存储、语音设置、关于页面
-5. **账户管理**：退出登录功能
+1. **探索模式**：浏览和搜索可用的技能和 MCP 服务器
+2. **已安装管理**：查看和管理已安装的技能和插件
+3. **技能分类**：按类型、来源、评分等维度分类管理
+4. **搜索过滤**：支持关键词搜索和多维度筛选
+5. **批量操作**：支持批量安装、卸载和更新
 
-#### 设置流程
+#### 商店管理流程
 
 ```mermaid
 flowchart TD
-Start[打开设置页面] --> LoadData[加载用户数据]
-LoadData --> DisplayOverview[显示工作区概览]
-DisplayOverview --> DisplayStats[显示使用统计]
-DisplayStats --> DisplayQuickSettings[显示快速设置]
-DisplayQuickSettings --> DisplayMoreSettings[显示更多设置]
-DisplayMoreSettings --> UserAction[用户操作]
-UserAction --> NavigateTo[跳转到对应设置页面]
-UserAction --> Logout[退出登录]
-NavigateTo --> DisplayOverview
-Logout --> ServerConfig[返回服务器配置]
+Start[打开技能商店] --> LoadData[加载商店数据]
+LoadData --> DisplayExplore[显示探索界面]
+DisplayExplore --> DisplayInstalled[显示已安装界面]
+DisplayInstalled --> UserAction[用户操作]
+UserAction --> Search[搜索技能]
+UserAction --> Filter[筛选分类]
+UserAction --> Install[安装技能]
+UserAction --> Uninstall[卸载技能]
+UserAction --> Configure[配置MCP]
+Search --> DisplayExplore
+Filter --> DisplayExplore
+Install --> LoadData
+Uninstall --> LoadData
+Configure --> TestConnection[测试连接]
+TestConnection --> LoadData
 ```
 
 **图表来源**
 
-- [apps/mobile/src/screens/ProfileScreen.tsx:38-346](file://apps/mobile/src/screens/ProfileScreen.tsx#L38-L346)
-
-#### 特殊功能
-
-- **实时统计**：显示准确的消息、会话、话题统计数据
-- **快速导航**：提供常用设置的快速入口
-- **账户安全**：提供安全的退出登录机制
-- **版本信息**：显示应用版本信息
-
-**章节来源**
-
-- [apps/mobile/src/screens/ProfileScreen.tsx:1-346](file://apps/mobile/src/screens/ProfileScreen.tsx#L1-L346)
-
-### 技能设置屏幕组件
-
-**新增** 技能设置屏幕提供了完整的技能和 MCP 服务器管理功能，支持 Agent 技能、社区 MCP 和自定义 MCP 的管理。
-
-#### 功能分类
-
-1. **Agent 技能管理**：内置、市场和用户技能的安装、卸载和管理
-2. **社区 MCP 管理**：第三方 MCP 服务器的安装和管理
-3. **自定义 MCP 管理**：用户自定义 MCP 服务器的添加、测试和管理
-4. **技能导入功能**：支持从 URL、GitHub 和 JSON 导入技能
-
-#### 技能管理流程
-
-```mermaid
-flowchart TD
-Start[打开技能设置] --> LoadSkills[加载技能列表]
-LoadSkills --> DisplayAgentSkills[显示Agent技能]
-DisplayAgentSkills --> DisplayCommunityMCP[显示社区MCP]
-DisplayCommunityMCP --> DisplayCustomMCP[显示自定义MCP]
-DisplayCustomMCP --> UserAction[用户操作]
-UserAction --> InstallSkill[安装技能]
-UserAction --> UninstallSkill[卸载技能]
-UserAction --> ImportSkill[导入技能]
-UserAction --> AddCustomMCP[添加自定义MCP]
-InstallSkill --> LoadSkills
-UninstallSkill --> LoadSkills
-ImportSkill --> LoadSkills
-AddCustomMCP --> TestConnection[测试连接]
-TestConnection --> LoadSkills
-```
-
-**图表来源**
-
-- [apps/mobile/src/screens/SkillSettingsScreen.tsx:1-1277](file://apps/mobile/src/screens/SkillSettingsScreen.tsx#L1-L1277)
+- [apps/mobile/src/screens/StoreScreen.tsx:1-800](file://apps/mobile/src/screens/StoreScreen.tsx#L1-L800)
 
 #### 技术特性
 
@@ -425,136 +341,140 @@ TestConnection --> LoadSkills
 
 **章节来源**
 
-- [apps/mobile/src/screens/SkillSettingsScreen.tsx:1-1277](file://apps/mobile/src/screens/SkillSettingsScreen.tsx#L1-L1277)
+- [apps/mobile/src/screens/StoreScreen.tsx:1-800](file://apps/mobile/src/screens/StoreScreen.tsx#L1-L800)
 
-### 更多设置屏幕组件
+### 助手列表屏幕组件
 
-**新增** 更多设置屏幕提供了完整的高级设置管理功能。
+**新增** 助手列表屏幕提供了完整的 AI 助手管理功能，支持助手的创建、配置、删除和会话管理。
 
-#### 设置分类
+#### 主要功能模块
 
-1. **AI 配置**：默认代理设置
-2. **数据存储**：云同步备份、存储管理
-3. **语音设置**：语音识别、文本转语音
-4. **关于信息**：隐私政策、应用信息
+1. **助手列表展示**：显示所有可用的 AI 助手
+2. **助手创建**：支持快速创建新的 AI 助手
+3. **助手配置**：进入助手详细配置界面
+4. **助手删除**：安全删除不需要的助手
+5. **会话关联**：将助手与现有会话关联
 
-#### 设置管理流程
-
-```mermaid
-flowchart TD
-Start[打开更多设置] --> AiConfig[AI配置区域]
-AiConfig --> DataStorage[数据存储区域]
-DataStorage --> VoiceSettings[语音设置区域]
-VoiceSettings --> AboutInfo[关于信息区域]
-AboutInfo --> UserAction[用户操作]
-UserAction --> Navigate[跳转到对应功能]
-UserAction --> ExternalLink[打开外部链接]
-Navigate --> AiConfig
-ExternalLink --> Start
-```
-
-**图表来源**
-
-- [apps/mobile/src/screens/SettingsScreen.tsx:84-156](file://apps/mobile/src/screens/SettingsScreen.tsx#L84-L156)
-
-#### 技术特性
-
-- **模块化设计**：按功能区域组织设置项
-- **动画效果**：提供流畅的页面切换动画
-- **外部链接**：支持打开外部网页链接
-- **状态管理**：提供占位符和未来功能预留
-
-**章节来源**
-
-- [apps/mobile/src/screens/SettingsScreen.tsx:1-156](file://apps/mobile/src/screens/SettingsScreen.tsx#L1-L156)
-
-### 服务器配置屏幕组件
-
-服务器配置屏幕提供了完整的后端服务器连接配置功能。该组件实现了安全的 URL 验证和连接测试机制。
-
-#### 配置流程
+#### 助手管理流程
 
 ```mermaid
 stateDiagram-v2
-[*] --> Idle : 应用启动
-Idle --> Loading : 加载配置
-Loading --> Editing : 显示现有配置
-Editing --> Testing : 测试连接
-Testing --> Success : 连接成功
-Testing --> Error : 连接失败
-Success --> Saving : 保存配置
-Error --> Editing : 重新编辑
-Saving --> [*] : 配置完成
-Editing --> [*] : 取消配置
+[*] --> Loading : 应用启动
+Loading --> Displaying : 显示助手列表
+Displaying --> Creating : 创建新助手
+Displaying --> Configuring : 配置助手
+Displaying --> Chatting : 开始聊天
+Creating --> Loading : 创建完成
+Configuring --> Loading : 配置完成
+Chatting --> Loading : 返回列表
 ```
 
 **图表来源**
 
-- [apps/mobile/src/screens/ServerConfigScreen.tsx:32-97](file://apps/mobile/src/screens/ServerConfigScreen.tsx#L32-L97)
+- [apps/mobile/src/screens/AgentListScreen.tsx:51-342](file://apps/mobile/src/screens/AgentListScreen.tsx#L51-L342)
 
-#### 安全验证机制
+#### 技术特性
 
-- **URL 格式验证**：自动添加协议前缀和去除尾部斜杠
-- **连接测试**：通过健康检查端点验证服务器可达性
-- **错误处理**：详细的错误信息反馈和用户指导
-- **配置持久化**：使用 AsyncStorage 安全存储配置信息
+- **助手查询**：从 API 获取完整的助手列表
+- **会话关联**：自动关联已有会话
+- **创建向导**：简化新助手的创建流程
+- **删除保护**：防止误删默认助手
+- **实时刷新**：支持手动刷新助手列表
 
 **章节来源**
 
-- [apps/mobile/src/screens/ServerConfigScreen.tsx:1-275](file://apps/mobile/src/screens/ServerConfigScreen.tsx#L1-L275)
-- [apps/mobile/src/lib/api.ts:78-89](file://apps/mobile/src/lib/api.ts#L78-L89)
+- [apps/mobile/src/screens/AgentListScreen.tsx:1-342](file://apps/mobile/src/screens/AgentListScreen.tsx#L1-L342)
 
-### 引导流程屏幕组件
+### 助手配置屏幕组件
 
-引导流程为新用户提供完整的应用介绍和初始配置过程。该流程包含三个关键步骤：
+**新增** 助手配置屏幕提供了完整的 AI 助手个性化配置功能。
 
-1. **欢迎页面**：品牌介绍和功能概述
-2. **服务器配置**：后端连接设置
-3. **完成页面**：配置确认和开始使用
+#### 功能分类
 
-#### 引导流程序列
+1. **基本信息配置**：标题、描述、头像等基础信息
+2. **对话参数设置**：温度、最大令牌数、频率惩罚等
+3. **记忆功能配置**：记忆开关、记忆强度设置
+4. **技能集成**：选择和配置助手使用的技能
+5. **模型选择**：选择合适的 AI 模型和提供商
+
+#### 配置管理流程
 
 ```mermaid
-sequenceDiagram
-participant User as 用户
-participant Welcome as 欢迎页面
-participant ServerConfig as 服务器配置
-participant Completion as 完成页面
-participant App as 应用主界面
-User->>Welcome : 打开应用
-Welcome->>User : 显示欢迎信息
-User->>Welcome : 点击开始
-Welcome->>ServerConfig : 导航到配置页面
-ServerConfig->>User : 输入服务器地址
-User->>ServerConfig : 保存配置
-ServerConfig->>Completion : 导航到完成页面
-Completion->>App : 切换到主界面
-App->>User : 显示应用功能
+flowchart TD
+Start[打开助手配置] --> LoadConfig[加载配置数据]
+LoadConfig --> DisplayBasic[显示基本信息]
+DisplayBasic --> DisplayParams[显示参数设置]
+DisplayParams --> DisplayMemory[显示记忆设置]
+DisplayMemory --> DisplaySkills[显示技能配置]
+DisplaySkills --> UserAction[用户操作]
+UserAction --> SaveConfig[保存配置]
+UserAction --> TestConfig[测试配置]
+SaveConfig --> LoadConfig
+TestConfig --> LoadConfig
 ```
 
 **图表来源**
 
-- [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx:11-44](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx#L11-L44)
+- [apps/mobile/src/screens/AgentConfigScreen.tsx:1-800](file://apps/mobile/src/screens/AgentConfigScreen.tsx#L1-L800)
+
+#### 技术特性
+
+- **参数验证**：对数值参数进行有效性验证
+- **实时预览**：配置变化的实时预览效果
+- **技能管理**：完整的技能选择和管理界面
+- **模型选择**：直观的模型和提供商选择
+- **配置保存**：支持部分参数的增量保存
 
 **章节来源**
 
-- [apps/mobile/src/screens/onboarding/WelcomeScreen.tsx:1-45](file://apps/mobile/src/screens/onboarding/WelcomeScreen.tsx#L1-L45)
+- [apps/mobile/src/screens/AgentConfigScreen.tsx:1-800](file://apps/mobile/src/screens/AgentConfigScreen.tsx#L1-L800)
 
-### 发现屏幕组件
+### 智能重命名功能
 
-**移除** Discover 标签页已被 Artwork、Resources 和 Skills 标签页替代，原有的发现功能整合到新的导航结构中。
+**新增** 智能重命名功能为对话主题提供了 AI 驱动的自动重命名能力。
 
-#### 发现功能迁移
+#### 功能特性
 
-发现屏幕原本提供 Agent、Model 和 Provider 的发现功能，现已整合到以下新的导航结构中：
+1. **AI 重命名建议**：基于对话内容生成智能重命名建议
+2. **手动重命名**：支持用户手动输入自定义标题
+3. **重命名历史**：查看和管理历史重命名记录
+4. **重命名策略**：支持多种重命名策略和模板
+5. **批量重命名**：支持批量重命名多个对话主题
 
-- Agent 发现 → 通过技能市场和 Agent 详情页面
-- Model 发现 → 通过 AI 提供商和模型列表页面
-- Provider 发现 → 通过 AI 提供商详情页面
+#### 重命名流程
+
+```mermaid
+flowchart TD
+Start[用户触发重命名] --> ShowMenu[显示重命名选项]
+ShowMenu --> SmartRename[智能重命名]
+ShowMenu --> ManualRename[手动重命名]
+SmartRename --> GenerateTitle[生成重命名建议]
+GenerateTitle --> AIProcess[AI处理对话内容]
+AIProcess --> GetSuggestion[获取重命名建议]
+GetSuggestion --> UserApproval[用户确认]
+ManualRename --> UserInput[用户输入标题]
+UserApproval --> SaveRename[保存重命名]
+UserInput --> SaveRename
+SaveRename --> UpdateUI[更新界面显示]
+```
+
+**图表来源**
+
+- [apps/mobile/src/components/ui/TopicItem.tsx:30-269](file://apps/mobile/src/components/ui/TopicItem.tsx#L30-L269)
+- [apps/mobile/src/lib/titleGeneration.ts](file://apps/mobile/src/lib/titleGeneration.ts)
+
+#### 技术实现
+
+- **标题生成算法**：基于对话内容的智能标题生成
+- **AI 集成**：与后端 AI 服务的深度集成
+- **用户反馈**：支持用户对 AI 建议的反馈和调整
+- **历史记录**：完整的重命名历史追踪
+- **性能优化**：高效的重命名处理和缓存机制
 
 **章节来源**
 
-- [apps/mobile/src/screens/DiscoverScreen.tsx:1-217](file://apps/mobile/src/screens/DiscoverScreen.tsx#L1-L217)
+- [apps/mobile/src/components/ui/TopicItem.tsx:1-269](file://apps/mobile/src/components/ui/TopicItem.tsx#L1-L269)
+- [apps/mobile/src/lib/titleGeneration.ts](file://apps/mobile/src/lib/titleGeneration.ts)
 
 ### 状态管理系统
 
@@ -708,29 +628,29 @@ Tailwind --> ReactNative
 
 #### 新增功能问题
 
-**问题**：Artwork 标签无法访问或功能异常
+**问题**：Create 标签无法访问或功能异常
 
-- 检查 ArtworkScreen 组件的导入和注册
+- 检查 CreateScreen 组件的导入和注册
 - 验证 AI 模型配置和网络连接
 - 确认图像生成 API 的可用性
 
-**问题**：Resources 标签显示空白或加载失败
+**问题**：Store 标签显示空白或加载失败
 
-- 检查 ResourceScreen 组件的导入和注册
-- 验证文件 API 接口和网络连接
-- 确认用户权限和认证状态
-
-**问题**：Skills 标签显示空白或加载失败
-
-- 检查 SkillSettingsScreen 组件的导入和注册
+- 检查 StoreScreen 组件的导入和注册
 - 验证技能 API 接口和网络连接
 - 确认 MCP 服务器配置和认证状态
 
-**问题**：Settings 标签显示空白或加载失败
+**问题**：AgentList 标签显示空白或加载失败
 
-- 检查 SettingsScreen 组件的导入和注册
-- 验证设置数据的 API 接口
-- 确认设置存储的读写权限
+- 检查 AgentListScreen 组件的导入和注册
+- 验证 Agent API 接口和网络连接
+- 确认用户权限和认证状态
+
+**问题**：智能重命名功能异常
+
+- 检查 TitleGeneration 服务的可用性
+- 验证 AI 重命名 API 的连接状态
+- 确认对话内容的完整性
 
 #### 状态管理问题
 
@@ -780,9 +700,9 @@ Tailwind --> ReactNative
 
 ### 新功能价值
 
-**Artwork 标签**：为用户提供 AI 图像生成功能，支持多种模型和参数配置
-**Resources 标签**：提供完整的文件资源管理功能，支持多类型文件的上传、下载和管理
-**Skills 标签**：统一管理 Agent 技能和 MCP 服务器，提供完整的技能生态系统
-**Settings 标签**：统一管理应用设置，提供更合理的导航流程和用户体验
+**助手中心导航系统**：为用户提供完整的 AI 助手管理功能，支持助手的创建、配置和管理
+**智能重命名功能**：通过 AI 技术为对话主题提供智能重命名建议，提升用户体验
+**创作中心**：统一管理图像生成和视频创作功能，提供更好的创作体验
+**技能商店**：提供完整的技能和 MCP 服务器管理，支持丰富的 AI 功能扩展
 
 该导航系统为 LobeHub 移动应用提供了坚实的技术基础，能够支持复杂的功能需求和良好的用户体验。

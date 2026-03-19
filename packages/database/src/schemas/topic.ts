@@ -17,7 +17,8 @@ import { createdAt, timestamps, timestamptz } from './_helpers';
 import { agents } from './agent';
 import { chatGroups } from './chatGroup';
 import { documents } from './file';
-import { sessions, sessionTags } from './session';
+import { sessions } from './session';
+import { tags } from './tag';
 import { users } from './user';
 
 export const topics = pgTable(
@@ -29,7 +30,7 @@ export const topics = pgTable(
     title: text('title'),
     favorite: boolean('favorite').default(false),
     sessionId: text('session_id').references(() => sessions.id, { onDelete: 'cascade' }),
-    tagId: text('tag_id').references(() => sessionTags.id, { onDelete: 'set null' }),
+    tagId: text('tag_id').references(() => tags.id, { onDelete: 'set null' }),
     content: text('content'),
     editorData: jsonb('editor_data'),
     agentId: text('agent_id').references(() => agents.id, { onDelete: 'cascade' }),

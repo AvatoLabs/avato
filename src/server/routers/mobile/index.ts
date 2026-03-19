@@ -26,7 +26,7 @@ import { notebookRouter } from '../lambda/notebook';
 import { pluginRouter } from '../lambda/plugin';
 import { sessionRouter } from '../lambda/session';
 import { sessionGroupRouter } from '../lambda/sessionGroup';
-import { sessionTagRouter } from '../lambda/sessionTag';
+import { tagRouter } from '../lambda/tag';
 import { topicRouter } from '../lambda/topic';
 import { uploadRouter } from '../lambda/upload';
 import { userRouter } from '../lambda/user';
@@ -59,7 +59,7 @@ export const mobileRouter = router({
   plugin: pluginRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
-  sessionTag: sessionTagRouter,
+  tag: tagRouter,
   topic: topicRouter,
   upload: uploadRouter,
   user: userRouter,

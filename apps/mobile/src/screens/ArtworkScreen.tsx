@@ -427,7 +427,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── Main Screen ──────────────────────────────────────────────────────
-export default function ArtworkScreen() {
+interface ArtworkScreenProps {
+  hideHeader?: boolean;
+}
+
+export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -666,21 +670,15 @@ export default function ArtworkScreen() {
 
   useEffect(() => stopPolling, [stopPolling]);
 
-  // ── Keyboard lift: use screenY for accurate offset, add paddingBottom so input sticks to keyboard ──
+  // ── Keyboard lift: keep composer close to keyboard without double-counting bottom inset ──
   const inputPaddingBottom = Math.max(insets.bottom, 8);
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
       const coords = event?.endCoordinates;
       const windowHeight = Dimensions.get('window').height;
       const screenY = Number(coords?.screenY ?? windowHeight);
-      // Distance from screen bottom to keyboard top = how much to translate
       const offsetFromBottom = windowHeight - screenY;
-      if (offsetFromBottom > 0) {
-        // Add input's paddingBottom so BlurView bottom sits flush with keyboard top
-        setKeyboardOffset(offsetFromBottom + inputPaddingBottom);
-      } else {
-        setKeyboardOffset(0);
-      }
+      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom : 0);
     };
     const handleKeyboardHide = () => {
       setKeyboardOffset(0);
@@ -977,12 +975,14 @@ export default function ArtworkScreen() {
   return (
     <View className="flex-1 bg-background">
       {/* ── Header ── */}
-      <ScreenHeader
-        title={t.artworkTitle}
-        titleIcon={
-          <Palette color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        }
-      />
+      {!hideHeader ? (
+        <ScreenHeader
+          title={t.artworkTitle}
+          titleIcon={
+            <Palette color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          }
+        />
+      ) : null}
 
       {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
       <View>
@@ -1000,10 +1000,16 @@ export default function ArtworkScreen() {
             <View className="flex-row items-center">
               <Sparkles color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
               <View className="ml-2 flex-1">
-                <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}
+                >
                   {modelName || t.artworkSelectModel}
                 </Text>
-                <Text className="mt-0.5 text-[11px] text-secondary/40" numberOfLines={1}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2, opacity: 0.8 }}
+                >
                   {summaryParts.join(' · ')}
                 </Text>
               </View>
@@ -1022,7 +1028,11 @@ export default function ArtworkScreen() {
               setShowSidebar(true);
             }}
           >
-            <SlidersHorizontal color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            <SlidersHorizontal
+              color={colors.primary}
+              size={20}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -1038,10 +1048,10 @@ export default function ArtworkScreen() {
                 flexGrow: 1,
                 justifyContent: 'center',
                 alignItems: 'center',
-                paddingBottom: insets.bottom + 80,
+                paddingBottom: 20,
                 paddingHorizontal: containerPad,
               }
-            : { paddingBottom: insets.bottom + 80, paddingHorizontal: containerPad }
+            : { paddingBottom: 20, paddingHorizontal: containerPad }
         }
       >
         {batches.length > 0 ? (
@@ -1102,11 +1112,9 @@ export default function ArtworkScreen() {
 
       {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
       <Animated.View
-        className="absolute bottom-0 left-0 right-0"
+        className="px-4 pt-1"
         style={{
           paddingBottom: Math.max(insets.bottom, 8),
-          paddingHorizontal: 16,
-          paddingTop: 4,
           transform: [{ translateY: -keyboardOffset }],
         }}
       >
@@ -1123,13 +1131,20 @@ export default function ArtworkScreen() {
           <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
             <TextInput
               multiline
-              className="flex-1 text-foreground text-[16px] leading-[22px] min-h-[36px]"
+              className="flex-1 min-h-[36px]"
               maxLength={2000}
               placeholder={t.artworkPromptPlaceholder}
               placeholderTextColor={colors.muted}
-              style={{ maxHeight: 112, paddingVertical: 0, textAlignVertical: 'top' }}
               underlineColorAndroid="transparent"
               value={prompt}
+              style={{
+                color: colors.foreground,
+                fontSize: 16,
+                lineHeight: 22,
+                maxHeight: 112,
+                paddingVertical: 0,
+                textAlignVertical: 'top',
+              }}
               onChangeText={setPrompt}
             />
             <TouchableOpacity
@@ -1200,7 +1215,12 @@ export default function ArtworkScreen() {
               {/* Sidebar header */}
               <View className="flex-row items-center justify-between mb-2">
                 <Text
-                  style={{ color: colors.foreground, fontSize: 18, fontWeight: '700', letterSpacing: -0.3 }}
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 18,
+                    fontWeight: '700',
+                    letterSpacing: -0.3,
+                  }}
                 >
                   {t.artworkTitle}
                 </Text>
@@ -1235,7 +1255,11 @@ export default function ArtworkScreen() {
                 >
                   {modelName || t.artworkSelectModel}
                 </Text>
-                <ChevronDown color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <ChevronDown
+                  color={colors.iconMuted}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               </TouchableOpacity>
               {showPicker && (
                 <Animated.View
@@ -1251,7 +1275,9 @@ export default function ArtworkScreen() {
                   <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
                     {allModels.length === 0 ? (
                       <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                        <Text style={{ color: colors.muted, fontSize: 14 }}>{t.artworkNoModels}</Text>
+                        <Text style={{ color: colors.muted, fontSize: 14 }}>
+                          {t.artworkNoModels}
+                        </Text>
                         <Text style={{ color: colors.secondaryText, fontSize: 12, marginTop: 4 }}>
                           {t.artworkNoModelsDesc}
                         </Text>
@@ -1274,10 +1300,14 @@ export default function ArtworkScreen() {
                           }}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '500' }}>
+                            <Text
+                              style={{ color: colors.foreground, fontSize: 13, fontWeight: '500' }}
+                            >
                               {m.displayName || m.id}
                             </Text>
-                            <Text style={{ color: colors.muted, fontSize: 10 }}>{m.providerName}</Text>
+                            <Text style={{ color: colors.muted, fontSize: 10 }}>
+                              {m.providerName}
+                            </Text>
                           </View>
                           {model === m.id && (
                             <View
@@ -1343,7 +1373,12 @@ export default function ArtworkScreen() {
                       <>
                         <ImageIcon color={colors.secondaryText} size={28} strokeWidth={1.5} />
                         <Text
-                          style={{ color: colors.muted, fontSize: 12, marginTop: 6, textAlign: 'center' }}
+                          style={{
+                            color: colors.muted,
+                            fontSize: 12,
+                            marginTop: 6,
+                            textAlign: 'center',
+                          }}
                         >
                           {t.artworkReferenceImagesDesc}
                         </Text>
@@ -1687,24 +1722,49 @@ function BatchCard({
   return (
     <Animated.View className="bg-card rounded-2xl p-3 mb-3" entering={FadeInDown.duration(350)}>
       {/* Prompt */}
-      <Text className="text-foreground text-[13px] mb-2" numberOfLines={3}>
+      <Text numberOfLines={3} style={{ color: colors.foreground, fontSize: 13, marginBottom: 8 }}>
         {batch.prompt}
       </Text>
 
       {/* Meta */}
       <View className="flex-row items-center gap-2 mb-2">
-        <View className="bg-white/10 px-2 py-0.5 rounded-md">
-          <Text className="text-foreground/60 text-[10px]">{batch.model}</Text>
+        <View
+          style={{
+            backgroundColor: colors.fillTertiary,
+            borderRadius: 6,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+          }}
+        >
+          <Text style={{ color: colors.secondaryText, fontSize: 10, fontWeight: '500' }}>
+            {batch.model}
+          </Text>
         </View>
         {batch.width && batch.height && (
-          <View className="bg-white/10 px-2 py-0.5 rounded-md">
-            <Text className="text-foreground/60 text-[10px]">
+          <View
+            style={{
+              backgroundColor: colors.fillTertiary,
+              borderRadius: 6,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: colors.secondaryText, fontSize: 10, fontWeight: '500' }}>
               {batch.width}×{batch.height}
             </Text>
           </View>
         )}
-        <View className="bg-white/10 px-2 py-0.5 rounded-md">
-          <Text className="text-foreground/60 text-[10px]">×{batch.generations.length}</Text>
+        <View
+          style={{
+            backgroundColor: colors.fillTertiary,
+            borderRadius: 6,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+          }}
+        >
+          <Text style={{ color: colors.secondaryText, fontSize: 10, fontWeight: '500' }}>
+            ×{batch.generations.length}
+          </Text>
         </View>
       </View>
 
@@ -1738,7 +1798,9 @@ function BatchCard({
                 />
               ) : isErr ? (
                 <View className="items-center p-2">
-                  <Text className="text-red-400 text-[10px]">{t.artworkError}</Text>
+                  <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '600' }}>
+                    {t.artworkError}
+                  </Text>
                 </View>
               ) : (
                 <View className="items-center">

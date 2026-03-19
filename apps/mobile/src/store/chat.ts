@@ -72,11 +72,62 @@ const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayl
     arguments: exec.arguments,
     id: exec.id,
     identifier: exec.identifier,
-    intervention: exec.intervention,
+    intervention: exec.intervention ?? { status: 'approved' },
     result_content: exec.result,
+    result_msg_id: exec.id,
     source: exec.identifier.startsWith('lobe-') ? 'builtin' : ('plugin' as const),
     type: 'function',
   }));
+
+const mergeToolPayloads = (
+  previous: ChatToolPayload[] | undefined,
+  incoming: ChatToolPayload[] | undefined,
+): ChatToolPayload[] | undefined => {
+  if (!previous?.length) return incoming?.length ? incoming : undefined;
+  if (!incoming?.length) return previous;
+
+  const merged = new Map<string, ChatToolPayload>();
+  const order: string[] = [];
+
+  const ensureKey = (tool: ChatToolPayload) => tool.id || `${tool.identifier}:${tool.apiName}`;
+
+  for (const tool of previous) {
+    const key = ensureKey(tool);
+    order.push(key);
+    merged.set(key, tool);
+  }
+
+  for (const tool of incoming) {
+    const key = ensureKey(tool);
+    if (!merged.has(key)) {
+      order.push(key);
+      merged.set(key, tool);
+      continue;
+    }
+
+    const existing = merged.get(key)!;
+    const next = {
+      ...existing,
+      ...tool,
+      intervention:
+        tool.result_content !== undefined || tool.result_msg_id
+          ? (tool.intervention ?? { status: 'approved' })
+          : (tool.intervention ?? existing.intervention),
+      result_content:
+        tool.result_content !== undefined ? tool.result_content : existing.result_content,
+      result_msg_id: tool.result_msg_id ?? existing.result_msg_id,
+    } satisfies ChatToolPayload;
+
+    merged.set(key, next);
+  }
+
+  return order.map((key) => merged.get(key)!).filter(Boolean);
+};
+
+const mergeResolvedToolPayloads = (
+  tools: ChatToolPayload[] | undefined,
+  executions: ToolExecutionItem[] | undefined,
+) => mergeToolPayloads(tools, executions ? toolExecutionsToPayloads(executions) : undefined);
 
 /**
  * Resolves per-session chat options with Agent Config as single source of truth:
@@ -972,18 +1023,9 @@ interface ChatState {
   /** Timestamp when reasoning started (for computing duration) */
   reasoningStartedAt: number | null;
   regenerateMessage: (sessionId: string, messageId: string) => Promise<void>;
-  rejectToolCall: (
-    sessionId: string,
-    messageId: string,
-    toolId: string,
-    reason?: string,
-  ) => void;
+  rejectToolCall: (sessionId: string, messageId: string, toolId: string, reason?: string) => void;
   /** Reject a tool message (role=tool) - updates plugin.intervention locally */
-  rejectToolMessage: (
-    sessionId: string,
-    messageId: string,
-    reason?: string,
-  ) => void;
+  rejectToolMessage: (sessionId: string, messageId: string, reason?: string) => void;
   reset: () => void;
   sendMessage: (
     sessionId: string,
@@ -1722,7 +1764,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const t = useI18n.getState().t;
         const { messageKey } = classifyError(err);
         const errorMessage =
-          messageKey === 'errorProviderOverloaded' ? t.errorProviderOverloaded : rawMessage || t.errorSendFailed;
+          messageKey === 'errorProviderOverloaded'
+            ? t.errorProviderOverloaded
+            : rawMessage || t.errorSendFailed;
         useToast.getState().show('error', errorMessage);
 
         set((s) => ({
@@ -2008,7 +2052,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, tools: toolPayloads } : m,
+                  m.id === assistantMsgId
+                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
+                    : m,
                 ),
               },
             }));
@@ -2018,7 +2064,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, tools } : m,
+                  m.id === assistantMsgId
+                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
+                    : m,
                 ),
               },
             }));
@@ -2062,9 +2110,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }));
       }
 
-      const resolvedTools =
-        result.tools ||
-        (result.toolExecutions ? toolExecutionsToPayloads(result.toolExecutions) : undefined);
+      const resolvedTools = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
 
       if (result.images || result.search || resolvedTools || result.usage || result.performance) {
         set((s) => ({
@@ -2155,7 +2201,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const rawMessage = err instanceof Error ? err.message : '';
       const { messageKey } = classifyError(err);
       const errorMessage =
-        messageKey === 'errorProviderOverloaded' ? t.errorProviderOverloaded : rawMessage || t.errorNetwork;
+        messageKey === 'errorProviderOverloaded'
+          ? t.errorProviderOverloaded
+          : rawMessage || t.errorNetwork;
       useToast.getState().show('error', errorMessage);
       set((s) => ({
         messagesBySession: {
@@ -2746,7 +2794,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, tools: toolPayloads } : m,
+                  m.id === assistantMsgId
+                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, toolPayloads) }
+                    : m,
                 ),
               },
             }));
@@ -2756,7 +2806,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
               messagesBySession: {
                 ...s.messagesBySession,
                 [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
-                  m.id === assistantMsgId ? { ...m, tools } : m,
+                  m.id === assistantMsgId
+                    ? { ...m, tools: mergeToolPayloads(m.tools ?? undefined, tools) }
+                    : m,
                 ),
               },
             }));
@@ -2798,9 +2850,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }));
       }
 
-      const resolvedToolsRegen =
-        result.tools ||
-        (result.toolExecutions ? toolExecutionsToPayloads(result.toolExecutions) : undefined);
+      const resolvedToolsRegen = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
 
       if (
         result.images ||
@@ -2931,8 +2981,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await get().fetchMessages(sessionId, topicId ?? undefined, { preserveOnEmpty: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const isNotSupported =
-        msg.includes('not yet supported') || msg.includes('not implemented');
+      const isNotSupported = msg.includes('not yet supported') || msg.includes('not implemented');
       useToast.getState().show('error', isNotSupported ? t.chatToolApproveNotSupported : msg);
     }
   },
@@ -2968,9 +3017,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (msg.id !== messageId || msg.role !== 'tool') return msg;
         return {
           ...msg,
-          plugin: msg.plugin
-            ? { ...msg.plugin, intervention }
-            : msg.plugin,
+          plugin: msg.plugin ? { ...msg.plugin, intervention } : msg.plugin,
           pluginIntervention: intervention,
         };
       });

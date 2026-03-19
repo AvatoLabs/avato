@@ -1,10 +1,11 @@
 /**
  * TopicItem — A single topic row for TopicListScreen.
  */
-import { Heart, MoreHorizontal, Pencil, Trash2, Wand2 } from 'lucide-react-native';
+import { Heart, MoreHorizontal, Pencil, Tag, Trash2, Wand2 } from 'lucide-react-native';
 import React, { memo, useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
 
+import { withAlpha } from '../../constants/tags';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
@@ -15,8 +16,10 @@ import { useToast } from './Toast';
 
 interface TopicItemProps {
   isActive: boolean;
+  isGroup?: boolean;
   onDelete: () => void;
   onFavorite: () => void;
+  onMoveToTag?: () => void;
   onPress: () => void;
   onRename?: (newTitle: string) => void;
   onSmartRename?: () => void;
@@ -24,7 +27,17 @@ interface TopicItemProps {
 }
 
 const TopicItem = memo<TopicItemProps>(
-  ({ topic, isActive, onPress, onFavorite, onDelete, onRename, onSmartRename }) => {
+  ({
+    topic,
+    isActive,
+    isGroup,
+    onPress,
+    onFavorite,
+    onDelete,
+    onMoveToTag,
+    onRename,
+    onSmartRename,
+  }) => {
     const { t } = useI18n();
     const toast = useToast();
     const colors = useThemeColors();
@@ -38,18 +51,20 @@ const TopicItem = memo<TopicItemProps>(
 
     const handleDelete = useCallback(() => {
       setMenuVisible(false);
-      Alert.alert(t.delete, t.topicDeleteConfirm, [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: t.delete,
-          style: 'destructive',
-          onPress: () => {
-            haptics.warning();
-            onDelete();
+      setTimeout(() => {
+        Alert.alert(t.deleteTopicConfirm, t.deleteTopicDesc, [
+          { text: t.cancel, style: 'cancel' },
+          {
+            text: t.delete,
+            style: 'destructive',
+            onPress: () => {
+              haptics.warning();
+              onDelete();
+            },
           },
-        },
-      ]);
-    }, [t, onDelete]);
+        ]);
+      }, 300);
+    }, [onDelete, t]);
 
     const formatDate = (dateStr: string) => {
       const d = new Date(dateStr);
@@ -84,12 +99,30 @@ const TopicItem = memo<TopicItemProps>(
                 />
               )}
               <Text
-                numberOfLines={1}
                 className="text-[15px] font-medium tracking-tight"
-              style={{ color: isActive ? colors.primary : colors.foreground }}
+                numberOfLines={1}
+                style={{ color: isActive ? colors.primary : colors.foreground }}
               >
                 {topic.title}
               </Text>
+              {isGroup && (
+                <View
+                  className="ml-2 flex-row items-center rounded-full px-2.5 py-0.5"
+                  style={{ backgroundColor: withAlpha(colors.primary, '18') }}
+                >
+                  <View
+                    className="mr-1.5 rounded-full"
+                    style={{ backgroundColor: colors.primary, height: 6, width: 6 }}
+                  />
+                  <Text
+                    className="text-[10px] font-semibold"
+                    numberOfLines={1}
+                    style={{ color: colors.primary }}
+                  >
+                    {t.chatListGroupTag}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text
               className="text-[12px] mt-0.5 font-medium"
@@ -106,11 +139,7 @@ const TopicItem = memo<TopicItemProps>(
               setMenuVisible(true);
             }}
           >
-            <MoreHorizontal
-              color={colors.muted}
-              size={18}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <MoreHorizontal color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </TouchableOpacity>
 
@@ -157,11 +186,7 @@ const TopicItem = memo<TopicItemProps>(
                       onSmartRename();
                     }}
                   >
-                    <Wand2
-                      color={colors.muted}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
+                    <Wand2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="ml-3 text-base text-foreground">{t.actionSmartRename}</Text>
                   </Pressable>
                 )}
@@ -170,23 +195,27 @@ const TopicItem = memo<TopicItemProps>(
                     className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                     onPress={handleRename}
                   >
-                    <Pencil
-                      color={colors.muted}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
+                    <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                     <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+                  </Pressable>
+                )}
+                {onMoveToTag && (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      setMenuVisible(false);
+                      onMoveToTag();
+                    }}
+                  >
+                    <Tag color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.tagMoveSession}</Text>
                   </Pressable>
                 )}
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={handleDelete}
                 >
-                  <Trash2
-                    color={colors.danger}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
                 </Pressable>
               </View>

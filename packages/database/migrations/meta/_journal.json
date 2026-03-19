@@ -665,6 +665,13 @@
       "when": 1773916027433,
       "tag": "0094_wet_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1773931025915,
+      "tag": "0095_rename_session_tags_to_tags",
+      "breakpoints": true
     }
   ],
   "version": "6"

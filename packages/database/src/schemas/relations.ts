@@ -16,7 +16,8 @@ import { documents, files, knowledgeBases } from './file';
 import { generationBatches, generations, generationTopics } from './generation';
 import { messageGroups, messages, messagesFiles, messageTranslates } from './message';
 import { chunks, documentChunks, unstructuredChunks } from './rag';
-import { sessionGroups, sessions, sessionTags } from './session';
+import { sessionGroups, sessions } from './session';
+import { tags } from './tag';
 import { threads, topicDocuments, topics } from './topic';
 import { users } from './user';
 
@@ -86,9 +87,9 @@ export const topicRelations = relations(topics, ({ one, many }) => ({
     fields: [topics.sessionId],
     references: [sessions.id],
   }),
-  tag: one(sessionTags, {
+  tag: one(tags, {
     fields: [topics.tagId],
-    references: [sessionTags.id],
+    references: [tags.id],
   }),
   documents: many(topicDocuments),
 }));

@@ -14,9 +14,7 @@ import {
   ActivityIndicator,
   Image as RNImage,
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   Switch,
   Text,
@@ -26,10 +24,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import ContentSkeleton from '../components/ui/ContentSkeleton';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import SkillsSheet from '../components/ui/SkillsSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
@@ -158,7 +156,10 @@ function CollapsibleSection({
   return (
     <SectionCard title={title}>
       <TouchableOpacity activeOpacity={0.8} className="flex-row items-center" onPress={onToggle}>
-        <View className="mr-3 h-10 w-10 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+        <View
+          className="mr-3 h-10 w-10 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: colors.primarySubtle }}
+        >
           <Icon color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </View>
         <View className="flex-1">
@@ -281,7 +282,10 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
 
   if (!providerId) {
     return (
-      <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+      <View
+        className="h-11 w-11 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: colors.primarySubtle }}
+      >
         <Cpu color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
       </View>
     );
@@ -289,7 +293,10 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
 
   if (!uri || error) {
     return (
-      <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+      <View
+        className="h-11 w-11 items-center justify-center rounded-2xl"
+        style={{ backgroundColor: colors.primarySubtle }}
+      >
         <Text className="text-[12px] font-bold" style={{ color: colors.primary }}>
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
@@ -298,7 +305,10 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
   }
 
   return (
-    <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+    <View
+      className="h-11 w-11 items-center justify-center rounded-2xl"
+      style={{ backgroundColor: colors.primarySubtle }}
+    >
       <RNImage
         source={{ uri }}
         style={{ borderRadius: 10, height: 24, width: 24 }}
@@ -308,41 +318,7 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
   );
 }
 
-function SkillRow({
-  accessory,
-  description,
-  title,
-}: {
-  accessory: React.ReactNode;
-  description?: string;
-  title: React.ReactNode;
-}) {
-  return (
-    <View className="mb-3 flex-row items-center rounded-2xl bg-foreground/[0.03] px-3.5 py-3 last:mb-0">
-      <View className="flex-1 pr-3">
-        {typeof title === 'string' ? (
-          <Text className="text-[14px] font-semibold text-foreground" numberOfLines={1}>
-            {title}
-          </Text>
-        ) : (
-          title
-        )}
-        {description ? (
-          <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60" numberOfLines={2}>
-            {description}
-          </Text>
-        ) : null}
-      </View>
-      {accessory}
-    </View>
-  );
-}
-
-function CreateNewAgentConfigScreen({
-  navigation,
-}: {
-  navigation: any;
-}) {
+function CreateNewAgentConfigScreen({ navigation }: { navigation: any }) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -374,8 +350,8 @@ function CreateNewAgentConfigScreen({
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
-      style={{ backgroundColor: colors.background }}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+      style={{ backgroundColor: colors.background }}
     >
       <ScreenHeader
         rightAccessibilityLabel={t.accessibilitySave}
@@ -399,7 +375,10 @@ function CreateNewAgentConfigScreen({
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-5 px-5">
-          <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+          <Text
+            className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider"
+            style={{ color: colors.secondaryText }}
+          >
             {t.agentConfigName}
           </Text>
           <View className="rounded-2xl p-4" style={{ backgroundColor: colors.fillQuaternary }}>
@@ -408,13 +387,13 @@ function CreateNewAgentConfigScreen({
               className="rounded-xl px-4 py-3 text-[15px]"
               placeholder={t.chatListNewAssistant}
               placeholderTextColor={colors.secondaryText}
+              value={title}
               style={{
                 backgroundColor: colors.fillTertiary,
                 borderColor: colors.border,
                 borderWidth: 1,
                 color: colors.foreground,
               }}
-              value={title}
               onChangeText={setTitle}
             />
           </View>
@@ -472,7 +451,9 @@ function SessionOnlyAgentConfigScreen({ navigation }: { navigation: any }) {
             style={{ backgroundColor: colors.primary }}
             onPress={openStore}
           >
-            <Text className="text-[13px] font-semibold" style={{ color: colors.iconOnPrimary }}>{t.agentConfigOpenStore}</Text>
+            <Text className="text-[13px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+              {t.agentConfigOpenStore}
+            </Text>
           </TouchableOpacity>
         </SectionCard>
       </ScrollView>
@@ -821,7 +802,10 @@ function SessionAgentConfigScreen({
               void loadSkills();
             }}
           >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="h-11 w-11 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               <Puzzle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="ml-3 flex-1">
@@ -1032,138 +1016,20 @@ function SessionAgentConfigScreen({
         }}
       />
 
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
+      <SkillsSheet
+        agentConfigOpenStore={t.agentConfigOpenStore}
+        agentSkillItems={agentSkillItems}
+        builtinItems={builtinSkillItems}
+        enabledIdentifiers={selectedSkills}
+        installedPlugins={installedPlugins}
+        loading={loadingSkills}
+        skillsEmpty={t.agentConfigSkillsEmpty}
+        skillsEmptyDesc={t.skillsEmptyDesc}
+        skillsTitle={t.skillsTitle}
         visible={skillsVisible}
-        onRequestClose={() => setSkillsVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSkillsVisible(false)}
-        >
-          <Pressable
-            className="max-h-[74%] rounded-t-2xl bg-card"
-            onPress={(event) => event.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-1">
-              <View className="h-1 w-9 rounded-full bg-foreground/10" />
-            </View>
-            <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
-              <Text className="text-[18px] font-bold tracking-tight text-foreground">
-                {t.skillsTitle}
-              </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => setSkillsVisible(false)}>
-                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>{t.done}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 28 }}>
-              {loadingSkills ? (
-                <View className="items-center py-10">
-                  <ActivityIndicator color={colors.primary} />
-                </View>
-              ) : builtinSkillItems.length === 0 &&
-                agentSkillItems.length === 0 &&
-                installedPlugins.length === 0 ? (
-                <View className="items-center py-10">
-                  <Text className="text-[14px] text-secondary/50">{t.agentConfigSkillsEmpty}</Text>
-                </View>
-              ) : (
-                <>
-                  {builtinSkillItems.length > 0 ? (
-                    <SectionCard title={t.storeBuiltIn}>
-                      {builtinSkillItems.map((item) => (
-                        <SkillRow
-                          description={item.description}
-                          key={`builtin-${item.identifier}`}
-                          accessory={
-                            <Switch
-                              value={selectedSkills.has(item.identifier)}
-                              trackColor={{
-                                false: 'rgba(120,120,128,0.18)',
-                                true: `${colors.primary}66`,
-                              }}
-                              onValueChange={() => toggleSkill(item.identifier)}
-                            />
-                          }
-                          title={
-                            <View className="flex-row items-center">
-                              <BuiltinSkillIcon icon={item.icon} size={20} />
-                              <Text className="ml-2 text-[14px] font-semibold text-foreground">
-                                {item.title}
-                              </Text>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </SectionCard>
-                  ) : null}
-
-                  {agentSkillItems.length > 0 ? (
-                    <SectionCard title={t.skillsTitle}>
-                      {agentSkillItems.map((item) => {
-                        const identifier = item.identifier || item.id;
-                        return (
-                          <SkillRow
-                            description={item.description}
-                            key={`skill-${identifier}`}
-                            title={item.name}
-                            accessory={
-                              <Switch
-                                value={selectedSkills.has(identifier)}
-                                trackColor={{
-                                  false: 'rgba(120,120,128,0.18)',
-                                  true: `${colors.primary}66`,
-                                }}
-                                onValueChange={() => toggleSkill(identifier)}
-                              />
-                            }
-                          />
-                        );
-                      })}
-                    </SectionCard>
-                  ) : null}
-
-                  {installedPlugins.length > 0 ? (
-                    <SectionCard title={t.storeInstalled}>
-                      {installedPlugins.map((plugin) => (
-                        <SkillRow
-                          description={plugin.manifest?.meta?.description}
-                          key={`plugin-${plugin.identifier}`}
-                          accessory={
-                            <Switch
-                              value={selectedSkills.has(plugin.identifier)}
-                              trackColor={{
-                                false: 'rgba(120,120,128,0.18)',
-                                true: `${colors.primary}66`,
-                              }}
-                              onValueChange={() => toggleSkill(plugin.identifier)}
-                            />
-                          }
-                          title={
-                            <View className="flex-row items-center">
-                              <View className="h-6 w-6 items-center justify-center rounded-lg bg-foreground/[0.04]">
-                                <Text className="text-[14px]" style={{ color: colors.foreground }}>
-                                  {plugin.manifest?.meta?.avatar ?? '🔌'}
-                                </Text>
-                              </View>
-                              <Text className="ml-2 text-[14px] font-semibold text-foreground">
-                                {plugin.manifest?.meta?.title || plugin.identifier}
-                              </Text>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </SectionCard>
-                  ) : null}
-                </>
-              )}
-            </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        onClose={() => setSkillsVisible(false)}
+        onToggle={toggleSkill}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1490,7 +1356,10 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
               void loadSkills();
             }}
           >
-            <View className="h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="h-11 w-11 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               <Puzzle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="ml-3 flex-1">
@@ -1682,136 +1551,20 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
         }}
       />
 
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
+      <SkillsSheet
+        agentConfigOpenStore={t.agentConfigOpenStore}
+        agentSkillItems={agentSkillItems}
+        builtinItems={builtinSkillItems}
+        enabledIdentifiers={selectedSkills}
+        installedPlugins={installedPlugins}
+        loading={loadingSkills}
+        skillsEmpty={t.agentConfigSkillsEmpty}
+        skillsEmptyDesc={t.skillsEmptyDesc}
+        skillsTitle={t.skillsTitle}
         visible={skillsVisible}
-        onRequestClose={() => setSkillsVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSkillsVisible(false)}
-        >
-          <Pressable
-            className="max-h-[74%] rounded-t-2xl bg-card"
-            onPress={(event) => event.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-1">
-              <View className="h-1 w-9 rounded-full bg-foreground/10" />
-            </View>
-            <View className="flex-row items-center justify-between px-5 pb-3 pt-2">
-              <Text className="text-[18px] font-bold tracking-tight text-foreground">
-                {t.skillsTitle}
-              </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => setSkillsVisible(false)}>
-                <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>{t.done}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 28 }}>
-              {loadingSkills ? (
-                <View className="items-center py-10">
-                  <ActivityIndicator color={colors.primary} />
-                </View>
-              ) : builtinSkillItems.length === 0 &&
-                agentSkillItems.length === 0 &&
-                installedPlugins.length === 0 ? (
-                <View className="items-center py-10">
-                  <Text className="text-[14px] text-secondary/50">{t.agentConfigSkillsEmpty}</Text>
-                </View>
-              ) : (
-                <>
-                  {builtinSkillItems.length > 0 ? (
-                    <SectionCard title={t.storeBuiltIn}>
-                      {builtinSkillItems.map((item) => (
-                        <SkillRow
-                          description={item.description}
-                          key={`builtin-${item.identifier}`}
-                          accessory={
-                            <Switch
-                              value={selectedSkills.has(item.identifier)}
-                              trackColor={{
-                                false: 'rgba(120,120,128,0.18)',
-                                true: `${colors.primary}66`,
-                              }}
-                              onValueChange={() => toggleSkill(item.identifier)}
-                            />
-                          }
-                          title={
-                            <View className="flex-row items-center">
-                              <BuiltinSkillIcon icon={item.icon} size={20} />
-                              <Text className="ml-2 text-[14px] font-semibold text-foreground">
-                                {(t as any)[item.titleKey] ?? item.identifier}
-                              </Text>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </SectionCard>
-                  ) : null}
-                  {agentSkillItems.length > 0 ? (
-                    <SectionCard title={t.storeInstalled}>
-                      {agentSkillItems.map((item) => (
-                        <SkillRow
-                          description={item.description}
-                          key={`skill-${item.id}`}
-                          accessory={
-                            <Switch
-                              value={selectedSkills.has(item.identifier ?? '')}
-                              trackColor={{
-                                false: 'rgba(120,120,128,0.18)',
-                                true: `${colors.primary}66`,
-                              }}
-                              onValueChange={() => toggleSkill(item.identifier ?? '')}
-                            />
-                          }
-                          title={
-                            <View className="flex-row items-center">
-                              <BuiltinSkillIcon icon={(item as any).icon || 'puzzle'} size={20} />
-                              <Text className="ml-2 text-[14px] font-semibold text-foreground">
-                                {item.title || item.identifier}
-                              </Text>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </SectionCard>
-                  ) : null}
-                  {installedPlugins.length > 0 ? (
-                    <SectionCard title={t.storePlugins}>
-                      {installedPlugins.map((item) => (
-                        <SkillRow
-                          description={item.description}
-                          key={`plugin-${item.identifier}`}
-                          accessory={
-                            <Switch
-                              value={selectedSkills.has(item.identifier)}
-                              trackColor={{
-                                false: 'rgba(120,120,128,0.18)',
-                                true: `${colors.primary}66`,
-                              }}
-                              onValueChange={() => toggleSkill(item.identifier)}
-                            />
-                          }
-                          title={
-                            <View className="flex-row items-center">
-                              <ProviderBadge logo={item.logo} providerId={item.identifier} />
-                              <Text className="ml-2 text-[14px] font-semibold text-foreground">
-                                {item.meta?.title || item.identifier}
-                              </Text>
-                            </View>
-                          }
-                        />
-                      ))}
-                    </SectionCard>
-                  ) : null}
-                </>
-              )}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setSkillsVisible(false)}
+        onToggle={toggleSkill}
+      />
     </KeyboardAvoidingView>
   );
 }

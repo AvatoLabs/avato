@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -15,9 +14,9 @@ import Animated from 'react-native-reanimated';
 
 import { getProviderIconUrl } from '../../constants/cdn';
 import { useI18n } from '../../lib/i18n';
+import { useModelStore } from '../../store/model';
 import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
-import { useModelStore } from '../../store/model';
 import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
 import type { RuntimeEnabledModel } from '../../types';
@@ -42,10 +41,7 @@ function ProviderLogo({
         className="rounded-full bg-foreground/5 items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <Text
-          className="text-[9px] font-semibold"
-          style={{ color: colors.secondaryText }}
-        >
+        <Text className="text-[9px] font-semibold" style={{ color: colors.secondaryText }}>
           {providerId.slice(0, 2).toUpperCase()}
         </Text>
       </View>
@@ -105,10 +101,8 @@ export function ModelDrawer({
   const selectModel = useModelStore((s) => s.selectModel);
   const loadSelection = useModelStore((s) => s.loadSelection);
 
-  const [search, setSearch] = useState('');
-
   const selectedModel = initialModel ?? storeSelectedModel;
-  const selectedProvider = initialProvider ?? storeSelectedProvider;
+  const _selectedProvider = initialProvider ?? storeSelectedProvider;
 
   useEffect(() => {
     if (visible) {
@@ -130,23 +124,7 @@ export function ModelDrawer({
     [selectModel, sessionId, onSelect, onClose, persistSelection],
   );
 
-  const q = search.toLowerCase();
-  const filtered = useMemo(
-    () =>
-      providers
-        .map((p) => ({
-          ...p,
-          children: p.children.filter(
-            (m) =>
-              !q ||
-              (m.displayName || m.id).toLowerCase().includes(q) ||
-              m.id.toLowerCase().includes(q) ||
-              p.name.toLowerCase().includes(q),
-          ),
-        }))
-        .filter((p) => p.children.length > 0),
-    [providers, q],
-  );
+  const filtered = useMemo(() => providers.filter((p) => p.children.length > 0), [providers]);
 
   return (
     <Modal
@@ -184,20 +162,6 @@ export function ModelDrawer({
                   />
                 )}
               </TouchableOpacity>
-            </View>
-
-            {/* Search */}
-            <View className="px-5 pb-3">
-              <View className="bg-foreground/5 rounded-xl px-3 h-9 flex-row items-center">
-                <TextInput
-                  className="flex-1 text-foreground text-[14px]"
-                  placeholder={t.modelPickerSearch}
-                  placeholderTextColor={colors.muted}
-                  returnKeyType="search"
-                  value={search}
-                  onChangeText={setSearch}
-                />
-              </View>
             </View>
 
             {/* Model list */}

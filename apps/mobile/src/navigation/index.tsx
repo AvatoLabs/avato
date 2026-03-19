@@ -19,15 +19,14 @@ import Animated, {
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { useThemeStore } from '../store/theme';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
 import AgentListScreen from '../screens/AgentListScreen';
 import AIProvidersScreen from '../screens/AIProvidersScreen';
 import AppLogsScreen from '../screens/AppLogsScreen';
-import ArtworkScreen from '../screens/ArtworkScreen';
 import ChatDetailScreen from '../screens/ChatDetailScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatSettingsScreen from '../screens/ChatSettingsScreen';
+import CreateScreen from '../screens/CreateScreen';
 import DataManagementScreen from '../screens/DataManagementScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MemoryDetailScreen from '../screens/MemoryDetailScreen';
@@ -43,6 +42,7 @@ import ServerConfigScreen from '../screens/ServerConfigScreen';
 import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import TopicListScreen from '../screens/TopicListScreen';
+import { useThemeStore } from '../store/theme';
 import { tokens } from '../theme/tokens';
 
 const Tab = createBottomTabNavigator();
@@ -213,8 +213,8 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen
-        component={ArtworkScreen}
-        name="Artwork"
+        component={CreateScreen}
+        name="Create"
         options={{
           tabBarIcon: ({ color, size }) => (
             <Palette color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
@@ -222,7 +222,7 @@ function BottomTabs() {
           tabBarLabel: ({ color, focused }) => (
             <AnimatedTabLabel color={color} focused={focused} label={t.tabArtwork} />
           ),
-          tabBarAccessibilityLabel: 'Artwork tab',
+          tabBarAccessibilityLabel: 'Create tab',
         }}
       />
       <Tab.Screen
@@ -293,11 +293,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
         options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen component={LoginScreen} name="Login" options={{ animation: 'fade' }} />
-      <Stack.Screen
-        component={BottomTabs}
-        name="MainTabs"
-        options={{ animation: 'fade' }}
-      />
+      <Stack.Screen component={BottomTabs} name="MainTabs" options={{ animation: 'fade' }} />
 
       {/* Chat */}
       <Stack.Screen

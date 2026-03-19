@@ -37,13 +37,7 @@ import {
   toParamsState,
 } from '../features/ChatSettings';
 import { useAgentConfig } from '../hooks/useAgentConfig';
-import {
-  agentApi,
-  agentGroupApi,
-  type AgentGroupDetail,
-  sessionApi,
-  sessionTagApi,
-} from '../lib/api';
+import { agentApi, agentGroupApi, type AgentGroupDetail, sessionApi, tagApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -54,9 +48,9 @@ import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { SessionTag } from '../types';
+import type { Tag as TagItem } from '../types';
 
-const sortSessionTags = (tags: SessionTag[]) =>
+const sortTags = (tags: TagItem[]) =>
   [...tags].sort((left, right) => {
     const leftSort = left.sort ?? Number.MAX_SAFE_INTEGER;
     const rightSort = right.sort ?? Number.MAX_SAFE_INTEGER;
@@ -122,7 +116,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       : null;
   const [tagSelectorVisible, setTagSelectorVisible] = useState(false);
   const [tagEditorVisible, setTagEditorVisible] = useState(false);
-  const [sessionTags, setSessionTags] = useState<SessionTag[]>([]);
+  const [tags, setTags] = useState<TagItem[]>([]);
   const [tagDraftName, setTagDraftName] = useState('');
   const [tagDraftColor, setTagDraftColor] = useState<string | null>(null);
   const [title, setTitle] = useState(session?.title || '');
@@ -211,20 +205,20 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     void loadGroupDetail();
   }, [isGroupSession, loadGroupDetail]);
 
-  const fetchSessionTags = useCallback(async () => {
+  const fetchTags = useCallback(async () => {
     if (isGroupSession) return;
 
     try {
-      const tags = await sessionTagApi.list();
-      setSessionTags(sortSessionTags(tags ?? []));
+      const list = await tagApi.list();
+      setTags(sortTags(list ?? []));
     } catch {
       toast.show('error', t.errorNetwork);
     }
   }, [isGroupSession, t.errorNetwork, toast]);
 
   useEffect(() => {
-    void fetchSessionTags();
-  }, [fetchSessionTags]);
+    void fetchTags();
+  }, [fetchTags]);
 
   useEffect(() => {
     if (!sessionId || isGroupSession) return;
@@ -247,8 +241,8 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   }, [activeTopicBySession, sessionId, topicsBySession]);
 
   const currentTag = useMemo(
-    () => sessionTags.find((tag) => tag.id === currentTopic?.tagId),
-    [currentTopic?.tagId, sessionTags],
+    () => tags.find((tag) => tag.id === currentTopic?.tagId),
+    [currentTopic?.tagId, tags],
   );
 
   const closeTagEditor = useCallback(() => {
@@ -464,13 +458,13 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     }
 
     try {
-      const newTagId = await sessionTagApi.create(name, tagDraftColor);
+      const newTagId = await tagApi.create(name, tagDraftColor);
       if (!newTagId) {
         toast.show('error', t.errorNetwork);
         return;
       }
 
-      await fetchSessionTags();
+      await fetchTags();
       await handleSelectTag(newTagId);
       closeTagEditor();
       setTagSelectorVisible(false);
@@ -484,7 +478,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     }
   }, [
     closeTagEditor,
-    fetchSessionTags,
+    fetchTags,
     handleSelectTag,
     sessionId,
     t,
@@ -504,17 +498,15 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         rightAccessibilityLabel={t.accessibilitySave}
         title={t.chatSettingsTitle}
         leftElement={
-          <ArrowLeft
-            color={colors.primary}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
         rightElement={
           saving ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
-            <Text className="font-medium text-[15px]" style={{ color: colors.primary }}>{t.save}</Text>
+            <Text className="font-medium text-[15px]" style={{ color: colors.primary }}>
+              {t.save}
+            </Text>
           )
         }
         onPressLeft={() => {
@@ -653,8 +645,14 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                           index === (groupDetail.agents?.length ?? 0) - 1 ? '' : 'mb-3'
                         }`}
                       >
-                        <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl" style={{ backgroundColor: colors.primarySubtle }}>
-                          <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>
+                        <View
+                          className="mr-3 h-11 w-11 items-center justify-center rounded-xl"
+                          style={{ backgroundColor: colors.primarySubtle }}
+                        >
+                          <Text
+                            className="text-[16px] font-semibold"
+                            style={{ color: colors.primary }}
+                          >
                             {avatarText}
                           </Text>
                         </View>
@@ -664,8 +662,14 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                               {member.title || t.settingsDefaultAgent}
                             </Text>
                             {member.isSupervisor ? (
-                              <View className="ml-2 rounded-full px-2 py-0.5" style={{ backgroundColor: colors.primarySubtle }}>
-                                <Text className="text-[11px] font-semibold" style={{ color: colors.primary }}>
+                              <View
+                                className="ml-2 rounded-full px-2 py-0.5"
+                                style={{ backgroundColor: colors.primarySubtle }}
+                              >
+                                <Text
+                                  className="text-[11px] font-semibold"
+                                  style={{ color: colors.primary }}
+                                >
                                   {t.groupSettingsSupervisor}
                                 </Text>
                               </View>
@@ -766,15 +770,11 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                   <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                 </View>
                 {!currentTopic?.tagId ? (
-                  <Check
-                    color={colors.primary}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 ) : null}
               </TouchableOpacity>
 
-              {sessionTags.map((tag) => (
+              {tags.map((tag) => (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   className="flex-row items-center justify-between rounded-xl px-3 py-3.5"
@@ -789,11 +789,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                     <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
                   </View>
                   {currentTopic?.tagId === tag.id ? (
-                    <Check
-                      color={colors.primary}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
+                    <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   ) : null}
                 </TouchableOpacity>
               ))}
@@ -804,12 +800,10 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                 style={{ backgroundColor: colors.primarySubtle }}
                 onPress={() => setTagEditorVisible(true)}
               >
-                <Tag
-                  color={colors.primary}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-                <Text className="ml-3 text-[14px] font-semibold" style={{ color: colors.primary }}>{t.tagCreate}</Text>
+                <Tag color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-3 text-[14px] font-semibold" style={{ color: colors.primary }}>
+                  {t.tagCreate}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </Pressable>

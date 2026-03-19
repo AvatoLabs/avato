@@ -30,9 +30,9 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 // Suppress known harmless errors in development
 if (__DEV__) {
   const originalError = console.error;
-  console.error = (...args: any[]) => {
-    const message = args.join(' ');
-    // Ignore expo-keep-awake activity errors (harmless in dev)
+  console.error = (...args: unknown[]) => {
+    const message = args.map((a) => (a instanceof Error ? a.message : String(a))).join(' ');
+    // Ignore expo-keep-awake activity errors (harmless when Activity is destroyed)
     if (message.includes('ExpoKeepAwake') && message.includes('activity is no longer available')) {
       return;
     }
@@ -47,7 +47,9 @@ function OfflineBanner() {
   return (
     <View style={{ position: 'absolute', top: insets.top, left: 0, right: 0, zIndex: 999 }}>
       <View style={{ backgroundColor: colors.danger, paddingVertical: 6, alignItems: 'center' }}>
-        <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '600' }}>{t.errorOffline}</Text>
+        <Text style={{ color: colors.iconOnPrimary, fontSize: 13, fontWeight: '600' }}>
+          {t.errorOffline}
+        </Text>
       </View>
     </View>
   );
@@ -73,7 +75,9 @@ function AppCrashFallback() {
       <Text style={{ color: foreground, fontSize: 22, fontWeight: '700', marginBottom: 12 }}>
         {t.errorUnknown}
       </Text>
-      <Text style={{ color: secondaryText, fontSize: 14, textAlign: 'center' }}>{t.logsCrashHint}</Text>
+      <Text style={{ color: secondaryText, fontSize: 14, textAlign: 'center' }}>
+        {t.logsCrashHint}
+      </Text>
     </View>
   );
 }

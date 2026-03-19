@@ -3,7 +3,6 @@ import type { LobeSessionGroups, SessionGroupId } from './sessionGroup';
 
 export * from './agentSession';
 export * from './sessionGroup';
-export * from './sessionTag';
 
 export interface ChatSessionList {
   sessionGroups: LobeSessionGroups;

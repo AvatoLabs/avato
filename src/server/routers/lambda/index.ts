@@ -15,6 +15,7 @@ import { agentEvalRouter } from './agentEval';
 import { agentEvalExternalRouter } from './agentEvalExternal';
 import { agentGroupRouter } from './agentGroup';
 import { agentSkillsRouter } from './agentSkills';
+import { aggregatorRouter } from './aggregator';
 import { aiAgentRouter } from './aiAgent';
 import { aiChatRouter } from './aiChat';
 import { aiModelRouter } from './aiModel';
@@ -43,8 +44,8 @@ import { ragEvalRouter } from './ragEval';
 import { searchRouter } from './search';
 import { sessionRouter } from './session';
 import { sessionGroupRouter } from './sessionGroup';
-import { sessionTagRouter } from './sessionTag';
 import { shareRouter } from './share';
+import { tagRouter } from './tag';
 import { threadRouter } from './thread';
 import { topicRouter } from './topic';
 import { uploadRouter } from './upload';
@@ -62,6 +63,7 @@ export const lambdaRouter = router({
   agentEval: agentEvalRouter,
   agentEvalExternal: agentEvalExternalRouter,
   agentSkills: agentSkillsRouter,
+  aggregator: aggregatorRouter,
   aiAgent: aiAgentRouter,
   aiChat: aiChatRouter,
   aiModel: aiModelRouter,
@@ -92,7 +94,7 @@ export const lambdaRouter = router({
   search: searchRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
-  sessionTag: sessionTagRouter,
+  tag: tagRouter,
   share: shareRouter,
   thread: threadRouter,
   topic: topicRouter,

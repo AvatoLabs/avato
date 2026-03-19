@@ -2,11 +2,12 @@
 
 import { Flexbox } from '@lobehub/ui';
 import { McpIcon, ProviderIcon, SkillsIcon } from '@lobehub/ui/icons';
-import { Bot, Brain, ShapesIcon } from 'lucide-react';
+import { Bot, Brain, Network, ShapesIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { isDesktop } from '@/const/version';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { usePathname } from '@/libs/router/navigation';
@@ -32,8 +33,8 @@ const Nav = memo(() => {
   const navigate = useNavigate();
   const { t } = useTranslation('discover');
 
-  const items: Item[] = useMemo(
-    () => [
+  const items: Item[] = useMemo(() => {
+    const baseItems: Item[] = [
       {
         icon: ShapesIcon,
         key: DiscoverTab.Home,
@@ -70,9 +71,19 @@ const Nav = memo(() => {
         title: t('tab.provider'),
         url: '/community/provider',
       },
-    ],
-    [t],
-  );
+    ];
+
+    if (!isDesktop) {
+      baseItems.splice(4, 0, {
+        icon: Network,
+        key: DiscoverTab.Aggregator,
+        title: t('tab.aggregator'),
+        url: '/community/aggregator',
+      });
+    }
+
+    return baseItems;
+  }, [t]);
 
   return (
     <Flexbox gap={1} paddingInline={4}>

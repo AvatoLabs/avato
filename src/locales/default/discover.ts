@@ -11,6 +11,109 @@ export default {
   'assistant.unfavoriteSuccess': 'Unsaved',
   'assistant.unlike': 'Unlike',
   'assistant.unlikeSuccess': 'Unliked',
+  'aggregator.description':
+    'A web-only experiment that aggregates MCP registries from multiple public sources. Only remote endpoints that pass server-side manifest verification can show one-click install.',
+  'aggregator.descriptionFallback': 'No description available from the indexed sources yet.',
+  'aggregator.empty.description':
+    'No MCP servers are available from the selected sources right now. Try another source or refresh later.',
+  'aggregator.empty.search': 'No MCP servers matched your current query.',
+  'aggregator.empty.title': 'No MCP servers found',
+  'aggregator.actions.install': 'Install',
+  'aggregator.actions.installed': 'Installed',
+  'aggregator.actions.viewSource': 'View Source',
+  'aggregator.filters.installable': 'Ready to Install',
+  'aggregator.filters.installable.description':
+    'Show only remote MCP endpoints that passed verification and are ready for one-click install.',
+  'aggregator.installability.discoverable': 'Discoverable',
+  'aggregator.installability.installable': 'Installable',
+  'aggregator.installability.verified': 'Verified Install',
+  'aggregator.installabilityReason.configRequired':
+    'This source publishes an endpoint template, but it still needs source-specific credentials or path values before it can be installed.',
+  'aggregator.installabilityReason.missingConnection':
+    'This source does not expose a direct remote MCP endpoint, so one-click install is unavailable.',
+  'aggregator.installabilityReason.notRemote':
+    'This MCP entry is local-only, so the web aggregator cannot install it.',
+  'aggregator.installabilityReason.verificationFailed':
+    'The remote MCP endpoint did not pass manifest verification, so one-click install is disabled.',
+  'aggregator.modes.mcp': 'MCP',
+  'aggregator.modes.skills': 'Skills',
+  'aggregator.meta.remote': 'Remote',
+  'aggregator.meta.verified': 'Verified',
+  'aggregator.skills.actions.import': 'Import',
+  'aggregator.skills.actions.installed': 'Imported',
+  'aggregator.skills.actions.viewSource': 'View Source',
+  'aggregator.skills.description':
+    'A web-only skills catalog experiment backed by the public SkillHub source. Only packages that pass server-side parsing are allowed to show one-click import.',
+  'aggregator.skills.descriptionFallback':
+    'No skill description is available from the indexed source yet.',
+  'aggregator.skills.empty.description':
+    'No skills are available from the selected source right now. Try another search or refresh later.',
+  'aggregator.skills.empty.search': 'No skills matched your current query.',
+  'aggregator.skills.empty.title': 'No skills found',
+  'aggregator.skills.installability.discoverable': 'Discoverable',
+  'aggregator.skills.installability.importable': 'Importable',
+  'aggregator.skills.installability.installable': 'Installable',
+  'aggregator.skills.installability.verified': 'Verified',
+  'aggregator.skills.installabilityReason.downloadUnavailable':
+    'This item is indexed, but no downloadable package is available yet.',
+  'aggregator.skills.installabilityReason.fetchFailed':
+    'The source package could not be fetched during verification, so one-click import is disabled.',
+  'aggregator.skills.installabilityReason.invalidPackage':
+    'The downloaded package did not pass LobeHub skill parsing, so one-click import is disabled.',
+  'aggregator.skills.installabilityReason.packageTooLarge':
+    'The source package is larger than the current verification limit, so one-click import is disabled.',
+  'aggregator.skills.meta.version': 'v{{version}}',
+  'aggregator.skills.metrics.downloads': '{{count}} downloads',
+  'aggregator.skills.metrics.installs': '{{count}} installs',
+  'aggregator.skills.metrics.stars': '{{count}} stars',
+  'aggregator.skills.sorts.downloads': 'Most Downloaded',
+  'aggregator.skills.sorts.installCount': 'Most Installed',
+  'aggregator.skills.sorts.name': 'Name',
+  'aggregator.skills.sorts.relevance': 'Relevance',
+  'aggregator.skills.sorts.stars': 'Most Starred',
+  'aggregator.skills.sorts.updatedAt': 'Recently Updated',
+  'aggregator.skills.sources.all': 'All Sources',
+  'aggregator.skills.sources.all.description':
+    'Merged and deduplicated results across every connected skill source.',
+  'aggregator.skills.sources.skillhub': 'Tencent SkillHub',
+  'aggregator.skills.sources.skillhub.description':
+    'Tencent SkillHub web uses the public lightmake.site API and downloadable ZIP packages, which makes it suitable for indexing and one-click imports.',
+  'aggregator.skills.stats.catalog': 'Indexed',
+  'aggregator.skills.stats.curated': 'Top Picks',
+  'aggregator.skills.stats.verified': 'Verified on Page',
+  'aggregator.skills.stats.results': 'Results',
+  'aggregator.skills.title': 'Skills Aggregator',
+  'aggregator.metrics.stars': '{{count}} stars',
+  'aggregator.metrics.tools': '{{count}} tools',
+  'aggregator.metrics.usage': '{{count}} uses',
+  'aggregator.sorts.name': 'Name',
+  'aggregator.sorts.popularity': 'Popularity',
+  'aggregator.sorts.relevance': 'Relevance',
+  'aggregator.sorts.updatedAt': 'Recently Updated',
+  'aggregator.sources.all': 'All Sources',
+  'aggregator.sources.all.description':
+    'Merged and deduplicated results across every connected registry.',
+  'aggregator.sources.glama': 'Glama',
+  'aggregator.sources.glama.description':
+    'Broad public MCP catalog with deployment and metadata coverage.',
+  'aggregator.sources.higress': 'Higress',
+  'aggregator.sources.higress.description':
+    'Hosted MCP marketplace that publishes deployment snippets and remote endpoint templates for Higress-backed servers.',
+  'aggregator.sources.official': 'Official Registry',
+  'aggregator.sources.official.description':
+    'The canonical MCP Registry feed published by the Model Context Protocol project.',
+  'aggregator.sources.smithery': 'Smithery',
+  'aggregator.sources.smithery.description':
+    'Hosted MCP marketplace with usage and verification signals.',
+  'aggregator.stats.catalog': 'Indexed',
+  'aggregator.stats.installable': 'Installable on Page',
+  'aggregator.stats.official': 'Official',
+  'aggregator.stats.remote': 'Remote',
+  'aggregator.stats.results': 'Results',
+  'aggregator.stats.verified': 'Verified',
+  'aggregator.title': 'MCP Aggregator',
+  'aggregator.warnings.item': '{{source}}: {{message}}',
+  'aggregator.warnings.title': 'Some sources could not be refreshed',
   'assistants.addAgent': 'Add Agent',
   'assistants.addAgentAndConverse': 'Add Agent & Chat',
   'assistants.addAgentSuccess': 'Added',
@@ -1122,6 +1225,7 @@ export default {
   'skills.sorts.updatedAt': 'Recently Updated',
 
   'tab.assistant': 'Agent',
+  'tab.aggregator': 'Aggregator',
 
   'tab.home': 'Home',
 

@@ -11,6 +11,7 @@ export * from './providers';
 export * from './skills';
 
 export enum DiscoverTab {
+  Aggregator = 'aggregator',
   Assistants = 'agent',
   GroupAgents = 'group_agent',
   Home = 'home',

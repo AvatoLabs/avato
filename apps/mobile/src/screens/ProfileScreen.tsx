@@ -13,6 +13,7 @@ import {
   Bot,
   Brain,
   BrainCircuit,
+  Bug,
   Check,
   ChevronRight,
   Cloud,
@@ -55,6 +56,7 @@ import { clearTransientAppState } from '../lib/appState';
 import { signOutFromBrowser } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
+import { getAppLoggingEnabled, setAppLoggingEnabled } from '../lib/logger';
 import { getApiUrl } from '../lib/server';
 import { useAgentStore } from '../store/agent';
 import { useConnectionStore } from '../store/connection';
@@ -155,6 +157,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [memorySaving, setMemorySaving] = useState(false);
   const [languageSheetVisible, setLanguageSheetVisible] = useState(false);
   const [displayServerUrl, setDisplayServerUrl] = useState('');
+  const [loggingEnabled, setLoggingEnabledState] = useState(false);
 
   useEffect(() => {
     if (serverUrl) {
@@ -163,6 +166,10 @@ export default function ProfileScreen({ navigation }: any) {
       getApiUrl().then(setDisplayServerUrl);
     }
   }, [serverUrl]);
+
+  useEffect(() => {
+    setLoggingEnabledState(getAppLoggingEnabled());
+  }, []);
 
   const memoryEffortOptions = useMemo<Array<{ label: string; value: MobileMemoryEffort }>>(
     () => [
@@ -224,6 +231,7 @@ export default function ProfileScreen({ navigation }: any) {
       void fetchUser();
       void loadMemorySettings();
       void loadDefaultModel();
+      setLoggingEnabledState(getAppLoggingEnabled());
       if (!useAgentStore.getState().initialized) {
         void useAgentStore.getState().loadAgents();
       }
@@ -242,6 +250,15 @@ export default function ProfileScreen({ navigation }: any) {
     ]);
     setRefreshing(false);
   }, [loadStats, checkConnection, fetchUser, loadMemorySettings, loadDefaultModel]);
+
+  const handleToggleLogging = useCallback(
+    async (value: boolean) => {
+      setLoggingEnabledState(value);
+      await setAppLoggingEnabled(value);
+      toast.show('success', value ? t.logsEnabled : t.logsDisabled);
+    },
+    [t.logsDisabled, t.logsEnabled, toast],
+  );
 
   useEffect(() => {
     void loadMemorySettings();
@@ -346,7 +363,10 @@ export default function ProfileScreen({ navigation }: any) {
               onPress={() => navigation?.navigate?.('Stats')}
             >
               <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-4" style={{ backgroundColor: colors.primarySubtle }}>
+                <View
+                  className="w-8 h-8 rounded-full items-center justify-center mr-4"
+                  style={{ backgroundColor: colors.primarySubtle }}
+                >
                   <BarChart3
                     color={colors.primary}
                     size={16}
@@ -357,7 +377,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.statsTitle}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.statsOverview}
                   </Text>
                 </View>
@@ -421,7 +444,10 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.memoryTitle}
                 </Text>
-                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
+                >
                   {t.memoryDesc}
                 </Text>
               </View>
@@ -445,7 +471,10 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.meAgents}
                 </Text>
-                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
+                >
                   {t.meAgentsDesc}
                 </Text>
               </View>
@@ -469,7 +498,10 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.notebookTitle}
                 </Text>
-                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
+                >
                   {t.notebookDesc}
                 </Text>
               </View>
@@ -489,18 +521,27 @@ export default function ProfileScreen({ navigation }: any) {
             className="mb-4 flex-row items-center rounded-xl bg-foreground/[0.03] px-5 py-4"
             onPress={() => navigation?.navigate?.('ServerConfig')}
           >
-            <View className="mr-4 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="mr-4 h-10 w-10 items-center justify-center rounded-full"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               <Server color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-foreground text-[15px] font-medium tracking-tight" numberOfLines={1}>
+              <Text
+                className="text-foreground text-[15px] font-medium tracking-tight"
+                numberOfLines={1}
+              >
                 {displayServerUrl || t.settingsNotConfigured}
               </Text>
               <View className="mt-1.5 flex-row items-center gap-2">
                 {checking ? (
                   <>
                     <ActivityIndicator color={colors.primary} size="small" />
-                    <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+                    <Text
+                      className="text-[12px] font-medium"
+                      style={{ color: colors.secondaryText }}
+                    >
                       {t.serverTesting}
                     </Text>
                   </>
@@ -517,11 +558,7 @@ export default function ProfileScreen({ navigation }: any) {
                 )}
               </View>
             </View>
-            <ChevronRight
-              color={colors.primary}
-              size={18}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ChevronRight color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           </TouchableOpacity>
         </SettingsSection>
 
@@ -541,7 +578,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsServerConfig}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.settingsServerConfigDesc}
                   </Text>
                 </View>
@@ -564,7 +604,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsAiProviders}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.settingsAiProvidersDesc}
                   </Text>
                 </View>
@@ -587,7 +630,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsDefaultModel}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {defaultModel || t.settingsNotConfigured}
                   </Text>
                 </View>
@@ -616,13 +662,20 @@ export default function ProfileScreen({ navigation }: any) {
                 <Text className="text-foreground text-[15px] font-medium tracking-tight">
                   {t.settingsLanguage}
                 </Text>
-                <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[12px] font-medium mt-0.5"
+                  style={{ color: colors.secondaryText }}
+                >
                   {LOCALE_DISPLAY_NAMES[locale as keyof typeof LOCALE_DISPLAY_NAMES] ??
                     locale ??
                     'en-US'}
                 </Text>
               </View>
-              <ChevronRight color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <ChevronRight
+                color={colors.primary}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
             </TouchableOpacity>
           </View>
         </SettingsSection>
@@ -637,9 +690,11 @@ export default function ProfileScreen({ navigation }: any) {
                   const Icon = opt.icon;
                   return (
                     <Pressable
-                      key={opt.value}
                       className="flex-1 flex-row items-center justify-center gap-1.5 rounded-lg py-2.5"
-                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
+                      key={opt.value}
+                      style={{
+                        backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
+                      }}
                       onPress={() => {
                         haptics.selection();
                         setThemePreference(opt.value);
@@ -672,9 +727,11 @@ export default function ProfileScreen({ navigation }: any) {
                   const active = colorScheme === opt.value;
                   return (
                     <Pressable
-                      key={opt.value}
                       className="flex-row items-center gap-1.5 rounded-lg py-2 px-3"
-                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
+                      key={opt.value}
+                      style={{
+                        backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
+                      }}
                       onPress={() => {
                         haptics.selection();
                         setColorScheme(opt.value);
@@ -703,7 +760,10 @@ export default function ProfileScreen({ navigation }: any) {
           <View className="mb-4">
             <View className="rounded-xl bg-foreground/[0.03] overflow-hidden px-5 py-4">
               <View className="flex-row items-center mb-4">
-                <View className="mr-4 h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
+                <View
+                  className="mr-4 h-8 w-8 items-center justify-center rounded-full"
+                  style={{ backgroundColor: colors.primarySubtle }}
+                >
                   <BrainCircuit
                     color={colors.primary}
                     size={16}
@@ -714,7 +774,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {memoryEnabled ? t.memoryToolOnTitle : t.memoryToolOffTitle}
                   </Text>
-                  <Text className="mt-0.5 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="mt-0.5 text-[12px] font-medium"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {memoryEnabled ? t.memoryToolOnDesc : t.memoryToolOffDesc}
                   </Text>
                 </View>
@@ -740,10 +803,12 @@ export default function ProfileScreen({ navigation }: any) {
                   const active = memoryEffort === opt.value;
                   return (
                     <Pressable
+                      className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
                       disabled={memoryLoading || memorySaving}
                       key={opt.value}
-                      className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
-                      style={{ backgroundColor: active ? colors.primarySubtle : colors.fillTertiary }}
+                      style={{
+                        backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
+                      }}
                       onPress={() => {
                         if (active) return;
                         haptics.selection();
@@ -771,8 +836,71 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </SettingsSection>
 
+        <SettingsSection delay={135} title={t.logsTitle}>
+          <View className="mb-4">
+            <View className="rounded-xl bg-foreground/[0.03] overflow-hidden">
+              <View className="flex-row items-center px-5 py-3.5">
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
+                  <Bug color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.logsCapture}
+                  </Text>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {t.logsCaptureDesc}
+                  </Text>
+                </View>
+                <Switch
+                  value={loggingEnabled}
+                  trackColor={{
+                    false: colors.switchTrackOffAlt,
+                    true: `${colors.switchTrackOn}66`,
+                  }}
+                  onValueChange={(value) => {
+                    haptics.light();
+                    void handleToggleLogging(value);
+                  }}
+                />
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                className="flex-row items-center px-5 py-3.5"
+                onPress={() => safeNavigate('AppLogs')}
+              >
+                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
+                  <FileText
+                    color={colors.primary}
+                    size={16}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                    {t.logsView}
+                  </Text>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {t.logsViewDesc}
+                  </Text>
+                </View>
+                <ChevronRight
+                  color={colors.primary}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SettingsSection>
+
         {/* Data & Voice */}
-        <SettingsSection delay={120} title={t.settingsGroupData}>
+        <SettingsSection delay={150} title={t.settingsGroupData}>
           <View className="mb-4">
             <View className="rounded-xl bg-foreground/[0.03] overflow-hidden">
               <TouchableOpacity
@@ -791,7 +919,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsStorageManagement}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.settingsStorageManagementDesc}
                   </Text>
                 </View>
@@ -809,7 +940,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsSyncBackup}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -822,7 +956,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsSpeechRecognition}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -835,7 +972,10 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text className="text-foreground text-[15px] font-medium tracking-tight">
                     {t.settingsTts}
                   </Text>
-                  <Text className="text-[12px] font-medium mt-0.5" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[12px] font-medium mt-0.5"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.dataManageComingSoon}
                   </Text>
                 </View>
@@ -845,7 +985,7 @@ export default function ProfileScreen({ navigation }: any) {
         </SettingsSection>
 
         {/* Account */}
-        <SettingsSection delay={150} title={t.settingsGroupAccount}>
+        <SettingsSection delay={180} title={t.settingsGroupAccount}>
           <View className="mt-2 mb-4">
             <PressableScale
               className="rounded-xl py-4 items-center bg-foreground/[0.03]"
@@ -862,12 +1002,18 @@ export default function ProfileScreen({ navigation }: any) {
         </SettingsSection>
 
         {/* Version */}
-        <Text className="text-center text-[11px] font-medium mt-2" style={{ color: colors.tertiaryText }}>
+        <Text
+          className="text-center text-[11px] font-medium mt-2"
+          style={{ color: colors.tertiaryText }}
+        >
           {APP_NAME} v{APP_VERSION}
         </Text>
       </ScrollView>
 
-      <LanguageSheet onClose={() => setLanguageSheetVisible(false)} visible={languageSheetVisible} />
+      <LanguageSheet
+        visible={languageSheetVisible}
+        onClose={() => setLanguageSheetVisible(false)}
+      />
     </View>
   );
 }

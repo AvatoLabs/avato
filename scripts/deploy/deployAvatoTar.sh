@@ -18,6 +18,13 @@ REMOTE_RUNTIME_TAG="${REMOTE_RUNTIME_TAG:-avato-lobe:deploy}"
 TMP_BUILD_DIR="${TMP_BUILD_DIR:-/tmp/avato-runtime-build}"
 TMP_ARTIFACT_DIR="${TMP_ARTIFACT_DIR:-/tmp/avato-artifacts}"
 ARTIFACT_NAME="${ARTIFACT_NAME:-avato-runtime-${IMAGE_TAG}-amd64.tar.gz}"
+KEEP_LOCAL_ARTIFACTS="${KEEP_LOCAL_ARTIFACTS:-3}"
+KEEP_REMOTE_ARTIFACTS="${KEEP_REMOTE_ARTIFACTS:-3}"
+KEEP_REMOTE_RUNTIME_IMAGES="${KEEP_REMOTE_RUNTIME_IMAGES:-1}"
+
+LOCAL_ARTIFACT_PRUNE_FROM=$((KEEP_LOCAL_ARTIFACTS + 1))
+REMOTE_ARTIFACT_PRUNE_FROM=$((KEEP_REMOTE_ARTIFACTS + 1))
+REMOTE_IMAGE_PRUNE_FROM=$((KEEP_REMOTE_RUNTIME_IMAGES + 1))
 
 SSH_CONFIG_FILE="${SSH_CONFIG_FILE:-/tmp/ssh_config_avato}"
 
@@ -73,6 +80,11 @@ docker save "${IMAGE_NAME}" | gzip > "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
 shasum -a 256 "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
 ls -lh "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}"
 
+echo "==> Cleaning local build leftovers"
+docker image rm "${IMAGE_NAME}" >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true
+ls -1t "${TMP_ARTIFACT_DIR}"/avato-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
+
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
 expect <<EOF
 log_user 1
@@ -97,6 +109,9 @@ cd ${REMOTE_DEPLOY_PATH}
 docker load < ${REMOTE_ARTIFACT_DIR}/${ARTIFACT_NAME}
 docker tag ${IMAGE_NAME} ${REMOTE_RUNTIME_TAG}
 docker compose up -d lobe
+docker image ls avato-runtime --format "{{.Repository}}:{{.Tag}}" | tail -n +${REMOTE_IMAGE_PRUNE_FROM} | grep -v "^${IMAGE_NAME}$" | xargs -r docker image rm || true
+docker image prune -f >/dev/null 2>&1 || true
+ls -1t ${REMOTE_ARTIFACT_DIR}/avato-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +${REMOTE_ARTIFACT_PRUNE_FROM} | xargs -r rm -f
 docker compose ps
 docker logs --tail 50 avato-lobe
 '}

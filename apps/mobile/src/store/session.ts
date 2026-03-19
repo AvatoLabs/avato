@@ -121,7 +121,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   /**
-   * Create a session. Home chatbox also creates a regular Agent-bound session.
+   * Create a session container backed by the server session model.
    */
   createSession: async (titleOrConfig) => {
     const inputConfig: CreateSessionConfig =
@@ -132,6 +132,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       model: inputConfig.model,
       plugins: inputConfig.plugins,
       provider: inputConfig.provider,
+      slug: inputConfig.slug,
       systemPrompt: inputConfig.systemPrompt,
       title: inputConfig.title,
     };

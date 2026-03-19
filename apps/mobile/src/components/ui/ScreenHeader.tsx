@@ -25,6 +25,7 @@ interface ScreenHeaderProps {
   subtitle?: string;
   title: string;
   titleIcon?: React.ReactNode;
+  titleNode?: React.ReactNode;
 }
 
 export function ScreenHeader({
@@ -38,6 +39,7 @@ export function ScreenHeader({
   rightAccessibilityLabel,
   rightAccessibilityHint,
   titleIcon,
+  titleNode,
   headerStyle = 'flat',
   onPressLeft,
   onPressRight,
@@ -52,7 +54,14 @@ export function ScreenHeader({
 
   const headerContent = (content: React.ReactNode) =>
     useFlat ? (
-      <View className="border-b" style={{ backgroundColor: colors.background, borderColor: colors.border, paddingTop: insets.top }}>
+      <View
+        className="border-b"
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.border,
+          paddingTop: insets.top,
+        }}
+      >
         {content}
       </View>
     ) : (
@@ -128,20 +137,27 @@ export function ScreenHeader({
                 {titleIcon}
               </View>
             ) : null}
-            <View className="flex-1 justify-center">
-              <Text className="text-[22px] font-semibold tracking-tighter" style={{ color: colors.foreground }}>
-                {title}
-              </Text>
-              {subtitle ? (
+            {titleNode ? (
+              <View className="flex-1 justify-center">{titleNode}</View>
+            ) : (
+              <View className="flex-1 justify-center">
                 <Text
-                  className="mt-0.5 text-[12px] font-medium"
-                  numberOfLines={1}
-                  style={{ color: colors.muted }}
+                  className="text-[22px] font-semibold tracking-tighter"
+                  style={{ color: colors.foreground }}
                 >
-                  {subtitle}
+                  {title}
                 </Text>
-              ) : null}
-            </View>
+                {subtitle ? (
+                  <Text
+                    className="mt-0.5 text-[12px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: colors.muted }}
+                  >
+                    {subtitle}
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </View>
           {rightActions ? (
             <View className="flex-row items-center justify-end" style={{ minWidth: 40 }}>

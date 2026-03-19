@@ -149,6 +149,8 @@ export interface ImportGitHubInput {
 }
 
 export interface ImportUrlInput {
+  identifier?: string;
+  source?: 'market' | 'user';
   url: string;
 }
 
