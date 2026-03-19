@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOADING_FLAT } from '@/const/message';
 import { mutate } from '@/libs/swr';
-import { chatService } from '@/services/chat';
 import { messageService } from '@/services/message';
 import { topicService } from '@/services/topic';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
@@ -34,6 +33,7 @@ vi.mock('@/services/topic', () => ({
     removeTopic: vi.fn(),
     cloneTopic: vi.fn(),
     createTopic: vi.fn(),
+    generateTopicTitle: vi.fn(),
     updateTopicFavorite: vi.fn(),
     updateTopicTitle: vi.fn(),
     updateTopic: vi.fn(),
@@ -979,23 +979,15 @@ describe('topic action', () => {
       );
       const refreshTopicSpy = vi.spyOn(result.current, 'refreshTopic');
 
-      // Mock the `chatService.fetchPresetTaskResult` to simulate the AI response
-      vi.spyOn(chatService, 'fetchPresetTaskResult').mockImplementation((params) => {
-        if (params) {
-          params.onFinish?.('Summarized Title', { type: 'done' });
-        }
-        return Promise.resolve(undefined);
-      });
+      vi.spyOn(topicService, 'generateTopicTitle').mockResolvedValue('Summarized Title');
 
       await act(async () => {
         await result.current.summaryTopicTitle(topicId, messages);
       });
 
-      // Verify that the title was updated and the topic was refreshed
       expect(updateTopicTitleInSummarySpy).toHaveBeenCalledWith(topicId, LOADING_FLAT);
+      expect(updateTopicTitleInSummarySpy).toHaveBeenCalledWith(topicId, 'Summarized Title');
       expect(refreshTopicSpy).toHaveBeenCalled();
-
-      // TODO: need to test with fetchPresetTaskResult
     });
   });
   describe('createTopic', () => {

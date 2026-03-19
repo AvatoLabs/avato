@@ -25,6 +25,10 @@ export class TopicService {
     return lambdaClient.topic.cloneTopic.mutate({ id, newTitle });
   };
 
+  generateTopicTitle = (id: string): Promise<string | null> => {
+    return lambdaClient.topic.generateTopicTitle.mutate({ id });
+  };
+
   importTopic = (params: {
     agentId: string;
     data: string;

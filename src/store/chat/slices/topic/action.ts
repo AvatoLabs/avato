@@ -1,8 +1,6 @@
 // Note: To make the code more logic and readable, we just disable the auto sort key eslint rule
 // DON'T REMOVE THE FIRST LINE
-import { chainSummaryTitle } from '@lobechat/prompts';
 import { type ChatTopicMetadata, type MessageMapScope, type UIChatMessage } from '@lobechat/types';
-import { TraceNameMap } from '@lobechat/types';
 import isEqual from 'fast-deep-equal';
 import { t } from 'i18next';
 import { type SWRResponse } from 'swr';
@@ -11,18 +9,13 @@ import useSWR from 'swr';
 import { message } from '@/components/AntdStaticMethods';
 import { LOADING_FLAT } from '@/const/message';
 import { mutate, useClientDataSWRWithSync } from '@/libs/swr';
-import { chatService } from '@/services/chat';
 import { messageService } from '@/services/message';
 import { topicService } from '@/services/topic';
 import { type ChatStore } from '@/store/chat';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
 import { useGlobalStore } from '@/store/global';
-import { globalHelpers } from '@/store/global/helpers';
 import { type StoreSetter } from '@/store/types';
-import { useUserStore } from '@/store/user';
-import { systemAgentSelectors, userGeneralSettingsSelectors } from '@/store/user/selectors';
 import { type ChatTopic, type CreateTopicParams } from '@/types/topic';
-import { merge } from '@/utils/merge';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { displayMessageSelectors } from '../message/selectors';
@@ -190,50 +183,31 @@ export class ChatTopicActionImpl {
   };
 
   summaryTopicTitle = async (topicId: string, messages: UIChatMessage[]): Promise<void> => {
-    const { internal_updateTopicTitleInSummary, internal_updateTopicLoading } = this.#get();
+    void messages;
+    const { internal_updateTopicTitleInSummary, internal_updateTopicLoading, refreshTopic } =
+      this.#get();
     const topic = topicSelectors.getTopicById(topicId)(this.#get());
     if (!topic) return;
 
     internal_updateTopicTitleInSummary(topicId, LOADING_FLAT);
+    internal_updateTopicLoading(topicId, true);
 
-    let output = '';
+    try {
+      const title = await topicService.generateTopicTitle(topicId);
 
-    // Get current agent for topic
-    const topicConfig = systemAgentSelectors.topic(useUserStore.getState());
-
-    // Automatically summarize the topic title
-    await chatService.fetchPresetTaskResult({
-      onError: () => {
+      if (!title) {
         internal_updateTopicTitleInSummary(topicId, topic.title);
-      },
-      onFinish: async (text) => {
-        await this.#get().internal_updateTopic(topicId, { title: text });
-      },
-      onLoadingChange: (loading) => {
-        internal_updateTopicLoading(topicId, loading);
-      },
-      onMessageHandle: (chunk) => {
-        switch (chunk.type) {
-          case 'text': {
-            output += chunk.text;
-          }
-        }
+        return;
+      }
 
-        internal_updateTopicTitleInSummary(topicId, output);
-      },
-      params: merge(
-        topicConfig,
-        chainSummaryTitle(
-          messages,
-          userGeneralSettingsSelectors.responseLanguage(useUserStore.getState()) ||
-            globalHelpers.getCurrentLanguage(),
-        ),
-      ),
-      trace: this.#get().getCurrentTracePayload({
-        traceName: TraceNameMap.SummaryTopicTitle,
-        topicId,
-      }),
-    });
+      internal_updateTopicTitleInSummary(topicId, title);
+      await refreshTopic();
+    } catch (error) {
+      internal_updateTopicTitleInSummary(topicId, topic.title);
+      console.error('[summaryTopicTitle] Failed:', error);
+    } finally {
+      internal_updateTopicLoading(topicId, false);
+    }
   };
 
   favoriteTopic = async (id: string, favorite: boolean): Promise<void> => {
@@ -525,7 +499,7 @@ export class ChatTopicActionImpl {
     }
 
     this.#set(
-      { activeTopicId: !id ? (null as any) : id, activeThreadId: undefined },
+      { activeTopicId: id || (null as any), activeThreadId: undefined },
       false,
       n('toggleTopic'),
     );
