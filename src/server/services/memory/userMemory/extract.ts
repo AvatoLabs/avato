@@ -95,6 +95,8 @@ const LAYER_LABEL_MAP: Record<LayersEnum, string> = {
   [LayersEnum.Preference]: 'preferences',
 };
 
+const DIRECT_CHAT_TOPIC_PAGE_SIZE = 100;
+
 export interface MemoryExtractionCursor {
   createdAt: string;
   id: string;
@@ -1510,12 +1512,28 @@ export class MemoryExtractionExecutor {
     const includesBenchmark = payload.sources.includes(MemorySourceType.BenchmarkLocomo);
 
     if (includesChatTopic) {
-      if (!payload.topicIds.length) {
-        throw new Error('Direct chat_topic execution requires topicIds.');
-      }
-
       for (const userId of payload.userIds) {
-        const topicIds = await this.filterTopicIdsForUser(userId, payload.topicIds);
+        const topicIds =
+          payload.topicIds.length > 0
+            ? await this.filterTopicIdsForUser(userId, payload.topicIds)
+            : await this.listTopicIdsForUser(
+                {
+                  cursor:
+                    payload.topicCursor?.userId === userId
+                      ? {
+                          createdAt: new Date(payload.topicCursor.createdAt),
+                          id: payload.topicCursor.id,
+                        }
+                      : undefined,
+                  forceAll: payload.forceAll,
+                  forceTopics: payload.forceTopics,
+                  from: payload.from,
+                  to: payload.to,
+                  userId,
+                },
+                DIRECT_CHAT_TOPIC_PAGE_SIZE,
+              );
+
         for (const topicId of topicIds) {
           const extracted = await this.extractTopic({
             asyncTaskId: payload.asyncTaskId,
@@ -1571,7 +1589,49 @@ export class MemoryExtractionExecutor {
       }
     }
 
+    if (
+      includesChatTopic &&
+      !includesBenchmark &&
+      !payload.topicIds.length &&
+      payload.asyncTaskId &&
+      payload.userInitiated &&
+      results.length === 0
+    ) {
+      const taskUserId = payload.userId ?? payload.userIds[0];
+      if (taskUserId) {
+        try {
+          const asyncTaskModel = new AsyncTaskModel(await this.db, taskUserId);
+          await asyncTaskModel.update(payload.asyncTaskId, {
+            status: AsyncTaskStatus.Success,
+          });
+        } catch (error) {
+          console.error(
+            '[memory-extraction] failed to finalize async task with no pending topics',
+            error,
+          );
+        }
+      }
+    }
+
     return { processed: results.length, results };
+  }
+
+  private async listTopicIdsForUser(job: TopicPaginationJob, pageSize: number): Promise<string[]> {
+    const topicIds: string[] = [];
+    let cursor = job.cursor;
+
+    while (true) {
+      const page = await this.getTopicsForUser({ ...job, cursor }, pageSize);
+
+      if (!page.ids.length) break;
+
+      topicIds.push(...page.ids);
+
+      if (!page.cursor) break;
+      cursor = page.cursor;
+    }
+
+    return topicIds;
   }
 
   async getTopicsForUser(

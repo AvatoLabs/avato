@@ -1,14 +1,19 @@
 import { NextResponse } from 'next/server';
 
+import { AsyncTaskModel } from '@/database/models/asyncTask';
+import { getServerDB } from '@/database/server';
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
 import {
   MemoryExtractionExecutor,
+  type MemoryExtractionNormalizedPayload,
   memoryExtractionPayloadSchema,
   normalizeMemoryExtractionPayload,
 } from '@/server/services/memory/userMemory/extract';
+import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 
 export const POST = async (req: Request) => {
   const { webhook } = parseMemoryExtractionConfig();
+  let params: MemoryExtractionNormalizedPayload | undefined;
 
   if (webhook.headers && Object.keys(webhook.headers).length > 0) {
     for (const [key, value] of Object.entries(webhook.headers)) {
@@ -37,7 +42,7 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const params = normalizeMemoryExtractionPayload(payload, origin);
+    params = normalizeMemoryExtractionPayload(payload, origin);
     const executor = await MemoryExtractionExecutor.create();
     const result = await executor.runDirect(params);
 
@@ -47,6 +52,24 @@ export const POST = async (req: Request) => {
     );
   } catch (error) {
     console.error('[memory-extraction] failed', error);
+
+    const taskId = params?.asyncTaskId;
+    const taskUserId = params?.userId ?? params?.userIds?.[0];
+
+    if (taskId && taskUserId && params?.userInitiated) {
+      try {
+        const asyncTaskModel = new AsyncTaskModel(await getServerDB(), taskUserId);
+        await asyncTaskModel.update(taskId, {
+          error: new AsyncTaskError(
+            AsyncTaskErrorType.ServerError,
+            error instanceof Error ? error.message : 'Extraction failed',
+          ),
+          status: AsyncTaskStatus.Error,
+        });
+      } catch (taskError) {
+        console.error('[memory-extraction] failed to update async task status', taskError);
+      }
+    }
 
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }

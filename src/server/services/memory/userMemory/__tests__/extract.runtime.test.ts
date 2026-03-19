@@ -3,6 +3,7 @@ import { type EnabledAiModel } from 'model-bank';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type MemoryExtractionPrivateConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
+import { MemorySourceType } from '@/types/userMemory';
 
 import { MemoryExtractionExecutor } from '../extract';
 
@@ -277,5 +278,90 @@ describe('MemoryExtractionExecutor.resolveRuntimeKeyVaults', () => {
     });
 
     warnSpy.mockRestore();
+  });
+});
+
+describe('MemoryExtractionExecutor.runDirect', () => {
+  it('expands chat_topic payloads from userIds when topicIds are omitted', async () => {
+    const executor = createExecutor();
+    const getTopicsForUserSpy = vi
+      .spyOn(executor as any, 'getTopicsForUser')
+      .mockResolvedValueOnce({
+        cursor: { createdAt: new Date('2024-01-01T00:00:00.000Z'), id: 'topic-2' },
+        ids: ['topic-1', 'topic-2'],
+      })
+      .mockResolvedValueOnce({
+        cursor: undefined,
+        ids: ['topic-3'],
+      });
+    const extractTopicSpy = vi
+      .spyOn(executor as any, 'extractTopic')
+      .mockImplementation(async (...args: any[]) => {
+        const [{ topicId, userId }] = args as [{ topicId: string; userId: string }];
+
+        return {
+          extracted: true,
+          layers: {},
+          memoryIds: [`memory-${topicId}`],
+          userId,
+        };
+      });
+
+    const result = await executor.runDirect({
+      baseUrl: 'https://api.example.com',
+      forceAll: false,
+      forceTopics: false,
+      from: new Date('2024-01-01T00:00:00.000Z'),
+      identityCursor: 0,
+      layers: [],
+      sourceIds: [],
+      sources: [MemorySourceType.ChatTopic],
+      to: new Date('2024-01-31T00:00:00.000Z'),
+      topicCursor: undefined,
+      topicIds: [],
+      userCursor: undefined,
+      userId: 'user-1',
+      userIds: ['user-1'],
+      userInitiated: true,
+    });
+
+    expect(getTopicsForUserSpy).toHaveBeenCalledTimes(2);
+    expect(getTopicsForUserSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        cursor: undefined,
+        userId: 'user-1',
+      }),
+      100,
+    );
+    expect(getTopicsForUserSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        cursor: { createdAt: new Date('2024-01-01T00:00:00.000Z'), id: 'topic-2' },
+        userId: 'user-1',
+      }),
+      100,
+    );
+    expect(extractTopicSpy).toHaveBeenCalledTimes(3);
+    expect(extractTopicSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ topicId: 'topic-1', userId: 'user-1' }),
+    );
+    expect(extractTopicSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ topicId: 'topic-2', userId: 'user-1' }),
+    );
+    expect(extractTopicSpy).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ topicId: 'topic-3', userId: 'user-1' }),
+    );
+    expect(result).toMatchObject({
+      processed: 3,
+      results: [
+        { memoryIds: ['memory-topic-1'], topicId: 'topic-1', userId: 'user-1' },
+        { memoryIds: ['memory-topic-2'], topicId: 'topic-2', userId: 'user-1' },
+        { memoryIds: ['memory-topic-3'], topicId: 'topic-3', userId: 'user-1' },
+      ],
+    });
   });
 });
