@@ -4,7 +4,6 @@ import { type Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mutate } from '@/libs/swr';
-import { chatService } from '@/services/chat';
 import { threadService } from '@/services/thread';
 import { type ThreadItem } from '@/types/topic';
 import { ThreadStatus, ThreadType } from '@/types/topic';
@@ -32,16 +31,10 @@ vi.mock('@/const/version', () => ({
 vi.mock('@/services/thread', () => ({
   threadService: {
     createThreadWithMessage: vi.fn(),
+    generateThreadTitle: vi.fn(),
     getThreads: vi.fn(),
     removeThread: vi.fn(),
     updateThread: vi.fn(),
-  },
-}));
-
-// Mock chatService
-vi.mock('@/services/chat', () => ({
-  chatService: {
-    fetchPresetTaskResult: vi.fn(),
   },
 }));
 
@@ -54,36 +47,11 @@ vi.mock('swr', async () => {
   };
 });
 
-// Mock store helpers
-vi.mock('@/store/global/helpers', () => ({
-  globalHelpers: {
-    getCurrentLanguage: vi.fn(() => 'en-US'),
-  },
-}));
-
 vi.mock('@/store/session', () => ({
   useSessionStore: {
     getState: vi.fn(() => ({
       triggerSessionUpdate: vi.fn(),
     })),
-  },
-}));
-
-vi.mock('@/store/user', () => ({
-  useUserStore: {
-    getState: vi.fn(() => ({})),
-  },
-}));
-
-vi.mock('@/store/user/selectors', () => ({
-  systemAgentSelectors: {
-    thread: vi.fn(() => ({})),
-  },
-  userGeneralSettingsSelectors: {
-    responseLanguage: vi.fn(() => undefined),
-  },
-  userProfileSelectors: {
-    userAvatar: vi.fn(() => 'avatar-url'),
   },
 }));
 
@@ -457,14 +425,7 @@ describe('thread action', () => {
         },
       ];
 
-      (chatService.fetchPresetTaskResult as Mock).mockImplementation(
-        async ({ onMessageHandle, onFinish }) => {
-          await onMessageHandle?.({ text: 'New', type: 'text' });
-          await onMessageHandle?.({ text: ' Generated', type: 'text' });
-          await onMessageHandle?.({ text: ' Title', type: 'text' });
-          await onFinish?.('New Generated Title');
-        },
-      );
+      (threadService.generateThreadTitle as Mock).mockResolvedValue('New Generated Title');
 
       const internalUpdateSpy = vi
         .spyOn(result.current, 'internal_updateThread')
@@ -474,7 +435,7 @@ describe('thread action', () => {
         await result.current.summaryThreadTitle('thread-id', messages);
       });
 
-      expect(chatService.fetchPresetTaskResult).toHaveBeenCalled();
+      expect(threadService.generateThreadTitle).toHaveBeenCalledWith('thread-id');
       expect(internalUpdateSpy).toHaveBeenCalledWith('thread-id', {
         title: 'New Generated Title',
       });
@@ -505,13 +466,7 @@ describe('thread action', () => {
         });
       });
 
-      (chatService.fetchPresetTaskResult as Mock).mockImplementation(
-        async ({ onLoadingChange, onFinish }) => {
-          await onLoadingChange?.(true);
-          await onFinish?.('Title');
-          await onLoadingChange?.(false);
-        },
-      );
+      (threadService.generateThreadTitle as Mock).mockResolvedValue('Title');
 
       vi.spyOn(result.current, 'internal_updateThread').mockResolvedValue(undefined);
 
@@ -519,7 +474,7 @@ describe('thread action', () => {
         await result.current.summaryThreadTitle('thread-id', []);
       });
 
-      expect(chatService.fetchPresetTaskResult).toHaveBeenCalled();
+      expect(threadService.generateThreadTitle).toHaveBeenCalledWith('thread-id');
     });
 
     it('should revert title on error', async () => {
@@ -547,9 +502,7 @@ describe('thread action', () => {
         });
       });
 
-      (chatService.fetchPresetTaskResult as Mock).mockImplementation(async ({ onError }) => {
-        await onError?.();
-      });
+      (threadService.generateThreadTitle as Mock).mockRejectedValue(new Error('boom'));
 
       vi.spyOn(result.current, 'internal_updateThread').mockResolvedValue(undefined);
 
@@ -558,7 +511,7 @@ describe('thread action', () => {
       });
 
       // Should have called with LOADING_FLAT first, then reverted to old title on error
-      expect(chatService.fetchPresetTaskResult).toHaveBeenCalled();
+      expect(threadService.generateThreadTitle).toHaveBeenCalledWith('thread-id');
     });
 
     it('should not run if no portal thread found', async () => {
@@ -574,7 +527,7 @@ describe('thread action', () => {
         await result.current.summaryThreadTitle('thread-id', []);
       });
 
-      expect(chatService.fetchPresetTaskResult).not.toHaveBeenCalled();
+      expect(threadService.generateThreadTitle).not.toHaveBeenCalled();
     });
   });
 

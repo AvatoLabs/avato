@@ -13,6 +13,10 @@ export class ThreadService {
     return lambdaClient.thread.getThreads.query({ topicId });
   };
 
+  generateThreadTitle = (id: string): Promise<string | null> => {
+    return lambdaClient.thread.generateThreadTitle.mutate({ id });
+  };
+
   createThreadWithMessage = async ({
     message,
     ...params

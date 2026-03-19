@@ -5,6 +5,8 @@ import { ThreadModel } from '@/database/models/thread';
 import { insertThreadSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { pickLatestTitleContext } from '@/server/routers/lambda/_helpers/titleContext';
+import { SystemAgentService } from '@/server/services/systemAgent';
 import { type ThreadItem } from '@/types/topic/thread';
 import { createThreadSchema } from '@/types/topic/thread';
 
@@ -60,6 +62,25 @@ export const threadRouter = router({
     .input(z.object({ topicId: z.string() }))
     .query(async ({ input, ctx }) => {
       return ctx.threadModel.queryByTopicId(input.topicId);
+    }),
+
+  generateThreadTitle: threadProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const thread = await ctx.threadModel.findById(input.id);
+      if (!thread) return null;
+
+      const messages = await ctx.messageModel.query({ threadId: input.id });
+      const titleContext = pickLatestTitleContext(messages);
+      if (!titleContext) return null;
+
+      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
+      const title = await systemAgent.generateTopicTitle(titleContext);
+      if (!title) return null;
+
+      await ctx.threadModel.update(input.id, { title });
+
+      return title;
     }),
 
   removeAllThreads: threadProcedure.mutation(async ({ ctx }) => {

@@ -1,6 +1,5 @@
 // Disable the auto sort key eslint rule to make the code more logic and readable
 import { LOADING_FLAT } from '@lobechat/const';
-import { chainSummaryTitle } from '@lobechat/prompts';
 import {
   type CreateMessageParams,
   type IThreadType,
@@ -11,15 +10,10 @@ import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
 
 import { mutate, useClientDataSWR } from '@/libs/swr';
-import { chatService } from '@/services/chat';
 import { threadService } from '@/services/thread';
 import { threadSelectors } from '@/store/chat/selectors';
 import { type ChatStore } from '@/store/chat/store';
-import { globalHelpers } from '@/store/global/helpers';
 import { type StoreSetter } from '@/store/types';
-import { useUserStore } from '@/store/user';
-import { systemAgentSelectors, userGeneralSettingsSelectors } from '@/store/user/selectors';
-import { merge } from '@/utils/merge';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { displayMessageSelectors } from '../message/selectors';
@@ -174,43 +168,30 @@ export class ChatThreadActionImpl {
   };
 
   summaryThreadTitle = async (threadId: string, messages: UIChatMessage[]): Promise<void> => {
+    void messages;
     const { internal_updateThreadTitleInSummary, internal_updateThreadLoading } = this.#get();
     const portalThread = threadSelectors.currentPortalThread(this.#get());
     if (!portalThread) return;
 
     internal_updateThreadTitleInSummary(threadId, LOADING_FLAT);
+    internal_updateThreadLoading(threadId, true);
 
-    let output = '';
-    const threadConfig = systemAgentSelectors.thread(useUserStore.getState());
+    try {
+      const title = await threadService.generateThreadTitle(threadId);
 
-    await chatService.fetchPresetTaskResult({
-      onError: () => {
+      if (!title) {
         internal_updateThreadTitleInSummary(threadId, portalThread.title);
-      },
-      onFinish: async (text) => {
-        await this.#get().internal_updateThread(threadId, { title: text });
-      },
-      onLoadingChange: (loading) => {
-        internal_updateThreadLoading(threadId, loading);
-      },
-      onMessageHandle: (chunk) => {
-        switch (chunk.type) {
-          case 'text': {
-            output += chunk.text;
-          }
-        }
+        return;
+      }
 
-        internal_updateThreadTitleInSummary(threadId, output);
-      },
-      params: merge(
-        threadConfig,
-        chainSummaryTitle(
-          messages,
-          userGeneralSettingsSelectors.responseLanguage(useUserStore.getState()) ||
-            globalHelpers.getCurrentLanguage(),
-        ),
-      ),
-    });
+      internal_updateThreadTitleInSummary(threadId, title);
+      await this.#get().internal_updateThread(threadId, { title });
+    } catch (error) {
+      internal_updateThreadTitleInSummary(threadId, portalThread.title);
+      console.error('[summaryThreadTitle] Failed:', error);
+    } finally {
+      internal_updateThreadLoading(threadId, false);
+    }
   };
 
   internal_updateThreadTitleInSummary = (id: string, title: string): void => {
