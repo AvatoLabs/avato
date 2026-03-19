@@ -95,19 +95,13 @@ const LAYER_LABEL_MAP: Record<LayersEnum, string> = {
   [LayersEnum.Preference]: 'preferences',
 };
 
-export interface MemoryExtractionWorkflowCursor {
+export interface MemoryExtractionCursor {
   createdAt: string;
   id: string;
 }
 
-export interface TopicWorkflowCursor extends MemoryExtractionWorkflowCursor {
+export interface TopicCursor extends MemoryExtractionCursor {
   userId: string;
-}
-
-export interface MemoryExtractionHourlyWorkflowPayload {
-  baseUrl?: string;
-  cursor?: MemoryExtractionWorkflowCursor;
-  dryRun?: boolean;
 }
 
 export interface MemoryExtractionNormalizedPayload {
@@ -118,17 +112,12 @@ export interface MemoryExtractionNormalizedPayload {
   from?: Date;
   identityCursor: number;
   layers: LayersEnum[];
-  /**
-   * - `workflow` keeps fire-and-forget scheduling semantics via the internal trigger.
-   * - `direct` processes the extraction within the webhook request itself.
-   */
-  mode: 'workflow' | 'direct';
   sourceIds?: string[];
   sources: MemorySourceType[];
   to?: Date;
-  topicCursor?: TopicWorkflowCursor;
+  topicCursor?: TopicCursor;
   topicIds: string[];
-  userCursor?: MemoryExtractionWorkflowCursor;
+  userCursor?: MemoryExtractionCursor;
   userId?: string;
   userIds: string[];
   userInitiated?: boolean;
@@ -142,7 +131,6 @@ export const memoryExtractionPayloadSchema = z.object({
   fromDate: z.coerce.date().optional(),
   identityCursor: z.coerce.number().int().nonnegative().optional(),
   layers: z.array(z.nativeEnum(LayersEnum)).optional(),
-  mode: z.enum(['workflow', 'direct']).optional(),
   sourceIds: z.array(z.string()).optional(),
   sources: z.array(z.string()).optional(),
   toDate: z.coerce.date().optional(),
@@ -203,7 +191,6 @@ export const normalizeMemoryExtractionPayload = (
     from: parsed.fromDate,
     identityCursor: parsed.identityCursor ?? 0,
     layers: normalizeLayers(parsed.layers),
-    mode: parsed.mode ?? 'direct',
     sourceIds: Array.from(new Set(parsed.sourceIds || [])).filter(Boolean),
     sources: normalizeSources(parsed.sources),
     to: parsed.toDate,
@@ -218,19 +205,12 @@ export const normalizeMemoryExtractionPayload = (
   };
 };
 
-export type UserTopicWorkflowPayload = MemoryExtractionPayloadInput;
-
-export interface TopicBatchWorkflowPayload extends MemoryExtractionPayloadInput {
-  topicIds: string[];
-  userId: string;
-}
-
 export type ProviderKeyVaultMap = Record<
   string,
   AiProviderRuntimeState['runtimeConfig'][string]['keyVaults'] | undefined
 >;
 
-export const buildWorkflowPayloadInput = (
+export const buildMemoryExtractionPayloadInput = (
   payload: MemoryExtractionNormalizedPayload,
 ): MemoryExtractionPayloadInput => ({
   asyncTaskId: payload.asyncTaskId,
@@ -240,7 +220,6 @@ export const buildWorkflowPayloadInput = (
   fromDate: payload.from,
   identityCursor: payload.identityCursor,
   layers: payload.layers,
-  mode: payload.mode,
   sourceIds: payload.sourceIds,
   sources: payload.sources,
   toDate: payload.to,
@@ -2202,13 +2181,11 @@ export class MemoryExtractionExecutor {
   }
 }
 
-const WORKFLOW_PATHS = {
-  hourly: '/api/webhooks/memory-extraction',
-  personaUpdate: '/api/webhooks/memory-user-memory/persona/update-writing',
+const MEMORY_TRIGGER_PATHS = {
   users: '/api/webhooks/memory-extraction',
 } as const;
 
-const getWorkflowUrl = (path: string, baseUrl: string) => {
+const buildTriggerUrl = (path: string, baseUrl: string) => {
   const url = new URL(path, baseUrl);
 
   return url.toString();
@@ -2232,7 +2209,7 @@ const triggerInternalEndpoint = (
   body: Record<string, unknown>,
   options?: { extraHeaders?: Record<string, string> },
 ) => {
-  const workflowRunId = `internal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const triggerId = `internal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   void fetch(url, {
     body: JSON.stringify(body),
@@ -2251,10 +2228,10 @@ const triggerInternalEndpoint = (
       console.error('[memory-user-memory] Internal trigger failed:', error);
     });
 
-  return Promise.resolve({ workflowRunId });
+  return Promise.resolve({ triggerId });
 };
 
-export class MemoryExtractionWorkflowService {
+export class MemoryExtractionTriggerService {
   static triggerProcessUsers(
     payload: MemoryExtractionPayloadInput,
     options?: { extraHeaders?: Record<string, string> },
@@ -2263,62 +2240,7 @@ export class MemoryExtractionWorkflowService {
       throw new Error('Missing baseUrl for memory extraction trigger');
     }
 
-    const url = getWorkflowUrl(WORKFLOW_PATHS.users, payload.baseUrl);
-    return triggerInternalEndpoint(
-      url,
-      {
-        ...payload,
-        mode: 'direct',
-      },
-      options,
-    );
-  }
-
-  static triggerHourly(
-    payload: MemoryExtractionHourlyWorkflowPayload,
-    options?: { extraHeaders?: Record<string, string> },
-  ) {
-    if (!payload.baseUrl) {
-      throw new Error('Missing baseUrl for memory extraction trigger');
-    }
-
-    const url = getWorkflowUrl(WORKFLOW_PATHS.hourly, payload.baseUrl);
-    return triggerInternalEndpoint(
-      url,
-      {
-        ...payload,
-        mode: 'direct',
-      },
-      options,
-    );
-  }
-
-  static triggerProcessUserTopics(payload: UserTopicWorkflowPayload) {
-    return this.triggerProcessUsers(payload);
-  }
-
-  static triggerProcessTopics(_userId: string, payload: MemoryExtractionPayloadInput) {
-    return this.triggerProcessUsers(payload);
-  }
-
-  static triggerPersonaUpdate(
-    userId: string,
-    baseUrl: string,
-    options?: { extraHeaders?: Record<string, string> },
-  ) {
-    if (!baseUrl) {
-      throw new Error('Missing baseUrl for user persona trigger');
-    }
-
-    const url = getWorkflowUrl(WORKFLOW_PATHS.personaUpdate, baseUrl);
-    return triggerInternalEndpoint(
-      url,
-      {
-        baseUrl,
-        mode: 'direct',
-        userIds: [userId],
-      },
-      options,
-    );
+    const url = buildTriggerUrl(MEMORY_TRIGGER_PATHS.users, payload.baseUrl);
+    return triggerInternalEndpoint(url, payload, options);
   }
 }

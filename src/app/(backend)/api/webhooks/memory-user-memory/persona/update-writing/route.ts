@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { getServerDB } from '@/database/server';
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
-import { MemoryExtractionWorkflowService } from '@/server/services/memory/userMemory/extract';
 import {
   buildUserPersonaJobInput,
   UserPersonaService,
@@ -11,7 +10,6 @@ import {
 
 const userPersonaWebhookSchema = z.object({
   baseUrl: z.string().url().optional(),
-  mode: z.enum(['workflow', 'direct']).optional(),
   userId: z.string().optional(),
   userIds: z.array(z.string()).optional(),
 });
@@ -28,8 +26,6 @@ const normalizeUserPersonaPayload = (
   if (!baseUrl) throw new Error('Missing baseUrl for user persona trigger');
 
   return {
-    baseUrl,
-    mode: parsed.mode ?? 'direct',
     userIds: Array.from(
       new Set([...(parsed.userIds || []), ...(parsed.userId ? [parsed.userId] : [])]),
     ).filter(Boolean),
@@ -37,7 +33,7 @@ const normalizeUserPersonaPayload = (
 };
 
 export const POST = async (req: Request) => {
-  const { triggerExtraHeaders, webhook } = parseMemoryExtractionConfig();
+  const { webhook } = parseMemoryExtractionConfig();
 
   if (webhook.headers && Object.keys(webhook.headers).length > 0) {
     for (const [key, value] of Object.entries(webhook.headers)) {
@@ -60,25 +56,6 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ error: 'userId or userIds is required' }, { status: 400 });
     }
 
-    if (params.mode === 'workflow') {
-      const results = await Promise.all(
-        params.userIds.map(async (userId) => {
-          const { workflowRunId } = await MemoryExtractionWorkflowService.triggerPersonaUpdate(
-            userId,
-            params.baseUrl,
-            { extraHeaders: triggerExtraHeaders },
-          );
-
-          return { userId, workflowRunId };
-        }),
-      );
-
-      return NextResponse.json(
-        { message: 'User persona update scheduled asynchronously.', results },
-        { status: 202 },
-      );
-    }
-
     const db = await getServerDB();
 
     const service = new UserPersonaService(db);
@@ -91,7 +68,7 @@ export const POST = async (req: Request) => {
     }
 
     return NextResponse.json(
-      { message: 'User persona generated via webhook.', results },
+      { message: 'User persona generated successfully.', results },
       { status: 200 },
     );
   } catch (error) {

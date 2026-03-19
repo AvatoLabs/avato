@@ -2,15 +2,13 @@ import { NextResponse } from 'next/server';
 
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
 import {
-  buildWorkflowPayloadInput,
   MemoryExtractionExecutor,
   memoryExtractionPayloadSchema,
-  MemoryExtractionWorkflowService,
   normalizeMemoryExtractionPayload,
 } from '@/server/services/memory/userMemory/extract';
 
 export const POST = async (req: Request) => {
-  const { triggerExtraHeaders, webhook } = parseMemoryExtractionConfig();
+  const { webhook } = parseMemoryExtractionConfig();
 
   if (webhook.headers && Object.keys(webhook.headers).length > 0) {
     for (const [key, value] of Object.entries(webhook.headers)) {
@@ -40,23 +38,11 @@ export const POST = async (req: Request) => {
     }
 
     const params = normalizeMemoryExtractionPayload(payload, origin);
-    if (params.mode === 'workflow') {
-      const { workflowRunId } = await MemoryExtractionWorkflowService.triggerProcessUsers(
-        buildWorkflowPayloadInput(params),
-        { extraHeaders: triggerExtraHeaders },
-      );
-
-      return NextResponse.json(
-        { message: 'Memory extraction scheduled asynchronously.', workflowRunId },
-        { status: 202 },
-      );
-    }
-
     const executor = await MemoryExtractionExecutor.create();
     const result = await executor.runDirect(params);
 
     return NextResponse.json(
-      { message: 'Memory extraction executed via webhook.', result },
+      { message: 'Memory extraction executed successfully.', result },
       { status: 200 },
     );
   } catch (error) {

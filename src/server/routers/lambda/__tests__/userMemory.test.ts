@@ -92,10 +92,10 @@ vi.mock('@/server/globalConfig/parseMemoryExtractionConfig', () => ({
 }));
 
 vi.mock('@/server/services/memory/userMemory/extract', () => ({
-  MemoryExtractionWorkflowService: {
+  MemoryExtractionTriggerService: {
     triggerProcessUsers: mockTriggerProcessUsers,
   },
-  buildWorkflowPayloadInput: (payload: any) => payload,
+  buildMemoryExtractionPayloadInput: (payload: any) => payload,
   normalizeMemoryExtractionPayload: (payload: any) => payload,
 }));
 

@@ -27,8 +27,8 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
 import {
-  buildWorkflowPayloadInput,
-  MemoryExtractionWorkflowService,
+  buildMemoryExtractionPayloadInput,
+  MemoryExtractionTriggerService,
   normalizeMemoryExtractionPayload,
 } from '@/server/services/memory/userMemory/extract';
 
@@ -303,15 +303,14 @@ export const userMemoryRouter = router({
       const { triggerExtraHeaders } = parseMemoryExtractionConfig();
 
       try {
-        await MemoryExtractionWorkflowService.triggerProcessUsers(
-          buildWorkflowPayloadInput(
+        await MemoryExtractionTriggerService.triggerProcessUsers(
+          buildMemoryExtractionPayloadInput(
             normalizeMemoryExtractionPayload({
               asyncTaskId: taskId,
               baseUrl,
               forceAll: false,
               forceTopics: false,
               fromDate: input.fromDate,
-              mode: 'direct',
               sources: [MemorySourceType.ChatTopic],
               toDate: input.toDate,
               userIds: [ctx.userId],

@@ -6,7 +6,7 @@ import {
   type MemoryExtractionNormalizedPayload,
   type MemoryExtractionPayloadInput,
 } from '../extract';
-import { buildWorkflowPayloadInput, normalizeMemoryExtractionPayload } from '../extract';
+import { buildMemoryExtractionPayloadInput, normalizeMemoryExtractionPayload } from '../extract';
 
 describe('normalizeMemoryExtractionPayload', () => {
   it('normalizes sources, layers, ids, and dates with fallback baseUrl', () => {
@@ -19,7 +19,6 @@ describe('normalizeMemoryExtractionPayload', () => {
       fromDate,
       identityCursor: 3,
       layers: [LayersEnum.Context, LayersEnum.Identity, LayersEnum.Context],
-      mode: 'direct',
       sourceIds: ['source-1', 'source-1', ''],
       sources: ['chatTopics', 'benchmark_locomo', 'unknown'],
       toDate,
@@ -60,7 +59,7 @@ describe('normalizeMemoryExtractionPayload', () => {
   });
 });
 
-describe('buildWorkflowPayloadInput', () => {
+describe('buildMemoryExtractionPayloadInput', () => {
   const baseNormalized: MemoryExtractionNormalizedPayload = {
     baseUrl: 'https://api.example.com',
     forceAll: false,
@@ -68,7 +67,6 @@ describe('buildWorkflowPayloadInput', () => {
     from: undefined,
     identityCursor: 0,
     layers: [],
-    mode: 'workflow',
     sourceIds: [],
     sources: [MemorySourceType.ChatTopic],
     to: undefined,
@@ -80,12 +78,11 @@ describe('buildWorkflowPayloadInput', () => {
   };
 
   it('falls back to the first user id when userId is missing', () => {
-    const payload = buildWorkflowPayloadInput(baseNormalized);
+    const payload = buildMemoryExtractionPayloadInput(baseNormalized);
 
     expect(payload.userId).toBe('user-x');
     expect(payload.userIds).toEqual(['user-x', 'user-y']);
     expect(payload.baseUrl).toBe('https://api.example.com');
-    expect(payload.mode).toBe('workflow');
   });
 
   it('preserves explicit userId when provided', () => {
@@ -94,7 +91,7 @@ describe('buildWorkflowPayloadInput', () => {
       userId: 'user-z',
     };
 
-    const payload = buildWorkflowPayloadInput(normalized);
+    const payload = buildMemoryExtractionPayloadInput(normalized);
 
     expect(payload.userId).toBe('user-z');
     expect(payload.userIds).toEqual(['user-x', 'user-y']);
