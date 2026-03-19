@@ -213,12 +213,13 @@ function SessionLogo({
           className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
           style={{ width: size, height: size }}
         >
-          <Image
+          <RNImage
+            resizeMode="contain"
             source={AVATO_INBOX_ICON_ASSET}
             style={{
               width: size,
               height: size,
-              ...(effectiveTheme === 'dark' ? { tintColor: colors.foreground } : {}),
+              ...(effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : {}),
             }}
           />
         </View>
@@ -472,6 +473,11 @@ export default function ChatListScreen({ navigation }: any) {
     return [...assistants, ...groups];
   }, [inboxSession?.id, sessions]);
   const visibleInboxSession = inboxSession;
+  const getSessionDisplayTitle = useCallback(
+    (session?: ChatSession | null) =>
+      session?.id === visibleInboxSession?.id ? 'Avato' : session?.title || 'Avato',
+    [visibleInboxSession?.id],
+  );
   const draftAgentSessions = useMemo(() => {
     const entries = [visibleInboxSession, ...visibleSessions.filter((session) => session.type !== 'group')].filter(
       Boolean,
@@ -534,10 +540,7 @@ export default function ChatListScreen({ navigation }: any) {
             plugins: options?.includeComposerConfig ? options.plugins : undefined,
             provider: options?.includeComposerConfig ? options.provider : undefined,
             slug: INBOX_SESSION_ID,
-            title:
-              typeof inboxConfig?.title === 'string' && inboxConfig.title.trim().length > 0
-                ? inboxConfig.title
-                : 'Avato',
+            title: 'Avato',
           });
 
           if (!inboxConfig?.id || options?.includeComposerConfig) {
@@ -579,9 +582,7 @@ export default function ChatListScreen({ navigation }: any) {
                 ? inboxConfig.provider
                 : undefined,
             title:
-              typeof inboxConfig?.title === 'string' && inboxConfig.title.trim().length > 0
-                ? inboxConfig.title
-                : 'Avato',
+              'Avato',
             type: 'agent',
             updatedAt: new Date().toISOString(),
           };
@@ -1514,8 +1515,8 @@ export default function ChatListScreen({ navigation }: any) {
             <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
               <SessionLogo
                 avatar={item.avatar}
-                isInbox={itemIsInbox}
                 isGroup={item.type === 'group'}
+                isInbox={itemIsInbox}
                 provider={providerId}
                 size={36}
               />
@@ -1657,8 +1658,8 @@ export default function ChatListScreen({ navigation }: any) {
         <View className="mr-3.5 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
           <SessionLogo
             avatar={session.avatar}
-            isInbox={isInboxSession(session)}
             isGroup={session.type === 'group'}
+            isInbox={isInboxSession(session)}
             provider={providerId}
             size={36}
           />
@@ -1787,6 +1788,8 @@ export default function ChatListScreen({ navigation }: any) {
                   <SessionLogo
                     avatar={draftSessionIsInbox ? (draftSession?.avatar || DEFAULT_INBOX_AVATAR) : draftSession?.avatar}
                     isInbox={draftSessionIsInbox}
+                    providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
+                    size={34}
                     provider={
                       draftSessionIsInbox
                         ? undefined
@@ -1797,8 +1800,6 @@ export default function ChatListScreen({ navigation }: any) {
                           selectedProvider ||
                           undefined
                     }
-                    providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
-                    size={34}
                   />
                 </View>
                 <View className="flex-1">
@@ -1806,7 +1807,7 @@ export default function ChatListScreen({ navigation }: any) {
                     className="text-[16px] font-medium text-foreground tracking-tight"
                     numberOfLines={1}
                   >
-                    {draftSession?.title || 'Avato'}
+                    {getSessionDisplayTitle(draftSession)}
                   </Text>
                   {selectedModel ? (
                     <View className="mt-0.5 flex-row items-center">
@@ -2710,15 +2711,15 @@ export default function ChatListScreen({ navigation }: any) {
                     <View className="mr-3">
                       <SessionLogo
                         avatar={session.avatar}
-                        isInbox={session.id === visibleInboxSession?.id}
                         isGroup={false}
+                        isInbox={session.id === visibleInboxSession?.id}
                         provider={providerId}
                         size={38}
                       />
                     </View>
                     <View className="min-w-0 flex-1">
                       <Text className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
-                        {session.title || 'Avato'}
+                        {getSessionDisplayTitle(session)}
                       </Text>
                       <Text
                         className="mt-0.5 text-[12px]"

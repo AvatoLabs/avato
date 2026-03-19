@@ -136,6 +136,39 @@ describe('agentSelectors', () => {
 
       expect(meta.avatar).toBe(DEFAULT_AVATAR);
     });
+
+    it('should force inbox title to Avato when active agent is builtin inbox', () => {
+      const state = createState({
+        activeAgentId: 'agent-inbox',
+        agentMap: {
+          'agent-inbox': {
+            slug: INBOX_SESSION_ID,
+            title: 'Dirty Inbox Title',
+          } as any,
+        },
+        builtinAgentIdMap: { [INBOX_SESSION_ID]: 'agent-inbox' },
+      });
+
+      const meta = agentSelectors.currentAgentMeta(state);
+
+      expect(meta.title).toBe('Avato');
+    });
+  });
+
+  describe('currentAgentTitle', () => {
+    it('should force inbox title to Avato when slug is inbox', () => {
+      const state = createState({
+        activeAgentId: 'agent-inbox',
+        agentMap: {
+          'agent-inbox': {
+            slug: INBOX_SESSION_ID,
+            title: 'Dirty Inbox Title',
+          } as any,
+        },
+      });
+
+      expect(agentSelectors.currentAgentTitle(state)).toBe('Avato');
+    });
   });
 
   describe('getAgentMetaById', () => {

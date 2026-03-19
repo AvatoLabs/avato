@@ -5,6 +5,7 @@ import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_MODEL,
   DEFAUTT_AGENT_TTS_CONFIG,
+  INBOX_SESSION_ID,
 } from '@lobechat/const';
 import {
   type AgentMode,
@@ -28,7 +29,15 @@ import { builtinAgentSelectors } from './builtinAgentSelectors';
 const currentAgentData = (s: AgentStoreState) =>
   s.activeAgentId ? s.agentMap[s.activeAgentId] : undefined;
 
-const currentAgentTitle = (s: AgentStoreState) => currentAgentData(s)?.title;
+const isCurrentInboxAgent = (s: AgentStoreState) => {
+  const data = currentAgentData(s);
+  if (!data) return false;
+
+  return s.activeAgentId === builtinAgentSelectors.inboxAgentId(s) || data.slug === INBOX_SESSION_ID;
+};
+
+const currentAgentTitle = (s: AgentStoreState) =>
+  isCurrentInboxAgent(s) ? 'Avato' : currentAgentData(s)?.title;
 
 const currentAgentAvatar = (s: AgentStoreState) => currentAgentData(s)?.avatar || DEFAULT_AVATAR;
 
@@ -45,13 +54,14 @@ const currentAgentTags = (s: AgentStoreState) => currentAgentData(s)?.tags || []
  */
 const currentAgentMeta = (s: AgentStoreState): MetaData => {
   const data = currentAgentData(s);
+  const displayTitle = isCurrentInboxAgent(s) ? 'Avato' : data?.title || undefined;
   return {
     avatar: data?.avatar || DEFAULT_AVATAR,
     backgroundColor: data?.backgroundColor || DEFAULT_BACKGROUND_COLOR,
     description: data?.description || undefined,
     marketIdentifier: data?.marketIdentifier || undefined,
     tags: data?.tags,
-    title: data?.title || undefined,
+    title: displayTitle,
   };
 };
 

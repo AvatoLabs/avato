@@ -1121,27 +1121,31 @@ describe('AgentModel', () => {
   });
 
   describe('getBuiltinAgent', () => {
-    describe('inbox compatibility', () => {
-      it('should return existing inbox agent directly if slug exists in agents table', async () => {
-        // Create an agent with slug='inbox'
+    describe('inbox canonicalization', () => {
+      it('should return null for orphan standalone inbox agents', async () => {
         const [agent] = await serverDB
           .insert(agents)
           .values({
             slug: INBOX_SESSION_ID,
+            title: 'Dirty Inbox Title',
             userId,
+            virtual: false,
             model: 'gpt-4',
           })
           .returning();
 
         const result = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
 
-        expect(result).toBeDefined();
-        expect(result?.id).toBe(agent.id);
-        expect(result?.slug).toBe(INBOX_SESSION_ID);
+        expect(result).toBeNull();
+
+        const updatedAgent = await serverDB.query.agents.findFirst({
+          where: eq(agents.id, agent.id),
+        });
+        expect(updatedAgent?.slug).toBe(INBOX_SESSION_ID);
+        expect(updatedAgent?.title).toBe('Dirty Inbox Title');
       });
 
-      it('should find inbox from legacy session and update agent slug', async () => {
-        // Create legacy format: session(slug=inbox) + agent(no slug) + relation
+      it('should return canonical inbox agent from inbox session and normalize it', async () => {
         const [session] = await serverDB
           .insert(sessions)
           .values({
@@ -1172,35 +1176,108 @@ describe('AgentModel', () => {
         expect(result).toBeDefined();
         expect(result?.id).toBe(agent.id);
         expect(result?.slug).toBe(INBOX_SESSION_ID);
+        expect(result?.title).toBe('Avato');
+        expect(result?.virtual).toBe(true);
 
         // Verify the slug was updated in database
         const updatedAgent = await serverDB.query.agents.findFirst({
           where: eq(agents.id, agent.id),
         });
         expect(updatedAgent?.slug).toBe(INBOX_SESSION_ID);
+        expect(updatedAgent?.title).toBeNull();
+        expect(updatedAgent?.virtual).toBe(true);
       });
 
-      it('should create new inbox agent if no legacy data exists', async () => {
+      it('should return null when no canonical inbox session exists', async () => {
         const result = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
 
-        expect(result).toBeDefined();
-        expect(result?.slug).toBe(INBOX_SESSION_ID);
-        expect(result?.virtual).toBe(true);
+        expect(result).toBeNull();
       });
 
-      it('should return the same agent on subsequent calls (idempotent)', async () => {
-        // First call - creates the agent
-        const result1 = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
+      it('should return the same canonical agent on subsequent calls', async () => {
+        const [session] = await serverDB
+          .insert(sessions)
+          .values({
+            slug: INBOX_SESSION_ID,
+            userId,
+            type: 'agent',
+          })
+          .returning();
 
-        // Second call - should return the same agent
+        const [agent] = await serverDB
+          .insert(agents)
+          .values({
+            userId,
+            model: 'gpt-4',
+          })
+          .returning();
+
+        await serverDB.insert(agentsToSessions).values({
+          agentId: agent.id,
+          sessionId: session.id,
+          userId,
+        });
+
+        const result1 = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
         const result2 = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
 
         expect(result1?.id).toBe(result2?.id);
         expect(result1?.slug).toBe(result2?.slug);
       });
 
-      it('should not affect other users inbox agent', async () => {
-        // User1 creates inbox via legacy method
+      it('should prefer canonical inbox session binding over standalone inbox agents', async () => {
+        const [standaloneInboxAgent] = await serverDB
+          .insert(agents)
+          .values({
+            slug: INBOX_SESSION_ID,
+            title: 'Standalone Dirty Inbox',
+            userId,
+          })
+          .returning();
+
+        const [session] = await serverDB
+          .insert(sessions)
+          .values({
+            slug: INBOX_SESSION_ID,
+            userId,
+            type: 'agent',
+          })
+          .returning();
+
+        const [canonicalInboxAgent] = await serverDB
+          .insert(agents)
+          .values({
+            title: 'Canonical Dirty Inbox',
+            userId,
+          })
+          .returning();
+
+        await serverDB.insert(agentsToSessions).values({
+          agentId: canonicalInboxAgent.id,
+          sessionId: session.id,
+          userId,
+        });
+
+        const result = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
+
+        expect(result?.id).toBe(canonicalInboxAgent.id);
+        expect(result?.slug).toBe(INBOX_SESSION_ID);
+        expect(result?.title).toBe('Avato');
+
+        const refreshedStandalone = await serverDB.query.agents.findFirst({
+          where: eq(agents.id, standaloneInboxAgent.id),
+        });
+        const refreshedCanonical = await serverDB.query.agents.findFirst({
+          where: eq(agents.id, canonicalInboxAgent.id),
+        });
+
+        expect(refreshedStandalone?.id).toBe(standaloneInboxAgent.id);
+        expect(refreshedCanonical?.slug).toBe(INBOX_SESSION_ID);
+        expect(refreshedCanonical?.title).toBeNull();
+        expect(refreshedCanonical?.virtual).toBe(true);
+      });
+
+      it('should isolate canonical inbox agents by user', async () => {
         const [session] = await serverDB
           .insert(sessions)
           .values({
@@ -1224,17 +1301,34 @@ describe('AgentModel', () => {
           userId,
         });
 
-        // User2 gets their inbox (should create a new one)
-        const result2 = await agentModel2.getBuiltinAgent(INBOX_SESSION_ID);
+        const [session2] = await serverDB
+          .insert(sessions)
+          .values({
+            slug: INBOX_SESSION_ID,
+            userId: userId2,
+            type: 'agent',
+          })
+          .returning();
 
-        // User1 gets their inbox
+        const [agent2] = await serverDB
+          .insert(agents)
+          .values({
+            userId: userId2,
+            model: 'gpt-4o',
+          })
+          .returning();
+
+        await serverDB.insert(agentsToSessions).values({
+          agentId: agent2.id,
+          sessionId: session2.id,
+          userId: userId2,
+        });
+
+        const result2 = await agentModel2.getBuiltinAgent(INBOX_SESSION_ID);
         const result1 = await agentModel.getBuiltinAgent(INBOX_SESSION_ID);
 
-        // Should be different agents
         expect(result1?.id).toBe(agent.id);
-        expect(result2?.id).not.toBe(agent.id);
-
-        // Both should have slug='inbox'
+        expect(result2?.id).toBe(agent2.id);
         expect(result1?.slug).toBe(INBOX_SESSION_ID);
         expect(result2?.slug).toBe(INBOX_SESSION_ID);
       });
@@ -1632,8 +1726,7 @@ describe('AgentModel', () => {
       expect(result).toEqual([]);
     });
 
-    it('should handle agents with null virtual field (treat as non-virtual)', async () => {
-      // Directly insert agent with null virtual (simulating legacy data)
+    it('should exclude agents with null virtual field', async () => {
       await serverDB.insert(agents).values({
         id: 'null-virtual-agent',
         title: 'Null Virtual Agent',
@@ -1644,7 +1737,7 @@ describe('AgentModel', () => {
       const result = await agentModel.queryAgents();
 
       expect(result.some((a: { title: string | null }) => a.title === 'Null Virtual Agent')).toBe(
-        true,
+        false,
       );
     });
 
@@ -1741,7 +1834,7 @@ describe('AgentModel', () => {
     });
 
     it('should return the most recently updated agent when multiple match', async () => {
-      const [older] = await serverDB
+      const [_older] = await serverDB
         .insert(agents)
         .values({ userId, title: 'Older', marketIdentifier: 'dup-market' })
         .returning();
@@ -1881,6 +1974,32 @@ describe('AgentModel', () => {
     it('should return early for non-existent agent', async () => {
       const result = await agentModel.updateConfig('non-existent-id', { title: 'New' });
       expect(result).toBeUndefined();
+    });
+
+    it('should ignore custom title updates for inbox agent', async () => {
+      const [inboxAgent] = await serverDB
+        .insert(agents)
+        .values({
+          slug: INBOX_SESSION_ID,
+          title: 'Dirty Inbox Title',
+          userId,
+          virtual: false,
+        })
+        .returning();
+
+      await agentModel.updateConfig(inboxAgent.id, {
+        model: 'gpt-4o',
+        title: 'Should Not Persist',
+      });
+
+      const updatedAgent = await serverDB.query.agents.findFirst({
+        where: eq(agents.id, inboxAgent.id),
+      });
+
+      expect(updatedAgent?.slug).toBe(INBOX_SESSION_ID);
+      expect(updatedAgent?.title).toBeNull();
+      expect(updatedAgent?.virtual).toBe(true);
+      expect(updatedAgent?.model).toBe('gpt-4o');
     });
 
     it('should delete params field when value is undefined', async () => {

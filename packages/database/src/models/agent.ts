@@ -1,6 +1,6 @@
 import { getAgentPersistConfig } from '@lobechat/builtin-agents';
 import { INBOX_SESSION_ID } from '@lobechat/const';
-import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { PartialDeep } from 'type-fest';
 
 import { merge } from '@/utils/merge';
@@ -27,6 +27,44 @@ export class AgentModel {
     this.db = db;
   }
 
+  private normalizeBuiltinInboxAgent = <T extends Partial<AgentItem> | null | undefined>(
+    agent: T,
+  ): T => {
+    if (!agent || agent.slug !== INBOX_SESSION_ID) return agent;
+
+    return {
+      ...agent,
+      title: 'Avato',
+      virtual: true,
+    } as T;
+  };
+
+  private findCanonicalInboxAgent = async () => {
+    const result = await this.db
+      .select({ agent: agents })
+      .from(sessions)
+      .innerJoin(agentsToSessions, eq(sessions.id, agentsToSessions.sessionId))
+      .innerJoin(agents, eq(agentsToSessions.agentId, agents.id))
+      .where(and(eq(sessions.slug, INBOX_SESSION_ID), eq(sessions.userId, this.userId)))
+      .orderBy(desc(sessions.updatedAt), desc(agents.updatedAt))
+      .limit(1);
+
+    return result[0]?.agent ?? null;
+  };
+
+  private clearConflictingInboxSlugs = async (excludeAgentId: string) => {
+    await this.db
+      .update(agents)
+      .set({ slug: null })
+      .where(
+        and(
+          eq(agents.userId, this.userId),
+          eq(agents.slug, INBOX_SESSION_ID),
+          sql`${agents.id} <> ${excludeAgentId}`,
+        ),
+      );
+  };
+
   getAgentConfigById = async (id: string) => {
     const agent = await this.db.query.agents.findFirst({
       where: and(eq(agents.id, id), eq(agents.userId, this.userId)),
@@ -34,7 +72,7 @@ export class AgentModel {
 
     if (!agent) return null;
 
-    return this.enrichAgentWithKnowledge(agent);
+    return this.enrichAgentWithKnowledge(this.normalizeBuiltinInboxAgent(agent));
   };
 
   /**
@@ -44,11 +82,7 @@ export class AgentModel {
    */
   queryAgents = async (params?: { keyword?: string; limit?: number; offset?: number }) => {
     const { keyword, limit = 9999, offset = 0 } = params ?? {};
-    // Include agents where virtual is false OR null (legacy data without virtual field)
-    const baseConditions = and(
-      eq(agents.userId, this.userId),
-      or(eq(agents.virtual, false), isNull(agents.virtual)),
-    );
+    const baseConditions = and(eq(agents.userId, this.userId), eq(agents.virtual, false));
 
     // Add keyword search condition if provided
     const searchCondition = keyword
@@ -86,7 +120,7 @@ export class AgentModel {
 
     if (!agent) return null;
 
-    return this.enrichAgentWithKnowledge(agent);
+    return this.enrichAgentWithKnowledge(this.normalizeBuiltinInboxAgent(agent));
   };
 
   /**
@@ -405,12 +439,21 @@ export class AgentModel {
 
     if (!agent) return;
 
+    const isInboxAgent = agent.slug === INBOX_SESSION_ID;
+    const sanitizedData = isInboxAgent
+      ? ({
+          ...data,
+          title: undefined,
+          virtual: true,
+        } satisfies PartialDeep<AgentItem>)
+      : data;
+
     // First process the params field: undefined means delete, null means disable flag
     const existingParams = agent.params ?? {};
     const updatedParams: Record<string, any> = { ...existingParams };
 
-    if (data.params) {
-      const incomingParams = data.params as Record<string, any>;
+    if (sanitizedData.params) {
+      const incomingParams = sanitizedData.params as Record<string, any>;
       Object.keys(incomingParams).forEach((key) => {
         const incomingValue = incomingParams[key];
 
@@ -427,11 +470,16 @@ export class AgentModel {
 
     // Build data to be merged, excluding params (processed separately)
 
-    const { params: _params, ...restData } = data;
+    const { params: _params, ...restData } = sanitizedData;
     const mergedValue = merge(agent, restData);
 
     // Apply the processed parameters
     mergedValue.params = Object.keys(updatedParams).length > 0 ? updatedParams : undefined;
+    if (isInboxAgent) {
+      mergedValue.slug = INBOX_SESSION_ID;
+      mergedValue.title = null;
+      mergedValue.virtual = true;
+    }
 
     // Final cleanup: ensure no undefined or null values enter the database
     if (mergedValue.params) {
@@ -521,38 +569,29 @@ export class AgentModel {
    *
    */
   getBuiltinAgent = async (slug: string): Promise<AgentItem | null> => {
+    if (slug === INBOX_SESSION_ID) {
+      const canonicalInboxAgent = await this.findCanonicalInboxAgent();
+
+      if (!canonicalInboxAgent) return null;
+
+      await this.clearConflictingInboxSlugs(canonicalInboxAgent.id);
+
+      const [updatedAgent] = await this.db
+        .update(agents)
+        .set({ slug: INBOX_SESSION_ID, title: null, virtual: true })
+        .where(and(eq(agents.id, canonicalInboxAgent.id), eq(agents.userId, this.userId)))
+        .returning();
+
+      return this.normalizeBuiltinInboxAgent(updatedAgent);
+    }
+
     // 1. First try to find existing agent by slug
     const existing = await this.db.query.agents.findFirst({
+      orderBy: [desc(agents.updatedAt)],
       where: and(eq(agents.slug, slug), eq(agents.userId, this.userId)),
     });
 
     if (existing) return existing;
-
-    // For inbox agent, it has special compatibility handling:
-    // Historical inbox was stored as session with slug='inbox' and linked agent via agentsToSessions
-    // If found, update the agent's slug to 'inbox' for future direct queries
-    if (slug === INBOX_SESSION_ID) {
-      // Use join query for better performance instead of multiple findFirst calls
-      const result = await this.db
-        .select({ agent: agents })
-        .from(sessions)
-        .innerJoin(agentsToSessions, eq(sessions.id, agentsToSessions.sessionId))
-        .innerJoin(agents, eq(agentsToSessions.agentId, agents.id))
-        .where(and(eq(sessions.slug, INBOX_SESSION_ID), eq(sessions.userId, this.userId)))
-        .limit(1);
-
-      if (result.length > 0 && result[0].agent) {
-        // Update the agent's slug to 'inbox' for future direct queries
-        // Use both id and userId to ensure we only update current user's agent
-        const [updatedAgent] = await this.db
-          .update(agents)
-          .set({ slug: INBOX_SESSION_ID, virtual: true })
-          .where(eq(agents.id, result[0].agent.id))
-          .returning();
-
-        return updatedAgent;
-      }
-    }
 
     // 3. Check if this is a known builtin agent
     const persistConfig = getAgentPersistConfig(slug);
@@ -570,6 +609,6 @@ export class AgentModel {
       })
       .returning();
 
-    return result[0];
+    return this.normalizeBuiltinInboxAgent(result[0]);
   };
 }

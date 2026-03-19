@@ -10,7 +10,6 @@ import { FileModel } from '@/database/models/file';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
-import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
 import { insertAgentSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -218,16 +217,10 @@ export const agentRouter = router({
     )
     .query(async ({ input, ctx }) => {
       if (input.sessionId === INBOX_SESSION_ID) {
-        const item = await ctx.sessionModel.findByIdOrSlug(INBOX_SESSION_ID);
-        // if there is no session for user, create one
-        if (!item) {
-          // if there is no user, return default config
-          const user = await UserModel.findById(ctx.serverDB, ctx.userId);
-          if (!user) return DEFAULT_AGENT_CONFIG;
+        const user = await UserModel.findById(ctx.serverDB, ctx.userId);
+        if (!user) return DEFAULT_AGENT_CONFIG;
 
-          const res = await ctx.agentService.createInbox();
-          console.info('create inbox session', res);
-        }
+        await ctx.agentService.createInbox();
       }
 
       // Group chat: sessionId is chat group id (cg_xxx), not in sessions table
@@ -249,13 +242,6 @@ export const agentRouter = router({
 
       const agentConfig = await ctx.agentModel.findBySessionId(sessionId);
       if (agentConfig) return agentConfig;
-
-      await new AgentMigrationRepo(ctx.serverDB, ctx.userId).migrateSessionOnlyAgentBindings([
-        sessionId,
-      ]);
-
-      const migratedConfig = await ctx.agentModel.findBySessionId(sessionId);
-      if (migratedConfig) return migratedConfig;
 
       throw new Error(`Session [${input.sessionId}] has no bound agent`);
     }),

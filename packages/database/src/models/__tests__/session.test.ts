@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_CONFIG } from '@lobechat/const';
+import { DEFAULT_AGENT_CONFIG, INBOX_SESSION_ID } from '@lobechat/const';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { LLMParams } from 'model-bank';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -772,12 +772,20 @@ describe('SessionModel', () => {
       const inbox = await sessionModel.createInbox({});
 
       expect(inbox).toBeDefined();
-      expect(inbox?.slug).toBe('inbox');
+      expect(inbox?.slug).toBe(INBOX_SESSION_ID);
 
       // verify agent config
       const session = await sessionModel.findByIdOrSlug('inbox');
       expect(session?.agent).toBeDefined();
+      expect(session?.agent.slug).toBe(INBOX_SESSION_ID);
       expect(session?.agent.model).toBe(DEFAULT_AGENT_CONFIG.model);
+
+      const dbAgent = await serverDB.query.agents.findFirst({
+        where: eq(agents.id, session!.agent!.id),
+      });
+      expect(dbAgent?.slug).toBe(INBOX_SESSION_ID);
+      expect(dbAgent?.title).toBeNull();
+      expect(dbAgent?.virtual).toBe(true);
     });
 
     it('should not create duplicate inbox session', async () => {
@@ -793,8 +801,65 @@ describe('SessionModel', () => {
       // Verify only one inbox exists
       const sessions = await serverDB.query.sessions.findMany();
 
-      const inboxSessions = sessions.filter((s) => s.slug === 'inbox');
+      const inboxSessions = sessions.filter((s) => s.slug === INBOX_SESSION_ID);
       expect(inboxSessions).toHaveLength(1);
+    });
+
+    it('should ignore stray standalone inbox agents and create a canonical inbox binding', async () => {
+      const [standaloneInboxAgent] = await serverDB
+        .insert(agents)
+        .values({
+          slug: INBOX_SESSION_ID,
+          title: 'Polluted Inbox Title',
+          userId,
+          virtual: false,
+        })
+        .returning();
+
+      const inbox = await sessionModel.createInbox({});
+
+      expect(inbox?.slug).toBe(INBOX_SESSION_ID);
+
+      const links = await serverDB
+        .select()
+        .from(agentsToSessions)
+        .where(eq(agentsToSessions.sessionId, inbox!.id));
+      expect(links).toHaveLength(1);
+      expect(links[0].agentId).not.toBe(standaloneInboxAgent.id);
+
+      const updatedAgent = await serverDB.query.agents.findFirst({
+        where: eq(agents.id, standaloneInboxAgent.id),
+      });
+      expect(updatedAgent?.slug).toBeNull();
+      expect(updatedAgent?.title).toBe('Polluted Inbox Title');
+      expect(updatedAgent?.virtual).toBe(false);
+    });
+
+    it('should repair an existing inbox session without a bound agent', async () => {
+      const [inboxSession] = await serverDB
+        .insert(sessions)
+        .values({
+          slug: INBOX_SESSION_ID,
+          type: 'agent',
+          userId,
+        })
+        .returning();
+
+      const result = await sessionModel.createInbox({});
+      expect(result).toBeUndefined();
+
+      const links = await serverDB
+        .select()
+        .from(agentsToSessions)
+        .where(eq(agentsToSessions.sessionId, inboxSession.id));
+      expect(links).toHaveLength(1);
+
+      const repairedAgent = await serverDB.query.agents.findFirst({
+        where: eq(agents.id, links[0].agentId),
+      });
+      expect(repairedAgent?.slug).toBe(INBOX_SESSION_ID);
+      expect(repairedAgent?.title).toBeNull();
+      expect(repairedAgent?.virtual).toBe(true);
     });
   });
 

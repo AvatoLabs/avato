@@ -1,6 +1,6 @@
 import { type BuiltinAgentSlug } from '@lobechat/builtin-agents';
 import { BUILTIN_AGENTS } from '@lobechat/builtin-agents';
-import { DEFAULT_AGENT_CONFIG } from '@lobechat/const';
+import { DEFAULT_AGENT_CONFIG, INBOX_SESSION_ID } from '@lobechat/const';
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type AgentItem, type LobeAgentConfig } from '@lobechat/types';
 import { cleanObject, merge } from '@lobechat/utils';
@@ -72,6 +72,10 @@ export class AgentService {
    * This ensures the frontend always receives a complete config with model/provider.
    */
   async getBuiltinAgent(slug: string) {
+    if (slug === INBOX_SESSION_ID) {
+      await this.createInbox();
+    }
+
     // Fetch agent and defaultAgentConfig in parallel
     const [agent, defaultAgentConfig] = await Promise.all([
       this.agentModel.getBuiltinAgent(slug),

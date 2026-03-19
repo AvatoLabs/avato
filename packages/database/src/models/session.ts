@@ -224,6 +224,8 @@ export class SessionModel {
     type: 'agent' | 'group';
   }): Promise<SessionItem> => {
     return this.db.transaction(async (trx) => {
+      const isInboxAgent = slug === INBOX_SESSION_ID && type === 'agent';
+
       if (slug) {
         const existResult = await trx.query.sessions.findFirst({
           where: and(eq(sessions.slug, slug), eq(sessions.userId, this.userId)),
@@ -295,13 +297,14 @@ export class SessionModel {
           params: params || {},
           plugins,
           provider,
+          slug: isInboxAgent ? INBOX_SESSION_ID : undefined,
           systemRole,
           tags,
-          title,
+          title: isInboxAgent ? null : title,
           tts: tts || {},
           updatedAt: new Date(),
           userId: this.userId,
-          virtual: false,
+          virtual: isInboxAgent,
         })
         .returning();
 
@@ -329,14 +332,92 @@ export class SessionModel {
   };
 
   createInbox = async (defaultAgentConfig: PartialDeep<LobeAgentConfig>) => {
-    const item = await this.db.query.sessions.findFirst({
+    const inboxSession = await this.db.query.sessions.findFirst({
       where: and(eq(sessions.userId, this.userId), eq(sessions.slug, INBOX_SESSION_ID)),
     });
 
-    if (item) return;
+    const normalizedInboxConfig = merge(
+      DEFAULT_AGENT_CONFIG,
+      defaultAgentConfig,
+    ) as Partial<NewAgent>;
+
+    if (inboxSession) {
+      const inboxLink = await this.db.query.agentsToSessions.findFirst({
+        where: and(
+          eq(agentsToSessions.sessionId, inboxSession.id),
+          eq(agentsToSessions.userId, this.userId),
+        ),
+      });
+
+      if (inboxLink) {
+        await this.db.transaction(async (trx) => {
+          await trx
+            .update(agents)
+            .set({ slug: null })
+            .where(
+              and(
+                eq(agents.userId, this.userId),
+                eq(agents.slug, INBOX_SESSION_ID),
+                sql`${agents.id} <> ${inboxLink.agentId}`,
+              ),
+            );
+
+          await trx
+            .update(agents)
+            .set({ slug: INBOX_SESSION_ID, title: null, virtual: true })
+            .where(and(eq(agents.id, inboxLink.agentId), eq(agents.userId, this.userId)));
+        });
+
+        return;
+      }
+
+      return this.db.transaction(async (trx) => {
+        await trx
+          .update(agents)
+          .set({ slug: null })
+          .where(and(eq(agents.userId, this.userId), eq(agents.slug, INBOX_SESSION_ID)));
+
+        const [inboxAgent] = await trx
+          .insert(agents)
+          .values({
+            avatar: normalizedInboxConfig.avatar,
+            backgroundColor: normalizedInboxConfig.backgroundColor,
+            chatConfig: normalizedInboxConfig.chatConfig,
+            description: normalizedInboxConfig.description,
+            fewShots: normalizedInboxConfig.fewShots,
+            model:
+              typeof normalizedInboxConfig.model === 'string' ? normalizedInboxConfig.model : null,
+            openingMessage: normalizedInboxConfig.openingMessage,
+            openingQuestions: normalizedInboxConfig.openingQuestions ?? [],
+            params: normalizedInboxConfig.params ?? {},
+            plugins: normalizedInboxConfig.plugins,
+            provider: normalizedInboxConfig.provider,
+            slug: INBOX_SESSION_ID,
+            systemRole: normalizedInboxConfig.systemRole,
+            tags: normalizedInboxConfig.tags ?? [],
+            title: null,
+            tts: normalizedInboxConfig.tts ?? {},
+            updatedAt: new Date(),
+            userId: this.userId,
+            virtual: true,
+          })
+          .returning();
+
+        await trx.insert(agentsToSessions).values({
+          agentId: inboxAgent.id,
+          sessionId: inboxSession.id,
+          userId: this.userId,
+        });
+      });
+    }
+
+    await this.db
+      .update(agents)
+      .set({ slug: null })
+      .where(and(eq(agents.userId, this.userId), eq(agents.slug, INBOX_SESSION_ID)));
 
     return await this.create({
-      config: merge(DEFAULT_AGENT_CONFIG, defaultAgentConfig),
+      config: normalizedInboxConfig,
       slug: INBOX_SESSION_ID,
       type: 'agent',
     });
@@ -360,7 +441,7 @@ export class SessionModel {
     if (!result) return;
 
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { agent, clientId, ...session } = result;
+    const { agent, clientId, slug: _sessionSlug, ...session } = result;
     const sessionId = this.genId();
 
     if (!agent) {
