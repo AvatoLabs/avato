@@ -24,6 +24,7 @@ import {
   resolveAgentIdFromSession,
   resolveContext,
 } from './_helpers/resolveContext';
+import { pickLatestTitleContext } from './_helpers/titleContext';
 import { basicContextSchema } from './_schema/context';
 
 const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -66,26 +67,6 @@ const shouldScheduleAgentMigration = (key: string): boolean => {
 
   return true;
 };
-
-function extractMessageText(content: string | null | undefined): string {
-  if (!content || typeof content !== 'string') return '';
-
-  try {
-    const parsed = JSON.parse(content);
-
-    if (Array.isArray(parsed)) {
-      return parsed
-        .map((part: { content?: string; text?: string }) => part?.text ?? part?.content ?? '')
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-    }
-  } catch {
-    // Plain text content.
-  }
-
-  return content.trim();
-}
 
 export const topicRouter = router({
   batchCreateTopics: topicProcedure
@@ -336,23 +317,12 @@ export const topicRouter = router({
     .mutation(async ({ input, ctx }) => {
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
       const messages = await messageModel.query({ topicId: input.id });
-      const userMessage = messages.find((message) => message.role === 'user');
-      const assistantMessage = [...messages]
-        .reverse()
-        .find((message) => message.role === 'assistant');
+      const titleContext = pickLatestTitleContext(messages);
 
-      if (!userMessage || !assistantMessage) return null;
-
-      const userPrompt = extractMessageText(userMessage.content);
-      const lastAssistantContent = extractMessageText(assistantMessage.content);
-
-      if (!userPrompt || !lastAssistantContent) return null;
+      if (!titleContext) return null;
 
       const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
-      const title = await systemAgent.generateTopicTitle({
-        lastAssistantContent,
-        userPrompt,
-      });
+      const title = await systemAgent.generateTopicTitle(titleContext);
 
       if (!title) return null;
 

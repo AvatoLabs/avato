@@ -35,6 +35,7 @@ import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike, resolveSessionTypeWithFallback } from '../lib/session';
+import { generateBestTitle } from '../lib/titleGeneration';
 import type {
   ChatMessage,
   ChatToolPayload,
@@ -469,22 +470,10 @@ const triggerTopicTitleGeneration = (sessionId: string, topicId?: string | null)
 
   if (!isDefaultTopicTitle(topic?.title)) return;
 
-  const { t } = useI18n.getState();
-  const failMessage = [t.toastTitleGenerationFailed, t.toastTitleGenerationFailedHint]
-    .filter(Boolean)
-    .join(' ');
-
-  topicApi
-    .generateTitle(topicId)
-    .then((newTitle) => {
-      if (newTitle) {
-        return useTopicStore.getState().fetchTopics(sessionId);
-      }
-      useToast.getState().show('error', failMessage);
-    })
+  void generateBestTitle({ sessionId, topicId })
+    .then(() => undefined)
     .catch((error) => {
       console.warn('[ChatStore] generateTopicTitle failed:', error);
-      useToast.getState().show('error', failMessage);
     });
 };
 

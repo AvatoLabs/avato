@@ -8,6 +8,8 @@ import { type LobeChatDatabase } from '@/database/type';
 import { getServerGlobalConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
+import { sanitizeGeneratedTopicTitle } from './titleSanitizer';
+
 const log = debug('lobe-server:system-agent-service');
 
 const TOPIC_TITLE_SCHEMA = {
@@ -72,9 +74,10 @@ export class SystemAgentService {
         schema: TOPIC_TITLE_SCHEMA,
       });
 
-      const title = (result as { title?: string })?.title?.trim();
+      const rawTitle = (result as { title?: string })?.title;
+      const title = sanitizeGeneratedTopicTitle(rawTitle);
       if (!title) {
-        log('generateTopicTitle: LLM returned empty title');
+        log('generateTopicTitle: LLM returned invalid title: %O', rawTitle);
         return null;
       }
 

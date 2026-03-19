@@ -24,12 +24,12 @@ import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
 import { resolveTagColor } from '../constants/tags';
-import { tagApi, topicApi } from '../lib/api';
+import { tagApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
-import { useChatStore } from '../store/chat';
+import { generateBestTitle } from '../lib/titleGeneration';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
@@ -45,7 +45,6 @@ export default function TopicListScreen({ route, navigation }: any) {
   const session = useSessionStore((s) => s.sessions.find((x) => x.id === sessionId));
   const isGroupSession = session?.type === 'group';
   const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
-  const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
   const loading = useTopicStore((s) => s.loadingBySession[sessionKey] ?? false);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
@@ -70,11 +69,13 @@ export default function TopicListScreen({ route, navigation }: any) {
         .filter(Boolean)
         .join(' ');
       try {
-        const newTitle = await topicApi.generateTitle(topicId);
-        if (newTitle?.trim()) {
-          await updateTopic(topicId, sessionId, newTitle.trim());
+        const result = await generateBestTitle({ sessionId, topicId });
+        if (result?.title) {
           haptics.success();
-          toast.show('success', t.topicRenamed);
+          toast.show(
+            'success',
+            result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
+          );
         } else {
           toast.show('error', failMessage || 'Failed to generate title');
         }
@@ -82,7 +83,7 @@ export default function TopicListScreen({ route, navigation }: any) {
         toast.show('error', failMessage || 'Failed to generate title');
       }
     },
-    [sessionId, t, toast, updateTopic],
+    [sessionId, t, toast],
   );
 
   const [searchQuery, setSearchQuery] = useState('');

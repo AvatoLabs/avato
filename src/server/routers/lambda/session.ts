@@ -15,6 +15,8 @@ import { LobeMetaDataSchema } from '@/types/meta';
 import { type BatchTaskResult } from '@/types/service';
 import { type ChatSessionList, type LobeGroupSession } from '@/types/session';
 
+import { pickLatestTitleContext } from './_helpers/titleContext';
+
 const DEFAULT_SESSION_TITLES = [
   '',
   'New Chat',
@@ -26,51 +28,10 @@ const DEFAULT_SESSION_TITLES = [
   'Untitled',
 ];
 
-function extractMessageText(content: string | null | undefined): string {
-  if (!content || typeof content !== 'string') return '';
-  try {
-    const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .map((p: { text?: string; content?: string }) => p?.text ?? p?.content ?? '')
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-    }
-  } catch {
-    // Plain text
-  }
-  return content.trim();
-}
-
 function isDefaultSessionTitle(title: string | null | undefined) {
   const trimmedTitle = title?.trim() ?? '';
 
   return !trimmedTitle || DEFAULT_SESSION_TITLES.includes(trimmedTitle);
-}
-
-function pickLatestSessionTitleContext(
-  messages: Array<{ role: string; content: string }>,
-): { lastAssistantContent: string; userPrompt: string } | null {
-  for (let assistantIndex = messages.length - 1; assistantIndex >= 0; assistantIndex -= 1) {
-    const assistantMessage = messages[assistantIndex];
-    if (assistantMessage.role !== 'assistant') continue;
-
-    const lastAssistantContent = extractMessageText(assistantMessage.content);
-    if (!lastAssistantContent) continue;
-
-    for (let userIndex = assistantIndex - 1; userIndex >= 0; userIndex -= 1) {
-      const userMessage = messages[userIndex];
-      if (userMessage.role !== 'user') continue;
-
-      const userPrompt = extractMessageText(userMessage.content);
-      if (!userPrompt) continue;
-
-      return { lastAssistantContent, userPrompt };
-    }
-  }
-
-  return null;
 }
 
 const sessionProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -235,7 +196,7 @@ export const sessionRouter = router({
         }
 
         const messages = await messageModel.query({ groupId: sessionId });
-        const titleContext = pickLatestSessionTitleContext(messages);
+        const titleContext = pickLatestTitleContext(messages);
         if (!titleContext) {
           log('no titleContext (no user+assistant pair) for group, return null');
           return null;
@@ -259,7 +220,7 @@ export const sessionRouter = router({
       }
 
       const messages = await messageModel.queryBySessionId(sessionId);
-      const titleContext = pickLatestSessionTitleContext(messages);
+      const titleContext = pickLatestTitleContext(messages);
       if (!titleContext) {
         log('no titleContext (no user+assistant pair) for session, return null');
         return null;
