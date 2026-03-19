@@ -273,6 +273,17 @@ export const userMemoryRouter = router({
         source: 'chat_topic',
       });
 
+      const { webhook } = parseMemoryExtractionConfig();
+      const baseUrl = webhook.baseUrl || appEnv.INTERNAL_APP_URL || appEnv.APP_URL;
+
+      if (totalTopics > 0 && !baseUrl) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Memory extraction requires APP_URL or MEMORY_USER_MEMORY_WEBHOOK_BASE_URL to be configured',
+        });
+      }
+
       const initialStatus = totalTopics === 0 ? AsyncTaskStatus.Success : AsyncTaskStatus.Pending;
       const taskId = await ctx.asyncTaskModel.create({
         metadata,
@@ -289,16 +300,7 @@ export const userMemoryRouter = router({
         };
       }
 
-      const { triggerExtraHeaders, webhook } = parseMemoryExtractionConfig();
-      const baseUrl = webhook.baseUrl || appEnv.INTERNAL_APP_URL || appEnv.APP_URL;
-
-      if (!baseUrl) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message:
-            'Memory extraction requires APP_URL or MEMORY_USER_MEMORY_WEBHOOK_BASE_URL to be configured',
-        });
-      }
+      const { triggerExtraHeaders } = parseMemoryExtractionConfig();
 
       try {
         await MemoryExtractionWorkflowService.triggerProcessUsers(

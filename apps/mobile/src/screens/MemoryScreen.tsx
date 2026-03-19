@@ -231,10 +231,25 @@ function HomeTab() {
         scheduleTaskPoll(task.id);
       }
     } catch (error) {
+      const latestTask = await memoryApi.getMemoryExtractionTask().catch(() => null);
+
+      if (latestTask) {
+        setExtractionTask(latestTask);
+
+        if (latestTask.status === 'Pending' || latestTask.status === 'Processing') {
+          scheduleTaskPoll(latestTask.id);
+        } else {
+          stopPolling();
+        }
+      }
+
       const detail =
-        error instanceof Error && error.message && error.message !== 'Request failed'
+        latestTask?.error?.body?.detail ||
+        latestTask?.error?.body?.message ||
+        latestTask?.error?.message ||
+        (error instanceof Error && error.message && error.message !== 'Request failed'
           ? error.message
-          : t.memoryExtractFailed;
+          : t.memoryExtractFailed);
       toast.show('error', detail);
     } finally {
       setRequestingExtraction(false);
@@ -242,6 +257,7 @@ function HomeTab() {
   }, [
     requestingExtraction,
     scheduleTaskPoll,
+    stopPolling,
     t.memoryExtractFailed,
     t.memoryExtractQueued,
     t.memoryExtractSuccess,
@@ -336,10 +352,14 @@ function HomeTab() {
         {persona?.content || persona?.summary ? (
           <View className="bg-foreground/[0.02] rounded-xl p-4">
             {persona.summary ? (
-              <Text className="text-sm leading-5 mb-2" style={{ color: colors.foreground }}>{persona.summary}</Text>
+              <Text className="text-sm leading-5 mb-2" style={{ color: colors.foreground }}>
+                {persona.summary}
+              </Text>
             ) : null}
             {persona.content ? (
-              <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>{persona.content}</Text>
+              <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>
+                {persona.content}
+              </Text>
             ) : null}
           </View>
         ) : (
@@ -358,9 +378,13 @@ function HomeTab() {
           <Text className="text-base font-semibold text-foreground mb-2">
             {t.memoryExtractTitle}
           </Text>
-          <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>{extractionStatusText}</Text>
+          <Text className="text-sm leading-5" style={{ color: colors.secondaryText }}>
+            {extractionStatusText}
+          </Text>
           {extractionProgressText ? (
-            <Text className="text-xs mt-2" style={{ color: colors.secondaryText }}>{extractionProgressText}</Text>
+            <Text className="text-xs mt-2" style={{ color: colors.secondaryText }}>
+              {extractionProgressText}
+            </Text>
           ) : null}
           <TouchableOpacity
             className="mt-4 rounded-xl items-center justify-center"
@@ -395,7 +419,9 @@ function HomeTab() {
       {!persona?.content && !persona?.summary && roles.length === 0 && (
         <View className="items-center py-10">
           <Brain color={colors.secondaryText} size={48} strokeWidth={1.2} />
-          <Text className="text-base font-medium mt-4" style={{ color: colors.secondaryText }}>{t.memoryEmpty}</Text>
+          <Text className="text-base font-medium mt-4" style={{ color: colors.secondaryText }}>
+            {t.memoryEmpty}
+          </Text>
           <Text className="text-sm mt-1 text-center px-8" style={{ color: colors.secondaryText }}>
             {t.memoryEmptyDesc}
           </Text>
@@ -569,7 +595,11 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
                 {title}
               </Text>
               {subtext && title !== subtext ? (
-                <Text className="text-sm mt-1 leading-5" numberOfLines={2} style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-sm mt-1 leading-5"
+                  numberOfLines={2}
+                  style={{ color: colors.secondaryText }}
+                >
                   {subtext}
                 </Text>
               ) : null}
@@ -596,15 +626,21 @@ function MemoryListTab({ layer }: { layer: MemoryLayer }) {
             ) : null}
             {tags.slice(0, 3).map((tag, i) => (
               <View className="px-2 py-0.5 rounded-full bg-foreground/[0.06]" key={`${tag}-${i}`}>
-                <Text className="text-xs font-medium" style={{ color: colors.secondaryText }}>{tag}</Text>
+                <Text className="text-xs font-medium" style={{ color: colors.secondaryText }}>
+                  {tag}
+                </Text>
               </View>
             ))}
-            {date ? <Text className="text-xs ml-auto" style={{ color: colors.secondaryText }}>{date}</Text> : null}
+            {date ? (
+              <Text className="text-xs ml-auto" style={{ color: colors.secondaryText }}>
+                {date}
+              </Text>
+            ) : null}
           </View>
         </TouchableOpacity>
       );
     },
-    [layer, handleDelete, layerColor, nav],
+    [colors.secondaryText, layer, handleDelete, layerColor, nav],
   );
 
   if (loading) {

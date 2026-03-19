@@ -13,14 +13,24 @@ const mockFindById = vi.fn();
 const mockCountTopicsForMemoryExtractor = vi.fn();
 const {
   mockAddIdentityEntry,
+  mockAppEnv,
   mockExperienceUpdate,
   mockGetAllIdentitiesWithMemory,
+  mockParseMemoryExtractionConfig,
   mockTriggerProcessUsers,
   mockUpdateIdentityEntry,
 } = vi.hoisted(() => ({
   mockAddIdentityEntry: vi.fn(),
+  mockAppEnv: {
+    APP_URL: 'https://example.com',
+    INTERNAL_APP_URL: 'https://internal.example.com',
+  } as { APP_URL?: string; INTERNAL_APP_URL?: string },
   mockExperienceUpdate: vi.fn(),
   mockGetAllIdentitiesWithMemory: vi.fn(),
+  mockParseMemoryExtractionConfig: vi.fn(() => ({
+    triggerExtraHeaders: { 'x-test': 'ok' },
+    webhook: { baseUrl: 'https://internal.example.com' },
+  })),
   mockTriggerProcessUsers: vi.fn(),
   mockUpdateIdentityEntry: vi.fn(),
 }));
@@ -74,17 +84,11 @@ vi.mock('@/database/models/userMemory', () => ({
 }));
 
 vi.mock('@/envs/app', () => ({
-  appEnv: {
-    APP_URL: 'https://example.com',
-    INTERNAL_APP_URL: 'https://internal.example.com',
-  },
+  appEnv: mockAppEnv,
 }));
 
 vi.mock('@/server/globalConfig/parseMemoryExtractionConfig', () => ({
-  parseMemoryExtractionConfig: vi.fn(() => ({
-    triggerExtraHeaders: { 'x-test': 'ok' },
-    webhook: { baseUrl: 'https://internal.example.com' },
-  })),
+  parseMemoryExtractionConfig: mockParseMemoryExtractionConfig,
 }));
 
 vi.mock('@/server/services/memory/userMemory/extract', () => ({
@@ -108,6 +112,12 @@ const createCaller = (ctxOverrides: Partial<any> = {}) => {
 describe('userMemoryRouter.requestMemoryFromChatTopic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAppEnv.APP_URL = 'https://example.com';
+    mockAppEnv.INTERNAL_APP_URL = 'https://internal.example.com';
+    mockParseMemoryExtractionConfig.mockReturnValue({
+      triggerExtraHeaders: { 'x-test': 'ok' },
+      webhook: { baseUrl: 'https://internal.example.com' },
+    });
   });
 
   it('dedupes when an active task exists', async () => {
@@ -190,6 +200,24 @@ describe('userMemoryRouter.requestMemoryFromChatTopic', () => {
       },
       status: AsyncTaskStatus.Success,
     });
+    expect(mockTriggerProcessUsers).not.toHaveBeenCalled();
+  });
+
+  it('does not create a task when async trigger baseUrl is unavailable', async () => {
+    mockFindActiveByType.mockResolvedValue(undefined);
+    mockCountTopicsForMemoryExtractor.mockResolvedValue(3);
+
+    mockAppEnv.APP_URL = undefined;
+    mockAppEnv.INTERNAL_APP_URL = undefined;
+    mockParseMemoryExtractionConfig.mockReturnValueOnce({
+      triggerExtraHeaders: { 'x-test': 'ok' },
+      webhook: { baseUrl: undefined },
+    } as any);
+
+    const caller = createCaller();
+
+    await expect(caller.requestMemoryFromChatTopic({})).rejects.toBeInstanceOf(TRPCError);
+    expect(mockCreate).not.toHaveBeenCalled();
     expect(mockTriggerProcessUsers).not.toHaveBeenCalled();
   });
 

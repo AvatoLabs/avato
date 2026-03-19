@@ -7,7 +7,10 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMemoryAnalysisAsyncTask } from '@/routes/(main)/memory/features/MemoryAnalysis/useTask';
-import { memoryExtractionService } from '@/services/userMemory/extraction';
+import {
+  memoryExtractionService,
+  type MemoryExtractionTask,
+} from '@/services/userMemory/extraction';
 
 import DateRangeModal from './DateRangeModal';
 
@@ -25,6 +28,15 @@ const AnalysisTrigger = memo<Props>(({ footerNote, range, onRangeChange, iconOnl
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const resolveTaskErrorMessage = (task: MemoryExtractionTask | null | undefined) => {
+    const body = task?.error?.body;
+
+    if (typeof body === 'string') return body;
+    if (body?.detail) return body.detail;
+
+    return '';
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
@@ -40,7 +52,13 @@ const AnalysisTrigger = memo<Props>(({ footerNote, range, onRangeChange, iconOnl
       setOpen(false);
     } catch (error) {
       console.error(error);
-      message.error(t('analysis.toast.failed'));
+      const task = await refresh();
+      const detail =
+        resolveTaskErrorMessage(task) ||
+        (error instanceof Error && error.message ? error.message : '') ||
+        t('analysis.toast.failed');
+
+      message.error(detail);
     } finally {
       setSubmitting(false);
     }
