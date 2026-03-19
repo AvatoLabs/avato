@@ -133,30 +133,28 @@ createCompressionGroup: messageProcedure
 
   
   
-createMessage: messageProcedure
+  createMessage: messageProcedure
     .input(CreateNewMessageParamsSchema)
     .mutation(async ({ input, ctx }) => {
-      const normalizedInput =
-        input.sessionId?.startsWith('cg_') && !input.groupId
-          ? {
-              ...input,
-              groupId: input.sessionId,
-              sessionId: null,
-            }
-          : input;
+      if (input.sessionId?.startsWith('cg_') && !input.groupId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Group message must use groupId. sessionId=cg_* is not supported.',
+        });
+      }
 
       // If there's no agentId but has sessionId, resolve agentId from sessionId
-      let agentId = normalizedInput.agentId;
-      if (!agentId && normalizedInput.sessionId) {
+      let agentId = input.agentId;
+      if (!agentId && input.sessionId) {
         agentId = (await resolveAgentIdFromSession(
-          normalizedInput.sessionId,
+          input.sessionId,
           ctx.serverDB,
           ctx.userId,
         ))!;
       }
 
       // Create message with the resolved agentId
-      return ctx.messageService.createMessage({ ...normalizedInput, agentId } as any);
+      return ctx.messageService.createMessage({ ...input, agentId } as any);
     }),
 
   

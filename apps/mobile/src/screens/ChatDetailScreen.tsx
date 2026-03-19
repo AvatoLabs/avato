@@ -22,7 +22,7 @@ import {
   Settings,
   Square,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +58,7 @@ import MessageBubble, { type GroupMessageSpeaker } from '../components/ui/Messag
 import MessageListSkeleton from '../components/ui/MessageListSkeleton';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
 import PressableScale from '../components/ui/PressableScale';
+import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
@@ -68,6 +69,7 @@ import {
   agentGroupApi,
   type AgentGroupDetail,
   agentSkillApi,
+  getApiUrl,
   messageApi,
   pluginApi,
   sessionApi,
@@ -87,7 +89,13 @@ import { useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { AgentSkillItem, ChatMessage, InstalledPlugin, MobileMemoryEffort } from '../types';
+import type {
+  AgentSkillItem,
+  ChatMessage,
+  FileListItem,
+  InstalledPlugin,
+  MobileMemoryEffort,
+} from '../types';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -136,6 +144,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const [memorySheetVisible, setMemorySheetVisible] = useState(false);
   const [modelDrawerVisible, setModelDrawerVisible] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
+  const [resourcePickerVisible, setResourcePickerVisible] = useState(false);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const listRef = useRef<FlashList<ChatMessage>>(null);
   const isScrolledToBottom = useRef(true);
@@ -180,10 +189,9 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     hasObservedTopicChange.current = false;
   }, [sessionId]);
 
-  useEffect(() => {
+  // Sync route topicId to store immediately (useLayoutEffect so it runs before useFocusEffect)
+  useLayoutEffect(() => {
     if (!sessionId) return;
-    // Only switch when route explicitly provides topicId (e.g. from search/deep link).
-    // When absent, preserve existing activeTopic to avoid clearing history on return.
     if (initialTopicId != null) {
       switchTopic(sessionId, initialTopicId);
     }
@@ -219,16 +227,23 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   );
 
   // Refresh messages/topics when screen gains focus (align with Web revalidateOnFocus)
+  // Prefer initialTopicId from route over store — avoids fetching historical topic when navigating from home send
   useFocusEffect(
     useCallback(() => {
       if (!sessionId) return;
       const state = useChatStore.getState();
       if (state.generating && state.activeStreamingSessionId === sessionId) return;
-      const topicId = useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
+      const topicId =
+        initialTopicId ?? useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
       void fetchSessions();
       fetchMessages(sessionId, topicId, { preferPopulatedTopic: true });
-      fetchTopics(sessionId);
-    }, [sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics]),
+      void fetchTopics(sessionId).then(() => {
+        // Re-assert initialTopicId after fetchTopics; it may have overwritten with nextTopics[0]
+        if (initialTopicId != null) {
+          switchTopic(sessionId, initialTopicId);
+        }
+      });
+    }, [initialTopicId, sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics, switchTopic]),
   );
 
   useEffect(() => {
@@ -695,6 +710,36 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     setAttachmentSheetVisible(true);
   }, []);
 
+  const handleFromWorkspace = useCallback(() => {
+    setResourcePickerVisible(true);
+  }, []);
+
+  const handleWorkspaceSelect = useCallback(
+    async (items: FileListItem[]) => {
+      const base = await getApiUrl();
+      const baseUrl = base?.replace(/\/$/, '') ?? '';
+      for (const item of items) {
+        if (item.sourceType !== 'file' || !item.id || item.id.startsWith('docs_')) continue;
+
+        const fileUrl = item.url?.startsWith('http')
+          ? item.url
+          : baseUrl
+            ? `${baseUrl}/f/${item.id}`
+            : item.url;
+        addFile({
+          fileId: item.id,
+          id: `workspace-${item.id}-${Date.now()}`,
+          name: item.name,
+          size: item.size,
+          type: item.fileType,
+          uri: fileUrl || `file://${item.id}`,
+          url: fileUrl,
+        });
+      }
+    },
+    [addFile],
+  );
+
   // ── Toolbar: Model ────────────────────────────────────────────────
   const handleModelPress = useCallback(() => {
     if (isGroupSession) return;
@@ -821,10 +866,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         groupSupervisorId={groupDetail?.supervisorAgentId}
         message={item}
         sessionId={sessionId || sessionKey}
+        topicId={activeTopic ?? null}
         onSaveToTopic={handleSaveToTopic}
       />
     ),
     [
+      activeTopic,
       generating,
       groupDetail?.supervisorAgentId,
       groupMembersById,
@@ -1273,7 +1320,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
         onClose={() => setAttachmentSheetVisible(false)}
         onDocument={() => void pickDocument()}
+        onFromWorkspace={handleFromWorkspace}
         onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
+      />
+      <ResourcePickerSheet
+        visible={resourcePickerVisible}
+        onClose={() => setResourcePickerVisible(false)}
+        onSelect={handleWorkspaceSelect}
       />
       <MemoryToolSheet
         effort={memoryEffort}

@@ -326,7 +326,7 @@ const ItemCard = memo<{
               style={{ borderRadius: 10, height: 40, width: 40 }}
             />
           ) : isEmojiAvatar(item.avatar) ? (
-            <Text style={{ fontSize: 20 }}>{item.avatar}</Text>
+            <Text style={{ color: colors.foreground, fontSize: 20 }}>{item.avatar}</Text>
           ) : (
             <Box color={colors.secondaryText} size={18} strokeWidth={1.5} />
           )}
@@ -423,7 +423,7 @@ const InstalledRow = memo<{
             style={{ borderRadius: 8, height: 36, width: 36 }}
           />
         ) : isEmojiAvatar(item.avatar) ? (
-          <Text style={{ fontSize: 18 }}>{item.avatar}</Text>
+          <Text style={{ color: colors.foreground, fontSize: 18 }}>{item.avatar}</Text>
         ) : (
           <Box color={colors.secondaryText} size={16} strokeWidth={1.5} />
         )}
@@ -1190,7 +1190,7 @@ function StoreItemModal({
                   style={{ borderRadius: 14, height: 48, width: 48 }}
                 />
               ) : isEmojiAvatar(detail.avatar) ? (
-                <Text style={{ fontSize: 20 }}>{detail.avatar}</Text>
+                <Text style={{ color: colors.foreground, fontSize: 20 }}>{detail.avatar}</Text>
               ) : (
                 <Package color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
               )}

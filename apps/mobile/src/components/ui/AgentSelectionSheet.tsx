@@ -57,7 +57,9 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
         className="mr-3 h-11 w-11 items-center justify-center rounded-2xl"
         style={{ backgroundColor: colors.primarySubtle }}
       >
-        <Text className="text-[18px]">{avatar}</Text>
+        <Text className="text-[18px]" style={{ color: colors.foreground }}>
+          {avatar}
+        </Text>
       </View>
     );
   }
@@ -231,6 +233,7 @@ export default function AgentSelectionSheet({
                   className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
                   placeholder={titleInputPlaceholder}
                   placeholderTextColor={colors.secondaryText}
+                  style={{ color: colors.foreground }}
                   value={draftTitle}
                   onChangeText={setDraftTitle}
                 />
@@ -274,6 +277,7 @@ export default function AgentSelectionSheet({
                 className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
                 placeholder={t.search}
                 placeholderTextColor={colors.secondaryText}
+                style={{ color: colors.foreground }}
                 value={keyword}
                 onChangeText={setKeyword}
               />

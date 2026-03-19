@@ -32,9 +32,14 @@ type TranslationKeys = {
   chatListSearch: string;
   chatListAll: string;
   chatListAgents: string;
+  chatListCollapseAssistant: string;
+  chatListExpandAssistant: string;
+  chatListViewAssistant: string;
   chatListViewSession: string;
   chatListViewTopic: string;
+  chatListAssistants: string;
   chatListTopicRecent: string;
+  chatListTopics: string;
   chatListTopicEmpty: string;
   chatListTopicEmptyDesc: string;
   chatListEmpty: string;
@@ -42,7 +47,10 @@ type TranslationKeys = {
   chatListCreateAgent: string;
   chatListCreateGroup: string;
   chatListCreateTag: string;
+  chatListNewAssistant: string;
   chatListNewConversation: string;
+  deleteTopicConfirm: string;
+  deleteTopicDesc: string;
   chatSearchMatchMessage: string;
   chatSearchMatchSession: string;
   chatSearchMatchTopic: string;
@@ -82,10 +90,28 @@ type TranslationKeys = {
   chatToolResponse: string;
   chatToolAborted: string;
   chatToolApprove: string;
+  chatToolApproveNotSupported: string;
   chatToolReject: string;
   chatToolAbortedDesc: string;
   chatToolRejectedDesc: string;
   chatToolPendingDesc: string;
+  chatToolGtdTodoCount: string;
+  chatToolGtdPlanGoalPlaceholder: string;
+  chatToolGtdPlanDescPlaceholder: string;
+  chatToolGtdPlanContextPlaceholder: string;
+  chatToolGtdAddTodoPlaceholder: string;
+  chatToolNotebookCreateDocTitlePlaceholder: string;
+  chatToolNotebookCreateDocDescPlaceholder: string;
+  chatToolNotebookCreateDocContentPlaceholder: string;
+  chatToolStreamingCreatePlan: string;
+  chatToolStreamingExecTask: string;
+  chatToolStreamingCreateDocument: string;
+  chatToolStreamingExecuteCode: string;
+  chatToolStreamingAddExperience: string;
+  chatToolStreamingAddPreference: string;
+  chatToolStreamingWebSearch: string;
+  chatToolStreamingKnowledgeBase: string;
+  chatToolStreamingSearchSkill: string;
   chatShowMore: string;
   chatShowLess: string;
   chatAskAnything: string;
@@ -421,8 +447,10 @@ type TranslationKeys = {
   // File / Attachment
   fileAttach: string;
   fileCamera: string;
-  fileGallery: string;
   fileDocument: string;
+  fileFromWorkspace: string;
+  fileFromWorkspaceDesc: string;
+  fileGallery: string;
   fileUploading: string;
   fileUploadFailed: string;
 
@@ -613,6 +641,7 @@ type TranslationKeys = {
   chatHint3: string;
   chatHint4: string;
   streakCelebrate: string;
+  activeAssistants: string;
   activeChats: string;
   chatEmptyWave: string;
   relativeTimeNow: string;
@@ -687,6 +716,7 @@ type TranslationKeys = {
   resourceDeleteConfirm: string;
   resourceDeleteDesc: string;
   resourceUploadFailed: string;
+  resourceUploaded: string;
   resourceDownload: string;
   resourceDownloaded: string;
   resourceDownloadFailed: string;
@@ -697,6 +727,32 @@ type TranslationKeys = {
   resourceKB: string;
   resourceMB: string;
   resourceGB: string;
+  resourceLibraryAll: string;
+  resourceLibraryInbox: string;
+  resourceLibrarySelect: string;
+  resourceFolderRoot: string;
+  resourceNewFolder: string;
+  resourceMoveToFolder: string;
+  resourceFolderDeleteConfirm: string;
+  resourceFolderDeleteDesc: string;
+  resourceCreateFolder: string;
+  resourceCreateFolderPlaceholder: string;
+  resourceSortBy: string;
+  resourceSortNewest: string;
+  resourceSortOldest: string;
+  resourceSortName: string;
+  resourceSortSize: string;
+  resourceLoadMore: string;
+  resourceFolderEmpty: string;
+  resourceFolderEmptyDesc: string;
+  resourceViewList: string;
+  resourceViewGrid: string;
+  resourceViewModeToggle: string;
+  resourceSelect: string;
+  resourceSelectCount: string;
+  resourceBatchDelete: string;
+  resourceBatchMove: string;
+  resourceCancelSelect: string;
 
   // Store
   tabStore: string;
@@ -984,9 +1040,14 @@ const en: TranslationKeys = {
   chatListSearch: 'Search sessions and messages',
   chatListAll: 'All',
   chatListAgents: 'Agents',
+  chatListCollapseAssistant: 'Collapse',
+  chatListExpandAssistant: 'Expand',
+  chatListViewAssistant: 'Assistants',
   chatListViewSession: 'Sessions',
   chatListViewTopic: 'Topics',
+  chatListAssistants: 'Assistants',
   chatListTopicRecent: 'Recent',
+  chatListTopics: 'Topics',
   chatListTopicEmpty: 'No topics yet',
   chatListTopicEmptyDesc: 'Your recent conversations will appear here.',
   chatListEmpty: 'No sessions yet',
@@ -994,7 +1055,10 @@ const en: TranslationKeys = {
   chatListCreateAgent: 'New Agent',
   chatListCreateGroup: 'New Group Chat',
   chatListCreateTag: 'New Tag',
+  chatListNewAssistant: 'New Assistant',
   chatListNewConversation: 'New Session',
+  deleteTopicConfirm: 'Delete this topic?',
+  deleteTopicDesc: 'This conversation will be permanently deleted.',
   chatSearchMatchMessage: 'message',
   chatSearchMatchSession: 'session',
   chatSearchMatchTopic: 'topic',
@@ -1033,10 +1097,28 @@ const en: TranslationKeys = {
   chatToolResponse: 'Response',
   chatToolAborted: 'Aborted',
   chatToolApprove: 'Approve',
+  chatToolApproveNotSupported: 'Tool approval is not yet supported for this flow.',
   chatToolReject: 'Reject',
   chatToolAbortedDesc: 'This tool call was aborted.',
   chatToolRejectedDesc: 'This tool call was rejected.',
   chatToolPendingDesc: 'This tool needs your approval to run.',
+  chatToolGtdTodoCount: '{{count}} todos',
+  chatToolGtdPlanGoalPlaceholder: 'Goal or objective',
+  chatToolGtdPlanDescPlaceholder: 'Brief summary',
+  chatToolGtdPlanContextPlaceholder: 'Context and constraints',
+  chatToolGtdAddTodoPlaceholder: 'Add todo item',
+  chatToolNotebookCreateDocTitlePlaceholder: 'Document title',
+  chatToolNotebookCreateDocDescPlaceholder: 'Brief description',
+  chatToolNotebookCreateDocContentPlaceholder: 'Content (Markdown)',
+  chatToolStreamingCreatePlan: 'Creating plan…',
+  chatToolStreamingExecTask: 'Executing task…',
+  chatToolStreamingCreateDocument: 'Creating document…',
+  chatToolStreamingExecuteCode: 'Executing code…',
+  chatToolStreamingAddExperience: 'Adding experience…',
+  chatToolStreamingAddPreference: 'Adding preference…',
+  chatToolStreamingWebSearch: 'Searching…',
+  chatToolStreamingKnowledgeBase: 'Searching knowledge base…',
+  chatToolStreamingSearchSkill: 'Searching skills…',
   chatShowMore: 'Show more',
   chatShowLess: 'Show less',
   chatAskAnything: 'Ask anything...',
@@ -1283,7 +1365,7 @@ const en: TranslationKeys = {
   homeQuickAnalyze: 'Groups',
   homeQuickCreate: 'Art',
   homeAgentAll: 'All',
-  homeRecents: 'Recent',
+  homeRecents: 'Assistants',
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
   homeStartChat: 'Start Chat',
@@ -1358,8 +1440,10 @@ const en: TranslationKeys = {
 
   fileAttach: 'Attach',
   fileCamera: 'Camera',
-  fileGallery: 'Photo Library',
   fileDocument: 'Document',
+  fileFromWorkspace: 'From Workspace',
+  fileFromWorkspaceDesc: 'Import files from your resource workspace.',
+  fileGallery: 'Photo Library',
   fileUploading: 'Uploading...',
   fileUploadFailed: 'Upload failed',
 
@@ -1545,6 +1629,7 @@ const en: TranslationKeys = {
   chatHint3: 'Try: debug this error...',
   chatHint4: 'Try: plan my week...',
   streakCelebrate: '\u{1F525} {count}-day streak!',
+  activeAssistants: '{count} assistants',
   activeChats: '{count} sessions',
   chatEmptyWave: 'Hey there \u{1F44B}',
   relativeTimeNow: 'now',
@@ -1617,6 +1702,7 @@ const en: TranslationKeys = {
   resourceDeleteConfirm: 'Delete File',
   resourceDeleteDesc: 'This file will be permanently deleted.',
   resourceUploadFailed: 'Upload failed',
+  resourceUploaded: 'Uploaded successfully',
   resourceDownload: 'Download',
   resourceDownloaded: 'Saved to local files',
   resourceDownloadFailed: 'Download failed',
@@ -1627,6 +1713,32 @@ const en: TranslationKeys = {
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+  resourceLibraryAll: 'All Files',
+  resourceLibraryInbox: 'Uncategorized',
+  resourceFolderRoot: 'Root',
+  resourceLibrarySelect: 'Select Library',
+  resourceNewFolder: 'New Folder',
+  resourceMoveToFolder: 'Move to Folder',
+  resourceFolderDeleteConfirm: 'Delete Folder',
+  resourceFolderDeleteDesc: 'This folder and its contents will be permanently deleted.',
+  resourceCreateFolder: 'Create Folder',
+  resourceCreateFolderPlaceholder: 'Folder name',
+  resourceSortBy: 'Sort by',
+  resourceSortNewest: 'Newest first',
+  resourceSortOldest: 'Oldest first',
+  resourceSortName: 'Name',
+  resourceSortSize: 'Size',
+  resourceLoadMore: 'Load more',
+  resourceFolderEmpty: 'This folder is empty',
+  resourceFolderEmptyDesc: 'Upload files or create subfolders',
+  resourceViewList: 'List',
+  resourceViewGrid: 'Grid',
+  resourceViewModeToggle: 'Toggle list or grid view',
+  resourceSelect: 'Select',
+  resourceSelectCount: '{count} selected',
+  resourceBatchDelete: 'Delete',
+  resourceBatchMove: 'Move',
+  resourceCancelSelect: 'Cancel',
 
   tabStore: 'Store',
   storeSearch: 'Search extensions...',
@@ -1911,17 +2023,25 @@ const zh_tw: TranslationKeys = {
   chatListSearch: '搜尋會話與訊息',
   chatListAll: '全部',
   chatListAgents: '助手',
+  chatListCollapseAssistant: '收起',
+  chatListExpandAssistant: '展開',
+  chatListViewAssistant: '助理',
   chatListViewSession: '會話',
   chatListViewTopic: '話題',
+  chatListAssistants: '助理',
   chatListTopicRecent: '最近',
+  chatListTopics: '話題',
   chatListTopicEmpty: '暫無話題',
-  chatListTopicEmptyDesc: '最近對話將顯示在這裡。',
+  chatListTopicEmptyDesc: '對話將顯示在這裡。',
   chatListEmpty: '暫無會話',
   chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 會話。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群組會話',
   chatListCreateTag: '新建標籤',
+  chatListNewAssistant: '新助理',
   chatListNewConversation: '新會話',
+  deleteTopicConfirm: '刪除此話題？',
+  deleteTopicDesc: '此對話將被永久刪除。',
   chatSearchMatchMessage: '訊息',
   chatSearchMatchSession: '會話',
   chatSearchMatchTopic: '話題',
@@ -1960,10 +2080,28 @@ const zh_tw: TranslationKeys = {
   chatToolResponse: '響應',
   chatToolAborted: '已中止',
   chatToolApprove: '允許',
+  chatToolApproveNotSupported: '此流程暫不支援工具批准。',
   chatToolReject: '拒絕',
   chatToolAbortedDesc: '此工具調用已中止。',
   chatToolRejectedDesc: '此工具調用已被拒絕。',
   chatToolPendingDesc: '此工具需要您的批准才能運行。',
+  chatToolGtdTodoCount: '{{count}} 項待辦',
+  chatToolGtdPlanGoalPlaceholder: '目標或目的',
+  chatToolGtdPlanDescPlaceholder: '簡要說明',
+  chatToolGtdPlanContextPlaceholder: '背景與約束',
+  chatToolGtdAddTodoPlaceholder: '添加待辦',
+  chatToolNotebookCreateDocTitlePlaceholder: '文檔標題',
+  chatToolNotebookCreateDocDescPlaceholder: '簡要說明',
+  chatToolNotebookCreateDocContentPlaceholder: '內容（Markdown）',
+  chatToolStreamingCreatePlan: '正在創建計劃…',
+  chatToolStreamingExecTask: '正在執行任務…',
+  chatToolStreamingCreateDocument: '正在創建文檔…',
+  chatToolStreamingExecuteCode: '正在執行代碼…',
+  chatToolStreamingAddExperience: '正在添加經驗記憶…',
+  chatToolStreamingAddPreference: '正在添加偏好記憶…',
+  chatToolStreamingWebSearch: '正在搜索…',
+  chatToolStreamingKnowledgeBase: '正在檢索知識庫…',
+  chatToolStreamingSearchSkill: '正在搜索技能…',
   chatShowMore: '展開更多',
   chatShowLess: '收起',
   chatAskAnything: '有什麼可以幫助你的嗎？',
@@ -2207,7 +2345,7 @@ const zh_tw: TranslationKeys = {
   homeQuickAnalyze: '群組',
   homeQuickCreate: '作圖',
   homeAgentAll: '全部',
-  homeRecents: '最近',
+  homeRecents: '助理',
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
   homeStartChat: '開始聊天',
@@ -2282,8 +2420,10 @@ const zh_tw: TranslationKeys = {
 
   fileAttach: '附件',
   fileCamera: '拍照',
-  fileGallery: '相簿',
   fileDocument: '文件',
+  fileFromWorkspace: '從工作區',
+  fileFromWorkspaceDesc: '從資源工作區導入文件。',
+  fileGallery: '相簿',
   fileUploading: '上傳中...',
   fileUploadFailed: '上傳失敗',
 
@@ -2468,6 +2608,7 @@ const zh_tw: TranslationKeys = {
   chatHint3: '試試：除錯這個錯誤...',
   chatHint4: '試試：規劃我的一週...',
   streakCelebrate: '\u{1F525} 連續 {count} 天！',
+  activeAssistants: '{count} 個助理',
   activeChats: '{count} 個會話',
   chatEmptyWave: '嘿 \u{1F44B}',
   relativeTimeNow: '剛剛',
@@ -2539,6 +2680,7 @@ const zh_tw: TranslationKeys = {
   resourceDeleteConfirm: '刪除檔案',
   resourceDeleteDesc: '該檔案將被永久刪除。',
   resourceUploadFailed: '上傳失敗',
+  resourceUploaded: '上傳成功',
   resourceDownload: '下載',
   resourceDownloaded: '已保存到本地檔案',
   resourceDownloadFailed: '下載失敗',
@@ -2549,6 +2691,32 @@ const zh_tw: TranslationKeys = {
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+  resourceLibraryAll: '全部檔案',
+  resourceLibraryInbox: '未归类',
+  resourceFolderRoot: '根目錄',
+  resourceLibrarySelect: '選擇資源庫',
+  resourceNewFolder: '新建資料夾',
+  resourceMoveToFolder: '移至資料夾',
+  resourceFolderDeleteConfirm: '刪除資料夾',
+  resourceFolderDeleteDesc: '該資料夾及其內容將被永久刪除。',
+  resourceCreateFolder: '建立資料夾',
+  resourceCreateFolderPlaceholder: '資料夾名稱',
+  resourceSortBy: '排序',
+  resourceSortNewest: '最新優先',
+  resourceSortOldest: '最早優先',
+  resourceSortName: '名稱',
+  resourceSortSize: '大小',
+  resourceLoadMore: '載入更多',
+  resourceFolderEmpty: '此資料夾為空',
+  resourceFolderEmptyDesc: '上傳檔案或建立子資料夾',
+  resourceViewList: '列表',
+  resourceViewGrid: '網格',
+  resourceViewModeToggle: '切換列表或網格檢視',
+  resourceSelect: '選擇',
+  resourceSelectCount: '已選 {count} 項',
+  resourceBatchDelete: '刪除',
+  resourceBatchMove: '移動',
+  resourceCancelSelect: '取消',
 
   tabStore: '商店',
   storeSearch: '搜尋擴充項目...',
@@ -2831,17 +2999,25 @@ const zh: TranslationKeys = {
   chatListSearch: '搜索会话与消息',
   chatListAll: '全部',
   chatListAgents: '助手',
+  chatListCollapseAssistant: '收起',
+  chatListExpandAssistant: '展开',
+  chatListViewAssistant: '助理',
   chatListViewSession: '会话',
   chatListViewTopic: '话题',
+  chatListAssistants: '助理',
   chatListTopicRecent: '最近',
+  chatListTopics: '话题',
   chatListTopicEmpty: '暂无话题',
-  chatListTopicEmptyDesc: '最近对话将显示在这里。',
+  chatListTopicEmptyDesc: '对话将显示在这里。',
   chatListEmpty: '暂无会话',
   chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 会话。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群组会话',
   chatListCreateTag: '新建标签',
+  chatListNewAssistant: '新助理',
   chatListNewConversation: '新会话',
+  deleteTopicConfirm: '删除此话题？',
+  deleteTopicDesc: '此对话将被永久删除。',
   chatSearchMatchMessage: '消息',
   chatSearchMatchSession: '会话',
   chatSearchMatchTopic: '话题',
@@ -2880,10 +3056,28 @@ const zh: TranslationKeys = {
   chatToolResponse: '响应',
   chatToolAborted: '已中止',
   chatToolApprove: '允许',
+  chatToolApproveNotSupported: '此流程暂不支持工具批准。',
   chatToolReject: '拒绝',
   chatToolAbortedDesc: '此工具调用已中止。',
   chatToolRejectedDesc: '此工具调用已被拒绝。',
   chatToolPendingDesc: '此工具需要您的批准才能运行。',
+  chatToolGtdTodoCount: '{{count}} 项待办',
+  chatToolGtdPlanGoalPlaceholder: '目标或目的',
+  chatToolGtdPlanDescPlaceholder: '简要说明',
+  chatToolGtdPlanContextPlaceholder: '背景与约束',
+  chatToolGtdAddTodoPlaceholder: '添加待办',
+  chatToolNotebookCreateDocTitlePlaceholder: '文档标题',
+  chatToolNotebookCreateDocDescPlaceholder: '简要说明',
+  chatToolNotebookCreateDocContentPlaceholder: '内容（Markdown）',
+  chatToolStreamingCreatePlan: '正在创建计划…',
+  chatToolStreamingExecTask: '正在执行任务…',
+  chatToolStreamingCreateDocument: '正在创建文档…',
+  chatToolStreamingExecuteCode: '正在执行代码…',
+  chatToolStreamingAddExperience: '正在添加经验记忆…',
+  chatToolStreamingAddPreference: '正在添加偏好记忆…',
+  chatToolStreamingWebSearch: '正在搜索…',
+  chatToolStreamingKnowledgeBase: '正在检索知识库…',
+  chatToolStreamingSearchSkill: '正在搜索技能…',
   chatShowMore: '展开更多',
   chatShowLess: '收起',
   chatAskAnything: '问我任何问题...',
@@ -3127,7 +3321,7 @@ const zh: TranslationKeys = {
   homeQuickAnalyze: '群组',
   homeQuickCreate: '作图',
   homeAgentAll: '全部',
-  homeRecents: '最近',
+  homeRecents: '助理',
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
   homeStartChat: '开始聊天',
@@ -3202,8 +3396,10 @@ const zh: TranslationKeys = {
 
   fileAttach: '附件',
   fileCamera: '拍照',
-  fileGallery: '相册',
   fileDocument: '文档',
+  fileFromWorkspace: '从工作区',
+  fileFromWorkspaceDesc: '从资源工作区导入文件。',
+  fileGallery: '相册',
   fileUploading: '上传中...',
   fileUploadFailed: '上传失败',
 
@@ -3388,6 +3584,7 @@ const zh: TranslationKeys = {
   chatHint3: '试试：调试这个错误...',
   chatHint4: '试试：规划我的一周...',
   streakCelebrate: '\u{1F525} 连续 {count} 天！',
+  activeAssistants: '{count} 个助理',
   activeChats: '{count} 个会话',
   chatEmptyWave: '嘿 \u{1F44B}',
   relativeTimeNow: '刚刚',
@@ -3460,6 +3657,7 @@ const zh: TranslationKeys = {
   resourceDeleteConfirm: '删除文件',
   resourceDeleteDesc: '该文件将被永久删除。',
   resourceUploadFailed: '上传失败',
+  resourceUploaded: '上传成功',
   resourceDownload: '下载',
   resourceDownloaded: '已保存到本地文件',
   resourceDownloadFailed: '下载失败',
@@ -3470,6 +3668,32 @@ const zh: TranslationKeys = {
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
+  resourceLibraryAll: '全部文件',
+  resourceLibraryInbox: '未归类',
+  resourceFolderRoot: '根目录',
+  resourceLibrarySelect: '选择资源库',
+  resourceNewFolder: '新建文件夹',
+  resourceMoveToFolder: '移动到文件夹',
+  resourceFolderDeleteConfirm: '删除文件夹',
+  resourceFolderDeleteDesc: '该文件夹及其内容将被永久删除。',
+  resourceCreateFolder: '创建文件夹',
+  resourceCreateFolderPlaceholder: '文件夹名称',
+  resourceSortBy: '排序',
+  resourceSortNewest: '最新优先',
+  resourceSortOldest: '最早优先',
+  resourceSortName: '名称',
+  resourceSortSize: '大小',
+  resourceLoadMore: '加载更多',
+  resourceFolderEmpty: '此文件夹为空',
+  resourceFolderEmptyDesc: '上传文件或创建子文件夹',
+  resourceViewList: '列表',
+  resourceViewGrid: '网格',
+  resourceViewModeToggle: '切换列表或网格视图',
+  resourceSelect: '选择',
+  resourceSelectCount: '已选 {count} 项',
+  resourceBatchDelete: '删除',
+  resourceBatchMove: '移动',
+  resourceCancelSelect: '取消',
 
   tabStore: '商店',
   storeSearch: '搜索扩展...',

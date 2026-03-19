@@ -40,7 +40,9 @@ const ToggleOption = memo<ToggleOptionProps>(
         </View>
         <View className="flex-1">
           <Text className="text-foreground text-[17px] font-semibold tracking-tight">{title}</Text>
-          <Text className="text-secondary/60 text-[13px] leading-5 mt-1">{description}</Text>
+          <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
+            {description}
+          </Text>
         </View>
       </Pressable>
     );
@@ -121,7 +123,7 @@ const MemoryToolSheet = memo<MemoryToolSheetProps>(
                   <Text className="text-foreground text-[17px] font-semibold tracking-tight">
                     {t.memoryToolEffortTitle}
                   </Text>
-                  <Text className="text-secondary/60 text-[13px] leading-5 mt-1">
+                  <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
                     {t.memoryToolEffortDesc}
                   </Text>
 

@@ -108,7 +108,7 @@ export default function SkillsSheet({
               {item.title}
             </Text>
             {item.description ? (
-              <Text className="text-secondary/50 mt-0.5 text-[12px]" numberOfLines={1}>
+              <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
                 {item.description}
               </Text>
             ) : null}
@@ -136,7 +136,7 @@ export default function SkillsSheet({
               {item.skill.name || item.skill.identifier || item.skill.id}
             </Text>
             {item.skill.description ? (
-              <Text className="text-secondary/50 mt-0.5 text-[12px]" numberOfLines={1}>
+              <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
                 {item.skill.description}
               </Text>
             ) : null}
@@ -156,7 +156,9 @@ export default function SkillsSheet({
     return (
       <View className="flex-row items-center py-3.5" key={plugin.identifier}>
         <View className="mr-3 h-9 w-9 items-center justify-center rounded-xl bg-foreground/5">
-          <Text className="text-[18px]">{plugin.manifest?.meta?.avatar ?? '🔌'}</Text>
+          <Text className="text-[18px]" style={{ color: colors.foreground }}>
+            {plugin.manifest?.meta?.avatar ?? '🔌'}
+          </Text>
         </View>
         <View className="mr-3 flex-1">
           <Text
@@ -166,7 +168,7 @@ export default function SkillsSheet({
             {plugin.manifest?.meta?.title || plugin.identifier}
           </Text>
           {plugin.manifest?.meta?.description ? (
-            <Text className="text-secondary/50 mt-0.5 text-[12px]" numberOfLines={1}>
+            <Text className="mt-0.5 text-[12px]" numberOfLines={1} style={{ color: colors.secondaryText }}>
               {plugin.manifest.meta.description}
             </Text>
           ) : null}
@@ -194,8 +196,8 @@ export default function SkillsSheet({
     if (items.length === 0) {
       return (
         <View className="items-center py-10">
-          <Text className="text-secondary/50 px-4 text-center text-[14px]">{skillsEmpty}</Text>
-          <Text className="text-secondary/40 mt-1 text-center text-[12px]">{skillsEmptyDesc}</Text>
+          <Text className="px-4 text-center text-[14px]" style={{ color: colors.secondaryText }}>{skillsEmpty}</Text>
+          <Text className="mt-1 text-center text-[12px]" style={{ color: colors.muted }}>{skillsEmptyDesc}</Text>
         </View>
       );
     }

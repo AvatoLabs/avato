@@ -209,4 +209,38 @@ export const aiChatRouter = router({
         userMessageId: messageId,
       } as SendMessageServerResponse;
     }),
+
+  /**
+   * Approve a pending tool call. Requires backend support for human-in-the-loop tool execution.
+   * Currently returns an error; implement in AgentRuntimeService when ready.
+   */
+  approveToolCall: aiChatProcedure
+    .input(
+      z.object({
+        assistantGroupId: z.string().optional(),
+        sessionId: z.string(),
+        topicId: z.string().optional(),
+        toolMessageId: z.string(),
+      }),
+    )
+    .mutation(async () => {
+      throw new Error('Tool approval is not yet supported for mobile/cloud flow');
+    }),
+
+  /**
+   * Reject a pending tool call. Requires backend support for human-in-the-loop tool execution.
+   * Currently returns an error; implement in AgentRuntimeService when ready.
+   */
+  rejectToolCall: aiChatProcedure
+    .input(
+      z.object({
+        reason: z.string().optional(),
+        sessionId: z.string(),
+        topicId: z.string().optional(),
+        toolMessageId: z.string(),
+      }),
+    )
+    .mutation(async () => {
+      throw new Error('Tool rejection is not yet supported for mobile/cloud flow');
+    }),
 });

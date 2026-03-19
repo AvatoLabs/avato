@@ -35,7 +35,7 @@ export function BuiltinSkillIcon({ icon, size = 36 }: BuiltinSkillIconProps) {
         backgroundColor: colors.fillTertiary,
       }}
     >
-      <Text style={{ fontSize: size * 0.55 }}>{emoji}</Text>
+      <Text style={{ color: colors.foreground, fontSize: size * 0.55 }}>{emoji}</Text>
     </View>
   );
 }

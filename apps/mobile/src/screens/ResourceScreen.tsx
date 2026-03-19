@@ -2,18 +2,24 @@
  * ResourceScreen — File / Resource management aligned with web /resource
  *
  * Features:
- *  • List all user files with tabs: All, Images, Documents, Others
+ *  • Library selection (All Files / specific library)
+ *  • Folder hierarchy with breadcrumb navigation
+ *  • List files and folders with tabs: All, Images, Documents, Others
+ *  • Create folder, move to folder
  *  • Upload via camera roll (ImagePicker) or file picker (DocumentPicker)
- *  • Delete files with confirmation alert
- *  • Pull-to-refresh
- *  • Search filter
+ *  • Upload to current folder when in library
+ *  • Delete files/folders with confirmation alert
+ *  • Pull-to-refresh, search filter
  *  • Image thumbnail preview inline
  */
 import * as DocumentPicker from 'expo-document-picker';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  ArrowDownUp,
   ArrowLeft,
+  Check,
+  ChevronRight,
   Download,
   Eye,
   File,
@@ -21,7 +27,10 @@ import {
   FileImage,
   FileText,
   FileVideo,
+  Folder,
   FolderOpen,
+  Grid3X3,
+  List,
   Plus,
   Search,
   Share2,
@@ -54,7 +63,13 @@ import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { fileApi, getApiUrl } from '../lib/api';
+import {
+  fileApi,
+  getApiUrl,
+  knowledgeBaseApi,
+  resourceApi,
+  type FolderCrumb,
+} from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -62,11 +77,42 @@ import { codeInlineRules } from '../lib/markdownRules';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { FileListItem } from '../types';
+import type { FileListItem, KnowledgeBaseItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
 type FileCategory = 'all' | 'images' | 'documents' | 'others';
+type SorterType = 'createdAt' | 'name' | 'size';
+type SortOrder = 'asc' | 'desc';
+type ViewMode = 'list' | 'grid';
+
+function sortFileList(
+  list: FileListItem[],
+  sorter: SorterType,
+  sortOrder: SortOrder,
+): FileListItem[] {
+  const sorted = [...list];
+  sorted.sort((a, b) => {
+    let aVal: string | number;
+    let bVal: string | number;
+    switch (sorter) {
+      case 'name':
+        aVal = (a.name ?? '').toLowerCase();
+        bVal = (b.name ?? '').toLowerCase();
+        break;
+      case 'size':
+        aVal = a.size ?? 0;
+        bVal = b.size ?? 0;
+        break;
+      default:
+        aVal = new Date(a.createdAt).getTime();
+        bVal = new Date(b.createdAt).getTime();
+    }
+    const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    return sortOrder === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
+}
 const IMAGE_EXTENSIONS = new Set([
   'avif',
   'bmp',
@@ -163,9 +209,12 @@ function hasKnownImageSignature(bytes: Uint8Array): boolean {
   return false;
 }
 
-function isDocument(fileType: string): boolean {
+const DOCUMENT_EXTENSIONS = /\.(?:md|mdx|doc|docx|ppt|pptx|xls|xlsx|pdf|txt|rtf)$/i;
+
+function isDocument(fileType: string, fileName?: string): boolean {
   const docs = ['application/pdf', 'text/', 'application/msword', 'application/vnd'];
-  return docs.some((p) => fileType.startsWith(p));
+  if (docs.some((p) => fileType.startsWith(p))) return true;
+  return !!(fileName && DOCUMENT_EXTENSIONS.test(fileName));
 }
 
 function isMarkdownFile(fileType: string, name?: string): boolean {
@@ -253,11 +302,16 @@ function isVideo(fileType: string): boolean {
 }
 
 function matchesCategory(item: FileListItem, category: FileCategory): boolean {
+  if (item.fileType === 'custom/folder') return true;
   if (category === 'all') return true;
   if (category === 'images') return isImage(item.fileType, item.name);
-  if (category === 'documents') return isDocument(item.fileType);
-  if (category === 'others') return !isImage(item.fileType, item.name) && !isDocument(item.fileType);
+  if (category === 'documents') return isDocument(item.fileType, item.name);
+  if (category === 'others') return !isImage(item.fileType, item.name) && !isDocument(item.fileType, item.name);
   return true;
+}
+
+function isFolder(item: FileListItem): boolean {
+  return item.fileType === 'custom/folder';
 }
 
 function FileTypeIcon({
@@ -277,7 +331,7 @@ function FileTypeIcon({
     return <FileAudio color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
   if (isVideo(fileType))
     return <FileVideo color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
-  if (isDocument(fileType))
+  if (isDocument(fileType, fileName))
     return <FileText color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
   return <File color={color} size={size} strokeWidth={tokens.icon.strokeWidth} />;
 }
@@ -739,18 +793,37 @@ FilePreviewModal.displayName = 'FilePreviewModal';
 
 interface FileRowProps {
   apiBaseUrl: string;
+  isSelected?: boolean;
   item: FileListItem;
-  onDelete: (id: string, name: string) => void;
+  onDelete: (id: string, name: string, isFolder: boolean) => void;
+  onFolderPress?: (item: FileListItem) => void;
+  onMoveToFolder?: (item: FileListItem) => void;
   onPress: (item: FileListItem) => void;
+  onSelect?: (item: FileListItem) => void;
+  selectMode?: boolean;
+  showFolderActions?: boolean;
 }
 
-function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
+function FileRow({
+  item,
+  isSelected,
+  onDelete,
+  onFolderPress,
+  onMoveToFolder,
+  onPress,
+  onSelect,
+  apiBaseUrl,
+  selectMode,
+  showFolderActions,
+}: FileRowProps) {
   const colors = useThemeColors();
+  const { t } = useI18n();
   const iconColor = colors.secondaryText;
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
-  const isImageFile = isImage(item.fileType, item.name);
+  const itemIsFolder = isFolder(item);
+  const isImageFile = !itemIsFolder && isImage(item.fileType, item.name);
   const thumbnailCandidates = isImageFile
     ? buildRemoteFileCandidates(apiBaseUrl, item)
     : [];
@@ -877,20 +950,49 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
 
   const showThumbnail = thumbnailDataUrl && !thumbnailFailed;
 
+  const handlePress = () => {
+    if (selectMode && onSelect) {
+      onSelect(item);
+    } else if (itemIsFolder && onFolderPress) {
+      onFolderPress(item);
+    } else {
+      onPress(item);
+    }
+  };
+
   return (
     <TouchableOpacity
-      accessibilityLabel={`${item.name}, ${formatBytes(item.size)}`}
+      accessibilityLabel={itemIsFolder ? item.name : `${item.name}, ${formatBytes(item.size)}`}
       accessibilityRole="button"
       activeOpacity={0.6}
       className="flex-row items-center px-5 py-3 bg-background"
-      onPress={() => onPress(item)}
+      onPress={handlePress}
       onLongPress={() => {
         haptics.medium();
-        onDelete(item.id, item.name);
+        if (selectMode && onSelect) {
+          onSelect(item);
+        } else if (itemIsFolder) {
+          onDelete(item.id, item.name, true);
+        } else if (showFolderActions && onMoveToFolder) {
+          Alert.alert(item.name, undefined, [
+            { text: t.cancel, style: 'cancel' },
+            { text: t.delete, style: 'destructive', onPress: () => onDelete(item.id, item.name, false) },
+            { text: t.resourceMoveToFolder, onPress: () => onMoveToFolder(item) },
+          ]);
+        } else {
+          onDelete(item.id, item.name, false);
+        }
       }}
     >
+      {selectMode && (
+        <View className="mr-3 h-6 w-6 items-center justify-center rounded-full border-2" style={{ borderColor: isSelected ? colors.primary : colors.muted }}>
+          {isSelected && <Check color={colors.primary} size={14} strokeWidth={2.5} />}
+        </View>
+      )}
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
-        {showThumbnail ? (
+        {itemIsFolder ? (
+          <Folder color={iconColor} size={26} strokeWidth={tokens.icon.strokeWidth} />
+        ) : showThumbnail ? (
           <ExpoImage
             cachePolicy="memory-disk"
             className="h-12 w-12 rounded-xl"
@@ -909,14 +1011,16 @@ function FileRow({ item, onDelete, onPress, apiBaseUrl }: FileRowProps) {
           {item.name}
         </Text>
         <Text className="mt-0.5 text-[12px]" style={{ color: colors.secondaryText }}>
-          {formatBytes(item.size)}
-          {'  ·  '}
-          {formatDate(item.createdAt)}
+          {itemIsFolder ? formatDate(item.createdAt) : `${formatBytes(item.size)}  ·  ${formatDate(item.createdAt)}`}
         </Text>
       </View>
 
       <View className="ml-2">
-        <Eye color={colors.secondaryText} size={16} strokeWidth={1.5} />
+        {itemIsFolder ? (
+          <ChevronRight color={colors.secondaryText} size={18} strokeWidth={1.5} />
+        ) : (
+          <Eye color={colors.secondaryText} size={16} strokeWidth={1.5} />
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -940,7 +1044,106 @@ export default function ResourceScreen() {
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileListItem | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [libraryId, setLibraryId] = useState<string | null>(null);
+  const [currentFolderSlug, setCurrentFolderSlug] = useState<string | null>(null);
+  const [folderBreadcrumb, setFolderBreadcrumb] = useState<FolderCrumb[]>([]);
+  const [libraries, setLibraries] = useState<KnowledgeBaseItem[]>([]);
+  const [librarySelectVisible, setLibrarySelectVisible] = useState(false);
+  const [createFolderVisible, setCreateFolderVisible] = useState(false);
+  const [createFolderName, setCreateFolderName] = useState('');
+  const [moveToFolderItem, setMoveToFolderItem] = useState<FileListItem | null>(null);
+  const [moveTargetFolders, setMoveTargetFolders] = useState<FileListItem[]>([]);
+  const [moveFolderStack, setMoveFolderStack] = useState<Array<{ id: string; name: string } | null>>([
+    null,
+  ]);
+  const [sorter, setSorter] = useState<SorterType>('createdAt');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const nextOffsetRef = useRef(0);
+  const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
+
+  const toggleSelect = useCallback((item: FileListItem) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    const hasFolders = ids.some((id) => {
+      const item = files.find((f) => f.id === id);
+      return item?.fileType === 'custom/folder';
+    });
+    const confirmTitle = hasFolders ? t.resourceFolderDeleteConfirm : t.resourceDeleteConfirm;
+    const confirmDesc = hasFolders ? t.resourceFolderDeleteDesc : t.resourceDeleteDesc;
+    Alert.alert(confirmTitle, `${ids.length} items\n${confirmDesc}`, [
+      { text: t.cancel, style: 'cancel' },
+      {
+        text: t.delete,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            for (const id of ids) {
+              const item = files.find((f) => f.id === id);
+              if (item?.fileType === 'custom/folder') {
+                await resourceApi.deleteDocument(id);
+              } else {
+                await fileApi.remove(id);
+              }
+            }
+            haptics.success();
+            clearSelection();
+            await loadFiles(true);
+          } catch {
+            toast.show('error', t.resourceDeleteFailed);
+          }
+        },
+      },
+    ]);
+  }, [selectedIds, files, clearSelection, loadFiles, t, toast]);
+
+  const [batchMoveIds, setBatchMoveIds] = useState<Set<string>>(new Set());
+
+  const handleBatchMove = useCallback(() => {
+    setBatchMoveIds(new Set(selectedIds));
+    setMoveToFolderItem({ id: '__batch__', name: '', fileType: '', size: 0, createdAt: '', sourceType: 'file', url: '' } as FileListItem);
+    setMoveFolderStack([null]);
+  }, [selectedIds]);
+
+  const moveFolderParentId = moveFolderStack[moveFolderStack.length - 1]?.id ?? null;
+  const moveFolderCurrent = moveFolderStack.length > 1 ? moveFolderStack[moveFolderStack.length - 1] : null;
+
+  useEffect(() => {
+    if (moveToFolderItem && libraryId) {
+      resourceApi
+        .getKnowledgeItems({
+          knowledgeBaseId: libraryId,
+          parentId: moveFolderParentId,
+        })
+        .then((res) => {
+          const folders = (res?.items ?? []).filter((i) => i.fileType === 'custom/folder');
+          setMoveTargetFolders(folders);
+        })
+        .catch(() => setMoveTargetFolders([]));
+    } else {
+      setMoveTargetFolders([]);
+      setMoveFolderStack([null]);
+    }
+  }, [moveToFolderItem, libraryId, moveFolderParentId]);
 
   const handlePreview = useCallback((item: FileListItem) => {
     haptics.light();
@@ -950,30 +1153,77 @@ export default function ResourceScreen() {
 
   // ── Data ─────────────────────────────────────────────────────────
 
+  const loadLibraries = useCallback(async () => {
+    try {
+      const list = await knowledgeBaseApi.list();
+      setLibraries(list ?? []);
+    } catch {
+      setLibraries([]);
+    }
+  }, []);
+
+  const loadFolderBreadcrumb = useCallback(async (slug: string) => {
+    try {
+      const chain = await resourceApi.getFolderBreadcrumb(slug);
+      setFolderBreadcrumb(chain ?? []);
+    } catch {
+      setFolderBreadcrumb([]);
+    }
+  }, []);
+
   const loadFiles = useCallback(
-    async (silent = false) => {
-      if (!silent) setLoading(true);
+    async (silent = false, append = false) => {
+      const ticket = ++loadRequestRef.current;
+      const loadOffset = append ? nextOffsetRef.current : 0;
+      if (!silent) setLoading(append ? false : true);
+      if (append) setLoadingMore(true);
       try {
         const base = await getApiUrl();
         setApiBase(base);
-        const result = await fileApi.list({
+        const result = await resourceApi.getKnowledgeItems({
           category: category === 'all' ? undefined : category,
+          knowledgeBaseId: libraryId ?? undefined,
+          limit: 50,
+          offset: loadOffset,
+          parentId: currentFolderSlug ?? null,
           q: searchText || undefined,
+          sorter,
+          sortType: sortOrder,
         });
-        setFiles(result ?? []);
+        if (ticket !== loadRequestRef.current) return;
+        const items = result?.items ?? [];
+        setHasMore(result?.hasMore ?? false);
+        nextOffsetRef.current = loadOffset + items.length;
+        setFiles(append ? (prev) => [...prev, ...items] : items);
       } catch {
-        setFiles([]);
+        if (ticket !== loadRequestRef.current) return;
+        if (!append) setFiles([]);
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (ticket === loadRequestRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+          setLoadingMore(false);
+        }
       }
     },
-    [category, searchText],
+    [category, searchText, libraryId, currentFolderSlug, sorter, sortOrder],
   );
 
   useEffect(() => {
     useConnectionStore.getState().checkConnection();
   }, []);
+
+  useEffect(() => {
+    loadLibraries();
+  }, [loadLibraries]);
+
+  useEffect(() => {
+    if (currentFolderSlug) {
+      loadFolderBreadcrumb(currentFolderSlug);
+    } else {
+      setFolderBreadcrumb([]);
+    }
+  }, [currentFolderSlug, loadFolderBreadcrumb]);
 
   useEffect(() => {
     loadFiles();
@@ -984,14 +1234,96 @@ export default function ResourceScreen() {
     loadFiles(true);
   }, [loadFiles]);
 
+  const handleFolderPress = useCallback((item: FileListItem) => {
+    const slug = item.slug || item.id;
+    setCurrentFolderSlug(slug);
+  }, []);
+
+  const handleBreadcrumbPress = useCallback((item: FolderCrumb, index: number) => {
+    if (index === folderBreadcrumb.length - 1) return;
+    setCurrentFolderSlug(item.slug);
+  }, [folderBreadcrumb.length]);
+
+  const handleBackToRoot = useCallback(() => {
+    setCurrentFolderSlug(null);
+  }, []);
+
+  const handleCreateFolder = useCallback(async () => {
+    if (!libraryId) return;
+    const name = createFolderName.trim() || t.resourceNewFolder;
+    setCreateFolderVisible(false);
+    setCreateFolderName('');
+    try {
+      await resourceApi.createFolder({
+        knowledgeBaseId: libraryId,
+        parentId: currentFolderSlug ?? undefined,
+        title: name,
+      });
+      haptics.success();
+      await loadFiles(true);
+    } catch {
+      toast.show('error', t.resourceUploadFailed);
+    }
+  }, [libraryId, currentFolderSlug, createFolderName, loadFiles, t.resourceNewFolder, t.resourceUploadFailed, toast]);
+
+  const handleMoveToFolder = useCallback(
+    async (targetFolderId: string | null) => {
+      const isBatch = batchMoveIds.size > 0;
+      const idsToMove = isBatch ? Array.from(batchMoveIds) : moveToFolderItem ? [moveToFolderItem.id] : [];
+      setMoveToFolderItem(null);
+      setBatchMoveIds(new Set());
+      setMoveFolderStack([null]);
+      if (idsToMove.length === 0) return;
+      try {
+        for (const id of idsToMove) {
+          const item = files.find((f) => f.id === id);
+          if (item && id !== '__batch__') {
+            await resourceApi.moveResource(id, targetFolderId, item.sourceType);
+          }
+        }
+        haptics.success();
+        toast.show('success', t.done);
+        clearSelection();
+        await loadFiles(true);
+      } catch {
+        toast.show('error', t.resourceUploadFailed);
+      }
+    },
+    [moveToFolderItem, batchMoveIds, files, clearSelection, loadFiles, t.done, t.resourceUploadFailed, toast],
+  );
+
   // ── Upload ────────────────────────────────────────────────────────
 
   const doUpload = useCallback(
     async (uri: string, name: string, mimeType: string) => {
       setUploading(true);
       try {
-        await fileApi.upload(uri, name, mimeType);
+        const created = await fileApi.upload(uri, name, mimeType, {
+          knowledgeBaseId: libraryId ?? undefined,
+          parentId: currentFolderSlug ?? undefined,
+        });
         haptics.success();
+        toast.show('success', t.resourceUploaded);
+        setFiles((prev) => {
+          const optimistic: FileListItem = {
+            chunkCount: null,
+            chunkingError: null,
+            chunkingStatus: null,
+            createdAt: new Date().toISOString(),
+            editorData: null,
+            embeddingError: null,
+            embeddingStatus: null,
+            fileType: mimeType,
+            finishEmbedding: false,
+            id: created.id,
+            name,
+            size: 0,
+            sourceType: 'file',
+            url: created.url,
+          };
+          return [optimistic, ...prev];
+        });
+        await new Promise((r) => setTimeout(r, 200));
         await loadFiles(true);
       } catch {
         toast.show('error', t.resourceUploadFailed);
@@ -999,7 +1331,7 @@ export default function ResourceScreen() {
         setUploading(false);
       }
     },
-    [loadFiles, t, toast],
+    [loadFiles, libraryId, currentFolderSlug, t, toast],
   );
 
   const handlePickPhoto = useCallback(async () => {
@@ -1034,19 +1366,29 @@ export default function ResourceScreen() {
     setAttachmentSheetVisible(true);
   }, []);
 
+  const currentLibraryName = libraryId
+    ? libraries.find((l) => l.id === libraryId)?.name ?? ''
+    : t.resourceLibraryInbox;
+
   // ── Delete ────────────────────────────────────────────────────────
 
   const handleDelete = useCallback(
-    (id: string, name: string) => {
+    (id: string, name: string, isFolderItem: boolean) => {
       haptics.warning();
-      Alert.alert(t.resourceDeleteConfirm, `"${name}"\n${t.resourceDeleteDesc}`, [
+      const confirmTitle = isFolderItem ? t.resourceFolderDeleteConfirm : t.resourceDeleteConfirm;
+      const confirmDesc = isFolderItem ? t.resourceFolderDeleteDesc : t.resourceDeleteDesc;
+      Alert.alert(confirmTitle, `"${name}"\n${confirmDesc}`, [
         { text: t.cancel, style: 'cancel' },
         {
           text: t.delete,
           style: 'destructive',
           onPress: async () => {
             try {
-              await fileApi.remove(id);
+              if (isFolderItem) {
+                await resourceApi.deleteDocument(id);
+              } else {
+                await fileApi.remove(id);
+              }
               haptics.success();
               setFiles((prev) => prev.filter((f) => f.id !== id));
             } catch {
@@ -1059,9 +1401,24 @@ export default function ResourceScreen() {
     [t, toast],
   );
 
-  // ── Filtered files ────────────────────────────────────────────────
+  // ── Filtered & sorted files ────────────────────────────────────────
 
-  const filtered = files.filter((f) => matchesCategory(f, category));
+  const filtered = sortFileList(
+    files.filter((f) => matchesCategory(f, category)),
+    sorter,
+    sortOrder,
+  );
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || loadingMore) return;
+    void loadFiles(true, true);
+  }, [hasMore, loadingMore, loadFiles]);
+
+  const getSortLabel = () => {
+    if (sorter === 'createdAt') return sortOrder === 'desc' ? t.resourceSortNewest : t.resourceSortOldest;
+    if (sorter === 'name') return `${t.resourceSortName} ${sortOrder === 'asc' ? 'A-Z' : 'Z-A'}`;
+    return `${t.resourceSortSize} ${sortOrder === 'asc' ? '↑' : '↓'}`;
+  };
 
   // ── Tabs ──────────────────────────────────────────────────────────
 
@@ -1078,16 +1435,113 @@ export default function ResourceScreen() {
     <View className="flex-1 bg-background">
       {/* Header */}
       <ScreenHeader
-        rightAccessibilityLabel={t.accessibilityAddResource}
-        title={t.resourceTitle}
-        rightElement={
-          <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        rightAccessibilityLabel={
+          selectMode ? t.resourceCancelSelect : t.resourceViewModeToggle
+        }
+        title={selectMode ? t.resourceSelectCount.replace('{count}', String(selectedIds.size)) : t.resourceTitle}
+        rightActions={
+          selectMode ? (
+            <TouchableOpacity
+              hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+              onPress={clearSelection}
+            >
+              <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '500' }}>
+                {t.resourceCancelSelect}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View className="flex-row items-center" style={{ gap: 20 }}>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}
+              >
+                {viewMode === 'list' ? (
+                  <Grid3X3 color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                ) : (
+                  <List color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+                onPress={() => setSelectMode(true)}
+              >
+                <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '500' }}>
+                  {t.resourceSelect}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )
         }
         titleIcon={
           <FolderOpen color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
-        onPressRight={() => setAttachmentSheetVisible(true)}
       >
+        {/* Library selector */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5"
+          onPress={() => setLibrarySelectVisible(true)}
+        >
+          <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+          <Text className="ml-2.5 flex-1 text-[14px] font-medium text-foreground" numberOfLines={1}>
+            {currentLibraryName}
+          </Text>
+          <ChevronRight color={colors.muted} size={18} strokeWidth={1.5} />
+        </TouchableOpacity>
+
+        {/* Breadcrumb when in folder */}
+        {folderBreadcrumb.length > 0 && (
+          <ScrollView
+            className="mx-4 mb-2"
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="flex-row items-center rounded-full px-3 py-1.5"
+              style={{ backgroundColor: colors.fillTertiary }}
+              onPress={handleBackToRoot}
+            >
+              <ArrowLeft color={colors.primary} size={14} strokeWidth={2} />
+              <Text className="ml-1 text-[12px] font-medium" style={{ color: colors.primary }}>
+                {libraryId ? t.resourceFolderRoot : t.resourceLibraryInbox}
+              </Text>
+            </TouchableOpacity>
+            {folderBreadcrumb.map((crumb, index) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="flex-row items-center rounded-full px-3 py-1.5"
+                key={crumb.id}
+                style={{
+                  backgroundColor:
+                    index === folderBreadcrumb.length - 1 ? colors.primary : colors.fillTertiary,
+                }}
+                onPress={() => handleBreadcrumbPress(crumb, index)}
+              >
+                <Text
+                  className="text-[12px] font-medium"
+                  numberOfLines={1}
+                  style={{
+                    color: index === folderBreadcrumb.length - 1 ? colors.iconOnPrimary : colors.muted,
+                    maxWidth: 80,
+                  }}
+                >
+                  {crumb.name}
+                </Text>
+                {index < folderBreadcrumb.length - 1 && (
+                  <ChevronRight
+                    color={colors.muted}
+                    size={14}
+                    strokeWidth={1.5}
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
         <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
           <Search color={colors.muted} size={16} strokeWidth={2} />
           <TextInput
@@ -1107,52 +1561,96 @@ export default function ResourceScreen() {
           )}
         </View>
 
-        <ScrollView
-          horizontal
-          className="mx-4 mb-2"
-          contentContainerStyle={{ gap: 4 }}
-          showsHorizontalScrollIndicator={false}
-        >
-          {TABS.map((tab) => {
-            const active = category === tab.key;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                className="rounded-full px-4 py-1.5"
-                key={tab.key}
-                style={{
-                  backgroundColor: active ? colors.primary : colors.fillTertiary,
-                }}
-                onPress={() => {
-                  haptics.selection();
-                  setCategory(tab.key);
-                }}
-              >
-                <Text
-                  className="text-[13px] font-semibold"
-                  style={{ color: active ? colors.iconOnPrimary : colors.muted }}
+        {/* Filter tabs + sort (single row) */}
+        <View className="mx-4 mb-2 flex-row items-center justify-between">
+          <ScrollView
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flex: 1 }}
+          >
+            {TABS.map((tab) => {
+              const active = category === tab.key;
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="rounded-full px-4 py-2"
+                  key={tab.key}
+                  style={{
+                    backgroundColor: active ? colors.primary : colors.fillTertiary,
+                  }}
+                  onPress={() => {
+                    haptics.selection();
+                    setCategory(tab.key);
+                  }}
                 >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    className="text-[13px] font-semibold"
+                    style={{ color: active ? colors.iconOnPrimary : colors.muted }}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            accessibilityLabel={`${t.resourceSortBy}: ${getSortLabel()}`}
+            accessibilityRole="button"
+            className="ml-2 items-center justify-center rounded-full p-2"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ backgroundColor: colors.fillTertiary }}
+            onPress={() => setSortMenuVisible(true)}
+          >
+            <ArrowDownUp color={colors.primary} size={18} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
       </ScreenHeader>
+
+      {/* Batch action bar */}
+      {selectMode && selectedIds.size > 0 && (
+        <View
+          className="flex-row items-center justify-around border-t border-border bg-card px-4 py-3"
+          style={{ paddingBottom: insets.bottom + 12 }}
+        >
+          <TouchableOpacity
+            className="flex-1 items-center"
+            onPress={handleBatchDelete}
+          >
+            <Text style={{ color: colors.danger }}>{t.resourceBatchDelete}</Text>
+          </TouchableOpacity>
+          {libraryId && (
+            <TouchableOpacity
+              className="flex-1 items-center"
+              onPress={handleBatchMove}
+            >
+              <Text style={{ color: colors.primary }}>{t.resourceBatchMove}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Content */}
       {loading && files.length === 0 ? (
         <FileGridSkeleton />
       ) : (
         <FlatList
-          ItemSeparatorComponent={() => <View className="mx-4 h-px bg-foreground/5" />}
+          key={viewMode}
+          columnWrapperStyle={viewMode === 'grid' ? { justifyContent: 'space-between', paddingHorizontal: 12 } : undefined}
+          ItemSeparatorComponent={
+            viewMode === 'list' ? () => <View className="mx-4 h-px bg-foreground/5" /> : undefined
+          }
           data={filtered}
           keyExtractor={(item) => item.id}
+          numColumns={viewMode === 'grid' ? 3 : 1}
           ListEmptyComponent={
             <EmptyState
-              description={t.resourceEmptyDesc}
+              description={
+                currentFolderSlug ? t.resourceFolderEmptyDesc : t.resourceEmptyDesc
+              }
               iconVariant="resource"
-              title={t.resourceEmpty}
+              title={currentFolderSlug ? t.resourceFolderEmpty : t.resourceEmpty}
             />
           }
           contentContainerStyle={
@@ -1173,41 +1671,134 @@ export default function ResourceScreen() {
               onRefresh={onRefresh}
             />
           }
-          renderItem={({ item }) => (
-            <FileRow
-              apiBaseUrl={apiBase}
-              item={item}
-              onDelete={handleDelete}
-              onPress={handlePreview}
-            />
-          )}
+          ListFooterComponent={
+            hasMore ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="items-center justify-center py-4"
+                disabled={loadingMore}
+                onPress={handleLoadMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <Text style={{ color: colors.primary }}>{t.resourceLoadMore}</Text>
+                )}
+              </TouchableOpacity>
+            ) : null
+          }
+          onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
+          onEndReachedThreshold={0.3}
+          renderItem={({ item }) =>
+            viewMode === 'grid' ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="flex-1 m-1 items-center rounded-xl bg-foreground/5 p-3"
+                style={viewMode === 'grid' ? { minWidth: 0 } : undefined}
+                onPress={() =>
+                  selectMode
+                    ? toggleSelect(item)
+                    : isFolder(item) && libraryId
+                      ? handleFolderPress(item)
+                      : handlePreview(item)
+                }
+                onLongPress={() =>
+                  selectMode ? toggleSelect(item) : handleDelete(item.id, item.name, isFolder(item))
+                }
+              >
+                {selectMode && (
+                  <View
+                    className="absolute right-2 top-2 z-10 h-5 w-5 items-center justify-center rounded-full border-2"
+                    style={{ borderColor: selectedIds.has(item.id) ? colors.primary : colors.muted }}
+                  >
+                    {selectedIds.has(item.id) && <Check color={colors.primary} size={12} strokeWidth={2.5} />}
+                  </View>
+                )}
+                <View className="h-14 w-14 items-center justify-center">
+                  {isFolder(item) ? (
+                    <Folder color={colors.muted} size={28} strokeWidth={tokens.icon.strokeWidth} />
+                  ) : isImage(item.fileType, item.name) ? (
+                    (() => {
+                      const imgUrl = buildRemoteFileCandidates(apiBase, item)[0];
+                      return imgUrl ? (
+                        <ExpoImage
+                          cachePolicy="memory-disk"
+                          className="h-14 w-14 rounded-lg bg-foreground/5"
+                          contentFit="cover"
+                          source={{ uri: imgUrl }}
+                        />
+                      ) : (
+                        <FileTypeIcon color={colors.muted} fileName={item.name} fileType={item.fileType} size={28} />
+                      );
+                    })()
+                  ) : (
+                    <FileTypeIcon color={colors.muted} fileName={item.name} fileType={item.fileType} size={28} />
+                  )}
+                </View>
+                <Text className="mt-1 text-center text-[11px] text-foreground" numberOfLines={2}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <FileRow
+                apiBaseUrl={apiBase}
+                isSelected={selectedIds.has(item.id)}
+                item={item}
+                onDelete={handleDelete}
+                onFolderPress={libraryId ? handleFolderPress : undefined}
+                onMoveToFolder={
+                  libraryId
+                    ? (i) => {
+                        setMoveToFolderItem(i);
+                        setBatchMoveIds(new Set());
+                        setMoveFolderStack([null]);
+                      }
+                    : undefined
+                }
+                onPress={handlePreview}
+                onSelect={selectMode ? toggleSelect : undefined}
+                selectMode={selectMode}
+                showFolderActions={!!libraryId}
+              />
+            )
+          }
         />
       )}
 
-      {/* Upload FAB */}
-      <View
-        className="absolute bottom-0 right-0"
-        style={{ paddingBottom: insets.bottom + 12, paddingRight: 20 }}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          className="items-center justify-center rounded-full shadow-lg"
-          style={{ width: 56, height: 56, elevation: 6, backgroundColor: colors.primary }}
-          onPress={uploading ? undefined : handleUpload}
+      {/* Upload FAB — hidden in select mode to avoid confusion */}
+      {!selectMode && (
+        <View
+          className="absolute bottom-0 right-0"
+          style={{ paddingBottom: insets.bottom + 12, paddingRight: 20 }}
         >
-          {uploading ? (
-            <ActivityIndicator color={colors.iconOnPrimary} size="small" />
-          ) : (
-            <Plus color={colors.iconOnPrimary} size={26} strokeWidth={2.5} />
-          )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="items-center justify-center rounded-full shadow-lg"
+            style={{ width: 56, height: 56, elevation: 6, backgroundColor: colors.primary }}
+            onPress={uploading ? undefined : handleUpload}
+          >
+            {uploading ? (
+              <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+            ) : (
+              <Plus color={colors.iconOnPrimary} size={26} strokeWidth={2.5} />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       <AttachmentSheet
-        visible={attachmentSheetVisible}
-        onClose={() => setAttachmentSheetVisible(false)}
         onDocument={() => void handlePickFile()}
         onGallery={() => void handlePickPhoto()}
+        onNewFolder={
+          libraryId
+            ? () => {
+                setAttachmentSheetVisible(false);
+                setCreateFolderVisible(true);
+              }
+            : undefined
+        }
+        onClose={() => setAttachmentSheetVisible(false)}
+        visible={attachmentSheetVisible}
       />
 
       <FilePreviewModal
@@ -1216,6 +1807,296 @@ export default function ResourceScreen() {
         visible={previewVisible}
         onClose={() => setPreviewVisible(false)}
       />
+
+      {/* Library select modal */}
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={librarySelectVisible}
+        onRequestClose={() => setLibrarySelectVisible(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setLibrarySelectVisible(false)}
+        >
+          <View
+            className="rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16, maxHeight: '60%' }}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <Text className="px-5 text-[18px] font-bold text-foreground">
+              {t.resourceLibrarySelect}
+            </Text>
+            <ScrollView className="mt-2 max-h-64">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="mx-5 flex-row items-center rounded-xl px-4 py-3"
+                style={{
+                  backgroundColor: !libraryId ? colors.primary + '20' : colors.fillTertiary,
+                }}
+                onPress={() => {
+                  setLibraryId(null);
+                  setCurrentFolderSlug(null);
+                  setLibrarySelectVisible(false);
+                }}
+              >
+                <FolderOpen
+                  color={!libraryId ? colors.primary : colors.muted}
+                  size={22}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <Text
+                  className="ml-3 text-[16px] font-medium"
+                  style={{ color: !libraryId ? colors.primary : colors.foreground }}
+                >
+                  {t.resourceLibraryInbox}
+                </Text>
+              </TouchableOpacity>
+              {libraries.map((lib) => (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
+                  key={lib.id}
+                  style={{
+                    backgroundColor: libraryId === lib.id ? colors.primary + '20' : colors.fillTertiary,
+                  }}
+                  onPress={() => {
+                    setLibraryId(lib.id);
+                    setCurrentFolderSlug(null);
+                    setLibrarySelectVisible(false);
+                  }}
+                >
+                  <FolderOpen
+                    color={libraryId === lib.id ? colors.primary : colors.muted}
+                    size={22}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text
+                    className="ml-3 flex-1 text-[16px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: libraryId === lib.id ? colors.primary : colors.foreground }}
+                  >
+                    {lib.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Move to folder modal */}
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={!!moveToFolderItem || batchMoveIds.size > 0}
+        onRequestClose={() => {
+          setMoveToFolderItem(null);
+          setBatchMoveIds(new Set());
+          setMoveFolderStack([null]);
+        }}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => {
+            setMoveToFolderItem(null);
+            setBatchMoveIds(new Set());
+            setMoveFolderStack([null]);
+          }}
+        >
+          <View
+            className="rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16, maxHeight: '55%' }}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <View className="flex-row items-center justify-between px-5">
+              <TouchableOpacity
+                onPress={() =>
+                  moveFolderStack.length > 1
+                    ? setMoveFolderStack((s) => s.slice(0, -1))
+                    : undefined
+                }
+              >
+                {moveFolderStack.length > 1 ? (
+                  <ArrowLeft color={colors.primary} size={22} strokeWidth={2} />
+                ) : (
+                  <View style={{ width: 22 }} />
+                )}
+              </TouchableOpacity>
+              <Text className="flex-1 text-center text-[18px] font-bold text-foreground" numberOfLines={1}>
+                {batchMoveIds.size > 0
+                  ? t.resourceSelectCount.replace('{count}', String(batchMoveIds.size))
+                  : moveFolderCurrent?.name ?? t.resourceMoveToFolder}
+              </Text>
+              <View style={{ width: 22 }} />
+            </View>
+            <ScrollView className="mt-2 max-h-56">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
+                style={{ backgroundColor: colors.fillTertiary }}
+                onPress={() => void handleMoveToFolder(null)}
+              >
+                <FolderOpen color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                <Text className="ml-3 text-[16px] font-medium text-foreground">
+                  {t.resourceFolderRoot}
+                </Text>
+              </TouchableOpacity>
+              {moveFolderCurrent && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
+                  style={{ backgroundColor: colors.primary + '20' }}
+                  onPress={() => void handleMoveToFolder(moveFolderCurrent.id)}
+                >
+                  <Folder color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 flex-1 text-[16px] font-medium" numberOfLines={1} style={{ color: colors.primary }}>
+                    {moveFolderCurrent.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {moveTargetFolders.map((folder) => (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
+                  key={folder.id}
+                  style={{ backgroundColor: colors.fillTertiary }}
+                  onPress={() =>
+                    setMoveFolderStack((s) => [...s, { id: folder.slug ?? folder.id, name: folder.name }])
+                  }
+                >
+                  <Folder color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text
+                    className="ml-3 flex-1 text-[16px] font-medium text-foreground"
+                    numberOfLines={1}
+                  >
+                    {folder.name}
+                  </Text>
+                  <ChevronRight color={colors.muted} size={20} strokeWidth={1.5} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Sort menu modal */}
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={sortMenuVisible}
+        onRequestClose={() => setSortMenuVisible(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setSortMenuVisible(false)}
+        >
+          <View
+            className="rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16 }}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <Text className="px-5 text-[18px] font-bold text-foreground">
+              {t.resourceSortBy}
+            </Text>
+            <View className="mt-2 px-5 pb-4">
+              {[
+                { sorter: 'createdAt' as const, order: 'desc' as const, label: t.resourceSortNewest },
+                { sorter: 'createdAt' as const, order: 'asc' as const, label: t.resourceSortOldest },
+                { sorter: 'name' as const, order: 'asc' as const, label: `${t.resourceSortName} A-Z` },
+                { sorter: 'name' as const, order: 'desc' as const, label: `${t.resourceSortName} Z-A` },
+                { sorter: 'size' as const, order: 'asc' as const, label: `${t.resourceSortSize} ↑` },
+                { sorter: 'size' as const, order: 'desc' as const, label: `${t.resourceSortSize} ↓` },
+              ].map((opt) => (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="flex-row items-center rounded-xl px-4 py-3"
+                  key={`${opt.sorter}-${opt.order}`}
+                  style={{
+                    backgroundColor:
+                      sorter === opt.sorter && sortOrder === opt.order
+                        ? colors.primary + '20'
+                        : colors.fillTertiary,
+                    marginTop: 4,
+                  }}
+                  onPress={() => {
+                    setSorter(opt.sorter);
+                    setSortOrder(opt.order);
+                    setSortMenuVisible(false);
+                    nextOffsetRef.current = 0;
+                    void loadFiles(false, false);
+                  }}
+                >
+                  <Text
+                    className="text-[16px] font-medium"
+                    style={{
+                      color:
+                        sorter === opt.sorter && sortOrder === opt.order
+                          ? colors.primary
+                          : colors.foreground,
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Create folder modal */}
+      <Modal
+        accessibilityViewIsModal
+        animationType="fade"
+        transparent
+        visible={createFolderVisible}
+        onRequestClose={() => setCreateFolderVisible(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-6">
+          <View className="w-full max-w-sm rounded-2xl bg-card p-5">
+            <Text className="text-[18px] font-bold text-foreground">{t.resourceCreateFolder}</Text>
+            <TextInput
+              autoFocus
+              className="mt-4 rounded-xl border border-foreground/10 bg-background px-4 py-3 text-[16px] text-foreground"
+              placeholder={t.resourceCreateFolderPlaceholder}
+              placeholderTextColor={colors.muted}
+              value={createFolderName}
+              onChangeText={setCreateFolderName}
+              onSubmitEditing={() => void handleCreateFolder()}
+            />
+            <View className="mt-4 flex-row justify-end gap-3">
+              <TouchableOpacity
+                className="rounded-xl px-4 py-2"
+                onPress={() => {
+                  setCreateFolderVisible(false);
+                  setCreateFolderName('');
+                }}
+              >
+                <Text style={{ color: colors.primary }}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="rounded-xl bg-primary px-4 py-2"
+                onPress={() => void handleCreateFolder()}
+              >
+                <Text className="font-medium text-white">{t.done}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

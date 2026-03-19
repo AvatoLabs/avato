@@ -24,6 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import ContentSkeleton from '../components/ui/ContentSkeleton';
@@ -40,7 +41,6 @@ import { useI18n } from '../lib/i18n';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useThemeStore } from '../store/theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin, MobileMemoryEffort } from '../types';
@@ -335,6 +335,85 @@ function SkillRow({
       </View>
       {accessory}
     </View>
+  );
+}
+
+function CreateNewAgentConfigScreen({
+  navigation,
+  tagId,
+}: {
+  navigation: any;
+  tagId?: string;
+}) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
+  const fetchSessions = useSessionStore((s) => s.fetchSessions);
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const result = await agentApi.create(
+        { title: title.trim() || t.chatListNewAssistant },
+        tagId,
+      );
+      if (result?.sessionId) {
+        await fetchSessions();
+        haptics.success();
+        navigation.replace('AgentConfig', { sessionId: result.sessionId });
+      } else {
+        toast.show('error', t.errorNetwork);
+      }
+    } catch {
+      toast.show('error', t.errorNetwork);
+    } finally {
+      setSaving(false);
+    }
+  }, [fetchSessions, navigation, saving, tagId, t.chatListNewAssistant, t.errorNetwork, title, toast]);
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      className="flex-1 bg-background"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
+    >
+      <ScreenHeader
+        rightAccessibilityLabel={t.accessibilitySave}
+        title={t.chatListCreateAgent}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
+        rightElement={
+          saving ? (
+            <ActivityIndicator color={colors.primary} size="small" />
+          ) : (
+            <Save color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+          )
+        }
+        onPressLeft={() => navigation.goBack()}
+        onPressRight={() => void handleSave()}
+      />
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 48, paddingTop: 16, paddingHorizontal: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <SectionCard title={t.agentConfigName}>
+          <TextInput
+            autoFocus
+            className="rounded-xl border border-foreground/10 bg-foreground/[0.03] px-4 py-3 text-[15px] text-foreground"
+            placeholder={t.chatListNewAssistant}
+            placeholderTextColor={colors.secondaryText}
+            value={title}
+            onChangeText={setTitle}
+          />
+        </SectionCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1059,7 +1138,7 @@ function SessionAgentConfigScreen({
                           title={
                             <View className="flex-row items-center">
                               <View className="h-6 w-6 items-center justify-center rounded-lg bg-foreground/[0.04]">
-                                <Text className="text-[14px]">
+                                <Text className="text-[14px]" style={{ color: colors.foreground }}>
                                   {plugin.manifest?.meta?.avatar ?? '🔌'}
                                 </Text>
                               </View>
@@ -1733,6 +1812,8 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
 export default function AgentConfigScreen({ navigation, route }: any) {
   const sessionId = route.params?.sessionId as string | undefined;
   const agentId = route.params?.agentId as string | undefined;
+  const createNew = route.params?.createNew as boolean | undefined;
+  const tagId = route.params?.tagId as string | undefined;
 
   if (sessionId) {
     return <SessionAgentConfigScreen navigation={navigation} sessionId={sessionId} />;
@@ -1740,6 +1821,10 @@ export default function AgentConfigScreen({ navigation, route }: any) {
 
   if (agentId) {
     return <AgentConfigByAgentIdScreen agentId={agentId} navigation={navigation} />;
+  }
+
+  if (createNew) {
+    return <CreateNewAgentConfigScreen navigation={navigation} tagId={tagId} />;
   }
 
   return <SessionOnlyAgentConfigScreen navigation={navigation} />;

@@ -941,7 +941,15 @@ export interface FileListItem {
   name: string;
   parentId?: string | null;
   size: number;
+  slug?: string | null;
   sourceType: 'file' | 'document';
   url: string;
   userId?: string;
+}
+
+export interface KnowledgeBaseItem {
+  avatar?: string | null;
+  description?: string | null;
+  id: string;
+  name: string;
 }

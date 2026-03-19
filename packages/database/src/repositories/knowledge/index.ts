@@ -626,7 +626,7 @@ export class KnowledgeRepo {
         return 'audio';
       }
       case FilesTabs.Documents: {
-        return ['application', 'custom'];
+        return ['application', 'custom', 'text'];
       }
       case FilesTabs.Images: {
         return 'image';

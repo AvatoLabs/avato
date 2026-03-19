@@ -24,10 +24,10 @@ import {
   agentGroupApi,
   aiAgentApi,
   aiChatApi,
+  chatToolApi,
   configApi,
   fileApi,
   messageApi,
-  sessionApi,
   topicApi,
   userApi,
 } from '../lib/api';
@@ -71,6 +71,7 @@ const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayl
     arguments: exec.arguments,
     id: exec.id,
     identifier: exec.identifier,
+    intervention: exec.intervention,
     result_content: exec.result,
     source: exec.identifier.startsWith('lobe-') ? 'builtin' : ('plugin' as const),
     type: 'function',
@@ -363,6 +364,9 @@ const buildAttachmentPromptText = (text: string, attachments: UploadedAttachment
   return textBlocks.join('\n\n');
 };
 
+const isAttachableFileId = (fileId?: string | null) =>
+  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+
 const normalizeTopicItem = (topic: any, sessionId: string): Topic => ({
   createdAt:
     typeof topic?.createdAt === 'string'
@@ -435,33 +439,6 @@ const isDefaultTopicTitle = (title?: string | null) => {
     DEFAULT_TOPIC_TITLES.includes(trimmedTitle) ||
     trimmedTitle === t.topicTitle ||
     trimmedTitle === t.chatListNewConversation
-  );
-};
-
-/** Session 默认标题。含 legacy 值以兼容已有数据。 */
-const DEFAULT_SESSION_TITLES = [
-  '',
-  'New Chat',
-  'New Conversation',
-  'New conversation',
-  'New Group Chat',
-  'New Session',
-  '新对话',
-  '新對話',
-  '新会话',
-  'Untitled',
-];
-
-const isDefaultSessionTitle = (title?: string | null) => {
-  const trimmedTitle = title?.trim() ?? '';
-  if (!trimmedTitle) return true;
-
-  const { t } = useI18n.getState();
-  return (
-    DEFAULT_SESSION_TITLES.includes(trimmedTitle) ||
-    trimmedTitle === t.chatListNewConversation ||
-    trimmedTitle === t.chatListCreateGroup ||
-    trimmedTitle === t.groupCreateDefaultTitle
   );
 };
 
@@ -970,12 +947,18 @@ interface ChatState {
   activeOperationId: string | null;
   activeStreamingMessageId: string | null;
   activeStreamingSessionId: string | null;
+  approveToolCall: (
+    sessionId: string,
+    messageId: string,
+    topicId?: string,
+    assistantGroupId?: string,
+  ) => Promise<void>;
   clearMessages: (sessionId: string) => Promise<void>;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   /** Message currently being edited (id) */
   editingMessageId: string | null;
-  editMessage: (sessionId: string, messageId: string, content: string) => Promise<void>;
 
+  editMessage: (sessionId: string, messageId: string, content: string) => Promise<void>;
   /** Session IDs currently fetching messages (for skeleton) */
   fetchingMessagesBySession: Record<string, boolean>;
   // Actions
@@ -995,6 +978,18 @@ interface ChatState {
   /** Timestamp when reasoning started (for computing duration) */
   reasoningStartedAt: number | null;
   regenerateMessage: (sessionId: string, messageId: string) => Promise<void>;
+  rejectToolCall: (
+    sessionId: string,
+    messageId: string,
+    toolId: string,
+    reason?: string,
+  ) => void;
+  /** Reject a tool message (role=tool) - updates plugin.intervention locally */
+  rejectToolMessage: (
+    sessionId: string,
+    messageId: string,
+    reason?: string,
+  ) => void;
   reset: () => void;
   sendMessage: (
     sessionId: string,
@@ -1013,6 +1008,14 @@ interface ChatState {
   /** Streaming content buffer for the current generation */
   streamBuffer: string;
   toggleMessageCollapsed: (sessionId: string, messageId: string, expanded?: boolean) => void;
+  /** Update tool arguments (for Intervention form edits before approve) */
+  updatePluginArguments: (
+    sessionId: string,
+    messageId: string,
+    toolId: string,
+    value: Record<string, unknown>,
+    replace?: boolean,
+  ) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -1272,8 +1275,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
       await hydrateAttachmentContents(uploadedAttachments);
     }
 
+    if (uploadedAttachments.some((file) => !isAttachableFileId(file.fileId))) {
+      const t = useI18n.getState().t;
+      useToast.getState().show('error', t.fileUploadFailed);
+      return false;
+    }
+
     const displayContent = textContent || buildAttachmentDisplayContent(uploadedAttachments);
-    const attachedFileIds = uploadedAttachments.map((f) => f.fileId);
+    const attachedFileIds = uploadedAttachments
+      .map((f) => f.fileId)
+      .filter((fileId): fileId is string => isAttachableFileId(fileId));
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -1511,26 +1522,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
               settledAssistant.id,
             );
             triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-            const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-            if (sess && isDefaultSessionTitle(sess.title)) {
-              sessionApi
-                .generateTitle(sessionId)
-                .then((newTitle) => {
-                  if (newTitle) {
-                    useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                  } else {
-                    useToast
-                      .getState()
-                      .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                  }
-                })
-                .catch((err) => {
-                  console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                  useToast
-                    .getState()
-                    .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                });
-            }
             didSettle = true;
             break;
           }
@@ -1541,23 +1532,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
             if (byId) {
               pruneGroupLoadingPlaceholder(sessionId, targetId, byId.id);
               triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-              const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-              if (sess && isDefaultSessionTitle(sess.title)) {
-                sessionApi
-                  .generateTitle(sessionId)
-                  .then((newTitle) => {
-                    if (newTitle) {
-                      useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                      useSessionStore.getState().fetchSessions();
-                    }
-                  })
-                  .catch((err) => {
-                    console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                    useToast
-                      .getState()
-                      .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                  });
-              }
               didSettle = true;
               break;
             }
@@ -1630,26 +1604,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
               if (settledAssistant) {
                 pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, settledAssistant.id);
                 triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-                const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-                if (sess && isDefaultSessionTitle(sess.title)) {
-                  sessionApi
-                    .generateTitle(sessionId)
-                    .then((newTitle) => {
-                      if (newTitle) {
-                        useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                      } else {
-                        useToast
-                          .getState()
-                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                      }
-                    })
-                    .catch((err) => {
-                      console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                      useToast
-                        .getState()
-                        .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                    });
-                }
                 didSettle = true;
                 break;
               }
@@ -1660,26 +1614,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 if (byId) {
                   pruneGroupLoadingPlaceholder(sessionId, targetAssistantId, byId.id);
                   triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-                  const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-                  if (sess && isDefaultSessionTitle(sess.title)) {
-                    sessionApi
-                      .generateTitle(sessionId)
-                      .then((newTitle) => {
-                        if (newTitle) {
-                          useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                        } else {
-                          useToast
-                            .getState()
-                            .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                        }
-                      })
-                      .catch((err) => {
-                        console.warn('[ChatStore] generateSessionTitle (group) failed:', err);
-                        useToast
-                          .getState()
-                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                      });
-                  }
                   didSettle = true;
                   break;
                 }
@@ -1748,27 +1682,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
               if (!errMsg && completionObserved) {
                 triggerTopicTitleGeneration(sessionId, resolvedTopicId);
-                const sess = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-                if (sess && isDefaultSessionTitle(sess.title)) {
-                  void sessionApi
-                    .generateTitle(sessionId)
-                    .then((newTitle) => {
-                      if (newTitle) {
-                        useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                      } else {
-                        useToast
-                          .getState()
-                          .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                      }
-                    })
-                    .catch((err) => {
-                      console.warn('[ChatStore] generateSessionTitle failed:', err);
-                      useToast
-                        .getState()
-                        .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                    });
-                }
-
                 setTimeout(() => {
                   void Promise.allSettled([
                     get().fetchMessages(sessionId, resolvedTopicId ?? undefined, {
@@ -2226,27 +2139,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
             },
           }));
 
-          // Fire-and-forget: generate session title if still default
-          const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-          if (session && isDefaultSessionTitle(session.title)) {
-            sessionApi
-              .generateTitle(sessionId)
-              .then((newTitle) => {
-                if (newTitle) {
-                  useSessionStore.getState().updateSessionTitle(sessionId, newTitle);
-                  // Do NOT fetchSessions here — it can overwrite with stale data before server propagates
-                } else {
-                  useToast
-                    .getState()
-                    .show('error', useI18n.getState().t.toastTitleGenerationFailed);
-                }
-              })
-              .catch((err) => {
-                console.warn('[ChatStore] generateSessionTitle failed:', err);
-                useToast.getState().show('error', useI18n.getState().t.toastTitleGenerationFailed);
-              });
-          }
-
           if (shouldCreateTopicAfterResponse && !resolvedTopicId) {
             const createdTopic = await useTopicStore.getState().createTopic(sessionId, '', {
               messageIds: extractPersistedMessageIds(mergedPersistedMessages),
@@ -2448,10 +2340,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return;
       }
 
-      const fileIds: string[] = [
+      const rawFileIds: string[] = [
         ...(userMsg.fileList?.map((f) => f.id).filter(Boolean) ?? []),
         ...(userMsg.imageList?.map((i) => i.id).filter(Boolean) ?? []),
       ];
+      if (rawFileIds.some((fileId) => !isAttachableFileId(fileId))) {
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t.fileUploadFailed);
+        return;
+      }
+      const fileIds = rawFileIds;
 
       const topicId = useTopicStore.getState().activeTopicBySession[sessionId] ?? undefined;
 
@@ -3025,6 +2923,104 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setEditingMessage: (id: string | null) => {
     set({ editingMessageId: id });
+  },
+
+  approveToolCall: async (
+    sessionId: string,
+    messageId: string,
+    topicId?: string,
+    assistantGroupId?: string,
+  ) => {
+    const t = useI18n.getState().t;
+    try {
+      await chatToolApi.approveToolCall({
+        assistantGroupId,
+        sessionId,
+        topicId,
+        toolMessageId: messageId,
+      });
+      await get().fetchMessages(sessionId, topicId ?? undefined, { preserveOnEmpty: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isNotSupported =
+        msg.includes('not yet supported') || msg.includes('not implemented');
+      useToast.getState().show('error', isNotSupported ? t.chatToolApproveNotSupported : msg);
+    }
+  },
+
+  rejectToolCall: (sessionId: string, messageId: string, toolId: string, reason?: string) => {
+    set((s) => {
+      const messages = s.messagesBySession[sessionId] || [];
+      const nextMessages = messages.map((msg) => {
+        if (msg.id !== messageId || !msg.tools?.length) return msg;
+        return {
+          ...msg,
+          tools: msg.tools.map((t) =>
+            t.id === toolId
+              ? { ...t, intervention: { rejectedReason: reason, status: 'rejected' as const } }
+              : t,
+          ),
+        };
+      });
+      return {
+        messagesBySession: { ...s.messagesBySession, [sessionId]: nextMessages },
+      };
+    });
+  },
+
+  rejectToolMessage: (sessionId: string, messageId: string, reason?: string) => {
+    const intervention: { rejectedReason?: string; status: 'rejected' } = {
+      rejectedReason: reason,
+      status: 'rejected',
+    };
+    set((s) => {
+      const messages = s.messagesBySession[sessionId] || [];
+      const nextMessages = messages.map((msg) => {
+        if (msg.id !== messageId || msg.role !== 'tool') return msg;
+        return {
+          ...msg,
+          plugin: msg.plugin
+            ? { ...msg.plugin, intervention }
+            : msg.plugin,
+          pluginIntervention: intervention,
+        };
+      });
+      return {
+        messagesBySession: { ...s.messagesBySession, [sessionId]: nextMessages },
+      };
+    });
+  },
+
+  updatePluginArguments: (
+    sessionId: string,
+    messageId: string,
+    toolId: string,
+    value: Record<string, unknown>,
+    replace = false,
+  ) => {
+    set((s) => {
+      const messages = s.messagesBySession[sessionId] || [];
+      const nextMessages = messages.map((msg) => {
+        if (msg.id !== messageId || !msg.tools?.length) return msg;
+        return {
+          ...msg,
+          tools: msg.tools.map((t) => {
+            if (t.id !== toolId) return t;
+            let prev: Record<string, unknown> = {};
+            try {
+              prev = JSON.parse(t.arguments || '{}') as Record<string, unknown>;
+            } catch {
+              //
+            }
+            const next = replace ? value : { ...prev, ...value };
+            return { ...t, arguments: JSON.stringify(next) };
+          }),
+        };
+      });
+      return {
+        messagesBySession: { ...s.messagesBySession, [sessionId]: nextMessages },
+      };
+    });
   },
 }));
 

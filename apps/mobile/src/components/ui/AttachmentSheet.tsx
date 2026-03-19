@@ -1,4 +1,4 @@
-import { Camera, FileText, Image as ImageIcon } from 'lucide-react-native';
+import { Camera, FileText, FolderOpen, FolderPlus, Image as ImageIcon } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -14,7 +14,9 @@ interface AttachmentSheetProps {
   onCamera?: () => void;
   onClose: () => void;
   onDocument: () => void;
+  onFromWorkspace?: () => void;
   onGallery?: () => void;
+  onNewFolder?: () => void;
   visible: boolean;
 }
 
@@ -27,26 +29,31 @@ interface AttachmentOptionProps {
 }
 
 const AttachmentOption = memo<AttachmentOptionProps>(
-  ({ description, icon, isLast, onPress, title }) => (
-    <Pressable
-      className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'mb-px' : ''}`}
-      onPress={onPress}
-    >
-      <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
-        {icon}
-      </View>
-      <View className="flex-1">
-        <Text className="text-foreground text-[17px] font-semibold tracking-tight">{title}</Text>
-        <Text className="text-secondary/60 text-[13px] leading-5 mt-1">{description}</Text>
-      </View>
-    </Pressable>
-  ),
+  ({ description, icon, isLast, onPress, title }) => {
+    const colors = useThemeColors();
+    return (
+      <Pressable
+        className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'mb-px' : ''}`}
+        onPress={onPress}
+      >
+        <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
+          {icon}
+        </View>
+        <View className="flex-1">
+          <Text className="text-foreground text-[17px] font-semibold tracking-tight">{title}</Text>
+          <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
+            {description}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  },
 );
 
 AttachmentOption.displayName = 'AttachmentOption';
 
 const AttachmentSheet = memo<AttachmentSheetProps>(
-  ({ visible, onClose, onCamera, onGallery, onDocument }) => {
+  ({ visible, onClose, onCamera, onGallery, onDocument, onFromWorkspace, onNewFolder }) => {
     const colors = useThemeColors();
     const { t } = useI18n();
     const insets = useSafeAreaInsets();
@@ -107,6 +114,44 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
           onDocument();
         },
       },
+      onFromWorkspace
+        ? {
+            description: t.fileFromWorkspaceDesc,
+            icon: (
+              <FolderOpen
+                color={colors.foreground}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            ),
+            key: 'fromWorkspace',
+            title: t.fileFromWorkspace,
+            onPress: () => {
+              haptics.light();
+              onClose();
+              onFromWorkspace();
+            },
+          }
+        : null,
+      onNewFolder
+        ? {
+            description: 'Create a new folder in the current location.',
+            icon: (
+              <FolderPlus
+                color={colors.foreground}
+                size={18}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            ),
+            key: 'newFolder',
+            title: t.resourceNewFolder,
+            onPress: () => {
+              haptics.light();
+              onClose();
+              onNewFolder();
+            },
+          }
+        : null,
     ].filter(Boolean) as Array<{
       description: string;
       icon: React.ReactNode;
@@ -138,7 +183,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
                 <Text className="text-foreground text-[18px] font-bold tracking-tight">
                   {t.fileAttach}
                 </Text>
-                <Text className="text-secondary/60 text-[13px] leading-5 mt-1">
+                <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
                   Pick the source that fits the task. Everything lands in the same chat composer.
                 </Text>
 

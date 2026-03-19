@@ -32,7 +32,9 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
   if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
     return (
       <View className="h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
-        <Text className="text-[20px]">{avatar}</Text>
+        <Text className="text-[20px]" style={{ color: colors.foreground }}>
+          {avatar}
+        </Text>
       </View>
     );
   }

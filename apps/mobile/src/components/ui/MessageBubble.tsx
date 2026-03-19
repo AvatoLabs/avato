@@ -61,6 +61,12 @@ import type {
   ImageCitationItem,
   MessageContentPart,
 } from '../../types';
+import {
+  getMobileBuiltinDisplayName,
+  getMobileBuiltinIntervention,
+  getMobileBuiltinRender,
+  getMobileBuiltinStreaming,
+} from '../../features/BuiltinTools';
 import ImageViewer from './ImageViewer';
 import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
@@ -211,6 +217,7 @@ interface MessageBubbleProps {
   message: ChatMessage;
   onSaveToTopic?: () => void;
   sessionId: string;
+  topicId?: string | null;
 }
 
 export interface GroupMessageSpeaker {
@@ -624,7 +631,15 @@ const GroupTasksBlock = memo<{
 GroupTasksBlock.displayName = 'GroupTasksBlock';
 
 const MessageBubble = memo<MessageBubbleProps>(
-  ({ message, sessionId, generating, groupMembersById, groupSupervisorId, onSaveToTopic }) => {
+  ({
+    message,
+    sessionId,
+    topicId,
+    generating,
+    groupMembersById,
+    groupSupervisorId,
+    onSaveToTopic,
+  }) => {
     const isUser = message.role === 'user';
     const isToolMessage = message.role === 'tool';
     const { t } = useI18n();
@@ -975,7 +990,10 @@ const MessageBubble = memo<MessageBubbleProps>(
           <Text
             key={node.key}
             style={styles.link}
-            onPress={() => openUrl(href, onLinkPress)}
+            onPress={() => {
+              if (onLinkPress?.(href) === false) return;
+              openUrl(href);
+            }}
           >
             {children}
           </Text>
@@ -1367,7 +1385,14 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <SearchGroundingBlock search={message.search} />
                       )}
 
-                      {hasTools && message.tools && <ToolCallsBlock tools={message.tools} />}
+                      {hasTools && message.tools && (
+                        <ToolCallsBlock
+                          messageId={message.id}
+                          sessionId={sessionId}
+                          topicId={topicId ?? undefined}
+                          tools={message.tools}
+                        />
+                      )}
 
                       {!isUser &&
                         !isToolMessage &&
@@ -1466,7 +1491,11 @@ const MessageBubble = memo<MessageBubbleProps>(
                           </View>
                         )
                       ) : isToolMessage ? (
-                        <ToolResultBlock message={message} />
+                        <ToolResultBlock
+                          message={message}
+                          sessionId={sessionId}
+                          topicId={topicId ?? undefined}
+                        />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
                           <TypingIndicator color={colors.typingIndicator} />
@@ -1703,6 +1732,36 @@ const formatToolDisplayTitle = (
     title: titleSegments.join(' > '),
   };
 };
+
+/**
+ * Shared helper for ToolCallsBlock + ToolResultBlock.
+ * Builtin tools use getMobileBuiltinDisplayName (Inspector/displayName) first;
+ * others fall back to formatToolDisplayTitle (identifier > apiName).
+ */
+function buildToolDisplayProps(
+  tool: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'>,
+  fallbackTitle: string,
+  locale: string | undefined,
+  hasResult: boolean,
+  isPending: boolean,
+) {
+  const { params, title } = formatToolDisplayTitle(tool);
+  const argumentsText = [
+    params.length ? `(${params.join(', ')})` : '',
+    tool.arguments ? formatToolArguments(tool.arguments) : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const displayTitle =
+    getMobileBuiltinDisplayName(tool.identifier, tool.apiName, locale) ||
+    title ||
+    tool.apiName ||
+    tool.identifier ||
+    fallbackTitle;
+  const BuiltinRender = getMobileBuiltinRender(tool.identifier, tool.apiName);
+  const useBuiltinRender = BuiltinRender && hasResult && !isPending;
+  return { argumentsText, BuiltinRender, displayTitle, useBuiltinRender };
+}
 
 const formatToolArgumentValue = (value: unknown) => {
   if (typeof value === 'string') return value.length > 40 ? `${value.slice(0, 40)}...` : value;
@@ -2342,11 +2401,14 @@ const ToolCard = memo<{
   collapsible?: boolean;
   argumentsText?: string;
   content?: string;
+  customContent?: React.ReactNode;
   error?: unknown;
+  interventionContent?: React.ReactNode;
   onApprove?: () => void;
   onReject?: () => void;
   resultReady?: boolean;
   status?: 'aborted' | 'pending' | 'rejected' | string | null;
+  streamingContent?: React.ReactNode;
   title: string;
 }>(
   ({
@@ -2356,9 +2418,12 @@ const ToolCard = memo<{
     resultReady,
     error,
     content,
+    customContent,
     collapsible = false,
+    interventionContent,
     onApprove,
     onReject,
+    streamingContent,
   }) => {
     const { t } = useI18n();
     const colors = useThemeColors();
@@ -2397,8 +2462,9 @@ const ToolCard = memo<{
           <View className="flex-1">
             <View className="flex-row items-center">
               <Text
-                className="flex-1 text-[12px] font-semibold text-foreground/80"
+                className="flex-1 text-[12px] font-semibold"
                 numberOfLines={1}
+                style={{ color: colors.foreground }}
               >
                 {title}
               </Text>
@@ -2410,16 +2476,26 @@ const ToolCard = memo<{
                 )
               ) : null}
             </View>
-            <Text className="mt-0.5 text-[10px] uppercase tracking-[0.5px] text-foreground/38">
+            <Text
+              className="mt-0.5 text-[10px] uppercase tracking-[0.5px]"
+              style={{ color: colors.secondaryText }}
+            >
               <ToolStatusLabel error={error} resultReady={resultReady} status={status} />
             </Text>
 
             {showDetail && isPending && (
               <View className="mt-2">
-                <Text className="text-[11px] leading-4 text-foreground/55 mb-2">
-                  {t.chatToolPendingDesc}
-                </Text>
-                <View className="flex-row gap-2">
+                {interventionContent ? (
+                  interventionContent
+                ) : (
+                  <Text
+                    className="text-[11px] leading-4 mb-2"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {t.chatToolPendingDesc}
+                  </Text>
+                )}
+                <View className="flex-row gap-2 mt-2">
                   <TouchableOpacity
                     activeOpacity={0.7}
                     className="rounded-full px-4 py-1.5"
@@ -2465,18 +2541,28 @@ const ToolCard = memo<{
               </Text>
             )}
 
-            {showDetail && argumentsText ? (
+            {showDetail && customContent ? (
+              <View className="mt-2">{customContent}</View>
+            ) : null}
+            {showDetail && !customContent && streamingContent && !resultReady ? (
+              <View className="mt-2">{streamingContent}</View>
+            ) : null}
+            {showDetail && !customContent && !streamingContent && argumentsText ? (
               <>
-                <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                <Text
+                  className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px]"
+                  style={{ color: colors.tertiaryText }}
+                >
                   {t.chatToolArguments}
                 </Text>
                 <View style={{ position: 'relative' }}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <Text
                       selectable
-                      className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4 text-foreground/60"
+                      className="mt-1 rounded-xl px-3 py-2 text-[11px] leading-4"
                       style={{
                         backgroundColor: chatAccent.subtleBg,
+                        color: colors.markdownText,
                         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                       }}
                     >
@@ -2487,17 +2573,21 @@ const ToolCard = memo<{
                 </View>
               </>
             ) : null}
-            {showDetail && truncatedContent ? (
+            {showDetail && !customContent && truncatedContent ? (
               <>
-                <Text className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px] text-foreground/35">
+                <Text
+                  className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px]"
+                  style={{ color: colors.tertiaryText }}
+                >
                   {t.chatToolResponse}
                 </Text>
                 <View style={{ position: 'relative' }}>
                   <Text
                     selectable
-                    className="mt-1 rounded-xl px-3 py-2 text-[12px] leading-5 text-foreground/72"
+                    className="mt-1 rounded-xl px-3 py-2 text-[12px] leading-5"
                     style={{
                       backgroundColor: chatAccent.subtleBg,
+                      color: colors.markdownText,
                       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                     }}
                   >
@@ -2527,7 +2617,11 @@ const ToolCard = memo<{
               </Text>
             ) : null}
             {!showDetail && argumentsText ? (
-              <Text className="mt-2 text-[11px] leading-4 text-foreground/55" numberOfLines={2}>
+              <Text
+                className="mt-2 text-[11px] leading-4"
+                numberOfLines={2}
+                style={{ color: colors.secondaryText }}
+              >
                 {argumentsText}
               </Text>
             ) : null}
@@ -2540,13 +2634,43 @@ const ToolCard = memo<{
 
 ToolCard.displayName = 'ToolCard';
 
-const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
+const ToolCallsBlock = memo<{
+  messageId: string;
+  sessionId: string;
+  topicId?: string;
+  tools: ChatToolPayload[];
+}>(({ tools, messageId, sessionId, topicId }) => {
   const { t } = useI18n();
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
   const allCompleted = tools.every((tool) => tool.result_content || tool.result_msg_id);
   const [expanded, setExpanded] = useState(true);
+  const approveToolCall = useChatStore((s) => s.approveToolCall);
+  const rejectToolCall = useChatStore((s) => s.rejectToolCall);
+  const updatePluginArguments = useChatStore((s) => s.updatePluginArguments);
+  const locale = useI18n((s) => s.locale);
+  const beforeApproveRef = useRef<Map<string, () => void | Promise<void>>>(new Map());
+
+  const registerBeforeApprove = useCallback((toolId: string) => {
+    return (id: string, cb: () => void | Promise<void>) => {
+      beforeApproveRef.current.set(`${toolId}.${id}`, cb);
+      return () => beforeApproveRef.current.delete(`${toolId}.${id}`);
+    };
+  }, []);
+
+  const handleApproveWithBefore = useCallback(
+    async (toolId: string) => {
+      const keys = [...beforeApproveRef.current.keys()].filter((k) => k.startsWith(toolId));
+      for (const k of keys) {
+        const cb = beforeApproveRef.current.get(k);
+        if (cb) await cb();
+        beforeApproveRef.current.delete(k);
+      }
+      await approveToolCall(sessionId, messageId, topicId);
+    },
+    [sessionId, messageId, topicId, approveToolCall],
+  );
 
   return (
     <View
@@ -2572,7 +2696,10 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
                   : colors.textGray
             }
           />
-          <Text className="ml-2 text-[12px] font-medium text-foreground/65">
+          <Text
+            className="ml-2 text-[12px] font-medium"
+            style={{ color: colors.secondaryText }}
+          >
             {t.chatToolsTitle} ({tools.length})
           </Text>
           {hasPending && (
@@ -2606,25 +2733,91 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
       {expanded ? (
         <View className="mt-3 gap-2">
           {tools.map((tool) => {
-            const { params, title } = formatToolDisplayTitle(tool);
-            const argumentsText = [
-              params.length ? `(${params.join(', ')})` : '',
-              tool.arguments ? formatToolArguments(tool.arguments) : '',
-            ]
-              .filter(Boolean)
-              .join('\n');
-
             const hasResult = !!(tool.result_content || tool.result_msg_id);
+            const isPending = tool.intervention?.status === 'pending';
+            const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } =
+              buildToolDisplayProps(
+                tool,
+                tool.apiName || tool.identifier || '',
+                locale,
+                hasResult,
+                isPending,
+              );
+
+            const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
+            const showIntervention = isPending && BuiltinIntervention;
+
+            const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
+            const showStreaming = !hasResult && !isPending && BuiltinStreaming;
+
+            let parsedArgs: Record<string, unknown> = {};
+            try {
+              parsedArgs = JSON.parse(tool.arguments || '{}') as Record<string, unknown>;
+            } catch {
+              //
+            }
+
+            const handleArgsChange = (value: Record<string, unknown>) => {
+              updatePluginArguments(sessionId, messageId, tool.id, value, true);
+            };
+
+            const interventionContent =
+              showIntervention && BuiltinIntervention ? (
+                <BuiltinIntervention
+                  args={parsedArgs}
+                  onArgsChange={handleArgsChange}
+                  registerBeforeApprove={registerBeforeApprove(tool.id)}
+                />
+              ) : undefined;
+
+            const streamingContent =
+              showStreaming && BuiltinStreaming ? (
+                <BuiltinStreaming args={parsedArgs} apiName={tool.apiName} identifier={tool.identifier} />
+              ) : undefined;
+
+            if (useBuiltinRender && BuiltinRender) {
+              return (
+                <ToolCard
+                  collapsible
+                  customContent={
+                    hasResult ? (
+                      <BuiltinRender
+                        apiName={tool.apiName}
+                        arguments={tool.arguments}
+                        content={tool.result_content}
+                        identifier={tool.identifier}
+                      />
+                    ) : undefined
+                  }
+                  interventionContent={interventionContent}
+                  key={tool.id}
+                  onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
+                  onReject={
+                    isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
+                  }
+                  resultReady={hasResult}
+                  status={tool.intervention?.status ?? null}
+                  streamingContent={streamingContent}
+                  title={displayTitle}
+                />
+              );
+            }
 
             return (
               <ToolCard
                 collapsible
                 argumentsText={argumentsText || undefined}
                 content={tool.result_content || undefined}
+                interventionContent={interventionContent}
                 key={tool.id}
+                onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
+                onReject={
+                  isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
+                }
                 resultReady={hasResult}
                 status={tool.intervention?.status ?? null}
-                title={title || tool.apiName || tool.identifier}
+                streamingContent={streamingContent}
+                title={displayTitle}
               />
             );
           })}
@@ -2636,30 +2829,59 @@ const ToolCallsBlock = memo<{ tools: ChatToolPayload[] }>(({ tools }) => {
 
 ToolCallsBlock.displayName = 'ToolCallsBlock';
 
-const ToolResultBlock = memo<{ message: ChatMessage }>(({ message }) => {
+const ToolResultBlock = memo<{
+  message: ChatMessage;
+  sessionId: string;
+  topicId?: string;
+}>(({ message, sessionId, topicId }) => {
+  const locale = useI18n((s) => s.locale);
   const toolName = message.plugin?.apiName || message.plugin?.identifier || 'Tool';
-  const { params, title } = formatToolDisplayTitle({
-    apiName: message.plugin?.apiName || '',
+  const identifier = message.plugin?.identifier || '';
+  const apiName = message.plugin?.apiName || '';
+  const toolPayload: Pick<ChatToolPayload, 'apiName' | 'arguments' | 'identifier'> = {
+    apiName,
     arguments: message.plugin?.arguments || '',
-    identifier: message.plugin?.identifier || toolName,
-  });
-  const toolArguments = [
-    params.length ? `(${params.join(', ')})` : '',
-    message.plugin?.arguments ? formatToolArguments(message.plugin.arguments) : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+    identifier: identifier || toolName,
+  };
   const hasResult =
     !!message.content || !!message.pluginState || !!message.metadata?.tempDisplayContent?.length;
+  const isPending = message.pluginIntervention?.status === 'pending';
+  const hasError = !!message.pluginError;
+  const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } = buildToolDisplayProps(
+    toolPayload,
+    toolName,
+    locale,
+    hasResult,
+    isPending || hasError,
+  );
+  const approveToolCall = useChatStore((s) => s.approveToolCall);
+  const rejectToolMessage = useChatStore((s) => s.rejectToolMessage);
 
   return (
     <ToolCard
-      argumentsText={toolArguments || undefined}
-      content={message.content || undefined}
+      argumentsText={argumentsText || undefined}
+      content={useBuiltinRender ? undefined : (message.content || undefined)}
+      customContent={
+        useBuiltinRender && BuiltinRender ? (
+          <BuiltinRender
+            apiName={apiName}
+            arguments={message.plugin?.arguments}
+            content={message.content}
+            identifier={identifier}
+            pluginState={message.pluginState as Record<string, unknown> | undefined}
+          />
+        ) : undefined
+      }
       error={message.pluginError}
+      onApprove={
+        isPending ? () => approveToolCall(sessionId, message.id, topicId) : undefined
+      }
+      onReject={
+        isPending ? () => rejectToolMessage(sessionId, message.id) : undefined
+      }
       resultReady={hasResult && !message.pluginError}
       status={message.pluginIntervention?.status ?? null}
-      title={title || toolName}
+      title={displayTitle}
     />
   );
 });

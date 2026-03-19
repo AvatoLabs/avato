@@ -34,6 +34,7 @@ import type {
   HeatmapDay,
   ImageGenerationParams,
   InstalledPlugin,
+  KnowledgeBaseItem,
   MarketAgent,
   MemoryActivityItem,
   MemoryContextItem,
@@ -463,6 +464,10 @@ const mergeToolCallChunks = (origin: MobileToolCallChunk[], value: MobileToolCal
   return next;
 };
 
+interface MobileToolCallChunkWithIntervention extends MobileToolCallChunk {
+  intervention?: ToolInterventionPayload;
+}
+
 const transformToolCalls = (toolCalls: MobileToolCallChunk[]): ChatToolPayload[] =>
   toolCalls.map((toolCall, index) => {
     const fullName = toolCall.function?.name || `tool_${index + 1}`;
@@ -474,12 +479,14 @@ const transformToolCalls = (toolCalls: MobileToolCallChunk[]): ChatToolPayload[]
       ? underscoreIdentifier
       : slashIdentifier || fullName;
     const apiName = underscoreApiName || slashApiName;
+    const withIntervention = toolCall as MobileToolCallChunkWithIntervention;
 
     return {
       apiName,
       arguments: toolCall.function?.arguments || '{}',
       id: toolCall.id || `${index}`,
       identifier,
+      intervention: withIntervention.intervention,
       source: identifier.startsWith('lobe-') ? 'builtin' : undefined,
       thoughtSignature: toolCall.thoughtSignature,
       type: 'default',
@@ -830,6 +837,12 @@ export const agentGroupApi = {
 };
 
 // ── AI Agent API (group chat execution) ───────────────────────────────
+const isValidChatFileId = (fileId?: string | null): fileId is string =>
+  typeof fileId === 'string' && fileId.trim().length > 0 && !fileId.startsWith('docs_');
+
+const hasInvalidChatFileIds = (fileIds?: string[]) =>
+  !!fileIds?.some((fileId) => !isValidChatFileId(fileId));
+
 export const aiAgentApi = {
   execGroupAgent: (params: {
     agentId: string;
@@ -849,7 +862,13 @@ export const aiAgentApi = {
       topicId?: string;
       topics?: { items: any[]; total: number };
       userMessageId?: string;
-    }>('aiAgent.execGroupAgent', params).then((result) => ({
+    }>('aiAgent.execGroupAgent', (() => {
+      if (hasInvalidChatFileIds(params.files)) {
+        throw new Error('Invalid file IDs for group chat. document IDs (docs_*) are not allowed.');
+      }
+
+      return params;
+    })()).then((result) => ({
       ...result,
       messages: normalizeMessages(result.messages),
     })),
@@ -929,6 +948,22 @@ export const aiAgentApi = {
   }) => trpcMutate('aiAgent.updateClientTaskThreadStatus', params),
 };
 
+// ── Chat Tool (approve/reject) API ───────────────────────────────────
+export const chatToolApi = {
+  approveToolCall: (params: {
+    assistantGroupId?: string;
+    sessionId: string;
+    topicId?: string;
+    toolMessageId: string;
+  }) => trpcMutate('aiChat.approveToolCall', params),
+  rejectToolCall: (params: {
+    reason?: string;
+    sessionId: string;
+    topicId?: string;
+    toolMessageId: string;
+  }) => trpcMutate('aiChat.rejectToolCall', params),
+};
+
 // ── Message API ─────────────────────────────────────────────────────
 export interface CreateMessageParams {
   content: string;
@@ -963,14 +998,12 @@ export interface MessageSearchResult {
 }
 
 const normalizeCreateMessageParams = (params: CreateMessageParams): CreateMessageParams => {
-  if (params.groupId) return params;
+  if (hasInvalidChatFileIds(params.files)) {
+    throw new Error('Invalid file IDs in message.createMessage. document IDs (docs_*) are not allowed.');
+  }
 
-  if (typeof params.sessionId === 'string' && params.sessionId.startsWith('cg_')) {
-    return {
-      ...params,
-      groupId: params.sessionId,
-      sessionId: null,
-    };
+  if (!params.groupId && typeof params.sessionId === 'string' && params.sessionId.startsWith('cg_')) {
+    throw new Error('Group message must use groupId. sessionId=cg_* is not supported.');
   }
 
   return params;
@@ -1038,11 +1071,17 @@ export interface ChatRequestOptions {
   topicId?: string;
 }
 
+export interface ToolInterventionPayload {
+  rejectedReason?: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'aborted' | 'none';
+}
+
 export interface ToolExecutionItem {
   apiName: string;
   arguments: string;
   id: string;
   identifier: string;
+  intervention?: ToolInterventionPayload;
   result: string;
 }
 
@@ -1776,6 +1815,77 @@ export const aiProviderApi = {
     trpcMutate('aiProvider.updateAiProviderConfig', { id, value }),
 };
 
+// ── Knowledge Base API ──────────────────────────────────────────────
+
+export const knowledgeBaseApi = {
+  list: () => trpcQuery<KnowledgeBaseItem[]>('knowledgeBase.getKnowledgeBases'),
+};
+
+// ── Resource API (unified files + documents with folder support) ─────
+
+export interface ResourceQueryParams {
+  category?: string;
+  knowledgeBaseId?: string;
+  limit?: number;
+  offset?: number;
+  parentId?: string | null;
+  q?: string | null;
+  showFilesInKnowledgeBase?: boolean;
+  sorter?: 'createdAt' | 'size' | 'name';
+  sortType?: 'asc' | 'desc';
+}
+
+export interface ResourceListResponse {
+  hasMore: boolean;
+  items: FileListItem[];
+  total?: number;
+}
+
+export interface FolderCrumb {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export const resourceApi = {
+  getKnowledgeItems: (params: ResourceQueryParams) =>
+    trpcQuery<ResourceListResponse>('file.getKnowledgeItems', {
+      limit: 50,
+      offset: 0,
+      showFilesInKnowledgeBase: false,
+      ...params,
+    }),
+
+  getFolderBreadcrumb: (slug: string) =>
+    trpcQuery<FolderCrumb[]>('document.getFolderBreadcrumb', { slug }),
+
+  createFolder: (params: {
+    knowledgeBaseId: string;
+    parentId?: string;
+    title: string;
+  }) =>
+    trpcMutate<{ id: string }>('document.createDocument', {
+      editorData: '{}',
+      fileType: 'custom/folder',
+      knowledgeBaseId: params.knowledgeBaseId,
+      parentId: params.parentId,
+      title: params.title,
+    }),
+
+  moveResource: async (
+    id: string,
+    parentId: string | null,
+    sourceType: 'file' | 'document',
+  ) => {
+    if (sourceType === 'file') {
+      return trpcMutate('file.updateFile', { id, parentId });
+    }
+    return trpcMutate('document.updateDocument', { id, parentId });
+  },
+
+  deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
+};
+
 // ── File / Upload API ──────────────────────────────────────────────
 
 export const fileApi = {
@@ -1804,6 +1914,7 @@ export const fileApi = {
       directory?: string;
       knowledgeBaseId?: string;
       onProgress?: (progress: number) => void;
+      parentId?: string;
       sessionId?: string;
       skipCheckFileType?: boolean;
       skipDeduplication?: boolean;
@@ -1839,6 +1950,7 @@ export const fileApi = {
       knowledgeBaseId: options?.knowledgeBaseId,
       metadata,
       name,
+      parentId: options?.parentId,
       size: fileInfo.size,
       url: storagePath,
     });

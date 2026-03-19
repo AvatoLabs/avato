@@ -93,7 +93,7 @@ export default function EmptyState({
           />
         </View>
       ) : (
-        <Text className="text-4xl mb-4" style={{ fontSize: 32 }}>
+        <Text className="text-4xl mb-4" style={{ color: colors.foreground, fontSize: 32 }}>
           {icon}
         </Text>
       )}

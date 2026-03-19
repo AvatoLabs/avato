@@ -27,10 +27,11 @@ export const useFileStore = create<FileState>((set, get) => ({
   pendingFiles: [],
 
   addFile: (file) => {
+    const alreadyUploaded = 'fileId' in file && 'url' in file && !!file.fileId && !!file.url;
     const attachment: FileAttachment = {
       ...file,
-      status: 'pending',
-      progress: 0,
+      progress: alreadyUploaded ? 100 : 0,
+      status: alreadyUploaded ? 'done' : 'pending',
     };
     set((s) => ({ pendingFiles: [...s.pendingFiles, attachment] }));
   },
@@ -44,6 +45,16 @@ export const useFileStore = create<FileState>((set, get) => ({
     if (!file) return null;
 
     if (file.fileId && file.url) {
+      if (file.fileId.startsWith('docs_')) {
+        const t = useI18n.getState().t;
+        useToast.getState().show('error', t.fileUploadFailed);
+        set((s) => ({
+          pendingFiles: s.pendingFiles.map((f) =>
+            f.id === id ? { ...f, status: 'error' as const } : f,
+          ),
+        }));
+        return null;
+      }
       return { fileId: file.fileId, url: file.url };
     }
 

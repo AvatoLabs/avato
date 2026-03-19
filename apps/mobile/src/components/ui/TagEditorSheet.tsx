@@ -84,6 +84,7 @@ export function TagEditorSheet({
                 className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] font-medium text-foreground"
                 placeholder={placeholder}
                 placeholderTextColor={colors.secondaryText}
+                style={{ color: colors.foreground }}
                 value={name}
                 onChangeText={onChangeName}
               />

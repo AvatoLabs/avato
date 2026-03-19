@@ -235,6 +235,7 @@ describe('KnowledgeRepo', () => {
         result.every(
           (item) =>
             item.fileType.startsWith('application') ||
+            item.fileType.startsWith('text') ||
             (item.fileType.startsWith('custom') && item.fileType !== 'custom/document'),
         ),
       ).toBe(true);
@@ -734,11 +735,12 @@ describe('KnowledgeRepo', () => {
         category: FilesTabs.Documents,
       });
 
-      // Should include application/* files and custom/* docs
+      // Should include application/*, text/* (md, txt) and custom/* docs (excl custom/document)
       expect(
         result.every(
           (item) =>
             item.fileType.startsWith('application') ||
+            item.fileType.startsWith('text') ||
             (item.fileType.startsWith('custom') && item.fileType !== 'custom/document'),
         ),
       ).toBe(true);
