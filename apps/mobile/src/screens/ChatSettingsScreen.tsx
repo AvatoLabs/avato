@@ -51,6 +51,7 @@ import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike } from '../lib/session';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
+import { useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { SessionTag } from '../types';
@@ -98,10 +99,14 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const isGroupSession = isGroupSessionLike(sessionId, session?.type);
   const removeSession = useSessionStore((s) => s.removeSession);
   const renameSession = useSessionStore((s) => s.renameSession);
-  const updateSessionTag = useSessionStore((s) => s.updateSessionTag);
   const updateSessionTitle = useSessionStore((s) => s.updateSessionTitle);
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const clearMessages = useChatStore((s) => s.clearMessages);
+  const fetchTopics = useTopicStore((s) => s.fetchTopics);
+  const createTopic = useTopicStore((s) => s.createTopic);
+  const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
+  const topicsBySession = useTopicStore((s) => s.topicsBySession);
+  const activeTopicBySession = useTopicStore((s) => s.activeTopicBySession);
 
   const { config: agentConfig, invalidate } = useAgentConfig(
     sessionId,
@@ -221,9 +226,29 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
     void fetchSessionTags();
   }, [fetchSessionTags]);
 
+  useEffect(() => {
+    if (!sessionId || isGroupSession) return;
+    void fetchTopics(sessionId);
+  }, [fetchTopics, isGroupSession, sessionId]);
+
+  const currentTopic = useMemo(() => {
+    if (!sessionId) return null;
+
+    const sessionTopics = topicsBySession[sessionId] ?? [];
+    if (sessionTopics.length === 0) return null;
+
+    const activeTopicId = activeTopicBySession[sessionId];
+    if (activeTopicId) {
+      const matched = sessionTopics.find((topic) => topic.id === activeTopicId);
+      if (matched) return matched;
+    }
+
+    return sessionTopics[0];
+  }, [activeTopicBySession, sessionId, topicsBySession]);
+
   const currentTag = useMemo(
-    () => sessionTags.find((tag) => tag.id === session?.tagId),
-    [session?.tagId, sessionTags],
+    () => sessionTags.find((tag) => tag.id === currentTopic?.tagId),
+    [currentTopic?.tagId, sessionTags],
   );
 
   const closeTagEditor = useCallback(() => {
@@ -405,7 +430,17 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       if (!sessionId) return;
 
       try {
-        await updateSessionTag(sessionId, tagId);
+        let targetTopic = currentTopic;
+        if (!targetTopic) {
+          const created = await createTopic(sessionId, t.chatListNewConversation);
+          if (!created) {
+            toast.show('error', t.errorNetwork);
+            return;
+          }
+          targetTopic = created;
+        }
+
+        await updateTopicTag(targetTopic.id, sessionId, tagId);
         setTagSelectorVisible(false);
         haptics.success();
       } catch (err) {
@@ -416,7 +451,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         });
       }
     },
-    [sessionId, t, toast, updateSessionTag],
+    [createTopic, currentTopic, sessionId, t, toast, updateTopicTag],
   );
 
   const handleCreateTag = useCallback(async () => {
@@ -436,8 +471,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       }
 
       await fetchSessionTags();
-      await updateSessionTag(sessionId, newTagId);
-      await fetchSessions();
+      await handleSelectTag(newTagId);
       closeTagEditor();
       setTagSelectorVisible(false);
       haptics.success();
@@ -451,13 +485,12 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   }, [
     closeTagEditor,
     fetchSessionTags,
-    fetchSessions,
+    handleSelectTag,
     sessionId,
     t,
     tagDraftColor,
     tagDraftName,
     toast,
-    updateSessionTag,
   ]);
 
   return (
@@ -510,6 +543,24 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
           onDescriptionChange={isGroupSession ? setGroupDescription : undefined}
           onTitleChange={setTitle}
         />
+
+        {isGroupSession ? (
+          <Animated.View entering={FadeInDown.delay(60).duration(300)}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              className="mx-5 mt-4 flex-row items-center justify-center rounded-xl py-3"
+              style={{ backgroundColor: colors.primary }}
+              onPress={() => {
+                haptics.light();
+                navigation.replace('ChatDetail', { sessionId });
+              }}
+            >
+              <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                {t.groupStartConversation}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ) : null}
 
         {!isGroupSession ? (
           <TagSection
@@ -714,7 +765,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                   />
                   <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                 </View>
-                {!session?.tagId ? (
+                {!currentTopic?.tagId ? (
                   <Check
                     color={colors.primary}
                     size={18}
@@ -737,7 +788,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
                     />
                     <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
                   </View>
-                  {session?.tagId === tag.id ? (
+                  {currentTopic?.tagId === tag.id ? (
                     <Check
                       color={colors.primary}
                       size={18}

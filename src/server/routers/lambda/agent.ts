@@ -76,13 +76,12 @@ export const agentRouter = router({
           .partial()
           .optional(),
         groupId: z.string().optional(),
-        tagId: z.string().optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const session = await ctx.sessionModel.create({
         config: input.config as any,
-        session: { groupId: input.groupId, tagId: input.tagId },
+        session: { groupId: input.groupId },
         type: 'agent',
       });
 

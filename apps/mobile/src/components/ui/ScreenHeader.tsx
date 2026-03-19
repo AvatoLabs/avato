@@ -50,7 +50,7 @@ export function ScreenHeader({
 
   const headerContent = (content: React.ReactNode) =>
     useFlat ? (
-      <View className="bg-background border-b border-border" style={{ paddingTop: insets.top }}>
+      <View className="border-b" style={{ backgroundColor: colors.background, borderColor: colors.border, paddingTop: insets.top }}>
         {content}
       </View>
     ) : (
@@ -82,8 +82,9 @@ export function ScreenHeader({
             </View>
           ) : null}
           <Text
-            className="flex-1 text-[22px] font-semibold text-foreground tracking-tighter"
+            className="flex-1 text-[22px] font-semibold tracking-tighter"
             numberOfLines={1}
+            style={{ color: colors.foreground }}
           >
             {title}
           </Text>
@@ -123,7 +124,7 @@ export function ScreenHeader({
               </View>
             ) : null}
             <View className="flex-1 justify-center">
-              <Text className="text-[22px] font-semibold text-foreground tracking-tighter">
+              <Text className="text-[22px] font-semibold tracking-tighter" style={{ color: colors.foreground }}>
                 {title}
               </Text>
               {subtitle ? (

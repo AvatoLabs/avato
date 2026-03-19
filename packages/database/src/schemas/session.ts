@@ -101,7 +101,6 @@ export const sessions = pgTable(
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     groupId: text('group_id').references(() => sessionGroups.id, { onDelete: 'set null' }),
-    tagId: text('tag_id').references(() => sessionTags.id, { onDelete: 'set null' }),
     clientId: text('client_id'),
     pinned: boolean('pinned').default(false),
 
@@ -118,7 +117,6 @@ export const sessions = pgTable(
     index('sessions_id_user_id_idx').on(t.id, t.userId),
     index('sessions_user_id_updated_at_idx').on(t.userId, t.updatedAt),
     index('sessions_group_id_idx').on(t.groupId),
-    index('sessions_tag_id_idx').on(t.tagId),
   ],
 );
 

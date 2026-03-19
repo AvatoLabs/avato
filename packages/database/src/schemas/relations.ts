@@ -86,6 +86,10 @@ export const topicRelations = relations(topics, ({ one, many }) => ({
     fields: [topics.sessionId],
     references: [sessions.id],
   }),
+  tag: one(sessionTags, {
+    fields: [topics.tagId],
+    references: [sessionTags.id],
+  }),
   documents: many(topicDocuments),
 }));
 
@@ -208,10 +212,6 @@ export const sessionsRelations = relations(sessions, ({ many, one }) => ({
   group: one(sessionGroups, {
     fields: [sessions.groupId],
     references: [sessionGroups.id],
-  }),
-  tag: one(sessionTags, {
-    fields: [sessions.tagId],
-    references: [sessionTags.id],
   }),
 }));
 

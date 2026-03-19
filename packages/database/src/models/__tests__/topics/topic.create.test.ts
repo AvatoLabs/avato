@@ -50,6 +50,7 @@ describe('TopicModel - Create', () => {
         title: 'New Topic',
         favorite: true,
         sessionId,
+        tagId: null,
         userId,
         historySummary: null,
         metadata: null,
@@ -108,6 +109,7 @@ describe('TopicModel - Create', () => {
         trigger: null,
         mode: null,
         sessionId,
+        tagId: null,
         userId,
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date),
@@ -314,7 +316,7 @@ describe('TopicModel - Create', () => {
         ]);
       });
 
-      const { topic: duplicatedTopic, messages: duplicatedMessages } = await topicModel.duplicate(
+      const { topic: _duplicatedTopic, messages: duplicatedMessages } = await topicModel.duplicate(
         topicId,
         'Duplicated Topic',
       );
@@ -375,7 +377,7 @@ describe('TopicModel - Create', () => {
         });
       });
 
-      const { topic: duplicatedTopic, messages: duplicatedMessages } = await topicModel.duplicate(
+      const { topic: _duplicatedTopic, messages: duplicatedMessages } = await topicModel.duplicate(
         topicId,
         'Duplicated Topic',
       );

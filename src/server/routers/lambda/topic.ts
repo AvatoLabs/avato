@@ -96,6 +96,7 @@ export const topicRouter = router({
             favorite: z.boolean().optional(),
             id: z.string().optional(),
             messages: z.array(z.string()).optional(),
+            tagId: z.string().nullable().optional(),
             title: z.string(),
           })
           .extend(basicContextSchema.shape),
@@ -180,6 +181,7 @@ export const topicRouter = router({
           favorite: z.boolean().optional(),
           groupId: z.string().nullable().optional(),
           messages: z.array(z.string()).optional(),
+          tagId: z.string().nullable().optional(),
           title: z.string(),
         })
         .extend(basicContextSchema.shape),
@@ -246,14 +248,15 @@ export const topicRouter = router({
         isInbox: z.boolean().optional(),
         pageSize: z.number().optional(),
         sessionId: z.string().nullable().optional(),
+        tagId: z.string().nullable().optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
-      const { sessionId, isInbox, groupId, excludeTriggers, ...rest } = input;
+      const { sessionId, isInbox, groupId, excludeTriggers, tagId, ...rest } = input;
 
       // If groupId is provided, query by groupId directly
       if (groupId) {
-        const result = await ctx.topicModel.query({ excludeTriggers, groupId, ...rest });
+        const result = await ctx.topicModel.query({ excludeTriggers, groupId, tagId, ...rest });
         return { items: result.items, total: result.total };
       }
 
@@ -269,17 +272,20 @@ export const topicRouter = router({
             agentId: effectiveAgentId,
             excludeTriggers,
             isInbox,
+            tagId,
           }
         : sessionId
           ? {
               ...rest,
               containerId: sessionId,
               excludeTriggers,
+              tagId,
             }
           : {
               ...rest,
               excludeTriggers,
               isInbox,
+              tagId,
             };
 
       const result = await ctx.topicModel.query(queryParams);
@@ -505,11 +511,12 @@ export const topicRouter = router({
           return {
             agent: null,
             group: groupInfo ?? null,
-            id: topic.id,
-            sessionId: topic.groupId,
-            title: topic.title,
-            type: 'group' as const,
-            updatedAt: topic.updatedAt,
+          id: topic.id,
+          sessionId: topic.groupId,
+          tagId: topic.tagId,
+          title: topic.title,
+          type: 'group' as const,
+          updatedAt: topic.updatedAt,
           };
         }
 
@@ -526,6 +533,7 @@ export const topicRouter = router({
           group: null,
           id: topic.id,
           sessionId: topic.sessionId ?? null,
+          tagId: topic.tagId,
           title: topic.title,
           type: 'agent' as const,
           updatedAt: topic.updatedAt,
@@ -550,6 +558,7 @@ export const topicRouter = router({
         groupId: z.string().nullable().optional(),
         keywords: z.string(),
         sessionId: z.string().nullable().optional(),
+        tagId: z.string().nullable().optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
@@ -559,7 +568,7 @@ export const topicRouter = router({
         ctx.userId,
       );
 
-      return ctx.topicModel.queryByKeyword(input.keywords, resolved.sessionId);
+      return ctx.topicModel.queryByKeyword(input.keywords, resolved.sessionId, input.tagId);
     }),
 
   /**
@@ -592,6 +601,7 @@ export const topicRouter = router({
             })
             .optional(),
           sessionId: z.string().optional(),
+          tagId: z.string().nullable().optional(),
           title: z.string().optional(),
         }),
       }),

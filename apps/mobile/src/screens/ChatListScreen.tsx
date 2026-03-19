@@ -4,9 +4,11 @@
  * Shows: HeroComposer, recent topics block, pinned assistants, and assistant list.
  *
  * Session vs Topic (per topic-chat-conversation-semantic-audit):
- * - Session: 会话容器，对应 Agent 或群组，可含多个 Topic → 用户概念「助理」
+ * - Session: 会话容器，对应 Agent 或群组，可含多个 Topic → 用户概念「助理」或「群聊」
  * - Topic: 一次对话/话题，含消息序列，属于 Session
- * - 助理 Tab：助理列表，可展开显示附属 Topic 列表；顶部保留「最近话题」区块
+ * - 助理 Tab：单助理会话列表，可展开显示附属 Topic
+ * - 群聊 Tab：群组会话列表，可展开显示附属 Topic
+ * - 话题 Tab：最近话题列表（跨会话）
  */
 import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -62,7 +64,7 @@ import { SectionBlock } from '../components/ui/SectionBlock';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { TagEditorSheet } from '../components/ui/TagEditorSheet';
 import { useToast } from '../components/ui/Toast';
-import { getProviderIconUrl } from '../constants/cdn';
+import { getProviderIconUrl, inferProviderFromModelId } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
 import { resolveTagColor, withAlpha } from '../constants/tags';
@@ -309,11 +311,12 @@ export default function ChatListScreen({ navigation }: any) {
   const unpinSession = useSessionStore((s) => s.unpinSession);
   const updateSessionTitle = useSessionStore((s) => s.updateSessionTitle);
   const renameSession = useSessionStore((s) => s.renameSession);
-  const updateSessionTag = useSessionStore((s) => s.updateSessionTag);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const topicsBySession = useTopicStore((s) => s.topicsBySession);
+  const activeTopicBySession = useTopicStore((s) => s.activeTopicBySession);
   const removeTopic = useTopicStore((s) => s.removeTopic);
+  const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
   const updateTopic = useTopicStore((s) => s.updateTopic);
 
   const [heroText, setHeroText] = useState('');
@@ -342,10 +345,15 @@ export default function ChatListScreen({ navigation }: any) {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [renameTarget, setRenameTarget] = useState<ChatSession | null>(null);
   const [selectedPillKey, setSelectedPillKey] = useState<string>(ALL_CHATS_PILL_KEY);
-  const [viewMode, setViewMode] = useState<'assistant' | 'topic'>('assistant');
+  const [viewMode, setViewMode] = useState<'assistant' | 'group' | 'topic'>('assistant');
   const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(() => new Set());
   const [recentTopics, setRecentTopics] = useState<RecentTopic[]>([]);
   const [recentTopicsLoading, setRecentTopicsLoading] = useState(false);
+  const [topicRenameTarget, setTopicRenameTarget] = useState<{
+    sessionId: string;
+    title: string;
+    topicId: string;
+  } | null>(null);
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const selectedProvider = useModelStore((s) => s.selectedProvider);
@@ -458,6 +466,10 @@ export default function ChatListScreen({ navigation }: any) {
         .catch(() => setRecentTopics([]));
     }, [fetchSessionTags, initialized, fetchSessions, loadGlobalMemorySettings]),
   );
+
+  const refreshRecentTopics = useCallback(() => {
+    topicApi.recentTopics(24).then(setRecentTopics).catch(() => setRecentTopics([]));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -594,7 +606,6 @@ export default function ChatListScreen({ navigation }: any) {
     async (options?: { includeComposerConfig?: boolean; plugins?: string[] }) => {
       const includeComposerConfig = options?.includeComposerConfig === true;
       const newId = await createSession({
-        tagId: activeTagId,
         ...(includeComposerConfig
           ? {
               model: selectedModel || undefined,
@@ -606,18 +617,20 @@ export default function ChatListScreen({ navigation }: any) {
 
       return newId;
     },
-    [activeTagId, createSession, selectedModel, selectedProvider],
+    [createSession, selectedModel, selectedProvider],
   );
 
   const createQuickTopic = useCallback(
     async (sessionId: string) => {
       try {
-        return await topicApi.create(sessionId, t.chatListNewConversation);
+        return await topicApi.create(sessionId, t.chatListNewConversation, {
+          tagId: activeTagId ?? null,
+        });
       } catch {
         return null;
       }
     },
-    [t.chatListNewConversation],
+    [activeTagId, t.chatListNewConversation],
   );
 
   const handleCreateChat = async () => {
@@ -967,6 +980,110 @@ export default function ChatListScreen({ navigation }: any) {
     setTagEditorVisible(true);
   }, []);
 
+  /** sessionId -> latest topic (from recentTopics) for session preview/tag filter */
+  const latestTopicBySessionId = useMemo(() => {
+    const map = new Map<
+      string,
+      { tagId?: string | null; title: string; topicId: string; updatedAt: string }
+    >();
+    for (const topic of recentTopics) {
+      const sid = topic.sessionId;
+      if (!sid) continue;
+      const existing = map.get(sid);
+      const ts =
+        typeof topic.updatedAt === 'string'
+          ? topic.updatedAt
+          : ((topic.updatedAt as Date)?.toISOString?.() ?? '');
+      if (!existing || new Date(ts).getTime() > new Date(existing.updatedAt).getTime()) {
+        map.set(sid, {
+          tagId: topic.tagId ?? null,
+          title: topic.title ?? '',
+          topicId: topic.id,
+          updatedAt: ts,
+        });
+      }
+    }
+    return map;
+  }, [recentTopics]);
+
+  const handleDeleteTag = useCallback(async () => {
+    if (!editingTag) return;
+
+    try {
+      await sessionTagApi.remove(editingTag.id);
+      await Promise.all([fetchSessionTags(true), fetchSessions()]);
+      if (activeTagId === editingTag.id) {
+        setSelectedPillKey(ALL_CHATS_PILL_KEY);
+      }
+      haptics.success();
+      closeTagEditor();
+    } catch (err) {
+      const { messageKey, type } = classifyError(err);
+      toast.show('error', t[messageKey], {
+        onRetry: type === 'auth' ? navigateToLogin : undefined,
+        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+      });
+    }
+  }, [activeTagId, closeTagEditor, editingTag, fetchSessionTags, fetchSessions, t, toast]);
+
+  const resolveTopicTargetForSession = useCallback(
+    async (sessionId: string) => {
+      let topics = topicsBySession[sessionId] ?? [];
+
+      if (topics.length === 0) {
+        await fetchTopics(sessionId);
+        topics = useTopicStore.getState().topicsBySession[sessionId] ?? [];
+      }
+
+      if (topics.length === 0) {
+        const newTopicId = await createQuickTopic(sessionId);
+        if (!newTopicId) return null;
+
+        return { sessionId, topicId: newTopicId };
+      }
+
+      const activeTopicId = activeTopicBySession[sessionId];
+      if (activeTopicId && topics.some((topic) => topic.id === activeTopicId)) {
+        return { sessionId, topicId: activeTopicId };
+      }
+
+      const latestTopicId = latestTopicBySessionId.get(sessionId)?.topicId;
+      if (latestTopicId && topics.some((topic) => topic.id === latestTopicId)) {
+        return { sessionId, topicId: latestTopicId };
+      }
+
+      return { sessionId, topicId: topics[0].id };
+    },
+    [activeTopicBySession, createQuickTopic, fetchTopics, latestTopicBySessionId, topicsBySession],
+  );
+
+  const handleMoveSessionToTag = useCallback(
+    async (tagId?: string | null, targetSessionId?: string | null) => {
+      const sessionId = targetSessionId || actionSession?.id;
+      if (!sessionId) return;
+
+      try {
+        const target = await resolveTopicTargetForSession(sessionId);
+        if (!target) {
+          toast.show('error', t.errorNetwork);
+          return;
+        }
+
+        await updateTopicTag(target.topicId, target.sessionId, tagId);
+        await refreshRecentTopics();
+        haptics.success();
+        closeActionSheet();
+      } catch (err) {
+        const { messageKey, type } = classifyError(err);
+        toast.show('error', t[messageKey], {
+          onRetry: type === 'auth' ? navigateToLogin : undefined,
+          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
+        });
+      }
+    },
+    [actionSession?.id, closeActionSheet, refreshRecentTopics, resolveTopicTargetForSession, t, toast, updateTopicTag],
+  );
+
   const handleSubmitTag = useCallback(async () => {
     const name = tagDraftName.trim();
     if (!name) {
@@ -997,7 +1114,7 @@ export default function ChatListScreen({ navigation }: any) {
       await fetchSessionTags(true);
 
       if (targetSessionId) {
-        await updateSessionTag(targetSessionId, newTagId);
+        await handleMoveSessionToTag(newTagId, targetSessionId);
         closeActionSheet();
       }
 
@@ -1016,78 +1133,55 @@ export default function ChatListScreen({ navigation }: any) {
     closeTagEditor,
     editingTag,
     fetchSessionTags,
+    handleMoveSessionToTag,
     t,
     tagDraftColor,
     tagDraftName,
     tagEditorTargetSessionId,
     toast,
-    updateSessionTag,
   ]);
-
-  const handleDeleteTag = useCallback(async () => {
-    if (!editingTag) return;
-
-    try {
-      await sessionTagApi.remove(editingTag.id);
-      await Promise.all([fetchSessionTags(true), fetchSessions()]);
-      if (activeTagId === editingTag.id) {
-        setSelectedPillKey(ALL_CHATS_PILL_KEY);
-      }
-      haptics.success();
-      closeTagEditor();
-    } catch (err) {
-      const { messageKey, type } = classifyError(err);
-      toast.show('error', t[messageKey], {
-        onRetry: type === 'auth' ? navigateToLogin : undefined,
-        retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
-      });
-    }
-  }, [activeTagId, closeTagEditor, editingTag, fetchSessionTags, fetchSessions, t, toast]);
-
-  const handleMoveSessionToTag = useCallback(
-    async (tagId?: string | null) => {
-      if (!actionSession) return;
-
-      try {
-        await updateSessionTag(actionSession.id, tagId);
-        haptics.success();
-        closeActionSheet();
-      } catch (err) {
-        const { messageKey, type } = classifyError(err);
-        toast.show('error', t[messageKey], {
-          onRetry: type === 'auth' ? navigateToLogin : undefined,
-          retryLabel: type === 'auth' ? t.errorAuthGoToLogin : undefined,
-        });
-      }
-    },
-    [actionSession, closeActionSheet, t, toast, updateSessionTag],
-  );
 
   const pillItems = useMemo<ChatFilterPill[]>(() => {
     const tagPills = sessionTags.map((tag) => ({
       color: tag.color,
-      count: sessions.filter((session) => session.tagId === tag.id).length,
+      count: recentTopics.filter((topic) => topic.tagId === tag.id).length,
       key: getTagPillKey(tag.id),
       label: tag.name,
       tagId: tag.id,
     }));
 
     return [{ count: sessions.length, key: ALL_CHATS_PILL_KEY, label: t.chatListAll }, ...tagPills];
-  }, [sessionTags, sessions, t.chatListAll]);
+  }, [recentTopics, sessionTags, sessions.length, t.chatListAll]);
 
   const matchesSelectedPill = useCallback(
     (session: ChatSession) => {
       if (selectedPillKey === ALL_CHATS_PILL_KEY) return true;
-      if (activeTagId) return session.tagId === activeTagId;
+      if (viewMode === 'group') return true;
+      if (activeTagId) return latestTopicBySessionId.get(session.id)?.tagId === activeTagId;
       return true;
     },
-    [activeTagId, selectedPillKey],
+    [activeTagId, latestTopicBySessionId, selectedPillKey, viewMode],
   );
 
-  const visibleSessions = useMemo(
-    () => sessions.filter(matchesSelectedPill),
-    [matchesSelectedPill, sessions],
-  );
+  const visibleSessions = useMemo(() => {
+    if (viewMode === 'topic') return sessions;
+    const byType =
+      viewMode === 'assistant'
+        ? sessions.filter((s) => s.type !== 'group')
+        : sessions.filter((s) => s.type === 'group');
+    return byType.filter(matchesSelectedPill);
+  }, [matchesSelectedPill, sessions, viewMode]);
+
+  const subtitleCount =
+    viewMode === 'topic'
+      ? recentTopics.length
+      : visibleSessions.length;
+  const subtitleText =
+    viewMode === 'topic'
+      ? t.activeTopics.replace('{count}', String(subtitleCount))
+      : viewMode === 'group'
+        ? t.activeGroups.replace('{count}', String(subtitleCount))
+        : t.activeAssistants.replace('{count}', String(subtitleCount));
 
   const { pinnedSessions, filteredSessions } = useMemo(() => {
     const pinned = visibleSessions.filter((session) => session.pinned);
@@ -1111,29 +1205,11 @@ export default function ChatListScreen({ navigation }: any) {
     navigation?.navigate?.('MainTabs', { screen: 'Store' });
   }, [navigation]);
 
-  /** sessionId -> latest topic (from recentTopics) for Session row weak preview */
-  const latestTopicBySessionId = useMemo(() => {
-    const map = new Map<string, { title: string; updatedAt: string }>();
-    for (const t of recentTopics) {
-      const sid = t.sessionId;
-      if (!sid) continue;
-      const existing = map.get(sid);
-      const ts =
-        typeof t.updatedAt === 'string'
-          ? t.updatedAt
-          : ((t.updatedAt as Date)?.toISOString?.() ?? '');
-      if (!existing || new Date(ts).getTime() > new Date(existing.updatedAt).getTime()) {
-        map.set(sid, { title: t.title ?? '', updatedAt: ts });
-      }
-    }
-    return map;
-  }, [recentTopics]);
-
   const handleCreateAgent = useCallback(() => {
     setCreateMenuVisible(false);
     haptics.light();
-    navigation.navigate('AgentConfig', { createNew: true, tagId: activeTagId });
-  }, [activeTagId, navigation]);
+    navigation.navigate('AgentConfig', { createNew: true });
+  }, [navigation]);
 
   const handleCreateGroup = useCallback(async () => {
     setCreateMenuVisible(false);
@@ -1168,7 +1244,12 @@ export default function ChatListScreen({ navigation }: any) {
         setCreateGroupSheetVisible(false);
         await fetchSessions();
         haptics.success();
-        navigation.navigate('ChatDetail', { sessionId: result.group.id });
+        // Align with web: empty group → config page; group with members → chat page
+        if (agentIds.length === 0) {
+          navigation.navigate('ChatSettings', { sessionId: result.group.id });
+        } else {
+          navigation.navigate('ChatDetail', { sessionId: result.group.id });
+        }
       } catch {
         toast.show('error', t.errorNetwork);
       }
@@ -1208,7 +1289,7 @@ export default function ChatListScreen({ navigation }: any) {
   );
 
   const handleDeleteTopic = useCallback(
-    (topicId: string, sessionId: string) => {
+    (topicId: string, sessionId: string, onAfterDelete?: () => void) => {
       Alert.alert(t.deleteTopicConfirm, t.deleteTopicDesc, [
         { text: t.cancel, style: 'cancel' },
         {
@@ -1216,12 +1297,22 @@ export default function ChatListScreen({ navigation }: any) {
           style: 'destructive',
           onPress: () => {
             haptics.warning();
-            void removeTopic(topicId, sessionId);
+            void removeTopic(topicId, sessionId).then(() => onAfterDelete?.());
           },
         },
       ]);
     },
     [removeTopic, t.cancel, t.delete, t.deleteTopicConfirm, t.deleteTopicDesc],
+  );
+
+  const handleTopicRename = useCallback(
+    async (topicId: string, sessionId: string, newTitle: string) => {
+      await updateTopic(topicId, sessionId, newTitle);
+      haptics.success();
+      useToast.getState().show('success', t.topicRenamed);
+      refreshRecentTopics();
+    },
+    [refreshRecentTopics, t.topicRenamed, updateTopic],
   );
 
   const [smartRenamingTopicId, setSmartRenamingTopicId] = useState<string | null>(null);
@@ -1237,6 +1328,7 @@ export default function ChatListScreen({ navigation }: any) {
         if (newTitle?.trim()) {
           await updateTopic(topicId, sessionId, newTitle.trim());
           useToast.getState().show('success', t18n.topicRenamed);
+          refreshRecentTopics();
         } else {
           useToast.getState().show('error', failMsg);
         }
@@ -1246,7 +1338,7 @@ export default function ChatListScreen({ navigation }: any) {
         setSmartRenamingTopicId(null);
       }
     },
-    [smartRenamingTopicId, updateTopic],
+    [refreshRecentTopics, smartRenamingTopicId, updateTopic],
   );
 
   const toggleAssistantExpand = useCallback((sessionId: string) => {
@@ -1263,174 +1355,152 @@ export default function ChatListScreen({ navigation }: any) {
     });
   }, [fetchTopics]);
 
-  const handleSwipeDelete = useCallback(
-    (session: ChatSession) => {
-      Alert.alert(t.deleteSessionConfirm, t.deleteSessionDesc, [
-        { text: t.cancel, style: 'cancel' },
-        {
-          text: t.delete,
-          style: 'destructive',
-          onPress: () => {
-            haptics.warning();
-            removeSession(session.id);
-          },
-        },
-      ]);
-    },
-    [removeSession, t.cancel, t.delete, t.deleteSessionConfirm, t.deleteSessionDesc],
-  );
-
   const renderAssistantRow = (item: ChatSession, showTopicPreview?: boolean) => {
-    const providerId = item.provider || (item.model ? modelToProvider[item.model] : undefined);
+    const providerId =
+      item.provider ||
+      (item.model ? modelToProvider[item.model] : undefined) ||
+      (item.model ? inferProviderFromModelId(item.model) : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
     const isExpanded = expandedSessionIds.has(item.id);
     const topics = topicsBySession[item.id] ?? [];
-
-    const renderRightActions = () => (
-      <TouchableOpacity
-        accessibilityLabel={t.delete}
-        accessibilityRole="button"
-        activeOpacity={0.8}
-        className="items-center justify-center px-5"
-        style={{
-          backgroundColor: colors.danger,
-          minWidth: 72,
-        }}
-        onPress={() => handleSwipeDelete(item)}
-      >
-        <Trash2 color={colors.iconOnPrimary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        <Text className="mt-1 text-[12px] font-semibold text-white">{t.delete}</Text>
-      </TouchableOpacity>
-    );
+    const latestTopic = latestTopicBySessionId.get(item.id);
 
     return (
-      <Swipeable friction={2} key={item.id} renderRightActions={renderRightActions}>
-        <View>
-          <View className="flex-row items-center bg-background">
-            <TouchableOpacity
-              accessibilityLabel={item.title}
-              accessibilityRole="button"
-              activeOpacity={0.4}
-              className="flex-1 flex-row items-start px-5 py-3 active:bg-foreground/10"
-              onLongPress={() => handleLongPress(item)}
-              onPress={() => navigation.navigate('ChatDetail', { sessionId: item.id })}
-            >
-              <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
-                <SessionLogo
-                  avatar={item.avatar}
-                  provider={providerId}
-                  providerLogo={providerLogo}
-                  size={36}
-                />
-              </View>
-              <View className="flex-1 mr-3 mt-0.5">
-                <View className="flex-row items-center mb-0.5 flex-wrap">
-                  {item.pinned && (
-                    <Pin
-                      color={colors.primary}
-                      size={11}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginRight: 4 }}
-                    />
-                  )}
-                  <Text
-                    className="text-foreground text-[15px] font-medium tracking-tight"
-                    numberOfLines={1}
-                  >
-                    {item.title || t.chatListNewConversation}
-                  </Text>
-                  {renderTagChip(item.tagId)}
-                </View>
-                <Text className="text-[12px] font-medium" numberOfLines={1} style={{ color: colors.secondaryText }}>
-                  {showTopicPreview
-                    ? (() => {
-                        const latest = latestTopicBySessionId.get(item.id);
-                        if (latest?.title)
-                          return `${t.topicTitle}: ${latest.title} · ${formatTimeAgo(latest.updatedAt, t)}`;
-                        return item.description ?? '';
-                      })()
-                    : (item.description ?? '')}
-                </Text>
-              </View>
-              <Text className="text-[10px] font-medium tracking-wide" style={{ color: colors.secondaryText }}>
-                {formatTimeAgo(item.updatedAt, t)}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel={isExpanded ? t.chatListCollapseAssistant : t.chatListExpandAssistant}
-              accessibilityRole="button"
-              activeOpacity={0.7}
-              className="px-4 py-3"
-              onPress={(e) => {
-                e.stopPropagation();
-                toggleAssistantExpand(item.id);
-              }}
-            >
-              {isExpanded ? (
-                <ChevronUp color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              ) : (
-                <ChevronDown color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              )}
-            </TouchableOpacity>
-          </View>
-          {isExpanded && topics.length > 0 && (
-            <View className="pl-5 pr-2 pb-2" style={{ paddingLeft: 20 + 36 + 14 }}>
-              {topics.map((topic: Topic) => (
-                <TouchableOpacity
-                  accessibilityLabel={topic.title}
-                  accessibilityRole="button"
-                  activeOpacity={0.65}
-                  className="flex-row items-center rounded-lg px-3 py-2.5 active:bg-foreground/5"
-                  key={topic.id}
-                  onLongPress={() => {
-                    haptics.medium();
-                    Alert.alert(
-                      topic.title || t.chatListNewConversation,
-                      undefined,
-                      [
-                        { text: t.cancel, style: 'cancel' },
-                        {
-                          text: t.actionSmartRename,
-                          onPress: () => void handleTopicSmartRename(topic.id, item.id),
-                        },
-                        {
-                          text: t.delete,
-                          style: 'destructive',
-                          onPress: () => handleDeleteTopic(topic.id, item.id),
-                        },
-                      ],
-                    );
-                  }}
-                  onPress={() =>
-                    navigation.navigate('ChatDetail', {
-                      sessionId: item.id,
-                      topicId: topic.id,
-                    })
-                  }
+      <View key={item.id}>
+        <View className="flex-row items-center bg-background">
+          <TouchableOpacity
+            accessibilityLabel={item.title}
+            accessibilityRole="button"
+            activeOpacity={0.4}
+            className="flex-1 flex-row items-start px-5 py-3 active:bg-foreground/10"
+            onLongPress={() => handleLongPress(item)}
+            onPress={() => toggleAssistantExpand(item.id)}
+          >
+            <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
+              <SessionLogo
+                avatar={item.avatar}
+                provider={providerId}
+                providerLogo={providerLogo}
+                size={36}
+              />
+            </View>
+            <View className="flex-1 mr-3 mt-0.5">
+              <View className="flex-row items-center mb-0.5 flex-wrap">
+                {item.pinned && (
+                  <Pin
+                    color={colors.primary}
+                    size={11}
+                    strokeWidth={tokens.icon.strokeWidth}
+                    style={{ marginRight: 4 }}
+                  />
+                )}
+                <Text
+                  className="text-foreground text-[15px] font-medium tracking-tight"
+                  numberOfLines={1}
                 >
-                  <Text
-                    className="flex-1 text-[14px] font-medium"
-                    numberOfLines={1}
-                    style={{ color: colors.foreground }}
-                  >
-                    {topic.title || t.chatListNewConversation}
-                  </Text>
-                  <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
-                    {formatTimeAgo(topic.updatedAt, t)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {isExpanded && topics.length === 0 && (
-            <View className="px-5 pb-3" style={{ paddingLeft: 20 + 36 + 14 }}>
-              <Text className="text-[13px]" style={{ color: colors.secondaryText }}>
-                {t.chatListTopicEmpty}
+                  {item.title || t.chatListNewConversation}
+                </Text>
+                {renderTagChip(latestTopic?.tagId ?? undefined)}
+              </View>
+              <Text className="text-[12px] font-medium" numberOfLines={1} style={{ color: colors.secondaryText }}>
+                {showTopicPreview
+                  ? (() => {
+                      const latest = latestTopicBySessionId.get(item.id);
+                      if (latest?.title)
+                        return `${t.topicTitle}: ${latest.title} · ${formatTimeAgo(latest.updatedAt, t)}`;
+                      return item.description ?? '';
+                    })()
+                  : (item.description ?? '')}
               </Text>
             </View>
-          )}
+            <Text className="text-[10px] font-medium tracking-wide" style={{ color: colors.secondaryText }}>
+              {formatTimeAgo(item.updatedAt, t)}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityLabel={isExpanded ? t.chatListCollapseAssistant : t.chatListExpandAssistant}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            className="px-4 py-3"
+            onPress={(e) => {
+              e.stopPropagation();
+              toggleAssistantExpand(item.id);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronUp color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            ) : (
+              <ChevronDown color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            )}
+          </TouchableOpacity>
         </View>
-      </Swipeable>
+        {isExpanded && topics.length > 0 && (
+          <View className="pl-5 pr-2 pb-2" style={{ paddingLeft: 20 + 36 + 14 }}>
+            {topics.map((topic: Topic) => (
+              <TouchableOpacity
+                accessibilityLabel={topic.title}
+                accessibilityRole="button"
+                activeOpacity={0.65}
+                className="flex-row items-center rounded-lg px-3 py-2.5 active:bg-foreground/5"
+                key={topic.id}
+                onLongPress={() => {
+                  haptics.medium();
+                  Alert.alert(
+                    topic.title || t.chatListNewConversation,
+                    undefined,
+                    [
+                      { text: t.cancel, style: 'cancel' },
+                      {
+                        text: t.actionSmartRename,
+                        onPress: () => void handleTopicSmartRename(topic.id, item.id),
+                      },
+                      {
+                        text: t.actionRename,
+                        onPress: () =>
+                          setTopicRenameTarget({
+                            sessionId: item.id,
+                            title: topic.title ?? '',
+                            topicId: topic.id,
+                          }),
+                      },
+                      {
+                        text: t.delete,
+                        style: 'destructive',
+                        onPress: () => handleDeleteTopic(topic.id, item.id),
+                      },
+                    ],
+                  );
+                }}
+                onPress={() =>
+                  navigation.navigate('ChatDetail', {
+                    sessionId: item.id,
+                    topicId: topic.id,
+                  })
+                }
+              >
+                <Text
+                  className="flex-1 text-[14px] font-medium"
+                  numberOfLines={1}
+                  style={{ color: colors.foreground }}
+                >
+                  {topic.title || t.chatListNewConversation}
+                </Text>
+                {renderTagChip(topic.tagId ?? undefined)}
+                <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
+                  {formatTimeAgo(topic.updatedAt, t)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {isExpanded && topics.length === 0 && (
+          <View className="px-5 pb-3" style={{ paddingLeft: 20 + 36 + 14 }}>
+            <Text className="text-[13px]" style={{ color: colors.secondaryText }}>
+              {t.chatListTopicEmpty}
+            </Text>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -1445,6 +1515,10 @@ export default function ChatListScreen({ navigation }: any) {
     const providerId =
       session.provider || (session.model ? modelToProvider[session.model] : undefined);
     const providerLogo = providerId ? providerLogoById[providerId] : undefined;
+    const topicTagId =
+      (topicId
+        ? (topicsBySession[session.id] ?? []).find((topic) => topic.id === topicId)?.tagId
+        : undefined) ?? latestTopicBySessionId.get(session.id)?.tagId;
 
     return (
       <TouchableOpacity
@@ -1487,7 +1561,7 @@ export default function ChatListScreen({ navigation }: any) {
                   ? t.chatSearchMatchTopic
                   : t.chatSearchMatchMessage}
             </Text>
-            {renderTagChip(session.tagId)}
+            {renderTagChip(topicTagId ?? undefined)}
           </View>
           <Text className="text-[12px] font-medium leading-5" numberOfLines={2} style={{ color: colors.secondaryText }}>
             {summary}
@@ -1498,11 +1572,12 @@ export default function ChatListScreen({ navigation }: any) {
   };
 
   const searchQuery = searchText.trim();
+  const actionTopicTagId = actionSession ? latestTopicBySessionId.get(actionSession.id)?.tagId : undefined;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        subtitle={t.activeAssistants.replace('{count}', String(visibleSessions.length))}
+        subtitle={subtitleText}
         title={greeting}
         rightActions={
           <View className="flex-row items-center">
@@ -1527,7 +1602,7 @@ export default function ChatListScreen({ navigation }: any) {
           <MessageCircle color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
       >
-        {/* Assistant | Topics tabs */}
+        {/* Assistant | Group | Topics tabs */}
         <ScrollView
           horizontal
           className="pb-2"
@@ -1556,6 +1631,24 @@ export default function ChatListScreen({ navigation }: any) {
             activeOpacity={0.8}
             className="flex-row items-center rounded-full px-4 py-2"
             style={{
+              backgroundColor: viewMode === 'group' ? colors.primary : colors.fillTertiary,
+            }}
+            onPress={() => {
+              haptics.selection();
+              setViewMode('group');
+            }}
+          >
+            <Text
+              className="text-[13px] font-semibold"
+              style={{ color: viewMode === 'group' ? colors.iconOnPrimary : colors.foreground }}
+            >
+              {t.chatListViewGroup}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            className="flex-row items-center rounded-full px-4 py-2"
+            style={{
               backgroundColor: viewMode === 'topic' ? colors.primary : colors.fillTertiary,
             }}
             onPress={() => {
@@ -1571,7 +1664,7 @@ export default function ChatListScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-        {/* Tag pills (assistant view only) */}
+        {/* Tag pills (assistant view only; groups use different structure) */}
         {viewMode === 'assistant' && (
         <ScrollView
           horizontal
@@ -1731,20 +1824,78 @@ export default function ChatListScreen({ navigation }: any) {
             ) : recentTopics.length > 0 ? (
               <SectionBlock title={t.chatListTopics}>
                 {recentTopics.map((topic) => {
-                    const navSessionId = topic.sessionId ?? topic.group?.id ?? null;
-                    if (!navSessionId) return null;
-                    const session = sessions.find((s) => s.id === navSessionId);
-                    const providerId =
-                      session?.provider ||
-                      (session?.model ? modelToProvider[session.model] : undefined);
-                    const providerLogo = providerId ? providerLogoById[providerId] : undefined;
-                    return (
+                  const navSessionId = topic.sessionId ?? topic.group?.id ?? null;
+                  if (!navSessionId) return null;
+                  const session = sessions.find((s) => s.id === navSessionId);
+                  const providerId =
+                    session?.provider ||
+                    (session?.model ? modelToProvider[session.model] : undefined);
+                  const providerLogo = providerId ? providerLogoById[providerId] : undefined;
+
+                  const renderTopicSwipeDelete = () => (
+                    <TouchableOpacity
+                      accessibilityLabel={t.delete}
+                      accessibilityRole="button"
+                      activeOpacity={0.8}
+                      className="items-center justify-center px-5"
+                      style={{
+                        backgroundColor: colors.danger,
+                        minWidth: 72,
+                      }}
+                      onPress={() =>
+                        handleDeleteTopic(topic.id, navSessionId, refreshRecentTopics)
+                      }
+                    >
+                      <Trash2
+                        color={colors.iconOnPrimary}
+                        size={20}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text className="mt-1 text-[12px] font-semibold text-white">{t.delete}</Text>
+                    </TouchableOpacity>
+                  );
+
+                  return (
+                    <Swipeable
+                      friction={2}
+                      key={topic.id}
+                      renderRightActions={renderTopicSwipeDelete}
+                    >
                       <TouchableOpacity
                         accessibilityLabel={topic.title ?? t.chatListNewConversation}
                         accessibilityRole="button"
                         activeOpacity={0.65}
                         className="flex-row items-start px-5 py-3 active:bg-foreground/10 bg-background"
-                        key={topic.id}
+                        onLongPress={() => {
+                          haptics.medium();
+                          Alert.alert(
+                            topic.title || t.chatListNewConversation,
+                            undefined,
+                            [
+                              { text: t.cancel, style: 'cancel' },
+                              {
+                                text: t.actionSmartRename,
+                                onPress: () =>
+                                  void handleTopicSmartRename(topic.id, navSessionId),
+                              },
+                              {
+                                text: t.actionRename,
+                                onPress: () =>
+                                  setTopicRenameTarget({
+                                    sessionId: navSessionId,
+                                    title: topic.title ?? '',
+                                    topicId: topic.id,
+                                  }),
+                              },
+                              {
+                                text: t.delete,
+                                style: 'destructive',
+                                onPress: () =>
+                                  handleDeleteTopic(topic.id, navSessionId, refreshRecentTopics),
+                              },
+                            ],
+                          );
+                        }}
                         onPress={() =>
                           navigation.navigate('ChatDetail', {
                             sessionId: navSessionId,
@@ -1761,12 +1912,15 @@ export default function ChatListScreen({ navigation }: any) {
                           />
                         </View>
                         <View className="flex-1 mr-3 mt-0.5">
-                          <Text
-                            className="text-foreground text-[15px] font-medium tracking-tight"
-                            numberOfLines={1}
-                          >
-                            {topic.title || t.chatListNewConversation}
-                          </Text>
+                          <View className="flex-row items-center mb-0.5 flex-wrap">
+                            <Text
+                              className="text-foreground text-[15px] font-medium tracking-tight"
+                              numberOfLines={1}
+                            >
+                              {topic.title || t.chatListNewConversation}
+                            </Text>
+                            {renderTagChip(topic.tagId ?? undefined)}
+                          </View>
                           <Text
                             className="text-secondary/40 text-[12px] font-medium"
                             numberOfLines={1}
@@ -1776,7 +1930,10 @@ export default function ChatListScreen({ navigation }: any) {
                               : (topic.agent?.title ?? session?.title ?? '')}
                           </Text>
                         </View>
-                        <Text className="text-[10px] font-medium tracking-wide" style={{ color: colors.secondaryText }}>
+                        <Text
+                          className="text-[10px] font-medium tracking-wide"
+                          style={{ color: colors.secondaryText }}
+                        >
                           {formatTimeAgo(
                             typeof topic.updatedAt === 'string'
                               ? topic.updatedAt
@@ -1785,8 +1942,9 @@ export default function ChatListScreen({ navigation }: any) {
                           )}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
+                    </Swipeable>
+                  );
+                })}
               </SectionBlock>
             ) : (
               <EmptyState
@@ -1843,9 +2001,13 @@ export default function ChatListScreen({ navigation }: any) {
             {visibleSessions.length === 0 && !sessionErrorMessage && !loading && (
               <Animated.View entering={FadeInDown.delay(150).duration(350)}>
                 <EmptyState
-                  description={t.chatListEmptyDesc}
+                  description={
+                    viewMode === 'group' ? t.chatListGroupEmptyDesc : t.chatListEmptyDesc
+                  }
                   iconVariant="chat"
-                  title={t.chatListEmpty}
+                  title={
+                    viewMode === 'group' ? t.chatListGroupEmpty : t.chatListEmpty
+                  }
                 />
               </Animated.View>
             )}
@@ -2080,7 +2242,7 @@ export default function ChatListScreen({ navigation }: any) {
                         />
                         <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                       </View>
-                      {!actionSession?.tagId ? (
+                      {!actionTopicTagId ? (
                         <Check
                           color={colors.primary}
                           size={18}
@@ -2104,7 +2266,7 @@ export default function ChatListScreen({ navigation }: any) {
                             {tag.name}
                           </Text>
                         </View>
-                        {actionSession?.tagId === tag.id ? (
+                        {actionTopicTagId === tag.id ? (
                           <Check
                             color={colors.primary}
                             size={18}
@@ -2147,6 +2309,25 @@ export default function ChatListScreen({ navigation }: any) {
           if (renameTarget) {
             haptics.success();
             renameSession(renameTarget.id, value);
+          }
+        }}
+      />
+
+      <PromptModal
+        defaultValue={topicRenameTarget?.title ?? ''}
+        placeholder={t.topicRenamePlaceholder}
+        submitLabel={t.save}
+        title={t.topicRename}
+        visible={!!topicRenameTarget}
+        onCancel={() => setTopicRenameTarget(null)}
+        onSubmit={async (value) => {
+          if (topicRenameTarget) {
+            setTopicRenameTarget(null);
+            await handleTopicRename(
+              topicRenameTarget.topicId,
+              topicRenameTarget.sessionId,
+              value,
+            );
           }
         }}
       />

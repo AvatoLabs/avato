@@ -1313,7 +1313,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
 
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    // When getGroupedSessions fails (e.g. tag_id), session may be undefined; fallback to group detail
+    // If grouped session fetch misses this ID, fallback to group detail probing.
     let isGroupSession = isGroupSessionLike(sessionId, session?.type);
     if (!isGroupSession && !session) {
       try {

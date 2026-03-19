@@ -45,7 +45,6 @@ interface SessionState {
   unpinSession: (id: string) => Promise<void>;
   /** Immediately update model/provider on a session (local-only, for instant UI feedback) */
   updateSessionMeta: (id: string, meta: { model?: string; provider?: string }) => void;
-  updateSessionTag: (id: string, tagId?: string | null) => Promise<void>;
   /** Update session title locally (e.g. after auto-generation) */
   updateSessionTitle: (id: string, title: string) => void;
 }
@@ -134,7 +133,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       plugins: inputConfig.plugins,
       provider: inputConfig.provider,
       systemPrompt: inputConfig.systemPrompt,
-      tagId: inputConfig.tagId,
       title: inputConfig.title,
     };
     const title = requestConfig.title || 'New Session';
@@ -149,7 +147,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         description: requestConfig.description,
         model: requestConfig.model,
         provider: requestConfig.provider,
-        tagId: requestConfig.tagId,
         type: 'agent',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -273,21 +270,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set((s) => ({
       sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, ...meta } : sess)),
     }));
-  },
-
-  updateSessionTag: async (id: string, tagId?: string | null) => {
-    set((s) => ({
-      sessions: s.sessions.map((sess) =>
-        sess.id === id ? { ...sess, tagId: tagId || undefined } : sess,
-      ),
-    }));
-    try {
-      await sessionApi.updateTag(id, tagId);
-    } catch (err) {
-      console.warn('[SessionStore] updateSessionTag error:', err);
-      get().fetchSessions();
-      throw err;
-    }
   },
 
   updateSessionTitle: (id: string, title: string) => {

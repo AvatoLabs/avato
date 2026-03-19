@@ -574,7 +574,6 @@ export class SessionModel {
     description,
     avatar,
     groupId,
-    tagId,
     type,
     ...res
   }: SessionItem & { agentsToSessions?: { agent: AgentItem }[] }):
@@ -612,7 +611,6 @@ export class SessionModel {
         group: groupId,
         members,
         meta,
-        tagId,
         type: 'group',
       } as LobeGroupSession;
     }
@@ -634,7 +632,6 @@ export class SessionModel {
         title: agent?.title ?? title ?? undefined,
       },
       model: (agent?.model as string | undefined) ?? '',
-      tagId,
       type: 'agent',
     } as LobeAgentSession;
   };

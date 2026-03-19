@@ -20,7 +20,7 @@ interface TopicState {
   createTopic: (
     sessionId: string,
     title: string,
-    options?: { messageIds?: string[] },
+    options?: { messageIds?: string[]; tagId?: string | null },
   ) => Promise<Topic | null>;
   favoriteTopic: (id: string) => Promise<void>;
   fetchTopics: (sessionId: string) => Promise<void>;
@@ -29,6 +29,7 @@ interface TopicState {
   switchTopic: (sessionId: string, topicId: string | null) => void;
   topicsBySession: Record<string, Topic[]>;
   updateTopic: (id: string, sessionId: string, title: string) => Promise<void>;
+  updateTopicTag: (id: string, sessionId: string, tagId?: string | null) => Promise<void>;
 }
 
 export const useTopicStore = create<TopicState>((set, get) => ({
@@ -87,7 +88,11 @@ export const useTopicStore = create<TopicState>((set, get) => ({
     await promise;
   },
 
-  createTopic: async (sessionId: string, title: string, options?: { messageIds?: string[] }) => {
+  createTopic: async (
+    sessionId: string,
+    title: string,
+    options?: { messageIds?: string[]; tagId?: string | null },
+  ) => {
     try {
       const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
       const sessionType = resolveSessionTypeWithFallback(sessionId, session?.type);
@@ -95,12 +100,14 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       const topicId = await topicApi.create(sessionId, title, {
         messageIds: options?.messageIds,
         sessionType,
+        tagId: options?.tagId,
       });
       if (topicId) {
         const placeholder: Topic = {
           id: topicId,
           title,
           sessionId,
+          tagId: options?.tagId ?? null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -175,9 +182,27 @@ export const useTopicStore = create<TopicState>((set, get) => ({
       },
     }));
     try {
-      await topicApi.update(id, title);
+      await topicApi.update(id, { title });
     } catch (err) {
       console.warn('[TopicStore] updateTopic error:', err);
+    }
+  },
+
+  updateTopicTag: async (id: string, sessionId: string, tagId?: string | null) => {
+    set((s) => ({
+      topicsBySession: {
+        ...s.topicsBySession,
+        [sessionId]: (s.topicsBySession[sessionId] ?? []).map((topic) =>
+          topic.id === id ? { ...topic, tagId: tagId ?? null } : topic,
+        ),
+      },
+    }));
+    try {
+      await topicApi.update(id, { tagId: tagId ?? null });
+    } catch (err) {
+      console.warn('[TopicStore] updateTopicTag error:', err);
+      get().fetchTopics(sessionId);
+      throw err;
     }
   },
 }));

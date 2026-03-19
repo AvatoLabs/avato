@@ -1,6 +1,5 @@
 import type { LobeSessions } from './agentSession';
 import type { LobeSessionGroups, SessionGroupId } from './sessionGroup';
-import type { SessionTagId } from './sessionTag';
 
 export * from './agentSession';
 export * from './sessionGroup';
@@ -15,7 +14,6 @@ export interface UpdateSessionParams {
   group?: SessionGroupId;
   meta?: any;
   pinned?: boolean;
-  tagId?: SessionTagId | null;
   updatedAt: Date;
 }
 

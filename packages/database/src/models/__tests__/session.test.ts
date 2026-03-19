@@ -11,7 +11,6 @@ import {
   messages,
   sessionGroups,
   sessions,
-  sessionTags,
   topics,
   users,
 } from '../../schemas';
@@ -84,11 +83,8 @@ describe('SessionModel', () => {
           { userId, name: 'Group 1', id: 'group1' },
           { userId, name: 'Group 2', id: 'group2' },
         ]);
-        await trx.insert(sessionTags).values([
-          { userId, color: '#1677FF', id: 'tag1', name: 'Tag 1' },
-        ]);
         await trx.insert(sessions).values([
-          { id: '1', userId, groupId: 'group1', tagId: 'tag1' },
+          { id: '1', userId, groupId: 'group1' },
           { id: '2', userId, groupId: 'group1' },
           { id: '23', userId, groupId: 'group1', pinned: true },
           { id: '3', userId, groupId: 'group2' },
@@ -106,7 +102,6 @@ describe('SessionModel', () => {
       expect(result.sessionGroups).toHaveLength(2);
       expect(result.sessionGroups[0].id).toBe('group1');
       expect(result.sessionGroups[0].name).toBe('Group 1');
-      expect((result.sessions.find((session) => session.id === '1') as any)?.tagId).toBe('tag1');
 
       expect(result.sessionGroups[1].id).toBe('group2');
     });

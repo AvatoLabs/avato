@@ -68,6 +68,7 @@ export interface ChatTopic extends Omit<BaseDataModel, 'meta'> {
   historySummary?: string;
   metadata?: ChatTopicMetadata;
   sessionId?: string;
+  tagId?: string | null;
   title: string;
   trigger?: string | null;
 }
@@ -105,6 +106,7 @@ export interface RecentTopic {
   id: string;
   /** Session or group ID for navigation (ChatDetail). For groups, equals group.id. */
   sessionId?: string | null;
+  tagId?: string | null;
   title: string | null;
   type: 'agent' | 'group';
   updatedAt: Date;
@@ -115,6 +117,7 @@ export interface CreateTopicParams {
   groupId?: string | null;
   messages?: string[];
   sessionId?: string | null;
+  tagId?: string | null;
   title: string;
 }
 
@@ -135,6 +138,7 @@ export interface QueryTopicParams {
    */
   isInbox?: boolean;
   pageSize?: number;
+  tagId?: string | null;
 }
 
 /**

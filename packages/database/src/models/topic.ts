@@ -30,6 +30,7 @@ export interface CreateTopicParams {
   messages?: string[];
   metadata?: ChatTopicMetadata;
   sessionId?: string | null;
+  tagId?: string | null;
   title?: string;
   trigger?: string | null;
 }
@@ -56,6 +57,7 @@ interface QueryTopicParams {
    */
   isInbox?: boolean;
   pageSize?: number;
+  tagId?: string | null;
 }
 
 export interface ListTopicsForMemoryExtractorCursor {
@@ -81,12 +83,14 @@ export class TopicModel {
     pageSize = 9999,
     groupId,
     isInbox,
+    tagId,
   }: QueryTopicParams = {}) => {
     const offset = current * pageSize;
     const excludeTriggerCondition =
       excludeTriggers && excludeTriggers.length > 0
         ? or(isNull(topics.trigger), not(inArray(topics.trigger, excludeTriggers)))
         : undefined;
+    const tagCondition = tagId ? eq(topics.tagId, tagId) : undefined;
 
     // If groupId is provided, query topics by groupId directly
     if (groupId) {
@@ -94,6 +98,7 @@ export class TopicModel {
         eq(topics.userId, this.userId),
         eq(topics.groupId, groupId),
         excludeTriggerCondition,
+        tagCondition,
       );
 
       const [items, totalResult] = await Promise.all([
@@ -104,6 +109,7 @@ export class TopicModel {
             historySummary: topics.historySummary,
             id: topics.id,
             metadata: topics.metadata,
+            tagId: topics.tagId,
             title: topics.title,
             updatedAt: topics.updatedAt,
           })
@@ -167,18 +173,33 @@ export class TopicModel {
             historySummary: topics.historySummary,
             id: topics.id,
             metadata: topics.metadata,
+            tagId: topics.tagId,
             title: topics.title,
             updatedAt: topics.updatedAt,
           })
           .from(topics)
-          .where(and(eq(topics.userId, this.userId), agentCondition, excludeTriggerCondition))
+          .where(
+            and(
+              eq(topics.userId, this.userId),
+              agentCondition,
+              excludeTriggerCondition,
+              tagCondition,
+            ),
+          )
           .orderBy(desc(topics.favorite), desc(topics.updatedAt))
           .limit(pageSize)
           .offset(offset),
         this.db
           .select({ count: count(topics.id) })
           .from(topics)
-          .where(and(eq(topics.userId, this.userId), agentCondition, excludeTriggerCondition)),
+          .where(
+            and(
+              eq(topics.userId, this.userId),
+              agentCondition,
+              excludeTriggerCondition,
+              tagCondition,
+            ),
+          ),
       ]);
 
       return { items, total: totalResult[0].count };
@@ -189,6 +210,7 @@ export class TopicModel {
       eq(topics.userId, this.userId),
       this.matchContainer(containerId),
       excludeTriggerCondition,
+      tagCondition,
     );
 
     const [items, totalResult] = await Promise.all([
@@ -201,6 +223,7 @@ export class TopicModel {
           id: topics.id,
           metadata: topics.metadata,
           sessionId: topics.sessionId,
+          tagId: topics.tagId,
           title: topics.title,
           updatedAt: topics.updatedAt,
         })
@@ -219,7 +242,7 @@ export class TopicModel {
 
     // Remove internal fields before returning
 
-    const cleanItems = items.map(({ agentId, sessionId, ...rest }) => rest);
+    const cleanItems = items.map(({ agentId: _agentId, sessionId: _sessionId, ...rest }) => rest);
 
     return { items: cleanItems, total: totalResult[0].count };
   };
@@ -238,10 +261,15 @@ export class TopicModel {
       .where(eq(topics.userId, this.userId));
   };
 
-  queryByKeyword = async (keyword: string, containerId?: string | null): Promise<TopicItem[]> => {
+  queryByKeyword = async (
+    keyword: string,
+    containerId?: string | null,
+    tagId?: string | null,
+  ): Promise<TopicItem[]> => {
     if (!keyword) return [];
 
     const keywordLowerCase = keyword.toLowerCase();
+    const tagCondition = tagId ? eq(topics.tagId, tagId) : undefined;
 
     // Query topics matching by title
     const topicsByTitle = await this.db.query.topics.findMany({
@@ -249,6 +277,7 @@ export class TopicModel {
       where: and(
         eq(topics.userId, this.userId),
         this.matchContainer(containerId),
+        tagCondition,
         ilike(topics.title, `%${keywordLowerCase}%`),
       ),
     });
@@ -264,6 +293,7 @@ export class TopicModel {
           ilike(messages.content, `%${keywordLowerCase}%`),
           eq(topics.userId, this.userId),
           this.matchContainer(containerId),
+          tagCondition,
         ),
       )
       .groupBy(messages.topicId);
@@ -279,7 +309,7 @@ export class TopicModel {
 
     const topicsByMessages = await this.db.query.topics.findMany({
       orderBy: [desc(topics.updatedAt)],
-      where: and(eq(topics.userId, this.userId), inArray(topics.id, topicIds)),
+      where: and(eq(topics.userId, this.userId), inArray(topics.id, topicIds), tagCondition),
     });
 
     // Merge results and deduplicate
@@ -383,6 +413,7 @@ export class TopicModel {
         groupId: topics.groupId,
         id: topics.id,
         sessionId: topics.sessionId,
+        tagId: topics.tagId,
         title: topics.title,
         updatedAt: topics.updatedAt,
       })
@@ -423,6 +454,7 @@ export class TopicModel {
         groupId: params.groupId || null,
         id,
         sessionId: params.sessionId || null,
+        tagId: params.tagId || null,
         userId: this.userId,
       };
 
@@ -454,6 +486,7 @@ export class TopicModel {
             groupId: params.sessionId ? null : params.groupId,
             id: params.id || this.genId(),
             sessionId: params.groupId ? null : params.sessionId,
+            tagId: params.tagId || null,
             title: params.title,
             trigger: params.trigger,
             userId: this.userId,

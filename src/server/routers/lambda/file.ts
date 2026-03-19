@@ -442,22 +442,33 @@ export const fileRouter = router({
     .input(
       z.object({
         id: z.string(),
+        name: z.string().optional(),
         parentId: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, parentId } = input;
+      const { id, name, parentId } = input;
 
-      // Resolve parentId if it's a slug (otherwise use as-is)
-      let resolvedParentId: string | null | undefined = parentId;
-      if (parentId) {
-        const docBySlug = await ctx.documentModel.findBySlug(parentId);
-        if (docBySlug) {
-          resolvedParentId = docBySlug.id;
-        }
+      const updates: Record<string, unknown> = {};
+
+      if (name !== undefined) {
+        updates.name = name;
       }
 
-      await ctx.fileModel.update(id, { parentId: resolvedParentId });
+      if (parentId !== undefined) {
+        let resolvedParentId: string | null | undefined = parentId;
+        if (parentId) {
+          const docBySlug = await ctx.documentModel.findBySlug(parentId);
+          if (docBySlug) {
+            resolvedParentId = docBySlug.id;
+          }
+        }
+        updates.parentId = resolvedParentId;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await ctx.fileModel.update(id, updates);
+      }
 
       return { success: true };
     }),

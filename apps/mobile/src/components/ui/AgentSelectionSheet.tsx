@@ -174,7 +174,8 @@ export default function AgentSelectionSheet({
         >
           <Animated.View entering={enteringModalContent()} style={{ maxHeight: '80%' }}>
             <Pressable
-            className="rounded-t-2xl bg-card"
+            className="rounded-t-2xl"
+            style={{ backgroundColor: colors.card }}
             onPress={(event) => event.stopPropagation()}
           >
           <View className="items-center pb-2 pt-3">
@@ -182,7 +183,7 @@ export default function AgentSelectionSheet({
           </View>
 
           <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
-            <Text className="text-[18px] font-bold tracking-tight text-foreground">{title}</Text>
+            <Text className="text-[18px] font-bold tracking-tight" style={{ color: colors.foreground }}>{title}</Text>
             <TouchableOpacity
               activeOpacity={0.75}
               disabled={submitDisabled}
@@ -226,14 +227,14 @@ export default function AgentSelectionSheet({
             >
             {showTitleInput ? (
               <View className="mb-4">
-                <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
+                <Text className="mb-1.5 px-1 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
                   {titleInputLabel || t.agentConfigName}
                 </Text>
                 <TextInput
-                  className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
+                  className="rounded-2xl px-4 py-3 text-[15px]"
                   placeholder={titleInputPlaceholder}
                   placeholderTextColor={colors.secondaryText}
-                  style={{ color: colors.foreground }}
+                  style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
                   value={draftTitle}
                   onChangeText={setDraftTitle}
                 />
@@ -243,20 +244,21 @@ export default function AgentSelectionSheet({
             {showSupervisorModelPicker ? (
               <TouchableOpacity
                 activeOpacity={0.75}
-                className="mb-4 flex-row items-center justify-between rounded-2xl bg-foreground/[0.04] px-4 py-3"
+                className="mb-4 flex-row items-center justify-between rounded-2xl px-4 py-3"
+                style={{ backgroundColor: colors.fillTertiary }}
                 onPress={() => {
                   haptics.light();
                   setSupervisorModelDrawerVisible(true);
                 }}
               >
-                <Text className="text-[14px] font-medium text-foreground">
+                <Text className="text-[14px] font-medium" style={{ color: colors.foreground }}>
                   {t.groupCreateSupervisorModel}
                 </Text>
                 <View className="flex-row items-center">
                   <Text
-                    className="mr-1.5 text-[13px] text-secondary/60"
+                    className="mr-1.5 text-[13px]"
                     numberOfLines={1}
-                    style={{ maxWidth: 140 }}
+                    style={{ color: colors.secondaryText, maxWidth: 140 }}
                   >
                     {supervisorModelLabel}
                   </Text>
@@ -270,14 +272,14 @@ export default function AgentSelectionSheet({
             ) : null}
 
             <View className="mb-4">
-              <Text className="mb-1.5 px-1 text-[12px] font-medium text-secondary/65">
+              <Text className="mb-1.5 px-1 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
                 {t.search}
               </Text>
               <TextInput
-                className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] text-foreground"
+                className="rounded-2xl px-4 py-3 text-[15px]"
                 placeholder={t.search}
+                style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
                 placeholderTextColor={colors.secondaryText}
-                style={{ color: colors.foreground }}
                 value={keyword}
                 onChangeText={setKeyword}
               />
@@ -288,9 +290,9 @@ export default function AgentSelectionSheet({
                 <ActivityIndicator color={colors.primary} />
               </View>
             ) : filteredAgents.length === 0 ? (
-              <View className="rounded-2xl bg-foreground/[0.03] px-4 py-5">
-                <Text className="text-[14px] font-semibold text-foreground">{t.agentsEmpty}</Text>
-                <Text className="mt-1 text-[12px] leading-5 text-secondary/60">
+              <View className="rounded-2xl px-4 py-5" style={{ backgroundColor: colors.fillQuaternary }}>
+                <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>{t.agentsEmpty}</Text>
+                <Text className="mt-1 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
                   {t.agentsEmptyDesc}
                 </Text>
               </View>
@@ -307,7 +309,7 @@ export default function AgentSelectionSheet({
                     style={{
                       backgroundColor: selected
                         ? `${colors.primary}12`
-                        : 'rgba(15,23,42,0.03)',
+                        : colors.fillTertiary,
                       borderColor: selected ? `${colors.primary}36` : 'transparent',
                       borderWidth: 1,
                     }}
@@ -326,10 +328,10 @@ export default function AgentSelectionSheet({
                   >
                     <AgentAvatar agent={agent} />
                     <View className="flex-1">
-                      <Text className="text-[14px] font-semibold text-foreground">
+                      <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>
                         {agent.title || t.settingsDefaultAgent}
                       </Text>
-                      <Text className="mt-0.5 text-[12px] leading-5 text-secondary/60">
+                      <Text className="mt-0.5 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
                         {agent.description || t.agentNoDescription}
                       </Text>
                     </View>

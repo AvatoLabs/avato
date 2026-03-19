@@ -31,12 +31,14 @@ import {
   FolderOpen,
   Grid3X3,
   List,
+  Pencil,
   Plus,
   Search,
   Share2,
+  Trash2,
   X,
 } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -44,6 +46,7 @@ import {
   FlatList,
   Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   Share,
@@ -60,6 +63,7 @@ import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import EmptyState from '../components/ui/EmptyState';
+import PromptModal from '../components/ui/PromptModal';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
@@ -392,6 +396,7 @@ const FilePreviewModal = memo(
     const colors = useThemeColors();
     const [imgLoading, setImgLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
     const [previewIndex, setPreviewIndex] = useState(0);
     const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
     const [textContent, setTextContent] = useState<string | null>(null);
@@ -419,6 +424,7 @@ const FilePreviewModal = memo(
       setPdfDataUrl(null);
       setTextContent(null);
       setPreviewLoadFailed(false);
+      setDownloadProgress(0);
     }, [apiBaseUrl, item?.id, visible]);
 
     const handlePreviewError = useCallback(() => {
@@ -518,9 +524,10 @@ const FilePreviewModal = memo(
     const handleDownload = async () => {
       if (downloading) return;
       setDownloading(true);
+      setDownloadProgress(0);
       try {
         await fileApi.download(item, {
-          onProgress: () => undefined,
+          onProgress: (p) => setDownloadProgress(p),
         });
         haptics.success();
         toast.show('success', t.resourceDownloaded);
@@ -528,6 +535,7 @@ const FilePreviewModal = memo(
         toast.show('error', t.resourceDownloadFailed);
       } finally {
         setDownloading(false);
+        setDownloadProgress(0);
       }
     };
 
@@ -609,7 +617,11 @@ const FilePreviewModal = memo(
                 onPress={() => void handleDownload()}
               >
                 {downloading ? (
-                  <ActivityIndicator color={imageFile ? '#fff' : colors.primary} size="small" />
+                  <View className="min-w-[28px] items-center">
+                    <Text className="text-[11px] font-medium" style={{ color: imageFile ? '#fff' : colors.primary }}>
+                      {downloadProgress}%
+                    </Text>
+                  </View>
                 ) : (
                   <Download
                     color={imageFile ? '#fff' : colors.primary}
@@ -772,11 +784,16 @@ const FilePreviewModal = memo(
                   onPress={() => void handleDownload()}
                 >
                   {downloading ? (
-                    <ActivityIndicator color={colors.iconOnPrimary} size="small" style={{ marginRight: 8 }} />
+                    <>
+                      <ActivityIndicator color={colors.iconOnPrimary} size="small" style={{ marginRight: 8 }} />
+                      <Text className="text-white text-[15px] font-semibold">{downloadProgress}%</Text>
+                    </>
                   ) : (
-                    <Download color={colors.iconOnPrimary} size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                    <>
+                      <Download color={colors.iconOnPrimary} size={18} strokeWidth={2} style={{ marginRight: 8 }} />
+                      <Text className="text-white text-[15px] font-semibold">{t.resourceDownload}</Text>
+                    </>
                   )}
-                  <Text className="text-white text-[15px] font-semibold">{t.resourceDownload}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -794,9 +811,11 @@ FilePreviewModal.displayName = 'FilePreviewModal';
 interface FileRowProps {
   apiBaseUrl: string;
   isSelected?: boolean;
+  isVisible?: boolean;
   item: FileListItem;
   onDelete: (id: string, name: string, isFolder: boolean) => void;
   onFolderPress?: (item: FileListItem) => void;
+  onLongPressItem?: (item: FileListItem) => void;
   onMoveToFolder?: (item: FileListItem) => void;
   onPress: (item: FileListItem) => void;
   onSelect?: (item: FileListItem) => void;
@@ -807,8 +826,10 @@ interface FileRowProps {
 function FileRow({
   item,
   isSelected,
+  isVisible = true,
   onDelete,
   onFolderPress,
+  onLongPressItem,
   onMoveToFolder,
   onPress,
   onSelect,
@@ -822,6 +843,7 @@ function FileRow({
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const [tryDirectUrl, setTryDirectUrl] = useState(true);
   const itemIsFolder = isFolder(item);
   const isImageFile = !itemIsFolder && isImage(item.fileType, item.name);
   const thumbnailCandidates = isImageFile
@@ -833,13 +855,19 @@ function FileRow({
     setThumbnailIndex(0);
     setThumbnailDataUrl(null);
     setThumbnailFailed(false);
+    setTryDirectUrl(true);
   }, [apiBaseUrl, item.id, item.url]);
+
+  const handleDirectUrlError = useCallback(() => {
+    setTryDirectUrl(false);
+  }, []);
 
   const handleThumbnailError = useCallback(() => {
     setThumbnailDataUrl(null);
 
     if (thumbnailIndex < thumbnailCandidates.length - 1) {
       setThumbnailIndex((current) => current + 1);
+      setTryDirectUrl(true);
       return;
     }
 
@@ -854,11 +882,13 @@ function FileRow({
     );
   }, []);
 
-  // Fetch image via redirect (native Image may not follow 302), convert to data URL
+  // Fallback: fetch via redirect when direct URL fails (ExpoImage may not follow 302 on some platforms)
   useEffect(() => {
-    if (!thumbnailUrl || !isImageFile) {
-      setThumbnailDataUrl(null);
-      setThumbnailFailed(false);
+    if (!isVisible || !thumbnailUrl || !isImageFile || tryDirectUrl) {
+      if (!tryDirectUrl && isVisible) {
+        setThumbnailDataUrl(null);
+        setThumbnailFailed(false);
+      }
       return;
     }
 
@@ -868,39 +898,18 @@ function FileRow({
 
     const loadThumbnail = async () => {
       try {
-        // /f/:id is public and redirects to pre-signed URL. Try without auth headers first
-        // to avoid passing Authorization/OIDC headers to object storage on redirect.
         let res = await fetch(thumbnailUrl, { redirect: 'follow' });
         if (cancelled) return;
         if (__DEV__ && !isLikelyImageResponse(res)) {
-          console.warn('[ResourceScreen] thumbnail non-image response, retry with auth', {
-            contentType: res.headers.get('content-type') || '',
-            status: res.status,
-            url: thumbnailUrl,
-          });
-        }
-
-        if (!isLikelyImageResponse(res) && apiBaseUrl) {
           const authHeaders = await getAuthHeaders(apiBaseUrl);
           if (cancelled) return;
-
           if (Object.keys(authHeaders).length > 0) {
-            res = await fetch(thumbnailUrl, {
-              headers: authHeaders,
-              redirect: 'follow',
-            });
+            res = await fetch(thumbnailUrl, { headers: authHeaders, redirect: 'follow' });
           }
         }
         if (cancelled) return;
 
         if (!isLikelyImageResponse(res)) {
-          if (__DEV__) {
-            console.warn('[ResourceScreen] thumbnail failed after retries', {
-              contentType: res.headers.get('content-type') || '',
-              status: res.status,
-              url: thumbnailUrl,
-            });
-          }
           handleThumbnailError();
           return;
         }
@@ -946,9 +955,14 @@ function FileRow({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, thumbnailUrl, isImageFile, item.fileType, handleThumbnailError, isLikelyImageResponse]);
+  }, [isVisible, apiBaseUrl, thumbnailUrl, isImageFile, tryDirectUrl, item.fileType, handleThumbnailError, isLikelyImageResponse]);
 
-  const showThumbnail = thumbnailDataUrl && !thumbnailFailed;
+  const thumbnailSource = thumbnailDataUrl
+    ? { uri: thumbnailDataUrl }
+    : isVisible && tryDirectUrl && thumbnailUrl
+      ? { uri: thumbnailUrl }
+      : null;
+  const showThumbnail = !!thumbnailSource && !thumbnailFailed;
 
   const handlePress = () => {
     if (selectMode && onSelect) {
@@ -971,6 +985,8 @@ function FileRow({
         haptics.medium();
         if (selectMode && onSelect) {
           onSelect(item);
+        } else if (onLongPressItem) {
+          onLongPressItem(item);
         } else if (itemIsFolder) {
           onDelete(item.id, item.name, true);
         } else if (showFolderActions && onMoveToFolder) {
@@ -992,14 +1008,14 @@ function FileRow({
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
         {itemIsFolder ? (
           <Folder color={iconColor} size={26} strokeWidth={tokens.icon.strokeWidth} />
-        ) : showThumbnail ? (
+        ) : showThumbnail && thumbnailSource ? (
           <ExpoImage
             cachePolicy="memory-disk"
             className="h-12 w-12 rounded-xl"
             contentFit="cover"
-            source={thumbnailDataUrl!}
+            source={thumbnailSource}
             transition={100}
-            onError={handleThumbnailError}
+            onError={tryDirectUrl ? handleDirectUrlError : handleThumbnailError}
           />
         ) : (
           <FileTypeIcon color={iconColor} fileName={item.name} fileType={item.fileType} size={26} />
@@ -1038,6 +1054,7 @@ export default function ResourceScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [category, setCategory] = useState<FileCategory>('all');
   const [searchText, setSearchText] = useState('');
   const [apiBase, setApiBase] = useState('');
@@ -1064,6 +1081,23 @@ export default function ResourceScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [actionItem, setActionItem] = useState<FileListItem | null>(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
+  const viewabilityConfig = useMemo(
+    () => ({ itemVisiblePercentThreshold: 10, minimumViewTime: 100 }),
+    [],
+  );
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: FileListItem }> }) => {
+    setVisibleIds((prev) => {
+      const next = new Set(prev);
+      for (const { item } of viewableItems) {
+        next.add(item.id);
+      }
+      return next;
+    });
+  }, []);
   const nextOffsetRef = useRef(0);
   const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
@@ -1081,6 +1115,64 @@ export default function ResourceScreen() {
     setSelectMode(false);
     setSelectedIds(new Set());
   }, []);
+
+  // ── Data (defined early for handleBatchDelete etc.) ──────────────────
+
+  const loadLibraries = useCallback(async () => {
+    try {
+      const list = await knowledgeBaseApi.list();
+      setLibraries(list ?? []);
+    } catch {
+      setLibraries([]);
+    }
+  }, []);
+
+  const loadFolderBreadcrumb = useCallback(async (slug: string) => {
+    try {
+      const chain = await resourceApi.getFolderBreadcrumb(slug);
+      setFolderBreadcrumb(chain ?? []);
+    } catch {
+      setFolderBreadcrumb([]);
+    }
+  }, []);
+
+  const loadFiles = useCallback(
+    async (silent = false, append = false) => {
+      const ticket = ++loadRequestRef.current;
+      const loadOffset = append ? nextOffsetRef.current : 0;
+      if (!silent) setLoading(append ? false : true);
+      if (append) setLoadingMore(true);
+      try {
+        const base = await getApiUrl();
+        setApiBase(base);
+        const result = await resourceApi.getKnowledgeItems({
+          category: category === 'all' ? undefined : category,
+          knowledgeBaseId: libraryId ?? undefined,
+          limit: 50,
+          offset: loadOffset,
+          parentId: currentFolderSlug ?? null,
+          q: searchText || undefined,
+          sorter,
+          sortType: sortOrder,
+        });
+        if (ticket !== loadRequestRef.current) return;
+        const items = result?.items ?? [];
+        setHasMore(result?.hasMore ?? false);
+        nextOffsetRef.current = loadOffset + items.length;
+        setFiles(append ? (prev) => [...prev, ...items] : items);
+      } catch {
+        if (ticket !== loadRequestRef.current) return;
+        if (!append) setFiles([]);
+      } finally {
+        if (ticket === loadRequestRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [category, searchText, libraryId, currentFolderSlug, sorter, sortOrder],
+  );
 
   const handleBatchDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -1150,64 +1242,6 @@ export default function ResourceScreen() {
     setPreviewItem(item);
     setPreviewVisible(true);
   }, []);
-
-  // ── Data ─────────────────────────────────────────────────────────
-
-  const loadLibraries = useCallback(async () => {
-    try {
-      const list = await knowledgeBaseApi.list();
-      setLibraries(list ?? []);
-    } catch {
-      setLibraries([]);
-    }
-  }, []);
-
-  const loadFolderBreadcrumb = useCallback(async (slug: string) => {
-    try {
-      const chain = await resourceApi.getFolderBreadcrumb(slug);
-      setFolderBreadcrumb(chain ?? []);
-    } catch {
-      setFolderBreadcrumb([]);
-    }
-  }, []);
-
-  const loadFiles = useCallback(
-    async (silent = false, append = false) => {
-      const ticket = ++loadRequestRef.current;
-      const loadOffset = append ? nextOffsetRef.current : 0;
-      if (!silent) setLoading(append ? false : true);
-      if (append) setLoadingMore(true);
-      try {
-        const base = await getApiUrl();
-        setApiBase(base);
-        const result = await resourceApi.getKnowledgeItems({
-          category: category === 'all' ? undefined : category,
-          knowledgeBaseId: libraryId ?? undefined,
-          limit: 50,
-          offset: loadOffset,
-          parentId: currentFolderSlug ?? null,
-          q: searchText || undefined,
-          sorter,
-          sortType: sortOrder,
-        });
-        if (ticket !== loadRequestRef.current) return;
-        const items = result?.items ?? [];
-        setHasMore(result?.hasMore ?? false);
-        nextOffsetRef.current = loadOffset + items.length;
-        setFiles(append ? (prev) => [...prev, ...items] : items);
-      } catch {
-        if (ticket !== loadRequestRef.current) return;
-        if (!append) setFiles([]);
-      } finally {
-        if (ticket === loadRequestRef.current) {
-          setLoading(false);
-          setRefreshing(false);
-          setLoadingMore(false);
-        }
-      }
-    },
-    [category, searchText, libraryId, currentFolderSlug, sorter, sortOrder],
-  );
 
   useEffect(() => {
     useConnectionStore.getState().checkConnection();
@@ -1297,9 +1331,11 @@ export default function ResourceScreen() {
   const doUpload = useCallback(
     async (uri: string, name: string, mimeType: string) => {
       setUploading(true);
+      setUploadProgress(0);
       try {
         const created = await fileApi.upload(uri, name, mimeType, {
           knowledgeBaseId: libraryId ?? undefined,
+          onProgress: (p) => setUploadProgress(p),
           parentId: currentFolderSlug ?? undefined,
         });
         haptics.success();
@@ -1329,6 +1365,7 @@ export default function ResourceScreen() {
         toast.show('error', t.resourceUploadFailed);
       } finally {
         setUploading(false);
+        setUploadProgress(0);
       }
     },
     [loadFiles, libraryId, currentFolderSlug, t, toast],
@@ -1399,6 +1436,63 @@ export default function ResourceScreen() {
       ]);
     },
     [t, toast],
+  );
+
+  const closeActionSheet = useCallback(() => setActionItem(null), []);
+
+  const handleLongPressItem = useCallback((item: FileListItem) => {
+    setActionItem(item);
+  }, []);
+
+  const handleRenameStart = useCallback(() => {
+    if (!actionItem) return;
+    setRenameValue(actionItem.name || '');
+    setRenameModalVisible(true);
+    closeActionSheet();
+  }, [actionItem, closeActionSheet]);
+
+  const handleRenameSubmit = useCallback(
+    async (newName: string) => {
+      if (!actionItem || !newName.trim()) return;
+      setRenameModalVisible(false);
+      try {
+        const itemIsFolder = isFolder(actionItem);
+        if (itemIsFolder) {
+          await resourceApi.updateDocument(actionItem.id, { title: newName.trim() });
+        } else {
+          await fileApi.update(actionItem.id, { name: newName.trim() });
+        }
+        haptics.success();
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === actionItem.id ? { ...f, name: newName.trim() } : f,
+          ),
+        );
+        toast.show('success', t.resourceRenamed);
+      } catch {
+        toast.show('error', t.resourceRenameFailed);
+      }
+    },
+    [actionItem, t, toast],
+  );
+
+  const handleShare = useCallback(
+    async (item: FileListItem) => {
+      closeActionSheet();
+      const base = apiBase?.replace(/\/$/, '') || '';
+      const url = base ? `${base}/f/${item.id}` : '';
+      if (!url) return;
+      try {
+        await Share.share(
+          Platform.OS === 'ios'
+            ? { title: item.name, url }
+            : { message: url, title: item.name },
+        );
+      } catch {
+        toast.show('error', t.resourceShareFailed);
+      }
+    },
+    [apiBase, closeActionSheet, t, toast],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
@@ -1646,6 +1740,34 @@ export default function ResourceScreen() {
           numColumns={viewMode === 'grid' ? 3 : 1}
           ListEmptyComponent={
             <EmptyState
+              action={
+                <View className="flex-row flex-wrap justify-center gap-3 mt-2">
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    className="flex-row items-center rounded-2xl px-5 py-3"
+                    style={{ backgroundColor: colors.primary }}
+                    onPress={handleUpload}
+                  >
+                    <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
+                    <Text className="ml-2 text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                      {t.resourceUpload}
+                    </Text>
+                  </TouchableOpacity>
+                  {libraryId && (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="flex-row items-center rounded-2xl px-5 py-3"
+                      style={{ backgroundColor: colors.primary + '20', borderWidth: 1, borderColor: colors.primary }}
+                      onPress={() => setCreateFolderVisible(true)}
+                    >
+                      <Folder color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                      <Text className="ml-2 text-[15px] font-semibold" style={{ color: colors.primary }}>
+                        {t.resourceNewFolder}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              }
               description={
                 currentFolderSlug ? t.resourceFolderEmptyDesc : t.resourceEmptyDesc
               }
@@ -1689,6 +1811,8 @@ export default function ResourceScreen() {
           }
           onEndReached={hasMore && !loadingMore ? handleLoadMore : undefined}
           onEndReachedThreshold={0.3}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           renderItem={({ item }) =>
             viewMode === 'grid' ? (
               <TouchableOpacity
@@ -1703,7 +1827,11 @@ export default function ResourceScreen() {
                       : handlePreview(item)
                 }
                 onLongPress={() =>
-                  selectMode ? toggleSelect(item) : handleDelete(item.id, item.name, isFolder(item))
+                  selectMode
+                    ? toggleSelect(item)
+                    : libraryId
+                      ? handleLongPressItem(item)
+                      : handleDelete(item.id, item.name, isFolder(item))
                 }
               >
                 {selectMode && (
@@ -1738,14 +1866,23 @@ export default function ResourceScreen() {
                 <Text className="mt-1 text-center text-[11px] text-foreground" numberOfLines={2}>
                   {item.name}
                 </Text>
+                <Text
+                  className="mt-0.5 text-center text-[10px]"
+                  numberOfLines={1}
+                  style={{ color: colors.secondaryText }}
+                >
+                  {isFolder(item) ? formatDate(item.createdAt) : formatBytes(item.size)}
+                </Text>
               </TouchableOpacity>
             ) : (
               <FileRow
                 apiBaseUrl={apiBase}
                 isSelected={selectedIds.has(item.id)}
+                isVisible={visibleIds.size === 0 || visibleIds.has(item.id)}
                 item={item}
                 onDelete={handleDelete}
                 onFolderPress={libraryId ? handleFolderPress : undefined}
+                onLongPressItem={libraryId ? handleLongPressItem : undefined}
                 onMoveToFolder={
                   libraryId
                     ? (i) => {
@@ -1778,7 +1915,14 @@ export default function ResourceScreen() {
             onPress={uploading ? undefined : handleUpload}
           >
             {uploading ? (
-              <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+              <View className="items-center">
+                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+                {uploadProgress > 0 && (
+                  <Text className="text-[9px] font-medium mt-0.5" style={{ color: colors.iconOnPrimary }}>
+                    {uploadProgress}%
+                  </Text>
+                )}
+              </View>
             ) : (
               <Plus color={colors.iconOnPrimary} size={26} strokeWidth={2.5} />
             )}
@@ -1806,6 +1950,99 @@ export default function ResourceScreen() {
         item={previewItem}
         visible={previewVisible}
         onClose={() => setPreviewVisible(false)}
+      />
+
+      {/* Item Action Sheet */}
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={!!actionItem}
+        onRequestClose={closeActionSheet}
+      >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={closeActionSheet}>
+          <Pressable
+            className="bg-card rounded-t-2xl overflow-hidden"
+            style={{ paddingBottom: insets.bottom + 16, maxHeight: '72%' }}
+            onPress={(e: any) => e.stopPropagation?.()}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            {actionItem ? (
+              <View className="px-5">
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    haptics.light();
+                    handlePreview(actionItem);
+                    closeActionSheet();
+                  }}
+                >
+                  <Eye color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.notebookPreview}</Text>
+                </Pressable>
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    haptics.light();
+                    setMoveToFolderItem(actionItem);
+                    setBatchMoveIds(new Set());
+                    setMoveFolderStack([null]);
+                    closeActionSheet();
+                  }}
+                >
+                  <Folder color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.resourceMoveToFolder}</Text>
+                </Pressable>
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={handleRenameStart}
+                >
+                  <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+                </Pressable>
+                {!isFolder(actionItem) && (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => void handleShare(actionItem)}
+                  >
+                    <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.msgActionShare}</Text>
+                  </Pressable>
+                )}
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    closeActionSheet();
+                    handleDelete(actionItem.id, actionItem.name, isFolder(actionItem));
+                  }}
+                >
+                  <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <View className="px-5 mt-2">
+              <Pressable
+                className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
+                onPress={closeActionSheet}
+              >
+                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>{t.cancel}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <PromptModal
+        defaultValue={renameValue}
+        placeholder={t.resourceRenamePlaceholder}
+        submitLabel={t.confirm}
+        title={t.actionRename}
+        visible={renameModalVisible}
+        onCancel={() => setRenameModalVisible(false)}
+        onSubmit={handleRenameSubmit}
       />
 
       {/* Library select modal */}
@@ -1988,73 +2225,59 @@ export default function ResourceScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Sort menu modal */}
+      {/* Sort menu — compact dropdown-style overlay */}
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
+        animationType="fade"
         transparent
         visible={sortMenuVisible}
         onRequestClose={() => setSortMenuVisible(false)}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          className="flex-1 justify-end bg-black/40"
+        <Pressable
+          className="flex-1 items-end px-5 pt-24"
+          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
           onPress={() => setSortMenuVisible(false)}
         >
-          <View
-            className="rounded-t-2xl bg-card"
-            style={{ paddingBottom: insets.bottom + 16 }}
+          <Pressable
+            className="rounded-2xl bg-card py-2 shadow-lg"
+            style={{ minWidth: 180 }}
+            onPress={(e: any) => e.stopPropagation?.()}
           >
-            <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <Text className="px-5 text-[18px] font-bold text-foreground">
-              {t.resourceSortBy}
-            </Text>
-            <View className="mt-2 px-5 pb-4">
-              {[
-                { sorter: 'createdAt' as const, order: 'desc' as const, label: t.resourceSortNewest },
-                { sorter: 'createdAt' as const, order: 'asc' as const, label: t.resourceSortOldest },
-                { sorter: 'name' as const, order: 'asc' as const, label: `${t.resourceSortName} A-Z` },
-                { sorter: 'name' as const, order: 'desc' as const, label: `${t.resourceSortName} Z-A` },
-                { sorter: 'size' as const, order: 'asc' as const, label: `${t.resourceSortSize} ↑` },
-                { sorter: 'size' as const, order: 'desc' as const, label: `${t.resourceSortSize} ↓` },
-              ].map((opt) => (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="flex-row items-center rounded-xl px-4 py-3"
-                  key={`${opt.sorter}-${opt.order}`}
+            {[
+              { sorter: 'createdAt' as const, order: 'desc' as const, label: t.resourceSortNewest },
+              { sorter: 'createdAt' as const, order: 'asc' as const, label: t.resourceSortOldest },
+              { sorter: 'name' as const, order: 'asc' as const, label: `${t.resourceSortName} A-Z` },
+              { sorter: 'name' as const, order: 'desc' as const, label: `${t.resourceSortName} Z-A` },
+              { sorter: 'size' as const, order: 'asc' as const, label: `${t.resourceSortSize} ↑` },
+              { sorter: 'size' as const, order: 'desc' as const, label: `${t.resourceSortSize} ↓` },
+            ].map((opt) => (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="px-4 py-2.5"
+                key={`${opt.sorter}-${opt.order}`}
+                onPress={() => {
+                  setSorter(opt.sorter);
+                  setSortOrder(opt.order);
+                  setSortMenuVisible(false);
+                  nextOffsetRef.current = 0;
+                  void loadFiles(false, false);
+                }}
+              >
+                <Text
+                  className="text-[15px] font-medium"
                   style={{
-                    backgroundColor:
+                    color:
                       sorter === opt.sorter && sortOrder === opt.order
-                        ? colors.primary + '20'
-                        : colors.fillTertiary,
-                    marginTop: 4,
-                  }}
-                  onPress={() => {
-                    setSorter(opt.sorter);
-                    setSortOrder(opt.order);
-                    setSortMenuVisible(false);
-                    nextOffsetRef.current = 0;
-                    void loadFiles(false, false);
+                        ? colors.primary
+                        : colors.foreground,
                   }}
                 >
-                  <Text
-                    className="text-[16px] font-medium"
-                    style={{
-                      color:
-                        sorter === opt.sorter && sortOrder === opt.order
-                          ? colors.primary
-                          : colors.foreground,
-                    }}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </TouchableOpacity>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* Create folder modal */}

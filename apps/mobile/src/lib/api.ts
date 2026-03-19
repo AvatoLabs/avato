@@ -195,6 +195,8 @@ const uploadFileToSameOrigin = async (
   }
 };
 
+const LARGE_FILE_SKIP_HASH_BYTES = 10 * 1024 * 1024; // 10MB
+
 const getLocalFileDescriptor = async (uri: string) => {
   const info = await FileSystem.getInfoAsync(uri, { md5: true });
 
@@ -202,10 +204,17 @@ const getLocalFileDescriptor = async (uri: string) => {
     throw new Error('local file not found');
   }
 
+  const size = info.size ?? 0;
+
   if (info.md5) {
+    return { hash: info.md5, size };
+  }
+
+  // Large files: skip base64 read to avoid OOM (sacrifice deduplication)
+  if (size > LARGE_FILE_SKIP_HASH_BYTES) {
     return {
-      hash: info.md5,
-      size: info.size || 0,
+      hash: `large-${size}-${Date.now()}`,
+      size,
     };
   }
 
@@ -213,7 +222,7 @@ const getLocalFileDescriptor = async (uri: string) => {
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  const approxSize = info.size || Math.floor((base64.length * 3) / 4);
+  const approxSize = size || Math.floor((base64.length * 3) / 4);
 
   return {
     hash: computeStringHash(base64),
@@ -660,10 +669,9 @@ export interface AgentQueryItem {
 
 export const agentApi = {
   /** Create a new agent (with session). Returns { agentId, sessionId }. */
-  create: (config?: Record<string, unknown>, tagId?: string) =>
+  create: (config?: Record<string, unknown>) =>
     trpcMutate<{ agentId: string; sessionId: string }>('agent.createAgent', {
       config,
-      tagId,
     }),
 
   queryAgents: (params?: { keyword?: string; limit?: number; offset?: number }) =>
@@ -711,7 +719,6 @@ export const sessionApi = {
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
-      tagId: s.tagId ?? undefined,
       type: s.type ?? 'agent',
     }));
   },
@@ -731,7 +738,7 @@ export const sessionApi = {
         systemRole: config?.systemPrompt,
         title: config?.title || 'New Session',
       },
-      session: { tagId: config?.tagId },
+      session: {},
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),
@@ -740,8 +747,6 @@ export const sessionApi = {
     trpcMutate('session.updateSession', { id, value: { pinned: true } }),
   unpin: (id: string) =>
     trpcMutate('session.updateSession', { id, value: { pinned: false } }),
-  updateTag: (id: string, tagId?: string | null) =>
-    trpcMutate('session.updateSession', { id, value: { tagId: tagId || null } }),
   duplicate: (id: string, title = 'Duplicated') =>
     trpcMutate<string | undefined>('session.cloneSession', { id, newTitle: title }),
   rename: (id: string, title: string) =>
@@ -762,7 +767,6 @@ export const sessionApi = {
       chatConfig: s.config?.chatConfig ?? s.chatConfig,
       model: s.model || s.config?.model || undefined,
       provider: s.config?.provider || undefined,
-      tagId: s.tagId ?? undefined,
       type: s.type ?? 'agent',
     }));
   },
@@ -1724,11 +1728,11 @@ export const aiChatApi = {
 
 // ── Topic API ───────────────────────────────────────────────────────
 export const topicApi = {
-  list: (containerId: string, options?: { sessionType?: 'agent' | 'group' }) => {
+  list: (containerId: string, options?: { sessionType?: 'agent' | 'group'; tagId?: string }) => {
     const params =
       options?.sessionType === 'group'
-        ? { groupId: containerId }
-        : { sessionId: containerId };
+        ? { groupId: containerId, tagId: options?.tagId }
+        : { sessionId: containerId, tagId: options?.tagId };
     return trpcQuery<{ items: Topic[]; total: number } | Topic[]>(
       'topic.getTopics',
       params,
@@ -1738,12 +1742,17 @@ export const topicApi = {
   create: (
     containerId: string,
     title: string,
-    options?: { messageIds?: string[]; sessionType?: 'agent' | 'group' },
+    options?: { messageIds?: string[]; sessionType?: 'agent' | 'group'; tagId?: string | null },
   ) => {
     const params =
       options?.sessionType === 'group'
-        ? { groupId: containerId, messages: options?.messageIds, title }
-        : { messages: options?.messageIds, sessionId: containerId, title };
+        ? { groupId: containerId, messages: options?.messageIds, tagId: options?.tagId, title }
+        : {
+            messages: options?.messageIds,
+            sessionId: containerId,
+            tagId: options?.tagId,
+            title,
+          };
     return trpcMutate<string>('topic.createTopic', params);
   },
   remove: (id: string) => trpcMutate('topic.removeTopic', { id }),
@@ -1752,8 +1761,8 @@ export const topicApi = {
     trpcMutate('topic.updateTopic', { id, value: { favorite } }),
   generateTitle: (id: string) =>
     trpcMutate<string | null>('topic.generateTopicTitle', { id }),
-  update: (id: string, title: string) =>
-    trpcMutate('topic.updateTopic', { id, value: { title } }),
+  update: (id: string, value: { favorite?: boolean; tagId?: string | null; title?: string }) =>
+    trpcMutate('topic.updateTopic', { id, value }),
   search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),
   /** Cross-session recent topics for "继续工作" / topic view. Returns sessionId for ChatDetail navigation. */
   recentTopics: (limit?: number) =>
@@ -1883,6 +1892,9 @@ export const resourceApi = {
     return trpcMutate('document.updateDocument', { id, parentId });
   },
 
+  updateDocument: (id: string, updates: { title?: string; parentId?: string | null }) =>
+    trpcMutate('document.updateDocument', { id, ...updates }),
+
   deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
 };
 
@@ -2008,6 +2020,9 @@ export const fileApi = {
   },
 
   remove: (id: string) => trpcMutate('file.removeFile', { id }),
+
+  update: (id: string, updates: { name?: string; parentId?: string | null }) =>
+    trpcMutate('file.updateFile', { id, ...updates }),
 
   getFileContents: (fileIds: string[]) =>
     trpcMutate<Array<{ content: string; fileId: string; filename: string }>>(

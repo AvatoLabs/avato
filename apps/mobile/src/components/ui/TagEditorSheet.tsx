@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { resolveTagColor, TAG_COLOR_OPTIONS, withAlpha } from '../../constants/tags';
+import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 
 interface TagEditorSheetProps {
@@ -47,6 +48,7 @@ export function TagEditorSheet({
   title,
   visible,
 }: TagEditorSheetProps) {
+  const { t } = useI18n();
   const colors = useThemeColors();
   return (
     <Modal
@@ -58,8 +60,8 @@ export function TagEditorSheet({
     >
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onCancel}>
         <Pressable
-          className="rounded-t-2xl bg-card"
-          style={{ maxHeight: '78%' }}
+          className="rounded-t-2xl"
+          style={{ backgroundColor: colors.card, maxHeight: '78%' }}
           onPress={(event) => event.stopPropagation()}
         >
           <View className="items-center pt-3 pb-2">
@@ -67,7 +69,7 @@ export function TagEditorSheet({
           </View>
 
           <View className="px-5 pb-4 pt-1">
-            <Text className="text-[18px] font-bold tracking-tight text-foreground">{title}</Text>
+            <Text className="text-[18px] font-bold tracking-tight" style={{ color: colors.foreground }}>{title}</Text>
           </View>
 
           <ScrollView
@@ -76,25 +78,25 @@ export function TagEditorSheet({
             keyboardShouldPersistTaps="handled"
           >
             <View>
-              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
-                {title}
+              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+                {t.agentConfigName}
               </Text>
               <TextInput
                 autoFocus
-                className="rounded-2xl bg-foreground/[0.04] px-4 py-3 text-[15px] font-medium text-foreground"
+                className="rounded-2xl px-4 py-3 text-[15px] font-medium"
                 placeholder={placeholder}
                 placeholderTextColor={colors.secondaryText}
-                style={{ color: colors.foreground }}
+                style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
                 value={name}
                 onChangeText={onChangeName}
               />
             </View>
 
             <View>
-              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider text-secondary/60">
+              <Text className="mb-2 px-1 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
                 {colorLabel}
               </Text>
-              <View className="rounded-2xl bg-foreground/[0.03] px-3 py-3">
+              <View className="rounded-2xl px-3 py-3" style={{ backgroundColor: colors.fillQuaternary }}>
                 <View className="mb-3 flex-row items-center">
                   <View
                     className="mr-3 h-8 rounded-full border"
@@ -147,7 +149,7 @@ export function TagEditorSheet({
                 style={{ backgroundColor: colors.primary }}
                 onPress={onSubmit}
               >
-                <Text className="text-[15px] font-semibold text-white">{submitLabel}</Text>
+                <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>{submitLabel}</Text>
               </TouchableOpacity>
 
               {onDelete ? (
@@ -169,10 +171,11 @@ export function TagEditorSheet({
 
               <TouchableOpacity
                 activeOpacity={0.85}
-                className="items-center rounded-2xl bg-foreground/[0.04] px-4 py-3"
+                className="items-center rounded-2xl px-4 py-3"
+                style={{ backgroundColor: colors.fillTertiary }}
                 onPress={onCancel}
               >
-                <Text className="text-[14px] font-medium text-foreground/55">{cancelLabel}</Text>
+                <Text className="text-[14px] font-medium" style={{ color: colors.secondaryText }}>{cancelLabel}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

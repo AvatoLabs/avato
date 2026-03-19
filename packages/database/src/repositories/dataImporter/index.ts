@@ -102,10 +102,6 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
         field: 'groupId',
         sourceTable: 'sessionGroups',
       },
-      {
-        field: 'tagId',
-        sourceTable: 'sessionTags',
-      },
     ],
     table: 'sessions',
     uniqueConstraints: ['slug'],
@@ -115,6 +111,10 @@ const IMPORT_TABLE_CONFIG: TableImportConfig[] = [
       {
         field: 'sessionId',
         sourceTable: 'sessions',
+      },
+      {
+        field: 'tagId',
+        sourceTable: 'sessionTags',
       },
     ],
     table: 'topics',

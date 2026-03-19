@@ -35,6 +35,7 @@ type TranslationKeys = {
   chatListCollapseAssistant: string;
   chatListExpandAssistant: string;
   chatListViewAssistant: string;
+  chatListViewGroup: string;
   chatListViewSession: string;
   chatListViewTopic: string;
   chatListAssistants: string;
@@ -44,6 +45,8 @@ type TranslationKeys = {
   chatListTopicEmptyDesc: string;
   chatListEmpty: string;
   chatListEmptyDesc: string;
+  chatListGroupEmpty: string;
+  chatListGroupEmptyDesc: string;
   chatListCreateAgent: string;
   chatListCreateGroup: string;
   chatListCreateTag: string;
@@ -215,6 +218,7 @@ type TranslationKeys = {
   groupSettingsRemoveMemberDesc: string;
   groupAddMembers: string;
   groupCreateDefaultTitle: string;
+  groupStartConversation: string;
   groupCreateSupervisorModel: string;
   groupMentionAllMembers: string;
   groupMentionTitle: string;
@@ -642,6 +646,8 @@ type TranslationKeys = {
   chatHint4: string;
   streakCelebrate: string;
   activeAssistants: string;
+  activeGroups: string;
+  activeTopics: string;
   activeChats: string;
   chatEmptyWave: string;
   relativeTimeNow: string;
@@ -723,6 +729,10 @@ type TranslationKeys = {
   resourceOpenExternal: string;
   resourcePreviewUnavailable: string;
   resourceDeleteFailed: string;
+  resourceRenameFailed: string;
+  resourceRenamePlaceholder: string;
+  resourceRenamed: string;
+  resourceShareFailed: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
@@ -1043,6 +1053,7 @@ const en: TranslationKeys = {
   chatListCollapseAssistant: 'Collapse',
   chatListExpandAssistant: 'Expand',
   chatListViewAssistant: 'Assistants',
+  chatListViewGroup: 'Groups',
   chatListViewSession: 'Sessions',
   chatListViewTopic: 'Topics',
   chatListAssistants: 'Assistants',
@@ -1052,6 +1063,8 @@ const en: TranslationKeys = {
   chatListTopicEmptyDesc: 'Your recent conversations will appear here.',
   chatListEmpty: 'No sessions yet',
   chatListEmptyDesc: 'Tap the + button above to create your first chat with Avato AI.',
+  chatListGroupEmpty: 'No groups yet',
+  chatListGroupEmptyDesc: 'Tap the + button to create a new group chat.',
   chatListCreateAgent: 'New Agent',
   chatListCreateGroup: 'New Group Chat',
   chatListCreateTag: 'New Tag',
@@ -1221,6 +1234,7 @@ const en: TranslationKeys = {
     'This member will be removed from the group. Virtual members may also be deleted permanently.',
   groupAddMembers: 'Add Members',
   groupCreateDefaultTitle: 'New Group Chat',
+  groupStartConversation: 'Start Conversation',
   groupCreateSupervisorModel: 'Host model',
   groupMentionAllMembers: 'All members',
   groupMentionTitle: 'Mention',
@@ -1630,6 +1644,8 @@ const en: TranslationKeys = {
   chatHint4: 'Try: plan my week...',
   streakCelebrate: '\u{1F525} {count}-day streak!',
   activeAssistants: '{count} assistants',
+  activeGroups: '{count} groups',
+  activeTopics: '{count} topics',
   activeChats: '{count} sessions',
   chatEmptyWave: 'Hey there \u{1F44B}',
   relativeTimeNow: 'now',
@@ -1709,6 +1725,10 @@ const en: TranslationKeys = {
   resourceOpenExternal: 'Open in Browser',
   resourcePreviewUnavailable: 'Unable to load preview',
   resourceDeleteFailed: 'Delete failed',
+  resourceRenameFailed: 'Rename failed',
+  resourceRenamePlaceholder: 'Enter new name',
+  resourceRenamed: 'Renamed successfully',
+  resourceShareFailed: 'Share failed',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -2026,6 +2046,7 @@ const zh_tw: TranslationKeys = {
   chatListCollapseAssistant: '收起',
   chatListExpandAssistant: '展開',
   chatListViewAssistant: '助理',
+  chatListViewGroup: '群聊',
   chatListViewSession: '會話',
   chatListViewTopic: '話題',
   chatListAssistants: '助理',
@@ -2035,6 +2056,8 @@ const zh_tw: TranslationKeys = {
   chatListTopicEmptyDesc: '對話將顯示在這裡。',
   chatListEmpty: '暫無會話',
   chatListEmptyDesc: '點擊上方 + 按鈕建立你的第一個 Avato AI 會話。',
+  chatListGroupEmpty: '暫無群聊',
+  chatListGroupEmptyDesc: '點擊上方 + 按鈕建立新的群組會話。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群組會話',
   chatListCreateTag: '新建標籤',
@@ -2200,6 +2223,7 @@ const zh_tw: TranslationKeys = {
   groupSettingsRemoveMemberDesc: '此成員將從群組中移除，虛擬成員也可能被永久刪除。',
   groupAddMembers: '新增成員',
   groupCreateDefaultTitle: '新群組會話',
+  groupStartConversation: '開始對話',
   groupCreateSupervisorModel: '主持人模型',
   groupMentionAllMembers: '全體成員',
   groupMentionTitle: '提及',
@@ -2609,6 +2633,8 @@ const zh_tw: TranslationKeys = {
   chatHint4: '試試：規劃我的一週...',
   streakCelebrate: '\u{1F525} 連續 {count} 天！',
   activeAssistants: '{count} 個助理',
+  activeGroups: '{count} 個群聊',
+  activeTopics: '{count} 個話題',
   activeChats: '{count} 個會話',
   chatEmptyWave: '嘿 \u{1F44B}',
   relativeTimeNow: '剛剛',
@@ -2687,6 +2713,10 @@ const zh_tw: TranslationKeys = {
   resourceOpenExternal: '在瀏覽器中打開',
   resourcePreviewUnavailable: '無法載入預覽',
   resourceDeleteFailed: '刪除失敗',
+  resourceRenameFailed: '重新命名失敗',
+  resourceRenamePlaceholder: '輸入新名稱',
+  resourceRenamed: '重新命名成功',
+  resourceShareFailed: '分享失敗',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -3002,6 +3032,7 @@ const zh: TranslationKeys = {
   chatListCollapseAssistant: '收起',
   chatListExpandAssistant: '展开',
   chatListViewAssistant: '助理',
+  chatListViewGroup: '群聊',
   chatListViewSession: '会话',
   chatListViewTopic: '话题',
   chatListAssistants: '助理',
@@ -3011,6 +3042,8 @@ const zh: TranslationKeys = {
   chatListTopicEmptyDesc: '对话将显示在这里。',
   chatListEmpty: '暂无会话',
   chatListEmptyDesc: '点击上方 + 按钮创建你的第一个 Avato AI 会话。',
+  chatListGroupEmpty: '暂无群聊',
+  chatListGroupEmptyDesc: '点击上方 + 按钮创建新的群组会话。',
   chatListCreateAgent: '新建助手',
   chatListCreateGroup: '新建群组会话',
   chatListCreateTag: '新建标签',
@@ -3177,6 +3210,7 @@ const zh: TranslationKeys = {
   groupSettingsRemoveMemberDesc: '此成员将从群组中移除，虚拟成员也可能被永久删除。',
   groupAddMembers: '添加成员',
   groupCreateDefaultTitle: '新群组会话',
+  groupStartConversation: '开始对话',
   groupCreateSupervisorModel: '主持人模型',
   groupMentionAllMembers: '全体成员',
   groupMentionTitle: '提及',
@@ -3585,6 +3619,8 @@ const zh: TranslationKeys = {
   chatHint4: '试试：规划我的一周...',
   streakCelebrate: '\u{1F525} 连续 {count} 天！',
   activeAssistants: '{count} 个助理',
+  activeGroups: '{count} 个群聊',
+  activeTopics: '{count} 个话题',
   activeChats: '{count} 个会话',
   chatEmptyWave: '嘿 \u{1F44B}',
   relativeTimeNow: '刚刚',
@@ -3664,6 +3700,10 @@ const zh: TranslationKeys = {
   resourceOpenExternal: '在浏览器中打开',
   resourcePreviewUnavailable: '无法加载预览',
   resourceDeleteFailed: '删除失败',
+  resourceRenameFailed: '重命名失败',
+  resourceRenamePlaceholder: '输入新名称',
+  resourceRenamed: '重命名成功',
+  resourceShareFailed: '分享失败',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',

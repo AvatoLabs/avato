@@ -14,7 +14,6 @@ export interface CreateSessionConfig {
   plugins?: string[];
   provider?: string;
   systemPrompt?: string;
-  tagId?: string;
   title?: string;
 }
 
@@ -35,8 +34,6 @@ export interface ChatSession {
   pinned?: boolean;
   /** Provider identifier (e.g. 'openai', 'anthropic') */
   provider?: string;
-  /** Tag identifier used for session organization */
-  tagId?: string;
   title: string;
   /** 'agent' for regular sessions, 'group' for multi-agent chat groups */
   type?: 'agent' | 'group';
@@ -314,6 +311,7 @@ export interface RecentTopic {
   } | null;
   id: string;
   sessionId?: string | null;
+  tagId?: string | null;
   title: string | null;
   type: 'agent' | 'group';
   updatedAt: string;
@@ -324,6 +322,7 @@ export interface Topic {
   favorite?: boolean;
   id: string;
   sessionId: string;
+  tagId?: string | null;
   title: string;
   updatedAt: string;
 }

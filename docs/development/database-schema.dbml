@@ -1300,7 +1300,6 @@ table sessions {
   type text [default: 'agent']
   user_id text [not null]
   group_id text
-  tag_id text
   client_id text
   pinned boolean [default: false]
   config jsonb
@@ -1315,7 +1314,6 @@ table sessions {
     (id, user_id) [name: 'sessions_id_user_id_idx']
     (user_id, updated_at) [name: 'sessions_user_id_updated_at_idx']
     group_id [name: 'sessions_group_id_idx']
-    tag_id [name: 'sessions_tag_id_idx']
   }
 }
 
@@ -1385,6 +1383,7 @@ table topics {
   title text
   favorite boolean [default: false]
   session_id text
+  tag_id text
   content text
   editor_data jsonb
   agent_id text
@@ -1404,6 +1403,7 @@ table topics {
     user_id [name: 'topics_user_id_idx']
     (id, user_id) [name: 'topics_id_user_id_idx']
     session_id [name: 'topics_session_id_idx']
+    tag_id [name: 'topics_tag_id_idx']
     group_id [name: 'topics_group_id_idx']
     agent_id [name: 'topics_agent_id_idx']
     trigger [name: 'topics_trigger_idx']
@@ -1802,10 +1802,10 @@ ref: messages.message_group_id > message_groups.id
 
 ref: sessions.group_id - session_groups.id
 
-ref: sessions.tag_id - session_tags.id
-
 ref: topic_documents.document_id > documents.id
 
 ref: topic_documents.topic_id > topics.id
 
 ref: topics.session_id - sessions.id
+
+ref: topics.tag_id - session_tags.id

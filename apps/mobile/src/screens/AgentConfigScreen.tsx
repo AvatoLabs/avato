@@ -340,10 +340,8 @@ function SkillRow({
 
 function CreateNewAgentConfigScreen({
   navigation,
-  tagId,
 }: {
   navigation: any;
-  tagId?: string;
 }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -357,10 +355,7 @@ function CreateNewAgentConfigScreen({
     if (saving) return;
     setSaving(true);
     try {
-      const result = await agentApi.create(
-        { title: title.trim() || t.chatListNewAssistant },
-        tagId,
-      );
+      const result = await agentApi.create({ title: title.trim() || t.chatListNewAssistant });
       if (result?.sessionId) {
         await fetchSessions();
         haptics.success();
@@ -373,12 +368,13 @@ function CreateNewAgentConfigScreen({
     } finally {
       setSaving(false);
     }
-  }, [fetchSessions, navigation, saving, tagId, t.chatListNewAssistant, t.errorNetwork, title, toast]);
+  }, [fetchSessions, navigation, saving, t.chatListNewAssistant, t.errorNetwork, title, toast]);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-background"
+      className="flex-1"
+      style={{ backgroundColor: colors.background }}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 64 : 0}
     >
       <ScreenHeader
@@ -402,16 +398,27 @@ function CreateNewAgentConfigScreen({
         contentContainerStyle={{ paddingBottom: 48, paddingTop: 16, paddingHorizontal: 20 }}
         keyboardShouldPersistTaps="handled"
       >
-        <SectionCard title={t.agentConfigName}>
-          <TextInput
-            autoFocus
-            className="rounded-xl border border-foreground/10 bg-foreground/[0.03] px-4 py-3 text-[15px] text-foreground"
-            placeholder={t.chatListNewAssistant}
-            placeholderTextColor={colors.secondaryText}
-            value={title}
-            onChangeText={setTitle}
-          />
-        </SectionCard>
+        <View className="mb-5 px-5">
+          <Text className="mb-2 px-2 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+            {t.agentConfigName}
+          </Text>
+          <View className="rounded-2xl p-4" style={{ backgroundColor: colors.fillQuaternary }}>
+            <TextInput
+              autoFocus
+              className="rounded-xl px-4 py-3 text-[15px]"
+              placeholder={t.chatListNewAssistant}
+              placeholderTextColor={colors.secondaryText}
+              style={{
+                backgroundColor: colors.fillTertiary,
+                borderColor: colors.border,
+                borderWidth: 1,
+                color: colors.foreground,
+              }}
+              value={title}
+              onChangeText={setTitle}
+            />
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -1813,7 +1820,6 @@ export default function AgentConfigScreen({ navigation, route }: any) {
   const sessionId = route.params?.sessionId as string | undefined;
   const agentId = route.params?.agentId as string | undefined;
   const createNew = route.params?.createNew as boolean | undefined;
-  const tagId = route.params?.tagId as string | undefined;
 
   if (sessionId) {
     return <SessionAgentConfigScreen navigation={navigation} sessionId={sessionId} />;
@@ -1824,7 +1830,7 @@ export default function AgentConfigScreen({ navigation, route }: any) {
   }
 
   if (createNew) {
-    return <CreateNewAgentConfigScreen navigation={navigation} tagId={tagId} />;
+    return <CreateNewAgentConfigScreen navigation={navigation} />;
   }
 
   return <SessionOnlyAgentConfigScreen navigation={navigation} />;

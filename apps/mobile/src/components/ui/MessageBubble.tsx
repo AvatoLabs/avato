@@ -656,6 +656,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [viewerUri, setViewerUri] = useState<string | null>(null);
     const [contentCollapsed, setContentCollapsed] = useState(true);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+    const [downloadingProgress, setDownloadingProgress] = useState(0);
 
     const deleteMessage = useChatStore((s) => s.deleteMessage);
     const editMessage = useChatStore((s) => s.editMessage);
@@ -752,14 +753,18 @@ const MessageBubble = memo<MessageBubbleProps>(
         if (downloadingFileId === file.id) return;
 
         setDownloadingFileId(file.id);
+        setDownloadingProgress(0);
         try {
-          await fileApi.download(file);
+          await fileApi.download(file, {
+            onProgress: (p) => setDownloadingProgress(p),
+          });
           haptics.success();
           toast.show('success', t.resourceDownloaded);
         } catch {
           toast.show('error', t.resourceDownloadFailed);
         } finally {
           setDownloadingFileId(null);
+          setDownloadingProgress(0);
         }
       },
       [downloadingFileId, t, toast],
@@ -1277,6 +1282,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                 <View className="mb-2">
                   <AttachmentBlock
                     downloadingFileId={downloadingFileId}
+                    downloadingProgress={downloadingProgress}
                     fileList={message.fileList}
                     imageList={message.imageList}
                     isUser={isUser}
@@ -1369,6 +1375,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <View className="mb-2">
                           <AttachmentBlock
                             downloadingFileId={downloadingFileId}
+                            downloadingProgress={downloadingProgress}
                             fileList={message.fileList}
                             imageList={message.imageList}
                             isUser={isUser}
@@ -1915,12 +1922,13 @@ RichContentPartsBlock.displayName = 'RichContentPartsBlock';
 
 const AttachmentBlock = memo<{
   downloadingFileId?: string | null;
+  downloadingProgress?: number;
   fileList?: ChatMessage['fileList'];
   imageList?: ChatMessage['imageList'];
   isUser: boolean;
   onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenImage: (url: string) => void;
-}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId }) => {
+}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId, downloadingProgress = 0 }) => {
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const mc = useMemo(
@@ -1996,10 +2004,18 @@ const AttachmentBlock = memo<{
                 </Text>
               </View>
               {downloadingFileId === file.id ? (
-                <ActivityIndicator
-                  color={isUser ? colors.userBubbleText : chatAccent.badgeText}
-                  size="small"
-                />
+                <View className="min-w-[28px] items-end">
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: isUser ? colors.userBubbleText : chatAccent.badgeText,
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {downloadingProgress}%
+                  </Text>
+                </View>
               ) : (
                 <Download
                   color={isUser ? colors.userBubbleText : chatAccent.badgeText}
