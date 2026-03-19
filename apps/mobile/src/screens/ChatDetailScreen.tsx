@@ -7,8 +7,8 @@ import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  ArrowDown,
   ArrowLeft,
-  ArrowUp,
   BookOpen,
   Brain,
   BrainCircuit,
@@ -76,11 +76,12 @@ import {
   topicApi,
   userApi,
 } from '../lib/api';
-import { buildDisplayMessagesWithGroupTasks } from '../lib/groupTasksTransform';
+import { buildDisplayMessages } from '../lib/groupTasksTransform';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { isGroupSessionLike } from '../lib/session';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
+import { generateBestTitle } from '../lib/titleGeneration';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
@@ -119,7 +120,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const rawMessages = useChatStore((s) => s.messagesBySession[sessionKey] ?? EMPTY_MESSAGES);
   const messages = useMemo(
-    () => (isGroupSession ? buildDisplayMessagesWithGroupTasks(rawMessages) : rawMessages),
+    () => buildDisplayMessages(rawMessages, isGroupSession),
     [rawMessages, isGroupSession],
   );
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
@@ -130,8 +131,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const fetchMessages = useChatStore((s) => s.fetchMessages);
 
   const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
+  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const switchTopic = useTopicStore((s) => s.switchTopic);
+  const activeTopicItem = useMemo(
+    () => topics.find((topic) => topic.id === activeTopic) ?? null,
+    [activeTopic, topics],
+  );
 
   const pendingFiles = useFileStore((s) => s.pendingFiles);
   const addFile = useFileStore((s) => s.addFile);
@@ -149,6 +155,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const [providerLogoError, setProviderLogoError] = useState(false);
   const listRef = useRef<FlashList<ChatMessage>>(null);
   const isScrolledToBottom = useRef(true);
+  const autoScrollLocked = useRef(false);
   const lastAutoScrollAt = useRef(0);
   const hasObservedTopicChange = useRef(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -189,6 +196,12 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   useEffect(() => {
     hasObservedTopicChange.current = false;
   }, [sessionId]);
+
+  useEffect(() => {
+    isScrolledToBottom.current = true;
+    autoScrollLocked.current = false;
+    lastAutoScrollAt.current = 0;
+  }, [activeTopic, sessionId]);
 
   // Sync route topicId to store immediately (useLayoutEffect so it runs before useFocusEffect)
   useLayoutEffect(() => {
@@ -598,16 +611,18 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   const autoScrollToEnd = useCallback(() => {
     if (!listRef.current || messages.length === 0) return;
-    if (!isScrolledToBottom.current && !generating) return;
+    if (autoScrollLocked.current || !isScrolledToBottom.current) return;
 
     const now = Date.now();
-    const minInterval = generating ? 120 : 0;
-    if (now - lastAutoScrollAt.current < minInterval) return;
+    const minInterval = generating ? 140 : 0;
+    const delta = now - lastAutoScrollAt.current;
+    if (delta < minInterval) return;
 
     lastAutoScrollAt.current = now;
     requestAnimationFrame(() => {
       try {
-        listRef.current?.scrollToEnd({ animated: !generating });
+        const animated = !generating || delta > 260;
+        listRef.current?.scrollToEnd({ animated });
       } catch {
         /* best-effort */
       }
@@ -623,6 +638,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const handleSend = useCallback(async () => {
     if (!sessionId || (!inputText.trim() && pendingFiles.length === 0) || generating) return;
     haptics.light();
+    autoScrollLocked.current = false;
+    isScrolledToBottom.current = true;
     sendScale.value = withSequence(withSpring(0.8, { damping: 8 }), withSpring(1, { damping: 6 }));
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     const textToSend = inputText.trim();
@@ -928,32 +945,32 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 className="text-[16px] font-medium text-foreground tracking-tight"
                 numberOfLines={1}
               >
-                {session?.title || t.chatTitle}
+                {activeTopicItem?.title || session?.title || t.chatTitle}
               </Text>
               {generating ? (
                 <Text className="text-[12px] mt-0.5 font-medium" style={{ color: colors.primary }}>
                   {isReasoning ? t.chatThinking : t.chatGenerating}
                 </Text>
               ) : !isGroupSession && sessionModel ? (
-                <View className="mt-0.5 flex-row items-center">
+                <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
                   {toolbarProviderLogo && !providerLogoError ? (
                     <RNImage
                       source={{ uri: toolbarProviderLogo }}
-                      style={{ borderRadius: 3, height: 12, marginRight: 5, width: 12 }}
+                      style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
                       onError={() => setProviderLogoError(true)}
                     />
                   ) : (
                     <Cpu
                       color={colors.secondaryText}
-                      size={12}
+                      size={13}
                       strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginRight: 5 }}
+                      style={{ marginRight: 6 }}
                     />
                   )}
                   <Text
                     className="flex-1 text-[12px] font-medium"
                     numberOfLines={1}
-                    style={{ color: colors.muted }}
+                    style={{ color: colors.muted, lineHeight: 14 }}
                   >
                     {sessionModel}
                   </Text>
@@ -975,13 +992,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                         .filter(Boolean)
                         .join(' ');
                       try {
-                        const newTitle = await topicApi.generateTitle(activeTopic);
-                        if (newTitle?.trim()) {
-                          await useTopicStore
-                            .getState()
-                            .updateTopic(activeTopic, sessionId!, newTitle.trim());
+                        const result = await generateBestTitle({
+                          sessionId: sessionId!,
+                          topicId: activeTopic,
+                        });
+                        if (result?.title) {
                           haptics.success();
-                          toast.show('success', t.topicRenamed);
+                          toast.show(
+                            'success',
+                            result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
+                          );
                         } else {
                           toast.show('error', failMessage || 'Failed to generate title');
                         }
@@ -1079,12 +1099,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               const atBottom =
                 layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
               isScrolledToBottom.current = atBottom;
+              autoScrollLocked.current = !atBottom && contentOffset.y > 24;
               setShowScrollToTop(!atBottom && contentOffset.y > 200);
             }}
           />
         )}
 
-        {/* Scroll to top FAB */}
+        {/* Jump to latest FAB */}
         {showScrollToTop && (
           <Animated.View
             className="absolute right-4 bottom-24"
@@ -1092,14 +1113,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             exiting={FadeOut.duration(150)}
           >
             <PressableScale
-              accessibilityLabel={t.chatScrollToTop}
+              accessibilityLabel={t.chatJumpToLatest}
               className="w-10 h-10 rounded-full bg-foreground/90 items-center justify-center shadow-lg"
               onPress={() => {
                 haptics.light();
-                listRef.current?.scrollToOffset({ offset: 0, animated: true });
+                autoScrollLocked.current = false;
+                isScrolledToBottom.current = true;
+                listRef.current?.scrollToEnd({ animated: true });
               }}
             >
-              <ArrowUp color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
+              <ArrowDown color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
             </PressableScale>
           </Animated.View>
         )}

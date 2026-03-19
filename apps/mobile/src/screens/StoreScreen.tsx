@@ -39,11 +39,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import CardSkeleton from '../components/ui/CardSkeleton';
 import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
+import {
+  MOBILE_RECOMMENDED_BUILTIN_SKILLS,
+  type MobileRecommendedBuiltinIcon,
+} from '../constants/recommendedBuiltins';
 import {
   ALL_CATEGORY_KEY,
   FALLBACK_MCP_CATEGORY_KEYS,
@@ -73,14 +78,18 @@ type StoreTab = 'explore' | 'installed';
 
 const MARKET_PAGE_SIZE = 21;
 
+const getValidCategoryKeys = (source: ExploreSource) =>
+  source === 'mcp' ? [...FALLBACK_MCP_CATEGORY_KEYS] : [...FALLBACK_SKILL_CATEGORY_KEYS];
+
 interface StoreInstalledItem {
   avatar?: string;
   badgeBackgroundColor: string;
   badgeColor: string;
+  builtinIcon?: MobileRecommendedBuiltinIcon;
   description?: string;
   id: string;
   identifier: string;
-  kind: 'plugin' | 'skill';
+  kind: 'builtin' | 'plugin' | 'skill';
   label: string;
   name: string;
 }
@@ -93,6 +102,7 @@ interface SelectedStoreEntry {
 interface StoreDetailItem {
   author?: string;
   avatar?: string;
+  builtinItem?: StoreInstalledItem | null;
   description?: string;
   identifier: string;
   installedPlugin?: InstalledPlugin | null;
@@ -134,16 +144,13 @@ const formatCount = (n: number, locale: Locale): string => {
 
 const deriveCategoriesFromItems = (
   items: MarketListItem[],
-  source: ExploreSource,
+  _source: ExploreSource,
 ): MarketCategoryItem[] => {
-  const validKeys =
-    source === 'mcp' ? [...FALLBACK_MCP_CATEGORY_KEYS] : [...FALLBACK_SKILL_CATEGORY_KEYS];
   const countByCategory = new Map<string, number>();
   for (const item of items) {
-    const raw = item.category?.trim();
+    const raw = item.category?.trim().toLowerCase();
     if (!raw) continue;
-    const cat = normalizeCategoryKey(raw, validKeys) || raw;
-    countByCategory.set(cat, (countByCategory.get(cat) ?? 0) + 1);
+    countByCategory.set(raw, (countByCategory.get(raw) ?? 0) + 1);
   }
   return Array.from(countByCategory.entries())
     .map(([category, count]) => ({ category, count }))
@@ -152,15 +159,33 @@ const deriveCategoriesFromItems = (
 
 const buildCategoryOptions = (
   categories: MarketCategoryItem[],
+  source: ExploreSource,
   locale: Locale,
 ): Array<{ count?: number; key: string; label: string }> => {
-  const normalized = categories
-    .filter((item): item is MarketCategoryItem & { category: string } => Boolean(item?.category))
-    .map((item) => ({
-      count: item.count,
-      key: item.category,
-      label: getCategoryLabel(item.category, locale),
-    }));
+  const validKeys = getValidCategoryKeys(source);
+  const categoryMap = new Map<string, { count?: number; key: string; label: string }>();
+
+  for (const item of categories) {
+    const rawKey = item?.category?.trim().toLowerCase();
+    if (!rawKey) continue;
+
+    const labelKey = normalizeCategoryKey(rawKey, validKeys) || rawKey;
+    const current = categoryMap.get(rawKey);
+    const nextCount = (item.count ?? 0) + (current?.count ?? 0);
+
+    categoryMap.set(rawKey, {
+      count: nextCount || undefined,
+      key: rawKey,
+      label:
+        current?.label ||
+        getCategoryLabel(labelKey, locale) ||
+        item.name ||
+        item.description ||
+        rawKey,
+    });
+  }
+
+  const normalized = [...categoryMap.values()].sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
 
   const totalCount = normalized.reduce((sum, item) => sum + (item.count ?? 0), 0);
 
@@ -176,30 +201,23 @@ const buildCategoryOptions = (
 
 const mergeCategoryBuckets = (
   categories: MarketCategoryItem[],
-  source: ExploreSource,
+  _source: ExploreSource,
 ): MarketCategoryItem[] => {
-  const fallbackKeys =
-    source === 'mcp' ? FALLBACK_MCP_CATEGORY_KEYS : FALLBACK_SKILL_CATEGORY_KEYS;
-  const categoryMap = new Map(
-    categories
-      .filter((item): item is MarketCategoryItem & { category: string } => Boolean(item?.category))
-      .map((item) => [item.category, item]),
-  );
+  const categoryMap = new Map<string, MarketCategoryItem>();
 
-  const merged: MarketCategoryItem[] = [];
-
-  for (const key of fallbackKeys) {
-    if (key === ALL_CATEGORY_KEY) continue;
-    const matched = categoryMap.get(key);
-    merged.push({ category: key, count: matched?.count });
-    categoryMap.delete(key);
+  for (const item of categories) {
+    const rawCategory = item?.category?.trim().toLowerCase();
+    if (!rawCategory) continue;
+    const current = categoryMap.get(rawCategory);
+    categoryMap.set(rawCategory, {
+      category: rawCategory,
+      count: (item.count ?? 0) + (current?.count ?? 0),
+      description: current?.description ?? item.description,
+      name: current?.name ?? item.name,
+    });
   }
 
-  for (const item of categoryMap.values()) {
-    merged.push(item);
-  }
-
-  return merged;
+  return [...categoryMap.values()].sort((a, b) => (b.count ?? 0) - (a.count ?? 0));
 };
 
 const mergeSkillLists = (...groups: AgentSkillItem[][]): AgentSkillItem[] => {
@@ -314,6 +332,69 @@ const buildInstalledSkillItem = (
     label,
     name: skill.name,
   };
+};
+
+const buildInstalledBuiltinItem = (
+  identifier: string,
+  t: I18nStore['t'],
+  colors: Pick<
+    ColorTokens,
+    | 'primary'
+    | 'fillTertiary'
+    | 'secondaryText'
+    | 'muted'
+    | 'danger'
+    | 'foreground'
+    | 'sourceBuiltin'
+    | 'sourceBuiltinMuted'
+    | 'sourceCustom'
+    | 'sourceCustomMuted'
+    | 'sourceMarketMuted'
+  >,
+): StoreInstalledItem | null => {
+  const builtin = MOBILE_RECOMMENDED_BUILTIN_SKILLS.find((item) => item.identifier === identifier);
+
+  if (!builtin) return null;
+
+  return {
+    badgeBackgroundColor: colors.sourceBuiltinMuted,
+    badgeColor: colors.sourceBuiltin,
+    builtinIcon: builtin.icon,
+    description: (t as any)[builtin.descriptionKey] ?? '',
+    id: builtin.identifier,
+    identifier: builtin.identifier,
+    kind: 'builtin',
+    label: t.storeBuiltIn,
+    name: (t as any)[builtin.titleKey] ?? builtin.identifier,
+  };
+};
+
+const filterMarketItemsByCategory = (
+  items: MarketListItem[],
+  categoryKey?: string,
+  source?: ExploreSource,
+) => {
+  if (!categoryKey || categoryKey === ALL_CATEGORY_KEY) return items;
+
+  const validKeys = source ? getValidCategoryKeys(source) : undefined;
+
+  return items.filter((item) => {
+    const rawCategory = item.category?.trim().toLowerCase();
+    if (!rawCategory) return false;
+    const normalizedCategory = validKeys ? normalizeCategoryKey(rawCategory, validKeys) : rawCategory;
+    return rawCategory === categoryKey || normalizedCategory === categoryKey;
+  });
+};
+
+const filterMarketItemsByQuery = (items: MarketListItem[], query?: string) => {
+  const normalizedQuery = query?.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter((item) =>
+    [item.name, item.identifier, item.description, item.category]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .some((value) => value.toLowerCase().includes(normalizedQuery)),
+  );
 };
 
 const ItemCard = memo<{
@@ -432,7 +513,9 @@ const InstalledRow = memo<{
         className="w-9 h-9 rounded-xl items-center justify-center mr-3 overflow-hidden"
         style={{ backgroundColor: colors.fillTertiary }}
       >
-        {item.avatar && !isEmojiAvatar(item.avatar) ? (
+        {item.builtinIcon ? (
+          <BuiltinSkillIcon icon={item.builtinIcon} size={36} />
+        ) : item.avatar && !isEmojiAvatar(item.avatar) ? (
           <RNImage
             resizeMode="cover"
             source={{ uri: item.avatar }}
@@ -1172,9 +1255,9 @@ function StoreItemModal({
 
   if (!detail) return null;
 
-  const isInstalled = Boolean(detail.installedPlugin || detail.installedSkill);
+  const isInstalled = Boolean(detail.installedPlugin || detail.installedSkill || detail.builtinItem);
   const canInstall = Boolean(detail.marketItem) && !isInstalled;
-  const canUninstall = Boolean(detail.installedPlugin || detail.installedSkill);
+  const canUninstall = Boolean(detail.installedPlugin || detail.installedSkill || detail.builtinItem);
 
   return (
     <Modal
@@ -1199,7 +1282,9 @@ function StoreItemModal({
               className="w-12 h-12 rounded-2xl items-center justify-center mr-3 overflow-hidden"
               style={{ backgroundColor: colors.fillTertiary }}
             >
-              {detail.avatar && !isEmojiAvatar(detail.avatar) ? (
+              {detail.builtinItem?.builtinIcon ? (
+                <BuiltinSkillIcon icon={detail.builtinItem.builtinIcon} size={48} />
+              ) : detail.avatar && !isEmojiAvatar(detail.avatar) ? (
                 <RNImage
                   resizeMode="cover"
                   source={{ uri: detail.avatar }}
@@ -1249,7 +1334,7 @@ function StoreItemModal({
             </View>
           ) : null}
 
-          {detail.installedSkill?.source === 'builtin' ? (
+          {detail.installedSkill?.source === 'builtin' || detail.builtinItem ? (
             <Text
               className="text-[12px] leading-5 mt-4"
               style={{ color: colors.secondaryText }}
@@ -1316,13 +1401,20 @@ export default function StoreScreen() {
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketLoadingMore, setMarketLoadingMore] = useState(false);
-  const [marketFetchError, setMarketFetchError] = useState(false);
+  const [marketSourceErrors, setMarketSourceErrors] = useState<Record<ExploreSource, boolean>>({
+    mcp: false,
+    skill: false,
+  });
   const marketRequestIdRef = useRef(0);
 
   const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
   const [installedSkills, setInstalledSkills] = useState<AgentSkillItem[]>([]);
   const [uninstalledBuiltinTools, setUninstalledBuiltinTools] = useState<string[]>([]);
   const [installedLoading, setInstalledLoading] = useState(false);
+  const marketSnapshotRef = useRef<Record<ExploreSource, MarketListItem[]>>({
+    mcp: [],
+    skill: [],
+  });
 
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [importUrlVisible, setImportUrlVisible] = useState(false);
@@ -1334,12 +1426,15 @@ export default function StoreScreen() {
   const installedIds = useMemo(
     () =>
       new Set([
+        ...MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+          (item) => !uninstalledBuiltinTools.includes(item.identifier),
+        ).map((item) => item.identifier),
         ...installedPlugins.map((plugin) => plugin.identifier),
         ...installedSkills
           .map((skill) => skill.identifier)
           .filter((identifier): identifier is string => Boolean(identifier)),
       ]),
-    [installedPlugins, installedSkills],
+    [installedPlugins, installedSkills, uninstalledBuiltinTools],
   );
 
   useEffect(() => {
@@ -1384,9 +1479,21 @@ export default function StoreScreen() {
     }, []),
   );
 
+  const marketFetchError = marketSourceErrors[activeExploreSource];
+
+  const snapshotCategories = mergeCategoryBuckets(
+    deriveCategoriesFromItems(marketSnapshotRef.current[activeExploreSource], activeExploreSource),
+    activeExploreSource,
+  );
+
   const categoryOptions = useMemo(
-    () => buildCategoryOptions(marketCategories, locale),
-    [locale, marketCategories],
+    () =>
+      buildCategoryOptions(
+        marketSourceErrors[activeExploreSource] ? snapshotCategories : marketCategories,
+        activeExploreSource,
+        locale,
+      ),
+    [activeExploreSource, locale, marketCategories, marketSourceErrors, snapshotCategories],
   );
 
   const updateBuiltinSkillInstallation = useCallback(
@@ -1408,8 +1515,13 @@ export default function StoreScreen() {
   );
 
   const fetchCategories = useCallback(async (source: ExploreSource) => {
-    const fallback = mergeCategoryBuckets([], source);
+    const fallback = mergeCategoryBuckets(
+      deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
+      source,
+    );
     setMarketCategories(fallback);
+
+    if (marketSourceErrors[source]) return;
 
     try {
       const list =
@@ -1417,23 +1529,35 @@ export default function StoreScreen() {
           ? await marketSkillApi.getMcpCategories()
           : await marketSkillApi.getCategories();
       const items = Array.isArray(list) ? list : [];
-      setMarketCategories(mergeCategoryBuckets(items, source));
+      setMarketCategories(
+        mergeCategoryBuckets(
+          [...items, ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source)],
+          source,
+        ),
+      );
     } catch {
       // keep fallback
     }
-  }, []);
+  }, [marketSourceErrors]);
 
   const fetchExploreTotals = useCallback(async () => {
-    try {
-      const [mcpResult, skillResult] = await Promise.all([
-        marketSkillApi.getMcpList({ page: 1, pageSize: 1 }),
-        marketSkillApi.getSkillList({ page: 1, pageSize: 1 }),
-      ]);
+    const [mcpResult, skillResult] = await Promise.allSettled([
+      marketSkillApi.getMcpList({ page: 1, pageSize: 1 }),
+      marketSkillApi.getSkillList({ page: 1, pageSize: 1 }),
+    ]);
 
-      setMarketMcpTotal(mcpResult.totalCount ?? 0);
-      setMarketSkillTotal(skillResult.totalCount ?? 0);
-    } catch {
-      // Keep existing counts if totals cannot be refreshed.
+    if (mcpResult.status === 'fulfilled') {
+      setMarketMcpTotal(mcpResult.value.totalCount ?? 0);
+      setMarketSourceErrors((prev) => ({ ...prev, mcp: false }));
+    } else {
+      setMarketSourceErrors((prev) => ({ ...prev, mcp: true }));
+    }
+
+    if (skillResult.status === 'fulfilled') {
+      setMarketSkillTotal(skillResult.value.totalCount ?? 0);
+      setMarketSourceErrors((prev) => ({ ...prev, skill: false }));
+    } else {
+      setMarketSourceErrors((prev) => ({ ...prev, skill: true }));
     }
   }, []);
 
@@ -1445,7 +1569,7 @@ export default function StoreScreen() {
         setMarketLoadingMore(true);
       } else {
         setMarketLoading(true);
-        setMarketFetchError(false);
+        setMarketSourceErrors((prev) => ({ ...prev, [source]: false }));
       }
 
       const categoryParam =
@@ -1470,33 +1594,46 @@ export default function StoreScreen() {
         if (requestId !== marketRequestIdRef.current) return;
 
         const remoteItems = result.items || [];
+        const shouldRefreshSnapshot = !append && page === 1 && !categoryParam && !debouncedQuery;
+
+        if (shouldRefreshSnapshot) {
+          marketSnapshotRef.current[source] = remoteItems;
+        }
+
         if (source === 'mcp') setMarketMcpTotal(result.totalCount ?? 0);
         if (source === 'skill') setMarketSkillTotal(result.totalCount ?? 0);
 
-        // Fallback: when categories API failed, derive from "all" items
         if (!append && page === 1 && !categoryParam && remoteItems.length > 0) {
           setMarketCategories((prev) =>
             mergeCategoryBuckets(
-              prev.some((item) => item.count != null)
-                ? prev
-                : deriveCategoriesFromItems(remoteItems, source),
+              [...prev, ...deriveCategoriesFromItems(remoteItems, source)],
               source,
             ),
           );
         }
 
-        // Explore lists community data only; builtin skills stay in Installed tab (align with Web)
-        const nextItems = remoteItems;
-
         setMarketItems((prev) =>
-          append ? mergeMarketItems([...prev, ...remoteItems]) : nextItems,
+          append ? mergeMarketItems([...prev, ...remoteItems]) : remoteItems,
         );
         setMarketPage(page);
-        setMarketHasMore(remoteItems.length >= MARKET_PAGE_SIZE);
+        setMarketHasMore((result.totalCount ?? 0) > page * MARKET_PAGE_SIZE);
       } catch {
         if (requestId !== marketRequestIdRef.current) return;
-        setMarketFetchError(true);
-        if (!append) setMarketItems([]);
+        setMarketSourceErrors((prev) => ({ ...prev, [source]: true }));
+        if (!append) {
+          const fallbackItems = filterMarketItemsByQuery(
+            filterMarketItemsByCategory(marketSnapshotRef.current[source], activeExploreCategory, source),
+            debouncedQuery,
+          );
+          setMarketItems(fallbackItems);
+          setMarketCategories(
+            mergeCategoryBuckets(
+              deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
+              source,
+            ),
+          );
+        }
+        setMarketHasMore(false);
         toast.show('error', t.errorNetwork);
       } finally {
         if (requestId === marketRequestIdRef.current) {
@@ -1584,11 +1721,28 @@ export default function StoreScreen() {
   );
 
   const allInstalled = useMemo(
-    () => [
-      ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
-      ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
-    ],
-    [colors, installedPlugins, installedSkills, t],
+    () => {
+      const builtinIdsAlreadyShown = new Set(
+        installedSkills
+          .map((skill) => skill.identifier || skill.id)
+          .filter((identifier): identifier is string => Boolean(identifier)),
+      );
+
+      const builtinInstalledItems = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+        (item) =>
+          !uninstalledBuiltinTools.includes(item.identifier) &&
+          !builtinIdsAlreadyShown.has(item.identifier),
+      )
+        .map((item) => buildInstalledBuiltinItem(item.identifier, t, colors))
+        .filter((item): item is StoreInstalledItem => Boolean(item));
+
+      return [
+        ...builtinInstalledItems,
+        ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
+        ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
+      ];
+    },
+    [colors, installedPlugins, installedSkills, t, uninstalledBuiltinTools],
   );
 
   const filteredInstalled = useMemo(() => {
@@ -1612,10 +1766,15 @@ export default function StoreScreen() {
         installedPlugins.find((plugin) => plugin.identifier === item.identifier) || null;
       const installedSkill =
         installedSkills.find((skill) => skill.identifier === item.identifier) || null;
+      const builtinItem =
+        item._source === 'builtin' && installedIds.has(item.identifier)
+          ? buildInstalledBuiltinItem(item.identifier, t, colors)
+          : null;
 
       return {
         avatar: item.avatar,
         author: item.author,
+        builtinItem,
         description: item.description,
         identifier: item.identifier,
         installedPlugin,
@@ -1642,6 +1801,7 @@ export default function StoreScreen() {
             (skill) => skill.id === item.id || skill.identifier === item.identifier,
           ) || null
         : null;
+    const builtinItem = item.kind === 'builtin' ? item : null;
 
     return {
       avatar: item.avatar,
@@ -1652,12 +1812,20 @@ export default function StoreScreen() {
           | undefined),
       description: item.description,
       identifier: item.identifier,
+      builtinItem,
       installedPlugin,
       installedSkill,
       label: item.label,
       name: item.name,
     };
-  }, [installedPlugins, installedSkills, selectedEntry, t.storeBuiltIn, t.storeMcp, t.storeSkills]);
+  }, [
+    colors,
+    installedIds,
+    installedPlugins,
+    installedSkills,
+    selectedEntry,
+    t,
+  ]);
 
   const handleSelectedInstall = useCallback(async () => {
     if (!selectedDetail?.marketItem) return;
@@ -1685,6 +1853,8 @@ export default function StoreScreen() {
           try {
             if (selectedDetail.installedPlugin) {
               await pluginApi.remove(selectedDetail.installedPlugin.identifier);
+            } else if (selectedDetail.builtinItem) {
+              await updateBuiltinSkillInstallation(selectedDetail.builtinItem.identifier, false);
             } else if (selectedDetail.installedSkill?.source === 'builtin') {
               await updateBuiltinSkillInstallation(
                 selectedDetail.installedSkill.identifier || selectedDetail.installedSkill.id,
@@ -1889,8 +2059,11 @@ export default function StoreScreen() {
     [],
   );
 
-  const activeExploreTotalCount =
-    activeExploreSource === 'mcp' ? marketMcpTotal : marketSkillTotal;
+  const activeExploreTotalCount = marketFetchError
+    ? marketItems.length
+    : activeExploreSource === 'mcp'
+      ? marketMcpTotal
+      : marketSkillTotal;
 
   return (
     <View className="flex-1 bg-background">
@@ -1967,7 +2140,11 @@ export default function StoreScreen() {
             >
               {exploreSources.map((source) => {
                 const active = activeExploreSource === source.key;
-                const total = source.key === 'mcp' ? marketMcpTotal : marketSkillTotal;
+                const total = marketSourceErrors[source.key]
+                  ? marketSnapshotRef.current[source.key].length
+                  : source.key === 'mcp'
+                    ? marketMcpTotal
+                    : marketSkillTotal;
                 const countStr = total > 0 ? ` ${formatCount(total, locale)}` : '';
                 return (
                   <TouchableOpacity

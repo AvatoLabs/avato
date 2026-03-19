@@ -43,9 +43,20 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
 
 import { getProviderIconUrl } from '../../constants/cdn';
+import {
+  AVATO_INBOX_ICON_ASSET,
+  isBuiltinInboxAvatar,
+} from '../../constants/session';
+import {
+  getMobileBuiltinDisplayName,
+  getMobileBuiltinIntervention,
+  getMobileBuiltinRender,
+  getMobileBuiltinStreaming,
+} from '../../features/BuiltinTools';
 import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
-import { I18nStore, useI18n } from '../../lib/i18n';
+import type { I18nStore} from '../../lib/i18n';
+import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
@@ -61,12 +72,6 @@ import type {
   ImageCitationItem,
   MessageContentPart,
 } from '../../types';
-import {
-  getMobileBuiltinDisplayName,
-  getMobileBuiltinIntervention,
-  getMobileBuiltinRender,
-  getMobileBuiltinStreaming,
-} from '../../features/BuiltinTools';
 import ImageViewer from './ImageViewer';
 import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
@@ -240,11 +245,11 @@ const escapeMentionLabel = (s: string) => s.replaceAll('[', '\\[').replaceAll(']
 /** Replace <mention name="X" id="Y" /> with [@X](mention:Y) for styled display in group chat */
 function preprocessMentionDisplay(content: string, allMembersLabel: string): string {
   return content
-    .replace(
+    .replaceAll(
       /<mention\s[^>]*id="ALL_MEMBERS"[^>]*\/>/g,
       `[${escapeMentionLabel(`@${allMembersLabel}`)}](mention:ALL_MEMBERS) `,
     )
-    .replace(
+    .replaceAll(
       /<mention\s[^>]*name="([^"]*)"[^>]*id="([^"]*)"[^>]*\/>/g,
       (_, name, id) => `[${escapeMentionLabel(`@${name || id}`)}](mention:${id}) `,
     );
@@ -408,8 +413,28 @@ ArtifactBlock.displayName = 'ArtifactBlock';
 const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageSpeaker }>(
   ({ fallbackLabel, speaker }) => {
     const colors = useThemeColors();
+    const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
     const avatar = speaker?.avatar?.trim();
     const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
+    const isInboxAvatar = isBuiltinInboxAvatar(avatar);
+
+    if (isInboxAvatar) {
+      return (
+        <View
+          className="h-7 w-7 items-center justify-center overflow-hidden rounded-full"
+          style={{ backgroundColor: colors.primarySubtle }}
+        >
+          <RNImage
+            source={AVATO_INBOX_ICON_ASSET}
+            style={{
+              height: 28,
+              width: 28,
+              ...(effectiveTheme === 'dark' ? { tintColor: colors.foreground } : {}),
+            }}
+          />
+        </View>
+      );
+    }
 
     if (avatar && avatar.length <= 4 && !resolvedAvatarUri) {
       return (
@@ -430,7 +455,13 @@ const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageS
           className="h-7 w-7 items-center justify-center overflow-hidden rounded-full"
           style={{ backgroundColor: colors.primarySubtle }}
         >
-          <RNImage source={{ uri: resolvedAvatarUri }} style={{ height: 28, width: 28 }} />
+          <RNImage
+            source={{ uri: resolvedAvatarUri }}
+            style={{
+              height: 28,
+              width: 28,
+            }}
+          />
         </View>
       );
     }
@@ -650,7 +681,6 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(message.content);
-    const [showActions, setShowActions] = useState(false);
     const [showImageViewer, setShowImageViewer] = useState(false);
     const [showStats, setShowStats] = useState(false);
     const [viewerUri, setViewerUri] = useState<string | null>(null);
@@ -667,7 +697,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       (s) => s.sessions.find((session) => session.id === sessionId)?.type === 'group',
     );
 
-    const dismissActions = useCallback(() => setShowActions(false), []);
+    const dismissActions = useCallback(() => {}, []);
 
     const handleCopy = useCallback(async () => {
       await Clipboard.setStringAsync(message.content);
@@ -721,13 +751,6 @@ const MessageBubble = memo<MessageBubbleProps>(
         },
       ]);
     }, [sessionId, message.id, deleteMessage, t, dismissActions]);
-
-    const handlePress = useCallback(() => {
-      if (!generating) {
-        haptics.light();
-        setShowActions((prev) => !prev);
-      }
-    }, [generating]);
 
     const handleSaveToTopic = useCallback(() => {
       haptics.light();
@@ -1160,12 +1183,7 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
-        <TouchableOpacity
-          activeOpacity={1}
-          className={`flex-row w-full mb-1.5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
-          delayLongPress={180}
-          onLongPress={handlePress}
-        >
+        <View className={`flex-row w-full mb-1.5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
           {!isUser && (
             <View className="mr-2.5 w-7 items-center pt-0.5">
               <View
@@ -1396,8 +1414,8 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <ToolCallsBlock
                           messageId={message.id}
                           sessionId={sessionId}
-                          topicId={topicId ?? undefined}
                           tools={message.tools}
+                          topicId={topicId ?? undefined}
                         />
                       )}
 
@@ -1589,7 +1607,7 @@ const MessageBubble = memo<MessageBubbleProps>(
               )}
 
               {/* Action Bar */}
-              {!generating && !isEditing && showActions && (
+              {!generating && !isEditing && (
                 <Animated.View
                   className={`flex-row items-center mt-2 gap-1 ${isUser ? 'justify-end' : 'justify-start'}`}
                   entering={FadeIn.duration(200)}
@@ -1658,7 +1676,7 @@ const MessageBubble = memo<MessageBubbleProps>(
               )}
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Token Stats Modal */}
         {showStats && message.usage && (
@@ -2336,6 +2354,17 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
 
 SearchGroundingBlock.displayName = 'SearchGroundingBlock';
 
+const isToolResultReady = (tool?: Pick<ChatToolPayload, 'result_content' | 'result_msg_id'> | null) =>
+  !!tool && (tool.result_content !== undefined || !!tool.result_msg_id);
+
+const isToolSettled = (
+  tool?: Pick<ChatToolPayload, 'intervention' | 'result_content' | 'result_msg_id'> | null,
+) => {
+  if (!tool) return false;
+  const status = tool.intervention?.status;
+  return status === 'aborted' || status === 'rejected' || isToolResultReady(tool);
+};
+
 const ToolStatusIcon = memo<{
   error?: unknown;
   resultReady?: boolean;
@@ -2501,9 +2530,7 @@ const ToolCard = memo<{
 
             {showDetail && isPending && (
               <View className="mt-2">
-                {interventionContent ? (
-                  interventionContent
-                ) : (
+                {interventionContent || (
                   <Text
                     className="text-[11px] leading-4 mb-2"
                     style={{ color: colors.secondaryText }}
@@ -2660,13 +2687,24 @@ const ToolCallsBlock = memo<{
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
-  const allCompleted = tools.every((tool) => tool.result_content || tool.result_msg_id);
+  const allCompleted = tools.every((tool) => isToolSettled(tool));
   const [expanded, setExpanded] = useState(true);
   const approveToolCall = useChatStore((s) => s.approveToolCall);
   const rejectToolCall = useChatStore((s) => s.rejectToolCall);
   const updatePluginArguments = useChatStore((s) => s.updatePluginArguments);
   const locale = useI18n((s) => s.locale);
   const beforeApproveRef = useRef<Map<string, () => void | Promise<void>>>(new Map());
+
+  useEffect(() => {
+    if (hasPending) {
+      setExpanded(true);
+      return;
+    }
+
+    if (allCompleted) {
+      setExpanded(false);
+    }
+  }, [allCompleted, hasPending]);
 
   const registerBeforeApprove = useCallback((toolId: string) => {
     return (id: string, cb: () => void | Promise<void>) => {
@@ -2749,7 +2787,7 @@ const ToolCallsBlock = memo<{
       {expanded ? (
         <View className="mt-3 gap-2">
           {tools.map((tool) => {
-            const hasResult = !!(tool.result_content || tool.result_msg_id);
+            const hasResult = isToolResultReady(tool);
             const isPending = tool.intervention?.status === 'pending';
             const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } =
               buildToolDisplayProps(
@@ -2781,20 +2819,26 @@ const ToolCallsBlock = memo<{
               showIntervention && BuiltinIntervention ? (
                 <BuiltinIntervention
                   args={parsedArgs}
-                  onArgsChange={handleArgsChange}
                   registerBeforeApprove={registerBeforeApprove(tool.id)}
+                  onArgsChange={handleArgsChange}
                 />
               ) : undefined;
 
             const streamingContent =
               showStreaming && BuiltinStreaming ? (
-                <BuiltinStreaming args={parsedArgs} apiName={tool.apiName} identifier={tool.identifier} />
+                <BuiltinStreaming apiName={tool.apiName} args={parsedArgs} identifier={tool.identifier} />
               ) : undefined;
 
             if (useBuiltinRender && BuiltinRender) {
               return (
                 <ToolCard
                   collapsible
+                  interventionContent={interventionContent}
+                  key={tool.id}
+                  resultReady={hasResult}
+                  status={tool.intervention?.status ?? null}
+                  streamingContent={streamingContent}
+                  title={displayTitle}
                   customContent={
                     hasResult ? (
                       <BuiltinRender
@@ -2805,16 +2849,10 @@ const ToolCallsBlock = memo<{
                       />
                     ) : undefined
                   }
-                  interventionContent={interventionContent}
-                  key={tool.id}
                   onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
                   onReject={
                     isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
                   }
-                  resultReady={hasResult}
-                  status={tool.intervention?.status ?? null}
-                  streamingContent={streamingContent}
-                  title={displayTitle}
                 />
               );
             }
@@ -2826,14 +2864,14 @@ const ToolCallsBlock = memo<{
                 content={tool.result_content || undefined}
                 interventionContent={interventionContent}
                 key={tool.id}
-                onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
-                onReject={
-                  isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
-                }
                 resultReady={hasResult}
                 status={tool.intervention?.status ?? null}
                 streamingContent={streamingContent}
                 title={displayTitle}
+                onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
+                onReject={
+                  isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
+                }
               />
             );
           })}
@@ -2877,6 +2915,10 @@ const ToolResultBlock = memo<{
     <ToolCard
       argumentsText={argumentsText || undefined}
       content={useBuiltinRender ? undefined : (message.content || undefined)}
+      error={message.pluginError}
+      resultReady={hasResult && !message.pluginError}
+      status={message.pluginIntervention?.status ?? null}
+      title={displayTitle}
       customContent={
         useBuiltinRender && BuiltinRender ? (
           <BuiltinRender
@@ -2888,16 +2930,12 @@ const ToolResultBlock = memo<{
           />
         ) : undefined
       }
-      error={message.pluginError}
       onApprove={
         isPending ? () => approveToolCall(sessionId, message.id, topicId) : undefined
       }
       onReject={
         isPending ? () => rejectToolMessage(sessionId, message.id) : undefined
       }
-      resultReady={hasResult && !message.pluginError}
-      status={message.pluginIntervention?.status ?? null}
-      title={displayTitle}
     />
   );
 });
@@ -3041,27 +3079,28 @@ interface ThinkingBlockProps {
   isMultimodal?: boolean;
   markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
+  model?: string;
   tempDisplayContent?: MessageContentPart[];
   thinking?: boolean;
-  model?: string;
 }
 
 const ThinkingBlock = memo<ThinkingBlockProps>(
-  ({ content, duration, isMultimodal, markdownRules, markdownStyles, tempDisplayContent, thinking, model }) => {
+  ({ content, duration, isMultimodal, markdownRules, markdownStyles, tempDisplayContent, thinking }) => {
     const { t } = useI18n();
     const colors = useThemeColors();
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
     const [expanded, setExpanded] = useState(thinking ?? false);
 
     useEffect(() => {
-      if (thinking) setExpanded(true);
+      setExpanded(!!thinking);
     }, [thinking]);
 
     const durationLabel = duration
       ? `${t.chatThoughtWithDuration} ${(duration / 1000).toFixed(1)}s`
       : t.chatThought;
 
-    const showContent = (expanded || thinking) && !!content;
+    const hasRenderableReasoning = !!content || !!tempDisplayContent?.length;
+    const showContent = (expanded || thinking) && hasRenderableReasoning;
 
     return (
       <View className="mb-2">
@@ -3088,15 +3127,6 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
               {durationLabel}
             </Text>
           )}
-          {model ? (
-            <Text
-              className="ml-2 text-[11px]"
-              numberOfLines={1}
-              style={{ color: colors.foreground }}
-            >
-              {model}
-            </Text>
-          ) : null}
         </TouchableOpacity>
 
         {showContent ? (

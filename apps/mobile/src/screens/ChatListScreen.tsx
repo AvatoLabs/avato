@@ -11,21 +11,29 @@
  * - Directory drawer shows assistants first, groups after
  */
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Bot,
+  Brain,
+  BrainCircuit,
   Check,
   ChevronDown,
   ChevronUp,
+  Cpu,
+  Globe,
   Menu,
   MessageCircle,
   MessageSquarePlus,
+  Paperclip,
   Pencil,
   Pin,
   Plus,
+  Puzzle,
   Search,
+  Send,
   Tag,
   Trash2,
   UsersRound,
@@ -35,8 +43,12 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   Image as RNImage,
+  Keyboard,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -45,27 +57,39 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  FadeInDown,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
 
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import EmptyState from '../components/ui/EmptyState';
-import { HeroComposer } from '../components/ui/HeroComposer';
+import FilePreview from '../components/ui/FilePreview';
 import ListSkeleton from '../components/ui/ListSkeleton';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
+import PressableScale from '../components/ui/PressableScale';
 import PromptModal from '../components/ui/PromptModal';
 import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
-import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SectionBlock } from '../components/ui/SectionBlock';
 import SkillsSheet from '../components/ui/SkillsSheet';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl, inferProviderFromModelId } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
-import { DEFAULT_INBOX_AVATAR, INBOX_SESSION_ID } from '../constants/session';
+import {
+  AVATO_INBOX_ICON_ASSET,
+  DEFAULT_INBOX_AVATAR,
+  INBOX_SESSION_ID,
+  isBuiltinInboxAvatar,
+} from '../constants/session';
 import { resolveTagColor, withAlpha } from '../constants/tags';
 import {
   agentApi,
@@ -87,6 +111,7 @@ import { navigateToLogin } from '../lib/navigation';
 import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { getStreak, recordUsage } from '../lib/streak';
+import { generateBestTitle } from '../lib/titleGeneration';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
@@ -140,6 +165,8 @@ const trimSearchSnippet = (value: string, maxLength = 88) => {
   return `${normalized.slice(0, maxLength - 1)}…`;
 };
 
+const DIRECTORY_DRAWER_WIDTH = Dimensions.get('window').width;
+
 function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60_000);
@@ -153,12 +180,14 @@ function formatTimeAgo(dateStr: string, t: RelativeTimeText): string {
 
 function SessionLogo({
   avatar,
+  isInbox = false,
   isGroup,
   provider,
   providerLogo,
   size = 36,
 }: {
   avatar?: string;
+  isInbox?: boolean;
   isGroup?: boolean;
   provider?: string;
   providerLogo?: string;
@@ -171,14 +200,51 @@ function SessionLogo({
   const iconUrl =
     providerLogo || (provider ? getProviderIconUrl(provider, effectiveTheme) : undefined);
   const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
+  const isInboxAvatar = isBuiltinInboxAvatar(avatar);
 
   useEffect(() => {
     setImgError(false);
   }, [iconUrl, resolvedAvatarUri]);
 
   if (avatar) {
-    // If it's an emoji (length <= 4 and not a URL), render as text
-    if (avatar.length <= 4 && !resolvedAvatarUri) {
+    if (isInboxAvatar && isInbox) {
+      return (
+        <View
+          className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
+          style={{ width: size, height: size }}
+        >
+          <Image
+            source={AVATO_INBOX_ICON_ASSET}
+            style={{
+              width: size,
+              height: size,
+              ...(effectiveTheme === 'dark' ? { tintColor: colors.foreground } : {}),
+            }}
+          />
+        </View>
+      );
+    }
+
+    if (isInboxAvatar && iconUrl && !imgError) {
+      return (
+        <View
+          className="rounded-full bg-foreground/5 items-center justify-center"
+          style={{ width: size, height: size }}
+        >
+          <RNImage
+            source={{ uri: iconUrl }}
+            style={{ width: iconSize, height: iconSize }}
+            onError={() => setImgError(true)}
+          />
+        </View>
+      );
+    }
+
+    if (isInboxAvatar && !isInbox) {
+      // Non-inbox sessions should not inherit the Avato builtin avatar.
+      // Fall through to provider/model branding below instead.
+    } else if (avatar.length <= 4 && !resolvedAvatarUri) {
+      // If it's an emoji (length <= 4 and not a URL), render as text
       return (
         <View
           className="rounded-full bg-foreground/5 items-center justify-center"
@@ -189,13 +255,16 @@ function SessionLogo({
       );
     }
 
-    if (resolvedAvatarUri) {
+    if (resolvedAvatarUri && !(isInboxAvatar && !isInbox)) {
       return (
         <View
           className="rounded-full bg-foreground/5 items-center justify-center overflow-hidden"
           style={{ width: size, height: size }}
         >
-          <Image source={{ uri: resolvedAvatarUri }} style={{ width: size, height: size }} />
+          <Image
+            source={{ uri: resolvedAvatarUri }}
+            style={{ width: size, height: size }}
+          />
         </View>
       );
     }
@@ -274,17 +343,7 @@ export default function ChatListScreen({ navigation }: any) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
-
-  // Dynamic greeting based on time of day + active chat count
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    let base: string;
-    if (hour >= 6 && hour < 12) base = t.greetingMorning;
-    else if (hour >= 12 && hour < 18) base = t.greetingAfternoon;
-    else if (hour >= 18 && hour < 22) base = t.greetingEvening;
-    else base = t.greetingNight;
-    return base;
-  }, [t]);
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
 
   const [streak, setStreak] = useState(0);
 
@@ -335,8 +394,13 @@ export default function ChatListScreen({ navigation }: any) {
     () => modelProviders.find((provider) => provider.id === selectedProvider)?.logo,
     [modelProviders, selectedProvider],
   );
+  const toolbarProviderLogo =
+    selectedProviderLogo ||
+    (selectedProvider ? getProviderIconUrl(selectedProvider, effectiveTheme) : undefined);
 
   const [heroText, setHeroText] = useState('');
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [providerLogoError, setProviderLogoError] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SearchSessionResult[]>([]);
   const [tags, setTags] = useState<TagItem[]>([]);
@@ -347,8 +411,11 @@ export default function ChatListScreen({ navigation }: any) {
   const [_actionPanel, setActionPanel] = useState<'root' | 'move-tag'>('root');
   const [createMenuVisible, setCreateMenuVisible] = useState(false);
   const [createGroupSheetVisible, setCreateGroupSheetVisible] = useState(false);
+  const [draftAssistantPickerVisible, setDraftAssistantPickerVisible] = useState(false);
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [directoryVisible, setDirectoryVisible] = useState(false);
+  const [directoryMounted, setDirectoryMounted] = useState(false);
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [resourcePickerVisible, setResourcePickerVisible] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
@@ -389,6 +456,39 @@ export default function ChatListScreen({ navigation }: any) {
   } | null>(null);
   const inboxSessionPromiseRef = useRef<Promise<ChatSession | null> | null>(null);
   const [persistedSkillIdentifiers, setPersistedSkillIdentifiers] = useState<string[]>([]);
+  const drawerTranslateX = useSharedValue(-DIRECTORY_DRAWER_WIDTH);
+  const drawerBackdropOpacity = useSharedValue(0);
+  const inputPaddingBottom = Math.max(insets.bottom, 8);
+  const hints = useMemo(
+    () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
+    [t],
+  );
+  const [hintIndex, setHintIndex] = useState(0);
+  const visibleSessions = useMemo(() => {
+    const assistants = sessions.filter(
+      (session) => session.type !== 'group' && session.id !== inboxSession?.id,
+    );
+    const groups = sessions.filter((session) => session.type === 'group');
+    return [...assistants, ...groups];
+  }, [inboxSession?.id, sessions]);
+  const visibleInboxSession = inboxSession;
+  const draftAgentSessions = useMemo(() => {
+    const entries = [visibleInboxSession, ...visibleSessions.filter((session) => session.type !== 'group')].filter(
+      Boolean,
+    ) as ChatSession[];
+
+    return entries.filter(
+      (session, index, list) => list.findIndex((item) => item.id === session.id) === index,
+    );
+  }, [visibleInboxSession, visibleSessions]);
+  const draftSession = useMemo(
+    () =>
+      draftAgentSessions.find((session) => session.id === draftSessionId) ??
+      draftAgentSessions[0] ??
+      null,
+    [draftAgentSessions, draftSessionId],
+  );
+  const draftSessionIsInbox = draftSession?.id === visibleInboxSession?.id;
 
   const fetchTags = useCallback(
     async (showError = false) => {
@@ -561,6 +661,73 @@ export default function ChatListScreen({ navigation }: any) {
     setEnabledSkills(new Set(persistedSkillIdentifiers));
   }, [persistedSkillIdentifiers]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setHintIndex((current) => (current + 1) % hints.length), 4000);
+    return () => clearInterval(timer);
+  }, [hints.length]);
+
+  useEffect(() => {
+    setProviderLogoError(false);
+  }, [toolbarProviderLogo, selectedProvider]);
+
+  useEffect(() => {
+    const handleKeyboardShow = (event: any) => {
+      const coords = event?.endCoordinates;
+      const windowHeight = Dimensions.get('window').height;
+      const screenY = Number(coords?.screenY ?? windowHeight);
+      const offsetFromBottom = windowHeight - screenY;
+
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom + inputPaddingBottom : 0);
+    };
+
+    const handleKeyboardHide = () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setKeyboardOffset(0);
+    };
+
+    const subscriptions =
+      Platform.OS === 'ios'
+        ? [
+            Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
+            Keyboard.addListener('keyboardWillChangeFrame', handleKeyboardShow),
+          ]
+        : [
+            Keyboard.addListener('keyboardDidShow', handleKeyboardShow),
+            Keyboard.addListener('keyboardDidHide', handleKeyboardHide),
+          ];
+
+    return () => {
+      for (const subscription of subscriptions) {
+        subscription.remove();
+      }
+    };
+  }, [inputPaddingBottom]);
+
+  useEffect(() => {
+    if (directoryVisible) {
+      setDirectoryMounted(true);
+      drawerTranslateX.value = withTiming(0, { duration: 260 });
+      drawerBackdropOpacity.value = withTiming(1, { duration: 220 });
+      return;
+    }
+
+    if (!directoryMounted) return;
+
+    drawerBackdropOpacity.value = withTiming(0, { duration: 180 });
+    drawerTranslateX.value = withTiming(-DIRECTORY_DRAWER_WIDTH, { duration: 220 }, (finished) => {
+      if (finished) {
+        runOnJS(setDirectoryMounted)(false);
+      }
+    });
+  }, [
+    directoryMounted,
+    directoryVisible,
+    drawerBackdropOpacity,
+    drawerTranslateX,
+  ]);
+
   const refreshRecentTopics = useCallback(() => {
     topicApi
       .recentTopics(24)
@@ -704,12 +871,36 @@ export default function ChatListScreen({ navigation }: any) {
   const handleCreateChat = async () => {
     setCreateMenuVisible(false);
     try {
-      const sessionId = await createQuickChatSession({
-        includeComposerConfig: true,
+      const nextPlugins = [...enabledSkills];
+      const sessionId =
+        draftSession?.id ??
+        (await createQuickChatSession({
+          includeComposerConfig: true,
+          model: selectedModel || undefined,
+          plugins: nextPlugins,
+          provider: selectedProvider || undefined,
+        }));
+      const agentConfig = await agentApi.getConfigBySession(sessionId).catch(() => null);
+      const configPayload = {
+        chatConfig: {
+          memory: { effort: memoryEffort, enabled: memoryEnabled },
+          searchMode: webSearchEnabled ? 'on' : 'off',
+        },
         model: selectedModel || undefined,
-        plugins: persistedSkillIdentifiers,
+        plugins: nextPlugins,
         provider: selectedProvider || undefined,
-      });
+      };
+
+      if (agentConfig?.id) {
+        await agentApi.updateConfig(agentConfig.id, configPayload).catch(() => {
+          /* best-effort */
+        });
+      } else {
+        await sessionApi.updateSessionConfig(sessionId, configPayload).catch(() => {
+          /* best-effort */
+        });
+      }
+
       const topicId = await createQuickTopic(sessionId);
       haptics.success();
       navigation.navigate('ChatDetail', topicId ? { sessionId, topicId } : { sessionId });
@@ -725,12 +916,14 @@ export default function ChatListScreen({ navigation }: any) {
 
     try {
       const nextPlugins = [...enabledSkills];
-      const sessionId = await createQuickChatSession({
-        includeComposerConfig: true,
-        model: selectedModel || undefined,
-        plugins: nextPlugins,
-        provider: selectedProvider || undefined,
-      });
+      const sessionId =
+        draftSession?.id ??
+        (await createQuickChatSession({
+          includeComposerConfig: true,
+          model: selectedModel || undefined,
+          plugins: nextPlugins,
+          provider: selectedProvider || undefined,
+        }));
       const topicId = await createQuickTopic(sessionId);
 
       const agentConfig = await agentApi.getConfigBySession(sessionId).catch(() => null);
@@ -770,6 +963,7 @@ export default function ChatListScreen({ navigation }: any) {
   }, [
     createQuickChatSession,
     createQuickTopic,
+    draftSession?.id,
     enabledSkills,
     heroText,
     memoryEffort,
@@ -984,6 +1178,41 @@ export default function ChatListScreen({ navigation }: any) {
     });
   }, []);
 
+  const loadDraftSessionConfig = useCallback(
+    async (sessionId: string | null) => {
+      if (!sessionId) return;
+
+      await loadSelection(sessionId);
+
+      try {
+        const config = await agentApi.getConfigBySession(sessionId);
+        const configuredPlugins = Array.isArray(config?.plugins)
+          ? config.plugins.filter(Boolean)
+          : [];
+
+        setEnabledSkills(
+          new Set(
+            configuredPlugins.length > 0 ? configuredPlugins : persistedSkillIdentifiers,
+          ),
+        );
+        setWebSearchEnabled(config?.chatConfig?.searchMode === 'on');
+        setMemoryEnabled(config?.chatConfig?.memory?.enabled !== false);
+        setMemoryEffort(config?.chatConfig?.memory?.effort ?? 'medium');
+      } catch {
+        setEnabledSkills(new Set(persistedSkillIdentifiers));
+        setWebSearchEnabled(false);
+        setMemoryEnabled(true);
+        setMemoryEffort('medium');
+      }
+    },
+    [loadSelection, persistedSkillIdentifiers],
+  );
+
+  useEffect(() => {
+    if (!draftSession?.id) return;
+    void loadDraftSessionConfig(draftSession.id);
+  }, [draftSession?.id, loadDraftSessionConfig]);
+
   const closeActionSheet = useCallback(() => {
     setActionPanel('root');
     setActionSession(null);
@@ -1053,21 +1282,37 @@ export default function ChatListScreen({ navigation }: any) {
     [refreshRecentTopics, t, toast, updateTopicTag],
   );
 
-  const visibleSessions = useMemo(() => {
-    const assistants = sessions.filter(
-      (s) => s.type !== 'group' && s.id !== inboxSession?.id,
-    );
-    const groups = sessions.filter((s) => s.type === 'group');
-    return [...assistants, ...groups];
-  }, [sessions, inboxSession?.id]);
-
-  const visibleInboxSession = inboxSession;
-  const subtitleText = t.homeRecents;
-
   const { pinnedSessions, filteredSessions } = useMemo(() => {
     const pinned = visibleSessions.filter((session) => session.pinned);
     const rest = visibleSessions.filter((session) => !session.pinned);
     return { pinnedSessions: pinned, filteredSessions: rest };
+  }, [visibleSessions]);
+
+  useEffect(() => {
+    if (draftAgentSessions.length === 0) return;
+
+    const hasSelectedDraft =
+      draftSessionId && draftAgentSessions.some((session) => session.id === draftSessionId);
+
+    if (!hasSelectedDraft) {
+      setDraftSessionId(draftAgentSessions[0].id);
+    }
+  }, [draftAgentSessions, draftSessionId]);
+
+  useEffect(() => {
+    setExpandedSessionIds((current) => {
+      const next = new Set(current);
+      let changed = false;
+
+      for (const session of visibleSessions) {
+        if (!next.has(session.id)) {
+          next.add(session.id);
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
   }, [visibleSessions]);
 
   const filteredSearchResults = searchResults;
@@ -1217,10 +1462,11 @@ export default function ChatListScreen({ navigation }: any) {
         .filter(Boolean)
         .join(' ');
       try {
-        const newTitle = await topicApi.generateTitle(topicId);
-        if (newTitle?.trim()) {
-          await updateTopic(topicId, sessionId, newTitle.trim());
-          useToast.getState().show('success', t18n.topicRenamed);
+        const result = await generateBestTitle({ sessionId, topicId });
+        if (result?.title) {
+          useToast
+            .getState()
+            .show('success', result.target === 'topic' ? t18n.topicRenamed : t18n.sessionRenamed);
           refreshRecentTopics();
         } else {
           useToast.getState().show('error', failMsg);
@@ -1231,7 +1477,7 @@ export default function ChatListScreen({ navigation }: any) {
         setSmartRenamingTopicId(null);
       }
     },
-    [refreshRecentTopics, smartRenamingTopicId, updateTopic],
+    [refreshRecentTopics, smartRenamingTopicId],
   );
 
   const toggleAssistantExpand = useCallback((sessionId: string) => {
@@ -1268,6 +1514,7 @@ export default function ChatListScreen({ navigation }: any) {
             <View className="w-10 h-10 rounded-full items-center justify-center mr-3.5 mt-0.5">
               <SessionLogo
                 avatar={item.avatar}
+                isInbox={itemIsInbox}
                 isGroup={item.type === 'group'}
                 provider={providerId}
                 size={36}
@@ -1410,6 +1657,7 @@ export default function ChatListScreen({ navigation }: any) {
         <View className="mr-3.5 mt-0.5 h-10 w-10 items-center justify-center rounded-full">
           <SessionLogo
             avatar={session.avatar}
+            isInbox={isInboxSession(session)}
             isGroup={session.type === 'group'}
             provider={providerId}
             size={36}
@@ -1443,187 +1691,398 @@ export default function ChatListScreen({ navigation }: any) {
     );
   };
 
-  const homeRecentTopics = useMemo(() => recentTopics.slice(0, 8), [recentTopics]);
   const searchQuery = searchText.trim();
+  const homeSuggestions = [t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4];
   const actionSessionIsGroup = actionSession?.type === 'group';
   const actionSessionIsInbox = isInboxSession(actionSession);
+  const drawerBackdropStyle = useAnimatedStyle(() => ({
+    opacity: drawerBackdropOpacity.value,
+  }));
+  const drawerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: drawerTranslateX.value }],
+  }));
+  const drawerGesture = Gesture.Pan()
+    .activeOffsetX([-8, 8])
+    .onUpdate((event) => {
+      const nextX = Math.min(0, Math.max(-DIRECTORY_DRAWER_WIDTH, event.translationX));
+      drawerTranslateX.value = nextX;
+      drawerBackdropOpacity.value = 1 + nextX / DIRECTORY_DRAWER_WIDTH;
+    })
+    .onEnd((event) => {
+      const shouldClose =
+        event.translationX < -DIRECTORY_DRAWER_WIDTH * 0.24 || event.velocityX < -700;
+
+      if (shouldClose) {
+        runOnJS(setDirectoryVisible)(false);
+        return;
+      }
+
+      drawerTranslateX.value = withTiming(0, { duration: 180 });
+      drawerBackdropOpacity.value = withTiming(1, { duration: 180 });
+    });
+
+  const openDrawerGesture = Gesture.Pan()
+    .enabled(!directoryMounted)
+    .activeOffsetX([16, 999])
+    .failOffsetY([-18, 18])
+    .onEnd((event) => {
+      const shouldOpen = event.translationX > 80 || event.velocityX > 720;
+
+      if (shouldOpen) {
+        runOnJS(setDirectoryVisible)(true);
+      }
+    });
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        subtitle={subtitleText}
-        title={greeting}
-        leftActions={
-          <TouchableOpacity
-            accessibilityLabel={t.accessibilityChatDirectory}
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            className="h-10 w-10 items-center justify-center"
-            onPress={() => {
-              haptics.light();
-              setDirectoryVisible(true);
+      {!directoryMounted ? (
+        <GestureDetector gesture={openDrawerGesture}>
+          <View
+            pointerEvents="box-only"
+            style={{
+              bottom: 0,
+              left: 0,
+              position: 'absolute',
+              top: 0,
+              width: 24,
+              zIndex: 30,
             }}
-          >
-            <Menu
-              color={directoryVisible ? colors.primary : colors.secondaryText}
-              size={20}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          </TouchableOpacity>
-        }
-        titleIcon={
-          <MessageCircle color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        }
-      />
-
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            colors={[colors.primary]}
-            refreshing={refreshing}
-            tintColor={colors.primary}
-            onRefresh={onRefresh}
           />
-        }
+        </GestureDetector>
+      ) : null}
+      <BlurView
+        className="z-10"
+        intensity={90}
+        style={{ paddingTop: insets.top }}
+        tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
       >
-        {streak > 1 ? (
-          <Animated.View entering={FadeInDown.delay(50).duration(350)}>
-            <Text className="px-5 pb-1 pt-3 text-[13px] font-medium text-secondary/60">
-              {streak >= 7 ? '🔥 ' : ''}
-              {t.streakMessage.replace('{count}', String(streak))}
-            </Text>
-          </Animated.View>
-        ) : null}
-
-        <Animated.View entering={FadeInDown.delay(100).duration(320)}>
-          <HeroComposer
-            attachmentCount={pendingFiles.length}
-            memoryEnabled={memoryEnabled}
-            modelProvider={selectedProvider}
-            modelProviderLogo={selectedProviderLogo}
-            searchEnabled={webSearchEnabled}
-            value={heroText}
-            onAttach={handleAttach}
-            onChangeText={setHeroText}
-            onModelPress={handleModelPress}
-            onPluginsPress={handlePluginsPress}
-            onSubmit={handleHeroSubmit}
-            onToggleMemory={handleToggleMemory}
-            onToggleSearch={handleToggleWebSearch}
-          />
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(140).duration(320)}>
-          <SectionBlock title={t.homeRecents}>
-            {homeRecentTopics.length > 0 ? (
-              homeRecentTopics.map((topic) => {
-                const targetSessionId = topic.sessionId || topic.group?.id;
-                if (!targetSessionId) return null;
-                const targetSession = sessions.find((session) => session.id === targetSessionId);
-
-                const providerId =
-                  targetSession?.provider ||
-                  (targetSession?.model
-                    ? inferProviderFromModelId(targetSession.model)
-                    : undefined);
-
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="flex-row items-center px-5 py-3"
-                    key={topic.id}
-                    onPress={() =>
-                      navigation.navigate('ChatDetail', {
-                        sessionId: targetSessionId,
-                        topicId: topic.id,
-                      })
+        <View className="flex-row items-center justify-between px-4 py-2.5">
+          <View className="flex-row items-center flex-1">
+            <PressableScale
+              accessibilityLabel={t.accessibilityChatDirectory}
+              accessibilityRole="button"
+              className="w-9 h-9 items-center justify-center rounded-full mr-2"
+              onPress={() => {
+                haptics.light();
+                setDirectoryVisible(true);
+              }}
+            >
+              <Menu
+                color={directoryVisible ? colors.primary : colors.foreground}
+                size={20}
+                strokeWidth={tokens.icon.strokeWidth}
+              />
+            </PressableScale>
+            <PressableScale
+              accessibilityLabel={t.chatListAssistants}
+              accessibilityRole="button"
+              className="flex-1 rounded-2xl px-2 py-1.5"
+              onPress={() => {
+                haptics.light();
+                setDraftAssistantPickerVisible(true);
+              }}
+            >
+              <View className="flex-row items-center">
+                <View className="mr-3">
+                  <SessionLogo
+                    avatar={draftSessionIsInbox ? (draftSession?.avatar || DEFAULT_INBOX_AVATAR) : draftSession?.avatar}
+                    isInbox={draftSessionIsInbox}
+                    provider={
+                      draftSessionIsInbox
+                        ? undefined
+                        : draftSession?.provider ||
+                          (draftSession?.model
+                            ? inferProviderFromModelId(draftSession.model)
+                            : undefined) ||
+                          selectedProvider ||
+                          undefined
                     }
+                    providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
+                    size={34}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text
+                    className="text-[16px] font-medium text-foreground tracking-tight"
+                    numberOfLines={1}
                   >
-                    <View className="mr-3.5 h-10 w-10 items-center justify-center rounded-full">
-                      <SessionLogo
-                        avatar={topic.group ? undefined : topic.agent?.avatar ?? undefined}
-                        isGroup={topic.type === 'group'}
-                        provider={providerId}
-                        size={36}
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <View className="flex-row items-center flex-wrap">
-                        <Text
-                          className="text-[15px] font-medium tracking-tight text-foreground"
-                          numberOfLines={1}
-                        >
-                          {topic.title || t.chatListNewConversation}
-                        </Text>
-                        {topic.type === 'group' ? renderGroupTagChip() : renderTagChip(topic.tagId ?? undefined)}
-                      </View>
+                    {draftSession?.title || 'Avato'}
+                  </Text>
+                  {selectedModel ? (
+                    <View className="mt-0.5 flex-row items-center">
                       <Text
-                        className="mt-0.5 text-[12px] font-medium"
+                        className="flex-1 text-[12px] font-medium"
                         numberOfLines={1}
-                        style={{ color: colors.secondaryText }}
+                        style={{ color: colors.muted }}
                       >
-                        {topic.type === 'group'
-                          ? topic.group?.title || t.chatListCreateGroup
-                          : topic.agent?.title || visibleInboxSession?.title || 'Avato'}
-                        {' · '}
-                        {formatTimeAgo(topic.updatedAt, t)}
+                        {selectedModel}
                       </Text>
                     </View>
-                  </TouchableOpacity>
-                );
-              })
-            ) : loading ? (
-              <ListSkeleton />
-            ) : (
-              <EmptyState
-                description={t.chatListEmptyDesc}
-                iconVariant="chat"
-                title={t.chatListEmpty}
-              />
-            )}
-          </SectionBlock>
-        </Animated.View>
+                  ) : null}
+                </View>
+                <ChevronDown
+                  color={colors.secondaryText}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{ marginLeft: 8 }}
+                />
+              </View>
+            </PressableScale>
+          </View>
+        </View>
+      </BlurView>
 
-        {sessionErrorMessage ? (
-          <Animated.View entering={FadeInDown.delay(180).duration(320)}>
-            <View className="px-5 pt-2">
-              <View
-                className="rounded-2xl px-4 py-4"
-                style={{ backgroundColor: colors.fillTertiary }}
+      <View className="flex-1">
+        <ScrollView
+          className="flex-1"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingBottom: insets.bottom + 116,
+            paddingTop: 12,
+          }}
+          refreshControl={
+            <RefreshControl
+              colors={[colors.primary]}
+              refreshing={refreshing}
+              tintColor={colors.primary}
+              onRefresh={onRefresh}
+            />
+          }
+        >
+          <View
+            style={{
+              justifyContent: 'center',
+              minHeight: Dimensions.get('window').height * 0.5,
+            }}
+          >
+            {sessionErrorMessage ? (
+              <Animated.View entering={FadeInDown.delay(180).duration(320)}>
+                <View className="px-5 pt-4">
+                  <View
+                    className="rounded-2xl px-4 py-4"
+                    style={{ backgroundColor: colors.fillTertiary }}
+                  >
+                    <Text className="text-[14px] font-semibold text-foreground">
+                      {sessionErrorMessage}
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      className="mt-3 rounded-full self-start px-4 py-2"
+                      style={{ backgroundColor: colors.primary }}
+                      onPress={() => void onRefresh()}
+                    >
+                      <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Animated.View>
+            ) : (
+              <Animated.View entering={FadeInDown.delay(80).duration(320)}>
+                <EmptyState
+                  description={t.chatEmptyDesc}
+                  iconVariant="chat"
+                  title={t.chatEmptyWave}
+                  action={
+                    <Animated.View
+                      className="flex-row flex-wrap justify-center gap-2 mt-4 px-6"
+                      entering={FadeInDown.delay(200).duration(350)}
+                    >
+                      {homeSuggestions.map((label) => (
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
+                          key={label}
+                          onPress={() => {
+                            haptics.light();
+                            setHeroText(label);
+                          }}
+                        >
+                          <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </Animated.View>
+                  }
+                />
+                {streak > 1 ? (
+                  <Text className="pt-6 text-center text-[13px] font-medium text-secondary/60">
+                    {streak >= 7 ? '🔥 ' : ''}
+                    {t.streakMessage.replace('{count}', String(streak))}
+                  </Text>
+                ) : null}
+              </Animated.View>
+            )}
+          </View>
+        </ScrollView>
+
+        <Animated.View
+          style={{
+            paddingBottom: Math.max(insets.bottom, 8),
+            paddingHorizontal: 16,
+            paddingTop: 4,
+            transform: [{ translateY: -keyboardOffset }],
+          }}
+        >
+          <BlurView
+            className="rounded-2xl overflow-hidden"
+            intensity={80}
+            tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
+            style={{
+              backgroundColor: colors.overlay,
+              borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
+              borderWidth: keyboardOffset > 0 ? 3 : 1,
+            }}
+          >
+            {pendingFiles.length > 0 && (
+              <View className="px-3 pt-2">
+                <FilePreview />
+              </View>
+            )}
+            <View className="px-3 pt-2">
+              <TextInput
+                multiline
+                accessibilityLabel={hints[hintIndex]}
+                className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
+                placeholder={hints[hintIndex]}
+                placeholderTextColor={colors.secondaryText}
+                style={{ paddingVertical: 0, textAlignVertical: 'top' }}
+                underlineColorAndroid="transparent"
+                value={heroText}
+                onChangeText={setHeroText}
+              />
+            </View>
+            <View className="flex-row items-center px-2 pb-1.5 pt-1">
+              <TouchableOpacity
+                accessibilityLabel="Select model"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full"
+                onPress={handleModelPress}
               >
-                <Text className="text-[14px] font-semibold text-foreground">
-                  {sessionErrorMessage}
-                </Text>
+                {toolbarProviderLogo && !providerLogoError ? (
+                  <RNImage
+                    source={{ uri: toolbarProviderLogo }}
+                    style={{ width: 20, height: 20, borderRadius: 4 }}
+                    onError={() => setProviderLogoError(true)}
+                  />
+                ) : (
+                  <Cpu color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Toggle search"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handleToggleWebSearch}
+              >
+                <Globe
+                  color={webSearchEnabled ? colors.primary : colors.muted}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Attach file"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handleAttach}
+              >
+                <View className="relative items-center justify-center">
+                  <Paperclip
+                    color={pendingFiles.length > 0 ? colors.primary : colors.muted}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  {pendingFiles.length > 0 && (
+                    <View
+                      className="absolute -right-2 -top-1 rounded-full items-center justify-center"
+                      style={{
+                        backgroundColor: colors.primary,
+                        minWidth: 14,
+                        height: 14,
+                        paddingHorizontal: 3,
+                      }}
+                    >
+                      <Text
+                        className="text-[9px] font-semibold"
+                        style={{ color: colors.iconOnPrimary }}
+                      >
+                        {pendingFiles.length > 9 ? '9+' : pendingFiles.length}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Toggle tools"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handlePluginsPress}
+              >
+                <Puzzle
+                  color={enabledSkills.size > 0 ? colors.primary : colors.muted}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel="Toggle memory"
+                activeOpacity={0.7}
+                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                onPress={handleToggleMemory}
+              >
+                {memoryEnabled ? (
+                  <BrainCircuit
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                ) : (
+                  <Brain color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                )}
+              </TouchableOpacity>
+              <View className="flex-1" />
+              {heroText.trim() || pendingFiles.length > 0 ? (
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  className="mt-3 rounded-full self-start px-4 py-2"
+                  className="w-9 h-9 rounded-full items-center justify-center"
                   style={{ backgroundColor: colors.primary }}
-                  onPress={() => void onRefresh()}
+                  onPress={handleHeroSubmit}
                 >
-                  <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
+                  <Send
+                    color={colors.iconOnPrimary}
+                    size={16}
+                    strokeWidth={tokens.icon.strokeWidth}
+                    style={{ marginLeft: 1 }}
+                  />
                 </TouchableOpacity>
-              </View>
+              ) : (
+                <View className="w-9 h-9" />
+              )}
             </View>
-          </Animated.View>
-        ) : null}
-      </ScrollView>
+          </BlurView>
+        </Animated.View>
+      </View>
 
       <Modal
         transparent
-        animationType="fade"
-        visible={directoryVisible}
+        animationType="none"
+        visible={directoryMounted}
         onRequestClose={() => setDirectoryVisible(false)}
       >
-        <Pressable className="flex-1 bg-black/25" onPress={() => setDirectoryVisible(false)}>
-          <Pressable
-            className="h-full bg-background"
-            style={{ paddingTop: insets.top, width: '84%' }}
-            onPress={(event) => event.stopPropagation()}
+        <View className="flex-1">
+          <Animated.View
+            className="bg-black/30"
+            style={[{ bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 }, drawerBackdropStyle]}
           >
+            <Pressable className="flex-1" onPress={() => setDirectoryVisible(false)} />
+          </Animated.View>
+          <GestureDetector gesture={drawerGesture}>
+            <Animated.View
+              className="h-full bg-background"
+              style={[{ paddingTop: insets.top, width: DIRECTORY_DRAWER_WIDTH }, drawerStyle]}
+            >
             <View className="flex-row items-center justify-between px-5 py-4">
               <View className="flex-row items-center">
                 <MessageCircle color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
@@ -1753,8 +2212,9 @@ export default function ChatListScreen({ navigation }: any) {
                 </Text>
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+            </Animated.View>
+          </GestureDetector>
+        </View>
       </Modal>
 
       <Modal
@@ -2186,6 +2646,94 @@ export default function ChatListScreen({ navigation }: any) {
                   ) : null}
                 </Pressable>
               ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={draftAssistantPickerVisible}
+        onRequestClose={() => setDraftAssistantPickerVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setDraftAssistantPickerVisible(false)}
+        >
+          <Pressable
+            className="bg-card rounded-t-2xl"
+            style={{ maxHeight: '72%', paddingBottom: insets.bottom + 16 }}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
+              <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+                {t.chatListAssistants}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="h-10 w-10 items-center justify-center"
+                onPress={() => setDraftAssistantPickerVisible(false)}
+              >
+                <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              className="px-5"
+              contentContainerStyle={{ paddingBottom: 16 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {draftAgentSessions.map((session) => {
+                const isSelected = draftSession?.id === session.id;
+                const providerId =
+                  session.provider ||
+                  (session.model ? inferProviderFromModelId(session.model) : undefined);
+
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.72}
+                    className="mb-2 flex-row items-center rounded-2xl px-3 py-3"
+                    key={session.id}
+                    style={{
+                      backgroundColor: isSelected ? withAlpha(colors.primary, '14') : colors.fillTertiary,
+                    }}
+                    onPress={() => {
+                      haptics.light();
+                      setDraftSessionId(session.id);
+                      setDraftAssistantPickerVisible(false);
+                    }}
+                  >
+                    <View className="mr-3">
+                      <SessionLogo
+                        avatar={session.avatar}
+                        isInbox={session.id === visibleInboxSession?.id}
+                        isGroup={false}
+                        provider={providerId}
+                        size={38}
+                      />
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
+                        {session.title || 'Avato'}
+                      </Text>
+                      <Text
+                        className="mt-0.5 text-[12px]"
+                        numberOfLines={1}
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {session.description || session.model || t.chatListTapToContinue}
+                      </Text>
+                    </View>
+                    {isSelected ? (
+                      <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </Pressable>
         </Pressable>

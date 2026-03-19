@@ -50,7 +50,7 @@ import type {
   ModelRankItem,
   RecentTopic,
   SessionRankItem,
-  SessionTag,
+  Tag,
   Topic,
   TopicRankItem,
   UserProfile,
@@ -739,6 +739,7 @@ export const sessionApi = {
         title: config?.title || 'New Session',
       },
       session: {},
+      slug: config?.slug,
       type: 'agent' as const,
     }),
   remove: (id: string) => trpcMutate('session.removeSession', { id }),
@@ -1259,6 +1260,23 @@ const sanitizeMessagesForProvider = (messages: MobileChatMessage[]): MobileChatM
     };
   });
 
+const stripTrailingTransportStopToken = (value: string) => {
+  const trimmedEnd = value.trimEnd();
+
+  if (trimmedEnd.toLowerCase() === 'stop') {
+    return '';
+  }
+
+  const normalized = trimmedEnd.replaceAll('\r\n', '\n');
+  const lines = normalized.split('\n');
+  const lastLine = lines.at(-1)?.trim().toLowerCase();
+
+  if (lastLine !== 'stop') return value;
+
+  lines.pop();
+  return lines.join('\n');
+};
+
 /**
  * Create a stateful SSE parser. The parser must be stateful because SSE fields
  * (id, event, data) often arrive in SEPARATE XHR onprogress chunks in React
@@ -1443,6 +1461,7 @@ export const aiChatApi = {
 
         const emitContentUpdate = () => {
           const hasContentImages = contentParts.some((part) => part.type === 'image');
+          const normalizedText = stripTrailingTransportStopToken(accText);
 
           contentMetadata = hasContentImages
             ? {
@@ -1452,7 +1471,7 @@ export const aiChatApi = {
             : undefined;
 
           callbacks.onContent?.({
-            content: accText,
+            content: normalizedText,
             ...contentMetadata,
           });
         };
@@ -1565,6 +1584,9 @@ export const aiChatApi = {
                 }
                 break;
               }
+              case 'stop': {
+                break;
+              }
               default: {
                 if (typeof chunk.data === 'string') {
                   rawTextBuffer += chunk.data;
@@ -1669,6 +1691,7 @@ export const aiChatApi = {
           const remaining = xhr.responseText.slice(processedLength);
           if (remaining) processNewData(remaining);
           processNewData('\n');
+          const finalText = stripTrailingTransportStopToken(accText);
           resolve({
             contentMetadata,
             images: accImages.length > 0 ? accImages : undefined,
@@ -1686,7 +1709,7 @@ export const aiChatApi = {
                   ? { content: accReasoning }
                   : undefined,
             search: accSearch,
-            text: accText,
+            text: finalText,
             toolExecutions: accToolExecutions,
             tools: accTools,
             usage: lastUsage,
@@ -1769,17 +1792,17 @@ export const topicApi = {
     trpcQuery<RecentTopic[]>('topic.recentTopics', limit != null ? { limit } : undefined),
 };
 
-// ── Session Tag API ────────────────────────────────────────────────
-export const sessionTagApi = {
-  list: () => trpcQuery<SessionTag[]>('sessionTag.getSessionTags'),
+// ── Tag API (topic-level) ─────────────────────────────────────────
+export const tagApi = {
+  list: () => trpcQuery<Tag[]>('tag.getTags'),
   create: (name: string, color?: string | null) =>
-    trpcMutate<string | undefined>('sessionTag.createSessionTag', { color, name }),
-  remove: (id: string) => trpcMutate('sessionTag.removeSessionTag', { id }),
-  removeAll: () => trpcMutate('sessionTag.removeAllSessionTags'),
+    trpcMutate<string | undefined>('tag.createTag', { color, name }),
+  remove: (id: string) => trpcMutate('tag.removeTag', { id }),
+  removeAll: () => trpcMutate('tag.removeAllTags'),
   update: (id: string, value: { color?: string | null; name?: string }) =>
-    trpcMutate('sessionTag.updateSessionTag', { id, value }),
+    trpcMutate('tag.updateTag', { id, value }),
   updateOrder: (sortMap: { id: string; sort: number }[]) =>
-    trpcMutate('sessionTag.updateSessionTagOrder', { sortMap }),
+    trpcMutate('tag.updateTagOrder', { sortMap }),
 };
 
 // ── Market / Community API ──────────────────────────────────────────
@@ -1868,6 +1891,15 @@ export const resourceApi = {
   getFolderBreadcrumb: (slug: string) =>
     trpcQuery<FolderCrumb[]>('document.getFolderBreadcrumb', { slug }),
 
+  getDocument: (id: string) =>
+    trpcQuery<{
+      content?: string | null;
+      editorData?: Record<string, any> | null;
+      fileType?: string | null;
+      id: string;
+      title?: string | null;
+    }>('document.getDocumentById', { id }),
+
   createFolder: (params: {
     knowledgeBaseId: string;
     parentId?: string;
@@ -1892,7 +1924,15 @@ export const resourceApi = {
     return trpcMutate('document.updateDocument', { id, parentId });
   },
 
-  updateDocument: (id: string, updates: { title?: string; parentId?: string | null }) =>
+  updateDocument: (
+    id: string,
+    updates: {
+      content?: string;
+      fileType?: string;
+      parentId?: string | null;
+      title?: string;
+    },
+  ) =>
     trpcMutate('document.updateDocument', { id, ...updates }),
 
   deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
@@ -2218,7 +2258,6 @@ const normalizeMarketCategoryItem = (item: any): MarketCategoryItem | null => {
     (typeof item.key === 'string' && item.key.trim()) ||
     (typeof item.slug === 'string' && item.slug.trim()) ||
     (typeof item.identifier === 'string' && item.identifier.trim()) ||
-    (typeof item.name === 'string' && item.name.trim()) ||
     '';
 
   if (!category) return null;
@@ -2270,26 +2309,24 @@ export const marketSkillApi = {
 
     try {
       const mcpResult = await trpcQuery<any>('market.getMcpList', input);
-      if (mcpResult?.items?.length > 0) {
-        return {
-          items: mcpResult.items.map((m: any) => ({
-            ...m,
-            _source: 'mcp' as const,
-            avatar: m.meta?.avatar || m.avatar,
-            category: m.category ?? m.meta?.category,
-            description: m.meta?.description || m.description || '',
-            identifier: m.identifier,
-            manifestUrl: m.manifestUrl,
-            name: m.meta?.title || m.name || m.title || m.identifier,
-          })),
-          totalCount: resolveMarketTotalCount(mcpResult),
-        };
-      }
-    } catch {
-      return { items: [], totalCount: 0 };
+      return {
+        items: Array.isArray(mcpResult?.items)
+          ? mcpResult.items.map((m: any) => ({
+              ...m,
+              _source: 'mcp' as const,
+              avatar: m.meta?.avatar || m.avatar,
+              category: m.category ?? m.meta?.category,
+              description: m.meta?.description || m.description || '',
+              identifier: m.identifier,
+              manifestUrl: m.manifestUrl,
+              name: m.meta?.title || m.name || m.title || m.identifier,
+            }))
+          : [],
+        totalCount: resolveMarketTotalCount(mcpResult ?? {}),
+      };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Failed to fetch MCP list');
     }
-
-    return { items: [], totalCount: 0 };
   },
 
   getSkillList: async (params?: {
@@ -2309,25 +2346,23 @@ export const marketSkillApi = {
 
     try {
       const result = await trpcQuery<any>('market.skill.getSkillList', input);
-      if (result?.items?.length > 0) {
-        return {
-          items: result.items.map((s: any) => ({
-            ...s,
-            _source: 'skill' as const,
-            avatar: s.icon || s.logo || s.avatar,
-            category: s.category ?? s.meta?.category,
-            description: s.description || s.meta?.description || '',
-            identifier: s.identifier,
-            name: s.name || s.meta?.title || s.identifier,
-          })),
-          totalCount: resolveMarketTotalCount(result),
-        };
-      }
-    } catch {
-      return { items: [], totalCount: 0 };
+      return {
+        items: Array.isArray(result?.items)
+          ? result.items.map((s: any) => ({
+              ...s,
+              _source: 'skill' as const,
+              avatar: s.icon || s.logo || s.avatar,
+              category: s.category ?? s.meta?.category,
+              description: s.description || s.meta?.description || '',
+              identifier: s.identifier,
+              name: s.name || s.meta?.title || s.identifier,
+            }))
+          : [],
+        totalCount: resolveMarketTotalCount(result ?? {}),
+      };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Failed to fetch skill list');
     }
-
-    return { items: [], totalCount: 0 };
   },
 
   getList: async (params?: {
@@ -2675,6 +2710,45 @@ export const artworkApi = {
     ),
   deleteGeneration: (generationId: string) =>
     trpcMutate('generation.deleteGeneration', { generationId }),
+};
+
+export const videoApi = {
+  createTopic: () => trpcMutate<string>('generationTopic.createTopic', { type: 'video' }),
+  getTopics: () => trpcQuery<GenerationTopic[]>('generationTopic.getAllGenerationTopics', { type: 'video' }),
+  deleteTopic: (id: string) => trpcMutate('generationTopic.deleteTopic', { id }),
+  updateTopic: (id: string, value: { title?: string | null; coverUrl?: string | null }) =>
+    trpcMutate('generationTopic.updateTopic', { id, value }),
+  getBatches: (topicId: string) =>
+    trpcQuery<GenerationBatch[]>('generationBatch.getGenerationBatches', {
+      topicId,
+      type: 'video',
+    }),
+  deleteBatch: (batchId: string) =>
+    trpcMutate('generationBatch.deleteGenerationBatch', { batchId }),
+  createVideo: (params: {
+    generationTopicId: string;
+    model: string;
+    params: {
+      aspectRatio?: string;
+      duration?: number;
+      endImageUrl?: string | null;
+      generateAudio?: boolean;
+      imageUrl?: string | null;
+      prompt: string;
+      resolution?: string;
+      seed?: number | null;
+    };
+    provider: string;
+  }) =>
+    trpcMutate<{ data: { batch: GenerationBatch; generations: any[] }; success: boolean }>(
+      'video.createVideo',
+      params,
+    ),
+  getGenerationStatus: (generationId: string, asyncTaskId: string) =>
+    trpcQuery<{ error: any; generation: any; status: string }>(
+      'generation.getGenerationStatus',
+      { asyncTaskId, generationId },
+    ),
 };
 
 // ── Notebook API ────────────────────────────────────────────────────

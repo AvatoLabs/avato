@@ -46,8 +46,8 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image as RNImage,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -59,7 +59,6 @@ import {
   View,
   type ViewToken,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -80,7 +79,6 @@ import {
 import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { codeInlineRules } from '../lib/markdownRules';
 import {
   clearResourceCacheEntry,
   getResourceCacheEntry,
@@ -175,69 +173,6 @@ function isImage(fileType: string, fileName?: string): boolean {
   return hasImageExtension(fileName);
 }
 
-function isImageMimeType(mime?: string | null): boolean {
-  if (!mime) return false;
-  const normalized = mime.toLowerCase();
-  return normalized.startsWith('image/');
-}
-
-function hasKnownImageSignature(bytes: Uint8Array): boolean {
-  if (bytes.length < 4) return false;
-
-  // PNG
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 137 &&
-    bytes[1] === 80 &&
-    bytes[2] === 78 &&
-    bytes[3] === 71 &&
-    bytes[4] === 13 &&
-    bytes[5] === 10 &&
-    bytes[6] === 26 &&
-    bytes[7] === 10
-  )
-    return true;
-
-  // JPEG
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return true;
-
-  // GIF
-  if (
-    bytes.length >= 6 &&
-    bytes[0] === 71 &&
-    bytes[1] === 73 &&
-    bytes[2] === 70 &&
-    bytes[3] === 56
-  )
-    return true;
-
-  // WEBP: RIFF....WEBP
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 82 &&
-    bytes[1] === 73 &&
-    bytes[2] === 70 &&
-    bytes[3] === 70 &&
-    bytes[8] === 87 &&
-    bytes[9] === 69 &&
-    bytes[10] === 66 &&
-    bytes[11] === 80
-  )
-    return true;
-
-  // BMP: BM
-  if (bytes[0] === 66 && bytes[1] === 77) return true;
-
-  // TIFF: II*\0 or MM\0*
-  if (
-    (bytes[0] === 73 && bytes[1] === 73 && bytes[2] === 42 && bytes[3] === 0) ||
-    (bytes[0] === 77 && bytes[1] === 77 && bytes[2] === 0 && bytes[3] === 42)
-  )
-    return true;
-
-  return false;
-}
-
 const DOCUMENT_EXTENSIONS = /\.(?:md|mdx|doc|docx|ppt|pptx|xls|xlsx|pdf|txt|rtf)$/i;
 
 function isDocument(fileType: string, fileName?: string): boolean {
@@ -251,76 +186,345 @@ function isMarkdownFile(fileType: string, name?: string): boolean {
   return !!(name && /\.(?:md|mdx)$/i.test(name));
 }
 
-function getResourcePreviewMdStyles(colors: {
-  foreground: string;
-  primary: string;
-  markdownCodeInlineBg: string;
-  markdownCodeInlineColor: string;
-  markdownCodeBlockBg: string;
-  markdownText: string;
-  fillTertiary: string;
-  divider: string;
-}) {
-  return {
-    body: { color: colors.foreground, fontSize: 15, lineHeight: 24 },
-    text: { color: colors.foreground },
-    textgroup: { color: colors.foreground },
-    heading1: {
-      color: colors.foreground,
-      fontSize: 22,
-      fontWeight: '700' as const,
-      marginBottom: 10,
-      marginTop: 18,
-    },
-    heading2: {
-      color: colors.foreground,
-      fontSize: 18,
-      fontWeight: '700' as const,
-      marginBottom: 8,
-      marginTop: 14,
-    },
-    heading3: {
-      color: colors.foreground,
-      fontSize: 16,
-      fontWeight: '600' as const,
-      marginBottom: 6,
-      marginTop: 12,
-    },
-    paragraph: { marginBottom: 10 },
-    bullet_list: { marginBottom: 10 },
-    ordered_list: { marginBottom: 10 },
-    list_item: { marginBottom: 4 },
-    code_inline: {
-      backgroundColor: colors.markdownCodeInlineBg,
-      borderRadius: 4,
-      color: colors.markdownCodeInlineColor,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: 13,
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-    },
-    fence: {
-      backgroundColor: colors.markdownCodeBlockBg,
-      borderRadius: 8,
-      color: colors.markdownText,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: 13,
-      lineHeight: 20,
-      marginBottom: 10,
-      padding: 12,
-    },
-    blockquote: {
-      backgroundColor: colors.fillTertiary,
-      borderColor: colors.primary,
-      borderLeftWidth: 3,
-      marginBottom: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    hr: { backgroundColor: colors.divider, height: 1, marginVertical: 12 },
-    link: { color: colors.primary },
-    strong: { fontWeight: '600' as const },
+const TEXT_EXTENSIONS = new Set([
+  'c',
+  'cc',
+  'conf',
+  'cpp',
+  'css',
+  'csv',
+  'd',
+  'env',
+  'go',
+  'h',
+  'hpp',
+  'html',
+  'ini',
+  'java',
+  'js',
+  'json',
+  'jsx',
+  'log',
+  'md',
+  'mdx',
+  'mjs',
+  'py',
+  'rb',
+  'rs',
+  'scss',
+  'sh',
+  'sql',
+  'svg',
+  'toml',
+  'ts',
+  'tsx',
+  'txt',
+  'xml',
+  'yaml',
+  'yml',
+]);
+
+function isTextLikeFile(
+  fileType: string,
+  fileName?: string,
+  sourceType?: 'document' | 'file',
+): boolean {
+  if (
+    fileType.startsWith('text/') ||
+    fileType === 'application/json' ||
+    fileType === 'application/javascript' ||
+    fileType === 'application/xml'
+  ) {
+    return true;
+  }
+
+  const ext = fileName?.split('.').pop()?.toLowerCase();
+  if (ext && TEXT_EXTENSIONS.has(ext)) return true;
+
+  // Documents in the resource tree are authored text by default unless explicitly binary.
+  if (
+    sourceType === 'document' &&
+    fileType !== 'application/pdf' &&
+    !fileType.includes('msword') &&
+    !fileType.includes('vnd.openxmlformats') &&
+    !fileType.includes('vnd.ms-excel') &&
+    !fileType.includes('vnd.ms-powerpoint')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const escapeHtmlAttribute = (value: string) => escapeHtml(value);
+
+const renderMarkdownInline = (value: string) => {
+  let html = escapeHtml(value);
+
+  html = html.replaceAll(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (_match, label: string, href: string) =>
+      `<a href="${escapeHtmlAttribute(href)}">${escapeHtml(label)}</a>`,
+  );
+  html = html.replaceAll(/`([^`]+)`/g, '<code>$1</code>');
+  html = html.replaceAll(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replaceAll(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  html = html.replaceAll(/~~([^~]+)~~/g, '<del>$1</del>');
+
+  return html;
+};
+
+const renderMarkdownTextSegment = (segment: string) => {
+  const lines = segment.replaceAll('\r\n', '\n').split('\n');
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  let blockquote: string[] = [];
+  let list:
+    | {
+        items: string[];
+        ordered: boolean;
+      }
+    | null = null;
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    blocks.push(`<p>${renderMarkdownInline(paragraph.join(' '))}</p>`);
+    paragraph = [];
   };
+
+  const flushBlockquote = () => {
+    if (blockquote.length === 0) return;
+    blocks.push(`<blockquote>${blockquote.map((item) => renderMarkdownInline(item)).join('<br />')}</blockquote>`);
+    blockquote = [];
+  };
+
+  const flushList = () => {
+    if (!list || list.items.length === 0) {
+      list = null;
+      return;
+    }
+
+    const tag = list.ordered ? 'ol' : 'ul';
+    blocks.push(`<${tag}>${list.items.map((item) => `<li>${renderMarkdownInline(item)}</li>`).join('')}</${tag}>`);
+    list = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      flushBlockquote();
+      flushList();
+      continue;
+    }
+
+    const headingPrefix = trimmed.match(/^#{1,6}(?=\s)/)?.[0] ?? '';
+    if (headingPrefix) {
+      flushParagraph();
+      flushBlockquote();
+      flushList();
+      const level = headingPrefix.length;
+      blocks.push(`<h${level}>${renderMarkdownInline(trimmed.slice(level + 1))}</h${level}>`);
+      continue;
+    }
+
+    const compact = trimmed.replaceAll(' ', '').replaceAll('\t', '');
+    if (
+      compact.length >= 3 &&
+      [...new Set(compact)].length === 1 &&
+      ['*', '-', '_'].includes(compact[0] ?? '')
+    ) {
+      flushParagraph();
+      flushBlockquote();
+      flushList();
+      blocks.push('<hr />');
+      continue;
+    }
+
+    if (trimmed.startsWith('>')) {
+      flushParagraph();
+      flushList();
+      blockquote.push(trimmed.startsWith('> ') ? trimmed.slice(2) : trimmed.slice(1));
+      continue;
+    }
+    flushBlockquote();
+
+    const orderedListSeparatorIndex = trimmed.indexOf('. ');
+    const orderedListPrefix =
+      orderedListSeparatorIndex > 0 ? trimmed.slice(0, orderedListSeparatorIndex) : '';
+    if (/^\d+$/.test(orderedListPrefix)) {
+      flushParagraph();
+      if (!list || !list.ordered) {
+        flushList();
+        list = { items: [], ordered: true };
+      }
+      list.items.push(trimmed.slice(orderedListSeparatorIndex + 2));
+      continue;
+    }
+
+    if (
+      trimmed.length > 2 &&
+      ['-', '*', '+'].includes(trimmed[0] ?? '') &&
+      trimmed[1] === ' '
+    ) {
+      flushParagraph();
+      if (!list || list.ordered) {
+        flushList();
+        list = { items: [], ordered: false };
+      }
+      list.items.push(trimmed.slice(2));
+      continue;
+    }
+
+    flushList();
+    paragraph.push(trimmed);
+  }
+
+  flushParagraph();
+  flushBlockquote();
+  flushList();
+
+  return blocks.join('\n');
+};
+
+const renderMarkdownToHtml = (markdown: string) => {
+  const normalized = markdown.replaceAll('\r\n', '\n');
+  const segments: string[] = [];
+  const codeBlockRegex = /```([\w-]+)?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = codeBlockRegex.exec(normalized)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push(renderMarkdownTextSegment(normalized.slice(lastIndex, match.index)));
+    }
+
+    const language = match[1]?.trim();
+    const code = escapeHtml(match[2].replace(/\n$/, ''));
+    segments.push(
+      `<pre><code${language ? ` data-language="${escapeHtmlAttribute(language)}"` : ''}>${code}</code></pre>`,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < normalized.length) {
+    segments.push(renderMarkdownTextSegment(normalized.slice(lastIndex)));
+  }
+
+  return segments.filter(Boolean).join('\n');
+};
+
+function buildMarkdownPreviewHtml(
+  markdown: string,
+  colors: {
+    background: string;
+    border: string;
+    fillTertiary: string;
+    foreground: string;
+    inputBg: string;
+    markdownCodeBlockBg: string;
+    markdownCodeInlineBg: string;
+    markdownCodeInlineColor: string;
+    muted: string;
+    primary: string;
+  },
+) {
+  const rendered = renderMarkdownToHtml(markdown);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: ${colors.background};
+        color: ${colors.foreground};
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 15px;
+        line-height: 1.68;
+        word-break: break-word;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        margin: 1.1em 0 0.45em;
+        line-height: 1.3;
+      }
+      p, ul, ol, blockquote, pre, table {
+        margin: 0 0 0.9em;
+      }
+      a {
+        color: ${colors.primary};
+        text-decoration: none;
+      }
+      code {
+        background: ${colors.markdownCodeInlineBg};
+        color: ${colors.markdownCodeInlineColor};
+        border-radius: 6px;
+        padding: 0.12em 0.36em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      pre {
+        overflow-x: auto;
+        background: ${colors.markdownCodeBlockBg};
+        border-radius: 12px;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+      pre code {
+        background: transparent;
+        color: ${colors.foreground};
+        padding: 0;
+      }
+      blockquote {
+        margin-left: 0;
+        padding: 0.65em 0 0.65em 12px;
+        border-left: 4px solid ${colors.primary};
+        background: ${colors.fillTertiary};
+        border-radius: 10px;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid ${colors.border};
+        padding: 8px 10px;
+        text-align: left;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid ${colors.border};
+        margin: 1.2em 0;
+      }
+      .muted {
+        color: ${colors.muted};
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+  <body>${rendered}</body>
+</html>`;
 }
 
 function isAudio(fileType: string): boolean {
@@ -399,6 +603,19 @@ function buildRemoteFileCandidates(apiBaseUrl: string, item: Pick<FileListItem, 
   return [...new Set([proxyUrl, resolved].filter(Boolean))];
 }
 
+async function removeLocalCachedFile(entry?: ResourceCacheEntry | null) {
+  if (!entry?.localUri) return;
+
+  try {
+    const info = await FileSystem.getInfoAsync(entry.localUri);
+    if (info.exists) {
+      await FileSystem.deleteAsync(entry.localUri, { idempotent: true });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 // ── File Preview Modal ────────────────────────────────────────────────
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -407,13 +624,15 @@ const FilePreviewModal = memo(
   ({
     apiBaseUrl,
     item,
+    remoteHeaders,
     visible,
     onCacheReady,
     onClose,
   }: {
     apiBaseUrl: string;
     item: FileListItem | null;
-    onCacheReady?: (fileId: string) => void;
+    onCacheReady?: (entry: ResourceCacheEntry) => void;
+    remoteHeaders?: Record<string, string>;
     visible: boolean;
     onClose: () => void;
   }) => {
@@ -431,12 +650,15 @@ const FilePreviewModal = memo(
     const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
     const [textContent, setTextContent] = useState<string | null>(null);
     const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+    const [editingText, setEditingText] = useState(false);
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [textDraft, setTextDraft] = useState('');
 
     const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
     const fileUrl = previewCandidates[previewIndex] || '';
     const imageFile = item ? isImage(item.fileType, item.name) : false;
     const textFile = item
-      ? item.fileType.startsWith('text/') || item.fileType === 'application/json'
+      ? isTextLikeFile(item.fileType, item.name, item.sourceType)
       : false;
     const pdfFile = item ? item.fileType === 'application/pdf' : false;
     // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
@@ -456,8 +678,11 @@ const FilePreviewModal = memo(
       setCachedEntry(null);
       setPdfDataUrl(null);
       setTextContent(null);
+      setEditingText(false);
       setPreviewLoadFailed(false);
       setDownloadProgress(0);
+      setSavingEdit(false);
+      setTextDraft('');
     }, [apiBaseUrl, item?.id, visible]);
 
     const handlePreviewError = useCallback(() => {
@@ -493,7 +718,7 @@ const FilePreviewModal = memo(
 
         if (isFresh) {
           setCachedEntry(existing);
-          onCacheReady?.(item.id);
+          onCacheReady?.(existing);
           return;
         }
 
@@ -524,7 +749,7 @@ const FilePreviewModal = memo(
           await saveResourceCacheEntry(nextEntry);
           if (!cancelled) {
             setCachedEntry(nextEntry);
-            onCacheReady?.(item.id);
+            onCacheReady?.(nextEntry);
           }
         } catch {
           /* remote fallback still works */
@@ -550,7 +775,12 @@ const FilePreviewModal = memo(
       let cancelled = false;
       const loadPdf = async () => {
         try {
-          const res = await fetch(fileUrl, { redirect: 'follow' });
+          const res = await fetch(fileUrl, {
+            ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+              ? { headers: remoteHeaders }
+              : {}),
+            redirect: 'follow',
+          });
           if (cancelled) return;
           if (!res.ok) {
             handlePreviewError();
@@ -566,7 +796,10 @@ const FilePreviewModal = memo(
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-          if (!cancelled) setPdfDataUrl(dataUrl);
+          if (!cancelled) {
+            setPreviewLoadFailed(false);
+            setPdfDataUrl(dataUrl);
+          }
         } catch {
           if (!cancelled) handlePreviewError();
         }
@@ -576,24 +809,50 @@ const FilePreviewModal = memo(
       return () => {
         cancelled = true;
       };
-    }, [cachedEntry?.localUri, fileUrl, pdfFile, visible, handlePreviewError]);
+    }, [cachedEntry?.localUri, fileUrl, handlePreviewError, pdfFile, remoteHeaders, visible]);
 
     // Text/Markdown: fetch via redirect (WebView fails on 302), render with Markdown or Text
     useEffect(() => {
-      if (!textFile || !visible) return;
+      if (!item || !textFile || !visible) return;
 
       let cancelled = false;
       const loadText = async () => {
         try {
+          if (item.sourceType === 'document' && typeof item.content === 'string') {
+            if (!cancelled) {
+              setPreviewLoadFailed(false);
+              setTextContent(item.content);
+            }
+            return;
+          }
+
+          if (item.sourceType === 'document') {
+            const document = await resourceApi.getDocument(item.id).catch(() => null);
+            if (cancelled) return;
+            if (typeof document?.content === 'string') {
+              setPreviewLoadFailed(false);
+              setTextContent(document.content);
+              return;
+            }
+          }
+
           if (cachedEntry?.localUri) {
             const text = await FileSystem.readAsStringAsync(cachedEntry.localUri);
-            if (!cancelled) setTextContent(text);
+            if (!cancelled) {
+              setPreviewLoadFailed(false);
+              setTextContent(text);
+            }
             return;
           }
 
           if (!fileUrl) return;
 
-          const res = await fetch(fileUrl, { redirect: 'follow' });
+          const res = await fetch(fileUrl, {
+            ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+              ? { headers: remoteHeaders }
+              : {}),
+            redirect: 'follow',
+          });
           if (cancelled) return;
           if (!res.ok) {
             handlePreviewError();
@@ -601,7 +860,10 @@ const FilePreviewModal = memo(
           }
 
           const text = await res.text();
-          if (!cancelled) setTextContent(text);
+          if (!cancelled) {
+            setPreviewLoadFailed(false);
+            setTextContent(text);
+          }
         } catch {
           if (!cancelled) handlePreviewError();
         }
@@ -611,12 +873,31 @@ const FilePreviewModal = memo(
       return () => {
         cancelled = true;
       };
-    }, [cachedEntry?.localUri, fileUrl, textFile, visible, handlePreviewError]);
+    }, [
+      cachedEntry?.localUri,
+      fileUrl,
+      handlePreviewError,
+      item,
+      item?.content,
+      item?.id,
+      item?.sourceType,
+      textFile,
+      remoteHeaders,
+      visible,
+    ]);
+
+    const itemUpdatedAt = item
+      ? ((item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined)
+      : undefined;
+    const markdownFile = item ? textFile && isMarkdownFile(item.fileType, item.name) : false;
+    const canEditText = !!item && textFile && item.sourceType === 'document';
+    const markdownHtml = useMemo(
+      () =>
+        markdownFile && textContent ? buildMarkdownPreviewHtml(textContent, colors) : undefined,
+      [colors, markdownFile, textContent],
+    );
 
     if (!item) return null;
-
-    const itemUpdatedAt = (item as FileListItem & { updatedAt?: string | null }).updatedAt ?? undefined;
-    const markdownFile = textFile && isMarkdownFile(item.fileType, item.name);
     const officeViewerUri =
       officeFile && !cachedEntry?.localUri
         ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`
@@ -636,16 +917,14 @@ const FilePreviewModal = memo(
             : undefined;
 
     const handleShare = () => {
+      const shareUrl = cachedEntry?.localUri || fileUrl;
+      const shareMessage = (textFile && textContent ? textContent : fileUrl) || item.name;
       void Share.share(
-        Platform.OS === 'ios'
-          ? {
-              title: item.name,
-              url: fileUrl,
-            }
-          : {
-              message: fileUrl,
-              title: item.name,
-            },
+        {
+          message: shareMessage,
+          title: item.name,
+          ...(shareUrl ? { url: shareUrl } : {}),
+        },
       );
     };
 
@@ -657,14 +936,16 @@ const FilePreviewModal = memo(
         const { localUri } = await fileApi.download(item, {
           onProgress: (p) => setDownloadProgress(p),
         });
-        await saveResourceCacheEntry({
+        const nextEntry: ResourceCacheEntry = {
           cachedAt: Date.now(),
           fileId: item.id,
           localUri,
           name: item.name,
           updatedAt: itemUpdatedAt,
-        });
-        onCacheReady?.(item.id);
+        };
+        await saveResourceCacheEntry(nextEntry);
+        setCachedEntry(nextEntry);
+        onCacheReady?.(nextEntry);
         haptics.success();
         toast.show('success', t.resourceDownloaded);
       } catch {
@@ -672,6 +953,36 @@ const FilePreviewModal = memo(
       } finally {
         setDownloading(false);
         setDownloadProgress(0);
+      }
+    };
+
+    const handleStartEdit = () => {
+      setTextDraft(textContent || '');
+      setEditingText(true);
+    };
+
+    const handleSaveEdit = async () => {
+      if (!item || !canEditText || savingEdit) return;
+
+      setSavingEdit(true);
+      try {
+        await resourceApi.updateDocument(item.id, {
+          content: textDraft,
+          fileType: item.fileType,
+        });
+
+        if (cachedEntry?.localUri) {
+          await FileSystem.writeAsStringAsync(cachedEntry.localUri, textDraft);
+        }
+
+        setTextContent(textDraft);
+        setEditingText(false);
+        haptics.success();
+        toast.show('success', t.save);
+      } catch {
+        toast.show('error', t.errorSaveFailed);
+      } finally {
+        setSavingEdit(false);
       }
     };
 
@@ -753,6 +1064,30 @@ const FilePreviewModal = memo(
             </TouchableOpacity>
 
             <View className="flex-row items-center gap-3 flex-shrink-0">
+              {canEditText ? (
+                editingText ? (
+                  <TouchableOpacity
+                    disabled={savingEdit}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => void handleSaveEdit()}
+                  >
+                    {savingEdit ? (
+                      <ActivityIndicator color={imageFile ? '#fff' : colors.primary} size="small" />
+                    ) : (
+                      <Text className="text-[13px] font-semibold" style={{ color: imageFile ? '#fff' : colors.primary }}>
+                        {t.save}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={handleStartEdit}
+                  >
+                    <Pencil color={imageFile ? '#fff' : colors.primary} size={20} strokeWidth={1.8} />
+                  </TouchableOpacity>
+                )
+              ) : null}
               <TouchableOpacity
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={handleShare}
@@ -802,9 +1137,20 @@ const FilePreviewModal = memo(
                   <ExpoImage
                     cachePolicy="memory-disk"
                     contentFit="contain"
-                    source={cachedEntry?.localUri ? { uri: cachedEntry.localUri } : fileUrl}
                     style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
                     transition={120}
+                    source={
+                      cachedEntry?.localUri
+                        ? { uri: cachedEntry.localUri }
+                        : fileUrl
+                          ? {
+                              ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+                                ? { headers: remoteHeaders }
+                                : {}),
+                              uri: fileUrl,
+                            }
+                          : undefined
+                    }
                     onError={handlePreviewError}
                     onLoad={() => setImgLoading(false)}
                   />
@@ -836,6 +1182,44 @@ const FilePreviewModal = memo(
                     {t.resourcePreviewUnavailable}
                   </Text>
                 </View>
+              ) : textFile && editingText ? (
+                <View className="flex-1 px-4 pb-6 pt-4" style={{ backgroundColor: colors.background }}>
+                  <TextInput
+                    multiline
+                    className="flex-1 rounded-3xl px-4 py-4 text-[15px]"
+                    placeholder={item.name}
+                    placeholderTextColor={colors.muted}
+                    value={textDraft}
+                    style={{
+                      backgroundColor: colors.inputBg,
+                      color: colors.foreground,
+                      textAlignVertical: 'top',
+                    }}
+                    onChangeText={setTextDraft}
+                  />
+                </View>
+              ) : textFile && textContent ? (
+                markdownHtml ? (
+                  <WebView
+                    originWhitelist={['*']}
+                    source={{ html: markdownHtml }}
+                    style={{ flex: 1, backgroundColor: colors.background }}
+                  />
+                ) : (
+                  <ScrollView
+                    className="flex-1"
+                    contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+                    style={{ backgroundColor: colors.background }}
+                  >
+                    <Text
+                      selectable
+                      className="text-[15px] leading-6"
+                      style={{ color: colors.foreground }}
+                    >
+                      {textContent}
+                    </Text>
+                  </ScrollView>
+                )
               ) : textFile && !textContent && !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
@@ -849,26 +1233,6 @@ const FilePreviewModal = memo(
                     {t.resourcePreviewUnavailable}
                   </Text>
                 </View>
-              ) : textFile && textContent ? (
-                <ScrollView
-                  className="flex-1"
-                  contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-                  style={{ backgroundColor: colors.background }}
-                >
-                  {markdownFile ? (
-                    <Markdown rules={codeInlineRules} style={getResourcePreviewMdStyles(colors)}>
-                      {textContent}
-                    </Markdown>
-                  ) : (
-                    <Text
-                      selectable
-                      className="text-[15px] leading-6"
-                      style={{ color: colors.foreground }}
-                    >
-                      {textContent}
-                    </Text>
-                  )}
-                </ScrollView>
               ) : documentSource ? (
                 <WebView
                   cacheEnabled
@@ -956,159 +1320,128 @@ FilePreviewModal.displayName = 'FilePreviewModal';
 
 function ResourceThumbnail({
   apiBaseUrl,
+  cachedLocalUri,
   item,
   isVisible = true,
+  onInvalidateCache,
   roundedClassName = 'rounded-xl',
+  remoteHeaders,
   size = 48,
 }: {
   apiBaseUrl: string;
+  cachedLocalUri?: string | null;
   isVisible?: boolean;
   item: FileListItem;
+  onInvalidateCache?: (fileId: string) => void;
   roundedClassName?: string;
+  remoteHeaders?: Record<string, string>;
   size?: number;
 }) {
   const colors = useThemeColors();
   const itemIsFolder = isFolder(item);
   const isImageFile = !itemIsFolder && isImage(item.fileType, item.name);
   const [thumbnailIndex, setThumbnailIndex] = useState(0);
-  const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [tryDirectUrl, setTryDirectUrl] = useState(true);
+  const [cachedUriFailed, setCachedUriFailed] = useState(false);
   const thumbnailCandidates = isImageFile ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
   const thumbnailUrl = thumbnailCandidates[thumbnailIndex] || null;
 
   useEffect(() => {
     setThumbnailIndex(0);
-    setThumbnailDataUrl(null);
-    setThumbnailFailed(false);
     setTryDirectUrl(true);
-  }, [apiBaseUrl, item.id, item.url]);
+    setCachedUriFailed(false);
+  }, [apiBaseUrl, cachedLocalUri, item.id, item.url]);
+
+  useEffect(() => {
+    if (!cachedLocalUri) return;
+
+    let cancelled = false;
+
+    const validateCachedThumbnail = async () => {
+      try {
+        const info = await FileSystem.getInfoAsync(cachedLocalUri);
+        if (!info.exists) {
+          if (!cancelled) {
+            setCachedUriFailed(true);
+            onInvalidateCache?.(item.id);
+          }
+          return;
+        }
+        if (!cancelled) setCachedUriFailed(false);
+      } catch {
+        if (!cancelled) {
+          setCachedUriFailed(true);
+          onInvalidateCache?.(item.id);
+        }
+      }
+    };
+
+    void validateCachedThumbnail();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedLocalUri, item.id, onInvalidateCache]);
 
   const handleDirectUrlError = useCallback(() => {
     setTryDirectUrl(false);
   }, []);
 
   const handleThumbnailError = useCallback(() => {
-    setThumbnailDataUrl(null);
-
     if (thumbnailIndex < thumbnailCandidates.length - 1) {
       setThumbnailIndex((current) => current + 1);
       setTryDirectUrl(true);
       return;
     }
-
-    setThumbnailFailed(true);
   }, [thumbnailCandidates.length, thumbnailIndex]);
 
-  const isLikelyImageResponse = useCallback((res: Response) => {
-    if (!res.ok) return false;
-    const contentType = res.headers.get('content-type')?.toLowerCase() || '';
-    return !contentType || contentType.startsWith('image/') || contentType.includes('octet-stream');
-  }, []);
-
-  useEffect(() => {
-    if (!isVisible || !thumbnailUrl || !isImageFile || tryDirectUrl) {
-      if (!tryDirectUrl && isVisible) {
-        setThumbnailDataUrl(null);
-        setThumbnailFailed(false);
+  const usingCachedLocalThumbnail = Boolean(cachedLocalUri && !cachedUriFailed);
+  const shouldUseRemoteThumbnail = Boolean(!usingCachedLocalThumbnail && isVisible && tryDirectUrl && thumbnailUrl);
+  const remoteThumbnailSource = shouldUseRemoteThumbnail
+    ? {
+        ...(remoteHeaders && Object.keys(remoteHeaders).length > 0 ? { headers: remoteHeaders } : {}),
+        uri: thumbnailUrl!,
       }
+    : null;
+
+  const handleImageError = useCallback(() => {
+    if (usingCachedLocalThumbnail) {
+      setCachedUriFailed(true);
       return;
     }
-
-    setThumbnailFailed(false);
-    setThumbnailDataUrl(null);
-    let cancelled = false;
-
-    const loadThumbnail = async () => {
-      try {
-        let res = await fetch(thumbnailUrl, { redirect: 'follow' });
-        if (cancelled) return;
-
-        if (__DEV__ && !isLikelyImageResponse(res)) {
-          const authHeaders = await getAuthHeaders(apiBaseUrl);
-          if (cancelled) return;
-          if (Object.keys(authHeaders).length > 0) {
-            res = await fetch(thumbnailUrl, { headers: authHeaders, redirect: 'follow' });
-          }
-        }
-        if (cancelled) return;
-
-        if (!isLikelyImageResponse(res)) {
-          handleThumbnailError();
-          return;
-        }
-
-        const blob = await res.blob();
-        if (cancelled) return;
-
-        const blobType = blob.type?.toLowerCase() || '';
-        const maybeGenericBinary = !blobType || blobType.includes('octet-stream');
-        if (!maybeGenericBinary && !isImageMimeType(blobType)) {
-          handleThumbnailError();
-          return;
-        }
-
-        if (!isImageMimeType(blobType)) {
-          const header = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
-          if (!hasKnownImageSignature(header)) {
-            handleThumbnailError();
-            return;
-          }
-        }
-
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        if (cancelled) return;
-
-        const preferredMime = isImageMimeType(blobType) ? blobType : item.fileType;
-        const normalizedDataUrl = dataUrl.startsWith('data:image/')
-          ? dataUrl
-          : dataUrl.replace(/^data:[^;]+;/, `data:${preferredMime};`);
-
-        setThumbnailDataUrl(normalizedDataUrl);
-      } catch {
-        if (!cancelled) handleThumbnailError();
-      }
-    };
-
-    void loadThumbnail();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    apiBaseUrl,
-    handleThumbnailError,
-    isImageFile,
-    isLikelyImageResponse,
-    isVisible,
-    item.fileType,
-    thumbnailUrl,
-    tryDirectUrl,
-  ]);
+    if (shouldUseRemoteThumbnail) {
+      handleDirectUrlError();
+      return;
+    }
+    handleThumbnailError();
+  }, [handleDirectUrlError, handleThumbnailError, shouldUseRemoteThumbnail, usingCachedLocalThumbnail]);
 
   if (itemIsFolder) {
     return <Folder color={colors.secondaryText} size={size * 0.54} strokeWidth={tokens.icon.strokeWidth} />;
   }
 
-  const thumbnailSource = thumbnailDataUrl
-    ? { uri: thumbnailDataUrl }
-    : isVisible && tryDirectUrl && thumbnailUrl
-      ? { uri: thumbnailUrl }
-      : null;
-
-  if (thumbnailSource && !thumbnailFailed) {
+  if (remoteThumbnailSource) {
     return (
       <ExpoImage
         cachePolicy="memory-disk"
         className={`h-full w-full ${roundedClassName}`}
         contentFit="cover"
-        source={thumbnailSource}
+        key={`remote:${item.id}:${thumbnailIndex}`}
+        source={remoteThumbnailSource}
         transition={100}
-        onError={tryDirectUrl ? handleDirectUrlError : handleThumbnailError}
+        onError={handleImageError}
+      />
+    );
+  }
+
+  if (usingCachedLocalThumbnail) {
+    return (
+      <RNImage
+        className={`h-full w-full ${roundedClassName}`}
+        key={`local:${item.id}:${cachedLocalUri}`}
+        resizeMode="cover"
+        source={{ uri: cachedLocalUri! }}
+        onError={handleImageError}
       />
     );
   }
@@ -1125,16 +1458,19 @@ function ResourceThumbnail({
 
 interface FileRowProps {
   apiBaseUrl: string;
+  cachedLocalUri?: string | null;
   isCached?: boolean;
   isSelected?: boolean;
   isVisible?: boolean;
   item: FileListItem;
   onDelete: (id: string, name: string, isFolder: boolean) => void;
   onFolderPress?: (item: FileListItem) => void;
+  onInvalidateCache?: (fileId: string) => void;
   onLongPressItem?: (item: FileListItem) => void;
   onMoveToFolder?: (item: FileListItem) => void;
   onPress: (item: FileListItem) => void;
   onSelect?: (item: FileListItem) => void;
+  remoteHeaders?: Record<string, string>;
   selectMode?: boolean;
   showFolderActions?: boolean;
 }
@@ -1142,8 +1478,10 @@ interface FileRowProps {
 function FileRow({
   item,
   isCached,
+  cachedLocalUri,
   isSelected,
   isVisible = true,
+  onInvalidateCache,
   onDelete,
   onFolderPress,
   onLongPressItem,
@@ -1151,6 +1489,7 @@ function FileRow({
   onPress,
   onSelect,
   apiBaseUrl,
+  remoteHeaders,
   selectMode,
   showFolderActions,
 }: FileRowProps) {
@@ -1200,13 +1539,20 @@ function FileRow({
         </View>
       )}
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
-        <ResourceThumbnail apiBaseUrl={apiBaseUrl} isVisible={isVisible} item={item} />
+        <ResourceThumbnail
+          apiBaseUrl={apiBaseUrl}
+          cachedLocalUri={cachedLocalUri}
+          isVisible={isVisible}
+          item={item}
+          remoteHeaders={remoteHeaders}
+          onInvalidateCache={onInvalidateCache}
+        />
         {isCached && !itemIsFolder ? (
           <View
-            className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
-            style={{ backgroundColor: colors.primary }}
+            className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+            style={{ backgroundColor: colors.successSubtle }}
           >
-            <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+            <Check color={colors.success} size={10} strokeWidth={2.6} />
           </View>
         ) : null}
       </View>
@@ -1220,13 +1566,11 @@ function FileRow({
         </Text>
       </View>
 
-      <View className="ml-2">
-        {itemIsFolder ? (
+      {itemIsFolder ? (
+        <View className="ml-2">
           <ChevronRight color={colors.secondaryText} size={18} strokeWidth={1.5} />
-        ) : (
-          <Eye color={colors.secondaryText} size={16} strokeWidth={1.5} />
-        )}
-      </View>
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -1277,6 +1621,10 @@ export default function ResourceScreen() {
   const [renameValue, setRenameValue] = useState('');
   const [visibleIds, setVisibleIds] = useState<Set<string>>(() => new Set());
   const [cachedResourceIds, setCachedResourceIds] = useState<Set<string>>(() => new Set());
+  const [cachedResourceMap, setCachedResourceMap] = useState<Record<string, ResourceCacheEntry>>(
+    {},
+  );
+  const [resourceAuthHeaders, setResourceAuthHeaders] = useState<Record<string, string>>({});
   const [treeChildrenByParent, setTreeChildrenByParent] = useState<Record<string, FileListItem[]>>(
     {},
   );
@@ -1327,10 +1675,128 @@ export default function ResourceScreen() {
     try {
       const entries = await listResourceCacheEntries();
       setCachedResourceIds(new Set(entries.map((entry) => entry.fileId)));
+      setCachedResourceMap(
+        Object.fromEntries(entries.map((entry) => [entry.fileId, entry])),
+      );
     } catch {
       setCachedResourceIds(new Set());
+      setCachedResourceMap({});
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateAuthHeaders = async () => {
+      try {
+        const headers = await getAuthHeaders(apiBase);
+        if (!cancelled) {
+          setResourceAuthHeaders(headers);
+        }
+      } catch {
+        if (!cancelled) {
+          setResourceAuthHeaders({});
+        }
+      }
+    };
+
+    if (apiBase) {
+      void hydrateAuthHeaders();
+    } else {
+      setResourceAuthHeaders({});
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
+
+  const invalidateCachedResource = useCallback((fileId: string) => {
+    setCachedResourceIds((prev) => {
+      if (!prev.has(fileId)) return prev;
+      const next = new Set(prev);
+      next.delete(fileId);
+      return next;
+    });
+    setCachedResourceMap((prev) => {
+      if (!prev[fileId]) return prev;
+      const next = { ...prev };
+      delete next[fileId];
+      return next;
+    });
+    void clearResourceCacheEntry(fileId);
+  }, []);
+
+  const purgeResourceState = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+
+      const idSet = new Set(ids);
+
+      setFiles((prev) => prev.filter((item) => !idSet.has(item.id)));
+      setSelectedIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setVisibleIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setTreeExpandedIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setTreeChildrenByParent((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([key, items]) => [
+            key,
+            items.filter((item) => !idSet.has(item.id)),
+          ]),
+        ),
+      );
+      setCachedResourceIds((prev) => {
+        if (prev.size === 0) return prev;
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
+      setCachedResourceMap((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+
+      if (previewItem && idSet.has(previewItem.id)) {
+        setPreviewVisible(false);
+        setPreviewItem(null);
+      }
+
+      if (actionItem && idSet.has(actionItem.id)) {
+        setActionItem(null);
+      }
+    },
+    [actionItem, previewItem],
+  );
+
+  const purgeDeletedResources = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(
+        ids.map(async (id) => {
+          const cachedEntry = cachedResourceMap[id] ?? (await getResourceCacheEntry(id));
+          await removeLocalCachedFile(cachedEntry);
+          await clearResourceCacheEntry(id);
+        }),
+      );
+      purgeResourceState(ids);
+    },
+    [cachedResourceMap, purgeResourceState],
+  );
 
   // ── Data (defined early for handleBatchDelete etc.) ──────────────────
 
@@ -1456,27 +1922,29 @@ export default function ResourceScreen() {
       {
         text: t.delete,
         style: 'destructive',
-        onPress: async () => {
-          try {
-            for (const id of ids) {
-              const item = files.find((f) => f.id === id);
-              if (item?.fileType === 'custom/folder') {
-                await resourceApi.deleteDocument(id);
-              } else {
-                await fileApi.remove(id);
+          onPress: async () => {
+            try {
+              for (const id of ids) {
+                const item = files.find((f) => f.id === id);
+                if (!item) continue;
+                if (item.fileType === 'custom/folder' || item.sourceType === 'document') {
+                  await resourceApi.deleteDocument(id);
+                } else {
+                  await fileApi.remove(id);
+                }
               }
-            }
-            haptics.success();
-            clearSelection();
-            await loadFiles(true);
-            await refreshTreeData();
-          } catch {
+              await purgeDeletedResources(ids);
+              haptics.success();
+              clearSelection();
+              await loadFiles(true);
+              await refreshTreeData();
+            } catch {
             toast.show('error', t.resourceDeleteFailed);
           }
         },
       },
     ]);
-  }, [selectedIds, files, clearSelection, loadFiles, refreshTreeData, t, toast]);
+  }, [selectedIds, files, purgeDeletedResources, clearSelection, loadFiles, refreshTreeData, t, toast]);
 
   const [batchMoveIds, setBatchMoveIds] = useState<Set<string>>(() => new Set());
 
@@ -1540,18 +2008,26 @@ export default function ResourceScreen() {
 
   useEffect(() => {
     nextOffsetRef.current = 0;
-    loadFiles();
-  }, [loadFiles]);
+    void (async () => {
+      await refreshCachedResources();
+      await loadFiles();
+    })();
+  }, [loadFiles, refreshCachedResources]);
 
   useEffect(() => {
     if (!libraryId) return;
     void loadTreeChildren(null, true);
   }, [libraryId, loadTreeChildren, sorter, sortOrder]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    loadFiles(true);
-  }, [loadFiles]);
+    try {
+      await refreshCachedResources();
+      await loadFiles(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadFiles, refreshCachedResources]);
 
   const handleFolderPress = useCallback((item: FileListItem) => {
     nextOffsetRef.current = 0;
@@ -1715,15 +2191,16 @@ export default function ResourceScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (isFolderItem) {
+              const existingItem = files.find((item) => item.id === id);
+              if (isFolderItem || existingItem?.sourceType === 'document') {
                 await resourceApi.deleteDocument(id);
               } else {
                 await fileApi.remove(id);
               }
               haptics.success();
-              setFiles((prev) => prev.filter((f) => f.id !== id));
+              await purgeDeletedResources([id]);
+              await loadFiles(true);
               await refreshTreeData();
-              await refreshCachedResources();
             } catch {
               toast.show('error', t.resourceDeleteFailed);
             }
@@ -1731,7 +2208,7 @@ export default function ResourceScreen() {
         },
       ]);
     },
-    [refreshCachedResources, refreshTreeData, t, toast],
+    [files, loadFiles, purgeDeletedResources, refreshTreeData, t, toast],
   );
 
   const closeActionSheet = useCallback(() => setActionItem(null), []);
@@ -1777,19 +2254,16 @@ export default function ResourceScreen() {
     async (item: FileListItem) => {
       closeActionSheet();
       const base = apiBase?.replace(/\/$/, '') || '';
-      const url = base ? `${base}/f/${item.id}` : '';
+      const cachedLocalUri = cachedResourceMap[item.id]?.localUri;
+      const url = cachedLocalUri || (base ? `${base}/f/${item.id}` : '');
       if (!url) return;
       try {
-        await Share.share(
-          Platform.OS === 'ios'
-            ? { title: item.name, url }
-            : { message: url, title: item.name },
-        );
+        await Share.share({ message: url, title: item.name, url });
       } catch {
         toast.show('error', t.resourceShareFailed);
       }
     },
-    [apiBase, closeActionSheet, t, toast],
+    [apiBase, cachedResourceMap, closeActionSheet, t, toast],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
@@ -2174,7 +2648,7 @@ export default function ResourceScreen() {
       {loading && files.length === 0 ? (
         <FileGridSkeleton />
       ) : (
-        <FlatList<ResourceListRow>
+      <FlatList<ResourceListRow>
           data={treeMode ? treeRows : filtered}
           key={treeMode ? 'tree' : viewMode}
           keyExtractor={(item) => (isResourceTreeRow(item) ? item.item.id : item.id)}
@@ -2253,6 +2727,15 @@ export default function ResourceScreen() {
                 }
               : { paddingBottom: insets.bottom + 80 }
           }
+          extraData={{
+            cachedResourceIds,
+            cachedResourceMap,
+            currentFolderId,
+            selectedIds,
+            selectMode,
+            treeExpandedIds,
+            visibleIds,
+          }}
           refreshControl={
             <RefreshControl
               colors={[colors.primary]}
@@ -2342,13 +2825,20 @@ export default function ResourceScreen() {
                       ) : null}
 
                       <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-foreground/5">
-                        <ResourceThumbnail apiBaseUrl={apiBase} item={entry} roundedClassName="rounded-xl" />
+                        <ResourceThumbnail
+                          apiBaseUrl={apiBase}
+                          cachedLocalUri={cachedResourceMap[entry.id]?.localUri}
+                          item={entry}
+                          remoteHeaders={resourceAuthHeaders}
+                          roundedClassName="rounded-xl"
+                          onInvalidateCache={invalidateCachedResource}
+                        />
                         {isCached && !entryIsFolder ? (
                           <View
-                            className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
-                            style={{ backgroundColor: colors.primary }}
+                            className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+                            style={{ backgroundColor: colors.successSubtle }}
                           >
-                            <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+                            <Check color={colors.success} size={10} strokeWidth={2.6} />
                           </View>
                         ) : null}
                       </View>
@@ -2404,16 +2894,19 @@ export default function ResourceScreen() {
                     <ResourceThumbnail
                       isVisible
                       apiBaseUrl={apiBase}
+                      cachedLocalUri={cachedResourceMap[item.id]?.localUri}
                       item={item}
+                      remoteHeaders={resourceAuthHeaders}
                       roundedClassName="rounded-lg"
                       size={56}
+                      onInvalidateCache={invalidateCachedResource}
                     />
                     {cachedResourceIds.has(item.id) && !isFolder(item) ? (
                       <View
-                        className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
-                        style={{ backgroundColor: colors.primary }}
+                        className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+                        style={{ backgroundColor: colors.successSubtle }}
                       >
-                        <Download color={colors.iconOnPrimary} size={10} strokeWidth={2.3} />
+                        <Check color={colors.success} size={10} strokeWidth={2.6} />
                       </View>
                     ) : null}
                   </View>
@@ -2432,14 +2925,17 @@ export default function ResourceScreen() {
             ) : (
               <FileRow
                 apiBaseUrl={apiBase}
+                cachedLocalUri={cachedResourceMap[item.id]?.localUri}
                 isCached={cachedResourceIds.has(item.id)}
                 isSelected={selectedIds.has(item.id)}
                 isVisible={visibleIds.size === 0 || visibleIds.has(item.id)}
                 item={item}
+                remoteHeaders={resourceAuthHeaders}
                 selectMode={selectMode}
                 showFolderActions={!!libraryId}
                 onDelete={handleDelete}
                 onFolderPress={libraryId ? handleFolderPress : undefined}
+                onInvalidateCache={invalidateCachedResource}
                 onLongPressItem={libraryId ? handleLongPressItem : undefined}
                 onPress={handlePreview}
                 onSelect={selectMode ? toggleSelect : undefined}
@@ -2526,15 +3022,20 @@ export default function ResourceScreen() {
       <FilePreviewModal
         apiBaseUrl={apiBase}
         item={previewItem}
+        remoteHeaders={resourceAuthHeaders}
         visible={previewVisible}
         onClose={() => setPreviewVisible(false)}
-        onCacheReady={(fileId) =>
+        onCacheReady={(entry) => {
           setCachedResourceIds((prev) => {
             const next = new Set(prev);
-            next.add(fileId);
+            next.add(entry.fileId);
             return next;
-          })
-        }
+          });
+          setCachedResourceMap((prev) => ({
+            ...prev,
+            [entry.fileId]: entry,
+          }));
+        }}
       />
 
       {/* Item Action Sheet */}
