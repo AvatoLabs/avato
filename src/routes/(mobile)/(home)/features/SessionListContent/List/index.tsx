@@ -4,8 +4,7 @@ import { memo } from 'react';
 import LazyLoad from 'react-lazy-load';
 import { Link } from 'react-router-dom';
 
-import { SESSION_CHAT_URL } from '@/const/index';
-import { useNavigateToAgent } from '@/hooks/useNavigateToAgent';
+import { useChatStore } from '@/store/chat';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { getSessionStoreState, useSessionStore } from '@/store/session';
 import { sessionGroupSelectors, sessionSelectors } from '@/store/session/selectors';
@@ -16,6 +15,7 @@ import { type LobeSessions } from '@/types/session';
 import SkeletonList from '../../SkeletonList';
 import AddButton from './AddButton';
 import SessionItem from './Item';
+import { getSessionListItemUrl } from './url';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   item: css`
@@ -39,27 +39,26 @@ interface SessionListProps {
   groupId?: string;
   showAddButton?: boolean;
 }
+
 const SessionList = memo<SessionListProps>(({ dataSource, groupId, showAddButton = true }) => {
   const { analytics } = useAnalytics();
 
   const isInit = useSessionStore(sessionSelectors.isSessionListInit);
   const mobile = useServerConfigStore((s) => s.isMobile);
-
-  const navigateToAgent = useNavigateToAgent();
+  const clearPortalStack = useChatStore((s) => s.clearPortalStack);
 
   const isEmpty = !dataSource || dataSource.length === 0;
   return !isInit ? (
     <SkeletonList />
   ) : !isEmpty ? (
-    dataSource.map(({ id, ...res }) => (
-      <LazyLoad className={styles.item} key={id}>
+    dataSource.map((sessionItem) => (
+      <LazyLoad className={styles.item} key={sessionItem.id}>
         <Link
-          aria-label={id}
+          aria-label={sessionItem.id}
           className={styles.link}
-          to={SESSION_CHAT_URL((res as any).config?.id, mobile)}
-          onClick={(e) => {
-            e.preventDefault();
-            navigateToAgent((res as any).config?.id);
+          to={getSessionListItemUrl(sessionItem, mobile)}
+          onClick={() => {
+            clearPortalStack();
 
             // Enhanced analytics tracking
             if (analytics) {
@@ -67,7 +66,7 @@ const SessionList = memo<SessionListProps>(({ dataSource, groupId, showAddButton
               const sessionStore = getSessionStoreState();
 
               const userId = userProfileSelectors.userId(userStore);
-              const session = sessionSelectors.getSessionById(id)(sessionStore);
+              const session = sessionSelectors.getSessionById(sessionItem.id)(sessionStore);
 
               if (session) {
                 const sessionGroupId = session.group || 'default';
@@ -82,7 +81,7 @@ const SessionList = memo<SessionListProps>(({ dataSource, groupId, showAddButton
                     assistant_tags: session.meta?.tags || [],
                     group_id: sessionGroupId,
                     group_name: groupName,
-                    session_id: id,
+                    session_id: sessionItem.id,
                     spm: 'homepage.chat.session_list_item.click',
                     user_id: userId || 'anonymous',
                   },
@@ -91,7 +90,7 @@ const SessionList = memo<SessionListProps>(({ dataSource, groupId, showAddButton
             }
           }}
         >
-          <SessionItem id={id} />
+          <SessionItem id={sessionItem.id} />
         </Link>
       </LazyLoad>
     ))

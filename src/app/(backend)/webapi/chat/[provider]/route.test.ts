@@ -11,6 +11,9 @@ import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 import { POST } from './route';
 
+const findSkillByIdentifierMock = vi.fn();
+const pluginQueryMock = vi.fn();
+
 vi.mock('@/app/(backend)/middleware/auth/utils', () => ({
   checkAuthMethod: vi.fn(),
 }));
@@ -22,6 +25,22 @@ vi.mock('@lobechat/utils/server', () => ({
 vi.mock('@/server/modules/ModelRuntime', () => ({
   initModelRuntimeFromDB: vi.fn(),
   createTraceOptions: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('@/server/services/file', () => ({
+  FileService: vi.fn().mockImplementation(() => ({})),
+}));
+
+vi.mock('@/database/models/agentSkill', () => ({
+  AgentSkillModel: vi.fn().mockImplementation(() => ({
+    findByIdentifier: findSkillByIdentifierMock,
+  })),
+}));
+
+vi.mock('@/database/models/plugin', () => ({
+  PluginModel: vi.fn().mockImplementation(() => ({
+    query: pluginQueryMock,
+  })),
 }));
 
 vi.mock('@/envs/auth', async (importOriginal) => {
@@ -55,6 +74,8 @@ beforeEach(() => {
 afterEach(() => {
   // 清除模拟调用历史
   vi.clearAllMocks();
+  findSkillByIdentifierMock.mockReset();
+  pluginQueryMock.mockReset();
 });
 
 describe('POST handler', () => {
@@ -204,6 +225,95 @@ describe('POST handler', () => {
         },
         errorType: 500,
       });
+    });
+
+    it('should inject skill context and expose lobe-skills builtin tool for mobile requests', async () => {
+      vi.mocked(getXorPayload).mockReturnValueOnce({
+        apiKey: 'test-api-key',
+        azureApiVersion: 'v1',
+        userId: 'abc',
+      });
+
+      findSkillByIdentifierMock.mockImplementation(async (identifier: string) => {
+        if (identifier !== 'demo-skill') return undefined;
+
+        return {
+          createdAt: new Date(),
+          description: 'Use this skill to handle demo tasks',
+          id: 'skill-1',
+          identifier: 'demo-skill',
+          manifest: {
+            description: 'Use this skill to handle demo tasks',
+            name: 'Demo Skill',
+            repository: 'https://example.com/demo-skill',
+          },
+          name: 'Demo Skill',
+          source: 'user',
+          updatedAt: new Date(),
+        };
+      });
+      pluginQueryMock.mockResolvedValue([]);
+
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      request = new Request(new URL('https://test.com'), {
+        headers: { [LOBE_CHAT_AUTH_HEADER]: 'Bearer some-valid-token' },
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ content: 'Please use the demo skill', role: 'user' }],
+          model: 'test-model',
+          plugins: ['demo-skill'],
+          stream: true,
+        }),
+      });
+
+      const toolLoopResponse = new Response(
+        JSON.stringify({
+          choices: [{ finish_reason: 'stop', message: { content: 'Done', role: 'assistant' } }],
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+      const finalStreamResponse = new Response('data: [DONE]\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi
+          .fn()
+          .mockResolvedValueOnce(toolLoopResponse)
+          .mockResolvedValueOnce(finalStreamResponse),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      const response = await POST(request as unknown as Request, { params: mockParams });
+      const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+
+      expect(response).toBe(finalStreamResponse);
+      expect(mockedChat).toHaveBeenCalledTimes(2);
+
+      const firstCall = mockedChat.mock.calls[0];
+      expect(firstCall).toBeDefined();
+
+      const firstCallPayload = firstCall![0] as any;
+      const systemMessage = firstCallPayload.messages.find(
+        (message: any) => message.role === 'system',
+      );
+
+      expect(firstCallPayload.tools).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            function: expect.objectContaining({
+              name: 'lobe-skills____runSkill',
+            }),
+          }),
+        ]),
+      );
+      expect(systemMessage?.content).toContain('<available_skills>');
+      expect(systemMessage?.content).toContain('name="Demo Skill"');
+      expect(systemMessage?.content).toContain('Use the runSkill tool to activate a skill');
+      expect(systemMessage?.content).toContain('Read reference files attached to a skill');
     });
   });
 });

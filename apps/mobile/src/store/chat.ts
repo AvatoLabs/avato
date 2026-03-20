@@ -113,6 +113,7 @@ const mergeToolPayloads = (
         tool.result_content !== undefined || tool.result_msg_id
           ? (tool.intervention ?? { status: 'approved' })
           : (tool.intervention ?? existing.intervention),
+      pluginState: tool.pluginState ?? existing.pluginState,
       result_content:
         tool.result_content !== undefined ? tool.result_content : existing.result_content,
       result_msg_id: tool.result_msg_id ?? existing.result_msg_id,

@@ -9,6 +9,16 @@ import { LobeSessionType } from '@/types/session';
 
 import { sessionSelectors } from './selectors';
 
+vi.mock('@/utils/localStorage', () => ({
+  AsyncLocalStorage: class {
+    async getFromLocalStorage() {
+      return {};
+    }
+
+    async saveToLocalStorage() {}
+  },
+}));
+
 // Mock sessionService 和其他依赖项
 vi.mock('@/services/session', () => ({
   sessionService: {
@@ -43,9 +53,7 @@ vi.mock('@/components/AntdStaticMethods', () => ({
 const mockRefresh = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
-  useSessionStore.setState({
-    refreshSessions: mockRefresh,
-  });
+  useSessionStore.setState({ refreshSessions: mockRefresh });
 });
 
 afterEach(() => {
@@ -138,10 +146,26 @@ describe('SessionAction', () => {
       expect(sessionService.removeSession).toHaveBeenCalledWith(sessionId);
       expect(mockRefresh).toHaveBeenCalled();
     });
+
+    it('should switch back to inbox when deleting the active session even if activeId is stale', async () => {
+      const { result } = renderHook(() => useSessionStore());
+      const sessionId = 'session-id';
+
+      act(() => {
+        useSessionStore.setState({ activeAgentId: sessionId, activeId: 'other-session' });
+      });
+
+      await act(async () => {
+        await result.current.removeSession(sessionId);
+      });
+
+      expect(result.current.activeAgentId).toBe('inbox');
+      expect(result.current.activeId).toBe('inbox');
+    });
   });
 
   describe('activeSession', () => {
-    it('should set the provided session id as active', async () => {
+    it('should set the provided session id as active for both active fields', async () => {
       const { result } = renderHook(() => useSessionStore());
       const sessionId = 'active-session-id';
 
@@ -150,6 +174,7 @@ describe('SessionAction', () => {
       });
 
       expect(result.current.activeAgentId).toBe(sessionId);
+      expect(result.current.activeId).toBe(sessionId);
     });
   });
 

@@ -74,16 +74,17 @@ export default function EmptyState({
 }: EmptyStateProps) {
   const colors = useThemeColors();
   const IconComponent = iconVariant ? (VARIANT_ICONS[iconVariant] ?? VARIANT_ICONS.default) : null;
-  const watermarkIconColor = withAlpha(colors.foreground, '10');
-  const illustrationGlow = withAlpha(colors.foreground, '05');
-  const illustrationRing = withAlpha(colors.foreground, '0D');
-  const illustrationSurface = colors.fillTertiary;
+  const watermarkIconColor = withAlpha(colors.foreground, '12');
+  const watermarkPlate = withAlpha(colors.foreground, '04');
+  const illustrationSurface = withAlpha(colors.primary, '12');
+  const illustrationBorder = withAlpha(colors.primary, '18');
   const shellBorder = colors.border;
   const shellBg = colors.card;
   const descriptionColor = colors.tertiaryText;
   const watermarkSize = compact ? 96 : EMPTY_WATERMARK_SIZE;
   const illustrationSize = compact ? 64 : EMPTY_ILLUSTRATION_SIZE;
   const iconSize = compact ? 24 : EMPTY_ICON_SIZE;
+  const watermarkPlateRadius = compact ? 24 : 30;
   const shellRadius = compact ? 24 : 28;
   const shellMaxWidth = compact ? 312 : 336;
 
@@ -114,23 +115,29 @@ export default function EmptyState({
               style={{ height: watermarkSize, width: watermarkSize }}
             >
               <View
-                className="absolute rounded-full"
+                className="absolute"
                 style={{
-                  backgroundColor: illustrationGlow,
-                  height: watermarkSize,
-                  width: watermarkSize,
+                  backgroundColor: watermarkPlate,
+                  borderRadius: watermarkPlateRadius,
+                  height: watermarkSize - 8,
+                  transform: [{ rotate: '-8deg' }],
+                  width: watermarkSize - 2,
                 }}
               />
               <View
-                className="absolute rounded-full"
+                className="absolute items-center justify-center"
                 style={{
-                  borderColor: illustrationRing,
-                  borderWidth: 1,
-                  height: watermarkSize - 12,
-                  width: watermarkSize - 12,
+                  height: watermarkSize,
+                  transform: [{ translateX: compact ? 8 : 10 }, { translateY: compact ? 4 : 6 }],
+                  width: watermarkSize,
                 }}
-              />
-              <IconComponent color={watermarkIconColor} size={compact ? 44 : 52} strokeWidth={1} />
+              >
+                <IconComponent
+                  color={watermarkIconColor}
+                  size={compact ? 46 : 56}
+                  strokeWidth={0.9}
+                />
+              </View>
             </View>
           ) : null}
 
@@ -139,7 +146,7 @@ export default function EmptyState({
               className="items-center justify-center"
               style={{
                 backgroundColor: illustrationSurface,
-                borderColor: colors.borderSubtle,
+                borderColor: illustrationBorder,
                 borderWidth: 1,
                 borderRadius: compact ? 20 : 24,
                 height: illustrationSize,

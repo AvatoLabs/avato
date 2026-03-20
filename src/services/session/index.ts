@@ -16,7 +16,7 @@ import {
 export class SessionService {
   hasSessions = async (): Promise<boolean> => {
     const result = await this.countSessions();
-    return result === 0;
+    return result > 0;
   };
 
   createSession = async (

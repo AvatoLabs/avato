@@ -57,6 +57,7 @@ import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
+import { getAssistantChainActionMessageId } from '../../store/messageDisplay';
 import { useThemeStore } from '../../store/theme';
 import { getChatAccent, useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
@@ -234,6 +235,12 @@ function preprocessMentionDisplay(content: string, allMembersLabel: string): str
       (_, name, id) => `[${escapeMentionLabel(`@${name || id}`)}](mention:${id}) `,
     );
 }
+
+const getAssistantChainText = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => message.content?.trim())
+    .filter((content): content is string => !!content)
+    .join('\n\n');
 
 const ARTIFACT_TAG_REGEX = /<lobeArtifact\b([^>]*)>([\s\S]*?)(?:<\/lobeArtifact>|$)/g;
 const ARTIFACT_ATTR_REGEX = /(\w+)="([^"]*)"/g;
@@ -686,15 +693,21 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [contentCollapsed, setContentCollapsed] = useState(true);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
     const [downloadingProgress, setDownloadingProgress] = useState(0);
+    const actionMessageId = isUser ? message.id : getAssistantChainActionMessageId(message);
+    const assistantChainChildren =
+      message.role === 'assistant' && message.children?.length ? message.children : null;
+    const messageCopyText = assistantChainChildren?.length
+      ? getAssistantChainText(assistantChainChildren)
+      : message.content;
 
     const dismissActions = useCallback(() => {}, []);
 
     const handleCopy = useCallback(async () => {
-      await Clipboard.setStringAsync(message.content);
+      await Clipboard.setStringAsync(messageCopyText);
       haptics.success();
       toast.show('success', t.toastCopied);
       dismissActions();
-    }, [message.content, t, toast, dismissActions]);
+    }, [messageCopyText, t, toast, dismissActions]);
 
     const handleEdit = useCallback(() => {
       haptics.light();
@@ -704,27 +717,27 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const handleEditSubmit = useCallback(() => {
       if (editText.trim() && editText !== message.content) {
-        useChatStore.getState().editMessage(sessionId, message.id, editText.trim());
+        useChatStore.getState().editMessage(sessionId, actionMessageId, editText.trim());
         haptics.success();
       }
       setIsEditing(false);
-    }, [editText, message.content, message.id, sessionId]);
+    }, [actionMessageId, editText, message.content, sessionId]);
 
     const handleRegenerate = useCallback(() => {
       haptics.light();
-      useChatStore.getState().regenerateMessage(sessionId, message.id);
-    }, [sessionId, message.id]);
+      useChatStore.getState().regenerateMessage(sessionId, actionMessageId);
+    }, [actionMessageId, sessionId]);
 
     const handleShare = useCallback(async () => {
       haptics.light();
       dismissActions();
       try {
-        const shareText = message.content || message.reasoning?.content || '';
+        const shareText = messageCopyText || message.reasoning?.content || '';
         await Share.share({ message: shareText });
       } catch {
         // user cancelled
       }
-    }, [message.content, message.reasoning?.content, dismissActions]);
+    }, [messageCopyText, message.reasoning?.content, dismissActions]);
 
     const handleDelete = useCallback(() => {
       haptics.light();
@@ -736,11 +749,11 @@ const MessageBubble = memo<MessageBubbleProps>(
           style: 'destructive',
           onPress: () => {
             haptics.warning();
-            useChatStore.getState().deleteMessage(sessionId, message.id);
+            useChatStore.getState().deleteMessage(sessionId, actionMessageId);
           },
         },
       ]);
-    }, [sessionId, message.id, t, dismissActions]);
+    }, [actionMessageId, sessionId, t, dismissActions]);
 
     const handleSaveToTopic = useCallback(() => {
       haptics.light();
@@ -1159,6 +1172,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       (message.metadata as Record<string, unknown>)?.expanded === true;
     const showMessageBubble =
       !showStandaloneUserAttachments ||
+      !!assistantChainChildren?.length ||
       !!renderedContent ||
       !!compareGroupChildren?.length ||
       !!compressedGroupMessages?.length ||
@@ -1395,11 +1409,11 @@ const MessageBubble = memo<MessageBubbleProps>(
                         </View>
                       ) : null}
 
-                      {hasSearch && message.search && (
+                      {!assistantChainChildren?.length && hasSearch && message.search && (
                         <SearchGroundingBlock search={message.search} />
                       )}
 
-                      {hasTools && message.tools && (
+                      {!assistantChainChildren?.length && hasTools && message.tools && (
                         <ToolCallsBlock
                           messageId={message.id}
                           sessionId={sessionId}
@@ -1408,7 +1422,8 @@ const MessageBubble = memo<MessageBubbleProps>(
                         />
                       )}
 
-                      {!isUser &&
+                      {!assistantChainChildren?.length &&
+                        !isUser &&
                         !isToolMessage &&
                         (renderedReasoning || (generating && isReasoning)) && (
                           <ThinkingBlock
@@ -1424,7 +1439,18 @@ const MessageBubble = memo<MessageBubbleProps>(
                             }
                           />
                         )}
-                      {compareGroupChildren?.length ? (
+                      {assistantChainChildren?.length ? (
+                        <AssistantChainBlock
+                          childrenMessages={assistantChainChildren}
+                          markdownRules={markdownRules}
+                          markdownStyles={markdownStyles}
+                          reasoningMarkdownStyles={reasoningMarkdownStyles}
+                          sessionId={sessionId}
+                          t={t}
+                          topicId={topicId ?? undefined}
+                          onOpenLink={handleOpenLink}
+                        />
+                      ) : compareGroupChildren?.length ? (
                         <CompareGroupBlock
                           childrenMessages={compareGroupChildren}
                           groupMembersById={groupMembersById}
@@ -2479,9 +2505,19 @@ const ToolCard = memo<{
     const isPending = status === 'pending';
     const isRejected = status === 'rejected';
     const isAborted = status === 'aborted';
-    const [expanded, setExpanded] = useState(!collapsible || isPending);
+    const shouldAutoExpand =
+      !collapsible || isPending || resultReady || !!streamingContent || !!customContent;
+    const [expanded, setExpanded] = useState(shouldAutoExpand);
     const showDetail = expanded || !collapsible;
     const [contentExpanded, setContentExpanded] = useState(false);
+    const hasAutoExpandedRef = useRef(shouldAutoExpand);
+
+    useEffect(() => {
+      if (!shouldAutoExpand || hasAutoExpandedRef.current) return;
+
+      setExpanded(true);
+      hasAutoExpandedRef.current = true;
+    }, [shouldAutoExpand]);
 
     const truncatedContent =
       content && content.length > 500 && !contentExpanded ? content.slice(0, 500) + '...' : content;
@@ -2578,11 +2614,7 @@ const ToolCard = memo<{
               </Text>
             )}
 
-            {showDetail && customContent ? <View className="mt-2">{customContent}</View> : null}
-            {showDetail && !customContent && streamingContent && !resultReady ? (
-              <View className="mt-2">{streamingContent}</View>
-            ) : null}
-            {showDetail && !customContent && !streamingContent && argumentsText ? (
+            {showDetail && argumentsText ? (
               <>
                 <Text
                   className="mt-2 text-[10px] font-semibold uppercase tracking-[0.5px]"
@@ -2607,6 +2639,10 @@ const ToolCard = memo<{
                   <ToolContentCopyButton text={argumentsText} />
                 </View>
               </>
+            ) : null}
+            {showDetail && customContent ? <View className="mt-2">{customContent}</View> : null}
+            {showDetail && !customContent && streamingContent && !resultReady ? (
+              <View className="mt-2">{streamingContent}</View>
             ) : null}
             {showDetail && !customContent && truncatedContent ? (
               <>
@@ -2820,6 +2856,7 @@ const ToolCallsBlock = memo<{
               return (
                 <ToolCard
                   collapsible
+                  argumentsText={argumentsText || undefined}
                   interventionContent={interventionContent}
                   key={tool.id}
                   resultReady={hasResult}
@@ -2833,6 +2870,8 @@ const ToolCallsBlock = memo<{
                         arguments={tool.arguments}
                         content={tool.result_content}
                         identifier={tool.identifier}
+                        pluginState={tool.pluginState}
+                        toolCallId={tool.id}
                       />
                     ) : undefined
                   }
@@ -2914,6 +2953,7 @@ const ToolResultBlock = memo<{
             content={message.content}
             identifier={identifier}
             pluginState={message.pluginState as Record<string, unknown> | undefined}
+            toolCallId={message.toolCallId ?? undefined}
           />
         ) : undefined
       }
@@ -2924,6 +2964,136 @@ const ToolResultBlock = memo<{
 });
 
 ToolResultBlock.displayName = 'ToolResultBlock';
+
+const AssistantChainBlock = memo<{
+  childrenMessages: ChatMessage[];
+  markdownRules?: Record<string, any>;
+  markdownStyles: Record<string, any>;
+  onOpenLink: (url?: string) => void;
+  reasoningMarkdownStyles: Record<string, any>;
+  sessionId: string;
+  t: I18nStore['t'];
+  topicId?: string;
+}>(
+  ({
+    childrenMessages,
+    markdownRules,
+    markdownStyles,
+    onOpenLink,
+    reasoningMarkdownStyles,
+    sessionId,
+    t,
+    topicId,
+  }) => {
+    return (
+      <View className="gap-3">
+        {childrenMessages.map((childMessage) => {
+          const childHasSearch =
+            !!childMessage.search &&
+            !!(childMessage.search.citations?.length || childMessage.search.imageResults?.length);
+          const childRenderedReasoning = injectCitationLinks(
+            childMessage.reasoning?.content,
+            childMessage.search?.citations,
+          );
+          const childMultimodalContentParts = childMessage.metadata?.isMultimodal
+            ? parseMessageContentParts(childMessage.metadata?.tempDisplayContent)
+            : null;
+          const childContent = preprocessMentionDisplay(
+            preprocessMathBlocks(
+              injectCitationLinks(childMessage.content, childMessage.search?.citations),
+            ),
+            t.groupMentionAllMembers,
+          );
+          const childHasArtifacts = ARTIFACT_TAG_REGEX.test(childContent);
+          ARTIFACT_TAG_REGEX.lastIndex = 0;
+          const childArtifactSegments = childHasArtifacts ? splitArtifacts(childContent) : null;
+          const childTextContent = childHasArtifacts
+            ? childContent.replace(ARTIFACT_TAG_REGEX, '')
+            : childContent;
+
+          return (
+            <View className="gap-2" key={childMessage.id}>
+              {childHasSearch && childMessage.search ? (
+                <SearchGroundingBlock search={childMessage.search} />
+              ) : null}
+
+              {childRenderedReasoning ? (
+                <ThinkingBlock
+                  content={childRenderedReasoning}
+                  duration={childMessage.reasoning?.duration}
+                  isMultimodal={childMessage.reasoning?.isMultimodal}
+                  markdownRules={markdownRules}
+                  markdownStyles={reasoningMarkdownStyles}
+                  model={childMessage.model}
+                  tempDisplayContent={
+                    childMessage.reasoning?.isMultimodal
+                      ? parseMessageContentParts(
+                          childMessage.reasoning?.tempDisplayContent ||
+                            childMessage.reasoning?.content,
+                        ) || undefined
+                      : undefined
+                  }
+                />
+              ) : null}
+
+              {childMultimodalContentParts?.length ? (
+                <RichContentPartsBlock
+                  citations={childMessage.search?.citations}
+                  markdownRules={markdownRules}
+                  markdownStyles={markdownStyles}
+                  model={childMessage.model}
+                  parts={childMultimodalContentParts}
+                  onOpenLink={onOpenLink}
+                />
+              ) : childTextContent ? (
+                <Markdown
+                  rules={markdownRules}
+                  style={markdownStyles}
+                  onLinkPress={(url) => {
+                    onOpenLink(url);
+                    return false;
+                  }}
+                >
+                  {childTextContent}
+                </Markdown>
+              ) : null}
+
+              {childArtifactSegments?.map((segment, index) =>
+                segment.type === 'artifact' ? (
+                  <ArtifactBlock
+                    artifactType={segment.artifactType}
+                    content={segment.content}
+                    key={`${childMessage.id}-artifact-${index}`}
+                    language={segment.language}
+                    title={segment.title}
+                  />
+                ) : null,
+              )}
+
+              {childMessage.tools?.length ? (
+                <ToolCallsBlock
+                  messageId={childMessage.id}
+                  sessionId={sessionId}
+                  tools={childMessage.tools}
+                  topicId={topicId}
+                />
+              ) : null}
+
+              {childMessage.search?.citations?.length ? (
+                <CitationFootnotesBlock
+                  citations={childMessage.search.citations}
+                  onOpenLink={onOpenLink}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    );
+  },
+);
+
+AssistantChainBlock.displayName = 'AssistantChainBlock';
 
 // ── UsageStatsModal ──
 

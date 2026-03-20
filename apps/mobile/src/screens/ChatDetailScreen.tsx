@@ -83,7 +83,6 @@ import {
   topicApi,
   userApi,
 } from '../lib/api';
-import { buildDisplayMessages } from '../lib/groupTasksTransform';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
@@ -92,6 +91,7 @@ import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skill
 import { generateBestTitle } from '../lib/titleGeneration';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
+import { buildDisplayMessages } from '../store/messageDisplay';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useThemeStore } from '../store/theme';

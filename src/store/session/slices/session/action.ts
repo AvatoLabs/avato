@@ -145,7 +145,7 @@ export class SessionActionImpl {
     await this.#get().refreshSessions();
 
     // If the active session deleted, switch to the inbox session
-    if (sessionId === this.#get().activeId) {
+    if (sessionId === this.#get().activeId || sessionId === this.#get().activeAgentId) {
       this.#get().switchSession(INBOX_SESSION_ID);
     }
   };
@@ -161,9 +161,13 @@ export class SessionActionImpl {
   };
 
   switchSession = (sessionId: string): void => {
-    if (this.#get().activeAgentId === sessionId) return;
+    if (this.#get().activeAgentId === sessionId && this.#get().activeId === sessionId) return;
 
-    this.#set({ activeAgentId: sessionId }, false, n(`activeSession/${sessionId}`));
+    this.#set(
+      { activeAgentId: sessionId, activeId: sessionId },
+      false,
+      n(`activeSession/${sessionId}`),
+    );
   };
 
   toggleAgentPinned = (): void => {

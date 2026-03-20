@@ -1,16 +1,21 @@
+import { builtinSkills } from '@lobechat/builtin-skills';
+import { SkillsIdentifier, SkillsManifest } from '@lobechat/builtin-tool-skills';
 import { WebBrowsingExecutionRuntime } from '@lobechat/builtin-tool-web-browsing/executionRuntime';
 import { builtinTools } from '@lobechat/builtin-tools';
-import type { LobeToolManifest } from '@lobechat/context-engine';
+import type { LobeToolManifest, SkillMeta } from '@lobechat/context-engine';
 import { type ChatCompletionErrorPayload, type ModelRuntime } from '@lobechat/model-runtime';
 import { AGENT_RUNTIME_ERROR_SET } from '@lobechat/model-runtime';
+import { skillsPrompts } from '@lobechat/prompts';
 import { ChatErrorType } from '@lobechat/types';
 
 import { checkAuth } from '@/app/(backend)/middleware/auth';
 import { AgentModel } from '@/database/models/agent';
+import { AgentSkillModel } from '@/database/models/agentSkill';
 import { PluginModel } from '@/database/models/plugin';
 import { SessionModel } from '@/database/models/session';
 import { UserMemoryIdentityModel } from '@/database/models/userMemory/identity';
 import { type LobeChatDatabase } from '@/database/type';
+import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { type ToolCallContent } from '@/libs/mcp';
 import { createTraceOptions, initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { FileService } from '@/server/services/file';
@@ -34,11 +39,28 @@ const MEMORY_LIMIT_BY_EFFORT = {
 } as const;
 
 type MobileMemoryEffort = keyof typeof MEMORY_LIMIT_BY_EFFORT;
+type MobileChatMessage = NonNullable<MobileChatPayload['messages']>[number];
 
 const normalizeMemoryEffort = (effort?: string): MobileMemoryEffort => {
   if (effort === 'low' || effort === 'medium' || effort === 'high') return effort;
   return 'medium';
 };
+
+const MOBILE_BUILTIN_SKILL_CONTEXT = {
+  isDesktop: false,
+  isWindows: false,
+} as const;
+
+const builtinSkillMetaMap = new Map<string, SkillMeta>(
+  filterBuiltinSkills(builtinSkills, MOBILE_BUILTIN_SKILL_CONTEXT).map((skill) => [
+    skill.identifier,
+    {
+      description: skill.description,
+      identifier: skill.identifier,
+      name: skill.name,
+    },
+  ]),
+);
 
 const buildMemoryContext = (
   memories: Array<{
@@ -59,6 +81,66 @@ const buildMemoryContext = (
   if (lines.length === 0) return undefined;
 
   return `## User Memory\n${lines.join('\n')}`;
+};
+
+const injectSystemContext = (
+  messages: MobileChatPayload['messages'],
+  prompt?: string,
+): MobileChatPayload['messages'] => {
+  if (!prompt?.trim()) return messages;
+
+  const normalizedMessages = [...(messages || [])];
+  const existingSystemMessage = normalizedMessages.find(
+    (message): message is MobileChatMessage => message.role === 'system',
+  );
+
+  if (existingSystemMessage && typeof existingSystemMessage.content === 'string') {
+    existingSystemMessage.content = [existingSystemMessage.content, prompt]
+      .filter(Boolean)
+      .join('\n\n');
+    return normalizedMessages;
+  }
+
+  normalizedMessages.unshift({
+    content: prompt,
+    role: 'system',
+  } as MobileChatMessage);
+
+  return normalizedMessages;
+};
+
+const resolveEnabledSkillMetas = async (
+  pluginIds: string[],
+  serverDB: LobeChatDatabase,
+  userId: string,
+): Promise<SkillMeta[]> => {
+  if (pluginIds.length === 0) return [];
+
+  const skillModel = new AgentSkillModel(serverDB, userId);
+  const metasByIdentifier = new Map(builtinSkillMetaMap);
+
+  const unresolvedIds = pluginIds.filter((pluginId) => !metasByIdentifier.has(pluginId));
+
+  if (unresolvedIds.length > 0) {
+    const dbSkills = await Promise.all(
+      unresolvedIds.map((pluginId) => skillModel.findByIdentifier(pluginId)),
+    );
+
+    for (const skill of dbSkills) {
+      if (!skill) continue;
+
+      metasByIdentifier.set(skill.identifier, {
+        description: skill.description || skill.manifest.description,
+        identifier: skill.identifier,
+        location: skill.manifest.repository || skill.manifest.sourceUrl,
+        name: skill.name,
+      });
+    }
+  }
+
+  return pluginIds
+    .map((pluginId) => metasByIdentifier.get(pluginId))
+    .filter((skill): skill is SkillMeta => !!skill);
 };
 
 interface MobileMemoryPayload {
@@ -446,6 +528,7 @@ export const POST = checkAuth(
 
       {
         let pluginIds: string[] | undefined;
+        let enabledSkills: SkillMeta[] = [];
 
         if (data.sessionId) {
           try {
@@ -476,7 +559,25 @@ export const POST = checkAuth(
 
         if (pluginIds?.length) {
           try {
-            mcpTools = await resolvePluginTools(pluginIds, serverDB, userId);
+            enabledSkills = await resolveEnabledSkillMetas(pluginIds, serverDB, userId);
+
+            if (enabledSkills.length > 0) {
+              const skillContext = [skillsPrompts(enabledSkills), SkillsManifest.systemRole]
+                .filter(Boolean)
+                .join('\n\n');
+
+              data.messages = injectSystemContext(data.messages, skillContext);
+
+              console.info(
+                `[webapi/chat] injected skill context for ${enabledSkills.length} skills: ${enabledSkills.map((skill) => skill.identifier).join(', ')}`,
+              );
+            }
+
+            const toolIds = enabledSkills.length
+              ? [...new Set([...pluginIds, SkillsIdentifier])]
+              : pluginIds;
+
+            mcpTools = await resolvePluginTools(toolIds, serverDB, userId);
             if (mcpTools.tools.length > 0) {
               data.tools = mcpTools.tools as any;
               console.info(
