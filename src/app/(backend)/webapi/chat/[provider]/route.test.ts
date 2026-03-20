@@ -305,7 +305,7 @@ describe('POST handler', () => {
         expect.arrayContaining([
           expect.objectContaining({
             function: expect.objectContaining({
-              name: 'lobe-skills____runSkill',
+              name: 'lobe-skills____runSkill____builtin',
             }),
           }),
         ]),

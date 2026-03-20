@@ -20,6 +20,7 @@ import {
 } from './types';
 
 const log = debug('lobe-server:tool-execution-service');
+const MAX_MCP_RETRIES = 3;
 
 interface ToolExecutionServiceDeps {
   builtinToolsExecutor: BuiltinToolsExecutor;
@@ -163,20 +164,44 @@ export class ToolExecutionService {
         return await this.executeCloudMCPTool(payload, context, mcpParams);
       }
 
-      // For stdio/http/sse types, use standard MCP service
-      const result = await this.mcpService.callTool({
-        argsStr: args,
-        clientParams: mcpParams,
-        toolName: apiName,
-      });
+      for (let attempt = 1; attempt <= MAX_MCP_RETRIES; attempt += 1) {
+        try {
+          const result = await this.mcpService.callTool({
+            argsStr: args,
+            clientParams: mcpParams,
+            processContentBlocks: context.processContentBlocks,
+            toolName: apiName,
+          });
 
-      log('MCP tool execution successful for: %s:%s', identifier, apiName);
+          log('MCP tool execution successful for: %s:%s', identifier, apiName);
 
-      return {
-        content: typeof result === 'string' ? result : JSON.stringify(result),
-        state: typeof result === 'object' ? result : undefined,
-        success: true,
-      };
+          return {
+            content: typeof result === 'string' ? result : result.content,
+            state: typeof result === 'object' ? result.state : undefined,
+            success: true,
+          };
+        } catch (error) {
+          const errorMessage = (error as Error).message;
+          const isRetryable =
+            errorMessage.includes('NoValidSessionId') ||
+            errorMessage.includes('Server not initialized');
+
+          if (isRetryable && attempt < MAX_MCP_RETRIES) {
+            log(
+              'Retrying MCP tool %s:%s after retryable session error (attempt %d/%d)',
+              identifier,
+              apiName,
+              attempt,
+              MAX_MCP_RETRIES,
+            );
+            continue;
+          }
+
+          throw error;
+        }
+      }
+
+      throw new Error(`MCP tool execution exceeded ${MAX_MCP_RETRIES} retries`);
     } catch (error) {
       log('MCP tool execution failed for %s:%s: %O', identifier, apiName, error);
       return {
