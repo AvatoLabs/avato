@@ -73,6 +73,7 @@ const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatToolPayl
     id: exec.id,
     identifier: exec.identifier,
     intervention: exec.intervention ?? { status: 'approved' },
+    pluginState: exec.state,
     result_content: exec.result,
     result_msg_id: exec.id,
     source: exec.identifier.startsWith('lobe-') ? 'builtin' : ('plugin' as const),

@@ -1088,6 +1088,7 @@ export interface ToolExecutionItem {
   identifier: string;
   intervention?: ToolInterventionPayload;
   result: string;
+  state?: Record<string, unknown>;
 }
 
 export interface StreamCallbacks {

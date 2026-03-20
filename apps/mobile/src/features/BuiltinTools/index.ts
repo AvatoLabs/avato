@@ -5,6 +5,7 @@
 
 import type React from 'react';
 
+import CalculatorRender from './calculator/Calculator';
 import CloudSandboxExecuteCode from './cloudSandbox/ExecuteCode';
 import GroupManagementBroadcast from './groupManagement/Broadcast';
 import GroupManagementSpeak from './groupManagement/Speak';
@@ -23,6 +24,7 @@ import WebBrowsingSearchResult from './webBrowsing/SearchResult';
 
 const GTD_ID = 'lobe-gtd';
 const NOTEBOOK_ID = 'lobe-notebook';
+const CALCULATOR_ID = 'lobe-calculator';
 const MEMORY_ID = 'lobe-user-memory';
 const CLOUD_SANDBOX_ID = 'lobe-cloud-sandbox';
 const WEB_BROWSING_ID = 'lobe-web-browsing';
@@ -39,6 +41,19 @@ const GTDApiName = {
   execTasks: 'execTasks',
   updatePlan: 'updatePlan',
   updateTodos: 'updateTodos',
+} as const;
+
+const CalculatorApiName = {
+  base: 'base',
+  calculate: 'calculate',
+  defintegrate: 'defintegrate',
+  differentiate: 'differentiate',
+  evaluate: 'evaluate',
+  execute: 'execute',
+  integrate: 'integrate',
+  limit: 'limit',
+  solve: 'solve',
+  sort: 'sort',
 } as const;
 
 const NotebookApiName = { createDocument: 'createDocument' } as const;
@@ -59,6 +74,18 @@ const BUILTIN_RENDERS: Record<
   string,
   Record<string, React.ComponentType<MobileBuiltinRenderProps>>
 > = {
+  [CALCULATOR_ID]: {
+    [CalculatorApiName.base]: CalculatorRender,
+    [CalculatorApiName.calculate]: CalculatorRender,
+    [CalculatorApiName.defintegrate]: CalculatorRender,
+    [CalculatorApiName.differentiate]: CalculatorRender,
+    [CalculatorApiName.evaluate]: CalculatorRender,
+    [CalculatorApiName.execute]: CalculatorRender,
+    [CalculatorApiName.integrate]: CalculatorRender,
+    [CalculatorApiName.limit]: CalculatorRender,
+    [CalculatorApiName.solve]: CalculatorRender,
+    [CalculatorApiName.sort]: CalculatorRender,
+  },
   [GTD_ID]: {
     [GTDApiName.clearTodos]: GTDTodoList,
     [GTDApiName.createPlan]: GTDCreatePlan,

@@ -274,15 +274,23 @@ describe('POST handler', () => {
           headers: { 'Content-Type': 'application/json' },
         },
       );
-      const finalStreamResponse = new Response('data: [DONE]\n\n', {
-        headers: { 'Content-Type': 'text/event-stream' },
-      });
       const mockRuntime: LobeRuntimeAI = {
         baseURL: 'abc',
         chat: vi
           .fn()
           .mockResolvedValueOnce(toolLoopResponse)
-          .mockResolvedValueOnce(finalStreamResponse),
+          .mockImplementationOnce(async (_payload, options: any) => {
+            await options?.callback?.onText?.('Done');
+            await options?.callback?.onCompletion?.({
+              speed: { tps: 20, ttft: 100 },
+              text: 'Done',
+              usage: { totalInputTokens: 10, totalOutputTokens: 5, totalTokens: 15 },
+            });
+
+            return new Response('data: [DONE]\n\n', {
+              headers: { 'Content-Type': 'text/event-stream' },
+            });
+          }),
       };
 
       vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
@@ -290,7 +298,7 @@ describe('POST handler', () => {
       const response = await POST(request as unknown as Request, { params: mockParams });
       const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
 
-      expect(response).toBe(finalStreamResponse);
+      expect(response.headers.get('Content-Type')).toContain('text/event-stream');
       expect(mockedChat).toHaveBeenCalledTimes(2);
 
       const firstCall = mockedChat.mock.calls[0];
@@ -316,7 +324,7 @@ describe('POST handler', () => {
       expect(systemMessage?.content).toContain('Read reference files attached to a skill');
     });
 
-    it('should keep tools on the final streaming call when the server tool loop finds no structured tool calls', async () => {
+    it('should execute tools via streaming fallback when the non-stream tool loop finds no structured tool calls', async () => {
       vi.mocked(getXorPayload).mockReturnValueOnce({
         apiKey: 'test-api-key',
         azureApiVersion: 'v1',
@@ -352,30 +360,70 @@ describe('POST handler', () => {
           headers: { 'Content-Type': 'application/json' },
         },
       );
-      const finalStreamResponse = new Response('data: [DONE]\n\n', {
-        headers: { 'Content-Type': 'text/event-stream' },
-      });
       const mockRuntime: LobeRuntimeAI = {
         baseURL: 'abc',
         chat: vi
           .fn()
           .mockResolvedValueOnce(toolLoopResponse)
-          .mockResolvedValueOnce(finalStreamResponse),
+          .mockImplementationOnce(async (_payload, options: any) => {
+            await options?.callback?.onToolsCalling?.({
+              chunk: [
+                {
+                  function: {
+                    arguments: '{"expression":"x^2","variable":"x"}',
+                    name: 'lobe-calculator____differentiate____builtin',
+                  },
+                  id: 'call_1',
+                  type: 'function',
+                },
+              ],
+              toolsCalling: [
+                {
+                  function: {
+                    arguments: '{"expression":"x^2","variable":"x"}',
+                    name: 'lobe-calculator____differentiate____builtin',
+                  },
+                  id: 'call_1',
+                  type: 'function',
+                },
+              ],
+            });
+
+            return new Response('data: [DONE]\n\n', {
+              headers: { 'Content-Type': 'text/event-stream' },
+            });
+          })
+          .mockImplementationOnce(async (_payload, options: any) => {
+            await options?.callback?.onText?.('The derivative is $2x$.');
+            await options?.callback?.onCompletion?.({
+              speed: { tps: 20, ttft: 100 },
+              text: 'The derivative is $2x$.',
+              usage: { totalInputTokens: 10, totalOutputTokens: 5, totalTokens: 15 },
+            });
+
+            return new Response('data: [DONE]\n\n', {
+              headers: { 'Content-Type': 'text/event-stream' },
+            });
+          }),
       };
 
       vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await POST(request as unknown as Request, { params: mockParams });
       const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+      const responseBody = await response.text();
 
-      expect(response).toBe(finalStreamResponse);
-      expect(mockedChat).toHaveBeenCalledTimes(2);
+      expect(response.headers.get('Content-Type')).toContain('text/event-stream');
+      expect(mockedChat).toHaveBeenCalledTimes(3);
 
       const firstCallPayload = mockedChat.mock.calls[0]![0] as any;
       const secondCallPayload = mockedChat.mock.calls[1]![0] as any;
+      const thirdCallPayload = mockedChat.mock.calls[2]![0] as any;
 
       expect(firstCallPayload.stream).toBe(false);
       expect(firstCallPayload.responseMode).toBe('json');
+      expect(secondCallPayload.stream).toBe(true);
+      expect(secondCallPayload.responseMode).toBeUndefined();
       expect(firstCallPayload.tools).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -386,6 +434,11 @@ describe('POST handler', () => {
         ]),
       );
       expect(secondCallPayload.tools).toEqual(firstCallPayload.tools);
+      expect(thirdCallPayload.tools).toEqual(firstCallPayload.tools);
+      expect(responseBody).toContain('event: tool_calls');
+      expect(responseBody).toContain('event: tool_executions');
+      expect(responseBody).toContain('"state":{"expression":"x^2","result":"2*x","variable":"x"}');
+      expect(responseBody).toContain('The derivative is $2x$.');
     });
   });
 });

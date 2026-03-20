@@ -10,9 +10,14 @@ import {
   ToolArgumentsRepairer,
   ToolNameResolver,
 } from '@lobechat/context-engine';
-import { type ModelRuntime } from '@lobechat/model-runtime';
+import {
+  type ChatStreamCallbacks,
+  consumeStreamUntilDone,
+  mergeMultipleChatMethodOptions,
+  type ModelRuntime,
+} from '@lobechat/model-runtime';
 import { skillsPrompts } from '@lobechat/prompts';
-import { type ChatToolPayload } from '@lobechat/types';
+import { type ChatToolPayload, type MessageToolCall } from '@lobechat/types';
 import { LOBE_DEFAULT_MODEL_LIST } from 'model-bank';
 
 import { AgentModel } from '@/database/models/agent';
@@ -114,6 +119,23 @@ interface MobileToolSet {
   sourceMap: Record<string, ToolSource>;
   tools?: NonNullable<ChatStreamPayload['tools']>;
 }
+
+interface MobileToolExecutionEvent {
+  apiName: string;
+  arguments: string;
+  id: string;
+  identifier: string;
+  intervention?: { status: 'approved' };
+  result: string;
+  state?: Record<string, unknown>;
+}
+
+type StreamCompletionData = Parameters<NonNullable<ChatStreamCallbacks['onCompletion']>>[0];
+type StreamGroundingData = Parameters<NonNullable<ChatStreamCallbacks['onGrounding']>>[0];
+type StreamTextData = Parameters<NonNullable<ChatStreamCallbacks['onText']>>[0];
+type StreamThinkingData = Parameters<NonNullable<ChatStreamCallbacks['onThinking']>>[0];
+type StreamToolsCallingData = Parameters<NonNullable<ChatStreamCallbacks['onToolsCalling']>>[0];
+type StreamUsageData = Parameters<NonNullable<ChatStreamCallbacks['onUsage']>>[0];
 
 const normalizeMemoryEffort = (effort?: string): MobileMemoryEffort => {
   if (effort === 'low' || effort === 'medium' || effort === 'high') return effort;
@@ -297,6 +319,25 @@ const dedupeTools = (tools: NonNullable<ChatStreamPayload['tools']>) => {
   });
 };
 
+const isExecutionStateRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const serializeToolExecutionContent = (content: unknown) =>
+  typeof content === 'string' ? content : JSON.stringify(content);
+
+const createToolExecutionEvent = (
+  toolCall: ChatToolPayload,
+  execution: { content: unknown; state?: unknown },
+): MobileToolExecutionEvent => ({
+  apiName: toolCall.apiName,
+  arguments: toolCall.arguments,
+  id: toolCall.id,
+  identifier: toolCall.identifier,
+  intervention: { status: 'approved' },
+  result: serializeToolExecutionContent(execution.content),
+  ...(isExecutionStateRecord(execution.state) ? { state: execution.state } : {}),
+});
+
 const normalizeToolCalls = (
   toolCalls: any[],
   manifestMap: Record<string, LobeToolManifest>,
@@ -316,46 +357,6 @@ const normalizeToolCalls = (
       source: sourceMap[payload.identifier],
     } satisfies ChatToolPayload;
   });
-};
-
-const buildToolExecutions = (
-  messages: MobileChatPayload['messages'],
-  manifestMap: Record<string, LobeToolManifest>,
-  sourceMap: Record<string, ToolSource>,
-) => {
-  const executions: Array<{
-    apiName: string;
-    arguments: string;
-    id: string;
-    identifier: string;
-    result: string;
-  }> = [];
-
-  for (const message of messages || []) {
-    if ((message as any).role !== 'assistant' || !(message as any).tool_calls?.length) continue;
-
-    const resolvedToolCalls = normalizeToolCalls(
-      (message as any).tool_calls,
-      manifestMap,
-      sourceMap,
-    );
-
-    for (const toolCall of resolvedToolCalls) {
-      const resultMessage = (messages || []).find(
-        (item: any) => item.role === 'tool' && item.tool_call_id === toolCall.id,
-      );
-
-      executions.push({
-        apiName: toolCall.apiName,
-        arguments: toolCall.arguments,
-        id: toolCall.id,
-        identifier: toolCall.identifier,
-        result: (resultMessage as any)?.content || '',
-      });
-    }
-  }
-
-  return executions;
 };
 
 export class MobileChatService {
@@ -639,6 +640,180 @@ export class MobileChatService {
     });
   };
 
+  private createToolExecutionService = () => {
+    const fileService = new FileService(this.serverDB, this.userId);
+    const builtinToolsExecutor = new BuiltinToolsExecutor(this.serverDB, this.userId);
+    const toolExecutionService = new ToolExecutionService({
+      builtinToolsExecutor,
+      mcpService,
+      pluginGatewayService: new PluginGatewayService(),
+    });
+
+    const boundProcessContentBlocks = async (blocks: any[]) =>
+      processContentBlocks(blocks, fileService);
+
+    return { boundProcessContentBlocks, toolExecutionService };
+  };
+
+  private streamToolLoopFallback = async (params: {
+    payload: MobileChatPayload;
+    runtimeOptions: Record<string, any>;
+    toolSet: MobileToolSet;
+  }) => {
+    const { payload, runtimeOptions, toolSet } = params;
+    const encoder = new TextEncoder();
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
+
+    const writeEvent = async (event: string, data: unknown) => {
+      await writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+    };
+
+    const writeText = async (text: string) => {
+      if (!text) return;
+      await writer.write(encoder.encode(`event: text\ndata: ${JSON.stringify(text)}\n\n`));
+    };
+
+    void (async () => {
+      try {
+        let loopMessages = [...(payload.messages || [])];
+
+        for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+          let roundContent = '';
+          let roundReasoning = '';
+          let roundGrounding: unknown;
+          let roundPerformance: unknown;
+          let roundUsage: unknown;
+          let rawToolCalls: MessageToolCall[] = [];
+          let normalizedToolCalls: ChatToolPayload[] = [];
+
+          console.info(
+            `[webapi/chat] streaming fallback round ${round + 1}: ${loopMessages.length} messages, ${payload.tools?.length ?? 0} tools`,
+          );
+
+          const response = await this.modelRuntime.chat(
+            {
+              ...payload,
+              apiMode: 'chatCompletion',
+              messages: loopMessages,
+              stream: true,
+            } as any,
+            {
+              ...runtimeOptions,
+              ...mergeMultipleChatMethodOptions([
+                runtimeOptions as any,
+                {
+                  callback: {
+                    onCompletion: async ({ grounding, speed, usage }: StreamCompletionData) => {
+                      roundGrounding = grounding;
+                      roundPerformance = speed;
+                      roundUsage = usage;
+                    },
+                    onGrounding: async (grounding: StreamGroundingData) => {
+                      roundGrounding = grounding;
+                    },
+                    onText: async (text: StreamTextData) => {
+                      roundContent += text;
+                    },
+                    onThinking: async (reasoning: StreamThinkingData) => {
+                      roundReasoning += reasoning;
+                    },
+                    onToolsCalling: async ({ toolsCalling }: StreamToolsCallingData) => {
+                      rawToolCalls = toolsCalling;
+                      normalizedToolCalls = normalizeToolCalls(
+                        toolsCalling,
+                        toolSet.manifestMap,
+                        toolSet.sourceMap,
+                      );
+                    },
+                    onUsage: async (usage: StreamUsageData) => {
+                      roundUsage = usage;
+                    },
+                  },
+                } as any,
+              ]),
+            },
+          );
+
+          await consumeStreamUntilDone(response);
+
+          if (normalizedToolCalls.length === 0) {
+            if (roundGrounding) await writeEvent('grounding', roundGrounding);
+            if (roundReasoning) await writeEvent('reasoning', roundReasoning);
+            await writeText(roundContent);
+            if (roundUsage) await writeEvent('usage', roundUsage);
+            if (roundPerformance) await writeEvent('performance', roundPerformance);
+            break;
+          }
+
+          console.info(
+            `[webapi/chat] streaming fallback round ${round + 1}: executing ${normalizedToolCalls.length} tools`,
+          );
+
+          await writeEvent('tool_calls', normalizedToolCalls);
+
+          loopMessages = [
+            ...loopMessages,
+            {
+              content: roundContent,
+              reasoning: roundReasoning ? { content: roundReasoning } : undefined,
+              role: 'assistant',
+              tool_calls: rawToolCalls,
+            } as any,
+          ];
+
+          const toolExecutions: MobileToolExecutionEvent[] = [];
+
+          for (const toolCall of normalizedToolCalls) {
+            const execution = await toolExecutionService.executeTool(toolCall, {
+              processContentBlocks:
+                toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
+              serverDB: this.serverDB,
+              toolManifestMap: toolSet.manifestMap,
+              topicId: payload.topicId,
+              userId: this.userId,
+            });
+
+            const executionContent = serializeToolExecutionContent(execution.content);
+            toolExecutions.push(createToolExecutionEvent(toolCall, execution));
+
+            loopMessages.push({
+              content: executionContent,
+              role: 'tool',
+              tool_call_id: toolCall.id,
+            } as any);
+          }
+
+          if (toolExecutions.length > 0) {
+            await writeEvent('tool_executions', toolExecutions);
+          }
+
+          if (round === MAX_TOOL_ROUNDS - 1) {
+            if (roundGrounding) await writeEvent('grounding', roundGrounding);
+            if (roundReasoning) await writeEvent('reasoning', roundReasoning);
+            await writeText(roundContent);
+            if (roundUsage) await writeEvent('usage', roundUsage);
+            if (roundPerformance) await writeEvent('performance', roundPerformance);
+          }
+        }
+      } catch (error) {
+        console.error('[webapi/chat] streaming tool fallback failed:', error);
+      } finally {
+        await writer.close();
+      }
+    })();
+
+    return new Response(readable, {
+      headers: {
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+      },
+      status: 200,
+    });
+  };
+
   handleChat = async (payload: MobileChatPayload, tracePayload?: TracePayload) => {
     const conversationConfig = await readSessionConversationConfig(
       this.serverDB,
@@ -704,30 +879,26 @@ export class MobileChatService {
       user: this.userId,
     };
 
+    if (toolSet) {
+      Object.values(toolSet.manifestMap).forEach((manifest) => {
+        const maybeMcpParams = (manifest as any).mcpParams as McpPluginConfig | undefined;
+        if (!maybeMcpParams) return;
+        (manifest as any).mcpParams = maybeMcpParams;
+      });
+    }
+
     const originalMessages = [...(data.messages || [])];
     let toolLoopSucceeded = false;
+    let toolExecutionsForResponse: MobileToolExecutionEvent[] = [];
 
     if (toolSet?.tools?.length) {
       try {
-        const fileService = new FileService(this.serverDB, this.userId);
-        const builtinToolsExecutor = new BuiltinToolsExecutor(this.serverDB, this.userId);
-        const toolExecutionService = new ToolExecutionService({
-          builtinToolsExecutor,
-          mcpService,
-          pluginGatewayService: new PluginGatewayService(),
-        });
-
-        const boundProcessContentBlocks = async (blocks: any[]) =>
-          processContentBlocks(blocks, fileService);
-
-        Object.values(toolSet.manifestMap).forEach((manifest) => {
-          const maybeMcpParams = (manifest as any).mcpParams as McpPluginConfig | undefined;
-          if (!maybeMcpParams) return;
-          (manifest as any).mcpParams = maybeMcpParams;
-        });
+        const { boundProcessContentBlocks, toolExecutionService } =
+          this.createToolExecutionService();
 
         let loopMessages = [...(data.messages || [])];
         let toolsWereCalled = false;
+        const loopToolExecutions: MobileToolExecutionEvent[] = [];
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
           console.info(
@@ -805,6 +976,8 @@ export class MobileChatService {
               `[webapi/chat] tool ${toolCall.identifier}:${toolCall.apiName} result: ${content.slice(0, 200)}${content.length > 200 ? '...' : ''}`,
             );
 
+            loopToolExecutions.push(createToolExecutionEvent(toolCall, execution));
+
             loopMessages.push({
               content,
               role: 'tool',
@@ -815,6 +988,7 @@ export class MobileChatService {
 
         if (toolsWereCalled) {
           data.messages = loopMessages;
+          toolExecutionsForResponse = loopToolExecutions;
           toolLoopSucceeded = true;
         }
       } catch (error) {
@@ -858,17 +1032,20 @@ export class MobileChatService {
       `[webapi/chat] final streaming call: tools=${data.tools?.length ?? 0}, messages=${data.messages?.length ?? 0}`,
     );
 
+    if (!toolLoopSucceeded && toolSet?.tools?.length) {
+      return this.streamToolLoopFallback({
+        payload: data,
+        runtimeOptions,
+        toolSet,
+      });
+    }
+
     const streamResponse = await this.modelRuntime.chat(data, runtimeOptions);
     if (!toolLoopSucceeded || !streamResponse.body || !toolSet) return streamResponse;
 
-    const toolExecutions = buildToolExecutions(
-      data.messages,
-      toolSet.manifestMap,
-      toolSet.sourceMap,
-    );
-    if (toolExecutions.length === 0) return streamResponse;
+    if (toolExecutionsForResponse.length === 0) return streamResponse;
 
-    const toolEventChunk = `event: tool_executions\ndata: ${JSON.stringify(toolExecutions)}\n\n`;
+    const toolEventChunk = `event: tool_executions\ndata: ${JSON.stringify(toolExecutionsForResponse)}\n\n`;
     const encoder = new TextEncoder();
     const toolChunkBytes = encoder.encode(toolEventChunk);
 
