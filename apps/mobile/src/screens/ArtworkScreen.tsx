@@ -6,8 +6,7 @@
  * Generation results feed with status polling
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -15,7 +14,6 @@ import {
   Copy,
   Image as ImageIcon,
   Palette,
-  SlidersHorizontal,
   Sparkles,
   Trash2,
   X,
@@ -24,6 +22,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Dimensions,
   Image as RNImage,
   Keyboard,
@@ -44,6 +43,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ComposerPrimaryAction, ComposerShell } from '../components/ui/ComposerShell';
+import { CreateConfigBar } from '../components/ui/CreateConfigBar';
 import EmptyState from '../components/ui/EmptyState';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -53,7 +54,6 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useArtworkStore } from '../store/artwork';
 import { useConnectionStore } from '../store/connection';
-import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
@@ -71,8 +71,9 @@ const IMAGE_COUNTS = [1, 2, 4, 8];
 const STORAGE_KEY = 'avato_artwork_config';
 const EDITABLE_NUMERIC_PARAM_KEYS = ['width', 'height', 'steps', 'cfg', 'seed'] as const;
 const PRESET_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'];
-const SECONDARY_BAR_HEIGHT = 48;
 const SIDEBAR_OPTION_GAP = 8;
+const ARTWORK_POLL_MAX_ATTEMPTS = 60;
+const ARTWORK_POLL_MAX_DELAY_MS = 15000;
 
 type ArtworkTaskStatus = 'pending' | 'processing' | 'success' | 'error';
 
@@ -435,10 +436,10 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
-  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isConnected = useConnectionStore((s) => s.isConnected);
+  const isScreenFocused = useIsFocused();
 
   // Config state
   const [imageProviders, setImageProviders] = useState<ImageProviderWithModels[]>([]);
@@ -456,6 +457,8 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const [showPicker, setShowPicker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const composerTranslateY = Platform.OS === 'ios' ? -keyboardOffset : 0;
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
 
   // Generation state — topicId only for createImage + polling (ephemeral, not persisted)
   const [topicId, setTopicId] = useState<string | null>(null);
@@ -466,6 +469,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const [baseUrl, setBaseUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollSessionRef = useRef(0);
+  const canPollRef = useRef(isScreenFocused && isAppActive);
   const hasHydratedRef = useRef(false);
   const hasRestoredConfigRef = useRef(false);
   const configRef = useRef({
@@ -670,6 +674,23 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
 
   useEffect(() => stopPolling, [stopPolling]);
 
+  useEffect(() => {
+    canPollRef.current = isScreenFocused && isAppActive;
+    if (!canPollRef.current) {
+      stopPolling();
+    }
+  }, [isAppActive, isScreenFocused, stopPolling]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setIsAppActive(nextState === 'active');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // ── Keyboard lift: keep composer close to keyboard without double-counting bottom inset ──
   const inputPaddingBottom = Math.max(insets.bottom, 8);
   useEffect(() => {
@@ -742,6 +763,8 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   // ── Poll generation status (updates local batch from remote, no remote sync for history) ──
   const startPolling = useCallback(
     (tid: string, batchId: string, batchGenerations: GenerationItem[]) => {
+      if (!canPollRef.current) return;
+
       stopPolling();
       const pendingGenerationIds = new Set(
         batchGenerations
@@ -758,14 +781,14 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
       let inFlight = false;
 
       const tick = async () => {
-        if (sessionId !== pollSessionRef.current || inFlight) return;
+        if (sessionId !== pollSessionRef.current || inFlight || !canPollRef.current) return;
         inFlight = true;
 
         try {
           attempt += 1;
 
           const latestBatches = await fetchBatchesFromRemote(tid);
-          if (sessionId !== pollSessionRef.current) return;
+          if (sessionId !== pollSessionRef.current || !canPollRef.current) return;
 
           const remoteBatch = (latestBatches || []).find((b) => b.id === batchId);
           if (remoteBatch) {
@@ -784,14 +807,14 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
             });
 
           const allDone = latestPending.length === 0;
-          if (allDone || attempt >= 60) {
+          if (allDone || attempt >= ARTWORK_POLL_MAX_ATTEMPTS) {
             if (sessionId === pollSessionRef.current) {
               stopPolling();
             }
             return;
           }
 
-          const delay = Math.min(2000 * 1.5 ** Math.floor(attempt / 5), 15000);
+          const delay = Math.min(2000 * 1.5 ** Math.floor(attempt / 5), ARTWORK_POLL_MAX_DELAY_MS);
           pollRef.current = setTimeout(tick, delay);
         } catch {
           if (sessionId === pollSessionRef.current) {
@@ -806,6 +829,66 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
     },
     [fetchBatchesFromRemote, stopPolling, updateBatch],
   );
+
+  const pollableBatch = useMemo(() => {
+    if (!topicId) return null;
+
+    for (let index = batches.length - 1; index >= 0; index -= 1) {
+      const batch = batches[index];
+      if (batch.generationTopicId !== topicId) continue;
+
+      const hasPending = batch.generations.some((generation) => {
+        const status = normalizeGenerationTaskStatus(generation.task?.status);
+        return !!generation.asyncTaskId && status !== 'success' && status !== 'error';
+      });
+      if (hasPending) return batch;
+    }
+
+    return null;
+  }, [batches, topicId]);
+
+  const pollableBatchSignature = useMemo(() => {
+    if (!pollableBatch) return '';
+
+    return pollableBatch.generations
+      .filter((generation) => {
+        const status = normalizeGenerationTaskStatus(generation.task?.status);
+        return !!generation.asyncTaskId && status !== 'success' && status !== 'error';
+      })
+      .map((generation) => `${generation.id}:${normalizeGenerationTaskStatus(generation.task?.status)}`)
+      .sort()
+      .join('|');
+  }, [pollableBatch]);
+
+  const pollableBatchId = pollableBatch?.id ?? null;
+  const pollableGenerations = pollableBatch?.generations ?? null;
+
+  useEffect(() => {
+    if (
+      !topicId ||
+      !pollableBatchId ||
+      !pollableGenerations ||
+      !pollableBatchSignature ||
+      !isScreenFocused ||
+      !isAppActive
+    ) {
+      stopPolling();
+      return;
+    }
+
+    startPolling(topicId, pollableBatchId, pollableGenerations);
+
+    return stopPolling;
+  }, [
+    isAppActive,
+    isScreenFocused,
+    pollableGenerations,
+    pollableBatchId,
+    pollableBatchSignature,
+    startPolling,
+    stopPolling,
+    topicId,
+  ]);
 
   // ── Generate ──
   const handleGenerate = useCallback(async () => {
@@ -891,8 +974,6 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
           generations: result.data.generations,
         };
         addBatch(batchToAdd);
-        const generationsToPoll = batchToAdd.generations;
-        startPolling(tid, batchToAdd.id, generationsToPoll);
       }
 
       setPrompt('');
@@ -913,7 +994,6 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
     imgCount,
     addBatch,
     fetchBatchesFromRemote,
-    startPolling,
     t,
     toast,
   ]);
@@ -984,58 +1064,14 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
         />
       ) : null}
 
-      {/* ── Model & Config Bar (matches ResourceScreen tab bar height) ── */}
-      <View>
-        <View
-          className="flex-row items-center px-4"
-          style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingVertical: 6 }}
-        >
-          <TouchableOpacity
-            className="flex-1 mr-3 rounded-2xl px-1 py-1"
-            onPress={() => {
-              haptics.selection();
-              setShowSidebar(true);
-            }}
-          >
-            <View className="flex-row items-center">
-              <Sparkles color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-              <View className="ml-2 flex-1">
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}
-                >
-                  {modelName || t.artworkSelectModel}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.secondaryText, fontSize: 11, marginTop: 2, opacity: 0.8 }}
-                >
-                  {summaryParts.join(' · ')}
-                </Text>
-              </View>
-              <ChevronDown
-                color={colors.secondaryText}
-                size={16}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginLeft: 10 }}
-              />
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="items-center justify-center rounded-full p-2"
-            onPress={() => {
-              haptics.selection();
-              setShowSidebar(true);
-            }}
-          >
-            <SlidersHorizontal
-              color={colors.primary}
-              size={20}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CreateConfigBar
+        label={modelName || t.artworkSelectModel}
+        summary={summaryParts.join(' · ')}
+        onPress={() => {
+          haptics.selection();
+          setShowSidebar(true);
+        }}
+      />
 
       {/* ── Generation Feed ── */}
       <ScrollView
@@ -1115,19 +1151,10 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
         className="px-4 pt-1"
         style={{
           paddingBottom: Math.max(insets.bottom, 8),
-          transform: [{ translateY: -keyboardOffset }],
+          transform: [{ translateY: composerTranslateY }],
         }}
       >
-        <BlurView
-          className="rounded-2xl overflow-hidden"
-          intensity={80}
-          tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
-          style={{
-            backgroundColor: colors.overlay,
-            borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
-            borderWidth: keyboardOffset > 0 ? 3 : 1,
-          }}
-        >
+        <ComposerShell active={keyboardOffset > 0}>
           <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
             <TextInput
               multiline
@@ -1147,14 +1174,9 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
               }}
               onChangeText={setPrompt}
             />
-            <TouchableOpacity
-              className="rounded-full items-center justify-center"
+            <ComposerPrimaryAction
+              active={!!prompt.trim() && !!model}
               disabled={!prompt.trim() || !model || generating}
-              style={{
-                width: 36,
-                height: 36,
-                backgroundColor: prompt.trim() && model ? colors.primary : colors.fillTertiary,
-              }}
               onPress={handleGenerate}
             >
               {generating ? (
@@ -1166,9 +1188,9 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
                   strokeWidth={tokens.icon.strokeWidth}
                 />
               )}
-            </TouchableOpacity>
+            </ComposerPrimaryAction>
           </View>
-        </BlurView>
+        </ComposerShell>
       </Animated.View>
 
       {/* ── Config Sidebar Overlay ── */}

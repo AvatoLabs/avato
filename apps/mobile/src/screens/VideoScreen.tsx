@@ -1,4 +1,4 @@
-import { BlurView } from 'expo-blur';
+import { useIsFocused } from '@react-navigation/native';
 import { Image as ExpoImage } from 'expo-image';
 import {
   Check,
@@ -7,13 +7,13 @@ import {
   Download,
   Play,
   Share2,
-  SlidersHorizontal,
   Sparkles,
   X,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Dimensions,
   Keyboard,
   Modal,
@@ -38,13 +38,14 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
+import { ComposerPrimaryAction, ComposerShell } from '../components/ui/ComposerShell';
+import { CreateConfigBar } from '../components/ui/CreateConfigBar';
 import EmptyState from '../components/ui/EmptyState';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, fileApi, getApiUrl, videoApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
-import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { GenerationBatch, GenerationItem, GenerationTopic } from '../types';
@@ -52,8 +53,10 @@ import type { GenerationBatch, GenerationItem, GenerationTopic } from '../types'
 const DURATION_OPTIONS = [5, 10];
 const RATIO_OPTIONS = ['adaptive', '16:9', '9:16', '1:1'];
 const RESOLUTION_OPTIONS = ['480p', '720p', '1080p'];
-const SECONDARY_BAR_HEIGHT = 48;
 const SIDEBAR_OPTION_GAP = 8;
+const VIDEO_POLL_BASE_DELAY_MS = 3500;
+const VIDEO_POLL_MAX_ATTEMPTS = 60;
+const VIDEO_POLL_MAX_DELAY_MS = 12000;
 
 interface VideoProviderItem {
   id: string;
@@ -103,6 +106,22 @@ function sortVideoBatches(batches: GenerationBatch[]) {
     const rightTs = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
     return leftTs - rightTs;
   });
+}
+
+function getPendingVideoGenerations(batches: GenerationBatch[]) {
+  return batches.flatMap((batch) =>
+    batch.generations.filter((generation) => {
+      const status = normalizeVideoStatus(generation.task?.status);
+      return !!generation.asyncTaskId && (status === 'pending' || status === 'processing');
+    }),
+  );
+}
+
+function getPendingVideoSignature(batches: GenerationBatch[]) {
+  return getPendingVideoGenerations(batches)
+    .map((generation) => `${generation.id}:${normalizeVideoStatus(generation.task?.status)}`)
+    .sort()
+    .join('|');
 }
 
 function resolveAssetUrl(baseUrl: string, url?: string, fileId?: string) {
@@ -446,8 +465,8 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
   const toast = useToast();
   const { t } = useI18n();
   const colors = useThemeColors();
-  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const { width: screenWidth } = useWindowDimensions();
+  const isScreenFocused = useIsFocused();
 
   const [apiBase, setApiBase] = useState('');
   const [providers, setProviders] = useState<VideoProviderItem[]>([]);
@@ -470,6 +489,11 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const composerTranslateY = Platform.OS === 'ios' ? -keyboardOffset : 0;
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollSessionRef = useRef(0);
+  const batchesRef = useRef<GenerationBatch[]>([]);
 
   const activeProvider = useMemo(
     () => providers.find((item) => item.id === provider) ?? null,
@@ -487,6 +511,11 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
       ),
     [providers],
   );
+  const pendingSignature = useMemo(() => getPendingVideoSignature(batches), [batches]);
+
+  useEffect(() => {
+    batchesRef.current = batches;
+  }, [batches]);
 
   const closeSidebar = useCallback(() => {
     setShowPicker(false);
@@ -582,6 +611,24 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
     setBatches(nextBatches);
   }, []);
 
+  const stopPolling = useCallback(() => {
+    pollSessionRef.current += 1;
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setIsAppActive(nextState === 'active');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   useEffect(() => {
     void loadModels();
     void loadTopics();
@@ -597,53 +644,109 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
   }, [activeTopicId, loadBatches]);
 
   useEffect(() => {
-    const pending = batches.flatMap((batch) =>
-      batch.generations.filter((generation) => {
-        const status = normalizeVideoStatus(generation.task?.status);
-        return status === 'pending' || status === 'processing';
-      }),
-    );
+    if (!activeTopicId || !pendingSignature || !isScreenFocused || !isAppActive) {
+      stopPolling();
+      return;
+    }
 
-    if (pending.length === 0) return;
+    stopPolling();
 
-    const timer = setInterval(async () => {
-      const updated = await Promise.all(
-        pending.map(async (generation) => {
-          if (!generation.asyncTaskId) return generation;
-          try {
-            const status = await videoApi.getGenerationStatus(
-              generation.id,
-              generation.asyncTaskId,
+    const sessionId = pollSessionRef.current;
+    let attempt = 0;
+    let inFlight = false;
+    let scheduledTick: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNext = () => {
+      if (sessionId !== pollSessionRef.current || attempt >= VIDEO_POLL_MAX_ATTEMPTS) return;
+
+      const delay =
+        attempt === 0
+          ? 0
+          : Math.min(
+              VIDEO_POLL_BASE_DELAY_MS * 1.25 ** Math.floor((attempt - 1) / 5),
+              VIDEO_POLL_MAX_DELAY_MS,
             );
-            return {
-              ...generation,
-              ...status?.generation,
-              task: {
-                ...generation.task,
-                ...status?.generation?.task,
-                error: status?.error ?? status?.generation?.task?.error ?? generation.task?.error,
-                status:
-                  status?.status || status?.generation?.task?.status || generation.task?.status,
-              },
-            };
-          } catch {
-            return generation;
-          }
-        }),
-      );
+      scheduledTick = setTimeout(() => {
+        void tick();
+      }, delay);
+      pollTimerRef.current = scheduledTick;
+    };
 
-      setBatches((current) =>
-        current.map((batch) => ({
-          ...batch,
-          generations: batch.generations.map(
-            (generation) => updated.find((item) => item.id === generation.id) ?? generation,
-          ),
-        })),
-      );
-    }, 3500);
+    const tick = async () => {
+      if (sessionId !== pollSessionRef.current || inFlight || !isScreenFocused || !isAppActive) {
+        return;
+      }
 
-    return () => clearInterval(timer);
-  }, [batches]);
+      const pending = getPendingVideoGenerations(batchesRef.current);
+      if (pending.length === 0) {
+        stopPolling();
+        return;
+      }
+
+      inFlight = true;
+      attempt += 1;
+
+      try {
+        const updated = await Promise.all(
+          pending.map(async (generation) => {
+            try {
+              const status = await videoApi.getGenerationStatus(
+                generation.id,
+                generation.asyncTaskId!,
+              );
+              return {
+                ...generation,
+                ...status?.generation,
+                task: {
+                  ...generation.task,
+                  ...status?.generation?.task,
+                  error:
+                    status?.error ?? status?.generation?.task?.error ?? generation.task?.error,
+                  status:
+                    status?.status || status?.generation?.task?.status || generation.task?.status,
+                },
+              };
+            } catch {
+              return generation;
+            }
+          }),
+        );
+
+        if (sessionId !== pollSessionRef.current) return;
+
+        setBatches((current) =>
+          current.map((batch) => ({
+            ...batch,
+            generations: batch.generations.map(
+              (generation) => updated.find((item) => item.id === generation.id) ?? generation,
+            ),
+          })),
+        );
+
+        const hasPending = updated.some((generation) => {
+          const status = normalizeVideoStatus(generation.task?.status);
+          return status === 'pending' || status === 'processing';
+        });
+
+        if (!hasPending || attempt >= VIDEO_POLL_MAX_ATTEMPTS) {
+          stopPolling();
+          return;
+        }
+        scheduleNext();
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (scheduledTick) {
+        clearTimeout(scheduledTick);
+      }
+      stopPolling();
+    };
+  }, [activeTopicId, isAppActive, isScreenFocused, pendingSignature, stopPolling]);
 
   const inputPaddingBottom = Math.max(insets.bottom, 8);
 
@@ -827,54 +930,11 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
         />
       ) : null}
 
-      <View>
-        <View
-          className="flex-row items-center px-4"
-          style={{ minHeight: SECONDARY_BAR_HEIGHT, paddingVertical: 6 }}
-        >
-          <TouchableOpacity className="mr-3 flex-1 rounded-2xl px-1 py-1" onPress={openSidebar}>
-            <View className="flex-row items-center">
-              <Sparkles color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
-              <View className="ml-2 flex-1">
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}
-                >
-                  {selectedModelLabel || t.videoSelectModel}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.secondaryText,
-                    fontSize: 11,
-                    marginTop: 2,
-                    opacity: 0.8,
-                  }}
-                >
-                  {summaryParts.join(' · ') || t.videoNoModels}
-                </Text>
-              </View>
-              <ChevronDown
-                color={colors.secondaryText}
-                size={16}
-                strokeWidth={tokens.icon.strokeWidth}
-                style={{ marginLeft: 10 }}
-              />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="items-center justify-center rounded-full p-2"
-            onPress={openSidebar}
-          >
-            <SlidersHorizontal
-              color={colors.primary}
-              size={20}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CreateConfigBar
+        label={selectedModelLabel || t.videoSelectModel}
+        summary={summaryParts.join(' · ') || t.videoNoModels}
+        onPress={openSidebar}
+      />
 
       <ScrollView
         className="flex-1"
@@ -931,19 +991,10 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
         className="px-4 pt-1"
         style={{
           paddingBottom: Math.max(insets.bottom, 8),
-          transform: [{ translateY: -keyboardOffset }],
+          transform: [{ translateY: composerTranslateY }],
         }}
       >
-        <BlurView
-          className="overflow-hidden rounded-2xl"
-          intensity={80}
-          tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
-          style={{
-            backgroundColor: colors.overlay,
-            borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
-            borderWidth: keyboardOffset > 0 ? 3 : 1,
-          }}
-        >
+        <ComposerShell active={keyboardOffset > 0}>
           <View className="flex-row items-end gap-2 px-3 pb-2 pt-2">
             <TextInput
               multiline
@@ -962,14 +1013,9 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
               }}
               onChangeText={setPrompt}
             />
-            <TouchableOpacity
-              className="items-center justify-center rounded-full"
+            <ComposerPrimaryAction
+              active={!!prompt.trim() && !!model}
               disabled={!prompt.trim() || !model || creating}
-              style={{
-                backgroundColor: prompt.trim() && model ? colors.primary : colors.fillTertiary,
-                height: 36,
-                width: 36,
-              }}
               onPress={() => void handleGenerate()}
             >
               {creating ? (
@@ -981,9 +1027,9 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
                   strokeWidth={tokens.icon.strokeWidth}
                 />
               )}
-            </TouchableOpacity>
+            </ComposerPrimaryAction>
           </View>
-        </BlurView>
+        </ComposerShell>
       </Animated.View>
 
       {showSidebar ? (

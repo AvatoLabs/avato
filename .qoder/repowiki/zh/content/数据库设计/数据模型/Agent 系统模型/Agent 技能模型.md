@@ -13,7 +13,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -26,13 +25,10 @@
 10. [附录](#附录)
 
 ## 简介
-
-本文件面向 Agent 技能模型，系统化梳理 agentSkills 表的字段设计、技能 Manifest 结构、内容与资源存储、生命周期管理（内置、市场、用户自定义）、版本与编辑状态、文件资源关联、以及技能注册 / 更新 / 删除的完整数据流程，并给出性能优化、缓存策略与并发访问控制的设计建议。
+本文件面向 Agent 技能模型，系统化梳理 agentSkills 表的字段设计、技能 Manifest 结构、内容与资源存储、生命周期管理（内置、市场、用户自定义）、版本与编辑状态、文件资源关联、以及技能注册/更新/删除的完整数据流程，并给出性能优化、缓存策略与并发访问控制的设计建议。
 
 ## 项目结构
-
 围绕 Agent 技能模型的关键模块分布如下：
-
 - 数据层：agentSkills 表及其索引、关系
 - 技能运行时与清单：内置工具技能的 Manifest 定义与 API 列表
 - 导入与解析：ZIP/URL/GitHub 多来源导入、Manifest 校验、资源提取与去重
@@ -69,7 +65,6 @@ DIS --> IMP
 ```
 
 图表来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L10-L57)
 - [packages/builtin-tool-skills/src/manifest.ts](file://packages/builtin-tool-skills/src/manifest.ts#L13-L34)
 - [packages/builtin-tool-skills/src/types.ts](file://packages/builtin-tool-skills/src/types.ts#L10-L92)
@@ -79,7 +74,6 @@ DIS --> IMP
 - [packages/types/src/discover/skills.ts](file://packages/types/src/discover/skills.ts#L10-L96)
 
 章节来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L10-L57)
 - [packages/builtin-tool-skills/src/manifest.ts](file://packages/builtin-tool-skills/src/manifest.ts#L13-L34)
 - [packages/builtin-tool-skills/src/types.ts](file://packages/builtin-tool-skills/src/types.ts#L10-L92)
@@ -89,16 +83,14 @@ DIS --> IMP
 - [packages/types/src/discover/skills.ts](file://packages/types/src/discover/skills.ts#L10-L96)
 
 ## 核心组件
-
 - agentSkills 表：统一承载技能标识、名称、描述、来源、Manifest、内容、编辑态、资源映射、ZIP 文件哈希与归属信息；并建立多维索引以支持高效查询与去重。
 - 技能 Manifest：内置工具技能的 API 清单、标识符、元信息与系统角色提示，确保运行时能力与权限声明一致。
 - SkillImporter：多来源导入入口，负责去重、ZIP 解析、资源存储、Manifest 合成与数据库写入。
 - SkillParser：ZIP 包解析、SKILL.md 提取与校验、资源文件提取、可选重打包以实现最小化存储。
-- SkillResourceService：资源文件上传至对象存储、全局文件记录创建、树形目录构建、文本 / 二进制内容读取与按需内容填充。
+- SkillResourceService：资源文件上传至对象存储、全局文件记录创建、树形目录构建、文本/二进制内容读取与按需内容填充。
 - Discover Skills 类型：市场技能的分类、排序、查询参数等类型定义，支撑前端展示与检索。
 
 章节来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L10-L57)
 - [packages/builtin-tool-skills/src/manifest.ts](file://packages/builtin-tool-skills/src/manifest.ts#L13-L34)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L25-L40)
@@ -107,7 +99,6 @@ DIS --> IMP
 - [packages/types/src/discover/skills.ts](file://packages/types/src/discover/skills.ts#L10-L96)
 
 ## 架构总览
-
 下图展示从导入到存储、再到资源读取与树形展示的端到端流程。
 
 ```mermaid
@@ -128,7 +119,6 @@ DB-->>U : "返回技能ID/状态"
 ```
 
 图表来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L83-L136)
 - [src/server/services/skill/parser.ts](file://src/server/services/skill/parser.ts#L77-L110)
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L47-L63)
@@ -136,7 +126,6 @@ DB-->>U : "返回技能ID/状态"
 ## 详细组件分析
 
 ### agentSkills 表字段设计与关系
-
 - 核心标识
   - name：技能名称，配合 userId 唯一性约束，保证同一用户下名称唯一。
   - description：技能描述。
@@ -185,15 +174,12 @@ AGENT_SKILLS }o--|| GLOBAL_FILES : "zipFile"
 ```
 
 图表来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L10-L57)
 
 章节来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L10-L57)
 
 ### 技能 Manifest 结构与内容存储
-
 - 内置工具技能的 Manifest 包含：
   - identifier：技能标识符
   - api：API 列表（runSkill、readReference、execScript、exportFile）
@@ -206,13 +192,11 @@ AGENT_SKILLS }o--|| GLOBAL_FILES : "zipFile"
   - 资源映射保存在 resources 字段，键为虚拟路径，值为资源元数据
 
 章节来源
-
 - [packages/builtin-tool-skills/src/manifest.ts](file://packages/builtin-tool-skills/src/manifest.ts#L13-L34)
 - [packages/builtin-tool-skills/src/types.ts](file://packages/builtin-tool-skills/src/types.ts#L10-L92)
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L25-L36)
 
 ### 资源映射机制与执行环境
-
 - 资源映射
   - 虚拟路径到资源元数据的 JSONB 映射，便于执行环境按路径读取
 - 执行 API
@@ -240,16 +224,13 @@ Return --> End
 ```
 
 图表来源
-
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L71-L111)
 
 章节来源
-
 - [packages/builtin-tool-skills/src/types.ts](file://packages/builtin-tool-skills/src/types.ts#L10-L92)
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L71-L111)
 
-### 技能生命周期管理（内置 / 市场 / 用户）
-
+### 技能生命周期管理（内置/市场/用户）
 - 内置技能（builtin）
   - 由内置工具技能包提供，Manifest 中 type 为 builtin
   - 不涉及 ZIP 上传与资源存储，直接使用运行时能力
@@ -274,19 +255,16 @@ stateDiagram-v2
 ```
 
 图表来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L143-L276)
 - [src/server/services/skill/parser.ts](file://src/server/services/skill/parser.ts#L77-L110)
 
 章节来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L45-L76)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L83-L136)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L143-L276)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L283-L457)
 
 ### 版本管理、内容编辑状态与文件资源关联
-
 - 版本管理
   - Manifest 中可包含版本号与仓库信息，GitHub 导入时会补充仓库与来源 URL
 - 内容编辑状态
@@ -296,12 +274,10 @@ stateDiagram-v2
   - zipFileHash 关联全局文件记录，支持 ZIP 级去重与资源复用
 
 章节来源
-
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L25-L41)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L176-L275)
 
 ### 技能注册、更新、删除的完整数据流程
-
 - 注册（新建）
   - 用户手动创建：校验名称唯一性，生成 identifier，写入 agentSkills
   - ZIP 导入：下载本地 -> 解析 -> 存储资源 -> 创建记录
@@ -330,7 +306,6 @@ C-->>S : "返回结果(已存在/已创建/已更新)"
 ```
 
 图表来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L45-L76)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L83-L136)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L143-L276)
@@ -339,16 +314,14 @@ C-->>S : "返回结果(已存在/已创建/已更新)"
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L47-L63)
 
 章节来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L45-L76)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L83-L136)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L143-L276)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L283-L457)
 
 ## 依赖关系分析
-
 - 组件耦合
-  - SkillImporter 依赖 SkillParser 与 SkillResourceService，形成 “解析 - 存储 - 写库” 的流水线
+  - SkillImporter 依赖 SkillParser 与 SkillResourceService，形成“解析-存储-写库”的流水线
   - agentSkills 表与 users、globalFiles 存在外键关系，确保归属与资源引用一致性
 - 外部依赖
   - 对象存储（用于资源与 ZIP 包上传）
@@ -367,21 +340,18 @@ DB --> USR["用户表"]
 ```
 
 图表来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L25-L40)
 - [src/server/services/skill/parser.ts](file://src/server/services/skill/parser.ts#L32-L124)
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L31-L63)
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L59-L68)
 
 章节来源
-
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L25-L40)
 - [src/server/services/skill/parser.ts](file://src/server/services/skill/parser.ts#L32-L124)
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L31-L63)
 - [packages/database/src/schemas/agentSkill.ts](file://packages/database/src/schemas/agentSkill.ts#L59-L68)
 
 ## 性能考量
-
 - 哈希与去重
   - ZIP 与资源均采用 SHA256 哈希作为去重与索引依据，减少重复存储与网络传输
 - 索引优化
@@ -397,12 +367,11 @@ DB --> USR["用户表"]
   - 导入流程中对名称与 identifier 做幂等检查，避免并发写入冲突
   - ZIP 重打包与上传过程建议加分布式锁或队列化处理，防止重复任务
 
-\[本节为通用性能建议，无需特定文件引用]
+[本节为通用性能建议，无需特定文件引用]
 
 ## 故障排查指南
-
 - 资源读取异常
-  - 现象：按虚拟路径读取资源时报 “资源未找到”
+  - 现象：按虚拟路径读取资源时报“资源未找到”
   - 排查：确认 resources 映射中是否存在该路径；检查 MIME 类型判断逻辑
 - ZIP 解析失败
   - 现象：导入 ZIP 时找不到 SKILL.md 或解析错误
@@ -415,22 +384,18 @@ DB --> USR["用户表"]
   - 排查：参考单元测试用例，验证嵌套目录、根文件、混合结构的构建逻辑
 
 章节来源
-
 - [src/server/services/skill/resource.ts](file://src/server/services/skill/resource.ts#L71-L111)
 - [src/server/services/skill/parser.ts](file://src/server/services/skill/parser.ts#L174-L237)
 - [src/server/services/skill/importer.ts](file://src/server/services/skill/importer.ts#L195-L204)
 - [src/server/services/skill/resource.test.ts](file://src/server/services/skill/resource.test.ts#L32-L225)
 
 ## 结论
-
 Agent 技能模型通过 agentSkills 表统一承载技能标识、来源、Manifest、内容与资源映射，并结合 ZIP 哈希实现资源级去重与高效存储。内置、市场与用户自定义三类来源通过 source 字段与导入流程清晰分离，配合严格的去重与索引策略，满足多来源协同与高并发场景下的稳定性与性能需求。
 
 ## 附录
-
 - 市场技能分类与查询参数
   - 分类枚举覆盖多个领域（如 AI-LLMs、DevOps、数据可视化等）
   - 查询参数支持分类筛选、排序方式、关键词搜索与分页
 
 章节来源
-
 - [packages/types/src/discover/skills.ts](file://packages/types/src/discover/skills.ts#L10-L96)

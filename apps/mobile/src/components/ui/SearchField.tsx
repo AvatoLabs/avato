@@ -7,21 +7,36 @@ import { tokens } from '../../theme/tokens';
 
 interface SearchFieldProps extends TextInputProps {
   containerClassName?: string;
+  rightElement?: React.ReactNode;
+  size?: 'compact' | 'default';
 }
 
-export function SearchField({ containerClassName = '', ...props }: SearchFieldProps) {
-  const colors = useThemeColors();
-  return (
-    <View
-      className={`flex-row items-center px-4 h-11 rounded-full border border-border ${containerClassName}`}
-    >
-      <Search color={colors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
-      <TextInput
-        className="flex-1 ml-2 text-foreground text-[16px] font-medium"
-        placeholderTextColor={colors.secondaryText}
-        {...props}
-        accessibilityLabel={props.accessibilityLabel ?? props.placeholder ?? 'Search'}
-      />
-    </View>
-  );
-}
+export const SearchField = ({ ref, containerClassName = '', rightElement, size = 'default', ...props }: SearchFieldProps & { ref?: React.RefObject<TextInput | null> }) => {
+    const colors = useThemeColors();
+    const height =
+      size === 'compact' ? tokens.mobile.heights.filterChip : tokens.mobile.heights.segmentedControl;
+
+    return (
+      <View
+        className={`flex-row items-center rounded-full px-4 ${containerClassName}`}
+        style={{
+          backgroundColor: colors.fillTertiary,
+          borderColor: colors.borderSubtle,
+          borderWidth: 1,
+          minHeight: height,
+        }}
+      >
+        <Search color={colors.secondaryText} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        <TextInput
+          className="flex-1 ml-2 text-foreground text-[16px] font-medium"
+          placeholderTextColor={colors.secondaryText}
+          ref={ref}
+          {...props}
+          accessibilityLabel={props.accessibilityLabel ?? props.placeholder ?? 'Search'}
+        />
+        {rightElement ? <View className="ml-2">{rightElement}</View> : null}
+      </View>
+    );
+  };
+
+SearchField.displayName = 'SearchField';

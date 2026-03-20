@@ -48,7 +48,7 @@ export function WorkspaceOverviewCard({
 
   return (
     <View
-      className="mx-5 mb-6 rounded-2xl overflow-hidden bg-foreground/[0.04]"
+      className="mx-6 mb-6 rounded-2xl overflow-hidden bg-foreground/[0.04]"
       style={{ borderWidth: 1, borderColor: colors.border }}
     >
       {useNativeBlur ? (
@@ -78,8 +78,8 @@ export function WorkspaceOverviewCard({
                 <View
                   className="w-2 h-2 rounded-full mr-2"
                   style={{
-                  backgroundColor: isConnected ? colors.primary : colors.tertiaryText,
-                }}
+                    backgroundColor: isConnected ? colors.success : colors.tertiaryText,
+                  }}
                 />
                 <Text className="text-secondary/80 text-[12px] font-medium">
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
@@ -96,7 +96,7 @@ export function WorkspaceOverviewCard({
               onPress={onPressModel}
             >
               <Text
-                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                className="mb-1 text-[11px] font-semibold"
                 style={{ color: colors.primary }}
               >
                 {t.settingsDefaultModel}
@@ -113,7 +113,7 @@ export function WorkspaceOverviewCard({
               onPress={onPressProviders}
             >
               <Text
-                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                className="mb-1 text-[11px] font-semibold"
                 style={{ color: colors.primary }}
               >
                 {t.workspaceProviders}
@@ -154,8 +154,8 @@ export function WorkspaceOverviewCard({
                 <View
                   className="w-2 h-2 rounded-full mr-2"
                   style={{
-                  backgroundColor: isConnected ? colors.primary : colors.tertiaryText,
-                }}
+                    backgroundColor: isConnected ? colors.success : colors.tertiaryText,
+                  }}
                 />
                 <Text className="text-secondary/80 text-[12px] font-medium">
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
@@ -172,7 +172,7 @@ export function WorkspaceOverviewCard({
               onPress={onPressModel}
             >
               <Text
-                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                className="mb-1 text-[11px] font-semibold"
                 style={{ color: colors.primary }}
               >
                 {t.settingsDefaultModel}
@@ -189,7 +189,7 @@ export function WorkspaceOverviewCard({
               onPress={onPressProviders}
             >
               <Text
-                className="text-[10px] font-semibold uppercase tracking-widest mb-1"
+                className="mb-1 text-[11px] font-semibold"
                 style={{ color: colors.primary }}
               >
                 {t.workspaceProviders}

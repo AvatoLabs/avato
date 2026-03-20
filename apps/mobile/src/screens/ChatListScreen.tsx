@@ -70,6 +70,11 @@ import { useShallow } from 'zustand/shallow';
 
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import {
+  ComposerCountBadge,
+  ComposerPrimaryAction,
+  ComposerShell,
+} from '../components/ui/ComposerShell';
 import EmptyState from '../components/ui/EmptyState';
 import FilePreview from '../components/ui/FilePreview';
 import ListSkeleton from '../components/ui/ListSkeleton';
@@ -196,6 +201,7 @@ function SessionLogo({
   const [imgError, setImgError] = useState(false);
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const colors = useThemeColors();
+  const avatoLogoTint = effectiveTheme === 'dark' ? colors.foreground : undefined;
   const iconSize = size * 0.65;
   const iconUrl =
     providerLogo || (provider ? getProviderIconUrl(provider, effectiveTheme) : undefined);
@@ -219,7 +225,7 @@ function SessionLogo({
             style={{
               width: size,
               height: size,
-              ...(effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : {}),
+              ...(avatoLogoTint ? { tintColor: avatoLogoTint } : {}),
             }}
           />
         </View>
@@ -679,7 +685,7 @@ export default function ChatListScreen({ navigation }: any) {
       const offsetFromBottom = windowHeight - screenY;
 
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom + inputPaddingBottom : 0);
+      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom : 0);
     };
 
     const handleKeyboardHide = () => {
@@ -1694,6 +1700,7 @@ export default function ChatListScreen({ navigation }: any) {
 
   const searchQuery = searchText.trim();
   const homeSuggestions = [t.chatSuggest1, t.chatSuggest2, t.chatSuggest3, t.chatSuggest4];
+  const composerTranslateY = Platform.OS === 'ios' ? -keyboardOffset : 0;
   const actionSessionIsGroup = actionSession?.type === 'group';
   const actionSessionIsInbox = isInboxSession(actionSession);
   const drawerBackdropStyle = useAnimatedStyle(() => ({
@@ -1923,19 +1930,10 @@ export default function ChatListScreen({ navigation }: any) {
             paddingBottom: Math.max(insets.bottom, 8),
             paddingHorizontal: 16,
             paddingTop: 4,
-            transform: [{ translateY: -keyboardOffset }],
+            transform: [{ translateY: composerTranslateY }],
           }}
         >
-          <BlurView
-            className="rounded-2xl overflow-hidden"
-            intensity={80}
-            tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
-            style={{
-              backgroundColor: colors.overlay,
-              borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
-              borderWidth: keyboardOffset > 0 ? 3 : 1,
-            }}
-          >
+          <ComposerShell active={keyboardOffset > 0}>
             {pendingFiles.length > 0 && (
               <View className="px-3 pt-2">
                 <FilePreview />
@@ -1996,21 +1994,11 @@ export default function ChatListScreen({ navigation }: any) {
                     strokeWidth={tokens.icon.strokeWidth}
                   />
                   {pendingFiles.length > 0 && (
-                    <View
-                      className="absolute -right-2 -top-1 rounded-full items-center justify-center"
-                      style={{
-                        backgroundColor: colors.primary,
-                        minWidth: 14,
-                        height: 14,
-                        paddingHorizontal: 3,
-                      }}
-                    >
-                      <Text
-                        className="text-[9px] font-semibold"
-                        style={{ color: colors.iconOnPrimary }}
-                      >
-                        {pendingFiles.length > 9 ? '9+' : pendingFiles.length}
-                      </Text>
+                    <View className="absolute -right-2 -top-1">
+                      <ComposerCountBadge
+                        color={colors.primary}
+                        value={pendingFiles.length > 9 ? '9+' : pendingFiles.length}
+                      />
                     </View>
                   )}
                 </View>
@@ -2045,10 +2033,8 @@ export default function ChatListScreen({ navigation }: any) {
               </TouchableOpacity>
               <View className="flex-1" />
               {heroText.trim() || pendingFiles.length > 0 ? (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  className="w-9 h-9 rounded-full items-center justify-center"
-                  style={{ backgroundColor: colors.primary }}
+                <ComposerPrimaryAction
+                  active
                   onPress={handleHeroSubmit}
                 >
                   <Send
@@ -2057,12 +2043,12 @@ export default function ChatListScreen({ navigation }: any) {
                     strokeWidth={tokens.icon.strokeWidth}
                     style={{ marginLeft: 1 }}
                   />
-                </TouchableOpacity>
+                </ComposerPrimaryAction>
               ) : (
                 <View className="w-9 h-9" />
               )}
             </View>
-          </BlurView>
+          </ComposerShell>
         </Animated.View>
       </View>
 

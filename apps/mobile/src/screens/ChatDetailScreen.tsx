@@ -50,6 +50,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import {
+  ComposerCountBadge,
+  ComposerPrimaryAction,
+  ComposerShell,
+} from '../components/ui/ComposerShell';
 import EmptyState from '../components/ui/EmptyState';
 import FilePreview from '../components/ui/FilePreview';
 import { GroupMentionInput } from '../components/ui/GroupMentionInput';
@@ -230,6 +235,24 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     }
   }, [isGroupSession, sessionId]);
 
+  const stopActiveGroupOperation = useCallback(
+    (reason: string) => {
+      if (!sessionId) return;
+
+      const state = useChatStore.getState();
+      const shouldStop =
+        state.generating &&
+        state.activeStreamingSessionId === sessionId &&
+        typeof state.activeOperationId === 'string';
+
+      if (!shouldStop) return;
+
+      console.warn(`[ChatDetail] stopping active group operation on ${reason}`);
+      stopGenerating();
+    },
+    [sessionId, stopGenerating],
+  );
+
   useEffect(() => {
     void loadGroupDetail();
   }, [loadGroupDetail]);
@@ -260,6 +283,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     }, [initialTopicId, sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics, switchTopic]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopActiveGroupOperation('blur');
+      };
+    }, [stopActiveGroupOperation]),
+  );
+
   useEffect(() => {
     let disposed = false;
 
@@ -283,7 +314,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       const screenY = Number(coords?.screenY ?? windowHeight);
       const offsetFromBottom = windowHeight - screenY;
       if (offsetFromBottom > 0) {
-        setKeyboardOffset(offsetFromBottom + inputPaddingBottom);
+        setKeyboardOffset(offsetFromBottom);
       } else {
         setKeyboardOffset(0);
       }
@@ -351,7 +382,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     if (!sessionId) return;
 
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState !== 'active') return;
+      if (nextState !== 'active') {
+        stopActiveGroupOperation(`appstate:${nextState}`);
+        return;
+      }
       if (
         useChatStore.getState().generating &&
         useChatStore.getState().activeStreamingSessionId === sessionId
@@ -370,7 +404,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     return () => {
       subscription.remove();
     };
-  }, [fetchMessages, fetchSessions, fetchTopics, sessionId, sessionKey]);
+  }, [fetchMessages, fetchSessions, fetchTopics, sessionId, sessionKey, stopActiveGroupOperation]);
 
   useEffect(() => {
     if (!generating) return;
@@ -1133,19 +1167,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             paddingBottom: Math.max(insets.bottom, 8),
             paddingHorizontal: 16,
             paddingTop: 4,
-            transform: [{ translateY: -keyboardOffset }],
+            transform: [{ translateY: Platform.OS === 'ios' ? -keyboardOffset : 0 }],
           }}
         >
-            <BlurView
-            className="rounded-2xl overflow-hidden"
-            intensity={80}
-            tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
-            style={{
-              backgroundColor: colors.overlay,
-              borderColor: keyboardOffset > 0 ? colors.primary : colors.primaryBorder,
-              borderWidth: keyboardOffset > 0 ? 3 : 1,
-            }}
-          >
+          <ComposerShell active={keyboardOffset > 0}>
             {pendingFiles.length > 0 && (
               <View className="px-3 pt-2">
                 <FilePreview sessionId={sessionId} />
@@ -1235,13 +1260,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     strokeWidth={tokens.icon.strokeWidth}
                   />
                   {pendingFiles.length > 0 && (
-                    <View
-                      className="absolute -right-2 -top-1 rounded-full items-center justify-center"
-                      style={{ backgroundColor: colors.primary, minWidth: 14, height: 14, paddingHorizontal: 3 }}
-                    >
-                      <Text className="text-[9px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-                        {pendingFiles.length > 9 ? '9+' : pendingFiles.length}
-                      </Text>
+                    <View className="absolute -right-2 -top-1">
+                      <ComposerCountBadge
+                        color={colors.primary}
+                        value={pendingFiles.length > 9 ? '9+' : pendingFiles.length}
+                      />
                     </View>
                   )}
                 </View>
@@ -1315,10 +1338,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 </Animated.View>
               ) : inputText.trim() || pendingFiles.length > 0 ? (
                 <Animated.View style={sendAnimStyle}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    className="w-9 h-9 rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.primary }}
+                  <ComposerPrimaryAction
+                    active
                     onPress={handleSend}
                   >
                     <Send
@@ -1327,13 +1348,13 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                       strokeWidth={tokens.icon.strokeWidth}
                       style={{ marginLeft: 1 }}
                     />
-                  </TouchableOpacity>
+                  </ComposerPrimaryAction>
                 </Animated.View>
               ) : (
                 <View className="w-9 h-9" />
               )}
             </View>
-          </BlurView>
+          </ComposerShell>
         </Animated.View>
       </View>
 

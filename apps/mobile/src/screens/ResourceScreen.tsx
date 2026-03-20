@@ -64,10 +64,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 import AttachmentSheet from '../components/ui/AttachmentSheet';
+import { FilterChip, SelectionBadge } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import {
   fileApi,
@@ -1468,6 +1470,7 @@ interface FileRowProps {
   onInvalidateCache?: (fileId: string) => void;
   onLongPressItem?: (item: FileListItem) => void;
   onMoveToFolder?: (item: FileListItem) => void;
+  onOpenActions?: (item: FileListItem) => void;
   onPress: (item: FileListItem) => void;
   onSelect?: (item: FileListItem) => void;
   remoteHeaders?: Record<string, string>;
@@ -1483,6 +1486,7 @@ function FileRow({
   isVisible = true,
   onInvalidateCache,
   onDelete,
+  onOpenActions,
   onFolderPress,
   onLongPressItem,
   onMoveToFolder,
@@ -1520,9 +1524,9 @@ function FileRow({
           onSelect(item);
         } else if (onLongPressItem) {
           onLongPressItem(item);
-        } else if (itemIsFolder) {
+        } else if (itemIsFolder && !onOpenActions) {
           onDelete(item.id, item.name, true);
-        } else if (showFolderActions && onMoveToFolder) {
+        } else if (!onOpenActions && showFolderActions && onMoveToFolder) {
           Alert.alert(item.name, undefined, [
             { text: t.cancel, style: 'cancel' },
             { text: t.delete, style: 'destructive', onPress: () => onDelete(item.id, item.name, false) },
@@ -1533,12 +1537,12 @@ function FileRow({
         }
       }}
     >
-      {selectMode && (
-        <View className="mr-3 h-6 w-6 items-center justify-center rounded-full border-2" style={{ borderColor: isSelected ? colors.primary : colors.muted }}>
-          {isSelected && <Check color={colors.primary} size={14} strokeWidth={2.5} />}
-        </View>
-      )}
       <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-foreground/5">
+        {selectMode ? (
+          <View className="absolute -right-1 -top-1 z-10">
+            <SelectionBadge selected={!!isSelected} />
+          </View>
+        ) : null}
         <ResourceThumbnail
           apiBaseUrl={apiBaseUrl}
           cachedLocalUri={cachedLocalUri}
@@ -1549,7 +1553,7 @@ function FileRow({
         />
         {isCached && !itemIsFolder ? (
           <View
-            className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+            className="absolute -bottom-1 -right-1 rounded-full px-1.5 py-0.5"
             style={{ backgroundColor: colors.successSubtle }}
           >
             <Check color={colors.success} size={10} strokeWidth={2.6} />
@@ -1566,7 +1570,19 @@ function FileRow({
         </Text>
       </View>
 
-      {itemIsFolder ? (
+      {onOpenActions && !selectMode ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          className="ml-2 h-8 w-8 items-center justify-center rounded-full"
+          hitSlop={8}
+          onPress={(event) => {
+            event.stopPropagation();
+            onOpenActions(item);
+          }}
+        >
+          <Pencil color={colors.secondaryText} size={16} strokeWidth={tokens.icon.strokeWidth} />
+        </TouchableOpacity>
+      ) : itemIsFolder && !selectMode ? (
         <View className="ml-2">
           <ChevronRight color={colors.secondaryText} size={18} strokeWidth={1.5} />
         </View>
@@ -2213,10 +2229,6 @@ export default function ResourceScreen() {
 
   const closeActionSheet = useCallback(() => setActionItem(null), []);
 
-  const handleLongPressItem = useCallback((item: FileListItem) => {
-    setActionItem(item);
-  }, []);
-
   const handleRenameStart = useCallback(() => {
     if (!actionItem) return;
     setRenameValue(actionItem.name || '');
@@ -2382,6 +2394,19 @@ export default function ResourceScreen() {
     return `${t.resourceSortSize} ${sortOrder === 'asc' ? '↑' : '↓'}`;
   };
 
+  const toggleSearch = () => {
+    setSearchVisible((value) => {
+      const next = !value;
+      if (!next) setSearchText('');
+      return next;
+    });
+  };
+
+  const handleEnterSelectMode = useCallback((item: FileListItem) => {
+    setSelectMode(true);
+    setSelectedIds(new Set([item.id]));
+  }, []);
+
   // ── Tabs ──────────────────────────────────────────────────────────
 
   const TABS: { key: FileCategory; label: string }[] = [
@@ -2397,10 +2422,8 @@ export default function ResourceScreen() {
     <View className="flex-1 bg-background">
       {/* Header */}
       <ScreenHeader
+        headerLevel="root"
         title={selectMode ? t.resourceSelectCount.replace('{count}', String(selectedIds.size)) : t.resourceTitle}
-        rightAccessibilityLabel={
-          selectMode ? t.resourceCancelSelect : t.resourceViewModeToggle
-        }
         rightActions={
           selectMode ? (
             <TouchableOpacity
@@ -2415,6 +2438,20 @@ export default function ResourceScreen() {
             <View className="flex-row items-center" style={{ gap: 20 }}>
               <TouchableOpacity
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={toggleSearch}
+              >
+                {searchVisible ? (
+                  <X color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                ) : (
+                  <Search
+                    color={colors.primary}
+                    size={22}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}
               >
                 {viewMode === 'list' ? (
@@ -2423,25 +2460,14 @@ export default function ResourceScreen() {
                   <List color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-                onPress={() => setSelectMode(true)}
-              >
-                <Text style={{ color: colors.primary, fontSize: 16, fontWeight: '500' }}>
-                  {t.resourceSelect}
-                </Text>
-              </TouchableOpacity>
             </View>
           )
-        }
-        titleIcon={
-          <FolderOpen color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
       >
         {/* Library selector */}
         <TouchableOpacity
           activeOpacity={0.7}
-          className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5"
+          className="mx-6 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5"
           onPress={() => setLibrarySelectVisible(true)}
         >
           <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
@@ -2455,7 +2481,7 @@ export default function ResourceScreen() {
         {folderBreadcrumb.length > 0 && (
           <ScrollView
             horizontal
-            className="mx-4 mb-2"
+            className="mx-6 mb-2"
             contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
             showsHorizontalScrollIndicator={false}
           >
@@ -2505,7 +2531,7 @@ export default function ResourceScreen() {
         )}
 
         {libraryId && treeMode ? (
-          <View className="mx-4 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
+          <View className="mx-6 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
                 <FolderOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -2545,79 +2571,61 @@ export default function ResourceScreen() {
         ) : null}
 
         {searchVisible ? (
-          <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-            <Search color={colors.muted} size={16} strokeWidth={2} />
-            <TextInput
-              className="ml-2.5 flex-1 text-[14px] text-foreground"
-              placeholder={t.search}
-              placeholderTextColor={colors.muted}
-              ref={searchRef}
-              returnKeyType="search"
-              value={searchText}
-              onChangeText={setSearchText}
-              onSubmitEditing={() => loadFiles()}
-            />
-            {searchText.length > 0 ? (
-              <TouchableOpacity hitSlop={8} onPress={() => setSearchText('')}>
-                <X color={colors.muted} size={16} strokeWidth={2} />
-              </TouchableOpacity>
-            ) : (
+          <SearchField
+            accessibilityLabel={t.search}
+            containerClassName="mx-6 mb-2"
+            placeholder={t.search}
+            ref={searchRef}
+            returnKeyType="search"
+            size="compact"
+            value={searchText}
+            rightElement={
               <TouchableOpacity
                 hitSlop={8}
                 onPress={() => {
+                  if (searchText.length > 0) {
+                    setSearchText('');
+                    return;
+                  }
+
                   setSearchVisible(false);
                 }}
               >
                 <X color={colors.muted} size={16} strokeWidth={2} />
               </TouchableOpacity>
-            )}
-          </View>
+            }
+            onChangeText={setSearchText}
+            onSubmitEditing={() => loadFiles()}
+          />
         ) : null}
 
-        {/* Filter tabs + sort (single row) */}
-        <View className="mx-4 mb-2 flex-row items-center justify-between">
+        {/* Filter tabs + sort */}
+        <View className="mx-6 mb-2">
           <ScrollView
             horizontal
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 12 }}
             showsHorizontalScrollIndicator={false}
-            style={{ flex: 1 }}
           >
             {TABS.map((tab) => {
               const active = category === tab.key;
               return (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  className="rounded-full px-4 py-2"
+                <FilterChip
+                  active={active}
                   key={tab.key}
-                  style={{
-                    backgroundColor: active ? colors.primary : colors.fillTertiary,
-                  }}
+                  label={tab.label}
                   onPress={() => {
                     haptics.selection();
                     setCategory(tab.key);
                   }}
-                >
-                  <Text
-                    className="text-[13px] font-semibold"
-                    style={{ color: active ? colors.iconOnPrimary : colors.muted }}
-                  >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
+                />
               );
             })}
+            <FilterChip
+              icon={<ArrowDownUp color={colors.primary} size={16} strokeWidth={2} />}
+              label={getSortLabel()}
+              onPress={() => setSortMenuVisible(true)}
+            />
           </ScrollView>
-          <TouchableOpacity
-            accessibilityLabel={`${t.resourceSortBy}: ${getSortLabel()}`}
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            className="ml-2 items-center justify-center rounded-full p-2"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ backgroundColor: colors.fillTertiary }}
-            onPress={() => setSortMenuVisible(true)}
-          >
-            <ArrowDownUp color={colors.primary} size={18} strokeWidth={2} />
-          </TouchableOpacity>
         </View>
       </ScreenHeader>
 
@@ -2763,10 +2771,8 @@ export default function ResourceScreen() {
                       haptics.medium();
                       if (selectMode) {
                         toggleSelect(entry);
-                      } else if (libraryId) {
-                        handleLongPressItem(entry);
                       } else {
-                        handleDelete(entry.id, entry.name, entryIsFolder);
+                        handleEnterSelectMode(entry);
                       }
                     }}
                     onPress={() => {
@@ -2811,20 +2817,12 @@ export default function ResourceScreen() {
                         ) : null}
                       </View>
 
-                      {selectMode ? (
-                        <View
-                          className="mr-3 h-6 w-6 items-center justify-center rounded-full border-2"
-                          style={{
-                            borderColor: selectedIds.has(entry.id) ? colors.primary : colors.muted,
-                          }}
-                        >
-                          {selectedIds.has(entry.id) ? (
-                            <Check color={colors.primary} size={14} strokeWidth={2.5} />
-                          ) : null}
-                        </View>
-                      ) : null}
-
-                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-foreground/5">
+                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-foreground/5 overflow-hidden">
+                        {selectMode ? (
+                          <View className="absolute -right-1 -top-1 z-10">
+                            <SelectionBadge selected={selectedIds.has(entry.id)} />
+                          </View>
+                        ) : null}
                         <ResourceThumbnail
                           apiBaseUrl={apiBase}
                           cachedLocalUri={cachedResourceMap[entry.id]?.localUri}
@@ -2835,7 +2833,7 @@ export default function ResourceScreen() {
                         />
                         {isCached && !entryIsFolder ? (
                           <View
-                            className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+                            className="absolute -bottom-1 -right-1 rounded-full px-1.5 py-0.5"
                             style={{ backgroundColor: colors.successSubtle }}
                           >
                             <Check color={colors.success} size={10} strokeWidth={2.6} />
@@ -2857,6 +2855,23 @@ export default function ResourceScreen() {
                             : `${formatBytes(entry.size)}  ·  ${formatDate(entry.createdAt)}`}
                         </Text>
                       </View>
+                      {libraryId && !selectMode ? (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          className="h-8 w-8 items-center justify-center rounded-full"
+                          hitSlop={8}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            setActionItem(entry);
+                          }}
+                        >
+                          <Pencil
+                            color={colors.secondaryText}
+                            size={16}
+                            strokeWidth={tokens.icon.strokeWidth}
+                          />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </TouchableOpacity>
                 );
@@ -2869,9 +2884,7 @@ export default function ResourceScreen() {
                 onLongPress={() =>
                   selectMode
                     ? toggleSelect(item)
-                    : libraryId
-                      ? handleLongPressItem(item)
-                      : handleDelete(item.id, item.name, isFolder(item))
+                    : handleEnterSelectMode(item)
                 }
                 onPress={() =>
                   selectMode
@@ -2881,16 +2894,13 @@ export default function ResourceScreen() {
                       : handlePreview(item)
                 }
               >
-                {selectMode && (
-                  <View
-                    className="absolute right-2 top-2 z-10 h-5 w-5 items-center justify-center rounded-full border-2"
-                    style={{ borderColor: selectedIds.has(item.id) ? colors.primary : colors.muted }}
-                  >
-                    {selectedIds.has(item.id) && <Check color={colors.primary} size={12} strokeWidth={2.5} />}
-                  </View>
-                )}
                 <View className="h-14 w-14 items-center justify-center">
                   <View className="h-14 w-14 items-center justify-center rounded-lg bg-foreground/5 overflow-hidden">
+                    {selectMode ? (
+                      <View className="absolute -right-1 -top-1 z-10">
+                        <SelectionBadge selected={selectedIds.has(item.id)} />
+                      </View>
+                    ) : null}
                     <ResourceThumbnail
                       isVisible
                       apiBaseUrl={apiBase}
@@ -2903,7 +2913,7 @@ export default function ResourceScreen() {
                     />
                     {cachedResourceIds.has(item.id) && !isFolder(item) ? (
                       <View
-                        className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5"
+                        className="absolute -bottom-1 -right-1 rounded-full px-1.5 py-0.5"
                         style={{ backgroundColor: colors.successSubtle }}
                       >
                         <Check color={colors.success} size={10} strokeWidth={2.6} />
@@ -2911,6 +2921,23 @@ export default function ResourceScreen() {
                     ) : null}
                   </View>
                 </View>
+                {libraryId && !selectMode ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    className="absolute right-2 top-2 z-10 h-7 w-7 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.overlay }}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setActionItem(item);
+                    }}
+                  >
+                    <Pencil
+                      color={colors.secondaryText}
+                      size={14}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                  </TouchableOpacity>
+                ) : null}
                 <Text className="mt-1 text-center text-[11px] text-foreground" numberOfLines={2}>
                   {item.name}
                 </Text>
@@ -2936,7 +2963,8 @@ export default function ResourceScreen() {
                 onDelete={handleDelete}
                 onFolderPress={libraryId ? handleFolderPress : undefined}
                 onInvalidateCache={invalidateCachedResource}
-                onLongPressItem={libraryId ? handleLongPressItem : undefined}
+                onLongPressItem={handleEnterSelectMode}
+                onOpenActions={libraryId ? setActionItem : undefined}
                 onPress={handlePreview}
                 onSelect={selectMode ? toggleSelect : undefined}
                 onMoveToFolder={
@@ -2960,28 +2988,9 @@ export default function ResourceScreen() {
       {/* Upload FAB — hidden in select mode to avoid confusion */}
       {!selectMode && (
         <View
-          className="absolute bottom-0 right-0 flex-row items-center"
-          style={{ gap: 12, paddingBottom: insets.bottom + 12, paddingRight: 20 }}
+          className="absolute bottom-0 right-0"
+          style={{ paddingBottom: insets.bottom + 12, paddingRight: 20 }}
         >
-          <TouchableOpacity
-            activeOpacity={0.8}
-            className="items-center justify-center rounded-full shadow-lg"
-            style={{ width: 48, height: 48, elevation: 4, backgroundColor: colors.fillTertiary }}
-            onPress={() => {
-              haptics.light();
-              setSearchVisible((value) => {
-                const next = !value;
-                if (!next) setSearchText('');
-                return next;
-              });
-            }}
-          >
-            {searchVisible ? (
-              <X color={colors.primary} size={18} strokeWidth={2.3} />
-            ) : (
-              <Search color={colors.primary} size={18} strokeWidth={2.3} />
-            )}
-          </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.8}
             className="items-center justify-center rounded-full shadow-lg"

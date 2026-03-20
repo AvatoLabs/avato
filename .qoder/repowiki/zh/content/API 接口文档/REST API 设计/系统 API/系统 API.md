@@ -19,7 +19,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -32,11 +31,9 @@
 10. [附录](#附录)
 
 ## 简介
-
 本文件面向 LobeHub 系统的运维与平台工程团队，提供系统管理端点的权威 API 规范与最佳实践。内容覆盖系统配置、健康检查、性能监控、日志管理、环境变量与配置热更新、服务发现与负载均衡、系统指标采集、告警通知、故障转移与灾难恢复，以及运维监控、性能调优、容量规划与安全审计的设计建议。
 
 ## 项目结构
-
 后端采用 tRPC 路由聚合模式，根路由统一挂载各业务模块路由，并在根层暴露公共端点（如健康检查）。系统配置、使用统计、首页聚合等管理类接口位于 lambda 路由层；可观测性通过 OpenTelemetry SDK 注册与导出器配置实现；开发期支持 .env 变更自动重启以实现配置热更新；生产侧通过 Docker Compose 集成 Grafana/Prometheus/Tempo/OpenTelemetry Collector 实现监控与追踪。
 
 ```mermaid
@@ -70,7 +67,6 @@ ENV --> R
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 - [src/server/services/systemAgent/index.ts:34-117](file://src/server/services/systemAgent/index.ts#L34-L117)
@@ -83,7 +79,6 @@ ENV --> R
 - [docker-compose/production/otel-collector/docker-compose.yml](file://docker-compose/production/otel-collector/docker-compose.yml)
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:1-110](file://src/server/routers/lambda/index.ts#L1-L110)
 - [src/server/routers/lambda/config/index.ts:1-41](file://src/server/routers/lambda/config/index.ts#L1-L41)
 - [src/server/routers/lambda/usage/index.ts](file://src/server/routers/lambda/usage/index.ts)
@@ -94,7 +89,6 @@ ENV --> R
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 ## 核心组件
-
 - 根路由与公共端点
   - 根路由统一挂载各业务子路由，并在顶层暴露健康检查端点，便于探活与负载均衡健康检查。
 - 配置路由
@@ -115,7 +109,6 @@ ENV --> R
   - 通过 Docker Compose 启动 Grafana/Prometheus/Tempo/Collector，形成端到端的指标与追踪采集链路。
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 - [src/server/routers/lambda/usage/index.ts](file://src/server/routers/lambda/usage/index.ts)
@@ -126,7 +119,6 @@ ENV --> R
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 ## 架构总览
-
 下图展示系统管理端点在整体架构中的位置与交互关系：根路由作为入口，配置与统计路由提供系统级能力，系统代理服务封装自动化任务，标题消毒器提供安全验证，可观测性贯穿请求生命周期，开发与生产分别通过插件与容器编排实现配置热更新与监控。
 
 ```mermaid
@@ -154,7 +146,6 @@ DevEnv --> Root
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 - [src/server/services/systemAgent/index.ts:34-117](file://src/server/services/systemAgent/index.ts#L34-L117)
@@ -166,7 +157,6 @@ DevEnv --> Root
 ## 详细组件分析
 
 ### 健康检查端点
-
 - 路径与方法
   - GET /healthcheck 或 /api/lambda/healthcheck（取决于网关映射）
 - 请求参数
@@ -182,11 +172,9 @@ DevEnv --> Root
   - 仅用于存活探测，不承载业务逻辑
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:78-78](file://src/server/routers/lambda/index.ts#L78-L78)
 
 ### 配置查询端点
-
 - 路径与方法
   - GET /api/lambda/config/getGlobalConfig
   - GET /api/lambda/config/getDefaultAgentConfig
@@ -217,17 +205,14 @@ Router-->>Client : {serverConfig, serverFeatureFlags}
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/config/index.ts:16-37](file://src/server/routers/lambda/config/index.ts#L16-L37)
 
 **章节来源**
-
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 
 ### 使用统计端点
-
 - 路径与方法
-  - GET /api/lambda/usage/\*（具体子路径依据 usageRouter 定义）
+  - GET /api/lambda/usage/*（具体子路径依据 usageRouter 定义）
 - 请求参数
   - 时间范围、分组维度、排序与分页参数（视具体接口而定）
 - 成功响应
@@ -239,13 +224,11 @@ Router-->>Client : {serverConfig, serverFeatureFlags}
   - 对高频查询增加缓存与预聚合
 
 **章节来源**
-
 - [src/server/routers/lambda/usage/index.ts](file://src/server/routers/lambda/usage/index.ts)
 
 ### 首页聚合端点
-
 - 路径与方法
-  - GET /api/lambda/home/\*（具体子路径依据 homeRouter 定义）
+  - GET /api/lambda/home/*（具体子路径依据 homeRouter 定义）
 - 请求参数
   - 无或少量筛选参数
 - 成功响应
@@ -255,11 +238,9 @@ Router-->>Client : {serverConfig, serverFeatureFlags}
   - 支持多语言与多区域数据聚合
 
 **章节来源**
-
 - [src/server/routers/lambda/home/index.ts](file://src/server/routers/lambda/home/index.ts)
 
 ### 系统代理服务（自动化任务）
-
 - 功能概述
   - 封装系统自动化任务的通用流程：读取用户系统代理配置 → 构建链式提示 → 调用模型运行时 → 标题消毒器安全验证 → 返回结构化结果
 - 典型任务
@@ -287,16 +268,13 @@ Return --> End
 ```
 
 **图表来源**
-
 - [src/server/services/systemAgent/index.ts:48-86](file://src/server/services/systemAgent/index.ts#L48-L86)
 - [src/server/services/systemAgent/titleSanitizer.ts:4-24](file://src/server/services/systemAgent/titleSanitizer.ts#L4-L24)
 
 **章节来源**
-
 - [src/server/services/systemAgent/index.ts:34-117](file://src/server/services/systemAgent/index.ts#L34-L117)
 
 ### 标题消毒器（新增功能）
-
 - 功能概述
   - 专门负责清理和验证生成的标题，防止恶意输出和格式污染
 - 核心验证规则
@@ -329,18 +307,15 @@ Return --> End
 ```
 
 **图表来源**
-
 - [src/server/services/systemAgent/titleSanitizer.ts:4-24](file://src/server/services/systemAgent/titleSanitizer.ts#L4-L24)
 
 **章节来源**
-
 - [src/server/services/systemAgent/titleSanitizer.ts:1-25](file://src/server/services/systemAgent/titleSanitizer.ts#L1-L25)
 - [src/server/services/systemAgent/titleSanitizer.test.ts:1-27](file://src/server/services/systemAgent/titleSanitizer.test.ts#L1-L27)
 
 ### 环境变量与配置热更新
-
 - 开发期
-  - Vite 插件监听 .env 与 .env.\* 文件变更，检测到关键键值变化后自动重启开发服务器，实现配置热更新体验
+  - Vite 插件监听 .env 与 .env.* 文件变更，检测到关键键值变化后自动重启开发服务器，实现配置热更新体验
 - 生产期
   - 通过容器编排与配置中心（如边缘配置）下发配置，结合滚动更新与蓝绿发布降低变更风险
 
@@ -355,15 +330,12 @@ Wait --> Watch
 ```
 
 **图表来源**
-
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 **章节来源**
-
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 ### 性能监控与可观测性
-
 - 指标与追踪
   - 通过 OpenTelemetry SDK 注册指标读取器与追踪导出器，支持周期性导出与调试日志级别控制
 - 导出配置
@@ -384,7 +356,6 @@ Tempo --> Grafana
 ```
 
 **图表来源**
-
 - [packages/observability-otel/src/node.ts:116-141](file://packages/observability-otel/src/node.ts#L116-L141)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 - [docker-compose/production/prometheus/docker-compose.yml](file://docker-compose/production/prometheus/docker-compose.yml)
@@ -392,7 +363,6 @@ Tempo --> Grafana
 - [docker-compose/production/otel-collector/docker-compose.yml](file://docker-compose/production/otel-collector/docker-compose.yml)
 
 **章节来源**
-
 - [packages/observability-otel/src/node.ts:94-141](file://packages/observability-otel/src/node.ts#L94-L141)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 - [docker-compose/production/prometheus/docker-compose.yml](file://docker-compose/production/prometheus/docker-compose.yml)
@@ -400,7 +370,6 @@ Tempo --> Grafana
 - [docker-compose/production/otel-collector/docker-compose.yml](file://docker-compose/production/otel-collector/docker-compose.yml)
 
 ### 日志管理
-
 - 调试日志
   - 通过环境变量控制 OpenTelemetry 调试级别，便于开发与问题定位
 - 运维日志
@@ -409,11 +378,9 @@ Tempo --> Grafana
   - 关键操作（如配置变更、权限变更）应记录审计日志并保留至少 90 天
 
 **章节来源**
-
 - [packages/observability-otel/src/node.ts:107-114](file://packages/observability-otel/src/node.ts#L107-L114)
 
 ### 服务发现与负载均衡
-
 - 服务发现
   - 在容器编排中通过服务名进行内部通信；对外暴露统一网关或反向代理
 - 负载均衡
@@ -422,23 +389,19 @@ Tempo --> Grafana
   - 多副本部署，结合滚动更新与探活失败自动摘除
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:78-78](file://src/server/routers/lambda/index.ts#L78-L78)
 
 ### 告警通知与灾难恢复
-
 - 告警
   - Prometheus 报警规则 + Grafana 告警通道；对关键指标（CPU、内存、QPS、错误率、P95 延迟）设置阈值
 - 灾难恢复
   - 多可用区部署；定期备份数据库与配置；演练恢复流程并记录复盘
 
 **章节来源**
-
 - [docker-compose/production/prometheus/docker-compose.yml](file://docker-compose/production/prometheus/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 
 ## 依赖关系分析
-
 - 路由层依赖
   - 根路由聚合各子路由，子路由再依赖各自的服务层与数据层
 - 服务层依赖
@@ -461,7 +424,6 @@ Env["envRestartKeys.ts"] --> Lambda
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 - [src/server/services/systemAgent/index.ts:34-117](file://src/server/services/systemAgent/index.ts#L34-L117)
@@ -470,7 +432,6 @@ Env["envRestartKeys.ts"] --> Lambda
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:56-107](file://src/server/routers/lambda/index.ts#L56-L107)
 - [src/server/routers/lambda/config/index.ts:11-40](file://src/server/routers/lambda/config/index.ts#L11-L40)
 - [src/server/services/systemAgent/index.ts:34-117](file://src/server/services/systemAgent/index.ts#L34-L117)
@@ -479,7 +440,6 @@ Env["envRestartKeys.ts"] --> Lambda
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 
 ## 性能考量
-
 - 指标导出间隔
   - 通过环境变量调整指标导出间隔，平衡数据实时性与资源消耗
 - 查询优化
@@ -493,13 +453,11 @@ Env["envRestartKeys.ts"] --> Lambda
   - 模型调用成本为主要性能瓶颈，建议合理配置模型参数
 
 **章节来源**
-
 - [packages/observability-otel/src/node.ts:116-122](file://packages/observability-otel/src/node.ts#L116-L122)
 - [src/server/routers/lambda/usage/index.ts](file://src/server/routers/lambda/usage/index.ts)
 - [src/server/services/systemAgent/titleSanitizer.ts:1-25](file://src/server/services/systemAgent/titleSanitizer.ts#L1-L25)
 
 ## 故障排查指南
-
 - 健康检查失败
   - 检查探针路径与超时设置；确认反向代理与网关映射正确
 - 配置未生效
@@ -514,24 +472,21 @@ Env["envRestartKeys.ts"] --> Lambda
   - 查看系统代理服务的错误日志
 
 **章节来源**
-
 - [src/server/routers/lambda/index.ts:78-78](file://src/server/routers/lambda/index.ts#L78-L78)
 - [plugins/vite/envRestartKeys.ts:93-121](file://plugins/vite/envRestartKeys.ts#L93-L121)
 - [packages/observability-otel/src/node.ts:116-141](file://packages/observability-otel/src/node.ts#L116-L141)
 - [src/server/services/systemAgent/index.ts:86-89](file://src/server/services/systemAgent/index.ts#L86-L89)
 
 ## 结论
-
 本文梳理了 LobeHub 系统的系统管理端点与可观测性基础设施，明确了健康检查、配置查询、使用统计、系统代理服务与监控生态的职责边界与协作关系。最新的标题生成功能增强了系统的安全性，通过新增的标题消毒器提供了多层安全验证，有效防止了恶意输出和格式污染。建议在生产环境中结合容器编排与配置中心实现配置热更新与弹性伸缩，在监控层面完善告警与演练，持续优化查询与缓存策略，保障系统稳定与可运维性。
 
 ## 附录
-
 - API 端点清单（示例）
   - GET /api/lambda/healthcheck
   - GET /api/lambda/config/getGlobalConfig
   - GET /api/lambda/config/getDefaultAgentConfig
-  - GET /api/lambda/usage/\*
-  - GET /api/lambda/home/\*
+  - GET /api/lambda/usage/*
+  - GET /api/lambda/home/*
 - 环境变量参考
   - 指标导出间隔：OTEL_METRICS_EXPORTER_INTERVAL
   - 调试级别：OTEL_JS_LOBEHUB_DIAG

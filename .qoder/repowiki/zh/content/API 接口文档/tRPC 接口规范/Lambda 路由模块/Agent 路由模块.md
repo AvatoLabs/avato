@@ -19,7 +19,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -32,13 +31,11 @@
 10. [附录](#附录)
 
 ## 简介
-
 本文件为 Agent 路由模块的 tRPC 接口文档，覆盖 Agent 创建、配置、管理以及分组协作、技能绑定、定时任务等能力。文档详细说明了各路由的输入参数、响应格式、错误处理与业务逻辑，并提供 TypeScript 类型定义、参数校验规则、中间件与权限控制策略，以及客户端集成建议与性能优化策略。
 
 **更新** 本版本重点反映了后端服务层的改进：inbox 创建触发逻辑的自动化处理、lambda 路由器的简化中间件架构。
 
 ## 项目结构
-
 Agent 路由模块位于后端 Lambda 层，围绕 tRPC 路由器组织，配合服务层与数据库模型实现完整的生命周期管理。最新的架构采用了简化的中间件设计，提高了代码的可维护性和执行效率。
 
 ```mermaid
@@ -72,34 +69,29 @@ W2 --> A
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agent.ts:30-43](file://src/server/routers/lambda/agent.ts#L30-L43)
 - [src/libs/trpc/lambda/index.ts:30-31](file://src/libs/trpc/lambda/index.ts#L30-L31)
 - [src/libs/trpc/lambda/middleware/serverDatabase.ts:5-11](file://src/libs/trpc/lambda/middleware/serverDatabase.ts#L5-L11)
 
 **章节来源**
-
 - [src/server/routers/lambda/agent.ts:1-392](file://src/server/routers/lambda/agent.ts#L1-L392)
 - [src/server/routers/lambda/agentGroup.ts:1-326](file://src/server/routers/lambda/agentGroup.ts#L1-L326)
 - [src/server/routers/lambda/agentSkills.ts:1-272](file://src/server/routers/lambda/agentSkills.ts#L1-L272)
 - [src/server/routers/lambda/agentCronJob.ts:1-364](file://src/server/routers/lambda/agentCronJob.ts#L1-L364)
 
 ## 核心组件
-
-- **agentRouter**：提供 Agent 的创建、配置读写、知识库 / 文件绑定、内置 Agent 查询、分组协作、生命周期管理等接口。**新增** inbox 创建触发逻辑的自动化处理。
+- **agentRouter**：提供 Agent 的创建、配置读写、知识库/文件绑定、内置 Agent 查询、分组协作、生命周期管理等接口。**新增** inbox 创建触发逻辑的自动化处理。
 - **agentGroupRouter**：提供分组创建、成员管理、复制、配置更新、查询详情与列表等接口。
 - **agentSkillsRouter**：提供技能导入（本地、GitHub、市场）、查询、资源读取、更新等接口。
 - **agentCronJobRouter**：提供定时任务的创建、查询、批量启停、重置执行次数、统计等接口。
 
 **章节来源**
-
 - [src/server/routers/lambda/agent.ts:45-391](file://src/server/routers/lambda/agent.ts#L45-L391)
 - [src/server/routers/lambda/agentGroup.ts:56-326](file://src/server/routers/lambda/agentGroup.ts#L56-L326)
 - [src/server/routers/lambda/agentSkills.ts:89-272](file://src/server/routers/lambda/agentSkills.ts#L89-L272)
 - [src/server/routers/lambda/agentCronJob.ts:39-364](file://src/server/routers/lambda/agentCronJob.ts#L39-L364)
 
 ## 架构总览
-
 **更新** tRPC 路由层通过简化的认证中间件与数据库上下文注入，调用服务层或直接访问数据库模型，返回标准化响应。新的中间件设计更加高效且易于维护。
 
 ```mermaid
@@ -127,7 +119,6 @@ Router-->>Client : 返回响应
 ```
 
 **图表来源**
-
 - [src/libs/trpc/lambda/index.ts:30-31](file://src/libs/trpc/lambda/index.ts#L30-L31)
 - [src/libs/trpc/lambda/middleware/serverDatabase.ts:5-11](file://src/libs/trpc/lambda/middleware/serverDatabase.ts#L5-L11)
 - [src/server/routers/lambda/agent.ts:30-43](file://src/server/routers/lambda/agent.ts#L30-L43)
@@ -135,44 +126,38 @@ Router-->>Client : 返回响应
 ## 详细组件分析
 
 ### Agent 路由（agentRouter）
-
 **更新** 中间件与上下文
-
 - 使用简化的认证过程与数据库中间件，向 ctx 注入 AgentModel、AgentService、ChatGroupModel、FileModel、KnowledgeBaseModel、SessionModel。
 - **新增** 自动化 inbox 创建触发逻辑，在查询配置时检测 INBOX_SESSION_ID 并自动创建对应的会话。
 
 **主要接口**
-
 - **checkByMarketIdentifier**：按市场标识符检查是否已存在。
 - **createAgent**：创建带会话的 Agent，返回 agentId 与 sessionId。
 - **createAgentOnly**：仅创建 Agent（不创建会话），用于群组代理构建器。
-- **createAgentFiles/createAgentKnowledgeBase**：为 Agent 绑定文件 / 知识库。
-- **deleteAgentFile/deleteAgentKnowledgeBase**：解绑文件 / 知识库。
+- **createAgentFiles/createAgentKnowledgeBase**：为 Agent 绑定文件/知识库。
+- **deleteAgentFile/deleteAgentKnowledgeBase**：解绑文件/知识库。
 - **duplicateAgent**：复制 Agent 及其会话。
 - **getAgentByForkedFromIdentifier/getAgentByMarketIdentifier**：按派生或市场标识符查询。
-- **getAgentConfig/getAgentConfigById**：按会话或 ID 获取完整配置（含知识库 / 文件）。
+- **getAgentConfig/getAgentConfigById**：按会话或 ID 获取完整配置（含知识库/文件）。
 - **getBuiltinAgent**：获取或创建内置 Agent。
 - **getKnowledgeBasesAndFiles**：列出可选的知识库与文件并标注启用状态。
 - **queryAgents**：关键词搜索非虚拟 Agent（最小信息集）。
 - **removeAgent**：删除 Agent 及其会话。
-- **toggleFile/toggleKnowledgeBase**：切换文件 / 知识库启用状态。
+- **toggleFile/toggleKnowledgeBase**：切换文件/知识库启用状态。
 - **updateAgentConfig**：更新 Agent 配置（支持部分更新与 params 合并）。
-- **updateAgentPinned**：固定 / 取消固定 Agent。
+- **updateAgentPinned**：固定/取消固定 Agent。
 
 **参数与响应**
-
 - 输入参数均使用 zod 校验，如 createAgent 的 config 使用 insertAgentSchema 的部分字段透传。
 - 响应统一返回对象，包含业务数据与标准字段（如 agentId、sessionId 等）。
 
 **错误处理**
-
 - 未找到会话时抛出错误；其他异常通过 TRPCError 统一转换。
 
 **业务逻辑**
-
-- **新增** Inbox 自动创建机制：当 sessionId 等于 INBOX_SESSION_ID 时，自动调用 AgentService.createInbox () 创建对应的 inbox 会话。
+- **新增** Inbox 自动创建机制：当 sessionId 等于 INBOX_SESSION_ID 时，自动调用 AgentService.createInbox() 创建对应的 inbox 会话。
 - **更新** 内置 Agent（如 inbox）兼容历史存储方式，首次访问时进行 slug 回填与标记。
-- 知识库 / 文件绑定采用并行查询与去重插入，提升性能。
+- 知识库/文件绑定采用并行查询与去重插入，提升性能。
 - params 字段支持逐项删除（undefined）与禁用（null）的语义化更新。
 
 ```mermaid
@@ -188,20 +173,16 @@ ThrowErr --> End
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agent.ts:218-247](file://src/server/routers/lambda/agent.ts#L218-L247)
 
 **章节来源**
-
 - [src/server/routers/lambda/agent.ts:30-391](file://src/server/routers/lambda/agent.ts#L30-L391)
 - [src/server/services/agent/index.ts:56-60](file://src/server/services/agent/index.ts#L56-L60)
 - [packages/database/src/models/agent.ts:30-119](file://packages/database/src/models/agent.ts#L30-L119)
 
 ### Agent 分组路由（agentGroupRouter）
-
 - 中间件与上下文
   - 注入 AgentGroupRepository、AgentGroupService、AgentModel、ChatGroupModel、UserModel。
-
 - 主要接口
   - addAgentsToGroup：将多个 Agent 添加到分组。
   - batchCreateAgentsInGroup：批量创建虚拟 Agent 并加入分组。
@@ -212,17 +193,15 @@ ThrowErr --> End
   - duplicateGroup：复制分组（监督 Agent 重新生成，成员复制或引用）。
   - getGroup/getGroupAgents/getGroupDetail：查询分组、成员与详情（合并默认 Agent 配置）。
   - getGroups：获取分组列表（合并默认配置）。
-  - removeAgentsFromGroup：从分组移除 Agent（区分虚拟 / 非虚拟处理）。
+  - removeAgentsFromGroup：从分组移除 Agent（区分虚拟/非虚拟处理）。
   - updateAgentInGroup：更新分组内 Agent 的启用、排序与角色。
   - updateGroup：更新分组配置（规范化配置）。
 
 - 参数与响应
   - 成员输入使用自定义 schema（避免 JSONB 类型推断问题），支持部分字段更新。
   - 批量创建返回创建的 Agent ID 列表与实体。
-
 - 错误处理
   - 移除前检查返回结构化结果，便于前端确认。
-
 - 业务逻辑
   - 虚拟 Agent 与非虚拟 Agent 的区分：移除时虚拟 Agent 将被永久删除，非虚拟 Agent 仅解除关联。
   - 分组详情合并用户默认 Agent 配置，保证前端渲染一致性。
@@ -244,23 +223,19 @@ Router-->>Client : 返回 {groupId, supervisorAgentId, agentIds}
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agentGroup.ts:135-189](file://src/server/routers/lambda/agentGroup.ts#L135-L189)
 
 **章节来源**
-
 - [src/server/routers/lambda/agentGroup.ts:56-326](file://src/server/routers/lambda/agentGroup.ts#L56-L326)
 - [packages/openapi/src/services/agent-group.service.ts:20-204](file://packages/openapi/src/services/agent-group.service.ts#L20-L204)
 
 ### Agent 技能路由（agentSkillsRouter）
-
 - 中间件与上下文
   - 注入 FileModel、FileService、MarketService、SkillImporter、AgentSkillModel、SkillResourceService。
-
 - 主要接口
-  - create：创建用户自定义技能（内容 + 元数据）。
+  - create：创建用户自定义技能（内容+元数据）。
   - delete：删除技能。
-  - getById/getByIdentifier/getByName：按 ID / 标识符 / 名称查询。
+  - getById/getByIdentifier/getByName：按 ID/标识符/名称查询。
   - getByIdWithZipUrl：返回可下载的 ZIP 包地址（若存在）。
   - importFromGitHub/importFromUrl/importFromZip/importFromMarket：从不同来源导入技能。
   - list/listResources/readResource/search：列出、列出资源、读取资源、搜索。
@@ -269,10 +244,8 @@ Router-->>Client : 返回 {groupId, supervisorAgentId, agentIds}
 - 参数与响应
   - 输入使用 zod 校验，如 create/update 的 schema。
   - 资源读取支持选择是否包含内容。
-
 - 错误处理
   - 导入流程捕获特定错误类型并映射为 TRPC 错误码（CONFLICT/NOT_FOUND/BAD_GATEWAY/BAD_REQUEST）。
-
 - 业务逻辑
   - ZIP 下载地址通过市场服务获取，导入后同步元数据。
   - 资源读取对缺失路径进行 NOT_FOUND 映射。
@@ -290,20 +263,16 @@ Throw --> End
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agentSkills.ts:143-156](file://src/server/routers/lambda/agentSkills.ts#L143-L156)
 - [src/server/routers/lambda/agentSkills.ts:21-52](file://src/server/routers/lambda/agentSkills.ts#L21-L52)
 
 **章节来源**
-
 - [src/server/routers/lambda/agentSkills.ts:89-272](file://src/server/routers/lambda/agentSkills.ts#L89-L272)
 - [packages/database/src/models/agentSkill.ts:36-154](file://packages/database/src/models/agentSkill.ts#L36-L154)
 
 ### Agent 定时任务路由（agentCronJobRouter）
-
 - 中间件与上下文
   - 使用认证中间件，注入 serverDB 与 userId。
-
 - 主要接口
   - batchUpdateStatus：批量启停任务。
   - create：创建任务（userId 自动注入）。
@@ -318,11 +287,9 @@ Throw --> End
 
 - 参数与响应
   - 输入使用 zod 校验，如 list 支持 limit/offset/agentId/enabled。
-  - 统一返回 {data, pagination?, success, message?} 结构。
-
+  - 统一返回 { data, pagination?, success, message? } 结构。
 - 错误处理
   - 未找到、内部错误等场景抛出 TRPCError。
-
 - 业务逻辑
   - 批量更新返回受影响条数与提示消息。
   - 统计与分页查询封装底层模型方法。
@@ -343,29 +310,23 @@ Router-->>Client : {data : {updatedCount}, message, success}
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agentCronJob.ts:250-281](file://src/server/routers/lambda/agentCronJob.ts#L250-L281)
 - [src/server/routers/lambda/agentCronJob.ts:43-66](file://src/server/routers/lambda/agentCronJob.ts#L43-L66)
 
 **章节来源**
-
 - [src/server/routers/lambda/agentCronJob.ts:39-364](file://src/server/routers/lambda/agentCronJob.ts#L39-L364)
 
 ## 依赖分析
-
 **更新** 路由层依赖
-
 - **简化的认证中间件**：使用 `oidcAuth` + `userAuth` 的组合，提供更强的安全性同时保持简洁性。
 - **数据库中间件**：提供统一的数据库连接管理。
 - 服务层负责复杂业务逻辑与权限校验。
 - 数据模型层负责数据持久化与查询。
 
 **类型与校验**
-
 - OpenAPI 类型与 Zod Schema 提供输入输出规范。
 
 **循环依赖**
-
 - 路由层通过服务层间接访问模型层，避免直接循环依赖。
 
 ```mermaid
@@ -382,21 +343,17 @@ W2["数据库中间件"] --> R1
 ```
 
 **图表来源**
-
 - [src/server/routers/lambda/agent.ts:30-43](file://src/server/routers/lambda/agent.ts#L30-L43)
 - [src/libs/trpc/lambda/index.ts:30-31](file://src/libs/trpc/lambda/index.ts#L30-L31)
 - [src/libs/trpc/lambda/middleware/serverDatabase.ts:5-11](file://src/libs/trpc/lambda/middleware/serverDatabase.ts#L5-L11)
 
 **章节来源**
-
 - [packages/openapi/src/types/agent.type.ts:1-200](file://packages/openapi/src/types/agent.type.ts#L1-L200)
 - [packages/openapi/src/types/agent-group.type.ts:1-54](file://packages/openapi/src/types/agent-group.type.ts#L1-L54)
 
 ## 性能考虑
-
 **更新** 性能优化策略
-
-- **并行查询**：Agent 知识库 / 文件查询采用 Promise.all 并行执行，减少往返时间。
+- **并行查询**：Agent 知识库/文件查询采用 Promise.all 并行执行，减少往返时间。
 - **批量操作**：批量创建虚拟 Agent 与批量更新任务，降低网络与事务开销。
 - **去重插入**：文件绑定时先查询已存在记录，仅插入缺失项，避免重复写入。
 - **分页与限制**：list 接口限制每页最大 100，避免超大数据集查询。
@@ -404,9 +361,7 @@ W2["数据库中间件"] --> R1
 - **简化的中间件链**：减少了不必要的中间件调用，提高请求处理速度。
 
 ## 故障排查指南
-
 **更新** 故障排查指南
-
 - **常见错误码**
   - NOT_FOUND：资源不存在（如技能、定时任务、会话）。
   - CONFLICT：导入冲突（如标识符重复）。
@@ -416,28 +371,25 @@ W2["数据库中间件"] --> R1
 
 - **典型问题定位**
   - **Agent 配置为空**：检查会话是否存在，必要时触发 Inbox 初始化。
-  - **知识库 / 文件未生效**：确认 enabled 字段与绑定记录存在。
+  - **知识库/文件未生效**：确认 enabled 字段与绑定记录存在。
   - **定时任务未执行**：检查任务状态、剩余执行次数与阈值设置。
-  - **Inbox 创建失败**：检查 AgentService.createInbox () 的调用链路和 SessionModel.createInbox () 的事务处理。
+  - **Inbox 创建失败**：检查 AgentService.createInbox() 的调用链路和 SessionModel.createInbox() 的事务处理。
 
 - **日志与追踪**
   - 路由层对关键操作打印日志，便于定位问题。
   - **新增** 中间件层的日志记录，帮助调试认证和数据库连接问题。
 
 **章节来源**
-
 - [src/server/routers/lambda/agent.ts:218-247](file://src/server/routers/lambda/agent.ts#L218-L247)
 - [src/server/routers/lambda/agentSkills.ts:21-52](file://src/server/routers/lambda/agentSkills.ts#L21-L52)
 - [src/server/routers/lambda/agentCronJob.ts:58-65](file://src/server/routers/lambda/agentCronJob.ts#L58-L65)
 
 ## 结论
-
 **更新** Agent 路由模块通过清晰的职责划分与严格的参数校验，提供了完整的 Agent 生命周期管理、分组协作、技能导入与定时任务能力。最新的架构改进包括简化的中间件设计和自动化的 inbox 创建机制，进一步提升了系统的可维护性和用户体验。结合服务层的权限控制与模型层的数据一致性保障，整体具备良好的扩展性与稳定性。建议在生产环境中配合缓存、索引与监控体系进一步优化性能与可观测性。
 
 ## 附录
 
 ### TypeScript 类型定义与校验规则
-
 - **Agent 类型**
   - CreateAgentRequest/UpdateAgentRequest/AgentDeleteRequest：定义创建、更新、删除的请求结构与必填字段。
   - CreateAgentRequestSchema/UpdateAgentRequestSchema：Zod 校验规则，覆盖聊天配置、参数、系统角色等字段。
@@ -457,6 +409,5 @@ W2["数据库中间件"] --> R1
   - batchUpdateStatus 输入：ids/enabled。
 
 **章节来源**
-
 - [packages/openapi/src/types/agent.type.ts:10-200](file://packages/openapi/src/types/agent.type.ts#L10-L200)
 - [packages/openapi/src/types/agent-group.type.ts:8-54](file://packages/openapi/src/types/agent-group.type.ts#L8-L54)

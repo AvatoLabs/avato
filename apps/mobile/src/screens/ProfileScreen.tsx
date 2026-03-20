@@ -26,7 +26,6 @@ import {
   Monitor,
   Moon,
   Server,
-  Settings,
   Sun,
   Volume2,
 } from 'lucide-react-native';
@@ -319,12 +318,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t.settingsTitle ?? 'Settings'}
-        titleIcon={
-          <Settings color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        }
-      />
+      <ScreenHeader headerLevel="root" title={t.settingsTitle ?? 'Settings'} />
 
       <ScrollView
         className="flex-1"
@@ -341,7 +335,7 @@ export default function ProfileScreen({ navigation }: any) {
       >
         {/* Workspace Overview — taps into profile / model / providers */}
         <Animated.View entering={FadeInDown.delay(50).duration(350)}>
-          <View className="pt-3">
+          <View className="pt-2">
             <WorkspaceOverviewCard
               defaultModel={defaultModel || t.settingsNotConfigured}
               isConnected={isConnected}

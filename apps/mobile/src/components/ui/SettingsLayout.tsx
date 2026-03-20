@@ -41,11 +41,17 @@ export function SettingsRow({
       <View className="flex-1">
         <Text className="text-foreground text-[15.5px] font-medium tracking-tight">{label}</Text>
         {subtitle && (
-          <Text className="text-[12.5px] mt-0.5 font-medium" style={{ color: colors.secondaryText }}>{subtitle}</Text>
+          <Text className="mt-0.5 text-[12.5px] font-medium" style={{ color: colors.secondaryText }}>
+            {subtitle}
+          </Text>
         )}
       </View>
       {onPress ? (
-        <ChevronRight color={effectiveIconColor} size={18} strokeWidth={tokens.icon.strokeWidth} />
+        <ChevronRight
+          color={colors.secondaryText}
+          size={18}
+          strokeWidth={tokens.icon.strokeWidth}
+        />
       ) : null}
     </>
   );
@@ -80,7 +86,10 @@ export function SettingsSection({ children, delay = 0, title }: SettingsSectionP
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
       <View className="mb-5 px-5">
-        <Text className="px-2 mb-2 text-[12px] font-medium uppercase tracking-wider" style={{ color: colors.secondaryText }}>
+        <Text
+          className="mb-2 px-2 text-[13px] font-semibold tracking-tight"
+          style={{ color: colors.secondaryText }}
+        >
           {title}
         </Text>
         <View>{children}</View>

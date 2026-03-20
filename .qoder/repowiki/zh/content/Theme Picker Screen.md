@@ -16,7 +16,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -68,13 +67,11 @@ UserStore --> Settings
 ```
 
 **图表来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L69>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L69)
 - [src/layout/GlobalProvider/AppTheme.tsx:1-197](file://src/layout/GlobalProvider/AppTheme.tsx#L1-L197)
 
 **章节来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L69>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L69)
 - [src/layout/GlobalProvider/AppTheme.tsx:1-197](file://src/layout/GlobalProvider/AppTheme.tsx#L1-L197)
 
 ## 核心组件
@@ -82,25 +79,20 @@ UserStore --> Settings
 主题选择器界面由多个相互协作的组件构成，每个组件都有特定的功能和职责：
 
 ### 主要颜色选择器
-
 负责提供主要品牌颜色的选择功能，支持多种预定义的颜色选项，包括透明色作为默认选项。
 
-### 中性颜色选择器
-
+### 中性颜色选择器  
 提供中性色调的选择功能，支持多种中性色彩方案，用于界面元素的配色。
 
 ### 主题模式切换
-
 实现整体主题模式的切换功能，支持浅色、深色和自动跟随系统三种模式。
 
 ### 实时预览
-
 提供即时的主题效果预览功能，让用户能够看到颜色变化的实际效果。
 
 **章节来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](<file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L1-L82>)
-- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx](<file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx#L1-L54>)
+- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L1-L82)
+- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx](file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx#L1-L54)
 
 ## 架构概览
 
@@ -123,12 +115,10 @@ Note over User,ThemeEngine : 实时主题切换流程
 ```
 
 **图表来源**
-
 - [src/layout/GlobalProvider/AppTheme.tsx:152-192](file://src/layout/GlobalProvider/AppTheme.tsx#L152-L192)
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L58-L65>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L58-L65)
 
 该架构的核心优势在于：
-
 - **响应式更新**：用户操作立即反映到界面
 - **状态管理**：集中化的设置状态管理
 - **主题隔离**：主题逻辑与业务逻辑分离
@@ -170,30 +160,26 @@ Appearance --> Preview : 包含
 ```
 
 **图表来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L17-L68>)
-- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](<file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L11-L79>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L17-L68)
+- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L11-L79)
 
 ### 颜色选择器组件
 
 两个颜色选择器组件都基于相同的架构模式，但服务于不同的颜色类别：
 
 #### 主要颜色选择器
-
-- 支持 13 种主要颜色选项
+- 支持13种主要颜色选项
 - 包含透明色作为默认选项
 - 使用国际化标签提供本地化支持
 
 #### 中性颜色选择器
-
-- 支持 6 种中性颜色选项
+- 支持6种中性颜色选项
 - 提供更柔和的色彩选择
 - 适用于界面元素的基础配色
 
 **章节来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](<file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L1-L82>)
-- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx](<file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx#L1-L54>)
+- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx](file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesPrimary.tsx#L1-L82)
+- [src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx](file://src/routes/(main)/settings/common/features/Appearance/ThemeSwatches/ThemeSwatchesNeutral.tsx#L1-L54)
 
 ### 主题提供者系统
 
@@ -215,12 +201,10 @@ style RenderUI fill:#c8e6c9
 ```
 
 **图表来源**
-
 - [src/layout/GlobalProvider/AppTheme.tsx:137-143](file://src/layout/GlobalProvider/AppTheme.tsx#L137-L143)
 - [src/layout/GlobalProvider/AppTheme.tsx:152-192](file://src/layout/GlobalProvider/AppTheme.tsx#L152-L192)
 
 **章节来源**
-
 - [src/layout/GlobalProvider/AppTheme.tsx:94-196](file://src/layout/GlobalProvider/AppTheme.tsx#L94-L196)
 
 ### 命令菜单集成
@@ -245,11 +229,9 @@ Note over User,UI : 快速主题切换流程
 ```
 
 **图表来源**
-
 - [src/features/CommandMenu/ThemeMenu.tsx:10-51](file://src/features/CommandMenu/ThemeMenu.tsx#L10-L51)
 
 **章节来源**
-
 - [src/features/CommandMenu/ThemeMenu.tsx:1-57](file://src/features/CommandMenu/ThemeMenu.tsx#L1-L57)
 
 ## 依赖关系分析
@@ -288,8 +270,7 @@ style AppTheme fill:#f3e5f5
 ```
 
 **图表来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L16>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L1-L16)
 - [src/layout/GlobalProvider/AppTheme.tsx:1-27](file://src/layout/GlobalProvider/AppTheme.tsx#L1-L27)
 
 ### 关键依赖特性
@@ -300,7 +281,6 @@ style AppTheme fill:#f3e5f5
 4. **状态持久化**：用户设置的持久化存储
 
 **章节来源**
-
 - [src/layout/GlobalProvider/NextThemeProvider.tsx:1-22](file://src/layout/GlobalProvider/NextThemeProvider.tsx#L1-L22)
 - [src/hooks/useIsDark.ts:1-11](file://src/hooks/useIsDark.ts#L1-L11)
 
@@ -309,19 +289,16 @@ style AppTheme fill:#f3e5f5
 主题选择器界面在设计时充分考虑了性能优化：
 
 ### 渲染优化
-
 - 使用 React.memo 避免不必要的重渲染
 - 按需加载主题资源
 - 优化颜色选择器的渲染性能
 
 ### 内存管理
-
 - 合理的组件卸载处理
 - 避免内存泄漏的事件监听器清理
 - 图片资源的懒加载策略
 
 ### 网络优化
-
 - CDN 加速的字体和图片资源
 - 条件加载桌面端特殊资源
 - 缓存策略优化
@@ -331,26 +308,22 @@ style AppTheme fill:#f3e5f5
 ### 常见问题及解决方案
 
 #### 主题切换不生效
-
 1. **检查浏览器主题设置**：确认系统主题设置正确
 2. **清除缓存**：刷新页面并清除浏览器缓存
 3. **检查网络连接**：确保主题资源可以正常加载
 
 #### 颜色选择器无响应
-
 1. **验证权限设置**：确认应用有必要的权限
 2. **检查控制台错误**：查看是否有 JavaScript 错误
 3. **重启应用**：完全关闭后重新启动应用
 
 #### 主题状态不同步
-
 1. **检查存储状态**：验证用户设置是否正确保存
 2. **同步设置**：手动触发设置更新
 3. **重置设置**：恢复到默认主题设置
 
 **章节来源**
-
-- [src/routes/(main)/settings/common/features/Appearance/index.tsx](<file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L58-L65>)
+- [src/routes/(main)/settings/common/features/Appearance/index.tsx](file://src/routes/(main)/settings/common/features/Appearance/index.tsx#L58-L65)
 - [src/layout/GlobalProvider/AppTheme.tsx:137-143](file://src/layout/GlobalProvider/AppTheme.tsx#L137-L143)
 
 ## 结论
@@ -358,14 +331,12 @@ style AppTheme fill:#f3e5f5
 主题选择器界面展现了现代前端应用的最佳实践，通过精心设计的架构和组件化开发，为用户提供了丰富而直观的主题定制体验。该系统不仅功能完善，而且具有良好的可维护性和扩展性。
 
 ### 主要成就
-
 - **用户体验优化**：直观的颜色选择器和实时预览
 - **技术架构先进**：基于 React 和 TypeScript 的现代化开发
 - **性能表现优秀**：优化的渲染和资源管理
 - **可访问性强**：完整的键盘导航和屏幕阅读器支持
 
 ### 未来发展方向
-
 - **更多主题选项**：扩展颜色选择器的覆盖范围
 - **高级定制功能**：支持更精细的主题参数调整
 - **主题分享机制**：允许用户创建和分享自定义主题

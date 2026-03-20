@@ -27,7 +27,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -40,14 +39,11 @@
 10. [附录](#附录)
 
 ## 简介
-
 本文件为 LobeHub Agent API 的权威文档，覆盖 Agent 生命周期管理（创建、查询、更新、删除）、配置参数、插件与技能集成、分组与市场发布、状态查询、批量操作、权限控制与版本管理等能力。同时提供模板管理、导入导出、共享发布的接口规范与使用示例，帮助开发者快速集成与扩展。
 
 ## 项目结构
-
 Agent API 由三层组成：
-
-- 路由层：定义 REST API 路由与鉴权 / 权限中间件
+- 路由层：定义 REST API 路由与鉴权/权限中间件
 - 控制器层：处理请求参数、调用服务层并返回标准化响应
 - 服务层：封装业务逻辑、数据库事务与权限校验
 
@@ -74,23 +70,20 @@ S1 --> S2
 ```
 
 图表来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L1-L116)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L1-L127)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L1-L358)
 - [packages/database/src/models/agent.ts](file://packages/database/src/models/agent.ts#L247-L280)
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L92-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L1-L47)
 
 章节来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L1-L116)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L1-L127)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L1-L358)
 
 ## 核心组件
-
 - 路由与中间件
   - 认证中间件：requireAuth
   - 权限检查中间件：requireAnyPermission
@@ -107,19 +100,16 @@ S1 --> S2
   - MarketApiService：前端封装市场 API 调用
 
 章节来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L1-L116)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L1-L127)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L1-L358)
 - [packages/database/src/models/agent.ts](file://packages/database/src/models/agent.ts#L247-L280)
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L92-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L1-L47)
 
 ## 架构总览
-
 Agent API 的关键流程包括：
-
 - HTTP 路由接收请求，经认证与权限校验后交由控制器处理
 - 控制器调用服务层执行业务逻辑（含数据库事务与权限解析）
 - 服务层可联动数据库模型与外部市场服务
@@ -142,7 +132,6 @@ Ctrl-->>Client : "200 OK + 数据"
 ```
 
 图表来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L57-L74)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L104-L125)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L251-L286)
@@ -151,7 +140,6 @@ Ctrl-->>Client : "200 OK + 数据"
 ## 详细组件分析
 
 ### 1) Agent 生命周期管理端点
-
 - 查询 Agent 列表
   - 方法与路径：GET /api/v1/agents
   - 权限：AGENT_READ（支持 ALL/OWNER 作用域）
@@ -179,7 +167,6 @@ Ctrl-->>Client : "200 OK + 数据"
   - 行为：支持迁移会话或级联删除
 
 章节来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L19-L113)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L18-L102)
 - [packages/openapi/src/types/agent.type.ts](file://packages/openapi/src/types/agent.type.ts#L10-L200)
@@ -187,7 +174,6 @@ Ctrl-->>Client : "200 OK + 数据"
 - [packages/database/src/models/agent.ts](file://packages/database/src/models/agent.ts#L247-L280)
 
 ### 2) Agent 模型参数与配置
-
 - 支持字段
   - 基本信息：title、description、avatar、backgroundColor、tags
   - 模型与提供商：model、provider
@@ -195,17 +181,15 @@ Ctrl-->>Client : "200 OK + 数据"
   - 自定义参数：params（以键值对形式存储，支持合并更新）
   - 系统角色：systemRole
 - 更新策略
-  - 部分字段可更新；params 采用 “合并更新” 而非全量覆盖
+  - 部分字段可更新；params 采用“合并更新”而非全量覆盖
   - 严格权限校验，确保仅授权用户可修改
 
 章节来源
-
 - [packages/openapi/src/types/agent.type.ts](file://packages/openapi/src/types/agent.type.ts#L10-L62)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L116-L186)
 
 ### 3) 插件与技能集成
-
-- 插件启用 / 禁用
+- 插件启用/禁用
   - 通过 AgentManagerRuntime 的 updateAgentConfig 支持 togglePlugin
   - 运行时将乐观更新 meta 字段并记录变更字段
 - 技能过滤引擎
@@ -225,21 +209,18 @@ Persist --> Done(["返回结果"])
 ```
 
 图表来源
-
 - [packages/agent-manager-runtime/src/AgentManagerRuntime.ts](file://packages/agent-manager-runtime/src/AgentManagerRuntime.ts#L185-L223)
 - [packages/context-engine/src/engine/skills/SkillEngine.ts](file://packages/context-engine/src/engine/skills/SkillEngine.ts#L25-L30)
 - [packages/context-engine/src/providers/AgentManagementContextInjector.ts](file://packages/context-engine/src/providers/AgentManagementContextInjector.ts#L142-L167)
 - [packages/database/src/models/agentSkill.ts](file://packages/database/src/models/agentSkill.ts#L47-L82)
 
 章节来源
-
 - [packages/agent-manager-runtime/src/AgentManagerRuntime.ts](file://packages/agent-manager-runtime/src/AgentManagerRuntime.ts#L185-L223)
 - [packages/context-engine/src/engine/skills/SkillEngine.ts](file://packages/context-engine/src/engine/skills/SkillEngine.ts#L1-L38)
 - [packages/context-engine/src/providers/AgentManagementContextInjector.ts](file://packages/context-engine/src/providers/AgentManagementContextInjector.ts#L142-L167)
 - [packages/database/src/models/agentSkill.ts](file://packages/database/src/models/agentSkill.ts#L1-L82)
 
 ### 4) 分组管理与市场发布
-
 - 分组 Agent 列表查询
   - tRPC 输入参数：category、locale、order、ownerId、page、pageSize、q、sort、status、visibility
   - 返回分页列表
@@ -263,20 +244,17 @@ T-->>FE : "200 OK"
 ```
 
 图表来源
-
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L252-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L45-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L45-L179)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L36-L47)
 
 章节来源
-
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L477-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L1-L47)
 - [packages/types/src/discover/groupAgents.ts](file://packages/types/src/discover/groupAgents.ts#L183-L213)
 
 ### 5) 状态查询、批量操作与会话关联
-
 - 状态查询
   - 详情接口返回 Agent 完整配置及关联资源（会话、知识库、文件）
 - 批量操作
@@ -288,13 +266,11 @@ T-->>FE : "200 OK"
   - 删除 Agent 时可选择迁移会话至其他 Agent
 
 章节来源
-
 - [packages/openapi/src/types/agent.type.ts](file://packages/openapi/src/types/agent.type.ts#L77-L154)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L288-L356)
 - [packages/database/src/models/agent.ts](file://packages/database/src/models/agent.ts#L247-L280)
 
 ### 6) 权限控制与版本管理
-
 - 权限模型
   - RBAC 权限键：AGENT_CREATE、AGENT_READ、AGENT_UPDATE、AGENT_DELETE
   - 支持作用域：ALL、OWNER
@@ -304,7 +280,6 @@ T-->>FE : "200 OK"
   - 前端通过 MarketApiService 设置 accessToken 或可信客户端令牌
 
 章节来源
-
 - [packages/const/src/rbac.ts](file://packages/const/src/rbac.ts#L201-L238)
 - [packages/openapi/src/middleware/permission-check.ts](file://packages/openapi/src/middleware/permission-check.ts)
 - [packages/openapi/src/middleware/auth.ts](file://packages/openapi/src/middleware/auth.ts)
@@ -312,24 +287,21 @@ T-->>FE : "200 OK"
 - [src/hooks/useAgentOwnershipCheck.ts](file://src/hooks/useAgentOwnershipCheck.ts#L63-L106)
 
 ### 7) 模板管理、导入导出与共享发布
-
 - 导出格式
   - 文本、PDF、JSON（兼容 OpenAI）等
-  - 可选包含系统角色、消息角色、用户信息、技能 / 插件调用详情
+  - 可选包含系统角色、消息角色、用户信息、技能/插件调用详情
 - 共享发布
-  - 通过市场 API 发布 / 取消发布 / 弃用 Agent
+  - 通过市场 API 发布/取消发布/弃用 Agent
   - 前端根据拥有者身份显示相应操作按钮
 - 复制 Agent
   - 服务层提供 duplicateAgent，支持新标题
 
 章节来源
-
 - [src/services/agent.ts](file://src/services/agent.ts#L212-L231)
 - [packages/database/src/models/agent.ts](file://packages/database/src/models/agent.ts#L472-L516)
-- [src/routes/(main)/community/(detail)/user/features/useUserDetail.ts](<file://src/routes/(main)/community/(detail)/user/features/useUserDetail.ts#L38-L77>)
+- [src/routes/(main)/community/(detail)/user/features/useUserDetail.ts](file://src/routes/(main)/community/(detail)/user/features/useUserDetail.ts#L38-L77)
 
 ## 依赖分析
-
 - 组件耦合
   - 路由层仅负责参数校验与鉴权，控制器与服务层职责清晰
   - 服务层通过 AgentModel 与数据库交互，必要时进行事务与会话迁移
@@ -349,23 +321,20 @@ Market --> Proxy["Next.js 代理路由"]
 ```
 
 图表来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L1-L116)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L1-L127)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L1-L358)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L1-L47)
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L92-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L1-L179)
 
 章节来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L1-L116)
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L1-L127)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L1-L358)
 - [src/services/marketApi.ts](file://src/services/marketApi.ts#L1-L47)
 
 ## 性能考量
-
 - 分页查询
   - 使用分页 Schema 限制每页大小，避免一次性加载过多数据
 - 事务与并发
@@ -375,13 +344,11 @@ Market --> Proxy["Next.js 代理路由"]
   - 市场拥有者校验具备缓存机制，减少重复请求
 
 章节来源
-
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L35-L70)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L192-L249)
 - [src/hooks/useAgentOwnershipCheck.ts](file://src/hooks/useAgentOwnershipCheck.ts#L63-L106)
 
 ## 故障排查指南
-
 - 常见错误与处理
   - 未登录或权限不足：返回 401/403，并提示具体权限缺失
   - Agent 不存在：返回 404
@@ -392,15 +359,12 @@ Market --> Proxy["Next.js 代理路由"]
   - 统一通过 BaseController.success/error 返回标准响应
 
 章节来源
-
 - [packages/openapi/src/controllers/agent.controller.ts](file://packages/openapi/src/controllers/agent.controller.ts#L104-L125)
 - [packages/openapi/src/services/agent.service.ts](file://packages/openapi/src/services/agent.service.ts#L251-L286)
 - [packages/openapi/src/common/base.controller.ts](file://packages/openapi/src/common/base.controller.ts)
 
 ## 结论
-
-本 API 以清晰的路由 - 控制器 - 服务分层设计，结合严格的权限控制与数据库事务，提供了完整的 Agent 生命周期管理能力。配合市场发布、分组管理、插件与技能引擎、批量操作与会话迁移，满足从开发到生产的多场景需求。建议在生产环境中：
-
+本 API 以清晰的路由-控制器-服务分层设计，结合严格的权限控制与数据库事务，提供了完整的 Agent 生命周期管理能力。配合市场发布、分组管理、插件与技能引擎、批量操作与会话迁移，满足从开发到生产的多场景需求。建议在生产环境中：
 - 明确权限边界与作用域
 - 合理使用分页与缓存
 - 在批量操作前做好幂等与回滚预案
@@ -409,7 +373,6 @@ Market --> Proxy["Next.js 代理路由"]
 ## 附录
 
 ### A. API 规范速查
-
 - 查询列表：GET /api/v1/agents（分页）
 - 创建：POST /api/v1/agents
 - 详情：GET /api/v1/agents/:id
@@ -417,10 +380,9 @@ Market --> Proxy["Next.js 代理路由"]
 - 删除：DELETE /api/v1/agents/:id
 - 市场创建：POST /market/agent/create
 - 我的 Agent：GET /market/agent/own
-- 发布 / 取消发布 / 弃用：POST /market/agent/:identifier/{publish|unpublish|deprecate}
+- 发布/取消发布/弃用：POST /market/agent/:identifier/{publish|unpublish|deprecate}
 
 章节来源
-
 - [packages/openapi/src/routes/agents.route.ts](file://packages/openapi/src/routes/agents.route.ts#L19-L113)
 - [src/server/routers/lambda/market/agent.ts](file://src/server/routers/lambda/market/agent.ts#L252-L556)
-- [src/app/(backend)/market/agent/\[\[...segments\]\]/route.ts](<file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L45-L179>)
+- [src/app/(backend)/market/agent/[[...segments]]/route.ts](file://src/app/(backend)/market/agent/[[...segments]]/route.ts#L45-L179)

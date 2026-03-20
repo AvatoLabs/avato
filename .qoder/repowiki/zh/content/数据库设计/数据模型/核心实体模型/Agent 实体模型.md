@@ -15,7 +15,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -28,13 +27,10 @@
 10. [附录：字段说明与操作示例](#附录字段说明与操作示例)
 
 ## 简介
-
 本文件系统性梳理 Agent 实体模型的设计与实现，覆盖数据库层面的主键生成、唯一索引、外键约束，以及核心字段与高级配置字段的语义与用途；解释虚拟 Agent 与固定 Agent 的差异，以及 openingMessage 与 openingQuestions 的作用；阐明 Agent 与 User、KnowledgeBase、File、SessionGroup 的关系映射与多对多中间表设计；并提供字段说明表与数据库操作示例路径。
 
 ## 项目结构
-
 围绕 Agent 的相关文件主要分布在以下位置：
-
 - 数据库模式与迁移：docs/development/database-schema.dbml、packages/database/migrations
 - 模式定义（Drizzle ORM）：packages/database/src/schemas/agent.ts
 - 模型实现（业务封装）：packages/database/src/models/agent.ts
@@ -66,34 +62,29 @@ M --> AF
 ```
 
 图表来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L1-L576)
 
 章节来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L1-L50)
 
 ## 核心组件
-
 - agents 表：存储 Agent 的元数据与配置，包含主键、唯一索引、外键约束及时间戳。
 - agents_knowledge_bases 中间表：Agent 与 KnowledgeBase 的多对多关联。
 - agents_files 中间表：Agent 与 File 的多对多关联。
 - AgentModel：封装查询、创建、更新、删除、复制、知识增强等业务逻辑。
 
 章节来源
-
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L21-L576)
 
 ## 架构总览
-
 Agent 的数据流从应用层的 AgentModel 出发，通过 Drizzle ORM 访问 agents 及其关联表；同时通过中间表实现与 KnowledgeBase、File 的多对多关系，并可选地与 SessionGroup 建立一对多关系。
 
 ```mermaid
@@ -117,14 +108,12 @@ M-->>C : 返回增强后的 Agent 配置
 ```
 
 图表来源
-
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L45-L151)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
 
 ## 详细组件分析
 
 ### 数据库表设计与约束
-
 - 主键与标识
   - agents.id：主键，UUID 生成器，默认非空。
   - agents_knowledge_bases、agents_files：复合主键，确保唯一组合。
@@ -144,7 +133,6 @@ M-->>C : 返回增强后的 Agent 配置
   - agents 表包含 created_at、updated_at、accessed_at 默认值与自动更新行为。
 
 章节来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
@@ -155,7 +143,6 @@ M-->>C : 返回增强后的 Agent 配置
 - [0084_snapshot.json](file://packages/database/migrations/meta/0084_snapshot.json#L8006-L8038)
 
 ### 字段说明与用途
-
 - 基础字段
   - id：Agent 唯一标识（主键）。
   - slug：友好标识，配合 user_id 唯一。
@@ -179,36 +166,30 @@ M-->>C : 返回增强后的 Agent 配置
   - params：动态参数（JSONB，默认空对象）。
 
 章节来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [0021_add_agent_opening_settings.sql](file://packages/database/migrations/0021_add_agent_opening_settings.sql#L1-L2)
 
 ### 虚拟 Agent 与固定 Agent
-
 - 固定 Agent：通常与会话绑定，具备会话生命周期管理，支持删除时级联清理会话与消息。
 - 虚拟 Agent：不绑定会话，主要用于群成员、内置助手等场景，创建时不生成会话，删除时仅删除记录本身。
 - 区分方式：通过 virtual 字段或是否存在会话关联判断。
 
 章节来源
-
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L45-L74)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L251-L293)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L523-L574)
 
 ### openingMessage 与 openingQuestions
-
 - openingMessage：Agent 首次对话显示的消息内容。
 - openingQuestions：Agent 首次对话显示的引导问题数组。
 - 作用：提升用户体验，提供初始交互入口。
 
 章节来源
-
 - [0021_add_agent_opening_settings.sql](file://packages/database/migrations/0021_add_agent_opening_settings.sql#L1-L2)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L67-L68)
 
 ### 关系映射与中间表设计
-
 - Agent ↔ KnowledgeBase：多对多，中间表 agents_knowledge_bases，包含启用状态与用户维度。
 - Agent ↔ File：多对多，中间表 agents_files，包含启用状态与用户维度。
 - Agent → SessionGroup：一对多（外键，删除时设为空）。
@@ -261,13 +242,11 @@ AGENTS ||--o{| FILES : "关联(中间表)"
 ```
 
 图表来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L95-L142)
 
 ## 依赖分析
-
 - 模式层依赖
   - agents 表依赖 users、session_groups。
   - 中间表依赖 agents、knowledge_bases/files/users。
@@ -288,19 +267,16 @@ M --> F["files 表"]
 ```
 
 图表来源
-
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L1-L50)
 - [agentRuntime.ts（运行时错误类型）](file://packages/types/src/agentRuntime.ts#L1-L48)
 
 章节来源
-
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L1-L50)
 - [agentRuntime.ts（运行时错误类型）](file://packages/types/src/agentRuntime.ts#L1-L48)
 
 ## 性能考量
-
 - 查询优化
   - 使用联合唯一索引 (client_id, user_id) 与 (slug, user_id) 加速定位。
   - 对 userId、title、description、session_group_id 建立普通索引，支撑过滤与排序。
@@ -311,46 +287,41 @@ M --> F["files 表"]
   - 去重插入 agents_files 时先查询已存在项，避免重复写入。
 
 章节来源
-
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L76-L84)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L122-L151)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L209-L233)
 
 ## 故障排查指南
-
 - 常见运行时错误类型
   - 模型未找到、配额不足、权限拒绝、上下文窗口超限、提供商凭据无效、流式分片错误、图像生成失败等。
 - 排查建议
   - 核对 provider/model/params 是否正确配置。
   - 检查用户配额与提供商密钥有效性。
-  - 查看 AgentModel 的更新 / 查询日志，确认 userId 与 agentId 条件匹配。
+  - 查看 AgentModel 的更新/查询日志，确认 userId 与 agentId 条件匹配。
 
 章节来源
-
 - [agentRuntime.ts（运行时错误类型）](file://packages/types/src/agentRuntime.ts#L1-L48)
 - [agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L346-L457)
 
 ## 结论
-
 Agent 实体模型通过清晰的主键、唯一索引与外键约束，结合中间表实现与知识库、文件的多对多关系，并通过 AgentModel 提供完善的 CRUD 与知识增强能力。虚拟 Agent 与固定 Agent 的区分满足不同使用场景，openingMessage 与 openingQuestions 则提升了初始交互体验。整体设计兼顾扩展性与性能，适合在多租户与复杂业务场景中稳定演进。
 
 ## 附录：字段说明与操作示例
 
 ### 字段说明表
-
 - 基础字段
   - id：主键，UUID。
-  - slug：varchar (100)，唯一索引 (user_id, slug)。
+  - slug：varchar(100)，唯一索引(user_id, slug)。
   - title/description：varchar(255)/varchar(1000)。
   - avatar/backgroundColor：text。
-  - tags：jsonb，默认 \[]。
+  - tags：jsonb，默认[]。
   - editorData：jsonb。
-  - clientId：text，唯一索引 (user_id, clientId)。
-  - userId：text，NOT NULL，FK (users.id)，级联删除。
-  - sessionGroupId：text，FK (session_groups.id)，删除设空。
-  - virtual/pinned：boolean，默认 false / 默认 false。
+  - clientId：text，唯一索引(user_id, clientId)。
+  - userId：text，NOT NULL，FK(users.id)，级联删除。
+  - sessionGroupId：text，FK(session_groups.id)，删除设空。
+  - virtual/pinned：boolean，默认false/默认false。
   - openingMessage：text。
-  - openingQuestions：text \[]，默认 {}。
+  - openingQuestions：text[]，默认{}。
   - created_at/updated_at/accessed_at：timestamp with time zone。
 - 高级配置字段
   - marketIdentifier：text。
@@ -359,16 +330,14 @@ Agent 实体模型通过清晰的主键、唯一索引与外键约束，结合�
   - chatConfig：jsonb，使用专用 Schema。
   - fewShots：jsonb。
   - model/provider/systemRole/tts：text/jsonb。
-  - params：jsonb，默认 {}。
+  - params：jsonb，默认{}。
 
 章节来源
-
 - [database-schema.dbml](file://docs/development/database-schema.dbml#L1-L80)
 - [agent.ts（模式定义）](file://packages/database/src/schemas/agent.ts#L30-L84)
 - [0021_add_agent_opening_settings.sql](file://packages/database/migrations/0021_add_agent_opening_settings.sql#L1-L2)
 
 ### 数据库操作示例（路径）
-
 - 创建 Agent（不含会话）
   - 示例路径：[agent.ts（模型实现）](file://packages/database/src/models/agent.ts#L312-L325)
 - 批量创建虚拟 Agent

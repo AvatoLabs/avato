@@ -20,7 +20,7 @@ export function SectionBlock({ title, action, onAction, children }: SectionBlock
     <View className="mb-6">
       <View className="flex-row items-center justify-between px-5 mb-3">
         <Text
-          className="text-[12px] font-medium uppercase tracking-wider"
+          className="text-[13px] font-semibold tracking-tight"
           style={{ color: colors.secondaryText }}
         >
           {title}

@@ -386,6 +386,7 @@ const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageS
   ({ fallbackLabel, speaker }) => {
     const colors = useThemeColors();
     const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+    const avatoLogoTint = effectiveTheme === 'dark' ? colors.foreground : undefined;
     const avatar = speaker?.avatar?.trim();
     const resolvedAvatarUri = useResolvedRemoteAsset(avatar);
     const isInboxAvatar = isBuiltinInboxAvatar(avatar);
@@ -401,7 +402,7 @@ const GroupSpeakerAvatar = memo<{ fallbackLabel: string; speaker?: GroupMessageS
             style={{
               height: 28,
               width: 28,
-              ...(effectiveTheme === 'dark' ? { tintColor: colors.foreground } : {}),
+              ...(avatoLogoTint ? { tintColor: avatoLogoTint } : {}),
             }}
           />
         </View>
@@ -652,6 +653,7 @@ const MessageBubble = memo<MessageBubbleProps>(
     const toast = useToast();
     const colors = useThemeColors();
     const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+    const avatoLogoTint = effectiveTheme === 'dark' ? colors.foreground : undefined;
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -1184,7 +1186,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                   <RNImage
                     className="w-5 h-5 rounded-md"
                     source={require('../../../assets/avato-icon.png')}
-                    style={effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined}
+                    style={avatoLogoTint ? { tintColor: avatoLogoTint } : undefined}
                   />
                 )}
               </View>
@@ -2713,9 +2715,9 @@ const ToolCallsBlock = memo<{
       >
         <View className="flex-row items-center flex-1">
           <Wrench
+            color={hasPending ? colors.info : allCompleted ? colors.iconSuccess : colors.textGray}
             size={14}
             strokeWidth={2}
-            color={hasPending ? colors.info : allCompleted ? colors.iconSuccess : colors.textGray}
           />
           <Text className="ml-2 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
             {t.chatToolsTitle} ({tools.length})

@@ -9,7 +9,7 @@
  *   Experience → Experience list
  *   Preference → Preference list
  */
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import {
   ArrowLeft,
   Brain,
@@ -28,6 +28,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Modal,
   RefreshControl,
@@ -71,6 +72,10 @@ type AnyMemoryItem =
   | MemoryExperienceItem
   | MemoryIdentityItem
   | MemoryPreferenceItem;
+
+const MEMORY_POLL_BASE_DELAY_MS = 2500;
+const MEMORY_POLL_MAX_ATTEMPTS = 60;
+const MEMORY_POLL_MAX_DELAY_MS = 10000;
 
 // ── Helper: get display text for a memory item ──────────────────────
 function getItemTitle(item: AnyMemoryItem, layer: MemoryLayer): string {
@@ -148,12 +153,15 @@ function HomeTab() {
   const { t } = useI18n();
   const colors = useThemeColors();
   const toast = useToast();
+  const isScreenFocused = useIsFocused();
   const [persona, setPersona] = useState<MemoryPersona | null>(null);
   const [roles, setRoles] = useState<Array<{ count: number; role: string }>>([]);
   const [extractionTask, setExtractionTask] = useState<MemoryExtractionTask | null>(null);
   const [requestingExtraction, setRequestingExtraction] = useState(false);
   const [loading, setLoading] = useState(true);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canPollRef = useRef(false);
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -163,17 +171,30 @@ function HomeTab() {
   }, []);
 
   const scheduleTaskPoll = useCallback(
-    (taskId?: string) => {
+    (taskId?: string, attempt = 0) => {
+      if (!canPollRef.current || attempt >= MEMORY_POLL_MAX_ATTEMPTS) {
+        stopPolling();
+        return;
+      }
+
       stopPolling();
+      const delay = Math.min(
+        MEMORY_POLL_BASE_DELAY_MS * 1.25 ** Math.floor(attempt / 5),
+        MEMORY_POLL_MAX_DELAY_MS,
+      );
+
       pollTimerRef.current = setTimeout(async () => {
         pollTimerRef.current = null;
+        if (!canPollRef.current) return;
+
         try {
           const nextTask = await memoryApi.getMemoryExtractionTask(taskId ? { taskId } : undefined);
           setExtractionTask(nextTask);
 
           if (nextTask && (nextTask.status === 'Pending' || nextTask.status === 'Processing')) {
-            scheduleTaskPoll(nextTask.id);
+            scheduleTaskPoll(nextTask.id, attempt + 1);
           } else if (nextTask?.status === 'Success') {
+            stopPolling();
             const [nextPersona, nextRoles] = await Promise.all([
               memoryApi.getPersona().catch(() => null),
               memoryApi
@@ -182,11 +203,15 @@ function HomeTab() {
             ]);
             setPersona(nextPersona);
             setRoles(nextRoles.roles || []);
+          } else {
+            stopPolling();
           }
         } catch {
-          // Keep the last known task state if polling fails transiently.
+          if (canPollRef.current) {
+            scheduleTaskPoll(taskId, attempt + 1);
+          }
         }
-      }, 2500);
+      }, delay);
     },
     [stopPolling],
   );
@@ -203,7 +228,7 @@ function HomeTab() {
       setRoles(r.roles || []);
 
       setExtractionTask(task);
-      if (task && (task.status === 'Pending' || task.status === 'Processing')) {
+      if (canPollRef.current && task && (task.status === 'Pending' || task.status === 'Processing')) {
         scheduleTaskPoll(task.id);
       } else {
         stopPolling();
@@ -214,9 +239,26 @@ function HomeTab() {
   }, [scheduleTaskPoll, stopPolling]);
 
   useEffect(() => {
-    load();
-    return stopPolling;
-  }, [load, stopPolling]);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setIsAppActive(nextState === 'active');
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => stopPolling, [stopPolling]);
+
+  useEffect(() => {
+    canPollRef.current = isScreenFocused && isAppActive;
+    if (!canPollRef.current) {
+      stopPolling();
+      return;
+    }
+
+    void load();
+  }, [isAppActive, isScreenFocused, load, stopPolling]);
 
   const handleRunExtraction = useCallback(async () => {
     if (requestingExtraction) return;

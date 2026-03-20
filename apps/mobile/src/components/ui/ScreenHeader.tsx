@@ -9,9 +9,11 @@ import { useThemeColors } from '../../theme/colors';
 
 /** 'flat' = enterprise-style solid bg + border; 'blur' = glassmorphic */
 type HeaderStyle = 'flat' | 'blur';
+type HeaderLevel = 'default' | 'root';
 
 interface ScreenHeaderProps {
   children?: React.ReactNode;
+  headerLevel?: HeaderLevel;
   /** 'flat' for enterprise look (default); 'blur' for glassmorphic */
   headerStyle?: HeaderStyle;
   leftActions?: React.ReactNode;
@@ -38,6 +40,7 @@ export function ScreenHeader({
   rightActions,
   rightAccessibilityLabel,
   rightAccessibilityHint,
+  headerLevel = 'default',
   titleIcon,
   titleNode,
   headerStyle = 'flat',
@@ -48,6 +51,7 @@ export function ScreenHeader({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const isSubScreen = !!leftElement;
+  const isRootHeader = !isSubScreen && headerLevel === 'root';
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
   const useFlat = headerStyle === 'flat';
@@ -124,6 +128,46 @@ export function ScreenHeader({
     </>
   );
 
+  const rootScreenContent = (
+    <>
+      <View className="px-6 pt-5 pb-5" style={{ minHeight: 48 }}>
+        <View className="flex-row items-center justify-between" style={{ minHeight: 48 }}>
+          <View className="mr-4 flex-1 justify-center">
+            {titleNode ? (
+              <View className="flex-1 justify-center">{titleNode}</View>
+            ) : (
+              <Text
+                className="text-[34px] font-bold leading-[38px] tracking-tight"
+                numberOfLines={1}
+                style={{ color: colors.foreground }}
+              >
+                {title}
+              </Text>
+            )}
+          </View>
+          {rightActions ? (
+            <View className="flex-row items-center justify-end" style={{ minWidth: 40 }}>
+              {rightActions}
+            </View>
+          ) : rightElement ? (
+            <TouchableOpacity
+              accessibilityHint={rightAccessibilityHint}
+              accessibilityLabel={rightAccessibilityLabel}
+              accessibilityRole="button"
+              activeOpacity={0.6}
+              className="-mr-2 h-10 w-10 items-center justify-center"
+              disabled={!onPressRight}
+              onPress={onPressRight}
+            >
+              {rightElement}
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+      {children}
+    </>
+  );
+
   const mainScreenContent = (
     <>
       <View className="px-5 pt-3 pb-2" style={{ minHeight: 56 }}>
@@ -184,6 +228,10 @@ export function ScreenHeader({
 
   if (isSubScreen) {
     return headerContent(subScreenContent);
+  }
+
+  if (isRootHeader) {
+    return headerContent(rootScreenContent);
   }
 
   return headerContent(mainScreenContent);

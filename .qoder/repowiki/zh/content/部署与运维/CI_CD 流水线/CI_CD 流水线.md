@@ -23,7 +23,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -40,7 +39,6 @@
 LobeHub 项目采用全面的 CI/CD 流水线设计，涵盖了从代码质量检查到多环境部署的完整自动化流程。该项目基于 GitHub Actions 构建了强大的持续集成和持续部署体系，支持多种发布渠道和部署策略。
 
 项目的核心特点包括：
-
 - 多层次的测试覆盖（单元测试、集成测试、端到端测试）
 - 多平台桌面应用构建和发布
 - Docker 容器化部署支持
@@ -95,12 +93,10 @@ Packages --> Types
 ```
 
 **图表来源**
-
 - [package.json](file://package.json#L30-L35)
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L1-L268)
 
 **章节来源**
-
 - [package.json](file://package.json#L30-L35)
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L1-L268)
 
@@ -145,7 +141,6 @@ DBTest --> Codecov
 ```
 
 **图表来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L13-L268)
 
 ### 桌面应用构建组件
@@ -188,12 +183,10 @@ Upload --> Manual
 ```
 
 **图表来源**
-
 - [.github/workflows/release-desktop-stable.yml](file://.github/workflows/release-desktop-stable.yml#L23-L370)
 - [.github/workflows/release-desktop-canary.yml](file://.github/workflows/release-desktop-canary.yml#L19-L430)
 
 **章节来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L13-L268)
 - [.github/workflows/release-desktop-stable.yml](file://.github/workflows/release-desktop-stable.yml#L72-L370)
 - [.github/workflows/release-desktop-canary.yml](file://.github/workflows/release-desktop-canary.yml#L40-L430)
@@ -242,7 +235,6 @@ Branches --> Release
 ```
 
 **图表来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L3-L11)
 - [.github/workflows/e2e.yml](file://.github/workflows/e2e.yml#L3-L24)
 - [.github/workflows/release-docker.yml](file://.github/workflows/release-docker.yml#L5-L12)
@@ -278,12 +270,10 @@ DevServices --> Rolling
 ```
 
 **图表来源**
-
 - [docker-compose/dev/docker-compose.yml](file://docker-compose/dev/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 
 **章节来源**
-
 - [docker-compose/dev/docker-compose.yml](file://docker-compose/dev/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 
@@ -317,7 +307,6 @@ Codecov-->>GitHub : 生成覆盖率报告
 ```
 
 **图表来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L13-L268)
 
 #### 端到端测试组件
@@ -343,11 +332,9 @@ Success --> End
 ```
 
 **图表来源**
-
 - [.github/workflows/e2e.yml](file://.github/workflows/e2e.yml#L26-L95)
 
 **章节来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L13-L268)
 - [.github/workflows/e2e.yml](file://.github/workflows/e2e.yml#L26-L95)
 
@@ -375,7 +362,6 @@ MergeFiles->>PublishS3 : 发布到 S3 更新服务器
 ```
 
 **图表来源**
-
 - [.github/workflows/release-desktop-stable.yml](file://.github/workflows/release-desktop-stable.yml#L76-L370)
 
 #### 金丝雀发布组件
@@ -399,11 +385,9 @@ Skip --> End
 ```
 
 **图表来源**
-
 - [.github/workflows/release-desktop-canary.yml](file://.github/workflows/release-desktop-canary.yml#L44-L430)
 
 **章节来源**
-
 - [.github/workflows/release-desktop-stable.yml](file://.github/workflows/release-desktop-stable.yml#L76-L370)
 - [.github/workflows/release-desktop-canary.yml](file://.github/workflows/release-desktop-canary.yml#L44-L430)
 
@@ -440,11 +424,9 @@ PushImage --> Registry
 ```
 
 **图表来源**
-
 - [.github/workflows/release-docker.yml](file://.github/workflows/release-docker.yml#L18-L133)
 
 **章节来源**
-
 - [.github/workflows/release-docker.yml](file://.github/workflows/release-docker.yml#L18-L133)
 
 ### 版本管理和发布流程
@@ -469,11 +451,9 @@ SemanticRelease-->>Developer : 发布完成
 ```
 
 **图表来源**
-
 - [package.json](file://package.json#L95-L96)
 
 **章节来源**
-
 - [package.json](file://package.json#L95-L96)
 
 ## 依赖关系分析
@@ -517,7 +497,6 @@ ReleaseYML --> GitHub
 ```
 
 **图表来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L223-L234)
 - [.github/workflows/e2e.yml](file://.github/workflows/e2e.yml#L48-L57)
 
@@ -555,12 +534,10 @@ OTELCollector --> ContainerRegistry
 ```
 
 **图表来源**
-
 - [docker-compose/dev/docker-compose.yml](file://docker-compose/dev/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 
 **章节来源**
-
 - [docker-compose/dev/docker-compose.yml](file://docker-compose/dev/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)
 
@@ -592,7 +569,6 @@ UploadArtifacts --> End([构建完成])
 ```
 
 **图表来源**
-
 - [.github/workflows/bundle-analyzer.yml](file://.github/workflows/bundle-analyzer.yml#L15-L116)
 
 ### 资源管理策略
@@ -664,7 +640,6 @@ RetryBuild --> Success[构建成功]
 4. **日志记录**: 完整的日志记录便于问题追踪
 
 **章节来源**
-
 - [.github/workflows/test.yml](file://.github/workflows/test.yml#L9-L11)
 - [.github/workflows/e2e.yml](file://.github/workflows/e2e.yml#L59-L84)
 
@@ -743,17 +718,17 @@ services:
     environment:
       POSTGRES_PASSWORD: postgres
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready']
+      test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
     ports:
-      - '5432:5432'
+      - "5432:5432"
 
   redis:
     image: redis:alpine
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -768,7 +743,7 @@ services:
     environment:
       BASE_URL: http://localhost:8080
     ports:
-      - '8080:8080'
+      - "8080:8080"
 ```
 
 ### 最佳实践建议
@@ -794,7 +769,6 @@ services:
    - 增强多环境管理能力
 
 **章节来源**
-
 - [Dockerfile](file://Dockerfile)
 - [docker-compose/dev/docker-compose.yml](file://docker-compose/dev/docker-compose.yml)
 - [docker-compose/production/grafana/docker-compose.yml](file://docker-compose/production/grafana/docker-compose.yml)

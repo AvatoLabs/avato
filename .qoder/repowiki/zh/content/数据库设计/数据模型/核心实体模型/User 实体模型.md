@@ -16,7 +16,6 @@
 </cite>
 
 ## 目录
-
 1. [简介](#简介)
 2. [项目结构](#项目结构)
 3. [核心组件](#核心组件)
@@ -29,12 +28,10 @@
 10. [附录](#附录)
 
 ## 简介
-
 本文件系统性梳理并解释 User 实体模型的设计理念与实现细节，覆盖用户标识符生成策略、账户状态管理（邮箱验证、两步验证、封禁）、权限控制（基于角色与权限的 RBAC）、配置字段（settings、blocked、subscription）以及与 Agent、KnowledgeBase、File 等实体的关系映射。同时给出认证状态、订阅状态、权限等级的业务逻辑说明，并提供用户注册、登录、权限验证的完整示例流程与安全最佳实践。
 
 ## 项目结构
-
-围绕 User 的核心代码分布在数据库模式层、模型层、类型与常量定义、RBAC 权限模型以及迁移脚本中，形成 “模式定义 → 模型封装 → 类型约束 → 权限控制 → 订阅扩展” 的分层设计。
+围绕 User 的核心代码分布在数据库模式层、模型层、类型与常量定义、RBAC 权限模型以及迁移脚本中，形成“模式定义 → 模型封装 → 类型约束 → 权限控制 → 订阅扩展”的分层设计。
 
 ```mermaid
 graph TB
@@ -69,7 +66,6 @@ SUB --> U
 ```
 
 图表来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L50-L418)
 - [packages/database/src/models/rbac.ts](file://packages/database/src/models/rbac.ts#L49-L164)
@@ -82,16 +78,14 @@ SUB --> U
 - [packages/database/migrations/meta/0007_snapshot.json](file://packages/database/migrations/meta/0007_snapshot.json#L2783-L2834)
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L50-L418)
 - [packages/types/src/user/preference.ts](file://packages/types/src/user/preference.ts#L52-L73)
 - [packages/const/src/user.ts](file://packages/const/src/user.ts#L11-L21)
 
 ## 核心组件
-
 - 数据表与字段
-  - users：用户主表，包含唯一标识 id、用户名 username、邮箱 email、标准化邮箱 normalized_email、头像 avatar、电话 phone、姓名系列字段、兴趣数组、引导状态与数据、邮箱 / 手机号验证标志、偏好 preference、角色 role、封禁状态 banned 及原因与到期时间、两步验证开关 twoFactorEnabled、最后活跃时间 lastActiveAt、时间戳等。
+  - users：用户主表，包含唯一标识 id、用户名 username、邮箱 email、标准化邮箱 normalized_email、头像 avatar、电话 phone、姓名系列字段、兴趣数组、引导状态与数据、邮箱/手机号验证标志、偏好 preference、角色 role、封禁状态 banned 及原因与到期时间、两步验证开关 twoFactorEnabled、最后活跃时间 lastActiveAt、时间戳等。
   - user_settings：用户配置表，以 users.id 作为主键并级联删除；包含通用、语言模型、系统代理、默认代理、市场、记忆、工具、图片、热键、TTS、密钥库等配置项。
   - user_installed_plugins：用户安装插件清单，复合主键 (userId, identifier)，记录插件类型、清单、设置、自定义参数与来源。
 - 模型方法
@@ -107,7 +101,6 @@ SUB --> U
   - 迁移脚本与迁移快照显示 user_subscriptions 表的存在，用于存储订阅状态、周期、价格等信息。
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L50-L418)
 - [packages/types/src/user/preference.ts](file://packages/types/src/user/preference.ts#L52-L73)
@@ -120,7 +113,6 @@ SUB --> U
 - [packages/database/migrations/meta/0007_snapshot.json](file://packages/database/migrations/meta/0007_snapshot.json#L2783-L2834)
 
 ## 架构总览
-
 下图展示用户实体在系统中的位置与交互关系：模型层封装数据库访问，类型与常量提供约束与默认值，RBAC 提供权限校验，迁移脚本扩展配置与订阅能力。
 
 ```mermaid
@@ -141,7 +133,6 @@ MIG --> SUB["user_subscriptions 表"]
 ```
 
 图表来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L50-L418)
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/types/src/user/preference.ts](file://packages/types/src/user/preference.ts#L52-L73)
@@ -156,7 +147,6 @@ MIG --> SUB["user_subscriptions 表"]
 ## 详细组件分析
 
 ### 用户表设计与字段语义
-
 - 标识与凭证
   - id：主键，UUID 或自定义字符串，全局唯一。
   - username：唯一索引，允许空值，用于登录名。
@@ -165,7 +155,7 @@ MIG --> SUB["user_subscriptions 表"]
   - emailVerified/emailVerifiedAt：邮箱验证状态与时间，兼容不同认证方案。
   - phoneNumberVerified：手机号验证标记。
 - 个人资料
-  - avatar、firstName、lastName、fullName、interests \[]：头像、姓名、全名、兴趣数组。
+  - avatar、firstName、lastName、fullName、interests[]：头像、姓名、全名、兴趣数组。
 - 引导与偏好
   - isOnboarded、onboarding：引导完成状态与流程版本。
   - preference：JSONB 存储用户偏好，默认值来自 DEFAULT_PREFERENCE。
@@ -178,12 +168,10 @@ MIG --> SUB["user_subscriptions 表"]
   - createdAt、updatedAt、clerkCreatedAt：创建时间、更新时间、Clerk 创建时间。
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/const/src/user.ts](file://packages/const/src/user.ts#L11-L21)
 
 ### 用户配置字段（settings）
-
 - user_settings 主键为 users.id，随用户删除级联删除。
 - 配置域（由类型与迁移脚本共同演进）：
   - 通用：general（如响应语言、字体大小等）
@@ -203,7 +191,6 @@ MIG --> SUB["user_subscriptions 表"]
   - 获取 API Key：getUserApiKeys（通过解密器解密 settings.keyVaults）。
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L68-L84)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L166-L222)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L201-L212)
@@ -212,7 +199,6 @@ MIG --> SUB["user_subscriptions 表"]
 - [packages/database/migrations/0051_add_market_into_user_settings.sql](file://packages/database/migrations/0051_add_market_into_user_settings.sql#L1-L1)
 
 ### 用户与 Agent、KnowledgeBase、File 的关系映射
-
 - 与 Agent 的关系
   - defaultAgent/systemAgent：用户设置中可指定默认或系统代理配置，体现用户与 Agent 的绑定关系。
 - 与 KnowledgeBase 的关系
@@ -252,13 +238,11 @@ varchar source
 ```
 
 图表来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L68-L105)
 
 ### 认证状态、订阅状态与权限等级
 
 #### 认证状态
-
 - 邮箱与手机号验证：emailVerified、emailVerifiedAt、phoneNumberVerified。
 - 两步验证：twoFactorEnabled。
 - SSO 提供商：getUserSSOProviders 返回用户已绑定的第三方提供商信息。
@@ -280,27 +264,23 @@ UM-->>C : "返回用户状态与配置"
 ```
 
 图表来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L155-L164)
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L29-L47)
 
 #### 订阅状态
-
 - 订阅表 user_subscriptions（迁移快照显示）包含用户订阅的 stripe_id、currency、pricing、账期起止、状态等字段，用于支撑桌面端订阅页面与计费流程。
-- 订阅状态与用户偏好 / 功能限制的联动可通过 settings.memory.enabled 与用户活跃度筛选（如仅对有聊天记录且启用记忆的用户进行小时记忆提取）间接体现。
+- 订阅状态与用户偏好/功能限制的联动可通过 settings.memory.enabled 与用户活跃度筛选（如仅对有聊天记录且启用记忆的用户进行小时记忆提取）间接体现。
 
 章节来源
-
 - [packages/database/migrations/meta/0006_snapshot.json](file://packages/database/migrations/meta/0006_snapshot.json#L2836-L2890)
 - [packages/database/migrations/meta/0007_snapshot.json](file://packages/database/migrations/meta/0007_snapshot.json#L2783-L2834)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L345-L389)
 
 #### 权限等级与 RBAC
-
 - 角色与权限
-  - 用户角色：userRoles（用户 - 角色关联），角色状态 isActive，角色过期检查。
+  - 用户角色：userRoles（用户-角色关联），角色状态 isActive，角色过期检查。
   - 权限集合：permissions（分类、编码、名称、状态）。
-  - 角色 - 权限映射：rolePermissions。
+  - 角色-权限映射：rolePermissions。
 - 权限查询与校验
   - getUserPermissionDetails：返回用户拥有的权限明细（分类、编码、名称、角色名）。
   - hasPermission/hasAllPermissions：单个或多个权限（AND）校验。
@@ -319,11 +299,9 @@ RBAC-->>C : "布尔结果全部满足"
 ```
 
 图表来源
-
 - [packages/database/src/models/rbac.ts](file://packages/database/src/models/rbac.ts#L49-L164)
 
 ### 用户标识符生成与规范化
-
 - 标识符生成
   - id 由外部系统生成并插入；UserModel.makeSureUserExist 支持幂等创建。
 - 唯一字段规范化
@@ -334,14 +312,12 @@ RBAC-->>C : "布尔结果全部满足"
   - 单测验证空字符串归一化、空白用户名返回 null、trim 后匹配等行为。
 
 章节来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L261-L295)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L238-L258)
-- [packages/database/src/models/**tests**/user.test.ts](file://packages/database/src/models/__tests__/user.test.ts#L140-L202)
-- [packages/database/src/models/**tests**/user.test.ts](file://packages/database/src/models/__tests__/user.test.ts#L417-L447)
+- [packages/database/src/models/__tests__/user.test.ts](file://packages/database/src/models/__tests__/user.test.ts#L140-L202)
+- [packages/database/src/models/__tests__/user.test.ts](file://packages/database/src/models/__tests__/user.test.ts#L417-L447)
 
 ### 用户注册、登录与权限验证示例
-
 - 注册
   - 调用 UserModel.createUser，传入 id 与基础信息；若 id 已存在则返回 duplicate 标记。
   - 归一化唯一字段后写入 users。
@@ -369,12 +345,10 @@ API-->>FE : "返回用户状态/权限"
 ```
 
 图表来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L265-L295)
 - [packages/database/src/models/rbac.ts](file://packages/database/src/models/rbac.ts#L149-L156)
 
 ### 安全最佳实践
-
 - 输入规范化
   - 使用 normalizeUniqueUserFields 将空字符串转为 null，确保唯一约束稳定。
 - 最小权限
@@ -387,17 +361,15 @@ API-->>FE : "返回用户状态/权限"
   - emailVerified/emailVerifiedAt、phoneNumberVerified、twoFactorEnabled 兼容多种认证方案。
 
 章节来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L238-L258)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L119-L137)
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L29-L47)
 - [packages/database/src/models/rbac.ts](file://packages/database/src/models/rbac.ts#L149-L156)
 
 ## 依赖关系分析
-
 - 内部依赖
   - UserModel 依赖 schemas 定义的 users/userSettings 表结构与索引；依赖类型包的 UserPreference/UserSettings；依赖常量包 DEFAULT_PREFERENCE。
-  - RBAC 模型依赖用户 - 角色 - 权限三层关系表，进行权限判定。
+  - RBAC 模型依赖用户-角色-权限三层关系表，进行权限判定。
 - 外部依赖
   - 认证：better-auth（role、banned、twoFactorEnabled、emailVerified）、nextauth（emailVerifiedAt）。
   - 订阅：user_subscriptions 表（迁移快照）。
@@ -418,7 +390,6 @@ MIG --> SUB["user_subscriptions 订阅表"]
 ```
 
 图表来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L50-L418)
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/types/src/user/preference.ts](file://packages/types/src/user/preference.ts#L52-L73)
@@ -431,7 +402,6 @@ MIG --> SUB["user_subscriptions 订阅表"]
 - [packages/database/migrations/meta/0007_snapshot.json](file://packages/database/migrations/meta/0007_snapshot.json#L2783-L2834)
 
 ## 性能考量
-
 - 索引优化
   - users 表对 email/username/createdAt 建有唯一与普通索引；对 banned=true 的部分索引加速封禁用户查询。
 - 分页与过滤
@@ -441,12 +411,10 @@ MIG --> SUB["user_subscriptions 订阅表"]
   - settings.memory.enabled 通过 COALESCE 处理缺失配置时的默认启用行为，减少额外分支判断。
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L51-L62)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L319-L389)
 
 ## 故障排查指南
-
 - 用户不存在
   - getUserState/getUserApiKeys 在找不到用户或设置时抛出 UserNotFoundError，需检查用户 id 是否正确。
 - 解密失败
@@ -457,25 +425,22 @@ MIG --> SUB["user_subscriptions 订阅表"]
   - hasAllPermissions 返回 false 时，检查用户角色是否过期、权限是否激活、是否在有效期范围内。
 
 章节来源
-
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L110-L112)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L119-L137)
 - [packages/database/src/models/user.ts](file://packages/database/src/models/user.ts#L238-L258)
 - [packages/database/src/models/rbac.ts](file://packages/database/src/models/rbac.ts#L71-L80)
 
 ## 结论
-
-User 实体模型通过清晰的表结构、完善的类型约束与默认值、严谨的权限控制与安全实践，构建了从认证到配置再到订阅的完整用户生命周期支持。其分层设计（模式 → 模型 → 类型 / 常量 → 权限 → 迁移）既保证了可维护性，也为未来扩展（如更多配置域、订阅策略）提供了稳定基座。
+User 实体模型通过清晰的表结构、完善的类型约束与默认值、严谨的权限控制与安全实践，构建了从认证到配置再到订阅的完整用户生命周期支持。其分层设计（模式 → 模型 → 类型/常量 → 权限 → 迁移）既保证了可维护性，也为未来扩展（如更多配置域、订阅策略）提供了稳定基座。
 
 ## 附录
 
 ### 字段对照与用途速查
-
 - 核心字段
   - id：用户唯一标识
   - email/username/phone：登录与联系信息（唯一）
   - avatar/firstName/lastName/fullName：个人资料
-  - interests \[]：兴趣标签数组
+  - interests[]：兴趣标签数组
   - isOnboarded/onboarding：引导状态与流程版本
   - preference：用户偏好（默认值 DEFAULT_PREFERENCE）
   - role/banned/banReason/banExpires：角色与封禁治理
@@ -488,7 +453,6 @@ User 实体模型通过清晰的表结构、完善的类型约束与默认值、
   - stripe_id、currency、pricing、billing_cycle_start/end、status 等（迁移快照）
 
 章节来源
-
 - [packages/database/src/schemas/user.ts](file://packages/database/src/schemas/user.ts#L9-L63)
 - [packages/types/src/user/preference.ts](file://packages/types/src/user/preference.ts#L52-L73)
 - [packages/const/src/user.ts](file://packages/const/src/user.ts#L11-L21)

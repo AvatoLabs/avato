@@ -52,11 +52,27 @@ export const tokens = {
 
   // Typography
   typography: {
+    mobile: {
+      body: 15,
+      meta: 12,
+      title: 22,
+    },
     weight: {
       regular: '400',
       medium: '500',
       semibold: '600',
     },
+  },
+
+  mobile: {
+    heights: {
+      composerAction: 36,
+      filterChip: 36,
+      headerAction: 40,
+      metaTag: 26,
+      segmentedControl: 44,
+    },
+    spacingScale: [4, 8, 12, 16, 24, 32] as const,
   },
 
   // Motion (P0: unified params for animations)

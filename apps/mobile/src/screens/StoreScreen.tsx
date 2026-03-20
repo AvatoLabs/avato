@@ -18,7 +18,6 @@ import {
   Link as LinkIcon,
   Package,
   Plus,
-  Search,
   Trash2,
   X,
 } from 'lucide-react-native';
@@ -41,9 +40,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuiltinSkillIcon } from '../components/ui/BuiltinSkillIcon';
 import CardSkeleton from '../components/ui/CardSkeleton';
+import { FilterChip, MetaTag, SegmentedControl } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import {
   MOBILE_RECOMMENDED_BUILTIN_SKILLS,
@@ -434,27 +435,19 @@ const ItemCard = memo<{
             <Text className="text-foreground text-[14px] font-semibold flex-1" numberOfLines={1}>
               {item.name || item.identifier}
             </Text>
-            <View
-              className="ml-2 rounded-md px-1.5 py-0.5"
-              style={{
-                backgroundColor:
-                  item._source === 'mcp' || item._source === 'legacy'
-                    ? colors.sourceMarketMuted
-                    : colors.sourceBuiltinMuted,
-              }}
-            >
-              <Text
-                className="text-[9px] font-bold tracking-wide"
-                style={{
-                  color:
-                    item._source === 'mcp' || item._source === 'legacy'
-                      ? colors.sourceMarket
-                      : colors.sourceBuiltin,
-                }}
-              >
-                {item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'SKILL'}
-              </Text>
-            </View>
+            <MetaTag
+              label={item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'Skill'}
+              backgroundColor={
+                item._source === 'mcp' || item._source === 'legacy'
+                  ? colors.sourceMarketMuted
+                  : colors.sourceBuiltinMuted
+              }
+              textColor={
+                item._source === 'mcp' || item._source === 'legacy'
+                  ? colors.sourceMarket
+                  : colors.sourceBuiltin
+              }
+            />
           </View>
 
           {item.description ? (
@@ -533,14 +526,11 @@ const InstalledRow = memo<{
           <Text className="text-foreground text-[14px] font-semibold flex-1" numberOfLines={1}>
             {item.name}
           </Text>
-          <View
-            className="ml-2 rounded-md px-1.5 py-0.5"
-            style={{ backgroundColor: item.badgeBackgroundColor }}
-          >
-            <Text className="text-[9px] font-bold tracking-wide" style={{ color: item.badgeColor }}>
-              {item.label}
-            </Text>
-          </View>
+          <MetaTag
+            backgroundColor={item.badgeBackgroundColor}
+            label={item.label}
+            textColor={item.badgeColor}
+          />
         </View>
         {item.description ? (
           <Text
@@ -2018,14 +2008,23 @@ export default function StoreScreen() {
     [fetchInstalled, t.errorSaveFailed, t.storeCustomMcpSaved, toast],
   );
 
-  const tabs: { key: StoreTab; label: string }[] = [
-    { key: 'explore', label: t.storeExplore },
-    { key: 'installed', label: t.storeInstalled },
-  ];
-  const exploreSources: { key: ExploreSource; label: string }[] = [
-    { key: 'mcp', label: t.storeMcp },
-    { key: 'skill', label: t.storeSkills },
-  ];
+  const tabs = useMemo(
+    () => [
+      { label: t.storeExplore, value: 'explore' as const },
+      {
+        label: allInstalled.length > 0 ? `${t.storeInstalled} ${allInstalled.length}` : t.storeInstalled,
+        value: 'installed' as const,
+      },
+    ],
+    [allInstalled.length, t.storeExplore, t.storeInstalled],
+  );
+  const exploreSources = useMemo(
+    () => [
+      { key: 'mcp' as const, label: t.storeMcp },
+      { key: 'skill' as const, label: t.storeSkills },
+    ],
+    [t.storeMcp, t.storeSkills],
+  );
 
   const isExplore = activeTab === 'explore';
   const loading = isExplore ? marketLoading : installedLoading;
@@ -2068,74 +2067,40 @@ export default function StoreScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        headerLevel="root"
         rightAccessibilityLabel={t.accessibilityAddStore}
         title={t.tabStore}
         rightElement={
           <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
         }
-        titleIcon={
-          <Package color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        }
         onPressRight={() => setShowCreateMenu(true)}
       >
-        <View className="mx-5 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5">
-          <Search color={colors.muted} size={16} strokeWidth={2} />
-          <TextInput
-            className="flex-1 text-foreground text-[14px] ml-2.5"
-            placeholder={t.storeSearch}
-            placeholderTextColor={colors.muted}
-            returnKeyType="search"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity hitSlop={8} onPress={() => setSearchQuery('')}>
-              <X color={colors.muted} size={16} strokeWidth={2} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <ScrollView
-          horizontal
-          className="mx-4 mb-2"
-          contentContainerStyle={{ gap: 4 }}
-          showsHorizontalScrollIndicator={false}
-        >
-          {tabs.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                className="rounded-full px-4 py-1.5"
-                key={tab.key}
-                style={{
-                  backgroundColor: active ? colors.primary : colors.fillTertiary,
-                }}
-                onPress={() => {
-                  haptics.selection();
-                  setActiveTab(tab.key);
-                }}
-              >
-                <Text
-                  className="text-[13px] font-semibold"
-                  style={{ color: active ? colors.iconOnPrimary : colors.muted }}
-                >
-                  {tab.label}
-                  {tab.key === 'installed' && allInstalled.length > 0
-                    ? ` ${allInstalled.length}`
-                    : ''}
-                </Text>
+        <SearchField
+          containerClassName="mx-6 mb-2"
+          placeholder={t.storeSearch}
+          returnKeyType="search"
+          size="compact"
+          value={searchQuery}
+          rightElement={
+            searchQuery ? (
+              <TouchableOpacity hitSlop={8} onPress={() => setSearchQuery('')}>
+                <X color={colors.muted} size={16} strokeWidth={2} />
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            ) : undefined
+          }
+          onChangeText={setSearchQuery}
+        />
+
+        <View className="px-6 pb-2">
+          <SegmentedControl items={tabs} value={activeTab} onChange={setActiveTab} />
+        </View>
 
         {isExplore ? (
           <>
             <ScrollView
               horizontal
-              className="mx-4 mb-1"
-              contentContainerStyle={{ gap: 6 }}
+              className="mb-1 px-6"
+              contentContainerStyle={{ gap: 8, paddingRight: 12 }}
               showsHorizontalScrollIndicator={false}
             >
               {exploreSources.map((source) => {
@@ -2145,72 +2110,45 @@ export default function StoreScreen() {
                   : source.key === 'mcp'
                     ? marketMcpTotal
                     : marketSkillTotal;
-                const countStr = total > 0 ? ` ${formatCount(total, locale)}` : '';
                 return (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-full px-4 py-1.5"
+                  <FilterChip
+                    active={active}
+                    count={total > 0 ? formatCount(total, locale) : undefined}
                     key={source.key}
-                    style={{
-                      backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
-                    }}
+                    label={source.label}
                     onPress={() => {
                       haptics.selection();
                       setActiveExploreCategory(ALL_CATEGORY_KEY);
                       setActiveExploreSource(source.key);
                     }}
-                  >
-                    <Text
-                      className="text-[12px] font-semibold"
-                      style={{
-                        color: active ? colors.primary : colors.muted,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {source.label}
-                      {countStr}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 );
               })}
             </ScrollView>
 
             <ScrollView
               horizontal
-              className="mx-4 mb-1"
-              contentContainerStyle={{ gap: 6, paddingRight: 12 }}
+              className="mb-1 px-6"
+              contentContainerStyle={{ gap: 8, paddingRight: 12 }}
               showsHorizontalScrollIndicator={false}
             >
               {categoryOptions.map((category) => {
                 const active = activeExploreCategory === category.key;
-                const countStr =
-                  category.count != null && category.count > 0
-                    ? ` ${formatCount(category.count, locale)}`
-                    : '';
                 return (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-full px-4 py-1.5"
+                  <FilterChip
+                    active={active}
                     key={`${activeExploreSource}-${category.key}`}
-                    style={{
-                      backgroundColor: active ? colors.primaryMuted : colors.fillTertiary,
-                    }}
+                    label={category.label}
+                    count={
+                      category.count != null && category.count > 0
+                        ? formatCount(category.count, locale)
+                        : undefined
+                    }
                     onPress={() => {
                       haptics.selection();
                       setActiveExploreCategory(category.key);
                     }}
-                  >
-                    <Text
-                      className="text-[12px] font-semibold"
-                      style={{
-                        color: active ? colors.primary : colors.muted,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {category.label}
-                      {countStr}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 );
               })}
             </ScrollView>
