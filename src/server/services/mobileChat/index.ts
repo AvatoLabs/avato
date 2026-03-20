@@ -826,7 +826,7 @@ export class MobileChatService {
       }
     }
 
-    if (toolSet?.tools?.length) {
+    if (toolSet?.tools?.length && toolLoopSucceeded) {
       delete data.tools;
     }
 

@@ -315,5 +315,77 @@ describe('POST handler', () => {
       expect(systemMessage?.content).toContain('Use the runSkill tool to activate a skill');
       expect(systemMessage?.content).toContain('Read reference files attached to a skill');
     });
+
+    it('should keep tools on the final streaming call when the server tool loop finds no structured tool calls', async () => {
+      vi.mocked(getXorPayload).mockReturnValueOnce({
+        apiKey: 'test-api-key',
+        azureApiVersion: 'v1',
+        userId: 'abc',
+      });
+
+      pluginQueryMock.mockResolvedValue([]);
+
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      request = new Request(new URL('https://test.com'), {
+        headers: { [LOBE_CHAT_AUTH_HEADER]: 'Bearer some-valid-token' },
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ content: 'use the calculator tool', role: 'user' }],
+          model: 'test-model',
+          plugins: ['lobe-calculator'],
+          stream: true,
+        }),
+      });
+
+      const toolLoopResponse = new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "I'll use the calculator tool for you.",
+                role: 'assistant',
+              },
+            },
+          ],
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+      const finalStreamResponse = new Response('data: [DONE]\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi
+          .fn()
+          .mockResolvedValueOnce(toolLoopResponse)
+          .mockResolvedValueOnce(finalStreamResponse),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      const response = await POST(request as unknown as Request, { params: mockParams });
+      const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+
+      expect(response).toBe(finalStreamResponse);
+      expect(mockedChat).toHaveBeenCalledTimes(2);
+
+      const firstCallPayload = mockedChat.mock.calls[0]![0] as any;
+      const secondCallPayload = mockedChat.mock.calls[1]![0] as any;
+
+      expect(firstCallPayload.stream).toBe(false);
+      expect(firstCallPayload.responseMode).toBe('json');
+      expect(firstCallPayload.tools).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            function: expect.objectContaining({
+              name: expect.stringContaining('lobe-calculator____'),
+            }),
+          }),
+        ]),
+      );
+      expect(secondCallPayload.tools).toEqual(firstCallPayload.tools);
+    });
   });
 });
