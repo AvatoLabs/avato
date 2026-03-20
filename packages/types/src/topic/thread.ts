@@ -62,7 +62,7 @@ export interface ThreadItem {
   lastActiveAt: Date;
   /** Metadata for agent task execution */
   metadata?: ThreadMetadata;
-  parentThreadId?: string;
+  parentThreadId?: string | null;
   sourceMessageId?: string | null;
   status: ThreadStatus;
   title: string;
@@ -86,6 +86,21 @@ export interface CreateThreadParams {
   title?: string;
   topicId: string;
   type: IThreadType;
+}
+
+export interface UpdateThreadParams {
+  /** Agent ID for agent task execution */
+  agentId?: string | null;
+  /** Group ID for group chat context */
+  groupId?: string | null;
+  /** Metadata for agent task execution */
+  metadata?: ThreadMetadata;
+  parentThreadId?: string | null;
+  sourceMessageId?: string | null;
+  status?: ThreadStatus;
+  title?: string;
+  topicId?: string;
+  type?: IThreadType;
 }
 
 export const threadMetadataSchema = z.object({
@@ -115,4 +130,18 @@ export const createThreadSchema = z.object({
     ThreadType.Standalone,
     ThreadType.Isolation,
   ]),
+});
+
+export const updateThreadSchema = z.object({
+  agentId: z.string().nullable().optional(),
+  groupId: z.string().nullable().optional(),
+  metadata: threadMetadataSchema.optional(),
+  parentThreadId: z.string().nullable().optional(),
+  sourceMessageId: z.string().nullable().optional(),
+  status: z.nativeEnum(ThreadStatus).optional(),
+  title: z.string().optional(),
+  topicId: z.string().optional(),
+  type: z
+    .enum([ThreadType.Continuation, ThreadType.Eval, ThreadType.Standalone, ThreadType.Isolation])
+    .optional(),
 });

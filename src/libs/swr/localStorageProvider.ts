@@ -269,6 +269,7 @@ export function clearSWRCache(cacheKey = 'lobechat-swr-cache'): void {
 const SWR_CACHEABLE_PATTERNS = [
   // Home page data
   'fetchAgentList', // Agent list
+  'fetchSessions', // Mobile session list
   'fetchGroups', // Group list
   'fetchRecentTopics', // Recent topics
   'fetchRecentResources', // Recent resources

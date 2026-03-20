@@ -26,12 +26,15 @@ const Header = memo(() => {
       left={
         <Flexbox horizontal align={'center'} className={styles.leftContainer} gap={8}>
           <UserAvatar size={32} onClick={() => navigate('/me')} />
-          <ProductLogo type={'text'} />
+          <div className={styles.brand}>
+            <ProductLogo type={'text'} />
+          </div>
         </Flexbox>
       }
       right={
         <ActionIcon
           aria-label={t('newSession')}
+          className={styles.action}
           icon={MessageSquarePlus}
           size={MOBILE_HEADER_ICON_SIZE}
           title={t('newSession')}

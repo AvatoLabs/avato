@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
+import type { NewAgent } from '../../schemas';
 import { agents, agentsToSessions, messages, sessions, topics } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
@@ -282,32 +283,37 @@ export class AgentMigrationRepo {
         const readString = (value: unknown) =>
           typeof value === 'string' && value.trim().length > 0 ? value : undefined;
         const readStringArray = (value: unknown) =>
-          Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
+          Array.isArray(value)
+            ? value.filter((item): item is string => typeof item === 'string')
+            : undefined;
         const readObject = (value: unknown) =>
           value && typeof value === 'object' && !Array.isArray(value)
             ? (value as Record<string, unknown>)
             : undefined;
+        const rawChatConfig = readObject(rawConfig.chatConfig);
+        const rawParams = readObject(rawConfig.params);
+
+        const createdAgentValues: NewAgent = {
+          avatar: readString(rawConfig.avatar) ?? session.avatar ?? null,
+          backgroundColor: readString(rawConfig.backgroundColor) ?? session.backgroundColor ?? null,
+          chatConfig: rawChatConfig ? (rawChatConfig as unknown as NewAgent['chatConfig']) : null,
+          createdAt: new Date(),
+          description: readString(rawConfig.description) ?? session.description ?? null,
+          model: readString(rawConfig.model) ?? null,
+          params: rawParams ? (rawParams as unknown as NewAgent['params']) : {},
+          plugins: readStringArray(rawConfig.plugins) ?? null,
+          provider: readString(rawConfig.provider) ?? null,
+          sessionGroupId: session.groupId ?? null,
+          systemRole: readString(rawConfig.systemRole) ?? null,
+          title: readString(rawConfig.title) ?? session.title ?? 'New Session',
+          updatedAt: new Date(),
+          userId: this.userId,
+          virtual: false,
+        };
 
         const [createdAgent] = await tx
           .insert(agents)
-          .values({
-            avatar: readString(rawConfig.avatar) ?? session.avatar ?? undefined,
-            backgroundColor:
-              readString(rawConfig.backgroundColor) ?? session.backgroundColor ?? undefined,
-            chatConfig: readObject(rawConfig.chatConfig) ?? {},
-            createdAt: new Date(),
-            description: readString(rawConfig.description) ?? session.description ?? undefined,
-            model: readString(rawConfig.model) ?? null,
-            params: readObject(rawConfig.params) ?? {},
-            plugins: readStringArray(rawConfig.plugins),
-            provider: readString(rawConfig.provider) ?? null,
-            sessionGroupId: session.groupId ?? undefined,
-            systemRole: readString(rawConfig.systemRole),
-            title: readString(rawConfig.title) ?? session.title ?? 'New Session',
-            updatedAt: new Date(),
-            userId: this.userId,
-            virtual: false,
-          })
+          .values(createdAgentValues)
           .returning({ id: agents.id });
 
         await tx.insert(agentsToSessions).values({

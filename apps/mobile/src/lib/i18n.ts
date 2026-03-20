@@ -376,6 +376,8 @@ type TranslationKeys = {
   homeSeeAll: string;
   homeAssistants: string;
   homeStartChat: string;
+  chatSidebarTags: string;
+  chatSidebarTagEmpty: string;
 
   // Studio / Capability Hub
   studioTitle: string;
@@ -453,11 +455,16 @@ type TranslationKeys = {
 
   // File / Attachment
   fileAttach: string;
+  fileAttachDesc: string;
   fileCamera: string;
+  fileCameraDesc: string;
   fileDocument: string;
+  fileDocumentDesc: string;
   fileFromWorkspace: string;
   fileFromWorkspaceDesc: string;
   fileGallery: string;
+  fileGalleryDesc: string;
+  fileNewFolderDesc: string;
   fileUploading: string;
   fileUploadFailed: string;
 
@@ -1422,6 +1429,8 @@ const en: TranslationKeys = {
   homeSeeAll: 'See all',
   homeAssistants: 'Assistants',
   homeStartChat: 'Start Chat',
+  chatSidebarTags: 'Tags',
+  chatSidebarTagEmpty: 'No chats in this tag yet',
 
   studioTitle: 'Studio',
   studioFeatured: 'Featured',
@@ -1492,11 +1501,16 @@ const en: TranslationKeys = {
   discoverNoResults: 'No results found',
 
   fileAttach: 'Attach',
+  fileAttachDesc: 'Choose a source. Everything goes into this composer.',
   fileCamera: 'Camera',
+  fileCameraDesc: 'Take a photo and attach it right away.',
   fileDocument: 'Document',
+  fileDocumentDesc: 'Attach files, notes, PDFs, or other supporting material.',
   fileFromWorkspace: 'From Workspace',
   fileFromWorkspaceDesc: 'Import files from your resource workspace.',
   fileGallery: 'Photo Library',
+  fileGalleryDesc: 'Pick one or more images from your library.',
+  fileNewFolderDesc: 'Create a folder in the current location.',
   fileUploading: 'Uploading...',
   fileUploadFailed: 'Upload failed',
 
@@ -2447,6 +2461,8 @@ const zh_tw: TranslationKeys = {
   homeSeeAll: '檢視全部',
   homeAssistants: '助手',
   homeStartChat: '開始聊天',
+  chatSidebarTags: '標籤',
+  chatSidebarTagEmpty: '這個標籤裡還沒有會話',
 
   studioTitle: '工作室',
   studioFeatured: '精選',
@@ -2517,11 +2533,16 @@ const zh_tw: TranslationKeys = {
   discoverNoResults: '未找到結果',
 
   fileAttach: '附件',
+  fileAttachDesc: '選擇來源，內容會直接加入目前的輸入框。',
   fileCamera: '拍照',
+  fileCameraDesc: '拍一張照片並立即附加。',
   fileDocument: '文件',
+  fileDocumentDesc: '附加文件、筆記、PDF 或其他補充資料。',
   fileFromWorkspace: '從工作區',
   fileFromWorkspaceDesc: '從資源工作區導入文件。',
   fileGallery: '相簿',
+  fileGalleryDesc: '從相簿選取一張或多張圖片。',
+  fileNewFolderDesc: '在目前位置建立資料夾。',
   fileUploading: '上傳中...',
   fileUploadFailed: '上傳失敗',
 
@@ -3468,6 +3489,8 @@ const zh: TranslationKeys = {
   homeSeeAll: '查看全部',
   homeAssistants: '助手',
   homeStartChat: '开始聊天',
+  chatSidebarTags: '标签',
+  chatSidebarTagEmpty: '这个标签里还没有会话',
 
   studioTitle: '工作室',
   studioFeatured: '精选',
@@ -3538,11 +3561,16 @@ const zh: TranslationKeys = {
   discoverNoResults: '未找到结果',
 
   fileAttach: '附件',
+  fileAttachDesc: '选择来源，内容会直接加入当前输入框。',
   fileCamera: '拍照',
+  fileCameraDesc: '拍一张照片并立即附加。',
   fileDocument: '文档',
+  fileDocumentDesc: '附加文件、笔记、PDF 或其他补充材料。',
   fileFromWorkspace: '从工作区',
   fileFromWorkspaceDesc: '从资源工作区导入文件。',
   fileGallery: '相册',
+  fileGalleryDesc: '从相册选择一张或多张图片。',
+  fileNewFolderDesc: '在当前位置创建文件夹。',
   fileUploading: '上传中...',
   fileUploadFailed: '上传失败',
 
@@ -4166,8 +4194,13 @@ export const useI18n = create<I18nStore>((set) => ({
   locale: 'en-US',
   t: en,
   setLocale: async (locale: Locale) => {
-    await AsyncStorage.setItem(STORAGE_KEY, locale);
     set({ locale, t: translations[locale] || en });
+
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, locale);
+    } catch (error) {
+      console.warn('[i18n] failed to persist locale:', error);
+    }
   },
   loadLocale: async () => {
     const saved = await AsyncStorage.getItem(STORAGE_KEY);

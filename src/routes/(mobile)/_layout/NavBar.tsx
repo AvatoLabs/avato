@@ -25,6 +25,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     z-index: 100;
     inset-block-end: 0;
     inset-inline: 0;
+
+    border-block-start: 1px solid
+      color-mix(in srgb, ${cssVar.colorBorderSecondary} 72%, transparent);
+
+    background: color-mix(in srgb, ${cssVar.colorBgContainer} 90%, transparent);
+    backdrop-filter: saturate(1.2) blur(18px);
+    box-shadow: 0 -6px 20px rgb(0 0 0 / 3%);
   `,
 }));
 
@@ -79,11 +86,12 @@ const NavBar = memo(() => {
           title: t('tab.me'),
         },
       ].filter(Boolean) as TabBarProps['items'],
-    [t],
+    [navigate, showMarket, t],
   );
 
   return (
     <TabBar
+      safeArea
       activeKey={activeKey}
       className={styles.container}
       height={MOBILE_TABBAR_HEIGHT}

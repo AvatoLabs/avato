@@ -57,7 +57,6 @@ import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
 import { useChatStore } from '../../store/chat';
-import { useSessionStore } from '../../store/session';
 import { useThemeStore } from '../../store/theme';
 import { getChatAccent, useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
@@ -114,13 +113,16 @@ const CodeCopyButton = memo<{ code: string }>(({ code }) => {
 CodeCopyButton.displayName = 'CodeCopyButton';
 
 const MermaidBlock = memo<{ code: string }>(({ code }) => {
+  const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [height, setHeight] = useState(200);
   const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-<style>body{margin:0;padding:8px;background:transparent;display:flex;justify-content:center}
+<style>:root{color-scheme:${effectiveTheme === 'dark' ? 'dark' : 'light'}}
+body{margin:0;padding:8px;background:transparent;color:${colors.foreground};display:flex;justify-content:center}
 .mermaid{font-size:13px}</style></head><body>
 <div class="mermaid">${code.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>
-<script>mermaid.initialize({startOnLoad:true,theme:'neutral'});
+<script>mermaid.initialize({startOnLoad:true,theme:'${effectiveTheme === 'dark' ? 'dark' : 'neutral'}'});
 mermaid.run().then(()=>{setTimeout(()=>{
 const h=document.querySelector('.mermaid').scrollHeight;
 window.ReactNativeWebView.postMessage(JSON.stringify({height:h+16}));
@@ -148,6 +150,8 @@ window.ReactNativeWebView.postMessage(JSON.stringify({height:h+16}));
 MermaidBlock.displayName = 'MermaidBlock';
 
 const MathBlock = memo<{ display?: boolean; math: string }>(({ math, display }) => {
+  const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [height, setHeight] = useState(display ? 60 : 22);
   const escaped = math
     .replaceAll('\\', '\\\\')
@@ -156,7 +160,9 @@ const MathBlock = memo<{ display?: boolean; math: string }>(({ math, display }) 
   const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<style>body{margin:0;padding:${display ? '8px' : '0 2px'};background:transparent;${display ? 'display:flex;justify-content:center' : 'display:inline'}}</style></head><body>
+<style>:root{color-scheme:${effectiveTheme === 'dark' ? 'dark' : 'light'}}
+body{margin:0;padding:${display ? '8px' : '0 2px'};background:transparent;color:${colors.foreground};${display ? 'display:flex;justify-content:center' : 'display:inline'}}
+.katex{color:${colors.foreground}}</style></head><body>
 <span id="m"></span><script>
 try{katex.render(\`${escaped}\`,document.getElementById('m'),{displayMode:${display},throwOnError:false});
 setTimeout(()=>{const h=document.body.scrollHeight;
@@ -191,6 +197,8 @@ interface MessageBubbleProps {
   generating?: boolean;
   groupMembersById?: Record<string, GroupMessageSpeaker>;
   groupSupervisorId?: string;
+  isGroupSession?: boolean;
+  isReasoning?: boolean;
   message: ChatMessage;
   onSaveToTopic?: () => void;
   sessionId: string;
@@ -279,6 +287,7 @@ const ArtifactBlock = memo<{
   title?: string;
 }>(({ title, artifactType, content, language: _language }) => {
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [height, setHeight] = useState(300);
   const [expanded, setExpanded] = useState(false);
 
@@ -287,6 +296,13 @@ const ArtifactBlock = memo<{
   const isHtml = !artifactType || artifactType === 'text/html' || artifactType.includes('html');
   const isCode = artifactType === 'application/lobe.artifacts.code';
   const isMarkdownArtifact = artifactType === 'text/markdown';
+  const artifactThemeScript = useMemo(
+    () =>
+      `(function(){var style=document.createElement('style');style.innerHTML=${JSON.stringify(
+        `:root{color-scheme:${effectiveTheme === 'dark' ? 'dark' : 'light'}}html,body{background:${colors.surface};color:${colors.foreground};font-family:-apple-system,system-ui,sans-serif;}a{color:${colors.primary};}`,
+      )};document.head&&document.head.appendChild(style);})();true;`,
+    [colors.foreground, colors.primary, colors.surface, effectiveTheme],
+  );
 
   if (isMermaid) {
     return (
@@ -314,13 +330,16 @@ const ArtifactBlock = memo<{
 
   const htmlContent = isSvg
     ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0;padding:8px;background:${colors.surface};display:flex;justify-content:center;align-items:center}
+<style>:root{color-scheme:${effectiveTheme === 'dark' ? 'dark' : 'light'}}
+body{margin:0;padding:8px;background:${colors.surface};color:${colors.foreground};display:flex;justify-content:center;align-items:center}
 svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
     : isHtml
       ? content.includes('<html')
         ? content
         : `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0;padding:8px;font-family:-apple-system,system-ui,sans-serif;font-size:14px}</style></head><body>${content}</body></html>`
+<style>:root{color-scheme:${effectiveTheme === 'dark' ? 'dark' : 'light'}}
+body{margin:0;padding:8px;background:${colors.surface};color:${colors.foreground};font-family:-apple-system,system-ui,sans-serif;font-size:14px}
+a{color:${colors.primary}}</style></head><body>${content}</body></html>`
       : null;
 
   if (!htmlContent) return null;
@@ -363,6 +382,7 @@ svg{max-width:100%;height:auto}</style></head><body>${content}</body></html>`
       {(!title || expanded) && (
         <WebView
           javaScriptEnabled
+          injectedJavaScriptBeforeContentLoaded={artifactThemeScript}
           originWhitelist={['*']}
           scrollEnabled={false}
           source={{ html: htmlContent }}
@@ -645,6 +665,8 @@ const MessageBubble = memo<MessageBubbleProps>(
     generating,
     groupMembersById,
     groupSupervisorId,
+    isGroupSession = false,
+    isReasoning = false,
     onSaveToTopic,
   }) => {
     const isUser = message.role === 'user';
@@ -665,15 +687,6 @@ const MessageBubble = memo<MessageBubbleProps>(
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
     const [downloadingProgress, setDownloadingProgress] = useState(0);
 
-    const deleteMessage = useChatStore((s) => s.deleteMessage);
-    const editMessage = useChatStore((s) => s.editMessage);
-    const regenerateMessage = useChatStore((s) => s.regenerateMessage);
-    const toggleMessageCollapsed = useChatStore((s) => s.toggleMessageCollapsed);
-    const isReasoning = useChatStore((s) => s.isReasoning);
-    const isGroupSession = useSessionStore(
-      (s) => s.sessions.find((session) => session.id === sessionId)?.type === 'group',
-    );
-
     const dismissActions = useCallback(() => {}, []);
 
     const handleCopy = useCallback(async () => {
@@ -691,16 +704,16 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const handleEditSubmit = useCallback(() => {
       if (editText.trim() && editText !== message.content) {
-        editMessage(sessionId, message.id, editText.trim());
+        useChatStore.getState().editMessage(sessionId, message.id, editText.trim());
         haptics.success();
       }
       setIsEditing(false);
-    }, [editText, message.content, message.id, sessionId, editMessage]);
+    }, [editText, message.content, message.id, sessionId]);
 
     const handleRegenerate = useCallback(() => {
       haptics.light();
-      regenerateMessage(sessionId, message.id);
-    }, [sessionId, message.id, regenerateMessage]);
+      useChatStore.getState().regenerateMessage(sessionId, message.id);
+    }, [sessionId, message.id]);
 
     const handleShare = useCallback(async () => {
       haptics.light();
@@ -723,11 +736,11 @@ const MessageBubble = memo<MessageBubbleProps>(
           style: 'destructive',
           onPress: () => {
             haptics.warning();
-            deleteMessage(sessionId, message.id);
+            useChatStore.getState().deleteMessage(sessionId, message.id);
           },
         },
       ]);
-    }, [sessionId, message.id, deleteMessage, t, dismissActions]);
+    }, [sessionId, message.id, t, dismissActions]);
 
     const handleSaveToTopic = useCallback(() => {
       haptics.light();
@@ -1442,7 +1455,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-1 py-1"
                               onPress={() => {
                                 haptics.light();
-                                toggleMessageCollapsed(sessionId, message.id, false);
+                                useChatStore
+                                  .getState()
+                                  .toggleMessageCollapsed(sessionId, message.id, false);
                               }}
                             >
                               <Text
@@ -1481,7 +1496,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-2 py-2 rounded-xl bg-foreground/[0.04] items-center"
                               onPress={() => {
                                 haptics.light();
-                                toggleMessageCollapsed(sessionId, message.id, true);
+                                useChatStore
+                                  .getState()
+                                  .toggleMessageCollapsed(sessionId, message.id, true);
                               }}
                             >
                               <Text

@@ -11,7 +11,7 @@
  *   </PressableScale>
  */
 import React, { memo } from 'react';
-import { type StyleProp, type ViewStyle } from 'react-native';
+import { type AccessibilityRole, type StyleProp, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -20,10 +20,13 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
+import { tokens } from '../../theme/tokens';
+
 interface PressableScaleProps {
   /** Accessibility */
+  accessibilityHint?: string;
   accessibilityLabel?: string;
-  accessibilityRole?: 'button' | 'link' | 'none';
+  accessibilityRole?: AccessibilityRole | 'none';
   /** Scale when pressed. Default: 0.97 — subtle but perceptible */
   activeScale?: number;
   children: React.ReactNode;
@@ -53,14 +56,17 @@ const PressableScale = memo<PressableScaleProps>(
     onPress,
     onLongPress,
     longPressDuration = 300,
-    activeScale = 0.97,
-    damping = 15,
-    stiffness = 150,
+    activeScale = 0.98,
+    damping = tokens.motion.spring.snappy.damping,
+    stiffness = tokens.motion.spring.snappy.stiffness,
     style,
+    accessibilityHint,
     accessibilityLabel,
     accessibilityRole = 'button',
   }) => {
     const scale = useSharedValue(1);
+    const translateY = useSharedValue(0);
+    const opacity = useSharedValue(1);
 
     const springConfig = { damping, stiffness, mass: 1 };
 
@@ -71,10 +77,14 @@ const PressableScale = memo<PressableScaleProps>(
       .onBegin(() => {
         'worklet';
         scale.value = withSpring(activeScale, springConfig);
+        translateY.value = withSpring(1, springConfig);
+        opacity.value = withSpring(0.96, springConfig);
       })
       .onFinalize((_event, success) => {
         'worklet';
         scale.value = withSpring(1, springConfig);
+        translateY.value = withSpring(0, springConfig);
+        opacity.value = withSpring(1, springConfig);
         if (success && onPress) {
           runOnJS(onPress)();
         }
@@ -93,19 +103,23 @@ const PressableScale = memo<PressableScaleProps>(
       .onFinalize(() => {
         'worklet';
         scale.value = withSpring(1, springConfig);
+        translateY.value = withSpring(0, springConfig);
+        opacity.value = withSpring(1, springConfig);
       });
 
     // Compose: long press has priority, tap is fallback
     const composed = onLongPress ? Gesture.Exclusive(longPress, tap) : tap;
 
     const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scale.value }],
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }, { scale: scale.value }],
     }));
 
     return (
       <GestureDetector gesture={composed}>
         <Animated.View
           accessible
+          accessibilityHint={accessibilityHint}
           accessibilityLabel={accessibilityLabel}
           accessibilityRole={accessibilityRole}
           className={className}

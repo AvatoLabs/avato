@@ -1,20 +1,22 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, type TouchableOpacityProps, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '../../lib/i18n';
 import { useThemeStore } from '../../store/theme';
 import { useThemeColors } from '../../theme/colors';
+import { enteringSection } from '../../theme/motion';
+import { tokens } from '../../theme/tokens';
+import PressableScale from './PressableScale';
 
-/** 'flat' = enterprise-style solid bg + border; 'blur' = glassmorphic */
 type HeaderStyle = 'flat' | 'blur';
 type HeaderLevel = 'default' | 'root';
 
 interface ScreenHeaderProps {
   children?: React.ReactNode;
   headerLevel?: HeaderLevel;
-  /** 'flat' for enterprise look (default); 'blur' for glassmorphic */
   headerStyle?: HeaderStyle;
   leftActions?: React.ReactNode;
   leftElement?: React.ReactNode;
@@ -28,6 +30,59 @@ interface ScreenHeaderProps {
   title: string;
   titleIcon?: React.ReactNode;
   titleNode?: React.ReactNode;
+}
+
+interface HeaderIconButtonProps {
+  accessibilityHint?: string;
+  accessibilityLabel?: string;
+  accessibilityRole?: TouchableOpacityProps['accessibilityRole'];
+  active?: boolean;
+  children: React.ReactNode;
+  disabled?: boolean;
+  hitSlop?: TouchableOpacityProps['hitSlop'];
+  onPress?: () => void;
+}
+
+const HEADER_ACTION_SIZE = tokens.mobile.heights.headerAction;
+const HEADER_CONTENT_HEIGHT = tokens.mobile.heights.headerContent;
+const HEADER_SUB_CONTENT_HEIGHT = tokens.mobile.heights.headerSubContent;
+const HEADER_DISPLAY_SIZE = tokens.typography.mobile.display;
+const HEADER_TITLE_SIZE = tokens.typography.mobile.title;
+const HEADER_META_SIZE = tokens.typography.mobile.meta;
+const HEADER_ROOT_HORIZONTAL_PADDING = tokens.spacing.lg;
+const HEADER_SIDE_PADDING = tokens.spacing.md + tokens.spacing.xs;
+const HEADER_TITLE_ICON_BOX_SIZE = tokens.icon.size.xl;
+
+export function HeaderIconButton({
+  accessibilityHint,
+  accessibilityLabel,
+  accessibilityRole = 'button',
+  active = false,
+  children,
+  disabled = false,
+  hitSlop: _hitSlop = { bottom: 8, left: 8, right: 8, top: 8 },
+  onPress,
+}: HeaderIconButtonProps) {
+  const colors = useThemeColors();
+
+  return (
+    <PressableScale
+      accessibilityHint={accessibilityHint}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      activeScale={0.94}
+      className="items-center justify-center rounded-full"
+      disabled={disabled || !onPress}
+      style={{
+        backgroundColor: active ? colors.primarySubtle : colors.fillQuaternary,
+        height: HEADER_ACTION_SIZE,
+        width: HEADER_ACTION_SIZE,
+      }}
+      onPress={onPress}
+    >
+      {children}
+    </PressableScale>
+  );
 }
 
 export function ScreenHeader({
@@ -54,7 +109,7 @@ export function ScreenHeader({
   const isRootHeader = !isSubScreen && headerLevel === 'root';
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
-  const useFlat = headerStyle === 'flat';
+  const useFlat = headerStyle === 'flat' || Platform.OS === 'android';
 
   const headerContent = (content: React.ReactNode) =>
     useFlat ? (
@@ -76,152 +131,216 @@ export function ScreenHeader({
 
   const subScreenContent = (
     <>
-      <View className="flex-row items-center justify-between px-5 py-3" style={{ minHeight: 64 }}>
-        <TouchableOpacity
-          accessibilityHint={t.accessibilityHintGoBack}
-          accessibilityLabel={t.accessibilityGoBack}
-          accessibilityRole="button"
-          activeOpacity={0.6}
-          className="-ml-2 h-10 items-center justify-center px-1"
-          disabled={!onPressLeft}
-          style={{ minWidth: 40 }}
-          onPress={onPressLeft}
+      <Animated.View entering={enteringSection()}>
+        <View
+          className="flex-row items-center justify-between"
+          style={{
+            minHeight: HEADER_SUB_CONTENT_HEIGHT,
+            paddingHorizontal: HEADER_SIDE_PADDING,
+            paddingVertical: tokens.spacing.sm + 4,
+          }}
         >
-          {leftElement}
-        </TouchableOpacity>
-
-        <View className="ml-1 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
-          {titleIcon ? (
-            <View className="mr-2.5 h-[28px] w-[28px] items-center justify-center">
-              {titleIcon}
-            </View>
-          ) : null}
-          <Text
-            className="flex-1 text-[22px] font-semibold tracking-tighter"
-            numberOfLines={1}
-            style={{ color: colors.foreground }}
-          >
-            {title}
-          </Text>
-        </View>
-
-        {rightActions ? (
-          <View style={{ minWidth: 40 }}>{rightActions}</View>
-        ) : rightElement ? (
-          <TouchableOpacity
-            accessibilityHint={rightAccessibilityHint}
-            accessibilityLabel={rightAccessibilityLabel}
+          <PressableScale
+            accessibilityHint={t.accessibilityHintGoBack}
+            accessibilityLabel={t.accessibilityGoBack}
             accessibilityRole="button"
-            activeOpacity={0.6}
-            className="-mr-2 h-10 items-end justify-center px-1"
-            disabled={!onPressRight}
-            style={{ minWidth: 40 }}
-            onPress={onPressRight}
+            activeScale={0.94}
+            className="-ml-2 items-center justify-center rounded-full"
+            disabled={!onPressLeft}
+            style={{ height: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE }}
+            onPress={onPressLeft}
           >
-            {rightElement}
-          </TouchableOpacity>
-        ) : (
-          <View style={{ minWidth: 40 }} />
-        )}
-      </View>
+            {leftElement}
+          </PressableScale>
+
+          <View
+            className="ml-1 flex-1 flex-row items-center"
+            style={{ minHeight: HEADER_TITLE_SIZE + tokens.spacing.sm }}
+          >
+            {titleIcon ? (
+              <View
+                className="mr-2.5 items-center justify-center"
+                style={{ height: HEADER_TITLE_ICON_BOX_SIZE, width: HEADER_TITLE_ICON_BOX_SIZE }}
+              >
+                {titleIcon}
+              </View>
+            ) : null}
+            <Text
+              className="flex-1 font-semibold tracking-tighter"
+              numberOfLines={1}
+              style={{ color: colors.foreground, fontSize: HEADER_TITLE_SIZE }}
+            >
+              {title}
+            </Text>
+          </View>
+
+          {rightActions ? (
+            <View style={{ minWidth: HEADER_ACTION_SIZE }}>{rightActions}</View>
+          ) : rightElement ? (
+            <PressableScale
+              accessibilityHint={rightAccessibilityHint}
+              accessibilityLabel={rightAccessibilityLabel}
+              accessibilityRole="button"
+              activeScale={0.94}
+              className="-mr-2 items-end justify-center rounded-full"
+              disabled={!onPressRight}
+              style={{ height: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE }}
+              onPress={onPressRight}
+            >
+              {rightElement}
+            </PressableScale>
+          ) : (
+            <View style={{ minWidth: HEADER_ACTION_SIZE }} />
+          )}
+        </View>
+      </Animated.View>
       {children}
     </>
   );
 
   const rootScreenContent = (
     <>
-      <View className="px-6 pt-5 pb-5" style={{ minHeight: 48 }}>
-        <View className="flex-row items-center justify-between" style={{ minHeight: 48 }}>
-          <View className="mr-4 flex-1 justify-center">
-            {titleNode ? (
-              <View className="flex-1 justify-center">{titleNode}</View>
-            ) : (
-              <Text
-                className="text-[34px] font-bold leading-[38px] tracking-tight"
-                numberOfLines={1}
-                style={{ color: colors.foreground }}
-              >
-                {title}
-              </Text>
-            )}
-          </View>
-          {rightActions ? (
-            <View className="flex-row items-center justify-end" style={{ minWidth: 40 }}>
-              {rightActions}
+      <Animated.View entering={enteringSection()}>
+        <View
+          style={{
+            minHeight: HEADER_CONTENT_HEIGHT,
+            paddingBottom: tokens.spacing.md,
+            paddingHorizontal: HEADER_ROOT_HORIZONTAL_PADDING,
+            paddingTop: tokens.spacing.md + tokens.spacing.xs,
+          }}
+        >
+          <View
+            className="flex-row items-center justify-between"
+            style={{ minHeight: HEADER_CONTENT_HEIGHT }}
+          >
+            <View className="mr-4 flex-1 justify-center">
+              {titleNode ? (
+                <View className="flex-1 justify-center">{titleNode}</View>
+              ) : (
+                <View className="flex-row items-center">
+                  {titleIcon ? (
+                    <View
+                      className="mr-3 items-center justify-center"
+                      style={{
+                        height: HEADER_TITLE_ICON_BOX_SIZE,
+                        width: HEADER_TITLE_ICON_BOX_SIZE,
+                      }}
+                    >
+                      {titleIcon}
+                    </View>
+                  ) : null}
+                  <Text
+                    className="flex-1 font-bold tracking-tight"
+                    numberOfLines={1}
+                    style={{
+                      color: colors.foreground,
+                      fontSize: HEADER_DISPLAY_SIZE,
+                      lineHeight: HEADER_DISPLAY_SIZE + tokens.spacing.xs,
+                    }}
+                  >
+                    {title}
+                  </Text>
+                </View>
+              )}
             </View>
-          ) : rightElement ? (
-            <TouchableOpacity
-              accessibilityHint={rightAccessibilityHint}
-              accessibilityLabel={rightAccessibilityLabel}
-              accessibilityRole="button"
-              activeOpacity={0.6}
-              className="-mr-2 h-10 w-10 items-center justify-center"
-              disabled={!onPressRight}
-              onPress={onPressRight}
-            >
-              {rightElement}
-            </TouchableOpacity>
-          ) : null}
+            {rightActions ? (
+              <View
+                className="flex-row items-center justify-end"
+                style={{ minWidth: HEADER_ACTION_SIZE }}
+              >
+                {rightActions}
+              </View>
+            ) : rightElement ? (
+              <PressableScale
+                accessibilityHint={rightAccessibilityHint}
+                accessibilityLabel={rightAccessibilityLabel}
+                accessibilityRole="button"
+                activeScale={0.94}
+                className="-mr-2 items-center justify-center rounded-full"
+                disabled={!onPressRight}
+                style={{ height: HEADER_ACTION_SIZE, width: HEADER_ACTION_SIZE }}
+                onPress={onPressRight}
+              >
+                {rightElement}
+              </PressableScale>
+            ) : null}
+          </View>
         </View>
-      </View>
+      </Animated.View>
       {children}
     </>
   );
 
   const mainScreenContent = (
     <>
-      <View className="px-5 pt-3 pb-2" style={{ minHeight: 56 }}>
-        <View className="flex-row items-center justify-between">
-          <View className="mr-3 flex-1 flex-row items-center" style={{ minHeight: 34 }}>
-            {leftActions ? (
-              <View className="mr-2.5 flex-row items-center justify-center">{leftActions}</View>
-            ) : null}
-            {titleIcon ? (
-              <View className="mr-2.5 h-[28px] w-[28px] items-center justify-center">
-                {titleIcon}
-              </View>
-            ) : null}
-            {titleNode ? (
-              <View className="flex-1 justify-center">{titleNode}</View>
-            ) : (
-              <View className="flex-1 justify-center">
-                <Text
-                  className="text-[22px] font-semibold tracking-tighter"
-                  style={{ color: colors.foreground }}
-                >
-                  {title}
-                </Text>
-                {subtitle ? (
-                  <Text
-                    className="mt-0.5 text-[12px] font-medium"
-                    numberOfLines={1}
-                    style={{ color: colors.muted }}
-                  >
-                    {subtitle}
-                  </Text>
-                ) : null}
-              </View>
-            )}
-          </View>
-          {rightActions ? (
-            <View className="flex-row items-center justify-end" style={{ minWidth: 40 }}>
-              {rightActions}
-            </View>
-          ) : rightElement ? (
-            <TouchableOpacity
-              accessibilityHint={rightAccessibilityHint}
-              accessibilityLabel={rightAccessibilityLabel}
-              accessibilityRole="button"
-              activeOpacity={0.6}
-              className="w-10 h-10 items-center justify-center -mr-2"
-              disabled={!onPressRight}
-              onPress={onPressRight}
+      <Animated.View entering={enteringSection()}>
+        <View
+          style={{
+            minHeight: HEADER_CONTENT_HEIGHT,
+            paddingBottom: tokens.spacing.sm,
+            paddingHorizontal: HEADER_SIDE_PADDING,
+            paddingTop: tokens.spacing.sm + 4,
+          }}
+        >
+          <View className="flex-row items-center justify-between">
+            <View
+              className="mr-3 flex-1 flex-row items-center"
+              style={{ minHeight: HEADER_TITLE_SIZE + tokens.spacing.sm }}
             >
-              {rightElement}
-            </TouchableOpacity>
-          ) : null}
+              {leftActions ? (
+                <View className="mr-2.5 flex-row items-center justify-center">{leftActions}</View>
+              ) : null}
+              {titleIcon ? (
+                <View
+                  className="mr-2.5 items-center justify-center"
+                  style={{ height: HEADER_TITLE_ICON_BOX_SIZE, width: HEADER_TITLE_ICON_BOX_SIZE }}
+                >
+                  {titleIcon}
+                </View>
+              ) : null}
+              {titleNode ? (
+                <View className="flex-1 justify-center">{titleNode}</View>
+              ) : (
+                <View className="flex-1 justify-center">
+                  <Text
+                    className="font-semibold tracking-tighter"
+                    style={{ color: colors.foreground, fontSize: HEADER_TITLE_SIZE }}
+                  >
+                    {title}
+                  </Text>
+                  {subtitle ? (
+                    <Text
+                      className="mt-0.5 font-medium"
+                      numberOfLines={1}
+                      style={{ color: colors.muted, fontSize: HEADER_META_SIZE }}
+                    >
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+            </View>
+            {rightActions ? (
+              <View className="flex-row items-center justify-end" style={{ minWidth: 40 }}>
+                {rightActions}
+              </View>
+            ) : rightElement ? (
+              <PressableScale
+                accessibilityHint={rightAccessibilityHint}
+                accessibilityLabel={rightAccessibilityLabel}
+                accessibilityRole="button"
+                activeScale={0.94}
+                className="-mr-2 items-center justify-center rounded-full"
+                disabled={!onPressRight}
+                style={{ height: HEADER_ACTION_SIZE, width: HEADER_ACTION_SIZE }}
+                onPress={onPressRight}
+              >
+                {rightElement}
+              </PressableScale>
+            ) : null}
+          </View>
         </View>
-      </View>
+      </Animated.View>
       {children}
     </>
   );

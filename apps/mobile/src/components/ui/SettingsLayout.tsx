@@ -5,9 +5,10 @@
 import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { useThemeColors } from '../../theme/colors';
+import { enteringSection } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
 
 export interface SettingsRowProps {
@@ -41,7 +42,10 @@ export function SettingsRow({
       <View className="flex-1">
         <Text className="text-foreground text-[15.5px] font-medium tracking-tight">{label}</Text>
         {subtitle && (
-          <Text className="mt-0.5 text-[12.5px] font-medium" style={{ color: colors.secondaryText }}>
+          <Text
+            className="mt-0.5 text-[12.5px] font-medium"
+            style={{ color: colors.secondaryText }}
+          >
             {subtitle}
           </Text>
         )}
@@ -58,7 +62,14 @@ export function SettingsRow({
 
   if (!onPress) {
     return (
-      <View className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02]">
+      <View
+        className="mb-2 flex-row items-center rounded-xl px-5 py-3.5"
+        style={{
+          backgroundColor: colors.fillQuaternary,
+          borderColor: colors.borderSubtle,
+          borderWidth: 1,
+        }}
+      >
         {content}
       </View>
     );
@@ -66,8 +77,13 @@ export function SettingsRow({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.6}
-      className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
+      activeOpacity={0.72}
+      className="mb-2 flex-row items-center rounded-xl px-5 py-3.5"
+      style={{
+        backgroundColor: colors.fillQuaternary,
+        borderColor: colors.borderSubtle,
+        borderWidth: 1,
+      }}
       onPress={onPress}
     >
       {content}
@@ -84,7 +100,7 @@ export interface SettingsSectionProps {
 export function SettingsSection({ children, delay = 0, title }: SettingsSectionProps) {
   const colors = useThemeColors();
   return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(300)}>
+    <Animated.View entering={enteringSection(delay)}>
       <View className="mb-5 px-5">
         <Text
           className="mb-2 px-2 text-[13px] font-semibold tracking-tight"

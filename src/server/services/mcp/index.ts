@@ -53,6 +53,29 @@ export class MCPService {
   // Store instances of the custom MCPClient, keyed by serialized MCPClientParams
   private clients: Map<string, MCPClient> = new Map();
 
+  private invalidateClient = async (params: MCPClientParams) => {
+    const key = this.serializeParams(params);
+    const client = this.clients.get(key);
+
+    this.clients.delete(key);
+
+    if (!client) return;
+
+    try {
+      await client.disconnect();
+    } catch (error) {
+      log('Failed to disconnect invalidated MCP client: %O', error);
+    }
+  };
+
+  private isRetryableSessionError = (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+
+    return (
+      error.message.includes('NoValidSessionId') || error.message.includes('Server not initialized')
+    );
+  };
+
   /**
    * Process MCP tool call result with content blocks processing
    * This is a common utility method that can be used by both internal MCP calls and external services (e.g., Klavis)
@@ -114,8 +137,7 @@ export class MCPService {
             parameters: item.inputSchema as PluginSchema,
           }));
         } catch (error) {
-          // Only retry for NoValidSessionId errors
-          if ((error as Error).message !== 'NoValidSessionId') {
+          if (!this.isRetryableSessionError(error)) {
             console.error(`Error listing tools for params %O:`, loggableParams, error);
             bail(
               new TRPCError({
@@ -126,6 +148,8 @@ export class MCPService {
             );
             return []; // This line will never be reached due to bail, but needed for type safety
           }
+
+          await this.invalidateClient(params);
           throw error; // Rethrow to trigger retry
         }
       },

@@ -23,7 +23,6 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  Dimensions,
   Image as RNImage,
   Keyboard,
   Platform,
@@ -40,6 +39,8 @@ import Animated, {
   FadeOut,
   SlideInRight,
   SlideOutRight,
+  useAnimatedKeyboard,
+  useAnimatedStyle,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,6 +53,7 @@ import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
 import { useArtworkStore } from '../store/artwork';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
@@ -177,6 +179,23 @@ function getGenerationPreviewSources(generation: GenerationItem) {
     generation.asset?.url,
     generation.asset?.originalUrl,
   ].filter((url, index, list): url is string => Boolean(url) && list.indexOf(url) === index);
+}
+
+function isGenerationRenderable(generation: GenerationItem) {
+  return getGenerationPreviewSources(generation).length > 0;
+}
+
+function isGenerationDisplaySuccess(generation: GenerationItem) {
+  const status = normalizeGenerationTaskStatus(generation.task?.status);
+
+  // The backend persists asset/file metadata before flipping asyncTask to success.
+  // If the preview is already available, treat it as completed for display/polling.
+  return status === 'success' || (status !== 'error' && isGenerationRenderable(generation));
+}
+
+function isGenerationPending(generation: GenerationItem) {
+  const status = normalizeGenerationTaskStatus(generation.task?.status);
+  return !!generation.asyncTaskId && status !== 'error' && !isGenerationDisplaySuccess(generation);
 }
 
 function applyRatioToDimensions(ratio: string, base = 1024) {
@@ -429,10 +448,14 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Main Screen ──────────────────────────────────────────────────────
 interface ArtworkScreenProps {
+  configOpenVersion?: number;
   hideHeader?: boolean;
 }
 
-export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps) {
+export default function ArtworkScreen({
+  configOpenVersion = 0,
+  hideHeader = false,
+}: ArtworkScreenProps) {
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
@@ -457,7 +480,21 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const [showPicker, setShowPicker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const composerTranslateY = Platform.OS === 'ios' ? -keyboardOffset : 0;
+  const animatedKeyboard = useAnimatedKeyboard();
+  const composerLiftStyle = useAnimatedStyle(() => {
+    const lift =
+      Platform.OS === 'android'
+        ? Math.max(
+            0,
+            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
+          )
+        : keyboardOffset;
+
+    return {
+      transform: [{ translateY: -lift }],
+    };
+  }, [insets.bottom, keyboardOffset]);
+  const composerActive = keyboardOffset > 0 || Boolean(prompt.trim()) || generating;
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
 
   // Generation state — topicId only for createImage + polling (ephemeral, not persisted)
@@ -472,6 +509,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const canPollRef = useRef(isScreenFocused && isAppActive);
   const hasHydratedRef = useRef(false);
   const hasRestoredConfigRef = useRef(false);
+  const lastConfigOpenVersionRef = useRef(configOpenVersion);
   const configRef = useRef({
     generationParams: { prompt: '' } as ImageGenerationParams,
     imgCount: 2,
@@ -505,6 +543,18 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
     },
     [],
   );
+
+  const openSidebar = useCallback(() => {
+    haptics.selection();
+    setShowSidebar(true);
+  }, []);
+
+  useEffect(() => {
+    if (configOpenVersion <= lastConfigOpenVersionRef.current) return;
+
+    lastConfigOpenVersionRef.current = configOpenVersion;
+    openSidebar();
+  }, [configOpenVersion, openSidebar]);
 
   // ── Load image models ──
   const loadModels = useCallback(
@@ -695,11 +745,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const inputPaddingBottom = Math.max(insets.bottom, 8);
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
-      const coords = event?.endCoordinates;
-      const windowHeight = Dimensions.get('window').height;
-      const screenY = Number(coords?.screenY ?? windowHeight);
-      const offsetFromBottom = windowHeight - screenY;
-      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom : 0);
+      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
     };
     const handleKeyboardHide = () => {
       setKeyboardOffset(0);
@@ -711,9 +757,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
             Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
             Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
             Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              const windowHeight = Dimensions.get('window').height;
-              const screenY = Number(event?.endCoordinates?.screenY ?? windowHeight);
-              if (screenY >= windowHeight - 1) {
+              if (getKeyboardOffset(event, insets.bottom) <= 0) {
                 handleKeyboardHide();
               } else {
                 handleKeyboardShow(event);
@@ -730,7 +774,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
         subscription.remove();
       }
     };
-  }, [inputPaddingBottom]);
+  }, [insets.bottom]);
 
   // ── Pick reference images ──
   const handlePickRef = useCallback(async () => {
@@ -767,12 +811,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
 
       stopPolling();
       const pendingGenerationIds = new Set(
-        batchGenerations
-          .filter((g) => {
-            const status = normalizeGenerationTaskStatus(g.task?.status);
-            return g.asyncTaskId && status !== 'success' && status !== 'error';
-          })
-          .map((g) => g.id),
+        batchGenerations.filter((generation) => isGenerationPending(generation)).map((g) => g.id),
       );
       if (pendingGenerationIds.size === 0) return;
 
@@ -792,19 +831,19 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
 
           const remoteBatch = (latestBatches || []).find((b) => b.id === batchId);
           if (remoteBatch) {
-            updateBatch(batchId, () => remoteBatch);
+            updateBatch(batchId, (currentBatch) => ({
+              ...currentBatch,
+              ...remoteBatch,
+              generationTopicId: currentBatch.generationTopicId,
+            }));
           }
 
           const latestPending = (latestBatches || [])
             .flatMap((batch) => batch.generations)
-            .filter((generation) => {
-              const status = normalizeGenerationTaskStatus(generation.task?.status);
-              return (
-                pendingGenerationIds.has(generation.id) &&
-                status !== 'success' &&
-                status !== 'error'
-              );
-            });
+            .filter(
+              (generation) =>
+                pendingGenerationIds.has(generation.id) && isGenerationPending(generation),
+            );
 
           const allDone = latestPending.length === 0;
           if (allDone || attempt >= ARTWORK_POLL_MAX_ATTEMPTS) {
@@ -830,18 +869,34 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
     [fetchBatchesFromRemote, stopPolling, updateBatch],
   );
 
-  const pollableBatch = useMemo(() => {
-    if (!topicId) return null;
+  const pollableBatch = useMemo<{ batch: GenerationBatch; topicId: string } | null>(() => {
+    const fallbackTopicId =
+      topicId ??
+      [...batches]
+        .reverse()
+        .find(
+          (batch) =>
+            batch.generationTopicId &&
+            batch.generations.some((generation) => isGenerationPending(generation)),
+        )?.generationTopicId ??
+      null;
+
+    if (!fallbackTopicId) return null;
 
     for (let index = batches.length - 1; index >= 0; index -= 1) {
       const batch = batches[index];
-      if (batch.generationTopicId !== topicId) continue;
+      const batchTopicId: string = batch.generationTopicId ?? fallbackTopicId;
+      if (batchTopicId !== fallbackTopicId) continue;
 
       const hasPending = batch.generations.some((generation) => {
-        const status = normalizeGenerationTaskStatus(generation.task?.status);
-        return !!generation.asyncTaskId && status !== 'success' && status !== 'error';
+        return isGenerationPending(generation);
       });
-      if (hasPending) return batch;
+      if (hasPending) {
+        return {
+          batch,
+          topicId: batchTopicId,
+        };
+      }
     }
 
     return null;
@@ -850,22 +905,23 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
   const pollableBatchSignature = useMemo(() => {
     if (!pollableBatch) return '';
 
-    return pollableBatch.generations
-      .filter((generation) => {
-        const status = normalizeGenerationTaskStatus(generation.task?.status);
-        return !!generation.asyncTaskId && status !== 'success' && status !== 'error';
-      })
-      .map((generation) => `${generation.id}:${normalizeGenerationTaskStatus(generation.task?.status)}`)
+    return pollableBatch.batch.generations
+      .filter((generation) => isGenerationPending(generation))
+      .map(
+        (generation) =>
+          `${generation.id}:${normalizeGenerationTaskStatus(generation.task?.status)}`,
+      )
       .sort()
       .join('|');
   }, [pollableBatch]);
 
-  const pollableBatchId = pollableBatch?.id ?? null;
-  const pollableGenerations = pollableBatch?.generations ?? null;
+  const pollableTopicId = pollableBatch?.topicId ?? null;
+  const pollableBatchId = pollableBatch?.batch.id ?? null;
+  const pollableGenerations = pollableBatch?.batch.generations ?? null;
 
   useEffect(() => {
     if (
-      !topicId ||
+      !pollableTopicId ||
       !pollableBatchId ||
       !pollableGenerations ||
       !pollableBatchSignature ||
@@ -876,7 +932,7 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
       return;
     }
 
-    startPolling(topicId, pollableBatchId, pollableGenerations);
+    startPolling(pollableTopicId, pollableBatchId, pollableGenerations);
 
     return stopPolling;
   }, [
@@ -885,9 +941,9 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
     pollableGenerations,
     pollableBatchId,
     pollableBatchSignature,
+    pollableTopicId,
     startPolling,
     stopPolling,
-    topicId,
   ]);
 
   // ── Generate ──
@@ -1064,14 +1120,13 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
         />
       ) : null}
 
-      <CreateConfigBar
-        label={modelName || t.artworkSelectModel}
-        summary={summaryParts.join(' · ')}
-        onPress={() => {
-          haptics.selection();
-          setShowSidebar(true);
-        }}
-      />
+      {!hideHeader ? (
+        <CreateConfigBar
+          label={modelName || t.artworkSelectModel}
+          summary={summaryParts.join(' · ')}
+          onPress={openSidebar}
+        />
+      ) : null}
 
       {/* ── Generation Feed ── */}
       <ScrollView
@@ -1149,12 +1204,9 @@ export default function ArtworkScreen({ hideHeader = false }: ArtworkScreenProps
       {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
       <Animated.View
         className="px-4 pt-1"
-        style={{
-          paddingBottom: Math.max(insets.bottom, 8),
-          transform: [{ translateY: composerTranslateY }],
-        }}
+        style={[{ paddingBottom: inputPaddingBottom }, composerLiftStyle]}
       >
-        <ComposerShell active={keyboardOffset > 0}>
+        <ComposerShell active={composerActive}>
           <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
             <TextInput
               multiline
@@ -1794,8 +1846,7 @@ function BatchCard({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }}>
         {batch.generations.map((gen) => {
           const status = normalizeGenerationTaskStatus(gen.task.status);
-          const hasPreview = getGenerationPreviewSources(gen).length > 0;
-          const isDone = status === 'success' && hasPreview;
+          const isDone = isGenerationDisplaySuccess(gen);
           const isErr = status === 'error';
           return (
             <View

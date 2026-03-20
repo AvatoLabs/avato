@@ -95,8 +95,8 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     }
 
     #${TOGGLE_BUTTON_ID} {
-      width: 0 !important;
-      opacity: 0;
+      width: 32px !important;
+      opacity: 0.72;
       transition:
         opacity,
         width 0.2s ${cssVar.motionEaseOut};
@@ -110,7 +110,7 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
         width 0.2s ${cssVar.motionEaseOut};
     }
     #${BACK_BUTTON_ID} {
-      width: 24px !important;
+      width: 32px !important;
     }
 
     &:hover {

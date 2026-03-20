@@ -1,3 +1,4 @@
+import { useDebounce } from 'ahooks';
 import { memo, useMemo } from 'react';
 
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -9,15 +10,18 @@ import { LobeSessionType } from '@/types/session';
 import SkeletonList from '../SkeletonList';
 import SessionList from './List';
 
+const SESSION_SEARCH_DEBOUNCE = 250;
+
 const SearchMode = memo(() => {
   const [sessionSearchKeywords, useSearchSessions] = useSessionStore((s) => [
     s.sessionSearchKeywords,
     s.useSearchSessions,
   ]);
+  const debouncedKeywords = useDebounce(sessionSearchKeywords, { wait: SESSION_SEARCH_DEBOUNCE });
 
   const isMobile = useServerConfigStore(serverConfigSelectors.isMobile);
 
-  const { data, isLoading } = useSearchSessions(sessionSearchKeywords);
+  const { data, isLoading } = useSearchSessions(debouncedKeywords);
 
   const filteredData = useMemo(() => {
     if (!data) return data;
@@ -32,7 +36,7 @@ const SearchMode = memo(() => {
     );
   }, [data, isMobile]);
 
-  return isLoading ? (
+  return isLoading || sessionSearchKeywords !== debouncedKeywords ? (
     <SkeletonList />
   ) : (
     <SessionList dataSource={filteredData} showAddButton={false} />

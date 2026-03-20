@@ -5,6 +5,7 @@ import {
   type IThreadType,
   type ThreadItem,
   type UIChatMessage,
+  type UpdateThreadParams,
 } from '@lobechat/types';
 import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
@@ -213,7 +214,7 @@ export class ChatThreadActionImpl {
     );
   };
 
-  internal_updateThread = async (id: string, data: Partial<ThreadItem>): Promise<void> => {
+  internal_updateThread = async (id: string, data: UpdateThreadParams): Promise<void> => {
     this.#get().internal_dispatchThread({ type: 'updateThread', id, value: data });
 
     this.#get().internal_updateThreadLoading(id, true);

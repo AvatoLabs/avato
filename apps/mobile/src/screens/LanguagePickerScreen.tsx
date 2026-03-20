@@ -20,18 +20,20 @@ export default function LanguagePickerScreen({ navigation }: any) {
   const { locale, setLocale, t } = useI18n();
   const colors = useThemeColors();
 
-  const handleSelect = async (code: Locale) => {
-    await setLocale(code);
+  const handleSelect = (code: Locale) => {
+    if (code !== locale) {
+      void setLocale(code);
+    }
     setTimeout(() => navigation.goBack(), 150);
   };
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t.languageTitle}
         leftElement={
           <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
         }
-        title={t.languageTitle}
         onPressLeft={() => navigation.goBack()}
       />
 

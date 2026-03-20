@@ -40,22 +40,42 @@ const DefaultMode = memo(() => {
     session.type === LobeSessionType.Agent &&
     Boolean((session as LobeAgentSession).config?.virtual);
 
-  const filterSessionsForView = (sessions: LobeSessions): LobeSessions => {
+  const filteredDefaultSessions = useMemo(() => {
     const filteredForDevice = isMobile
-      ? sessions.filter((session) => session.type !== LobeSessionType.Group)
-      : sessions;
+      ? defaultSessions.filter((session) => session.type !== LobeSessionType.Group)
+      : defaultSessions;
 
     if (isMobile) return filteredForDevice;
 
     return filteredForDevice.filter((session) => !shouldHideSession(session));
-  };
+  }, [defaultSessions, isMobile]);
 
-  const filteredDefaultSessions = filterSessionsForView(defaultSessions);
-  const filteredPinnedSessions = filterSessionsForView(pinnedSessions);
-  const filteredCustomSessionGroups = customSessionGroups?.map((group) => ({
-    ...group,
-    children: filterSessionsForView(group.children),
-  }));
+  const filteredPinnedSessions = useMemo(() => {
+    const filteredForDevice = isMobile
+      ? pinnedSessions.filter((session) => session.type !== LobeSessionType.Group)
+      : pinnedSessions;
+
+    if (isMobile) return filteredForDevice;
+
+    return filteredForDevice.filter((session) => !shouldHideSession(session));
+  }, [pinnedSessions, isMobile]);
+
+  const filteredCustomSessionGroups = useMemo(
+    () =>
+      customSessionGroups?.map((group) => {
+        const filteredForDevice = isMobile
+          ? group.children.filter((session) => session.type !== LobeSessionType.Group)
+          : group.children;
+
+        return {
+          ...group,
+          children: isMobile
+            ? filteredForDevice
+            : filteredForDevice.filter((session) => !shouldHideSession(session)),
+        };
+      }),
+    [customSessionGroups, isMobile],
+  );
 
   const [sessionGroupKeys, updateSystemStatus] = useGlobalStore((s) => [
     systemStatusSelectors.sessionGroupKeys(s),

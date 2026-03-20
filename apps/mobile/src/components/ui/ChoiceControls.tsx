@@ -37,6 +37,15 @@ interface SelectionBadgeProps {
   selected: boolean;
 }
 
+const CONTROL_ICON_SIZE = tokens.icon.size.sm - 1;
+const SEGMENTED_CONTROL_PADDING = 3;
+const SEGMENTED_HORIZONTAL_PADDING = tokens.spacing.sm + 4;
+const SEGMENTED_LABEL_SIZE = tokens.typography.mobile.body - 2;
+const FILTER_CHIP_LABEL_SIZE = tokens.typography.mobile.meta;
+const META_TAG_LABEL_SIZE = tokens.typography.mobile.meta;
+const SELECTION_BADGE_SIZE = 20;
+const SELECTION_BADGE_ICON_SIZE = tokens.typography.mobile.meta;
+
 export function SegmentedControl<T extends string>({
   items,
   onChange,
@@ -46,10 +55,11 @@ export function SegmentedControl<T extends string>({
 
   return (
     <View
-      className="flex-row rounded-full p-1"
+      className="flex-row rounded-full"
       style={{
         backgroundColor: colors.fillTertiary,
         minHeight: tokens.mobile.heights.segmentedControl,
+        padding: SEGMENTED_CONTROL_PADDING,
       }}
     >
       {items.map((item) => {
@@ -60,11 +70,12 @@ export function SegmentedControl<T extends string>({
           <TouchableOpacity
             accessibilityRole="button"
             activeOpacity={0.82}
-            className="flex-1 flex-row items-center justify-center rounded-full px-4"
+            className="flex-1 flex-row items-center justify-center rounded-full"
             key={item.value}
             style={{
               backgroundColor: active ? colors.primary : 'transparent',
-              minHeight: tokens.mobile.heights.segmentedControl - 8,
+              minHeight: tokens.mobile.heights.segmentedControl - SEGMENTED_CONTROL_PADDING * 2,
+              paddingHorizontal: SEGMENTED_HORIZONTAL_PADDING,
             }}
             onPress={() => {
               if (active) return;
@@ -75,13 +86,16 @@ export function SegmentedControl<T extends string>({
             {Icon ? (
               <Icon
                 color={active ? colors.iconOnPrimary : colors.secondaryText}
-                size={16}
+                size={CONTROL_ICON_SIZE}
                 strokeWidth={tokens.icon.strokeWidth}
               />
             ) : null}
             <Text
-              className={Icon ? 'ml-1.5 text-[14px] font-semibold' : 'text-[14px] font-semibold'}
-              style={{ color: active ? colors.iconOnPrimary : colors.foreground }}
+              className={Icon ? 'ml-1 font-semibold' : 'font-semibold'}
+              style={{
+                color: active ? colors.iconOnPrimary : colors.foreground,
+                fontSize: SEGMENTED_LABEL_SIZE,
+              }}
             >
               {item.label}
             </Text>
@@ -92,13 +106,7 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-export function FilterChip({
-  active = false,
-  count,
-  icon,
-  label,
-  ...props
-}: FilterChipProps) {
+export function FilterChip({ active = false, count, icon, label, ...props }: FilterChipProps) {
   const colors = useThemeColors();
   const activeBackgroundColor = active ? colors.primaryMuted : colors.fillTertiary;
   const textColor = active ? colors.primary : colors.muted;
@@ -107,7 +115,7 @@ export function FilterChip({
     <TouchableOpacity
       accessibilityRole="button"
       activeOpacity={0.72}
-      className="flex-row items-center justify-center rounded-full px-4"
+      className="flex-row items-center justify-center rounded-full px-3"
       style={{
         backgroundColor: activeBackgroundColor,
         borderColor: active ? colors.primaryBorder : 'transparent',
@@ -116,8 +124,11 @@ export function FilterChip({
       }}
       {...props}
     >
-      {icon ? <View className="mr-1.5">{icon}</View> : null}
-      <Text className="text-[13px] font-semibold" style={{ color: textColor }}>
+      {icon ? <View className="mr-1">{icon}</View> : null}
+      <Text
+        className="font-semibold"
+        style={{ color: textColor, fontSize: FILTER_CHIP_LABEL_SIZE }}
+      >
         {label}
         {count !== undefined && count !== null && count !== '' ? ` ${count}` : ''}
       </Text>
@@ -158,7 +169,10 @@ export function MetaTag({
       }}
     >
       {icon ? <View className="mr-1">{icon}</View> : null}
-      <Text className="text-[11px] font-semibold" style={{ color: resolvedTextColor }}>
+      <Text
+        className="font-semibold"
+        style={{ color: resolvedTextColor, fontSize: META_TAG_LABEL_SIZE }}
+      >
         {label}
       </Text>
     </View>
@@ -170,13 +184,21 @@ export function SelectionBadge({ selected }: SelectionBadgeProps) {
 
   return (
     <View
-      className="h-5 w-5 items-center justify-center rounded-full border-2"
+      className="items-center justify-center rounded-full border"
       style={{
-        backgroundColor: selected ? colors.primaryMuted : colors.background,
-        borderColor: selected ? colors.primary : colors.muted,
+        backgroundColor: selected ? colors.primarySubtle : colors.fillQuaternary,
+        borderColor: selected ? colors.primaryBorder : colors.borderSubtle,
+        height: SELECTION_BADGE_SIZE,
+        width: SELECTION_BADGE_SIZE,
       }}
     >
-      {selected ? <Check color={colors.primary} size={11} strokeWidth={2.6} /> : null}
+      {selected ? (
+        <Check
+          color={colors.primary}
+          size={SELECTION_BADGE_ICON_SIZE}
+          strokeWidth={tokens.icon.strokeWidth + 0.5}
+        />
+      ) : null}
     </View>
   );
 }

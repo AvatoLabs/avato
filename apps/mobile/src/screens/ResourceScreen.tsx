@@ -68,16 +68,10 @@ import { FilterChip, SelectionBadge } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import PromptModal from '../components/ui/PromptModal';
-import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
-import {
-  fileApi,
-  type FolderCrumb,
-  getApiUrl,
-  knowledgeBaseApi,
-  resourceApi,
-} from '../lib/api';
+import { fileApi, type FolderCrumb, getApiUrl, knowledgeBaseApi, resourceApi } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -118,11 +112,14 @@ function sortFileList(
   locale?: string,
 ): FileListItem[] {
   const sorted = [...list];
-  const collator = new Intl.Collator(locale ? [locale, 'zh-Hans-CN', 'en-US'] : ['zh-Hans-CN', 'en-US'], {
-    numeric: true,
-    sensitivity: 'base',
-    usage: 'sort',
-  });
+  const collator = new Intl.Collator(
+    locale ? [locale, 'zh-Hans-CN', 'en-US'] : ['zh-Hans-CN', 'en-US'],
+    {
+      numeric: true,
+      sensitivity: 'base',
+      usage: 'sort',
+    },
+  );
   sorted.sort((a, b) => {
     let cmp: number;
     switch (sorter) {
@@ -289,12 +286,10 @@ const renderMarkdownTextSegment = (segment: string) => {
   const blocks: string[] = [];
   let paragraph: string[] = [];
   let blockquote: string[] = [];
-  let list:
-    | {
-        items: string[];
-        ordered: boolean;
-      }
-    | null = null;
+  let list: {
+    items: string[];
+    ordered: boolean;
+  } | null = null;
 
   const flushParagraph = () => {
     if (paragraph.length === 0) return;
@@ -304,7 +299,9 @@ const renderMarkdownTextSegment = (segment: string) => {
 
   const flushBlockquote = () => {
     if (blockquote.length === 0) return;
-    blocks.push(`<blockquote>${blockquote.map((item) => renderMarkdownInline(item)).join('<br />')}</blockquote>`);
+    blocks.push(
+      `<blockquote>${blockquote.map((item) => renderMarkdownInline(item)).join('<br />')}</blockquote>`,
+    );
     blockquote = [];
   };
 
@@ -315,7 +312,9 @@ const renderMarkdownTextSegment = (segment: string) => {
     }
 
     const tag = list.ordered ? 'ol' : 'ul';
-    blocks.push(`<${tag}>${list.items.map((item) => `<li>${renderMarkdownInline(item)}</li>`).join('')}</${tag}>`);
+    blocks.push(
+      `<${tag}>${list.items.map((item) => `<li>${renderMarkdownInline(item)}</li>`).join('')}</${tag}>`,
+    );
     list = null;
   };
 
@@ -374,11 +373,7 @@ const renderMarkdownTextSegment = (segment: string) => {
       continue;
     }
 
-    if (
-      trimmed.length > 2 &&
-      ['-', '*', '+'].includes(trimmed[0] ?? '') &&
-      trimmed[1] === ' '
-    ) {
+    if (trimmed.length > 2 && ['-', '*', '+'].includes(trimmed[0] ?? '') && trimmed[1] === ' ') {
       flushParagraph();
       if (!list || list.ordered) {
         flushList();
@@ -541,7 +536,8 @@ function matchesCategory(item: FileListItem, category: FileCategory): boolean {
   if (category === 'all') return true;
   if (category === 'images') return isImage(item.fileType, item.name);
   if (category === 'documents') return isDocument(item.fileType, item.name);
-  if (category === 'others') return !isImage(item.fileType, item.name) && !isDocument(item.fileType, item.name);
+  if (category === 'others')
+    return !isImage(item.fileType, item.name) && !isDocument(item.fileType, item.name);
   return true;
 }
 
@@ -659,9 +655,7 @@ const FilePreviewModal = memo(
     const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
     const fileUrl = previewCandidates[previewIndex] || '';
     const imageFile = item ? isImage(item.fileType, item.name) : false;
-    const textFile = item
-      ? isTextLikeFile(item.fileType, item.name, item.sourceType)
-      : false;
+    const textFile = item ? isTextLikeFile(item.fileType, item.name, item.sourceType) : false;
     const pdfFile = item ? item.fileType === 'application/pdf' : false;
     // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
     const officeFile = item
@@ -921,13 +915,11 @@ const FilePreviewModal = memo(
     const handleShare = () => {
       const shareUrl = cachedEntry?.localUri || fileUrl;
       const shareMessage = (textFile && textContent ? textContent : fileUrl) || item.name;
-      void Share.share(
-        {
-          message: shareMessage,
-          title: item.name,
-          ...(shareUrl ? { url: shareUrl } : {}),
-        },
-      );
+      void Share.share({
+        message: shareMessage,
+        title: item.name,
+        ...(shareUrl ? { url: shareUrl } : {}),
+      });
     };
 
     const handleDownload = async () => {
@@ -1076,7 +1068,10 @@ const FilePreviewModal = memo(
                     {savingEdit ? (
                       <ActivityIndicator color={imageFile ? '#fff' : colors.primary} size="small" />
                     ) : (
-                      <Text className="text-[13px] font-semibold" style={{ color: imageFile ? '#fff' : colors.primary }}>
+                      <Text
+                        className="text-[13px] font-semibold"
+                        style={{ color: imageFile ? '#fff' : colors.primary }}
+                      >
                         {t.save}
                       </Text>
                     )}
@@ -1086,7 +1081,11 @@ const FilePreviewModal = memo(
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     onPress={handleStartEdit}
                   >
-                    <Pencil color={imageFile ? '#fff' : colors.primary} size={20} strokeWidth={1.8} />
+                    <Pencil
+                      color={imageFile ? '#fff' : colors.primary}
+                      size={20}
+                      strokeWidth={1.8}
+                    />
                   </TouchableOpacity>
                 )
               ) : null}
@@ -1103,7 +1102,10 @@ const FilePreviewModal = memo(
               >
                 {downloading ? (
                   <View className="min-w-[28px] items-center">
-                    <Text className="text-[11px] font-medium" style={{ color: imageFile ? '#fff' : colors.primary }}>
+                    <Text
+                      className="text-[11px] font-medium"
+                      style={{ color: imageFile ? '#fff' : colors.primary }}
+                    >
                       {downloadProgress}%
                     </Text>
                   </View>
@@ -1171,7 +1173,11 @@ const FilePreviewModal = memo(
                     {t.resourcePreviewUnavailable}
                   </Text>
                 </View>
-              ) : pdfFile && !cachedEntry?.localUri && fileUrl && !pdfDataUrl && !previewLoadFailed ? (
+              ) : pdfFile &&
+                !cachedEntry?.localUri &&
+                fileUrl &&
+                !pdfDataUrl &&
+                !previewLoadFailed ? (
                 <View
                   className="flex-1 items-center justify-center"
                   style={{ backgroundColor: colors.inputBg }}
@@ -1185,7 +1191,10 @@ const FilePreviewModal = memo(
                   </Text>
                 </View>
               ) : textFile && editingText ? (
-                <View className="flex-1 px-4 pb-6 pt-4" style={{ backgroundColor: colors.background }}>
+                <View
+                  className="flex-1 px-4 pb-6 pt-4"
+                  style={{ backgroundColor: colors.background }}
+                >
                   <TextInput
                     multiline
                     className="flex-1 rounded-3xl px-4 py-4 text-[15px]"
@@ -1282,10 +1291,16 @@ const FilePreviewModal = memo(
                 <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
                   {item.name}
                 </Text>
-                <Text className="text-[14px] text-center mb-1" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[14px] text-center mb-1"
+                  style={{ color: colors.secondaryText }}
+                >
                   {item.fileType}
                 </Text>
-                <Text className="text-[14px] text-center mb-8" style={{ color: colors.secondaryText }}>
+                <Text
+                  className="text-[14px] text-center mb-8"
+                  style={{ color: colors.secondaryText }}
+                >
                   {formatBytes(item.size)}
                   {'  ·  '}
                   {formatDate(item.createdAt)}
@@ -1297,13 +1312,26 @@ const FilePreviewModal = memo(
                 >
                   {downloading ? (
                     <>
-                      <ActivityIndicator color={colors.iconOnPrimary} size="small" style={{ marginRight: 8 }} />
-                      <Text className="text-white text-[15px] font-semibold">{downloadProgress}%</Text>
+                      <ActivityIndicator
+                        color={colors.iconOnPrimary}
+                        size="small"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text className="text-white text-[15px] font-semibold">
+                        {downloadProgress}%
+                      </Text>
                     </>
                   ) : (
                     <>
-                      <Download color={colors.iconOnPrimary} size={18} strokeWidth={2} style={{ marginRight: 8 }} />
-                      <Text className="text-white text-[15px] font-semibold">{t.resourceDownload}</Text>
+                      <Download
+                        color={colors.iconOnPrimary}
+                        size={18}
+                        strokeWidth={2}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text className="text-white text-[15px] font-semibold">
+                        {t.resourceDownload}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1398,10 +1426,14 @@ function ResourceThumbnail({
   }, [thumbnailCandidates.length, thumbnailIndex]);
 
   const usingCachedLocalThumbnail = Boolean(cachedLocalUri && !cachedUriFailed);
-  const shouldUseRemoteThumbnail = Boolean(!usingCachedLocalThumbnail && isVisible && tryDirectUrl && thumbnailUrl);
+  const shouldUseRemoteThumbnail = Boolean(
+    !usingCachedLocalThumbnail && isVisible && tryDirectUrl && thumbnailUrl,
+  );
   const remoteThumbnailSource = shouldUseRemoteThumbnail
     ? {
-        ...(remoteHeaders && Object.keys(remoteHeaders).length > 0 ? { headers: remoteHeaders } : {}),
+        ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+          ? { headers: remoteHeaders }
+          : {}),
         uri: thumbnailUrl!,
       }
     : null;
@@ -1416,10 +1448,21 @@ function ResourceThumbnail({
       return;
     }
     handleThumbnailError();
-  }, [handleDirectUrlError, handleThumbnailError, shouldUseRemoteThumbnail, usingCachedLocalThumbnail]);
+  }, [
+    handleDirectUrlError,
+    handleThumbnailError,
+    shouldUseRemoteThumbnail,
+    usingCachedLocalThumbnail,
+  ]);
 
   if (itemIsFolder) {
-    return <Folder color={colors.secondaryText} size={size * 0.54} strokeWidth={tokens.icon.strokeWidth} />;
+    return (
+      <Folder
+        color={colors.secondaryText}
+        size={size * 0.54}
+        strokeWidth={tokens.icon.strokeWidth}
+      />
+    );
   }
 
   if (remoteThumbnailSource) {
@@ -1529,7 +1572,11 @@ function FileRow({
         } else if (!onOpenActions && showFolderActions && onMoveToFolder) {
           Alert.alert(item.name, undefined, [
             { text: t.cancel, style: 'cancel' },
-            { text: t.delete, style: 'destructive', onPress: () => onDelete(item.id, item.name, false) },
+            {
+              text: t.delete,
+              style: 'destructive',
+              onPress: () => onDelete(item.id, item.name, false),
+            },
             { text: t.resourceMoveToFolder, onPress: () => onMoveToFolder(item) },
           ]);
         } else {
@@ -1566,7 +1613,9 @@ function FileRow({
           {item.name}
         </Text>
         <Text className="mt-0.5 text-[12px]" style={{ color: colors.secondaryText }}>
-          {itemIsFolder ? formatDate(item.createdAt) : `${formatBytes(item.size)}  ·  ${formatDate(item.createdAt)}`}
+          {itemIsFolder
+            ? formatDate(item.createdAt)
+            : `${formatBytes(item.size)}  ·  ${formatDate(item.createdAt)}`}
         </Text>
       </View>
 
@@ -1621,9 +1670,9 @@ export default function ResourceScreen() {
   const [createFolderName, setCreateFolderName] = useState('');
   const [moveToFolderItem, setMoveToFolderItem] = useState<FileListItem | null>(null);
   const [moveTargetFolders, setMoveTargetFolders] = useState<FileListItem[]>([]);
-  const [moveFolderStack, setMoveFolderStack] = useState<Array<{ id: string; name: string } | null>>([
-    null,
-  ]);
+  const [moveFolderStack, setMoveFolderStack] = useState<
+    Array<{ id: string; name: string } | null>
+  >([null]);
   const [sorter, setSorter] = useState<SorterType>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [hasMore, setHasMore] = useState(false);
@@ -1691,9 +1740,7 @@ export default function ResourceScreen() {
     try {
       const entries = await listResourceCacheEntries();
       setCachedResourceIds(new Set(entries.map((entry) => entry.fileId)));
-      setCachedResourceMap(
-        Object.fromEntries(entries.map((entry) => [entry.fileId, entry])),
-      );
+      setCachedResourceMap(Object.fromEntries(entries.map((entry) => [entry.fileId, entry])));
     } catch {
       setCachedResourceIds(new Set());
       setCachedResourceMap({});
@@ -1938,35 +1985,52 @@ export default function ResourceScreen() {
       {
         text: t.delete,
         style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const id of ids) {
-                const item = files.find((f) => f.id === id);
-                if (!item) continue;
-                if (item.fileType === 'custom/folder' || item.sourceType === 'document') {
-                  await resourceApi.deleteDocument(id);
-                } else {
-                  await fileApi.remove(id);
-                }
+        onPress: async () => {
+          try {
+            for (const id of ids) {
+              const item = files.find((f) => f.id === id);
+              if (!item) continue;
+              if (item.fileType === 'custom/folder' || item.sourceType === 'document') {
+                await resourceApi.deleteDocument(id);
+              } else {
+                await fileApi.remove(id);
               }
-              await purgeDeletedResources(ids);
-              haptics.success();
-              clearSelection();
-              await loadFiles(true);
-              await refreshTreeData();
-            } catch {
+            }
+            await purgeDeletedResources(ids);
+            haptics.success();
+            clearSelection();
+            await loadFiles(true);
+            await refreshTreeData();
+          } catch {
             toast.show('error', t.resourceDeleteFailed);
           }
         },
       },
     ]);
-  }, [selectedIds, files, purgeDeletedResources, clearSelection, loadFiles, refreshTreeData, t, toast]);
+  }, [
+    selectedIds,
+    files,
+    purgeDeletedResources,
+    clearSelection,
+    loadFiles,
+    refreshTreeData,
+    t,
+    toast,
+  ]);
 
   const [batchMoveIds, setBatchMoveIds] = useState<Set<string>>(() => new Set());
 
   const handleBatchMove = useCallback(() => {
     setBatchMoveIds(new Set(selectedIds));
-    setMoveToFolderItem({ id: '__batch__', name: '', fileType: '', size: 0, createdAt: '', sourceType: 'file', url: '' } as FileListItem);
+    setMoveToFolderItem({
+      id: '__batch__',
+      name: '',
+      fileType: '',
+      size: 0,
+      createdAt: '',
+      sourceType: 'file',
+      url: '',
+    } as FileListItem);
     setMoveFolderStack([null]);
   }, [selectedIds]);
 
@@ -2051,12 +2115,15 @@ export default function ResourceScreen() {
     setCurrentFolderSlug(item.slug ?? item.id);
   }, []);
 
-  const handleBreadcrumbPress = useCallback((item: FolderCrumb, index: number) => {
-    if (index === folderBreadcrumb.length - 1) return;
-    nextOffsetRef.current = 0;
-    setCurrentFolderId(item.id);
-    setCurrentFolderSlug(item.slug);
-  }, [folderBreadcrumb.length]);
+  const handleBreadcrumbPress = useCallback(
+    (item: FolderCrumb, index: number) => {
+      if (index === folderBreadcrumb.length - 1) return;
+      nextOffsetRef.current = 0;
+      setCurrentFolderId(item.id);
+      setCurrentFolderSlug(item.slug);
+    },
+    [folderBreadcrumb.length],
+  );
 
   const handleBackToRoot = useCallback(() => {
     nextOffsetRef.current = 0;
@@ -2081,12 +2148,26 @@ export default function ResourceScreen() {
     } catch {
       toast.show('error', t.resourceUploadFailed);
     }
-  }, [libraryId, currentFolderId, currentFolderSlug, createFolderName, loadFiles, refreshTreeData, t.resourceNewFolder, t.resourceUploadFailed, toast]);
+  }, [
+    libraryId,
+    currentFolderId,
+    currentFolderSlug,
+    createFolderName,
+    loadFiles,
+    refreshTreeData,
+    t.resourceNewFolder,
+    t.resourceUploadFailed,
+    toast,
+  ]);
 
   const handleMoveToFolder = useCallback(
     async (targetFolderId: string | null) => {
       const isBatch = batchMoveIds.size > 0;
-      const idsToMove = isBatch ? Array.from(batchMoveIds) : moveToFolderItem ? [moveToFolderItem.id] : [];
+      const idsToMove = isBatch
+        ? Array.from(batchMoveIds)
+        : moveToFolderItem
+          ? [moveToFolderItem.id]
+          : [];
       setMoveToFolderItem(null);
       setBatchMoveIds(new Set());
       setMoveFolderStack([null]);
@@ -2107,7 +2188,17 @@ export default function ResourceScreen() {
         toast.show('error', t.resourceUploadFailed);
       }
     },
-    [moveToFolderItem, batchMoveIds, files, clearSelection, loadFiles, refreshTreeData, t.done, t.resourceUploadFailed, toast],
+    [
+      moveToFolderItem,
+      batchMoveIds,
+      files,
+      clearSelection,
+      loadFiles,
+      refreshTreeData,
+      t.done,
+      t.resourceUploadFailed,
+      toast,
+    ],
   );
 
   // ── Upload ────────────────────────────────────────────────────────
@@ -2154,7 +2245,16 @@ export default function ResourceScreen() {
         setUploadProgress(0);
       }
     },
-    [currentFolderId, currentFolderSlug, libraryId, loadFiles, refreshCachedResources, refreshTreeData, t, toast],
+    [
+      currentFolderId,
+      currentFolderSlug,
+      libraryId,
+      loadFiles,
+      refreshCachedResources,
+      refreshTreeData,
+      t,
+      toast,
+    ],
   );
 
   const handlePickPhoto = useCallback(async () => {
@@ -2190,7 +2290,7 @@ export default function ResourceScreen() {
   }, []);
 
   const currentLibraryName = libraryId
-    ? libraries.find((l) => l.id === libraryId)?.name ?? ''
+    ? (libraries.find((l) => l.id === libraryId)?.name ?? '')
     : t.resourceLibraryInbox;
 
   // ── Delete ────────────────────────────────────────────────────────
@@ -2249,9 +2349,7 @@ export default function ResourceScreen() {
         }
         haptics.success();
         setFiles((prev) =>
-          prev.map((f) =>
-            f.id === actionItem.id ? { ...f, name: newName.trim() } : f,
-          ),
+          prev.map((f) => (f.id === actionItem.id ? { ...f, name: newName.trim() } : f)),
         );
         await refreshTreeData();
         toast.show('success', t.resourceRenamed);
@@ -2389,7 +2487,8 @@ export default function ResourceScreen() {
   }, [hasMore, loadingMore, loadFiles]);
 
   const getSortLabel = () => {
-    if (sorter === 'createdAt') return sortOrder === 'desc' ? t.resourceSortNewest : t.resourceSortOldest;
+    if (sorter === 'createdAt')
+      return sortOrder === 'desc' ? t.resourceSortNewest : t.resourceSortOldest;
     if (sorter === 'name') return `${t.resourceSortName} ${sortOrder === 'asc' ? 'A-Z' : 'Z-A'}`;
     return `${t.resourceSortSize} ${sortOrder === 'asc' ? '↑' : '↓'}`;
   };
@@ -2423,7 +2522,6 @@ export default function ResourceScreen() {
       {/* Header */}
       <ScreenHeader
         headerLevel="root"
-        title={selectMode ? t.resourceSelectCount.replace('{count}', String(selectedIds.size)) : t.resourceTitle}
         rightActions={
           selectMode ? (
             <TouchableOpacity
@@ -2435,46 +2533,52 @@ export default function ResourceScreen() {
               </Text>
             </TouchableOpacity>
           ) : (
-            <View className="flex-row items-center" style={{ gap: 20 }}>
-              <TouchableOpacity
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            <View className="flex-row items-center" style={{ gap: 6 }}>
+              <HeaderIconButton
+                accessibilityLabel={t.search}
+                active={searchVisible}
                 onPress={toggleSearch}
               >
                 {searchVisible ? (
-                  <X color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                  <X color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 ) : (
-                  <Search
-                    color={colors.primary}
-                    size={22}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              </HeaderIconButton>
+              <HeaderIconButton
                 onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}
               >
                 {viewMode === 'list' ? (
-                  <Grid3X3 color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                  <Grid3X3 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 ) : (
-                  <List color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                  <List color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 )}
-              </TouchableOpacity>
+              </HeaderIconButton>
             </View>
           )
+        }
+        title={
+          selectMode
+            ? t.resourceSelectCount.replace('{count}', String(selectedIds.size))
+            : t.resourceTitle
         }
       >
         {/* Library selector */}
         <TouchableOpacity
           activeOpacity={0.7}
-          className="mx-6 mb-2 flex-row items-center rounded-xl bg-foreground/[0.04] px-3.5 py-2.5"
+          className="mx-6 mb-2 flex-row items-center rounded-xl px-3.5 py-2.5"
+          style={{
+            backgroundColor: colors.fillQuaternary,
+            borderColor: colors.borderSubtle,
+            borderWidth: 1,
+          }}
           onPress={() => setLibrarySelectVisible(true)}
         >
           <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="ml-2.5 flex-1 text-[14px] font-medium text-foreground" numberOfLines={1}>
             {currentLibraryName}
           </Text>
-          <ChevronRight color={colors.muted} size={18} strokeWidth={1.5} />
+          <ChevronRight color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
 
         {/* Breadcrumb when in folder */}
@@ -2491,7 +2595,7 @@ export default function ResourceScreen() {
               style={{ backgroundColor: colors.fillTertiary }}
               onPress={handleBackToRoot}
             >
-              <ArrowLeft color={colors.primary} size={14} strokeWidth={2} />
+              <ArrowLeft color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-1 text-[12px] font-medium" style={{ color: colors.primary }}>
                 {libraryId ? t.resourceFolderRoot : t.resourceLibraryInbox}
               </Text>
@@ -2511,7 +2615,8 @@ export default function ResourceScreen() {
                   className="text-[12px] font-medium"
                   numberOfLines={1}
                   style={{
-                    color: index === folderBreadcrumb.length - 1 ? colors.iconOnPrimary : colors.muted,
+                    color:
+                      index === folderBreadcrumb.length - 1 ? colors.iconOnPrimary : colors.muted,
                     maxWidth: 80,
                   }}
                 >
@@ -2521,7 +2626,7 @@ export default function ResourceScreen() {
                   <ChevronRight
                     color={colors.muted}
                     size={14}
-                    strokeWidth={1.5}
+                    strokeWidth={tokens.icon.strokeWidth}
                     style={{ marginLeft: 4 }}
                   />
                 )}
@@ -2534,12 +2639,16 @@ export default function ResourceScreen() {
           <View className="mx-6 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <FolderOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <FolderOpen
+                  color={colors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="ml-2 text-[13px] font-semibold text-foreground">
                   {t.resourceExplorer}
                 </Text>
               </View>
-              <View className="flex-row items-center" style={{ gap: 8 }}>
+              <View className="flex-row items-center" style={{ gap: 6 }}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   className="rounded-full px-3 py-1.5"
@@ -2556,14 +2665,20 @@ export default function ResourceScreen() {
                   style={{ backgroundColor: colors.fillTertiary }}
                   onPress={handleCollapseAllTree}
                 >
-                  <Text className="text-[11px] font-semibold" style={{ color: colors.secondaryText }}>
+                  <Text
+                    className="text-[11px] font-semibold"
+                    style={{ color: colors.secondaryText }}
+                  >
                     {t.resourceCollapseAll}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
             {currentFolderId && folderBreadcrumb.length > 0 ? (
-              <Text className="mt-2 text-[11px] font-medium" style={{ color: colors.secondaryText }}>
+              <Text
+                className="mt-2 text-[11px] font-medium"
+                style={{ color: colors.secondaryText }}
+              >
                 {t.resourceCurrentFolder}: {folderBreadcrumb.map((crumb) => crumb.name).join(' / ')}
               </Text>
             ) : null}
@@ -2591,7 +2706,11 @@ export default function ResourceScreen() {
                   setSearchVisible(false);
                 }}
               >
-                <X color={colors.muted} size={16} strokeWidth={2} />
+                <X
+                  color={colors.muted}
+                  size={tokens.icon.size.sm}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               </TouchableOpacity>
             }
             onChangeText={setSearchText}
@@ -2603,8 +2722,13 @@ export default function ResourceScreen() {
         <View className="mx-6 mb-2">
           <ScrollView
             horizontal
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 12 }}
             showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingRight: 12,
+            }}
           >
             {TABS.map((tab) => {
               const active = category === tab.key;
@@ -2621,8 +2745,14 @@ export default function ResourceScreen() {
               );
             })}
             <FilterChip
-              icon={<ArrowDownUp color={colors.primary} size={16} strokeWidth={2} />}
               label={getSortLabel()}
+              icon={
+                <ArrowDownUp
+                  color={colors.primary}
+                  size={tokens.icon.size.sm}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              }
               onPress={() => setSortMenuVisible(true)}
             />
           </ScrollView>
@@ -2635,17 +2765,11 @@ export default function ResourceScreen() {
           className="flex-row items-center justify-around border-t border-border bg-card px-4 py-3"
           style={{ paddingBottom: insets.bottom + 12 }}
         >
-          <TouchableOpacity
-            className="flex-1 items-center"
-            onPress={handleBatchDelete}
-          >
+          <TouchableOpacity className="flex-1 items-center" onPress={handleBatchDelete}>
             <Text style={{ color: colors.danger }}>{t.resourceBatchDelete}</Text>
           </TouchableOpacity>
           {libraryId && (
-            <TouchableOpacity
-              className="flex-1 items-center"
-              onPress={handleBatchMove}
-            >
+            <TouchableOpacity className="flex-1 items-center" onPress={handleBatchMove}>
               <Text style={{ color: colors.primary }}>{t.resourceBatchMove}</Text>
             </TouchableOpacity>
           )}
@@ -2656,7 +2780,7 @@ export default function ResourceScreen() {
       {loading && files.length === 0 ? (
         <FileGridSkeleton />
       ) : (
-      <FlatList<ResourceListRow>
+        <FlatList<ResourceListRow>
           data={treeMode ? treeRows : filtered}
           key={treeMode ? 'tree' : viewMode}
           keyExtractor={(item) => (isResourceTreeRow(item) ? item.item.id : item.id)}
@@ -2680,7 +2804,10 @@ export default function ResourceScreen() {
                     onPress={handleUpload}
                   >
                     <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
-                    <Text className="ml-2 text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                    <Text
+                      className="ml-2 text-[15px] font-semibold"
+                      style={{ color: colors.iconOnPrimary }}
+                    >
                       {t.resourceUpload}
                     </Text>
                   </TouchableOpacity>
@@ -2688,11 +2815,22 @@ export default function ResourceScreen() {
                     <TouchableOpacity
                       activeOpacity={0.7}
                       className="flex-row items-center rounded-2xl px-5 py-3"
-                      style={{ backgroundColor: colors.primary + '20', borderWidth: 1, borderColor: colors.primary }}
+                      style={{
+                        backgroundColor: colors.primarySubtle,
+                        borderColor: colors.primaryBorder,
+                        borderWidth: 1,
+                      }}
                       onPress={() => setCreateFolderVisible(true)}
                     >
-                      <Folder color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                      <Text className="ml-2 text-[15px] font-semibold" style={{ color: colors.primary }}>
+                      <Folder
+                        color={colors.primary}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text
+                        className="ml-2 text-[15px] font-semibold"
+                        style={{ color: colors.primary }}
+                      >
                         {t.resourceNewFolder}
                       </Text>
                     </TouchableOpacity>
@@ -2700,7 +2838,9 @@ export default function ResourceScreen() {
                 </View>
               }
               description={
-                currentFolderId || currentFolderSlug ? t.resourceFolderEmptyDesc : t.resourceEmptyDesc
+                currentFolderId || currentFolderSlug
+                  ? t.resourceFolderEmptyDesc
+                  : t.resourceEmptyDesc
               }
             />
           }
@@ -2881,11 +3021,7 @@ export default function ResourceScreen() {
                 activeOpacity={0.7}
                 className="flex-1 m-1 items-center rounded-xl bg-foreground/5 p-3"
                 style={viewMode === 'grid' ? { minWidth: 0 } : undefined}
-                onLongPress={() =>
-                  selectMode
-                    ? toggleSelect(item)
-                    : handleEnterSelectMode(item)
-                }
+                onLongPress={() => (selectMode ? toggleSelect(item) : handleEnterSelectMode(item))}
                 onPress={() =>
                   selectMode
                     ? toggleSelect(item)
@@ -3001,7 +3137,10 @@ export default function ResourceScreen() {
               <View className="items-center">
                 <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 {uploadProgress > 0 && (
-                  <Text className="text-[9px] font-medium mt-0.5" style={{ color: colors.iconOnPrimary }}>
+                  <Text
+                    className="text-[9px] font-medium mt-0.5"
+                    style={{ color: colors.iconOnPrimary }}
+                  >
                     {uploadProgress}%
                   </Text>
                 )}
@@ -3123,7 +3262,9 @@ export default function ResourceScreen() {
                 className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
                 onPress={closeActionSheet}
               >
-                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>{t.cancel}</Text>
+                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                  {t.cancel}
+                </Text>
               </Pressable>
             </View>
           </Pressable>
@@ -3195,7 +3336,8 @@ export default function ResourceScreen() {
                   className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
                   key={lib.id}
                   style={{
-                    backgroundColor: libraryId === lib.id ? colors.primary + '20' : colors.fillTertiary,
+                    backgroundColor:
+                      libraryId === lib.id ? colors.primary + '20' : colors.fillTertiary,
                   }}
                   onPress={() => {
                     setLibraryId(lib.id);
@@ -3254,9 +3396,7 @@ export default function ResourceScreen() {
             <View className="flex-row items-center justify-between px-5">
               <TouchableOpacity
                 onPress={() =>
-                  moveFolderStack.length > 1
-                    ? setMoveFolderStack((s) => s.slice(0, -1))
-                    : undefined
+                  moveFolderStack.length > 1 ? setMoveFolderStack((s) => s.slice(0, -1)) : undefined
                 }
               >
                 {moveFolderStack.length > 1 ? (
@@ -3265,10 +3405,13 @@ export default function ResourceScreen() {
                   <View style={{ width: 22 }} />
                 )}
               </TouchableOpacity>
-              <Text className="flex-1 text-center text-[18px] font-bold text-foreground" numberOfLines={1}>
+              <Text
+                className="flex-1 text-center text-[18px] font-bold text-foreground"
+                numberOfLines={1}
+              >
                 {batchMoveIds.size > 0
                   ? t.resourceSelectCount.replace('{count}', String(batchMoveIds.size))
-                  : moveFolderCurrent?.name ?? t.resourceMoveToFolder}
+                  : (moveFolderCurrent?.name ?? t.resourceMoveToFolder)}
               </Text>
               <View style={{ width: 22 }} />
             </View>
@@ -3279,7 +3422,11 @@ export default function ResourceScreen() {
                 style={{ backgroundColor: colors.fillTertiary }}
                 onPress={() => void handleMoveToFolder(null)}
               >
-                <FolderOpen color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                <FolderOpen
+                  color={colors.primary}
+                  size={22}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="ml-3 text-[16px] font-medium text-foreground">
                   {t.resourceFolderRoot}
                 </Text>
@@ -3292,7 +3439,11 @@ export default function ResourceScreen() {
                   onPress={() => void handleMoveToFolder(moveFolderCurrent.id)}
                 >
                   <Folder color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-3 flex-1 text-[16px] font-medium" numberOfLines={1} style={{ color: colors.primary }}>
+                  <Text
+                    className="ml-3 flex-1 text-[16px] font-medium"
+                    numberOfLines={1}
+                    style={{ color: colors.primary }}
+                  >
                     {moveFolderCurrent.name}
                   </Text>
                 </TouchableOpacity>
@@ -3304,7 +3455,10 @@ export default function ResourceScreen() {
                   key={folder.id}
                   style={{ backgroundColor: colors.fillTertiary }}
                   onPress={() =>
-                    setMoveFolderStack((s) => [...s, { id: folder.slug ?? folder.id, name: folder.name }])
+                    setMoveFolderStack((s) => [
+                      ...s,
+                      { id: folder.slug ?? folder.id, name: folder.name },
+                    ])
                   }
                 >
                   <Folder color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
@@ -3343,8 +3497,16 @@ export default function ResourceScreen() {
             {[
               { sorter: 'createdAt' as const, order: 'desc' as const, label: t.resourceSortNewest },
               { sorter: 'createdAt' as const, order: 'asc' as const, label: t.resourceSortOldest },
-              { sorter: 'name' as const, order: 'asc' as const, label: `${t.resourceSortName} A-Z` },
-              { sorter: 'name' as const, order: 'desc' as const, label: `${t.resourceSortName} Z-A` },
+              {
+                sorter: 'name' as const,
+                order: 'asc' as const,
+                label: `${t.resourceSortName} A-Z`,
+              },
+              {
+                sorter: 'name' as const,
+                order: 'desc' as const,
+                label: `${t.resourceSortName} Z-A`,
+              },
               { sorter: 'size' as const, order: 'asc' as const, label: `${t.resourceSortSize} ↑` },
               { sorter: 'size' as const, order: 'desc' as const, label: `${t.resourceSortSize} ↓` },
             ].map((opt) => (

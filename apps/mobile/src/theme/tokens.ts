@@ -54,6 +54,7 @@ export const tokens = {
   typography: {
     mobile: {
       body: 15,
+      display: 32,
       meta: 12,
       title: 22,
     },
@@ -67,10 +68,12 @@ export const tokens = {
   mobile: {
     heights: {
       composerAction: 36,
-      filterChip: 36,
+      filterChip: 32,
+      headerContent: 56,
       headerAction: 40,
+      headerSubContent: 64,
       metaTag: 26,
-      segmentedControl: 44,
+      segmentedControl: 40,
     },
     spacingScale: [4, 8, 12, 16, 24, 32] as const,
   },

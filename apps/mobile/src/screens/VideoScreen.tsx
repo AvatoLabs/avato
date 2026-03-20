@@ -14,7 +14,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
-  Dimensions,
   Keyboard,
   Modal,
   Platform,
@@ -34,6 +33,8 @@ import Animated, {
   FadeOut,
   SlideInRight,
   SlideOutRight,
+  useAnimatedKeyboard,
+  useAnimatedStyle,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -46,6 +47,7 @@ import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, fileApi, getApiUrl, videoApi } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { GenerationBatch, GenerationItem, GenerationTopic } from '../types';
@@ -457,10 +459,14 @@ function VideoPreviewCard({
 }
 
 interface VideoScreenProps {
+  configOpenVersion?: number;
   hideHeader?: boolean;
 }
 
-export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
+export default function VideoScreen({
+  configOpenVersion = 0,
+  hideHeader = false,
+}: VideoScreenProps) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { t } = useI18n();
@@ -489,11 +495,26 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const composerTranslateY = Platform.OS === 'ios' ? -keyboardOffset : 0;
+  const animatedKeyboard = useAnimatedKeyboard();
+  const composerLiftStyle = useAnimatedStyle(() => {
+    const lift =
+      Platform.OS === 'android'
+        ? Math.max(
+            0,
+            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
+          )
+        : keyboardOffset;
+
+    return {
+      transform: [{ translateY: -lift }],
+    };
+  }, [insets.bottom, keyboardOffset]);
+  const composerActive = keyboardOffset > 0 || Boolean(prompt.trim()) || creating;
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollSessionRef = useRef(0);
   const batchesRef = useRef<GenerationBatch[]>([]);
+  const lastConfigOpenVersionRef = useRef(configOpenVersion);
 
   const activeProvider = useMemo(
     () => providers.find((item) => item.id === provider) ?? null,
@@ -526,6 +547,13 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
     haptics.selection();
     setShowSidebar(true);
   }, []);
+
+  useEffect(() => {
+    if (configOpenVersion <= lastConfigOpenVersionRef.current) return;
+
+    lastConfigOpenVersionRef.current = configOpenVersion;
+    openSidebar();
+  }, [configOpenVersion, openSidebar]);
 
   const loadModels = useCallback(async () => {
     setLoadingModels(true);
@@ -700,8 +728,7 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
                 task: {
                   ...generation.task,
                   ...status?.generation?.task,
-                  error:
-                    status?.error ?? status?.generation?.task?.error ?? generation.task?.error,
+                  error: status?.error ?? status?.generation?.task?.error ?? generation.task?.error,
                   status:
                     status?.status || status?.generation?.task?.status || generation.task?.status,
                 },
@@ -752,11 +779,7 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
 
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
-      const coords = event?.endCoordinates;
-      const windowHeight = Dimensions.get('window').height;
-      const screenY = Number(coords?.screenY ?? windowHeight);
-      const offsetFromBottom = windowHeight - screenY;
-      setKeyboardOffset(offsetFromBottom > 0 ? offsetFromBottom : 0);
+      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
     };
 
     const handleKeyboardHide = () => {
@@ -769,9 +792,7 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
             Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
             Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
             Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              const windowHeight = Dimensions.get('window').height;
-              const screenY = Number(event?.endCoordinates?.screenY ?? windowHeight);
-              if (screenY >= windowHeight - 1) {
+              if (getKeyboardOffset(event, insets.bottom) <= 0) {
                 handleKeyboardHide();
               } else {
                 handleKeyboardShow(event);
@@ -788,7 +809,7 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
         subscription.remove();
       }
     };
-  }, [inputPaddingBottom]);
+  }, [insets.bottom]);
 
   const handleResetTopic = useCallback(() => {
     haptics.light();
@@ -930,11 +951,13 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
         />
       ) : null}
 
-      <CreateConfigBar
-        label={selectedModelLabel || t.videoSelectModel}
-        summary={summaryParts.join(' · ') || t.videoNoModels}
-        onPress={openSidebar}
-      />
+      {!hideHeader ? (
+        <CreateConfigBar
+          label={selectedModelLabel || t.videoSelectModel}
+          summary={summaryParts.join(' · ') || t.videoNoModels}
+          onPress={openSidebar}
+        />
+      ) : null}
 
       <ScrollView
         className="flex-1"
@@ -989,12 +1012,9 @@ export default function VideoScreen({ hideHeader = false }: VideoScreenProps) {
 
       <Animated.View
         className="px-4 pt-1"
-        style={{
-          paddingBottom: Math.max(insets.bottom, 8),
-          transform: [{ translateY: composerTranslateY }],
-        }}
+        style={[{ paddingBottom: inputPaddingBottom }, composerLiftStyle]}
       >
-        <ComposerShell active={keyboardOffset > 0}>
+        <ComposerShell active={composerActive}>
           <View className="flex-row items-end gap-2 px-3 pb-2 pt-2">
             <TextInput
               multiline

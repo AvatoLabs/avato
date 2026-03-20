@@ -4,23 +4,15 @@
  */
 import { ArrowLeft, Check, MessageCircle, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import EmptyState from '../components/ui/EmptyState';
 import ListSkeleton from '../components/ui/ListSkeleton';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { SearchField } from '../components/ui/SearchField';
+import { SelectionListItem } from '../components/ui/SelectionList';
 import { useToast } from '../components/ui/Toast';
 import TopicItem from '../components/ui/TopicItem';
 import { resolveTagColor } from '../constants/tags';
@@ -30,9 +22,11 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
 import { generateBestTitle } from '../lib/titleGeneration';
+import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
-import { useTopicStore } from '../store/topic';
+import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
+import { enteringSection } from '../theme/motion';
 import { tokens } from '../theme/tokens';
 
 export default function TopicListScreen({ route, navigation }: any) {
@@ -44,7 +38,8 @@ export default function TopicListScreen({ route, navigation }: any) {
 
   const session = useSessionStore((s) => s.sessions.find((x) => x.id === sessionId));
   const isGroupSession = session?.type === 'group';
-  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
+  const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
+  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? EMPTY_TOPICS);
   const loading = useTopicStore((s) => s.loadingBySession[sessionKey] ?? false);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
@@ -72,10 +67,7 @@ export default function TopicListScreen({ route, navigation }: any) {
         const result = await generateBestTitle({ sessionId, topicId });
         if (result?.title) {
           haptics.success();
-          toast.show(
-            'success',
-            result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
-          );
+          toast.show('success', result.target === 'topic' ? t.topicRenamed : t.sessionRenamed);
         } else {
           toast.show('error', failMessage || 'Failed to generate title');
         }
@@ -103,7 +95,10 @@ export default function TopicListScreen({ route, navigation }: any) {
   }, [fetchTopics, navigation, sessionId, t.errorNetwork, t.errorUnknown, toast]);
 
   useEffect(() => {
-    tagApi.list().then((list) => setTags(list ?? [])).catch(() => setTags([]));
+    tagApi
+      .list()
+      .then((list) => setTags(list ?? []))
+      .catch(() => setTags([]));
   }, []);
 
   const handleMoveTopicToTag = useCallback(
@@ -185,36 +180,27 @@ export default function TopicListScreen({ route, navigation }: any) {
       />
 
       <View className="px-5 pb-3 pt-1">
-        <View className="bg-foreground/5 rounded-xl px-4 py-2.5 flex-row items-center">
-          <TextInput
-            className="flex-1 text-foreground text-[15px]"
-            placeholder={t.topicSearch}
-            placeholderTextColor={colors.muted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        <SearchField
+          placeholder={t.topicSearch}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
-      <Animated.View entering={FadeInDown.delay(50).duration(250)}>
-        <TouchableOpacity
-          activeOpacity={0.6}
-          className="flex-row items-center px-5 py-3.5 rounded-xl mx-5 mb-2"
-          style={activeTopic === null ? { backgroundColor: colors.primarySubtle } : undefined}
+      <Animated.View entering={enteringSection(40)}>
+        <SelectionListItem
+          className="mx-5 mb-2"
+          selected={activeTopic === null}
+          title={t.topicAllMessages}
+          leading={
+            <MessageCircle
+              color={activeTopic === null ? colors.primary : colors.secondaryText}
+              size={18}
+              strokeWidth={tokens.icon.strokeWidth}
+            />
+          }
           onPress={() => handleSwitchTopic(null)}
-        >
-          <MessageCircle
-            color={activeTopic === null ? colors.primary : colors.secondaryText}
-            size={18}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
-          <Text
-            className="ml-3 text-[15px] font-medium"
-            style={{ color: activeTopic === null ? colors.primary : colors.foreground }}
-          >
-            {t.topicAllMessages}
-          </Text>
-        </TouchableOpacity>
+        />
       </Animated.View>
 
       <FlatList
@@ -311,11 +297,7 @@ export default function TopicListScreen({ route, navigation }: any) {
                 onPress={() =>
                   topicTagTarget &&
                   sessionId &&
-                  void handleMoveTopicToTag(
-                    topicTagTarget.topicId,
-                    topicTagTarget.sessionId,
-                    null,
-                  )
+                  void handleMoveTopicToTag(topicTagTarget.topicId, topicTagTarget.sessionId, null)
                 }
               >
                 <View className="flex-row items-center">
@@ -326,11 +308,7 @@ export default function TopicListScreen({ route, navigation }: any) {
                   <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                 </View>
                 {!topicTagTarget?.currentTagId ? (
-                  <Check
-                    color={colors.primary}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
+                  <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                 ) : null}
               </Pressable>
               {tags.map((tag) => (
@@ -354,11 +332,7 @@ export default function TopicListScreen({ route, navigation }: any) {
                     <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
                   </View>
                   {topicTagTarget?.currentTagId === tag.id ? (
-                    <Check
-                      color={colors.primary}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
+                    <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   ) : null}
                 </Pressable>
               ))}

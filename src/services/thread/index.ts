@@ -1,8 +1,12 @@
-import { type CreateMessageParams } from '@lobechat/types';
+import {
+  type CreateMessageParams,
+  type CreateThreadParams,
+  type ThreadItem,
+  type UpdateThreadParams,
+} from '@lobechat/types';
 
 import { INBOX_SESSION_ID } from '@/const/session';
 import { lambdaClient } from '@/libs/trpc/client';
-import { type CreateThreadParams, type ThreadItem } from '@/types/topic';
 
 interface CreateThreadWithMessageParams extends CreateThreadParams {
   message: CreateMessageParams;
@@ -27,7 +31,7 @@ export class ThreadService {
     });
   };
 
-  updateThread = async (id: string, data: Partial<ThreadItem>) => {
+  updateThread = async (id: string, data: UpdateThreadParams) => {
     return lambdaClient.thread.updateThread.mutate({ id, value: data });
   };
 

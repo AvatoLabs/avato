@@ -48,14 +48,21 @@ export function WorkspaceOverviewCard({
 
   return (
     <View
-      className="mx-6 mb-6 rounded-2xl overflow-hidden bg-foreground/[0.04]"
-      style={{ borderWidth: 1, borderColor: colors.border }}
+      className="mx-6 mb-6 overflow-hidden rounded-2xl"
+      style={{
+        backgroundColor: colors.fillQuaternary,
+        borderColor: colors.borderSubtle,
+        borderWidth: 1,
+      }}
     >
       {useNativeBlur ? (
         <BlurView className="rounded-2xl overflow-hidden p-5" intensity={80} tint={blurTint}>
           {/* Identity — tap → ProfileEdit */}
-          <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
-            <View className="w-12 h-12 rounded-full items-center justify-center mr-3.5 overflow-hidden" style={{ backgroundColor: colors.primarySubtle }}>
+          <PressableScale className="mb-5 flex-row items-center" onPress={onPress}>
+            <View
+              className="mr-3.5 h-12 w-12 items-center justify-center overflow-hidden rounded-full"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               {resolvedAvatarUri ? (
                 <RNImage
                   source={{ uri: resolvedAvatarUri }}
@@ -81,7 +88,7 @@ export function WorkspaceOverviewCard({
                     backgroundColor: isConnected ? colors.success : colors.tertiaryText,
                   }}
                 />
-                <Text className="text-secondary/80 text-[12px] font-medium">
+                <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
                 </Text>
               </View>
@@ -92,13 +99,15 @@ export function WorkspaceOverviewCard({
           {/* Sub-cards — each independently tappable */}
           <View className="flex-row gap-3">
             <PressableScale
-              className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
+              className="flex-1 rounded-xl px-3.5 py-3"
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.borderSubtle,
+                borderWidth: 1,
+              }}
               onPress={onPressModel}
             >
-              <Text
-                className="mb-1 text-[11px] font-semibold"
-                style={{ color: colors.primary }}
-              >
+              <Text className="mb-1 text-[11px] font-semibold" style={{ color: colors.primary }}>
                 {t.settingsDefaultModel}
               </Text>
               <Text
@@ -109,13 +118,15 @@ export function WorkspaceOverviewCard({
               </Text>
             </PressableScale>
             <PressableScale
-              className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
+              className="flex-1 rounded-xl px-3.5 py-3"
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.borderSubtle,
+                borderWidth: 1,
+              }}
               onPress={onPressProviders}
             >
-              <Text
-                className="mb-1 text-[11px] font-semibold"
-                style={{ color: colors.primary }}
-              >
+              <Text className="mb-1 text-[11px] font-semibold" style={{ color: colors.primary }}>
                 {t.workspaceProviders}
               </Text>
               <Text className="text-foreground text-[14px] font-medium tracking-tight">
@@ -131,7 +142,10 @@ export function WorkspaceOverviewCard({
         <View className="rounded-2xl overflow-hidden p-5">
           {/* Identity — tap → ProfileEdit */}
           <PressableScale className="flex-row items-center mb-5" onPress={onPress}>
-            <View className="w-12 h-12 rounded-full items-center justify-center mr-3.5 overflow-hidden" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="mr-3.5 h-12 w-12 items-center justify-center overflow-hidden rounded-full"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               {resolvedAvatarUri ? (
                 <RNImage
                   source={{ uri: resolvedAvatarUri }}
@@ -157,7 +171,7 @@ export function WorkspaceOverviewCard({
                     backgroundColor: isConnected ? colors.success : colors.tertiaryText,
                   }}
                 />
-                <Text className="text-secondary/80 text-[12px] font-medium">
+                <Text className="text-[12px] font-medium" style={{ color: colors.secondaryText }}>
                   {isConnected ? t.workspaceConnected : t.workspaceNotConnected}
                 </Text>
               </View>
@@ -168,13 +182,15 @@ export function WorkspaceOverviewCard({
           {/* Sub-cards — each independently tappable */}
           <View className="flex-row gap-3">
             <PressableScale
-              className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
+              className="flex-1 rounded-xl px-3.5 py-3"
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.borderSubtle,
+                borderWidth: 1,
+              }}
               onPress={onPressModel}
             >
-              <Text
-                className="mb-1 text-[11px] font-semibold"
-                style={{ color: colors.primary }}
-              >
+              <Text className="mb-1 text-[11px] font-semibold" style={{ color: colors.primary }}>
                 {t.settingsDefaultModel}
               </Text>
               <Text
@@ -185,13 +201,15 @@ export function WorkspaceOverviewCard({
               </Text>
             </PressableScale>
             <PressableScale
-              className="flex-1 rounded-xl px-3.5 py-3 bg-foreground/[0.03]"
+              className="flex-1 rounded-xl px-3.5 py-3"
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.borderSubtle,
+                borderWidth: 1,
+              }}
               onPress={onPressProviders}
             >
-              <Text
-                className="mb-1 text-[11px] font-semibold"
-                style={{ color: colors.primary }}
-              >
+              <Text className="mb-1 text-[11px] font-semibold" style={{ color: colors.primary }}>
                 {t.workspaceProviders}
               </Text>
               <Text className="text-foreground text-[14px] font-medium tracking-tight">

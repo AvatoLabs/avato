@@ -5,15 +5,16 @@
  * groups by provider, and allows selection. Falls back to a static list if the
  * server is unreachable.
  */
-import { ArrowLeft, Check, RefreshCw, WifiOff } from 'lucide-react-native';
+import { ArrowLeft, RefreshCw, WifiOff } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image as RNImage, SectionList, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MetaTag } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
-import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
+import { SelectionListItem, SelectionSectionLabel } from '../components/ui/SelectionList';
 import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import { agentApi, agentGroupApi, aiProviderApi, sessionApi, userApi } from '../lib/api';
@@ -418,77 +419,37 @@ export default function ModelPickerScreen({ navigation, route }: any) {
     ({ item, section }: { item: RuntimeEnabledModel; section: ServerModelSection }) => {
       const tags = getAbilityTags(item);
       return (
-        <PressableScale
+        <SelectionListItem
           accessibilityLabel={item.displayName || item.id}
-          accessibilityRole="button"
-          className="mx-4 mb-px bg-foreground/5 flex-row items-center px-4 py-3.5"
-          style={{ borderRadius: 16 }}
+          className="mx-5 mb-2"
+          leading={<ProviderLogo logo={section.logo} providerId={section.providerId} size={28} />}
+          selected={selected === item.id}
+          title={item.displayName || item.id}
+          meta={tags.map((tag) => (
+            <MetaTag key={tag} label={tag} />
+          ))}
           onPress={() => handleSelect(item.id, section.providerId)}
-        >
-          <View className="mr-3">
-            <ProviderLogo logo={section.logo} providerId={section.providerId} size={28} />
-          </View>
-          <View className="flex-1">
-            <Text
-              className="text-[15px] font-medium tracking-tight"
-              style={{ color: selected === item.id ? colors.primary : colors.foreground }}
-            >
-              {item.displayName || item.id}
-            </Text>
-            {tags.length > 0 && (
-              <View className="flex-row flex-wrap gap-1 mt-1">
-                {tags.map((tag) => (
-                  <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
-                    <Text className="text-secondary/60 text-[10px] font-medium">{tag}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-          {selected === item.id && (
-            <Check color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-          )}
-        </PressableScale>
+        />
       );
     },
-    [colors, handleSelect, selected],
+    [handleSelect, selected],
   );
 
   const renderFallbackItem = useCallback(
     ({ item, section }: { item: FallbackModel; section: FallbackModelSection }) => (
-      <PressableScale
+      <SelectionListItem
         accessibilityLabel={item.displayName}
-        accessibilityRole="button"
-        className="mx-4 mb-px bg-foreground/5 flex-row items-center px-4 py-3.5"
-        style={{ borderRadius: 16 }}
+        className="mx-5 mb-2"
+        leading={<ProviderLogo providerId={section.providerId} size={28} />}
+        selected={selected === item.id}
+        title={item.displayName}
+        meta={(item.tags ?? []).map((tag) => (
+          <MetaTag key={tag} label={tag} />
+        ))}
         onPress={() => handleSelect(item.id, item.providerId)}
-      >
-        <View className="mr-3">
-          <ProviderLogo providerId={section.providerId} size={28} />
-        </View>
-        <View className="flex-1">
-          <Text
-            className="text-[15px] font-medium tracking-tight"
-            style={{ color: selected === item.id ? colors.primary : colors.foreground }}
-          >
-            {item.displayName}
-          </Text>
-          {item.tags && item.tags.length > 0 && (
-            <View className="flex-row flex-wrap gap-1 mt-1">
-              {item.tags.map((tag) => (
-                <View className="bg-foreground/5 px-2 py-0.5 rounded-full" key={tag}>
-                  <Text className="text-secondary/60 text-[10px] font-medium">{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-        {selected === item.id && (
-          <Check color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-        )}
-      </PressableScale>
+      />
     ),
-    [colors, handleSelect, selected],
+    [handleSelect, selected],
   );
 
   return (
@@ -517,6 +478,7 @@ export default function ModelPickerScreen({ navigation, route }: any) {
         </View>
       ) : serverModels ? (
         <SectionList
+          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           className="flex-1"
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
@@ -525,7 +487,6 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           windowSize={8}
-          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           contentContainerStyle={
             serverSections.length === 0
               ? {
@@ -537,16 +498,17 @@ export default function ModelPickerScreen({ navigation, route }: any) {
               : { paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }
           }
           renderSectionHeader={({ section }) => (
-            <View className="flex-row items-center px-5 mt-4 mb-2">
-              <ProviderLogo logo={section.logo} providerId={section.providerId} size={18} />
-              <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
-                {section.title}
-              </Text>
-            </View>
+            <SelectionSectionLabel
+              title={section.title}
+              leading={
+                <ProviderLogo logo={section.logo} providerId={section.providerId} size={18} />
+              }
+            />
           )}
         />
       ) : (
         <SectionList
+          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           className="flex-1"
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
@@ -555,17 +517,19 @@ export default function ModelPickerScreen({ navigation, route }: any) {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           windowSize={8}
-          ListEmptyComponent={<EmptyState iconVariant="model" title={t.discoverNoResults} />}
           ListHeaderComponent={
-            <View className="mx-5 mb-3 flex-row items-center bg-foreground/5 rounded-xl px-4 py-3">
-              <WifiOff color={colors.iconMuted} size={14} strokeWidth={tokens.icon.strokeWidth} />
-              <Text className="ml-2 text-secondary/60 text-[12px] font-medium flex-1">
-                {t.modelPickerOffline}
-              </Text>
-              <PressableScale onPress={fetchModels}>
-                <RefreshCw color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
-              </PressableScale>
-            </View>
+            <SelectionListItem
+              className="mx-5 mb-3"
+              title={t.modelPickerOffline}
+              titleNumberOfLines={2}
+              leading={
+                <WifiOff color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              }
+              rightAccessory={
+                <RefreshCw color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              }
+              onPress={() => fetchModels()}
+            />
           }
           contentContainerStyle={
             fallbackSections.length === 0
@@ -578,12 +542,10 @@ export default function ModelPickerScreen({ navigation, route }: any) {
               : { paddingBottom: Math.max(insets.bottom, 24), paddingTop: 8 }
           }
           renderSectionHeader={({ section }) => (
-            <View className="flex-row items-center px-5 mt-4 mb-2">
-              <ProviderLogo providerId={section.providerId} size={18} />
-              <Text className="ml-2 text-secondary/60 text-[12px] font-medium uppercase tracking-wider">
-                {section.title}
-              </Text>
-            </View>
+            <SelectionSectionLabel
+              leading={<ProviderLogo providerId={section.providerId} size={18} />}
+              title={section.title}
+            />
           )}
         />
       )}

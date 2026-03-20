@@ -1,27 +1,24 @@
-import { Check, ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { agentApi, type AgentQueryItem } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useModelStore } from '../../store/model';
 import { useThemeColors } from '../../theme/colors';
-import { enteringModalContent } from '../../theme/motion';
 import { tokens } from '../../theme/tokens';
+import { BottomSheetScaffold } from './BottomSheetScaffold';
 import { ModelDrawer } from './ModelDrawer';
+import { SearchField } from './SearchField';
+import { SelectionListItem } from './SelectionList';
 
 const EMPTY_AGENT_IDS: string[] = [];
 
@@ -54,7 +51,7 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
   if (avatar && avatar.length <= 4 && !avatar.startsWith('http')) {
     return (
       <View
-        className="mr-3 h-11 w-11 items-center justify-center rounded-2xl"
+        className="h-11 w-11 items-center justify-center rounded-2xl"
         style={{ backgroundColor: colors.primarySubtle }}
       >
         <Text className="text-[18px]" style={{ color: colors.foreground }}>
@@ -68,10 +65,12 @@ function AgentAvatar({ agent }: { agent: AgentQueryItem }) {
 
   return (
     <View
-      className="mr-3 h-11 w-11 items-center justify-center rounded-2xl"
+      className="h-11 w-11 items-center justify-center rounded-2xl"
       style={{ backgroundColor: colors.primarySubtle }}
     >
-      <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>{fallback}</Text>
+      <Text className="text-[16px] font-semibold" style={{ color: colors.primary }}>
+        {fallback}
+      </Text>
     </View>
   );
 }
@@ -158,207 +157,158 @@ export default function AgentSelectionSheet({
   }, [agents, excludedAgentIds]);
 
   const submitDisabled = submitting || (!allowEmptySelection && selectedIds.size === 0);
+  const submitAction = (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      disabled={submitDisabled}
+      onPress={async () => {
+        if (submitDisabled) return;
+
+        try {
+          setSubmitting(true);
+          await onSubmit({
+            agentIds: [...selectedIds],
+            supervisorConfig:
+              showSupervisorModelPicker && supervisorModel && supervisorProvider
+                ? { model: supervisorModel, provider: supervisorProvider }
+                : undefined,
+            title: draftTitle.trim(),
+          });
+        } finally {
+          setSubmitting(false);
+        }
+      }}
+    >
+      {submitting ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : (
+        <Text
+          className="text-[15px] font-semibold"
+          style={{ color: submitDisabled ? colors.secondaryText : colors.primary }}
+        >
+          {confirmLabel}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
-    <Modal
-      accessibilityViewIsModal
-      transparent
-      animationType="slide"
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ maxHeight: '80%' }}
+    <>
+      <BottomSheetScaffold
+        keyboardAvoiding
+        headerRight={submitAction}
+        maxHeight="80%"
+        title={title}
+        visible={visible}
+        onClose={onClose}
+      >
+        <ScrollView
+          className="px-5"
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Animated.View entering={enteringModalContent()} style={{ maxHeight: '80%' }}>
-            <Pressable
-            className="rounded-t-2xl"
-            style={{ backgroundColor: colors.card }}
-            onPress={(event) => event.stopPropagation()}
-          >
-          <View className="items-center pb-2 pt-3">
-            <View className="h-1 w-9 rounded-full bg-foreground/10" />
-          </View>
-
-          <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
-            <Text className="text-[18px] font-bold tracking-tight" style={{ color: colors.foreground }}>{title}</Text>
-            <TouchableOpacity
-              activeOpacity={0.75}
-              disabled={submitDisabled}
-              onPress={async () => {
-                if (submitDisabled) return;
-
-                try {
-                  setSubmitting(true);
-                  await onSubmit({
-                    agentIds: [...selectedIds],
-                    supervisorConfig:
-                      showSupervisorModelPicker && supervisorModel && supervisorProvider
-                        ? { model: supervisorModel, provider: supervisorProvider }
-                        : undefined,
-                    title: draftTitle.trim(),
-                  });
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <Text
-                  className="text-[15px] font-semibold"
-                  style={{
-                    color: submitDisabled ? colors.secondaryText : colors.primary,
-                  }}
-                >
-                  {confirmLabel}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-              className="px-5"
-              contentContainerStyle={{ paddingBottom: 24 }}
-              keyboardShouldPersistTaps="handled"
-            >
-            {showTitleInput ? (
-              <View className="mb-4">
-                <Text className="mb-1.5 px-1 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
-                  {titleInputLabel || t.agentConfigName}
-                </Text>
-                <TextInput
-                  className="rounded-2xl px-4 py-3 text-[15px]"
-                  placeholder={titleInputPlaceholder}
-                  placeholderTextColor={colors.secondaryText}
-                  style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
-                  value={draftTitle}
-                  onChangeText={setDraftTitle}
-                />
-              </View>
-            ) : null}
-
-            {showSupervisorModelPicker ? (
-              <TouchableOpacity
-                activeOpacity={0.75}
-                className="mb-4 flex-row items-center justify-between rounded-2xl px-4 py-3"
-                style={{ backgroundColor: colors.fillTertiary }}
-                onPress={() => {
-                  haptics.light();
-                  setSupervisorModelDrawerVisible(true);
-                }}
-              >
-                <Text className="text-[14px] font-medium" style={{ color: colors.foreground }}>
-                  {t.groupCreateSupervisorModel}
-                </Text>
-                <View className="flex-row items-center">
-                  <Text
-                    className="mr-1.5 text-[13px]"
-                    numberOfLines={1}
-                    style={{ color: colors.secondaryText, maxWidth: 140 }}
-                  >
-                    {supervisorModelLabel}
-                  </Text>
-                  <ChevronRight
-                    color={colors.secondaryText}
-                    size={18}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                </View>
-              </TouchableOpacity>
-            ) : null}
-
+          {showTitleInput ? (
             <View className="mb-4">
-              <Text className="mb-1.5 px-1 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
-                {t.search}
+              <Text
+                className="mb-1.5 px-1 text-[12px] font-medium"
+                style={{ color: colors.secondaryText }}
+              >
+                {titleInputLabel || t.agentConfigName}
               </Text>
               <TextInput
                 className="rounded-2xl px-4 py-3 text-[15px]"
-                placeholder={t.search}
-                style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
+                placeholder={titleInputPlaceholder}
                 placeholderTextColor={colors.secondaryText}
-                value={keyword}
-                onChangeText={setKeyword}
+                style={{ backgroundColor: colors.fillTertiary, color: colors.foreground }}
+                value={draftTitle}
+                onChangeText={setDraftTitle}
               />
             </View>
+          ) : null}
 
-            {loading ? (
-              <View className="items-center justify-center py-8">
-                <ActivityIndicator color={colors.primary} />
-              </View>
-            ) : filteredAgents.length === 0 ? (
-              <View className="rounded-2xl px-4 py-5" style={{ backgroundColor: colors.fillQuaternary }}>
-                <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>{t.agentsEmpty}</Text>
-                <Text className="mt-1 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
-                  {t.agentsEmptyDesc}
-                </Text>
-              </View>
-            ) : (
-              filteredAgents.map((agent, index) => {
-                const selected = selectedIds.has(agent.id);
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    key={agent.id}
-                    className={`flex-row items-center rounded-2xl px-4 py-3 ${
-                      index === filteredAgents.length - 1 ? '' : 'mb-3'
-                    }`}
-                    style={{
-                      backgroundColor: selected
-                        ? `${colors.primary}12`
-                        : colors.fillTertiary,
-                      borderColor: selected ? `${colors.primary}36` : 'transparent',
-                      borderWidth: 1,
-                    }}
-                    onPress={() => {
-                      haptics.selection();
-                      setSelectedIds((current) => {
-                        const next = new Set(current);
-                        if (next.has(agent.id)) {
-                          next.delete(agent.id);
-                        } else {
-                          next.add(agent.id);
-                        }
-                        return next;
-                      });
-                    }}
-                  >
-                    <AgentAvatar agent={agent} />
-                    <View className="flex-1">
-                      <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>
-                        {agent.title || t.settingsDefaultAgent}
-                      </Text>
-                      <Text className="mt-0.5 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
-                        {agent.description || t.agentNoDescription}
-                      </Text>
-                    </View>
-                    <View
-                      className="items-center justify-center rounded-full"
-                      style={{
-                        width: 22,
-                        height: 22,
-                        backgroundColor: selected
-                          ? colors.primary
-                          : colors.switchTrackOffAlt,
-                      }}
-                    >
-                      {selected ? (
-                        <Check color={colors.iconOnPrimary} size={13} strokeWidth={tokens.icon.strokeWidth + 0.3} />
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-            </Pressable>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Pressable>
+          {showSupervisorModelPicker ? (
+            <SelectionListItem
+              className="mb-4"
+              subtitle={supervisorModelLabel}
+              title={t.groupCreateSupervisorModel}
+              rightAccessory={
+                <ChevronRight
+                  color={colors.secondaryText}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              }
+              onPress={() => {
+                haptics.light();
+                setSupervisorModelDrawerVisible(true);
+              }}
+            />
+          ) : null}
 
+          <View className="mb-4">
+            <Text
+              className="mb-1.5 px-1 text-[12px] font-medium"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.search}
+            </Text>
+            <SearchField
+              placeholder={t.search}
+              size="compact"
+              value={keyword}
+              onChangeText={setKeyword}
+            />
+          </View>
+
+          {loading ? (
+            <View className="items-center justify-center py-8">
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : filteredAgents.length === 0 ? (
+            <View
+              className="rounded-2xl px-4 py-5"
+              style={{ backgroundColor: colors.fillQuaternary }}
+            >
+              <Text className="text-[14px] font-semibold" style={{ color: colors.foreground }}>
+                {t.agentsEmpty}
+              </Text>
+              <Text className="mt-1 text-[12px] leading-5" style={{ color: colors.secondaryText }}>
+                {t.agentsEmptyDesc}
+              </Text>
+            </View>
+          ) : (
+            filteredAgents.map((agent, index) => {
+              const selected = selectedIds.has(agent.id);
+
+              return (
+                <SelectionListItem
+                  className={index === filteredAgents.length - 1 ? '' : 'mb-2'}
+                  key={agent.id}
+                  leading={<AgentAvatar agent={agent} />}
+                  selected={selected}
+                  subtitle={agent.description || t.agentNoDescription}
+                  subtitleNumberOfLines={3}
+                  title={agent.title || t.settingsDefaultAgent}
+                  onPress={() => {
+                    haptics.selection();
+                    setSelectedIds((current) => {
+                      const next = new Set(current);
+
+                      if (next.has(agent.id)) {
+                        next.delete(agent.id);
+                      } else {
+                        next.add(agent.id);
+                      }
+
+                      return next;
+                    });
+                  }}
+                />
+              );
+            })
+          )}
+        </ScrollView>
+      </BottomSheetScaffold>
       {showSupervisorModelPicker ? (
         <ModelDrawer
           initialModel={supervisorModel || undefined}
@@ -372,6 +322,6 @@ export default function AgentSelectionSheet({
           }}
         />
       ) : null}
-    </Modal>
+    </>
   );
 }

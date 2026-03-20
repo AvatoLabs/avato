@@ -2,11 +2,11 @@
  * Navigation — single unified navigator with all screens.
  */
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { BlurView } from 'expo-blur';
 import { FolderOpen, MessageCircle, Palette, Store } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Image as RNImage, Platform, View } from 'react-native';
+import { Image as RNImage, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -43,10 +43,26 @@ import StatsScreen from '../screens/StatsScreen';
 import StoreScreen from '../screens/StoreScreen';
 import TopicListScreen from '../screens/TopicListScreen';
 import { useThemeStore } from '../store/theme';
+import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const TAB_TRANSITION_ANIMATION = 'shift' as const;
+const STACK_CARD_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'default';
+const STACK_ENTRY_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'simple_push';
+const IOS_STACK_GESTURE_OPTIONS =
+  Platform.OS === 'ios'
+    ? ({
+        animationMatchesGesture: true,
+        fullScreenGestureEnabled: true,
+        freezeOnBlur: true,
+        gestureDirection: 'horizontal',
+        gestureEnabled: true,
+      } as const)
+    : ({
+        freezeOnBlur: true,
+      } as const);
 
 function MeTabIcon({
   focused,
@@ -115,15 +131,8 @@ function MeTabIcon({
   );
 }
 
-function AnimatedTabLabel({
-  color,
-  focused,
-  label,
-}: {
-  color: string;
-  focused: boolean;
-  label: string;
-}) {
+function AnimatedTabLabel({ focused, label }: { focused: boolean; label: string }) {
+  const colors = useThemeColors();
   const opacity = useSharedValue(focused ? 1 : 0.7);
   const scale = useSharedValue(focused ? 1 : 0.94);
   const translateY = useSharedValue(focused ? 0 : 1.5);
@@ -152,7 +161,7 @@ function AnimatedTabLabel({
     <Animated.Text
       style={[
         {
-          color,
+          color: focused ? colors.foreground : colors.secondaryText,
           fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
           fontSize: 11,
           fontWeight: tokens.typography.weight.medium as any,
@@ -166,8 +175,107 @@ function AnimatedTabLabel({
   );
 }
 
+function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; focused: boolean }) {
+  const colors = useThemeColors();
+  const haloOpacity = useSharedValue(focused ? 1 : 0);
+  const haloScale = useSharedValue(focused ? 1 : 0.92);
+  const iconScale = useSharedValue(focused ? 1 : 0.94);
+  const translateY = useSharedValue(focused ? -1.5 : 0);
+
+  useEffect(() => {
+    haloOpacity.value = withTiming(focused ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+    haloScale.value = withSpring(focused ? 1 : 0.92, {
+      damping: 18,
+      stiffness: 210,
+    });
+    iconScale.value = withSpring(focused ? 1 : 0.94, {
+      damping: 16,
+      stiffness: 240,
+    });
+    translateY.value = withTiming(focused ? -1.5 : 0.5, {
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [focused, haloOpacity, haloScale, iconScale, translateY]);
+
+  const haloAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: haloOpacity.value,
+    transform: [{ scale: haloScale.value }],
+  }));
+
+  const iconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }, { scale: iconScale.value }],
+  }));
+
+  return (
+    <View style={{ alignItems: 'center', height: 34, justifyContent: 'center', width: 34 }}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            backgroundColor: colors.activeTabBg,
+            borderRadius: tokens.radius.full,
+          },
+          haloAnimatedStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          {
+            alignItems: 'center',
+            backgroundColor: focused ? 'transparent' : colors.fillQuaternary,
+            borderColor: focused ? 'transparent' : colors.borderSubtle,
+            borderRadius: tokens.radius.full,
+            borderWidth: focused ? 0 : 1,
+            height: 34,
+            justifyContent: 'center',
+            width: 34,
+          },
+          iconAnimatedStyle,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+function FloatingTabBarBackground() {
+  const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const blurTint = effectiveTheme === 'dark' ? 'dark' : 'light';
+  const overlay = (
+    <View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFillObject,
+        {
+          backgroundColor: colors.surfaceElevated,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          opacity: Platform.OS === 'ios' ? 0.9 : 0.98,
+        },
+      ]}
+    />
+  );
+
+  if (Platform.OS === 'ios') {
+    return (
+      <BlurView intensity={88} style={StyleSheet.absoluteFill} tint={blurTint}>
+        {overlay}
+      </BlurView>
+    );
+  }
+
+  return overlay;
+}
+
 function BottomTabs() {
-  const { colors } = useTheme();
+  const themeColors = useThemeColors();
   const { t } = useI18n();
   const [meIconTrigger, setMeIconTrigger] = useState(0);
 
@@ -179,22 +287,26 @@ function BottomTabs() {
         },
       }}
       screenOptions={{
-        animation: 'fade',
+        animation: TAB_TRANSITION_ANIMATION,
+        freezeOnBlur: true,
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text + '60',
+        tabBarActiveTintColor: themeColors.iconOnPrimary,
+        tabBarInactiveTintColor: themeColors.secondaryText,
+        tabBarBackground: () => <FloatingTabBarBackground />,
+        tabBarHideOnKeyboard: true,
         tabBarItemStyle: {
-          paddingTop: 4,
+          paddingTop: 6,
         },
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopWidth: 0, // Removed hard border
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
           elevation: 0,
           height: Platform.OS === 'android' ? 64 : 78,
-          paddingTop: 8,
-          shadowOpacity: 0.05, // Extremely subtle shadow instead of hard line
-          shadowOffset: { width: 0, height: -2 },
-          shadowRadius: 10,
+          paddingTop: 6,
+          shadowColor: themeColors.shadow,
+          shadowOpacity: 0.12,
+          shadowOffset: { width: 0, height: -6 },
+          shadowRadius: 22,
           ...(Platform.OS === 'android' ? { paddingBottom: 8 } : {}),
         },
       }}
@@ -203,12 +315,12 @@ function BottomTabs() {
         component={ChatListScreen}
         name="Chats"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <MessageCircle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          tabBarIcon: ({ color, focused, size }) => (
+            <AnimatedTabIcon focused={focused}>
+              <MessageCircle color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            </AnimatedTabIcon>
           ),
-          tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.tabChats} />
-          ),
+          tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabChats} />,
           tabBarAccessibilityLabel: 'Chats tab',
         }}
       />
@@ -216,12 +328,12 @@ function BottomTabs() {
         component={CreateScreen}
         name="Create"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Palette color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          tabBarIcon: ({ color, focused, size }) => (
+            <AnimatedTabIcon focused={focused}>
+              <Palette color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            </AnimatedTabIcon>
           ),
-          tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.tabArtwork} />
-          ),
+          tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabArtwork} />,
           tabBarAccessibilityLabel: 'Create tab',
         }}
       />
@@ -229,11 +341,13 @@ function BottomTabs() {
         component={ResourceScreen}
         name="Resources"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <FolderOpen color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          tabBarIcon: ({ color, focused, size }) => (
+            <AnimatedTabIcon focused={focused}>
+              <FolderOpen color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            </AnimatedTabIcon>
           ),
-          tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.resourceTitle} />
+          tabBarLabel: ({ focused }) => (
+            <AnimatedTabLabel focused={focused} label={t.resourceTitle} />
           ),
           tabBarAccessibilityLabel: 'Resources tab',
         }}
@@ -242,12 +356,12 @@ function BottomTabs() {
         component={StoreScreen}
         name="Store"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Store color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+          tabBarIcon: ({ color, focused, size }) => (
+            <AnimatedTabIcon focused={focused}>
+              <Store color={color} size={size - 2} strokeWidth={tokens.icon.strokeWidth} />
+            </AnimatedTabIcon>
           ),
-          tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.tabStore} />
-          ),
+          tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabStore} />,
           tabBarAccessibilityLabel: 'Store tab',
         }}
       />
@@ -261,11 +375,11 @@ function BottomTabs() {
         }}
         options={{
           tabBarIcon: ({ focused, size }) => (
-            <MeTabIcon focused={focused} size={size} trigger={meIconTrigger} />
+            <AnimatedTabIcon focused={focused}>
+              <MeTabIcon focused={focused} size={size} trigger={meIconTrigger} />
+            </AnimatedTabIcon>
           ),
-          tabBarLabel: ({ color, focused }) => (
-            <AnimatedTabLabel color={color} focused={focused} label={t.tabMe} />
-          ),
+          tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabMe} />,
           tabBarAccessibilityLabel: 'Me tab',
         }}
       />
@@ -279,101 +393,56 @@ interface RootNavigatorProps {
 
 export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigatorProps) {
   return (
-    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName={initialRoute}
+      screenOptions={{
+        animation: STACK_CARD_ANIMATION,
+        headerShown: false,
+        ...IOS_STACK_GESTURE_OPTIONS,
+      }}
+    >
       {/* Onboarding: Welcome -> ServerConfig (Connect) -> Login/MainTabs */}
       <Stack.Screen
         component={WelcomeScreen}
         name="OnboardingWelcome"
-        options={{ animation: 'fade' }}
+        options={{ animation: STACK_ENTRY_ANIMATION }}
       />
       <Stack.Screen
         component={ServerConfigScreen}
         initialParams={{ firstLaunch: initialRoute === 'ServerConfig' }}
         name="ServerConfig"
-        options={{ animation: 'slide_from_right' }}
+        options={{ animation: STACK_ENTRY_ANIMATION }}
       />
-      <Stack.Screen component={LoginScreen} name="Login" options={{ animation: 'fade' }} />
-      <Stack.Screen component={BottomTabs} name="MainTabs" options={{ animation: 'fade' }} />
+      <Stack.Screen
+        component={LoginScreen}
+        name="Login"
+        options={{ animation: STACK_ENTRY_ANIMATION }}
+      />
+      <Stack.Screen
+        component={BottomTabs}
+        name="MainTabs"
+        options={{ animation: STACK_ENTRY_ANIMATION }}
+      />
 
       {/* Chat */}
-      <Stack.Screen
-        component={ChatDetailScreen}
-        name="ChatDetail"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ChatSettingsScreen}
-        name="ChatSettings"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={TopicListScreen}
-        name="TopicList"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={NotebookScreen}
-        name="Notebook"
-        options={{ animation: 'slide_from_right' }}
-      />
+      <Stack.Screen component={ChatDetailScreen} name="ChatDetail" />
+      <Stack.Screen component={ChatSettingsScreen} name="ChatSettings" />
+      <Stack.Screen component={TopicListScreen} name="TopicList" />
+      <Stack.Screen component={NotebookScreen} name="Notebook" />
 
       {/* Settings */}
-      <Stack.Screen
-        component={AIProvidersScreen}
-        name="AIProviders"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ProviderDetailScreen}
-        name="ProviderDetail"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ModelPickerScreen}
-        name="ModelPicker"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={ProfileEditScreen}
-        name="ProfileEdit"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={DataManagementScreen}
-        name="DataManagement"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={AppLogsScreen}
-        name="AppLogs"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={StatsScreen}
-        name="Stats"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={MemoryScreen}
-        name="Memory"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={MemoryDetailScreen}
-        name="MemoryDetail"
-        options={{ animation: 'slide_from_right' }}
-      />
+      <Stack.Screen component={AIProvidersScreen} name="AIProviders" />
+      <Stack.Screen component={ProviderDetailScreen} name="ProviderDetail" />
+      <Stack.Screen component={ModelPickerScreen} name="ModelPicker" />
+      <Stack.Screen component={ProfileEditScreen} name="ProfileEdit" />
+      <Stack.Screen component={DataManagementScreen} name="DataManagement" />
+      <Stack.Screen component={AppLogsScreen} name="AppLogs" />
+      <Stack.Screen component={StatsScreen} name="Stats" />
+      <Stack.Screen component={MemoryScreen} name="Memory" />
+      <Stack.Screen component={MemoryDetailScreen} name="MemoryDetail" />
 
-      <Stack.Screen
-        component={AgentListScreen}
-        name="AgentList"
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        component={AgentConfigScreen}
-        name="AgentConfig"
-        options={{ animation: 'slide_from_right' }}
-      />
+      <Stack.Screen component={AgentListScreen} name="AgentList" />
+      <Stack.Screen component={AgentConfigScreen} name="AgentConfig" />
     </Stack.Navigator>
   );
 }

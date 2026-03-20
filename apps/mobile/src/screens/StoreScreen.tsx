@@ -18,6 +18,7 @@ import {
   Link as LinkIcon,
   Package,
   Plus,
+  Search,
   Trash2,
   X,
 } from 'lucide-react-native';
@@ -43,7 +44,7 @@ import CardSkeleton from '../components/ui/CardSkeleton';
 import { FilterChip, MetaTag, SegmentedControl } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import PressableScale from '../components/ui/PressableScale';
-import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
 import {
@@ -382,7 +383,9 @@ const filterMarketItemsByCategory = (
   return items.filter((item) => {
     const rawCategory = item.category?.trim().toLowerCase();
     if (!rawCategory) return false;
-    const normalizedCategory = validKeys ? normalizeCategoryKey(rawCategory, validKeys) : rawCategory;
+    const normalizedCategory = validKeys
+      ? normalizeCategoryKey(rawCategory, validKeys)
+      : rawCategory;
     return rawCategory === categoryKey || normalizedCategory === categoryKey;
   });
 };
@@ -541,7 +544,11 @@ const InstalledRow = memo<{
             {item.description}
           </Text>
         ) : (
-          <Text className="text-[11px] mt-0.5" numberOfLines={1} style={{ color: colors.tertiaryText }}>
+          <Text
+            className="text-[11px] mt-0.5"
+            numberOfLines={1}
+            style={{ color: colors.tertiaryText }}
+          >
             {item.identifier}
           </Text>
         )}
@@ -909,7 +916,10 @@ function AddCustomMcpModal({
                       style={{ backgroundColor: colors.fillTertiary }}
                       onPress={() => setShowQuickImport(false)}
                     >
-                      <Text className="text-[13px] font-semibold" style={{ color: colors.secondaryText }}>
+                      <Text
+                        className="text-[13px] font-semibold"
+                        style={{ color: colors.secondaryText }}
+                      >
                         {t.cancel}
                       </Text>
                     </Pressable>
@@ -917,7 +927,9 @@ function AddCustomMcpModal({
                     <Pressable
                       className="flex-1 rounded-lg py-2.5 px-4 items-center active:opacity-80"
                       disabled={!isQuickImportReady}
-                      style={{ backgroundColor: isQuickImportReady ? colors.primary : colors.fillTertiary }}
+                      style={{
+                        backgroundColor: isQuickImportReady ? colors.primary : colors.fillTertiary,
+                      }}
                       onPress={handleQuickImport}
                     >
                       <Text
@@ -1005,7 +1017,9 @@ function AddCustomMcpModal({
               <View className="flex-row mb-3 bg-foreground/5 rounded-xl p-1">
                 <Pressable
                   className="flex-1 py-2.5 rounded-lg items-center"
-                  style={authType === 'none' ? { backgroundColor: colors.primarySubtle } : undefined}
+                  style={
+                    authType === 'none' ? { backgroundColor: colors.primarySubtle } : undefined
+                  }
                   onPress={() => setAuthType('none')}
                 >
                   <Text
@@ -1019,7 +1033,9 @@ function AddCustomMcpModal({
                 </Pressable>
                 <Pressable
                   className="flex-1 py-2.5 rounded-lg items-center"
-                  style={authType === 'bearer' ? { backgroundColor: colors.primarySubtle } : undefined}
+                  style={
+                    authType === 'bearer' ? { backgroundColor: colors.primarySubtle } : undefined
+                  }
                   onPress={() => setAuthType('bearer')}
                 >
                   <Text
@@ -1035,7 +1051,10 @@ function AddCustomMcpModal({
 
               {authType === 'bearer' ? (
                 <>
-                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
+                  <Text
+                    className="text-[13px] font-medium mb-1.5"
+                    style={{ color: colors.foreground }}
+                  >
                     {t.skillsCustomMcpToken}
                   </Text>
                   <TextInput
@@ -1056,7 +1075,9 @@ function AddCustomMcpModal({
                 <Pressable
                   className="rounded-xl py-3 items-center active:opacity-80"
                   disabled={!isConnectionReady || testing}
-                  style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
+                  style={{
+                    backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary,
+                  }}
                   onPress={handleTestConnection}
                 >
                   {testing ? (
@@ -1077,7 +1098,10 @@ function AddCustomMcpModal({
               {testResult ? (
                 <View
                   className="rounded-xl px-4 py-2.5 mb-3"
-                  style={{ backgroundColor: testResult === 'success' ? colors.successSubtle : colors.dangerSubtle }}
+                  style={{
+                    backgroundColor:
+                      testResult === 'success' ? colors.successSubtle : colors.dangerSubtle,
+                  }}
                 >
                   <Text
                     className="text-[13px]"
@@ -1113,7 +1137,10 @@ function AddCustomMcpModal({
 
               {showAdvanced ? (
                 <>
-                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
+                  <Text
+                    className="text-[13px] font-medium mb-1.5"
+                    style={{ color: colors.foreground }}
+                  >
                     {t.skillsCustomMcpHeaders}
                   </Text>
                   {headers.map((header, index) => (
@@ -1167,7 +1194,10 @@ function AddCustomMcpModal({
                     </Text>
                   </Pressable>
 
-                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
+                  <Text
+                    className="text-[13px] font-medium mb-1.5"
+                    style={{ color: colors.foreground }}
+                  >
                     {t.skillsCustomMcpDesc}
                   </Text>
                   <TextInput
@@ -1181,7 +1211,10 @@ function AddCustomMcpModal({
                     onChangeText={setDescription}
                   />
 
-                  <Text className="text-[13px] font-medium mb-1.5" style={{ color: colors.foreground }}>
+                  <Text
+                    className="text-[13px] font-medium mb-1.5"
+                    style={{ color: colors.foreground }}
+                  >
                     {t.skillsCustomMcpAvatar}
                   </Text>
                   <TextInput
@@ -1201,7 +1234,9 @@ function AddCustomMcpModal({
               <Pressable
                 className="rounded-xl py-3.5 items-center mt-2 active:opacity-80"
                 disabled={!isConnectionReady || saving}
-                style={{ backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary }}
+                style={{
+                  backgroundColor: isConnectionReady ? colors.primary : colors.fillTertiary,
+                }}
                 onPress={handleSave}
               >
                 {saving ? (
@@ -1245,9 +1280,13 @@ function StoreItemModal({
 
   if (!detail) return null;
 
-  const isInstalled = Boolean(detail.installedPlugin || detail.installedSkill || detail.builtinItem);
+  const isInstalled = Boolean(
+    detail.installedPlugin || detail.installedSkill || detail.builtinItem,
+  );
   const canInstall = Boolean(detail.marketItem) && !isInstalled;
-  const canUninstall = Boolean(detail.installedPlugin || detail.installedSkill || detail.builtinItem);
+  const canUninstall = Boolean(
+    detail.installedPlugin || detail.installedSkill || detail.builtinItem,
+  );
 
   return (
     <Modal
@@ -1306,12 +1345,22 @@ function StoreItemModal({
                 {detail.identifier}
               </Text>
             </View>
-            <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.primarySubtle }}>
-              <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>{detail.label}</Text>
+            <View
+              className="px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
+              <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
+                {detail.label}
+              </Text>
             </View>
             {isInstalled ? (
-              <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.successSubtle }}>
-                <Text className="text-[11px] font-medium" style={{ color: colors.success }}>{t.storeInstalled}</Text>
+              <View
+                className="px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: colors.successSubtle }}
+              >
+                <Text className="text-[11px] font-medium" style={{ color: colors.success }}>
+                  {t.storeInstalled}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -1325,10 +1374,7 @@ function StoreItemModal({
           ) : null}
 
           {detail.installedSkill?.source === 'builtin' || detail.builtinItem ? (
-            <Text
-              className="text-[12px] leading-5 mt-4"
-              style={{ color: colors.secondaryText }}
-            >
+            <Text className="text-[12px] leading-5 mt-4" style={{ color: colors.secondaryText }}>
               {t.storeBuiltIn}
             </Text>
           ) : null}
@@ -1344,7 +1390,12 @@ function StoreItemModal({
                 {actionLoading ? (
                   <ActivityIndicator color={colors.iconOnPrimary} size="small" />
                 ) : (
-                  <Text className="text-[14px] font-semibold" style={{ color: colors.iconOnPrimary }}>{t.storeInstall}</Text>
+                  <Text
+                    className="text-[14px] font-semibold"
+                    style={{ color: colors.iconOnPrimary }}
+                  >
+                    {t.storeInstall}
+                  </Text>
                 )}
               </PressableScale>
             ) : null}
@@ -1380,8 +1431,10 @@ export default function StoreScreen() {
   const [activeExploreSource, setActiveExploreSource] = useState<ExploreSource>('mcp');
   const [activeExploreCategory, setActiveExploreCategory] = useState(ALL_CATEGORY_KEY);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchRef = useRef<TextInput>(null);
 
   const [marketItems, setMarketItems] = useState<MarketListItem[]>([]);
   const [marketCategories, setMarketCategories] = useState<MarketCategoryItem[]>([]);
@@ -1434,6 +1487,12 @@ export default function StoreScreen() {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!searchVisible) return;
+    const timer = setTimeout(() => searchRef.current?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [searchVisible]);
 
   const fetchInstalled = useCallback(async () => {
     setInstalledLoading(true);
@@ -1504,31 +1563,34 @@ export default function StoreScreen() {
     [fetchInstalled, uninstalledBuiltinTools],
   );
 
-  const fetchCategories = useCallback(async (source: ExploreSource) => {
-    const fallback = mergeCategoryBuckets(
-      deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
-      source,
-    );
-    setMarketCategories(fallback);
-
-    if (marketSourceErrors[source]) return;
-
-    try {
-      const list =
-        source === 'mcp'
-          ? await marketSkillApi.getMcpCategories()
-          : await marketSkillApi.getCategories();
-      const items = Array.isArray(list) ? list : [];
-      setMarketCategories(
-        mergeCategoryBuckets(
-          [...items, ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source)],
-          source,
-        ),
+  const fetchCategories = useCallback(
+    async (source: ExploreSource) => {
+      const fallback = mergeCategoryBuckets(
+        deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
+        source,
       );
-    } catch {
-      // keep fallback
-    }
-  }, [marketSourceErrors]);
+      setMarketCategories(fallback);
+
+      if (marketSourceErrors[source]) return;
+
+      try {
+        const list =
+          source === 'mcp'
+            ? await marketSkillApi.getMcpCategories()
+            : await marketSkillApi.getCategories();
+        const items = Array.isArray(list) ? list : [];
+        setMarketCategories(
+          mergeCategoryBuckets(
+            [...items, ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source)],
+            source,
+          ),
+        );
+      } catch {
+        // keep fallback
+      }
+    },
+    [marketSourceErrors],
+  );
 
   const fetchExploreTotals = useCallback(async () => {
     const [mcpResult, skillResult] = await Promise.allSettled([
@@ -1612,7 +1674,11 @@ export default function StoreScreen() {
         setMarketSourceErrors((prev) => ({ ...prev, [source]: true }));
         if (!append) {
           const fallbackItems = filterMarketItemsByQuery(
-            filterMarketItemsByCategory(marketSnapshotRef.current[source], activeExploreCategory, source),
+            filterMarketItemsByCategory(
+              marketSnapshotRef.current[source],
+              activeExploreCategory,
+              source,
+            ),
             debouncedQuery,
           );
           setMarketItems(fallbackItems);
@@ -1710,30 +1776,27 @@ export default function StoreScreen() {
     ],
   );
 
-  const allInstalled = useMemo(
-    () => {
-      const builtinIdsAlreadyShown = new Set(
-        installedSkills
-          .map((skill) => skill.identifier || skill.id)
-          .filter((identifier): identifier is string => Boolean(identifier)),
-      );
+  const allInstalled = useMemo(() => {
+    const builtinIdsAlreadyShown = new Set(
+      installedSkills
+        .map((skill) => skill.identifier || skill.id)
+        .filter((identifier): identifier is string => Boolean(identifier)),
+    );
 
-      const builtinInstalledItems = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
-        (item) =>
-          !uninstalledBuiltinTools.includes(item.identifier) &&
-          !builtinIdsAlreadyShown.has(item.identifier),
-      )
-        .map((item) => buildInstalledBuiltinItem(item.identifier, t, colors))
-        .filter((item): item is StoreInstalledItem => Boolean(item));
+    const builtinInstalledItems = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+      (item) =>
+        !uninstalledBuiltinTools.includes(item.identifier) &&
+        !builtinIdsAlreadyShown.has(item.identifier),
+    )
+      .map((item) => buildInstalledBuiltinItem(item.identifier, t, colors))
+      .filter((item): item is StoreInstalledItem => Boolean(item));
 
-      return [
-        ...builtinInstalledItems,
-        ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
-        ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
-      ];
-    },
-    [colors, installedPlugins, installedSkills, t, uninstalledBuiltinTools],
-  );
+    return [
+      ...builtinInstalledItems,
+      ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
+      ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
+    ];
+  }, [colors, installedPlugins, installedSkills, t, uninstalledBuiltinTools]);
 
   const filteredInstalled = useMemo(() => {
     if (!debouncedQuery) return allInstalled;
@@ -1808,14 +1871,7 @@ export default function StoreScreen() {
       label: item.label,
       name: item.name,
     };
-  }, [
-    colors,
-    installedIds,
-    installedPlugins,
-    installedSkills,
-    selectedEntry,
-    t,
-  ]);
+  }, [colors, installedIds, installedPlugins, installedSkills, selectedEntry, t]);
 
   const handleSelectedInstall = useCallback(async () => {
     if (!selectedDetail?.marketItem) return;
@@ -2012,7 +2068,8 @@ export default function StoreScreen() {
     () => [
       { label: t.storeExplore, value: 'explore' as const },
       {
-        label: allInstalled.length > 0 ? `${t.storeInstalled} ${allInstalled.length}` : t.storeInstalled,
+        label:
+          allInstalled.length > 0 ? `${t.storeInstalled} ${allInstalled.length}` : t.storeInstalled,
         value: 'installed' as const,
       },
     ],
@@ -2024,6 +2081,10 @@ export default function StoreScreen() {
       { key: 'skill' as const, label: t.storeSkills },
     ],
     [t.storeMcp, t.storeSkills],
+  );
+  const exploreSourceSwitchItems = useMemo(
+    () => exploreSources.map((source) => ({ label: source.label, value: source.key })),
+    [exploreSources],
   );
 
   const isExplore = activeTab === 'explore';
@@ -2064,32 +2125,73 @@ export default function StoreScreen() {
       ? marketMcpTotal
       : marketSkillTotal;
 
+  const toggleSearch = useCallback(() => {
+    setSearchVisible((value) => {
+      const next = !value;
+      if (!next) setSearchQuery('');
+      return next;
+    });
+  }, []);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         headerLevel="root"
         rightAccessibilityLabel={t.accessibilityAddStore}
         title={t.tabStore}
-        rightElement={
-          <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+        rightActions={
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            <HeaderIconButton
+              accessibilityLabel={t.storeSearch}
+              active={searchVisible}
+              onPress={toggleSearch}
+            >
+              {searchVisible ? (
+                <X color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              ) : (
+                <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              )}
+            </HeaderIconButton>
+            <HeaderIconButton
+              accessibilityLabel={t.accessibilityAddStore}
+              onPress={() => setShowCreateMenu(true)}
+            >
+              <Plus color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+            </HeaderIconButton>
+          </View>
         }
-        onPressRight={() => setShowCreateMenu(true)}
       >
-        <SearchField
-          containerClassName="mx-6 mb-2"
-          placeholder={t.storeSearch}
-          returnKeyType="search"
-          size="compact"
-          value={searchQuery}
-          rightElement={
-            searchQuery ? (
-              <TouchableOpacity hitSlop={8} onPress={() => setSearchQuery('')}>
-                <X color={colors.muted} size={16} strokeWidth={2} />
+        {searchVisible ? (
+          <SearchField
+            accessibilityLabel={t.storeSearch}
+            containerClassName="mx-6 mb-2"
+            placeholder={t.storeSearch}
+            ref={searchRef}
+            returnKeyType="search"
+            size="compact"
+            value={searchQuery}
+            rightElement={
+              <TouchableOpacity
+                hitSlop={8}
+                onPress={() => {
+                  if (searchQuery.length > 0) {
+                    setSearchQuery('');
+                    return;
+                  }
+
+                  setSearchVisible(false);
+                }}
+              >
+                <X
+                  color={colors.muted}
+                  size={tokens.icon.size.sm}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
               </TouchableOpacity>
-            ) : undefined
-          }
-          onChangeText={setSearchQuery}
-        />
+            }
+            onChangeText={setSearchQuery}
+          />
+        ) : null}
 
         <View className="px-6 pb-2">
           <SegmentedControl items={tabs} value={activeTab} onChange={setActiveTab} />
@@ -2100,38 +2202,21 @@ export default function StoreScreen() {
             <ScrollView
               horizontal
               className="mb-1 px-6"
-              contentContainerStyle={{ gap: 8, paddingRight: 12 }}
+              contentContainerStyle={{ gap: 6, paddingRight: 12 }}
               showsHorizontalScrollIndicator={false}
             >
-              {exploreSources.map((source) => {
-                const active = activeExploreSource === source.key;
-                const total = marketSourceErrors[source.key]
-                  ? marketSnapshotRef.current[source.key].length
-                  : source.key === 'mcp'
-                    ? marketMcpTotal
-                    : marketSkillTotal;
-                return (
-                  <FilterChip
-                    active={active}
-                    count={total > 0 ? formatCount(total, locale) : undefined}
-                    key={source.key}
-                    label={source.label}
-                    onPress={() => {
-                      haptics.selection();
-                      setActiveExploreCategory(ALL_CATEGORY_KEY);
-                      setActiveExploreSource(source.key);
-                    }}
-                  />
-                );
-              })}
-            </ScrollView>
-
-            <ScrollView
-              horizontal
-              className="mb-1 px-6"
-              contentContainerStyle={{ gap: 8, paddingRight: 12 }}
-              showsHorizontalScrollIndicator={false}
-            >
+              <View style={{ flexShrink: 0, width: 156 }}>
+                <SegmentedControl
+                  items={exploreSourceSwitchItems}
+                  value={activeExploreSource}
+                  onChange={(value) => {
+                    haptics.selection();
+                    setActiveExploreCategory(ALL_CATEGORY_KEY);
+                    setActiveExploreSource(value);
+                  }}
+                />
+              </View>
+              {categoryOptions.length > 0 ? <View style={{ width: 2 }} /> : null}
               {categoryOptions.map((category) => {
                 const active = activeExploreCategory === category.key;
                 return (
@@ -2296,7 +2381,11 @@ export default function StoreScreen() {
               }}
             >
               <View className="flex-row items-center">
-                <FileArchive color={colors.fileArchive} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                <FileArchive
+                  color={colors.fileArchive}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
                 <Text className="text-foreground text-[14px] font-medium ml-3">
                   {t.storeUploadZip}
                 </Text>

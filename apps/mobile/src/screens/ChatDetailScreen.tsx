@@ -27,7 +27,6 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  Dimensions,
   Image as RNImage,
   Keyboard,
   LayoutAnimation,
@@ -42,6 +41,7 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   FadeOut,
+  useAnimatedKeyboard,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -52,6 +52,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import {
   ComposerCountBadge,
+  ComposerIconButton,
   ComposerPrimaryAction,
   ComposerShell,
 } from '../components/ui/ComposerShell';
@@ -69,6 +70,7 @@ import { useToast } from '../components/ui/Toast';
 import { getProviderIconUrl } from '../constants/cdn';
 import type { MobileRecommendedBuiltinIcon } from '../constants/recommendedBuiltins';
 import { MOBILE_RECOMMENDED_BUILTIN_SKILLS } from '../constants/recommendedBuiltins';
+import { withAlpha } from '../constants/tags';
 import {
   agentApi,
   agentGroupApi,
@@ -84,6 +86,7 @@ import {
 import { buildDisplayMessages } from '../lib/groupTasksTransform';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
+import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
 import { isGroupSessionLike } from '../lib/session';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { generateBestTitle } from '../lib/titleGeneration';
@@ -92,7 +95,7 @@ import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
 import { useSessionStore } from '../store/session';
 import { useThemeStore } from '../store/theme';
-import { useTopicStore } from '../store/topic';
+import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -136,7 +139,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const fetchMessages = useChatStore((s) => s.fetchMessages);
 
   const activeTopic = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
-  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? []);
+  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? EMPTY_TOPICS);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const switchTopic = useTopicStore((s) => s.switchTopic);
   const activeTopicItem = useMemo(
@@ -165,6 +168,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const hasObservedTopicChange = useRef(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const animatedKeyboard = useAnimatedKeyboard();
 
   // Skills drawer
   const [skillsSheetVisible, setSkillsSheetVisible] = useState(false);
@@ -280,7 +284,15 @@ export default function ChatDetailScreen({ route, navigation }: any) {
           switchTopic(sessionId, initialTopicId);
         }
       });
-    }, [initialTopicId, sessionId, sessionKey, fetchMessages, fetchSessions, fetchTopics, switchTopic]),
+    }, [
+      initialTopicId,
+      sessionId,
+      sessionKey,
+      fetchMessages,
+      fetchSessions,
+      fetchTopics,
+      switchTopic,
+    ]),
   );
 
   useFocusEffect(
@@ -307,17 +319,23 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   }, []);
 
   const inputPaddingBottom = Math.max(insets.bottom, 8);
+  const composerLiftStyle = useAnimatedStyle(() => {
+    const lift =
+      Platform.OS === 'android'
+        ? Math.max(
+            0,
+            animatedKeyboard.height.value - insets.bottom - ANDROID_COMPOSER_LIFT_ADJUSTMENT,
+          )
+        : keyboardOffset;
+
+    return {
+      transform: [{ translateY: -lift }],
+    };
+  }, [insets.bottom, keyboardOffset]);
+
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
-      const coords = event?.endCoordinates;
-      const windowHeight = Dimensions.get('window').height;
-      const screenY = Number(coords?.screenY ?? windowHeight);
-      const offsetFromBottom = windowHeight - screenY;
-      if (offsetFromBottom > 0) {
-        setKeyboardOffset(offsetFromBottom);
-      } else {
-        setKeyboardOffset(0);
-      }
+      setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
     };
     const handleKeyboardHide = () => {
       setKeyboardOffset(0);
@@ -329,9 +347,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             Keyboard.addListener('keyboardWillShow', handleKeyboardShow),
             Keyboard.addListener('keyboardWillHide', handleKeyboardHide),
             Keyboard.addListener('keyboardWillChangeFrame', (event) => {
-              const windowHeight = Dimensions.get('window').height;
-              const screenY = Number(event?.endCoordinates?.screenY ?? windowHeight);
-              if (screenY >= windowHeight - 1) {
+              if (getKeyboardOffset(event, insets.bottom) <= 0) {
                 handleKeyboardHide();
               } else {
                 handleKeyboardShow(event);
@@ -348,7 +364,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         subscription.remove();
       }
     };
-  }, [inputPaddingBottom]);
+  }, [insets.bottom]);
 
   // Rotating placeholder hints
   const hints = useMemo(
@@ -642,6 +658,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   const sendAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sendScale.value }],
   }));
+  const composerActive =
+    keyboardOffset > 0 || Boolean(inputText.trim()) || pendingFiles.length > 0 || generating;
 
   const autoScrollToEnd = useCallback(() => {
     if (!listRef.current || messages.length === 0) return;
@@ -923,6 +941,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         generating={generating}
         groupMembersById={groupMembersById}
         groupSupervisorId={groupDetail?.supervisorAgentId}
+        isGroupSession={isGroupSession}
+        isReasoning={isReasoning}
         message={item}
         sessionId={sessionId || sessionKey}
         topicId={activeTopic ?? null}
@@ -935,6 +955,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       groupDetail?.supervisorAgentId,
       groupMembersById,
       handleSaveToTopic,
+      isGroupSession,
+      isReasoning,
       sessionId,
       sessionKey,
     ],
@@ -951,131 +973,277 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   return (
     <View className="flex-1 bg-background">
       {/* Header */}
-      <BlurView
+      <View
         className="z-10"
-        intensity={90}
-        style={{ paddingTop: insets.top }}
-        tint={effectiveTheme === 'dark' ? 'dark' : 'light'}
+        style={{
+          backgroundColor: Platform.OS === 'android' ? colors.background : undefined,
+          borderBottomColor: Platform.OS === 'android' ? colors.border : 'transparent',
+          borderBottomWidth: Platform.OS === 'android' ? 1 : 0,
+          paddingTop: insets.top,
+        }}
       >
-        <View className="flex-row items-center justify-between px-4 py-2.5">
-          <View className="flex-row items-center flex-1">
-            <PressableScale
-              accessibilityLabel={t.accessibilityGoBack}
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full mr-2"
-              onPress={() => {
-                haptics.light();
-                navigation.goBack();
-              }}
-            >
-              <ArrowLeft
-                color={colors.foreground}
-                size={22}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-            </PressableScale>
-            <View className="flex-1">
-              <Text
-                className="text-[16px] font-medium text-foreground tracking-tight"
-                numberOfLines={1}
-              >
-                {activeTopicItem?.title || session?.title || t.chatTitle}
-              </Text>
-              {generating ? (
-                <Text className="text-[12px] mt-0.5 font-medium" style={{ color: colors.primary }}>
-                  {isReasoning ? t.chatThinking : t.chatGenerating}
-                </Text>
-              ) : !isGroupSession && sessionModel ? (
-                <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
-                  {toolbarProviderLogo && !providerLogoError ? (
-                    <RNImage
-                      source={{ uri: toolbarProviderLogo }}
-                      style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
-                      onError={() => setProviderLogoError(true)}
-                    />
-                  ) : (
-                    <Cpu
-                      color={colors.secondaryText}
-                      size={13}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginRight: 6 }}
-                    />
-                  )}
+        {Platform.OS !== 'android' ? (
+          <BlurView intensity={90} tint={effectiveTheme === 'dark' ? 'dark' : 'light'}>
+            <View className="flex-row items-center justify-between px-4 py-2.5">
+              <View className="flex-row items-center flex-1">
+                <PressableScale
+                  accessibilityLabel={t.accessibilityGoBack}
+                  accessibilityRole="button"
+                  className="w-9 h-9 items-center justify-center rounded-full mr-2"
+                  onPress={() => {
+                    haptics.light();
+                    navigation.goBack();
+                  }}
+                >
+                  <ArrowLeft
+                    color={colors.foreground}
+                    size={22}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </PressableScale>
+                <View className="flex-1">
                   <Text
-                    className="flex-1 text-[12px] font-medium"
+                    className="text-[16px] font-medium text-foreground tracking-tight"
                     numberOfLines={1}
-                    style={{ color: colors.muted, lineHeight: 14 }}
                   >
-                    {sessionModel}
+                    {activeTopicItem?.title || session?.title || t.chatTitle}
                   </Text>
+                  {generating ? (
+                    <Text
+                      className="text-[12px] mt-0.5 font-medium"
+                      style={{ color: colors.primary }}
+                    >
+                      {isReasoning ? t.chatThinking : t.chatGenerating}
+                    </Text>
+                  ) : !isGroupSession && sessionModel ? (
+                    <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
+                      {toolbarProviderLogo && !providerLogoError ? (
+                        <RNImage
+                          source={{ uri: toolbarProviderLogo }}
+                          style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
+                          onError={() => setProviderLogoError(true)}
+                        />
+                      ) : (
+                        <Cpu
+                          color={colors.secondaryText}
+                          size={13}
+                          strokeWidth={tokens.icon.strokeWidth}
+                          style={{ marginRight: 6 }}
+                        />
+                      )}
+                      <Text
+                        className="flex-1 text-[12px] font-medium"
+                        numberOfLines={1}
+                        style={{ color: colors.muted, lineHeight: 14 }}
+                      >
+                        {sessionModel}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-            </View>
-          </View>
+              </View>
 
-          <View className="flex-row items-center gap-1">
-            <PressableScale
-              accessibilityLabel={t.topicTitle}
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full"
-              onLongPress={
-                activeTopic
-                  ? async () => {
-                      haptics.medium();
-                      const failMessage = [t.toastTitleGenerationFailed, t.toastTitleGenerationFailedHint]
-                        .filter(Boolean)
-                        .join(' ');
-                      try {
-                        const result = await generateBestTitle({
-                          sessionId: sessionId!,
-                          topicId: activeTopic,
-                        });
-                        if (result?.title) {
-                          haptics.success();
-                          toast.show(
-                            'success',
-                            result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
-                          );
-                        } else {
+              <View className="flex-row items-center gap-1">
+                <PressableScale
+                  accessibilityLabel={t.topicTitle}
+                  accessibilityRole="button"
+                  className="w-9 h-9 items-center justify-center rounded-full"
+                  onLongPress={
+                    activeTopic
+                      ? async () => {
+                          haptics.medium();
+                          const failMessage = [
+                            t.toastTitleGenerationFailed,
+                            t.toastTitleGenerationFailedHint,
+                          ]
+                            .filter(Boolean)
+                            .join(' ');
+                          try {
+                            const result = await generateBestTitle({
+                              sessionId: sessionId!,
+                              topicId: activeTopic,
+                            });
+                            if (result?.title) {
+                              haptics.success();
+                              toast.show(
+                                'success',
+                                result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
+                              );
+                            } else {
+                              toast.show('error', failMessage || 'Failed to generate title');
+                            }
+                          } catch {
+                            toast.show('error', failMessage || 'Failed to generate title');
+                          }
+                        }
+                      : undefined
+                  }
+                  onPress={() => {
+                    haptics.light();
+                    navigation.navigate('TopicList', { sessionId });
+                  }}
+                >
+                  <MessageCircle
+                    color={colors.muted}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                </PressableScale>
+                <PressableScale
+                  accessibilityLabel={t.notebookTitle}
+                  accessibilityRole="button"
+                  className="w-9 h-9 items-center justify-center rounded-full"
+                  onPress={() => {
+                    void handleOpenNotebook();
+                  }}
+                >
+                  <BookOpen color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </PressableScale>
+                <PressableScale
+                  accessibilityLabel={t.accessibilitySettings}
+                  accessibilityRole="button"
+                  className="w-9 h-9 items-center justify-center rounded-full"
+                  onPress={() => {
+                    haptics.light();
+                    navigation.navigate('ChatSettings', { sessionId });
+                  }}
+                >
+                  <Settings color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </PressableScale>
+              </View>
+            </View>
+          </BlurView>
+        ) : (
+          <View className="flex-row items-center justify-between px-4 py-2.5">
+            <View className="flex-row items-center flex-1">
+              <PressableScale
+                accessibilityLabel={t.accessibilityGoBack}
+                accessibilityRole="button"
+                className="w-9 h-9 items-center justify-center rounded-full mr-2"
+                onPress={() => {
+                  haptics.light();
+                  navigation.goBack();
+                }}
+              >
+                <ArrowLeft
+                  color={colors.foreground}
+                  size={22}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </PressableScale>
+              <View className="flex-1">
+                <Text
+                  className="text-[16px] font-medium text-foreground tracking-tight"
+                  numberOfLines={1}
+                >
+                  {activeTopicItem?.title || session?.title || t.chatTitle}
+                </Text>
+                {generating ? (
+                  <Text
+                    className="text-[12px] mt-0.5 font-medium"
+                    style={{ color: colors.primary }}
+                  >
+                    {isReasoning ? t.chatThinking : t.chatGenerating}
+                  </Text>
+                ) : !isGroupSession && sessionModel ? (
+                  <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
+                    {toolbarProviderLogo && !providerLogoError ? (
+                      <RNImage
+                        source={{ uri: toolbarProviderLogo }}
+                        style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
+                        onError={() => setProviderLogoError(true)}
+                      />
+                    ) : (
+                      <Cpu
+                        color={colors.secondaryText}
+                        size={13}
+                        strokeWidth={tokens.icon.strokeWidth}
+                        style={{ marginRight: 6 }}
+                      />
+                    )}
+                    <Text
+                      className="flex-1 text-[12px] font-medium"
+                      numberOfLines={1}
+                      style={{ color: colors.muted, lineHeight: 14 }}
+                    >
+                      {sessionModel}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            <View className="flex-row items-center gap-1">
+              <PressableScale
+                accessibilityLabel={t.topicTitle}
+                accessibilityRole="button"
+                className="w-9 h-9 items-center justify-center rounded-full"
+                onLongPress={
+                  activeTopic
+                    ? async () => {
+                        haptics.medium();
+                        const failMessage = [
+                          t.toastTitleGenerationFailed,
+                          t.toastTitleGenerationFailedHint,
+                        ]
+                          .filter(Boolean)
+                          .join(' ');
+                        try {
+                          const result = await generateBestTitle({
+                            sessionId: sessionId!,
+                            topicId: activeTopic,
+                          });
+                          if (result?.title) {
+                            haptics.success();
+                            toast.show(
+                              'success',
+                              result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
+                            );
+                          } else {
+                            toast.show('error', failMessage || 'Failed to generate title');
+                          }
+                        } catch {
                           toast.show('error', failMessage || 'Failed to generate title');
                         }
-                      } catch {
-                        toast.show('error', failMessage || 'Failed to generate title');
                       }
-                    }
-                  : undefined
-              }
-              onPress={() => {
-                haptics.light();
-                navigation.navigate('TopicList', { sessionId });
-              }}
-            >
-              <MessageCircle color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel={t.notebookTitle}
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full"
-              onPress={() => {
-                void handleOpenNotebook();
-              }}
-            >
-              <BookOpen color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-            </PressableScale>
-            <PressableScale
-              accessibilityLabel={t.accessibilitySettings}
-              accessibilityRole="button"
-              className="w-9 h-9 items-center justify-center rounded-full"
-              onPress={() => {
-                haptics.light();
-                navigation.navigate('ChatSettings', { sessionId });
-              }}
-            >
-              <Settings color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-            </PressableScale>
+                    : undefined
+                }
+                onPress={() => {
+                  haptics.light();
+                  navigation.navigate('TopicList', { sessionId });
+                }}
+              >
+                <MessageCircle
+                  color={colors.muted}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </PressableScale>
+              <PressableScale
+                accessibilityLabel={t.notebookTitle}
+                accessibilityRole="button"
+                className="w-9 h-9 items-center justify-center rounded-full"
+                onPress={() => {
+                  void handleOpenNotebook();
+                }}
+              >
+                <BookOpen color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </PressableScale>
+              <PressableScale
+                accessibilityLabel={t.accessibilitySettings}
+                accessibilityRole="button"
+                className="w-9 h-9 items-center justify-center rounded-full"
+                onPress={() => {
+                  haptics.light();
+                  navigation.navigate('ChatSettings', { sessionId });
+                }}
+              >
+                <Settings color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </PressableScale>
+            </View>
           </View>
-        </View>
-      </BlurView>
+        )}
+      </View>
 
       {/* Message List + Input */}
       <View className="flex-1">
@@ -1111,14 +1279,24 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                       {emptyStateSuggestions.map((label) => (
                         <TouchableOpacity
                           activeOpacity={0.7}
-                          className="px-4 py-2.5 rounded-full bg-foreground/[0.03]"
+                          className="rounded-full px-4 py-2.5"
                           key={label}
+                          style={{
+                            backgroundColor: withAlpha(colors.primary, '14'),
+                            borderColor: withAlpha(colors.primary, '24'),
+                            borderWidth: 1,
+                          }}
                           onPress={() => {
                             haptics.light();
                             setInputText(label);
                           }}
                         >
-                          <Text className="text-secondary text-[13px] font-medium">{label}</Text>
+                          <Text
+                            className="text-[13px] font-medium"
+                            style={{ color: colors.secondaryText }}
+                          >
+                            {label}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </Animated.View>
@@ -1163,14 +1341,16 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
         {/* Input Area — Floating Pill. Move by keyboard height for stable cross-platform lift. */}
         <Animated.View
-          style={{
-            paddingBottom: Math.max(insets.bottom, 8),
-            paddingHorizontal: 16,
-            paddingTop: 4,
-            transform: [{ translateY: Platform.OS === 'ios' ? -keyboardOffset : 0 }],
-          }}
+          style={[
+            {
+              paddingBottom: inputPaddingBottom,
+              paddingHorizontal: 16,
+              paddingTop: 4,
+            },
+            composerLiftStyle,
+          ]}
         >
-          <ComposerShell active={keyboardOffset > 0}>
+          <ComposerShell active={composerActive}>
             {pendingFiles.length > 0 && (
               <View className="px-3 pt-2">
                 <FilePreview sessionId={sessionId} />
@@ -1209,86 +1389,89 @@ export default function ChatDetailScreen({ route, navigation }: any) {
               )}
             </View>
             {/* Action toolbar row */}
-            <View className="flex-row items-center px-2 pb-1.5 pt-1">
+            <View
+              className="px-2 pb-1.5 pt-1"
+              style={{ alignItems: 'center', flexDirection: 'row' }}
+            >
               {!isGroupSession && (
-                <>
-                  {/* Model */}
-                  <TouchableOpacity
+                <View style={{ alignItems: 'center', flexDirection: 'row', flexShrink: 1 }}>
+                  <ComposerIconButton
                     accessibilityLabel="Select model"
-                    activeOpacity={0.7}
-                    className="w-8 h-8 items-center justify-center rounded-full"
+                    active={modelDrawerVisible}
+                    containerStyle={{ marginRight: 6 }}
                     onPress={handleModelPress}
                   >
                     {toolbarProviderLogo && !providerLogoError ? (
                       <RNImage
-                        style={{ width: 20, height: 20, borderRadius: 4 }}
+                        style={{ width: 16, height: 16, borderRadius: 4 }}
                         source={{
                           uri: toolbarProviderLogo,
                         }}
                         onError={() => setProviderLogoError(true)}
                       />
                     ) : (
-                      <Cpu color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                      <Cpu
+                        color={modelDrawerVisible ? primaryColor : colors.secondaryText}
+                        size={16}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
                     )}
-                  </TouchableOpacity>
-                  {/* Search */}
-                  <TouchableOpacity
+                  </ComposerIconButton>
+                  <ComposerIconButton
                     accessibilityLabel="Toggle search"
-                    activeOpacity={0.7}
-                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    active={searchEnabled}
+                    containerStyle={{ marginLeft: 6 }}
                     onPress={handleToggleSearch}
                   >
                     <Globe
                       color={searchEnabled ? primaryColor : colors.muted}
-                      size={20}
+                      size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
-                  </TouchableOpacity>
-                </>
+                  </ComposerIconButton>
+                </View>
               )}
               {/* Attach */}
-              <TouchableOpacity
+              <ComposerIconButton
                 accessibilityLabel="Attach file"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                active={pendingFiles.length > 0}
+                containerStyle={{ marginLeft: isGroupSession ? 0 : 6 }}
+                badge={
+                  pendingFiles.length > 0 ? (
+                    <ComposerCountBadge
+                      color={colors.primary}
+                      value={pendingFiles.length > 9 ? '9+' : pendingFiles.length}
+                    />
+                  ) : null
+                }
                 onPress={handleAttach}
               >
-                <View className="relative items-center justify-center">
-                  <Paperclip
-                    color={pendingFiles.length > 0 ? primaryColor : colors.muted}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                  {pendingFiles.length > 0 && (
-                    <View className="absolute -right-2 -top-1">
-                      <ComposerCountBadge
-                        color={colors.primary}
-                        value={pendingFiles.length > 9 ? '9+' : pendingFiles.length}
-                      />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                <Paperclip
+                  color={pendingFiles.length > 0 ? primaryColor : colors.muted}
+                  size={18}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              </ComposerIconButton>
               {!isGroupSession && (
                 <>
                   {/* Tools */}
-                  <TouchableOpacity
+                  <ComposerIconButton
                     accessibilityLabel="Toggle tools"
-                    activeOpacity={0.7}
-                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    active={enabledPlugins.size > 0}
+                    containerStyle={{ marginLeft: 6 }}
                     onPress={handlePluginsPress}
                   >
                     <Puzzle
                       color={enabledPlugins.size > 0 ? primaryColor : colors.muted}
-                      size={20}
+                      size={18}
                       strokeWidth={tokens.icon.strokeWidth}
                     />
-                  </TouchableOpacity>
+                  </ComposerIconButton>
                   {/* Memory */}
-                  <TouchableOpacity
+                  <ComposerIconButton
                     accessibilityLabel="Toggle memory"
-                    activeOpacity={0.7}
-                    className="w-8 h-8 items-center justify-center rounded-full ml-0.5"
+                    active={memoryEnabled}
+                    containerStyle={{ marginLeft: 6 }}
                     onPress={() => {
                       haptics.light();
                       setMemorySheetVisible(true);
@@ -1297,26 +1480,28 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                     {memoryEnabled ? (
                       <BrainCircuit
                         color={primaryColor}
-                        size={20}
+                        size={18}
                         strokeWidth={tokens.icon.strokeWidth}
                       />
                     ) : (
-                      <Brain color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                      <Brain color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                     )}
-                  </TouchableOpacity>
+                  </ComposerIconButton>
                 </>
               )}
               {/* Separator */}
-              <View className="w-px h-4 bg-black/10 mx-1" />
+              <View
+                style={{
+                  backgroundColor: colors.borderSubtle,
+                  height: 16,
+                  marginHorizontal: 8,
+                  width: 1,
+                }}
+              />
               {/* Clear */}
-              <TouchableOpacity
-                accessibilityLabel="Clear messages"
-                activeOpacity={0.7}
-                className="w-8 h-8 items-center justify-center rounded-full"
-                onPress={handleClear}
-              >
-                <Eraser color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </TouchableOpacity>
+              <ComposerIconButton accessibilityLabel="Clear messages" onPress={handleClear}>
+                <Eraser color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              </ComposerIconButton>
               {/* Spacer */}
               <View className="flex-1" />
               {/* Send / Stop */}
@@ -1338,10 +1523,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
                 </Animated.View>
               ) : inputText.trim() || pendingFiles.length > 0 ? (
                 <Animated.View style={sendAnimStyle}>
-                  <ComposerPrimaryAction
-                    active
-                    onPress={handleSend}
-                  >
+                  <ComposerPrimaryAction active onPress={handleSend}>
                     <Send
                       color={colors.iconOnPrimary}
                       size={16}

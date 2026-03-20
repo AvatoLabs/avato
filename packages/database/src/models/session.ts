@@ -377,31 +377,30 @@ export class SessionModel {
           .set({ slug: null })
           .where(and(eq(agents.userId, this.userId), eq(agents.slug, INBOX_SESSION_ID)));
 
-        const [inboxAgent] = await trx
-          .insert(agents)
-          .values({
-            avatar: normalizedInboxConfig.avatar,
-            backgroundColor: normalizedInboxConfig.backgroundColor,
-            chatConfig: normalizedInboxConfig.chatConfig,
-            description: normalizedInboxConfig.description,
-            fewShots: normalizedInboxConfig.fewShots,
-            model:
-              typeof normalizedInboxConfig.model === 'string' ? normalizedInboxConfig.model : null,
-            openingMessage: normalizedInboxConfig.openingMessage,
-            openingQuestions: normalizedInboxConfig.openingQuestions ?? [],
-            params: normalizedInboxConfig.params ?? {},
-            plugins: normalizedInboxConfig.plugins,
-            provider: normalizedInboxConfig.provider,
-            slug: INBOX_SESSION_ID,
-            systemRole: normalizedInboxConfig.systemRole,
-            tags: normalizedInboxConfig.tags ?? [],
-            title: null,
-            tts: normalizedInboxConfig.tts ?? {},
-            updatedAt: new Date(),
-            userId: this.userId,
-            virtual: true,
-          })
-          .returning();
+        const inboxAgentValues: NewAgent = {
+          avatar: normalizedInboxConfig.avatar ?? null,
+          backgroundColor: normalizedInboxConfig.backgroundColor ?? null,
+          chatConfig: normalizedInboxConfig.chatConfig ?? null,
+          description: normalizedInboxConfig.description ?? null,
+          fewShots: normalizedInboxConfig.fewShots ?? null,
+          model:
+            typeof normalizedInboxConfig.model === 'string' ? normalizedInboxConfig.model : null,
+          openingMessage: normalizedInboxConfig.openingMessage ?? null,
+          openingQuestions: normalizedInboxConfig.openingQuestions ?? [],
+          params: normalizedInboxConfig.params ?? {},
+          plugins: normalizedInboxConfig.plugins ?? null,
+          provider: normalizedInboxConfig.provider ?? null,
+          slug: INBOX_SESSION_ID,
+          systemRole: normalizedInboxConfig.systemRole ?? null,
+          tags: normalizedInboxConfig.tags ?? [],
+          title: null,
+          tts: normalizedInboxConfig.tts ?? null,
+          updatedAt: new Date(),
+          userId: this.userId,
+          virtual: true,
+        };
+
+        const [inboxAgent] = await trx.insert(agents).values(inboxAgentValues).returning();
 
         await trx.insert(agentsToSessions).values({
           agentId: inboxAgent.id,

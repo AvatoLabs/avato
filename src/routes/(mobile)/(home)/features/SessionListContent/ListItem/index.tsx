@@ -11,19 +11,34 @@ const { Item } = List;
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
+    active: css`
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 7%, ${cssVar.colorBgContainer});
+    `,
     container: css`
       position: relative;
+
       margin-block: 2px;
       padding-inline: 12px 16px;
       border-radius: ${cssVar.borderRadius};
+
+      transition:
+        background-color 160ms ease,
+        transform 160ms ease;
+
+      &:active {
+        transform: scale(0.995);
+        background: ${cssVar.colorFillTertiary};
+      }
     `,
     mobile: css`
       margin-block: 0;
       padding-inline-start: 12px;
-      border-radius: 0;
+      border-radius: 14px;
     `,
     title: css`
-      line-height: 1.2;
+      font-weight: 500;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
     `,
   };
 });
@@ -56,7 +71,7 @@ const ListItem = memo<
       actions={actions}
       active={mobile ? false : active}
       avatar={avatarRender}
-      className={cx(styles.container, mobile && styles.mobile)}
+      className={cx(styles.container, mobile && styles.mobile, active && styles.active)}
       ref={ref}
       showAction={actions && (isHovering || showAction || mobile)}
       title={<span className={styles.title}>{title}</span>}

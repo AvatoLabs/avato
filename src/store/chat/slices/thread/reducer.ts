@@ -1,11 +1,10 @@
+import { type ThreadItem, type UpdateThreadParams } from '@lobechat/types';
 import { produce } from 'immer';
-
-import { type ThreadItem } from '@/types/topic';
 
 type UpdateThreadAction = {
   id: string;
   type: 'updateThread';
-  value: Partial<ThreadItem>;
+  value: UpdateThreadParams;
 };
 
 type DeleteThreadAction = {

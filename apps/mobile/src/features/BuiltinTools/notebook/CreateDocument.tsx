@@ -11,6 +11,7 @@ import Markdown from 'react-native-markdown-display';
 import { haptics } from '../../../lib/haptics';
 import { useI18n } from '../../../lib/i18n';
 import { codeInlineRules } from '../../../lib/markdownRules';
+import { getThemedMarkdownStyles } from '../../../lib/markdownStyles';
 import { useThemeColors } from '../../../theme/colors';
 import type { MobileBuiltinRenderProps } from '../types';
 
@@ -22,12 +23,18 @@ interface NotebookDocument {
   type?: string;
 }
 
-function parseDocument(content?: string, pluginState?: Record<string, unknown>): NotebookDocument | null {
+function parseDocument(
+  content?: string,
+  pluginState?: Record<string, unknown>,
+): NotebookDocument | null {
   const doc = pluginState?.document as NotebookDocument | undefined;
   if (doc?.title) return doc;
   if (content) {
     try {
-      const parsed = JSON.parse(content) as { document?: NotebookDocument; state?: { document?: NotebookDocument } };
+      const parsed = JSON.parse(content) as {
+        document?: NotebookDocument;
+        state?: { document?: NotebookDocument };
+      };
       const d = parsed.document ?? parsed.state?.document;
       return d?.title ? d : null;
     } catch {
@@ -44,6 +51,7 @@ const CreateDocumentRender = memo<MobileBuiltinRenderProps>(({ content, pluginSt
   const colors = useThemeColors();
   const [copied, setCopied] = useState(false);
   const document = useMemo(() => parseDocument(content, pluginState), [content, pluginState]);
+  const markdownStyles = useMemo(() => getThemedMarkdownStyles(colors), [colors]);
 
   if (!document) return null;
 
@@ -107,7 +115,9 @@ const CreateDocumentRender = memo<MobileBuiltinRenderProps>(({ content, pluginSt
           showsVerticalScrollIndicator={false}
           style={{ maxHeight: MAX_CONTENT_HEIGHT }}
         >
-          <Markdown rules={codeInlineRules as any}>{document.content}</Markdown>
+          <Markdown rules={codeInlineRules as any} style={markdownStyles}>
+            {document.content}
+          </Markdown>
         </ScrollView>
       ) : null}
     </View>

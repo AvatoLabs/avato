@@ -14,6 +14,7 @@ import { useSessionStore } from './session';
 
 /** In-flight promises by sessionId for request deduplication */
 const fetchTopicsInFlight = new Map<string, Promise<void>>();
+export const EMPTY_TOPICS: Topic[] = [];
 
 interface TopicState {
   activeTopicBySession: Record<string, string | null>;

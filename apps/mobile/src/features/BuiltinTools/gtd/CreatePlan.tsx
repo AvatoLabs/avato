@@ -8,6 +8,7 @@ import { ScrollView, Text, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 
 import { codeInlineRules } from '../../../lib/markdownRules';
+import { getThemedMarkdownStyles } from '../../../lib/markdownStyles';
 import { useThemeColors } from '../../../theme/colors';
 import type { MobileBuiltinRenderProps } from '../types';
 
@@ -41,6 +42,7 @@ const MAX_CONTEXT_HEIGHT = 120;
 const CreatePlanRender = memo<MobileBuiltinRenderProps>(({ content, pluginState }) => {
   const colors = useThemeColors();
   const plan = useMemo(() => parsePlan(content, pluginState), [content, pluginState]);
+  const markdownStyles = useMemo(() => getThemedMarkdownStyles(colors), [colors]);
 
   if (!plan) return null;
 
@@ -75,12 +77,14 @@ const CreatePlanRender = memo<MobileBuiltinRenderProps>(({ content, pluginState 
       ) : null}
       {hasContext ? (
         <ScrollView
-          className="rounded-lg p-3"
           nestedScrollEnabled
+          className="rounded-lg p-3"
           showsVerticalScrollIndicator={false}
           style={{ backgroundColor: colors.overlay, maxHeight: MAX_CONTEXT_HEIGHT }}
         >
-          <Markdown rules={codeInlineRules as any}>{plan.context!}</Markdown>
+          <Markdown rules={codeInlineRules as any} style={markdownStyles}>
+            {plan.context!}
+          </Markdown>
         </ScrollView>
       ) : null}
     </View>

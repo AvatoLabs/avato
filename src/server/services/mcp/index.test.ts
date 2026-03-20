@@ -302,6 +302,30 @@ describe('MCPService', () => {
       ]);
     });
 
+    it('should retry when Server not initialized error occurs', async () => {
+      const mockTools = [
+        {
+          description: 'Test tool',
+          inputSchema: { type: 'object' },
+          name: 'tool1',
+        },
+      ];
+
+      mockClient.listTools.mockRejectedValueOnce(new Error('Bad Request: Server not initialized'));
+      mockClient.listTools.mockResolvedValueOnce(mockTools);
+
+      const result = await mcpService.listTools(mockParams);
+
+      expect(mockClient.listTools).toHaveBeenCalledTimes(2);
+      expect(result).toEqual([
+        {
+          description: 'Test tool',
+          name: 'tool1',
+          parameters: { type: 'object' },
+        },
+      ]);
+    });
+
     it('should retry up to 3 times for NoValidSessionId error', async () => {
       const mockTools = [
         {
@@ -330,6 +354,13 @@ describe('MCPService', () => {
 
       await expect(mcpService.listTools(mockParams)).rejects.toThrow('NoValidSessionId');
       // async-retry: 1 initial + 3 retries = 4 attempts
+      expect(mockClient.listTools).toHaveBeenCalledTimes(4);
+    });
+
+    it('should retry up to limit for Server not initialized errors', async () => {
+      mockClient.listTools.mockRejectedValue(new Error('Bad Request: Server not initialized'));
+
+      await expect(mcpService.listTools(mockParams)).rejects.toThrow('Server not initialized');
       expect(mockClient.listTools).toHaveBeenCalledTimes(4);
     });
 

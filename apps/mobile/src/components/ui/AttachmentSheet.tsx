@@ -1,14 +1,12 @@
 import { Camera, FileText, FolderOpen, FolderPlus, Image as ImageIcon } from 'lucide-react-native';
 import React, { memo } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, Text, View } from 'react-native';
 
 import { haptics } from '../../lib/haptics';
-import { useThemeColors } from '../../theme/colors';
 import { useI18n } from '../../lib/i18n';
-import { enteringModalContent } from '../../theme/motion';
+import { useThemeColors } from '../../theme/colors';
 import { tokens } from '../../theme/tokens';
+import { BottomSheetScaffold } from './BottomSheetScaffold';
 
 interface AttachmentSheetProps {
   onCamera?: () => void;
@@ -36,7 +34,10 @@ const AttachmentOption = memo<AttachmentOptionProps>(
         className={`flex-row items-start px-3.5 py-3 ${!isLast ? 'mb-px' : ''}`}
         onPress={onPress}
       >
-        <View className="w-9 h-9 rounded-xl bg-foreground/[0.04] items-center justify-center mr-3">
+        <View
+          className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+          style={{ backgroundColor: colors.fillTertiary }}
+        >
           {icon}
         </View>
         <View className="flex-1">
@@ -56,18 +57,13 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
   ({ visible, onClose, onCamera, onGallery, onDocument, onFromWorkspace, onNewFolder }) => {
     const colors = useThemeColors();
     const { t } = useI18n();
-    const insets = useSafeAreaInsets();
 
     const options = [
       onCamera
         ? {
-            description: 'Capture a new photo and attach it instantly.',
+            description: t.fileCameraDesc,
             icon: (
-              <Camera
-                color={colors.foreground}
-                size={18}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
+              <Camera color={colors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />
             ),
             key: 'camera',
             title: t.fileCamera,
@@ -80,7 +76,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         : null,
       onGallery
         ? {
-            description: 'Choose one or more images from your library.',
+            description: t.fileGalleryDesc,
             icon: (
               <ImageIcon
                 color={colors.foreground}
@@ -98,13 +94,9 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
           }
         : null,
       {
-        description: 'Attach files, notes, PDFs, or other supporting material.',
+        description: t.fileDocumentDesc,
         icon: (
-          <FileText
-            color={colors.foreground}
-            size={18}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <FileText color={colors.foreground} size={18} strokeWidth={tokens.icon.strokeWidth} />
         ),
         key: 'document',
         title: t.fileDocument,
@@ -135,7 +127,7 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
         : null,
       onNewFolder
         ? {
-            description: 'Create a new folder in the current location.',
+            description: t.fileNewFolderDesc,
             icon: (
               <FolderPlus
                 color={colors.foreground}
@@ -161,49 +153,31 @@ const AttachmentSheet = memo<AttachmentSheetProps>(
     }>;
 
     return (
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
+      <BottomSheetScaffold
+        description={t.fileAttachDesc}
+        maxHeight="72%"
+        title={t.fileAttach}
         visible={visible}
-        onRequestClose={onClose}
+        onClose={onClose}
       >
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-          <Animated.View entering={enteringModalContent()} style={{ maxHeight: '72%' }}>
-            <Pressable
-              className="bg-card rounded-t-2xl"
-              style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View className="items-center pt-3 pb-1">
-                <View className="w-9 h-1 rounded-full bg-foreground/10" />
-              </View>
-
-              <View className="px-5 pb-2 pt-2">
-                <Text className="text-foreground text-[18px] font-bold tracking-tight">
-                  {t.fileAttach}
-                </Text>
-                <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
-                  Pick the source that fits the task. Everything lands in the same chat composer.
-                </Text>
-
-                <View className="mt-4 bg-foreground/5 rounded-2xl overflow-hidden">
-                  {options.map((option, index) => (
-                    <AttachmentOption
-                      description={option.description}
-                      icon={option.icon}
-                      isLast={index === options.length - 1}
-                      key={option.key}
-                      title={option.title}
-                      onPress={option.onPress}
-                    />
-                  ))}
-                </View>
-              </View>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
+        <View className="px-5 pb-2">
+          <View
+            className="mt-4 overflow-hidden rounded-2xl"
+            style={{ backgroundColor: colors.fillQuaternary }}
+          >
+            {options.map((option, index) => (
+              <AttachmentOption
+                description={option.description}
+                icon={option.icon}
+                isLast={index === options.length - 1}
+                key={option.key}
+                title={option.title}
+                onPress={option.onPress}
+              />
+            ))}
+          </View>
+        </View>
+      </BottomSheetScaffold>
     );
   },
 );

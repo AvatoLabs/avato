@@ -2,13 +2,11 @@ import { z } from 'zod';
 
 import { MessageModel } from '@/database/models/message';
 import { ThreadModel } from '@/database/models/thread';
-import { insertThreadSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { pickLatestTitleContext } from '@/server/routers/lambda/_helpers/titleContext';
 import { SystemAgentService } from '@/server/services/systemAgent';
-import { type ThreadItem } from '@/types/topic/thread';
-import { createThreadSchema } from '@/types/topic/thread';
+import { createThreadSchema, type ThreadItem, updateThreadSchema } from '@/types/topic/thread';
 
 const threadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -97,7 +95,7 @@ export const threadRouter = router({
     .input(
       z.object({
         id: z.string(),
-        value: insertThreadSchema.partial(),
+        value: updateThreadSchema,
       }),
     )
     .mutation(async ({ input, ctx }) => {

@@ -19,6 +19,9 @@ export const enteringSkeleton = () => FadeIn.duration(D.fast);
 export const enteringListItem = (index = 0) =>
   FadeInDown.duration(D.normal).delay(Math.min(index, 3) * S.short);
 
+/** Screen / section block */
+export const enteringSection = (delay = 0) => FadeInDown.duration(D.normal).delay(delay);
+
 /** Modal / Sheet content (bottom sheet style) */
 export const enteringModalContent = () => FadeInUp.duration(D.normal);
 

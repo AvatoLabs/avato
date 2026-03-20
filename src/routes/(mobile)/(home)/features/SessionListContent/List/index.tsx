@@ -17,11 +17,23 @@ import SkeletonList from '../../SkeletonList';
 import AddButton from './AddButton';
 import SessionItem from './Item';
 
-const styles = createStaticStyles(
-  ({ css }) => css`
+const styles = createStaticStyles(({ css, cssVar }) => ({
+  item: css`
     min-height: 70px;
   `,
-);
+  link: css`
+    display: block;
+    color: inherit;
+    text-decoration: none;
+
+    -webkit-tap-highlight-color: transparent;
+
+    &:focus-visible {
+      outline: 2px solid ${cssVar.colorPrimary};
+      outline-offset: 2px;
+    }
+  `,
+}));
 interface SessionListProps {
   dataSource?: LobeSessions;
   groupId?: string;
@@ -40,9 +52,10 @@ const SessionList = memo<SessionListProps>(({ dataSource, groupId, showAddButton
     <SkeletonList />
   ) : !isEmpty ? (
     dataSource.map(({ id, ...res }) => (
-      <LazyLoad className={styles} key={id}>
+      <LazyLoad className={styles.item} key={id}>
         <Link
           aria-label={id}
+          className={styles.link}
           to={SESSION_CHAT_URL((res as any).config?.id, mobile)}
           onClick={(e) => {
             e.preventDefault();

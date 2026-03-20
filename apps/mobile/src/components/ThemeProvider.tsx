@@ -2,7 +2,7 @@
  * ThemeProvider — applies light/dark/system + color scheme to the app.
  * Syncs with NativeWind colorScheme for instant theme switch (no restart).
  */
-import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { colorScheme as nativeWindColorScheme } from 'nativewind';
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
@@ -22,11 +22,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     nativeWindColorScheme.set(effectiveTheme);
   }, [effectiveTheme]);
 
+  const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
   const navTheme = {
-    ...DefaultTheme,
+    ...baseNavigationTheme,
     dark: isDark,
     colors: {
-      ...DefaultTheme.colors,
+      ...baseNavigationTheme.colors,
       primary: tokens.primary,
       background: tokens.background,
       card: tokens.card,
@@ -40,7 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <View
       className={[isDark ? 'dark' : '', themeClass].filter(Boolean).join(' ')}
-      style={{ flex: 1 }}
+      style={{ backgroundColor: tokens.background, flex: 1 }}
     >
       <NavigationContainer ref={navigationRef} theme={navTheme}>
         {children}
