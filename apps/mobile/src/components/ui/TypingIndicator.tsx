@@ -5,8 +5,6 @@
  */
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-
-import { useThemeColors } from '../../theme/colors';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,6 +13,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+
+import { useThemeColors } from '../../theme/colors';
 
 interface TypingIndicatorProps {
   color?: string;
@@ -78,10 +78,10 @@ export default function TypingIndicator({ color, dotSize = 7 }: TypingIndicatorP
     <View
       style={{
         alignItems: 'center',
+        alignSelf: 'flex-start',
         flexDirection: 'row',
         gap: 4,
-        height: 24,
-        justifyContent: 'center',
+        paddingVertical: 4,
       }}
     >
       {Array.from({ length: DOT_COUNT }).map((_, i) => (

@@ -43,10 +43,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
 
 import { getProviderIconUrl } from '../../constants/cdn';
-import {
-  AVATO_INBOX_ICON_ASSET,
-  isBuiltinInboxAvatar,
-} from '../../constants/session';
+import { AVATO_INBOX_ICON_ASSET, isBuiltinInboxAvatar } from '../../constants/session';
 import {
   getMobileBuiltinDisplayName,
   getMobileBuiltinIntervention,
@@ -55,7 +52,7 @@ import {
 } from '../../features/BuiltinTools';
 import { fileApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
-import type { I18nStore} from '../../lib/i18n';
+import type { I18nStore } from '../../lib/i18n';
 import { useI18n } from '../../lib/i18n';
 import { codeInlineRules } from '../../lib/markdownRules';
 import { useResolvedRemoteAsset } from '../../lib/remoteAsset';
@@ -75,31 +72,6 @@ import type {
 import ImageViewer from './ImageViewer';
 import { useToast } from './Toast';
 import TypingIndicator from './TypingIndicator';
-
-const StreamingCursor = memo(() => {
-  const colors = useThemeColors();
-  const [visible, setVisible] = useState(true);
-  const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  useEffect(() => {
-    timer.current = setInterval(() => setVisible((v) => !v), 530);
-    return () => clearInterval(timer.current);
-  }, []);
-  return (
-    <View style={{ height: 18, justifyContent: 'center', marginLeft: 1, width: 8 }}>
-      {visible && (
-        <View
-          style={{
-            backgroundColor: colors.userBubbleBg,
-            borderRadius: 1,
-            height: 16,
-            width: 3,
-          }}
-        />
-      )}
-    </View>
-  );
-});
-StreamingCursor.displayName = 'StreamingCursor';
 
 const getTimeAgo = (date?: string | Date): string => {
   if (!date) return '';
@@ -494,7 +466,8 @@ const CompareGroupBlock = memo<{
     <View className="gap-2">
       {childrenMessages.map((child) => {
         const speakerId = child.agentId || groupSupervisorId;
-        const speaker = speakerId != null && groupMembersById ? groupMembersById[speakerId] : undefined;
+        const speaker =
+          speakerId != null && groupMembersById ? groupMembersById[speakerId] : undefined;
         const isSupervisor = Boolean(
           speaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
         );
@@ -502,9 +475,7 @@ const CompareGroupBlock = memo<{
           speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
         const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
         const childContent = preprocessMentionDisplay(
-          preprocessMathBlocks(
-            injectCitationLinks(child.content, child.search?.citations),
-          ),
+          preprocessMathBlocks(injectCitationLinks(child.content, child.search?.citations)),
           t.groupMentionAllMembers,
         );
 
@@ -524,20 +495,17 @@ const CompareGroupBlock = memo<{
                   {speakerName}
                 </Text>
                 {child.model ? (
-                    <Text
-                      className="text-[11px]"
-                      numberOfLines={1}
-                      style={{ color: colors.foreground }}
-                    >
-                      {child.model}
-                    </Text>
+                  <Text
+                    className="text-[11px]"
+                    numberOfLines={1}
+                    style={{ color: colors.foreground }}
+                  >
+                    {child.model}
+                  </Text>
                 ) : null}
               </View>
               {child.createdAt ? (
-                <Text
-                  className="ml-2 text-[10px]"
-                  style={{ color: colors.tertiaryText }}
-                >
+                <Text className="ml-2 text-[10px]" style={{ color: colors.tertiaryText }}>
                   {getTimeAgo(child.createdAt)}
                 </Text>
               ) : null}
@@ -577,7 +545,9 @@ const GroupTasksBlock = memo<{
 }>(({ groupMembersById, message, t }) => {
   const colors = useThemeColors();
   const tasks = message.tasks ?? [];
-  const taskAgentIds = [...new Set(tasks.map((task) => task.agentId).filter((id): id is string => id != null))];
+  const taskAgentIds = [
+    ...new Set(tasks.map((task) => task.agentId).filter((id): id is string => id != null)),
+  ];
   const agentNames = taskAgentIds
     .map((id) => groupMembersById?.[id]?.title ?? id)
     .filter(Boolean)
@@ -617,8 +587,13 @@ const GroupTasksBlock = memo<{
           const agentName = task.agentId
             ? (groupMembersById?.[task.agentId]?.title ?? task.agentId)
             : '';
-          const taskTitle =
-            String((task.metadata as Record<string, unknown>)?.taskTitle ?? task.taskDetail?.title ?? task.content?.slice(0, 60) ?? t.chatToolRunning ?? '');
+          const taskTitle = String(
+            (task.metadata as Record<string, unknown>)?.taskTitle ??
+              task.taskDetail?.title ??
+              task.content?.slice(0, 60) ??
+              t.chatToolRunning ??
+              '',
+          );
           const status = task.taskDetail?.status;
           const isDone = status === 'completed' || status === 'Completed';
           const isError =
@@ -1134,9 +1109,7 @@ const MessageBubble = memo<MessageBubbleProps>(
       : null;
     const CONTENT_COLLAPSE_THRESHOLD = 3000;
     const fullContent = preprocessMentionDisplay(
-      preprocessMathBlocks(
-        injectCitationLinks(message.content, message.search?.citations),
-      ),
+      preprocessMathBlocks(injectCitationLinks(message.content, message.search?.citations)),
       t.groupMentionAllMembers,
     );
     const hasArtifacts = !isUser && ARTIFACT_TAG_REGEX.test(fullContent);
@@ -1183,9 +1156,12 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     return (
       <Animated.View entering={FadeIn.duration(200)}>
-        <View className={`flex-row w-full mb-1.5 px-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <View
+          className={`flex-row w-full items-start px-4 ${isUser ? 'justify-end' : 'justify-start'}`}
+          style={{ marginBottom: isUser ? 14 : 16 }}
+        >
           {!isUser && (
-            <View className="mr-2.5 w-7 items-center pt-0.5">
+            <View className="mr-2.5 w-7 items-center">
               <View
                 className="h-7 w-7 items-center justify-center overflow-hidden rounded-full"
                 style={{ backgroundColor: colors.fillTertiary }}
@@ -1205,13 +1181,11 @@ const MessageBubble = memo<MessageBubbleProps>(
                     source={{ uri: getProviderIconUrl(message.provider, effectiveTheme) }}
                   />
                 ) : (
-<RNImage
-                  className="w-5 h-5 rounded-md"
-                  source={require('../../../assets/avato-icon.png')}
-                  style={
-                    effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined
-                  }
-                />
+                  <RNImage
+                    className="w-5 h-5 rounded-md"
+                    source={require('../../../assets/avato-icon.png')}
+                    style={effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : undefined}
+                  />
                 )}
               </View>
             </View>
@@ -1221,12 +1195,12 @@ const MessageBubble = memo<MessageBubbleProps>(
             {!isUser && (
               <>
                 {shouldShowGroupSpeaker ? (
-                  <View className="mb-1.5 flex-row items-center">
+                  <View className="mb-2 flex-row items-center" style={{ minHeight: 28 }}>
                     <View className="min-w-0 flex-1 flex-row items-center">
                       <Text
                         className="text-[12px] font-semibold"
                         numberOfLines={1}
-                        style={{ color: colors.foreground }}
+                        style={{ color: colors.foreground, lineHeight: 16 }}
                       >
                         {groupSpeakerName || t.settingsDefaultAgent}
                       </Text>
@@ -1247,7 +1221,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                         <Text
                           className="ml-2 flex-1 text-[11px]"
                           numberOfLines={1}
-                          style={{ color: colors.foreground }}
+                          style={{ color: colors.secondaryText, lineHeight: 14 }}
                         >
                           {message.model}
                         </Text>
@@ -1256,28 +1230,28 @@ const MessageBubble = memo<MessageBubbleProps>(
                     {message.createdAt ? (
                       <Text
                         className="ml-2 text-[10px]"
-                        style={{ color: colors.tertiaryText }}
+                        style={{ color: colors.tertiaryText, lineHeight: 14 }}
                       >
                         {getTimeAgo(message.createdAt)}
                       </Text>
                     ) : null}
                   </View>
                 ) : message.role === 'groupTasks' && message.createdAt ? (
-                  <View className="mb-1.5 flex-row justify-end">
+                  <View className="mb-2 flex-row justify-end" style={{ minHeight: 28 }}>
                     <Text
                       className="text-[10px]"
-                      style={{ color: colors.tertiaryText }}
+                      style={{ color: colors.tertiaryText, lineHeight: 14 }}
                     >
                       {getTimeAgo(message.createdAt)}
                     </Text>
                   </View>
                 ) : (
-                  <View className="mb-1.5 flex-row items-center">
+                  <View className="mb-2 flex-row items-center" style={{ minHeight: 28 }}>
                     {message.model ? (
                       <Text
                         className="text-[11px] flex-1"
                         numberOfLines={1}
-                        style={{ color: colors.foreground }}
+                        style={{ color: colors.secondaryText, lineHeight: 14 }}
                       >
                         {message.model}
                       </Text>
@@ -1285,7 +1259,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                     {message.createdAt ? (
                       <Text
                         className="text-[10px] ml-2"
-                        style={{ color: colors.tertiaryText }}
+                        style={{ color: colors.tertiaryText, lineHeight: 14 }}
                       >
                         {getTimeAgo(message.createdAt)}
                       </Text>
@@ -1491,7 +1465,9 @@ const MessageBubble = memo<MessageBubbleProps>(
                                 preprocessMathBlocks(
                                   injectCitationLinks(
                                     (message.content || '').slice(0, 500) +
-                                      (message.content && message.content.length > 500 ? '...' : ''),
+                                      (message.content && message.content.length > 500
+                                        ? '...'
+                                        : ''),
                                     message.search?.citations,
                                   ),
                                 ),
@@ -1559,7 +1535,6 @@ const MessageBubble = memo<MessageBubbleProps>(
                               />
                             ) : null,
                           )}
-                          {generating && !isUser && !isReasoning && <StreamingCursor />}
                           {isLongContent && (
                             <TouchableOpacity
                               activeOpacity={0.7}
@@ -1946,109 +1921,117 @@ const AttachmentBlock = memo<{
   isUser: boolean;
   onOpenFile: (file: NonNullable<ChatMessage['fileList']>[number]) => void;
   onOpenImage: (url: string) => void;
-}>(({ imageList, fileList, isUser, onOpenFile, onOpenImage, downloadingFileId, downloadingProgress = 0 }) => {
-  const colors = useThemeColors();
-  const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
-  const mc = useMemo(
-    () => ({
-      heading: colors.markdownHeading,
-      text: colors.markdownText,
-    }),
-    [colors],
-  );
-  return (
-  <View className="gap-2">
-    {imageList?.length ? (
-      <ScrollView
-        horizontal
-        contentContainerStyle={{ gap: 8 }}
-        showsHorizontalScrollIndicator={false}
-      >
-        {imageList.map((image) => (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            key={image.id}
-            onPress={() => onOpenImage(image.url)}
-          >
-            <RNImage
-              source={{ uri: image.url }}
-              style={{
-                backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
-                borderRadius: 14,
-                height: 120,
-                width: 120,
-              }}
-            />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    ) : null}
-
-    {fileList?.length ? (
+}>(
+  ({
+    imageList,
+    fileList,
+    isUser,
+    onOpenFile,
+    onOpenImage,
+    downloadingFileId,
+    downloadingProgress = 0,
+  }) => {
+    const colors = useThemeColors();
+    const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
+    const mc = useMemo(
+      () => ({
+        heading: colors.markdownHeading,
+        text: colors.markdownText,
+      }),
+      [colors],
+    );
+    return (
       <View className="gap-2">
-        {fileList.map((file) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            className="rounded-2xl px-3 py-2"
-            key={file.id}
-            style={{
-              backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
-            }}
-            onPress={() => onOpenFile(file)}
+        {imageList?.length ? (
+          <ScrollView
+            horizontal
+            contentContainerStyle={{ gap: 8 }}
+            showsHorizontalScrollIndicator={false}
           >
-            <View className="flex-row items-center justify-between gap-3">
-              <View className="flex-1">
-                <Text
-                  numberOfLines={1}
+            {imageList.map((image) => (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                key={image.id}
+                onPress={() => onOpenImage(image.url)}
+              >
+                <RNImage
+                  source={{ uri: image.url }}
                   style={{
-                    color: isUser ? colors.userBubbleText : mc.heading,
-                    fontSize: 13,
-                    fontWeight: '600',
+                    backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
+                    borderRadius: 14,
+                    height: 120,
+                    width: 120,
                   }}
-                >
-                  {file.name}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: isUser
-                      ? colors.userBubbleTextMuted
-                      : mc.text + '88',
-                    fontSize: 12,
-                    marginTop: 2,
-                  }}
-                >
-                  {file.fileType}
-                </Text>
-              </View>
-              {downloadingFileId === file.id ? (
-                <View className="min-w-[28px] items-end">
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      color: isUser ? colors.userBubbleText : chatAccent.badgeText,
-                      fontSize: 12,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {downloadingProgress}%
-                  </Text>
-                </View>
-              ) : (
-                <Download
-                  color={isUser ? colors.userBubbleText : chatAccent.badgeText}
-                  size={16}
-                  strokeWidth={1.9}
                 />
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {fileList?.length ? (
+          <View className="gap-2">
+            {fileList.map((file) => (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                className="rounded-2xl px-3 py-2"
+                key={file.id}
+                style={{
+                  backgroundColor: isUser ? colors.userBubbleSubtleBg : chatAccent.subtleBg,
+                }}
+                onPress={() => onOpenFile(file)}
+              >
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-1">
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: isUser ? colors.userBubbleText : mc.heading,
+                        fontSize: 13,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {file.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: isUser ? colors.userBubbleTextMuted : mc.text + '88',
+                        fontSize: 12,
+                        marginTop: 2,
+                      }}
+                    >
+                      {file.fileType}
+                    </Text>
+                  </View>
+                  {downloadingFileId === file.id ? (
+                    <View className="min-w-[28px] items-end">
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: isUser ? colors.userBubbleText : chatAccent.badgeText,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {downloadingProgress}%
+                      </Text>
+                    </View>
+                  ) : (
+                    <Download
+                      color={isUser ? colors.userBubbleText : chatAccent.badgeText}
+                      size={16}
+                      strokeWidth={1.9}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
       </View>
-    ) : null}
-  </View>
-  );
-});
+    );
+  },
+);
 
 AttachmentBlock.displayName = 'AttachmentBlock';
 
@@ -2354,8 +2337,9 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
 
 SearchGroundingBlock.displayName = 'SearchGroundingBlock';
 
-const isToolResultReady = (tool?: Pick<ChatToolPayload, 'result_content' | 'result_msg_id'> | null) =>
-  !!tool && (tool.result_content !== undefined || !!tool.result_msg_id);
+const isToolResultReady = (
+  tool?: Pick<ChatToolPayload, 'result_content' | 'result_msg_id'> | null,
+) => !!tool && (tool.result_content !== undefined || !!tool.result_msg_id);
 
 const isToolSettled = (
   tool?: Pick<ChatToolPayload, 'intervention' | 'result_content' | 'result_msg_id'> | null,
@@ -2555,10 +2539,7 @@ const ToolCard = memo<{
                     style={{ backgroundColor: colors.dangerMuted }}
                     onPress={onReject}
                   >
-                    <Text
-                      className="text-[12px] font-semibold"
-                      style={{ color: colors.danger }}
-                    >
+                    <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>
                       {t.chatToolReject}
                     </Text>
                   </TouchableOpacity>
@@ -2567,26 +2548,18 @@ const ToolCard = memo<{
             )}
 
             {showDetail && isRejected && (
-              <Text
-                className="mt-2 text-[11px] leading-4"
-                style={{ color: colors.tertiaryText }}
-              >
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: colors.tertiaryText }}>
                 {t.chatToolRejectedDesc}
               </Text>
             )}
 
             {showDetail && isAborted && (
-              <Text
-                className="mt-2 text-[11px] leading-4"
-                style={{ color: colors.tertiaryText }}
-              >
+              <Text className="mt-2 text-[11px] leading-4" style={{ color: colors.tertiaryText }}>
                 {t.chatToolAbortedDesc}
               </Text>
             )}
 
-            {showDetail && customContent ? (
-              <View className="mt-2">{customContent}</View>
-            ) : null}
+            {showDetail && customContent ? <View className="mt-2">{customContent}</View> : null}
             {showDetail && !customContent && streamingContent && !resultReady ? (
               <View className="mt-2">{streamingContent}</View>
             ) : null}
@@ -2742,18 +2715,9 @@ const ToolCallsBlock = memo<{
           <Wrench
             size={14}
             strokeWidth={2}
-            color={
-              hasPending
-                ? colors.info
-                : allCompleted
-                  ? colors.iconSuccess
-                  : colors.textGray
-            }
+            color={hasPending ? colors.info : allCompleted ? colors.iconSuccess : colors.textGray}
           />
-          <Text
-            className="ml-2 text-[12px] font-medium"
-            style={{ color: colors.secondaryText }}
-          >
+          <Text className="ml-2 text-[12px] font-medium" style={{ color: colors.secondaryText }}>
             {t.chatToolsTitle} ({tools.length})
           </Text>
           {hasPending && (
@@ -2826,7 +2790,11 @@ const ToolCallsBlock = memo<{
 
             const streamingContent =
               showStreaming && BuiltinStreaming ? (
-                <BuiltinStreaming apiName={tool.apiName} args={parsedArgs} identifier={tool.identifier} />
+                <BuiltinStreaming
+                  apiName={tool.apiName}
+                  args={parsedArgs}
+                  identifier={tool.identifier}
+                />
               ) : undefined;
 
             if (useBuiltinRender && BuiltinRender) {
@@ -2914,7 +2882,7 @@ const ToolResultBlock = memo<{
   return (
     <ToolCard
       argumentsText={argumentsText || undefined}
-      content={useBuiltinRender ? undefined : (message.content || undefined)}
+      content={useBuiltinRender ? undefined : message.content || undefined}
       error={message.pluginError}
       resultReady={hasResult && !message.pluginError}
       status={message.pluginIntervention?.status ?? null}
@@ -2930,12 +2898,8 @@ const ToolResultBlock = memo<{
           />
         ) : undefined
       }
-      onApprove={
-        isPending ? () => approveToolCall(sessionId, message.id, topicId) : undefined
-      }
-      onReject={
-        isPending ? () => rejectToolMessage(sessionId, message.id) : undefined
-      }
+      onApprove={isPending ? () => approveToolCall(sessionId, message.id, topicId) : undefined}
+      onReject={isPending ? () => rejectToolMessage(sessionId, message.id) : undefined}
     />
   );
 });
@@ -3085,7 +3049,15 @@ interface ThinkingBlockProps {
 }
 
 const ThinkingBlock = memo<ThinkingBlockProps>(
-  ({ content, duration, isMultimodal, markdownRules, markdownStyles, tempDisplayContent, thinking }) => {
+  ({
+    content,
+    duration,
+    isMultimodal,
+    markdownRules,
+    markdownStyles,
+    tempDisplayContent,
+    thinking,
+  }) => {
     const { t } = useI18n();
     const colors = useThemeColors();
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
@@ -3110,18 +3082,16 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
           onPress={() => !thinking && setExpanded((v) => !v)}
         >
           {thinking ? (
-            <ActivityIndicator
-              color={colors.primary}
-              size={12}
-              style={{ marginRight: 4 }}
-            />
+            <ActivityIndicator color={colors.primary} size={12} style={{ marginRight: 4 }} />
           ) : expanded ? (
             <ChevronDown color={colors.iconMuted} size={14} strokeWidth={2.5} />
           ) : (
             <ChevronRight color={colors.iconMuted} size={14} strokeWidth={2.5} />
           )}
           {thinking ? (
-            <Text className="text-[12px] font-medium ml-1" style={{ color: colors.primary }}>{t.chatThinking}</Text>
+            <Text className="text-[12px] font-medium ml-1" style={{ color: colors.primary }}>
+              {t.chatThinking}
+            </Text>
           ) : (
             <Text className="text-[12px] font-medium ml-1" style={{ color: chatAccent.badgeText }}>
               {durationLabel}
@@ -3191,16 +3161,10 @@ const ErrorBlock = memo<{
           : error.type || t.errorUnknown;
 
   return (
-    <View
-      className="mt-2 rounded-2xl px-3 py-3"
-      style={{ backgroundColor: colors.dangerMuted }}
-    >
+    <View className="mt-2 rounded-2xl px-3 py-3" style={{ backgroundColor: colors.dangerMuted }}>
       <View className="flex-row items-center mb-1">
         <AlertTriangle color={colors.danger} size={14} strokeWidth={2} />
-        <Text
-          className="ml-1.5 text-[13px] font-semibold flex-1"
-          style={{ color: colors.danger }}
-        >
+        <Text className="ml-1.5 text-[13px] font-semibold flex-1" style={{ color: colors.danger }}>
           {errorTypeLabel}
         </Text>
       </View>
