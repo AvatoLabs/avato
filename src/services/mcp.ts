@@ -30,6 +30,22 @@ function calculateObjectSizeBytes(obj: any): number {
   }
 }
 
+function normalizeMcpToolCallError(error: unknown): Error {
+  if (!(error instanceof Error)) return new Error(String(error));
+
+  if (
+    error.message.includes("Unexpected token '<'") &&
+    error.message.includes('is not valid JSON')
+  ) {
+    return new Error(
+      'MCP tool call failed because the tools tRPC endpoint returned HTML instead of JSON. This usually means the route or an upstream reverse proxy timed out before the MCP call completed.',
+      { cause: error },
+    );
+  }
+
+  return error;
+}
+
 class MCPService {
   async invokeMcpToolCall(
     payload: ChatToolPayload,
@@ -149,12 +165,12 @@ class MCPService {
       success = true;
       return result;
     } catch (error) {
-      const err = error as Error;
+      const err = normalizeMcpToolCallError(error);
       errorCode = 'CALL_FAILED';
       errorMessage = err.message;
 
       // Rethrow error, maintain original error handling logic
-      throw error;
+      throw err;
     } finally {
       // HTTP/SSE/streamable types: reporting is handled by server-side via mcp.callTool
       // Cloud type: reporting is handled by server-side via market.callCloudMcpEndpoint

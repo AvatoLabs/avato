@@ -282,6 +282,42 @@ describe('MCPService', () => {
       expect(discoverService.reportPluginCall).not.toHaveBeenCalled();
     });
 
+    it('should normalize HTML error responses from tools tRPC endpoint', async () => {
+      const { toolsClient } = await import('@/libs/trpc/client');
+
+      const mockPlugin = {
+        customParams: {
+          mcp: {
+            type: 'http',
+            url: 'https://mcp.example.com',
+          },
+        },
+        manifest: {
+          meta: { title: 'HTML Error Plugin' },
+          version: '1.0.0',
+        },
+      };
+
+      mockPluginSelectors.getInstalledPluginById.mockReturnValue(() => mockPlugin);
+      mockPluginSelectors.getCustomPluginById.mockReturnValue(() => null);
+
+      vi.mocked(toolsClient.mcp.callTool.mutate).mockRejectedValue(
+        new Error('Unexpected token \'<\', "<html>\\r\\n<h"... is not valid JSON'),
+      );
+
+      const payload: ChatToolPayload = {
+        id: 'tool-call-html-error',
+        identifier: 'html-error-plugin',
+        apiName: 'slowMethod',
+        arguments: '{}',
+        type: 'standalone',
+      };
+
+      await expect(mcpService.invokeMcpToolCall(payload, {})).rejects.toThrow(
+        'MCP tool call failed because the tools tRPC endpoint returned HTML instead of JSON.',
+      );
+    });
+
     it('should call toolsClient.market.callCloudMcpEndpoint for cloud type and not report from frontend', async () => {
       const { discoverService } = await import('./discover');
       const { toolsClient } = await import('@/libs/trpc/client');

@@ -547,7 +547,7 @@ For self-hosted deployments, configure MCP behavior with environment variables:
 
 ```bash
 # Plugin timeout (milliseconds)
-MCP_TOOL_TIMEOUT=30000
+MCP_TOOL_TIMEOUT=120000
 
 # Enable MCP debug logging
 DEBUG_MCP=1
@@ -555,6 +555,8 @@ DEBUG_MCP=1
 # MCP configuration file path
 MCP_CONFIG=/path/to/mcp-config.json
 ```
+
+If you deploy behind Nginx, an ingress, or a CDN, keep the proxy read timeout slightly higher than the app route budget, and keep the app route budget higher than `MCP_TOOL_TIMEOUT`.
 
 <Cards>
   <Card href={'/docs/usage/agent/web-search'} title={'Web Search'} />

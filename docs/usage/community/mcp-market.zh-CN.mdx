@@ -204,7 +204,7 @@ MCP 插件在受控权限下运行：
 
 ```bash
 # 插件超时时间（毫秒）
-MCP_TOOL_TIMEOUT=30000
+MCP_TOOL_TIMEOUT=120000
 
 # 启用 MCP 调试日志
 DEBUG_MCP=1
@@ -212,6 +212,8 @@ DEBUG_MCP=1
 # MCP 配置文件路径
 MCP_CONFIG=/path/to/mcp-config.json
 ```
+
+如果你前面还有 Nginx、Ingress 或 CDN，请把代理读超时设置得略高于应用路由预算，并确保应用路由预算高于 `MCP_TOOL_TIMEOUT`。
 
 ## 开发自定义 MCP 插件
 

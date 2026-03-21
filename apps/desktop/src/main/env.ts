@@ -74,7 +74,7 @@ export const getDesktopEnv = memoize(() =>
       FORCE_DEV_UPDATE_CONFIG: envBoolean(false),
 
       // mcp client
-      MCP_TOOL_TIMEOUT: envNumber(60_000),
+      MCP_TOOL_TIMEOUT: envNumber(120_000),
 
       // keep optional to preserve existing behavior:
       // - unset NODE_ENV should behave like "not production" in logger runtime paths
