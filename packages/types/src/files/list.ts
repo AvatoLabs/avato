@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { AsyncTaskStatus } from '../asyncTask';
+import type { InheritMode, ResourceRole } from '../resource';
 
 export interface FileListItem {
   chunkCount: number | null;
@@ -17,6 +18,7 @@ export interface FileListItem {
   fileType: string;
   finishEmbedding: boolean;
   id: string;
+  inheritMode?: InheritMode | null;
   /**
    * Metadata (for notes/documents)
    */
@@ -26,9 +28,12 @@ export interface FileListItem {
    * Parent folder ID (for folder hierarchy)
    */
   parentId?: string | null;
+  resourceRole?: ResourceRole | null;
+  resourceUid?: string | null;
   size: number;
   slug?: string | null;
   sourceType: string;
+  spaceId?: string | null;
   updatedAt: Date;
   url: string;
 }
@@ -46,6 +51,7 @@ export const QueryFileListSchema = z.object({
   parentId: z.string().nullable().optional(),
   q: z.string().nullable().optional(),
   showFilesInKnowledgeBase: z.boolean().default(false),
+  spaceId: z.string().optional(),
   sortType: z.enum(['desc', 'asc']).optional(),
   sorter: z.enum(['createdAt', 'name', 'size']).optional(),
 });
@@ -62,6 +68,7 @@ export interface QueryFileListParams {
   showFilesInKnowledgeBase?: boolean;
   sorter?: string;
   sortType?: string;
+  spaceId?: string;
 }
 
 export interface PaginatedFileList {

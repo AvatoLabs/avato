@@ -7,7 +7,7 @@ import { useFolderPath } from '@/routes/(main)/resource/features/hooks/useFolder
 import { useResourceManagerUrlSync } from '@/routes/(main)/resource/features/hooks/useResourceManagerUrlSync';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { sortFileList } from '@/routes/(main)/resource/features/store/selectors';
-import { useFetchResources, useResourceStore } from '@/store/file/slices/resource/hooks';
+import { useVisibleResources } from '@/store/file/slices/resource/hooks';
 
 import EmptyPlaceholder from './EmptyPlaceholder';
 import Header from './Header';
@@ -30,16 +30,25 @@ const ResourceExplorer = memo(() => {
   useResourceManagerUrlSync();
 
   // Get state from Resource Manager store
-  const [libraryId, category, viewMode, searchQuery, setSelectedFileIds, sorter, sortType] =
-    useResourceManagerStore((s) => [
-      s.libraryId,
-      s.category,
-      s.viewMode,
-      s.searchQuery,
-      s.setSelectedFileIds,
-      s.sorter,
-      s.sortType,
-    ]);
+  const [
+    libraryId,
+    category,
+    viewMode,
+    searchQuery,
+    setSelectedFileIds,
+    sorter,
+    sortType,
+    spaceId,
+  ] = useResourceManagerStore((s) => [
+    s.libraryId,
+    s.category,
+    s.viewMode,
+    s.searchQuery,
+    s.setSelectedFileIds,
+    s.sorter,
+    s.sortType,
+    s.spaceId,
+  ]);
 
   // searchQuery is still subscribed above for selection-clearing effect below
 
@@ -55,21 +64,19 @@ const ResourceExplorer = memo(() => {
       libraryId,
       parentId: currentFolderSlug || null,
       showFilesInKnowledgeBase: false,
+      spaceId,
       sortType,
       sorter,
     }),
-    [category, libraryId, currentFolderSlug, sortType, sorter],
+    [category, libraryId, currentFolderSlug, sortType, sorter, spaceId],
   );
 
   // Use SWR for data fetching with automatic caching and revalidation
-  const { isLoading, isValidating } = useFetchResources(queryParams);
-
-  // Get resource data from store (updated by SWR hook)
-  const { resourceList } = useResourceStore();
+  const { isLoading, isValidating, items } = useVisibleResources(queryParams);
 
   // Map ResourceItem[] to FileListItem[] for compatibility
   // TODO: Eventually update all consumers to use ResourceItem directly
-  const rawData = resourceList?.map((item) => ({
+  const rawData = items.map((item) => ({
     ...item,
     // Ensure all FileListItem fields are present with proper types
     chunkCount: item.chunkCount ?? null,
@@ -82,7 +89,7 @@ const ResourceExplorer = memo(() => {
   }));
 
   // Sort data using current sort settings
-  const data = sortFileList(rawData, sorter, sortType);
+  const data = sortFileList(rawData, sorter, sortType) || [];
 
   // Check task status
   useCheckTaskStatus(data);
@@ -95,7 +102,7 @@ const ResourceExplorer = memo(() => {
     setSelectedFileIds([]);
   }, [category, libraryId, searchQuery, setSelectedFileIds]);
 
-  const showEmptyStatus = !isLoading && !isValidating && data?.length === 0 && !currentFolderSlug;
+  const showEmptyStatus = !isLoading && !isValidating && data.length === 0 && !currentFolderSlug;
 
   return (
     <Flexbox height={'100%'}>

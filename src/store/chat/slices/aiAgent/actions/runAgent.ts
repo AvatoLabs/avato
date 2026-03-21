@@ -12,6 +12,7 @@ import { topicMapKey } from '@/store/chat/utils/topicMapKey';
 import { type StoreSetter } from '@/store/types';
 
 const log = debug('store:chat:ai-agent:runAgent');
+const TOPIC_REFRESH_DELAYS_MS = [1200, 3500, 7000];
 
 interface StreamingContext {
   assistantId: string;
@@ -33,6 +34,22 @@ export class AgentActionImpl {
     void set;
     this.#get = get;
   }
+
+  private scheduleTopicRefresh = (operationId: string) => {
+    const operation = this.#get().operations[operationId];
+    const topicId = operation?.metadata.createdTopicId ?? operation?.context.topicId;
+    if (!topicId) return;
+
+    for (const delay of TOPIC_REFRESH_DELAYS_MS) {
+      setTimeout(() => {
+        void this.#get()
+          .refreshTopic()
+          .catch((error) => {
+            console.error('[runAgent] Failed to refresh topics after runtime completion:', error);
+          });
+      }, delay);
+    }
+  };
 
   internal_cleanupAgentOperation = (assistantId: string): void => {
     // Find operation by messageId (assistantId)
@@ -132,6 +149,7 @@ export class AgentActionImpl {
         // Stop loading state
         log(`Stopping loading for completed agent runtime: ${assistantId}`);
         this.#get().internal_toggleMessageLoading(false, assistantId);
+        this.scheduleTopicRefresh(operationId);
         break;
       }
 

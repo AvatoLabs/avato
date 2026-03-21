@@ -1,3 +1,5 @@
+import type { BlobStatus, ResourceRole } from '../resource';
+
 export enum FilesTabs {
   All = 'all',
   Audios = 'audios',
@@ -16,13 +18,18 @@ export enum FileSource {
 }
 
 export interface FileItem {
+  blobId?: string | null;
+  blobStatus?: BlobStatus | null;
   content?: string;
   createdAt: Date;
   enabled?: boolean;
   id: string;
   name: string;
+  resourceRole?: ResourceRole | null;
+  resourceUid?: string | null;
   size: number;
   source?: FileSource | null;
+  spaceId?: string | null;
   type: string;
   updatedAt: Date;
   url: string;

@@ -38,6 +38,7 @@ const marketProcedure = publicProcedure
       ctx: {
         discoverService: new DiscoverService({
           accessToken: ctx.marketAccessToken,
+          userAgent: ctx.userAgent,
           userInfo: ctx.marketUserInfo,
         }),
         marketService: new MarketService({

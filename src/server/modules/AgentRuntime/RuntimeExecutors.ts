@@ -27,6 +27,7 @@ import { serverMessagesEngine } from '@/server/modules/Mecha/ContextEngineering'
 import { type EvalContext } from '@/server/modules/Mecha/ContextEngineering/types';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { type ToolExecutionService } from '@/server/services/toolExecution';
+import { TopicTitleService } from '@/server/services/topicTitle';
 
 import { type IStreamEventManager } from './types';
 
@@ -1031,6 +1032,19 @@ export const createRuntimeExecutors = (
     const { operationId, stepIndex, streamManager } = ctx;
 
     log('[%s:%d] Finishing execution: (%s)', operationId, stepIndex, reason);
+
+    if (ctx.topicId && ctx.userId) {
+      const topicTitleService = new TopicTitleService(ctx.serverDB, ctx.userId);
+
+      void topicTitleService
+        .summarizeTopicTitle({
+          messages: state.messages as any,
+          topicId: ctx.topicId,
+        })
+        .catch((error) => {
+          console.error('[agent-runtime.finish] auto topic title generation failed:', error);
+        });
+    }
 
     // Publish execution complete event
     await streamManager.publishStreamEvent(operationId, {

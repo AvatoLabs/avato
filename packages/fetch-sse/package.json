@@ -8,6 +8,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./sseParser": {
+      "types": "./src/sseParser.ts",
+      "default": "./src/sseParser.ts"
+    },
     "./parseError": {
       "types": "./src/parseError.ts",
       "default": "./src/parseError.ts"

@@ -41,10 +41,12 @@ import { notebookRouter } from './notebook';
 import { oauthDeviceFlowRouter } from './oauthDeviceFlow';
 import { pluginRouter } from './plugin';
 import { ragEvalRouter } from './ragEval';
+import { resourceShareRouter } from './resourceShare';
 import { searchRouter } from './search';
 import { sessionRouter } from './session';
 import { sessionGroupRouter } from './sessionGroup';
 import { shareRouter } from './share';
+import { spaceRouter } from './space';
 import { tagRouter } from './tag';
 import { threadRouter } from './thread';
 import { topicRouter } from './topic';
@@ -91,11 +93,13 @@ export const lambdaRouter = router({
   oauthDeviceFlow: oauthDeviceFlowRouter,
   plugin: pluginRouter,
   ragEval: ragEvalRouter,
+  resourceShare: resourceShareRouter,
   search: searchRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
   tag: tagRouter,
   share: shareRouter,
+  space: spaceRouter,
   thread: threadRouter,
   topic: topicRouter,
   upload: uploadRouter,

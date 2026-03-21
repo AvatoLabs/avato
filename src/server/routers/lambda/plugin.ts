@@ -27,22 +27,26 @@ export const pluginRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const result = await ctx.pluginModel.findById(input.identifier);
+      const nextPlugin = {
+        customParams: input.customParams ?? result?.customParams,
+        manifest: input.manifest ?? result?.manifest,
+        settings: input.settings ?? result?.settings,
+        type: input.type,
+      };
 
       // if not exist, we should create the plugin
       if (!result) {
         const data = await ctx.pluginModel.create({
-          customParams: input.customParams,
+          ...nextPlugin,
           identifier: input.identifier,
-          manifest: input.manifest,
-          settings: input.settings,
-          type: input.type,
         });
 
         return data.identifier;
       }
 
-      // or we can just update the plugin manifest
-      await ctx.pluginModel.update(input.identifier, { manifest: input.manifest });
+      await ctx.pluginModel.update(input.identifier, nextPlugin);
+
+      return input.identifier;
     }),
 
   createPlugin: pluginProcedure

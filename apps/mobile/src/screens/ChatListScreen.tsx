@@ -11,7 +11,6 @@
  * - Directory drawer shows assistants first, groups after
  */
 import { useFocusEffect } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,7 +24,6 @@ import {
   Cpu,
   FileText,
   Globe,
-  Menu,
   MessageCircle,
   MessageSquarePlus,
   Paperclip,
@@ -68,6 +66,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/shallow';
 
+import ChatListHeader from '../components/ChatListHeader';
 import AgentSelectionSheet from '../components/ui/AgentSelectionSheet';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import {
@@ -81,7 +80,6 @@ import FilePreview from '../components/ui/FilePreview';
 import ListSkeleton from '../components/ui/ListSkeleton';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import { ModelDrawer } from '../components/ui/ModelDrawer';
-import PressableScale from '../components/ui/PressableScale';
 import PromptModal from '../components/ui/PromptModal';
 import { QuickActionChip } from '../components/ui/QuickActionChip';
 import ResourcePickerSheet from '../components/ui/ResourcePickerSheet';
@@ -117,6 +115,7 @@ import { useResolvedRemoteAsset } from '../lib/remoteAsset';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
 import { recordUsage } from '../lib/streak';
 import { generateBestTitle } from '../lib/titleGeneration';
+import type { MainTabScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { useModelStore } from '../store/model';
@@ -379,7 +378,7 @@ function SessionLogo({
   );
 }
 
-export default function ChatListScreen({ navigation }: any) {
+export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats'>) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
@@ -1840,10 +1839,10 @@ export default function ChatListScreen({ navigation }: any) {
     async (topicId: string, sessionId: string, newTitle: string) => {
       await updateTopic(topicId, sessionId, newTitle);
       haptics.success();
-      useToast.getState().show('success', t.topicRenamed);
-      refreshRecentTopics();
+      toast.show('success', t.topicRenamed);
+      void refreshRecentTopics();
     },
-    [refreshRecentTopics, t.topicRenamed, updateTopic],
+    [refreshRecentTopics, t.topicRenamed, toast, updateTopic],
   );
 
   const [smartRenamingTopicId, setSmartRenamingTopicId] = useState<string | null>(null);
@@ -1852,30 +1851,35 @@ export default function ChatListScreen({ navigation }: any) {
       if (smartRenamingTopicId) return;
       haptics.light();
       setSmartRenamingTopicId(topicId);
-      const t18n = useI18n.getState().t;
       const failMsg = [
-        t18n.toastTitleGenerationFailed || 'Failed to generate title',
-        t18n.toastTitleGenerationFailedHint || '',
+        t.toastTitleGenerationFailed || 'Failed to generate title',
+        t.toastTitleGenerationFailedHint || '',
       ]
         .filter(Boolean)
         .join(' ');
       try {
-        const result = await generateBestTitle({ sessionId, topicId });
+        const result = await generateBestTitle({ force: true, sessionId, topicId });
         if (result?.title) {
-          useToast
-            .getState()
-            .show('success', result.target === 'topic' ? t18n.topicRenamed : t18n.sessionRenamed);
-          refreshRecentTopics();
+          toast.show('success', result.target === 'topic' ? t.topicRenamed : t.sessionRenamed);
+          void refreshRecentTopics();
         } else {
-          useToast.getState().show('error', failMsg);
+          toast.show('error', failMsg);
         }
       } catch {
-        useToast.getState().show('error', failMsg);
+        toast.show('error', failMsg);
       } finally {
         setSmartRenamingTopicId(null);
       }
     },
-    [refreshRecentTopics, smartRenamingTopicId],
+    [
+      refreshRecentTopics,
+      smartRenamingTopicId,
+      t.sessionRenamed,
+      t.toastTitleGenerationFailed,
+      t.toastTitleGenerationFailedHint,
+      t.topicRenamed,
+      toast,
+    ],
   );
 
   const toggleAssistantExpand = useCallback(
@@ -2246,197 +2250,41 @@ export default function ChatListScreen({ navigation }: any) {
           />
         </GestureDetector>
       ) : null}
-      <View
-        className="z-10"
-        style={{
-          backgroundColor: Platform.OS === 'android' ? colors.background : undefined,
-          borderBottomColor: Platform.OS === 'android' ? colors.border : 'transparent',
-          borderBottomWidth: Platform.OS === 'android' ? 1 : 0,
-          paddingTop: insets.top,
+      <ChatListHeader
+        directoryVisible={directoryVisible}
+        subtitle={selectedModel}
+        title={getSessionDisplayTitle(draftSession)}
+        avatar={
+          <SessionLogo
+            isInbox={draftSessionIsInbox}
+            providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
+            size={34}
+            avatar={
+              draftSessionIsInbox
+                ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
+                : draftSession?.avatar
+            }
+            provider={
+              draftSessionIsInbox
+                ? undefined
+                : draftSession?.provider ||
+                  (draftSession?.model
+                    ? inferProviderFromModelId(draftSession.model)
+                    : undefined) ||
+                  selectedProvider ||
+                  undefined
+            }
+          />
+        }
+        onOpenAssistantPicker={() => {
+          haptics.light();
+          setDraftAssistantPickerVisible(true);
         }}
-      >
-        {Platform.OS !== 'android' ? (
-          <BlurView intensity={90} tint={effectiveTheme === 'dark' ? 'dark' : 'light'}>
-            <View
-              className="flex-row items-center justify-between"
-              style={{
-                paddingHorizontal: tokens.spacing.md + tokens.spacing.xs,
-                paddingVertical: tokens.spacing.sm,
-              }}
-            >
-              <View className="flex-row items-center flex-1">
-                <HeaderIconButton
-                  accessibilityLabel={t.accessibilityChatDirectory}
-                  active={directoryVisible}
-                  onPress={() => {
-                    haptics.light();
-                    setDirectoryVisible(true);
-                  }}
-                >
-                  <Menu
-                    color={directoryVisible ? colors.primary : colors.foreground}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                </HeaderIconButton>
-                <PressableScale
-                  accessibilityLabel={t.chatListAssistants}
-                  accessibilityRole="button"
-                  className="ml-2 flex-1 rounded-2xl px-3 py-2"
-                  style={{
-                    backgroundColor: colors.fillQuaternary,
-                    borderColor: colors.borderSubtle,
-                    borderWidth: 1,
-                  }}
-                  onPress={() => {
-                    haptics.light();
-                    setDraftAssistantPickerVisible(true);
-                  }}
-                >
-                  <View className="flex-row items-center">
-                    <View className="mr-3">
-                      <SessionLogo
-                        isInbox={draftSessionIsInbox}
-                        providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
-                        size={34}
-                        avatar={
-                          draftSessionIsInbox
-                            ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
-                            : draftSession?.avatar
-                        }
-                        provider={
-                          draftSessionIsInbox
-                            ? undefined
-                            : draftSession?.provider ||
-                              (draftSession?.model
-                                ? inferProviderFromModelId(draftSession.model)
-                                : undefined) ||
-                              selectedProvider ||
-                              undefined
-                        }
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <Text
-                        className="text-[16px] font-medium text-foreground tracking-tight"
-                        numberOfLines={1}
-                      >
-                        {getSessionDisplayTitle(draftSession)}
-                      </Text>
-                      {selectedModel ? (
-                        <View className="mt-0.5 flex-row items-center">
-                          <Text
-                            className="flex-1 text-[12px] font-medium"
-                            numberOfLines={1}
-                            style={{ color: colors.muted }}
-                          >
-                            {selectedModel}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <ChevronDown
-                      color={colors.secondaryText}
-                      size={16}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginLeft: 8 }}
-                    />
-                  </View>
-                </PressableScale>
-              </View>
-            </View>
-          </BlurView>
-        ) : (
-          <View
-            className="flex-row items-center justify-between"
-            style={{
-              paddingHorizontal: tokens.spacing.md + tokens.spacing.xs,
-              paddingVertical: tokens.spacing.sm,
-            }}
-          >
-            <View className="flex-row items-center flex-1">
-              <HeaderIconButton
-                accessibilityLabel={t.accessibilityChatDirectory}
-                active={directoryVisible}
-                onPress={() => {
-                  haptics.light();
-                  setDirectoryVisible(true);
-                }}
-              >
-                <Menu
-                  color={directoryVisible ? colors.primary : colors.foreground}
-                  size={20}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </HeaderIconButton>
-              <PressableScale
-                accessibilityLabel={t.chatListAssistants}
-                accessibilityRole="button"
-                className="ml-2 flex-1 rounded-2xl px-3 py-2"
-                style={{
-                  backgroundColor: colors.fillQuaternary,
-                  borderColor: colors.borderSubtle,
-                  borderWidth: 1,
-                }}
-                onPress={() => {
-                  haptics.light();
-                  setDraftAssistantPickerVisible(true);
-                }}
-              >
-                <View className="flex-row items-center">
-                  <View className="mr-3">
-                    <SessionLogo
-                      isInbox={draftSessionIsInbox}
-                      providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
-                      size={34}
-                      avatar={
-                        draftSessionIsInbox
-                          ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
-                          : draftSession?.avatar
-                      }
-                      provider={
-                        draftSessionIsInbox
-                          ? undefined
-                          : draftSession?.provider ||
-                            (draftSession?.model
-                              ? inferProviderFromModelId(draftSession.model)
-                              : undefined) ||
-                            selectedProvider ||
-                            undefined
-                      }
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-[16px] font-medium text-foreground tracking-tight"
-                      numberOfLines={1}
-                    >
-                      {getSessionDisplayTitle(draftSession)}
-                    </Text>
-                    {selectedModel ? (
-                      <View className="mt-0.5 flex-row items-center">
-                        <Text
-                          className="flex-1 text-[12px] font-medium"
-                          numberOfLines={1}
-                          style={{ color: colors.muted }}
-                        >
-                          {selectedModel}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <ChevronDown
-                    color={colors.secondaryText}
-                    size={16}
-                    strokeWidth={tokens.icon.strokeWidth}
-                    style={{ marginLeft: 8 }}
-                  />
-                </View>
-              </PressableScale>
-            </View>
-          </View>
-        )}
-      </View>
+        onOpenDirectory={() => {
+          haptics.light();
+          setDirectoryVisible(true);
+        }}
+      />
 
       <View className="flex-1">
         <ScrollView
@@ -3120,7 +2968,7 @@ export default function ChatListScreen({ navigation }: any) {
         skillsTitle={t.skillsTitle}
         visible={skillsVisible}
         onClose={() => setSkillsVisible(false)}
-        onOpenStore={() => navigation.getParent()?.navigate('MainTabs', { screen: 'Store' })}
+        onOpenStore={() => navigation.navigate('Store')}
         onToggle={handleToggleSkill}
       />
       <TagEditorSheet

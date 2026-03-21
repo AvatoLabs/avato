@@ -553,6 +553,42 @@ describe('DiscoverService', () => {
           expect.any(Object),
         );
       });
+
+      it('should retry with M2M token when MCP list requires bearer auth', async () => {
+        const unauthorizedError = Object.assign(new Error('Missing bearer token'), {
+          errorBody: {
+            error: 'unauthorized',
+            error_description: 'Missing bearer token',
+          },
+          status: 401,
+        });
+        const m2mMarket = {
+          plugins: {
+            getPluginList: vi.fn().mockResolvedValue({
+              currentPage: 2,
+              items: mockPluginList,
+              pageSize: 20,
+              totalCount: mockPluginList.length,
+              totalPages: 1,
+            }),
+          },
+        };
+
+        mockMarket.plugins.getPluginList.mockRejectedValueOnce(unauthorizedError);
+        vi.spyOn(service as any, 'getM2MMarketSDK').mockResolvedValue(m2mMarket);
+
+        const result = await service.getMcpList({ locale: 'en-US', page: 2 });
+
+        expect((service as any).getM2MMarketSDK).toHaveBeenCalled();
+        expect(m2mMarket.plugins.getPluginList).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locale: 'en',
+            page: 2,
+          }),
+          expect.any(Object),
+        );
+        expect(result.currentPage).toBe(2);
+      });
     });
 
     describe('getMcpDetail', () => {

@@ -3,8 +3,10 @@ import { Upload } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { ArrowUpIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { useCreateNewModal } from '@/features/LibraryModal';
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useFileStore } from '@/store/file';
 
@@ -64,8 +66,9 @@ const EmptyPlaceholder = () => {
   const { t } = useTranslation('components');
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
+  const navigate = useNavigate();
 
-  const libraryId = useResourceManagerStore((s) => s.libraryId);
+  const [libraryId, spaceId] = useResourceManagerStore((s) => [s.libraryId, s.spaceId]);
 
   const { open } = useCreateNewModal();
 
@@ -81,7 +84,10 @@ const EmptyPlaceholder = () => {
             className={styles.card}
             padding={16}
             onClick={() => {
-              open();
+              open({
+                onSuccess: (id) => navigate(buildResourceLibraryPath(spaceId, id)),
+                spaceId,
+              });
             }}
           >
             <span className={styles.actionTitle}>
@@ -101,7 +107,7 @@ const EmptyPlaceholder = () => {
           multiple={true}
           showUploadList={false}
           beforeUpload={async (file) => {
-            await pushDockFileList([file], libraryId);
+            await pushDockFileList([file], libraryId, undefined, spaceId);
 
             return false;
           }}
@@ -122,7 +128,7 @@ const EmptyPlaceholder = () => {
           multiple={true}
           showUploadList={false}
           beforeUpload={async (file) => {
-            await pushDockFileList([file], libraryId);
+            await pushDockFileList([file], libraryId, undefined, spaceId);
 
             return false;
           }}

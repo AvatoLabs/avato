@@ -47,10 +47,12 @@ export class DocumentActionImpl {
     content,
     knowledgeBaseId,
     parentId,
+    spaceId,
   }: {
     content: string;
     knowledgeBaseId?: string;
     parentId?: string;
+    spaceId?: string;
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
@@ -65,6 +67,7 @@ export class DocumentActionImpl {
         createdAt: now,
       },
       parentId,
+      spaceId,
       title,
     });
 
@@ -79,6 +82,7 @@ export class DocumentActionImpl {
     name: string,
     parentId?: string,
     knowledgeBaseId?: string,
+    spaceId?: string,
   ): Promise<string> => {
     const now = Date.now();
 
@@ -95,6 +99,7 @@ export class DocumentActionImpl {
         createdAt: now,
       },
       parentId,
+      spaceId,
       slug,
       title: name,
     });

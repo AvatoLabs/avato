@@ -26,7 +26,7 @@ export class KnowledgeBaseCrudActionImpl {
   createNewKnowledgeBase = async (params: CreateKnowledgeBaseParams): Promise<string> => {
     const id = await knowledgeBaseService.createKnowledgeBase(params);
 
-    await this.#get().refreshKnowledgeBaseList();
+    await this.#get().refreshKnowledgeBaseList(params.spaceId);
 
     return id;
   };
@@ -43,8 +43,13 @@ export class KnowledgeBaseCrudActionImpl {
     );
   };
 
-  refreshKnowledgeBaseList = async (): Promise<void> => {
-    await mutate(FETCH_KNOWLEDGE_BASE_LIST_KEY);
+  refreshKnowledgeBaseList = async (spaceId?: string): Promise<void> => {
+    if (spaceId) {
+      await mutate([FETCH_KNOWLEDGE_BASE_LIST_KEY, spaceId]);
+      return;
+    }
+
+    await mutate((key) => Array.isArray(key) && key[0] === FETCH_KNOWLEDGE_BASE_LIST_KEY);
   };
 
   removeKnowledgeBase = async (id: string): Promise<void> => {
@@ -81,11 +86,12 @@ export class KnowledgeBaseCrudActionImpl {
   };
 
   useFetchKnowledgeBaseList = (
+    spaceId?: string,
     params: { suspense?: boolean } = {},
   ): SWRResponse<KnowledgeBaseItem[]> => {
     return useClientDataSWR<KnowledgeBaseItem[]>(
-      FETCH_KNOWLEDGE_BASE_LIST_KEY,
-      () => knowledgeBaseService.getKnowledgeBaseList(),
+      [FETCH_KNOWLEDGE_BASE_LIST_KEY, spaceId || 'all'],
+      () => knowledgeBaseService.getKnowledgeBaseList(spaceId),
       {
         fallbackData: [],
         onSuccess: () => {

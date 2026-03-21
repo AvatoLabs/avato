@@ -78,4 +78,46 @@ describe('responseParser', () => {
       ],
     });
   });
+
+  it('should parse custom SSE events with reasoning and tool calls', () => {
+    const result = parseChatCompletionTextResponse(
+      [
+        'id: chatcmpl-3',
+        'event: reasoning',
+        'data: "用户想研究 BTC 最近行情。"',
+        '',
+        'event: tool_calls',
+        'data: [{"index":0,"id":"call_1","type":"function","function":{"name":"deep-research____deep-research____mcp","arguments":"{\\"query\\":\\"BTC比特币2026年3月最新市场行情\\"}"}}]',
+        '',
+        'event: stop',
+        'data: "tool_calls"',
+        '',
+        'data: [DONE]',
+        '',
+      ].join('\n'),
+    );
+
+    expect(result).toEqual({
+      choices: [
+        {
+          finish_reason: 'tool_calls',
+          message: {
+            content: '',
+            reasoning_content: '用户想研究 BTC 最近行情。',
+            role: 'assistant',
+            tool_calls: [
+              {
+                function: {
+                  arguments: '{"query":"BTC比特币2026年3月最新市场行情"}',
+                  name: 'deep-research____deep-research____mcp',
+                },
+                id: 'call_1',
+                type: 'function',
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
 });

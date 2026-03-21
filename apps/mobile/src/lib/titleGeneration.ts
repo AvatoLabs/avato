@@ -3,6 +3,7 @@ import { useTopicStore } from '../store/topic';
 import { sessionApi, topicApi } from './api';
 
 export interface GenerateBestTitleParams {
+  force?: boolean;
   sessionId: string;
   topicId?: string | null;
 }
@@ -15,6 +16,7 @@ export interface GenerateBestTitleResult {
 const trimGeneratedTitle = (value?: string | null) => value?.trim() || '';
 
 export const generateBestTitle = async ({
+  force = true,
   sessionId,
   topicId,
 }: GenerateBestTitleParams): Promise<GenerateBestTitleResult | null> => {
@@ -28,7 +30,7 @@ export const generateBestTitle = async ({
 
   if (topicId) {
     try {
-      const nextTopicTitle = trimGeneratedTitle(await topicApi.generateTitle(topicId));
+      const nextTopicTitle = trimGeneratedTitle(await topicApi.generateTitle(topicId, { force }));
       if (nextTopicTitle) {
         useTopicStore.setState((state) => ({
           topicsBySession: {

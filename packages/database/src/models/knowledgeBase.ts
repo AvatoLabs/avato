@@ -25,7 +25,7 @@ export class KnowledgeBaseModel {
     return result;
   };
 
-  addFilesToKnowledgeBase = async (id: string, fileIds: string[]) => {
+  addFilesToKnowledgeBase = async (id: string, fileIds: string[], spaceId?: string) => {
     // Separate document IDs from file IDs
     const documentIds = fileIds.filter((id) => id.startsWith('docs_'));
     const directFileIds = fileIds.filter((id) => !id.startsWith('docs_'));
@@ -55,10 +55,22 @@ export class KnowledgeBaseModel {
       return [];
     }
 
+    // Get spaceId from knowledge base if not provided
+    let resolvedSpaceId = spaceId;
+    if (!resolvedSpaceId) {
+      const kb = await this.findById(id);
+      resolvedSpaceId = kb?.spaceId || undefined;
+    }
+
     return this.db
       .insert(knowledgeBaseFiles)
       .values(
-        resolvedFileIds.map((fileId) => ({ fileId, knowledgeBaseId: id, userId: this.userId })),
+        resolvedFileIds.map((fileId) => ({
+          fileId,
+          knowledgeBaseId: id,
+          spaceId: resolvedSpaceId,
+          userId: this.userId,
+        })),
       )
       .returning();
   };
@@ -121,7 +133,7 @@ export class KnowledgeBaseModel {
       );
   };
   // query
-  query = async () => {
+  query = async (spaceId?: string) => {
     const data = await this.db
       .select({
         avatar: knowledgeBases.avatar,
@@ -131,11 +143,12 @@ export class KnowledgeBaseModel {
         isPublic: knowledgeBases.isPublic,
         name: knowledgeBases.name,
         settings: knowledgeBases.settings,
+        spaceId: knowledgeBases.spaceId,
         type: knowledgeBases.type,
         updatedAt: knowledgeBases.updatedAt,
       })
       .from(knowledgeBases)
-      .where(eq(knowledgeBases.userId, this.userId))
+      .where(spaceId ? eq(knowledgeBases.spaceId, spaceId) : eq(knowledgeBases.userId, this.userId))
       .orderBy(desc(knowledgeBases.updatedAt));
 
     return data as KnowledgeBaseItem[];

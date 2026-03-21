@@ -19,8 +19,10 @@ import {
 import { fetchMobileAuthConfig, getValidAuthSession } from './src/lib/auth';
 import { useI18n } from './src/lib/i18n';
 import { AppErrorBoundary, initAppLogger } from './src/lib/logger';
+import { resetToLogin } from './src/lib/navigation';
 import { getApiUrl, hasConfiguredUrl } from './src/lib/server';
 import RootNavigator from './src/navigation';
+import type { BootstrapRoute } from './src/navigation/types';
 import { useConnectionStore } from './src/store/connection';
 import { useThemeStore } from './src/store/theme';
 import { useThemeColors } from './src/theme/colors';
@@ -86,11 +88,14 @@ export default function App() {
   const [isBootReady, setIsBootReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
-  const [initialRoute, setInitialRoute] = useState<
-    'Login' | 'MainTabs' | 'OnboardingWelcome' | 'ServerConfig'
-  >('MainTabs');
+  const [initialRoute, setInitialRoute] = useState<BootstrapRoute>('MainTabs');
   const loadLocale = useI18n((s) => s.loadLocale);
   const t = useI18n((s) => s.t);
+
+  const handleRequiresReauth = React.useCallback(() => {
+    setInitialRoute('Login');
+    resetToLogin();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -102,7 +107,7 @@ export default function App() {
         useToast.getState().show('success', t.toastConnectionRestored);
         void syncMobileBootstrapState().then(({ requiresReauth }) => {
           if (requiresReauth) {
-            setInitialRoute('Login');
+            handleRequiresReauth();
           }
         });
       }
@@ -117,7 +122,7 @@ export default function App() {
 
       void syncMobileBootstrapState().then(({ requiresReauth }) => {
         if (requiresReauth) {
-          setInitialRoute('Login');
+          handleRequiresReauth();
         }
       });
       useConnectionStore.getState().checkConnection();
@@ -126,7 +131,7 @@ export default function App() {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [handleRequiresReauth]);
 
   useEffect(() => {
     let isCancelled = false;

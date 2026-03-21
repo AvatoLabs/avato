@@ -13,6 +13,7 @@ interface UseNotionImportOptions {
   currentFolderId?: string | null;
   libraryId?: string | null;
   refetchResources: () => Promise<void>;
+  spaceId?: string;
   t: TFunction<'file'>;
 }
 
@@ -21,6 +22,7 @@ const useNotionImport = ({
   currentFolderId,
   libraryId,
   refetchResources,
+  spaceId,
   t,
 }: UseNotionImportOptions) => {
   const notionInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +146,7 @@ const useNotionImport = ({
               content,
               knowledgeBaseId: libraryId ?? undefined,
               parentId: currentFolderId ?? undefined,
+              spaceId,
               title,
             });
 
@@ -183,7 +186,7 @@ const useNotionImport = ({
       // Reset input to allow re-uploading
       event.target.value = '';
     },
-    [createDocument, currentFolderId, libraryId, refetchResources, t],
+    [createDocument, currentFolderId, libraryId, refetchResources, spaceId, t],
   );
 
   return {

@@ -46,18 +46,22 @@ import MemoryPreferencesPage from '@/routes/(main)/memory/preferences';
 import PageIndexPage from '@/routes/(main)/page';
 import DesktopPageLayout from '@/routes/(main)/page/_layout';
 import PageDetailPage from '@/routes/(main)/page/[id]';
+import ResourceRootRedirectPage from '@/routes/(main)/resource';
 import ResourceLayout from '@/routes/(main)/resource/_layout';
 import ResourceHomePage from '@/routes/(main)/resource/(home)';
 import ResourceHomeLayout from '@/routes/(main)/resource/(home)/_layout';
 import ResourceLibraryPage from '@/routes/(main)/resource/library';
 import ResourceLibraryLayout from '@/routes/(main)/resource/library/_layout';
 import ResourceLibrarySlugPage from '@/routes/(main)/resource/library/[slug]';
+import ResourceSharedPage from '@/routes/(main)/resource/shared';
+import ResourceSpaceSettingsPage from '@/routes/(main)/resource/space/[spaceId]/settings';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
 import StudioPage from '@/routes/(main)/studio';
 import VideoPage from '@/routes/(main)/video';
 import DesktopVideoLayout from '@/routes/(main)/video/_layout';
+import ShareResourcePage from '@/routes/share/r/[token]';
 import ShareTopicPage from '@/routes/share/t/[id]';
 import ShareTopicLayout from '@/routes/share/t/[id]/_layout';
 import { ErrorBoundary, redirectElement } from '@/utils/router';
@@ -208,17 +212,27 @@ export const desktopRoutes: RouteObject[] = [
       // Resource routes
       {
         children: [
-          // Home routes (resource list)
+          {
+            element: <ResourceRootRedirectPage />,
+            index: true,
+          },
           {
             children: [
               {
+                element: <ResourceSharedPage />,
+                path: 'shared',
+              },
+              {
                 element: <ResourceHomePage />,
-                index: true,
+                path: 'space/:spaceId',
+              },
+              {
+                element: <ResourceSpaceSettingsPage />,
+                path: 'space/:spaceId/settings',
               },
             ],
             element: <ResourceHomeLayout />,
           },
-          // Library routes (knowledge base detail)
           {
             children: [
               {
@@ -232,6 +246,20 @@ export const desktopRoutes: RouteObject[] = [
             ],
             element: <ResourceLibraryLayout />,
             path: 'library/:id',
+          },
+          {
+            children: [
+              {
+                element: <ResourceLibraryPage />,
+                index: true,
+              },
+              {
+                element: <ResourceLibrarySlugPage />,
+                path: ':slug',
+              },
+            ],
+            element: <ResourceLibraryLayout />,
+            path: 'space/:spaceId/library/:id',
           },
         ],
         element: <ResourceLayout />,
@@ -384,6 +412,15 @@ export const desktopRoutes: RouteObject[] = [
     ],
     element: <ShareTopicLayout />,
     path: '/share/t',
+  },
+  {
+    children: [
+      {
+        element: <ShareResourcePage />,
+        path: ':token',
+      },
+    ],
+    path: '/share/r',
   },
 ];
 

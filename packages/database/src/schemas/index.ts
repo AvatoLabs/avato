@@ -17,6 +17,7 @@ export * from './rag';
 export * from './ragEvals';
 export * from './rbac';
 export * from './relations';
+export * from './resource';
 export * from './session';
 export * from './tag';
 export * from './topic';

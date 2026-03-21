@@ -56,6 +56,7 @@ export class KnowledgeRepo {
     knowledgeBaseId,
     showFilesInKnowledgeBase,
     parentId,
+    spaceId,
     limit = 50,
     offset = 0,
   }: QueryFileListParams = {}): Promise<KnowledgeItem[]> {
@@ -77,6 +78,7 @@ export class KnowledgeRepo {
       parentId: resolvedParentId,
       q,
       showFilesInKnowledgeBase,
+      spaceId,
       sortType,
       sorter,
     });
@@ -87,6 +89,7 @@ export class KnowledgeRepo {
       knowledgeBaseId,
       parentId: resolvedParentId,
       q,
+      spaceId,
       sortType,
       sorter,
     });
@@ -305,8 +308,11 @@ export class KnowledgeRepo {
     knowledgeBaseId,
     showFilesInKnowledgeBase,
     parentId,
+    spaceId,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
-    const whereConditions: any[] = [sql`f.user_id = ${this.userId}`];
+    const whereConditions: any[] = [
+      spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+    ];
 
     // Parent ID filter
     if (parentId !== undefined) {
@@ -337,7 +343,9 @@ export class KnowledgeRepo {
     // Knowledge base filter
     if (knowledgeBaseId) {
       // Build where conditions using proper table references (f.column instead of files.column)
-      const kbWhereConditions: any[] = [sql`f.user_id = ${this.userId}`];
+      const kbWhereConditions: any[] = [
+        spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+      ];
 
       // Parent ID filter
       if (parentId !== undefined) {
@@ -432,9 +440,10 @@ export class KnowledgeRepo {
     q,
     knowledgeBaseId,
     parentId,
+    spaceId,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [
-      sql`${documents.userId} = ${this.userId}`,
+      spaceId ? sql`${documents.spaceId} = ${spaceId}` : sql`${documents.userId} = ${this.userId}`,
       sql`${documents.sourceType} != ${'file'}`,
     ];
 
@@ -497,7 +506,9 @@ export class KnowledgeRepo {
     // Documents are linked to knowledge bases through files table via fileId
     if (knowledgeBaseId) {
       // Build where conditions using proper table references (d.column instead of documents.column)
-      const kbWhereConditions: any[] = [sql`d.user_id = ${this.userId}`];
+      const kbWhereConditions: any[] = [
+        spaceId ? sql`d.space_id = ${spaceId}` : sql`d.user_id = ${this.userId}`,
+      ];
 
       // Parent ID filter
       if (parentId !== undefined) {

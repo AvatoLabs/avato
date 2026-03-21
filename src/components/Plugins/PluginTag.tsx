@@ -3,10 +3,12 @@ import { BadgeCheck, CircleUser, Package } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { normalizePluginAuthor } from '@/utils/normalizePluginAuthor';
+
 import MCPTag from './MCPTag';
 
 interface PluginTagProps {
-  author?: string;
+  author?: unknown;
   isMCP?: boolean;
   showIcon?: boolean;
   showText?: boolean;
@@ -17,7 +19,8 @@ const PluginTag = memo<PluginTagProps>(
   ({ showIcon = true, author, type, showText = true, isMCP }) => {
     const { t } = useTranslation('plugin');
     const isCustom = type === 'customPlugin';
-    const isOfficial = author === 'LobeHub';
+    const authorName = normalizePluginAuthor(author);
+    const isOfficial = authorName === 'LobeHub';
 
     const customTag = (
       <Tag color={'warning'} icon={showIcon && <Icon icon={Package} />} size={'small'}>
@@ -42,7 +45,7 @@ const PluginTag = memo<PluginTagProps>(
         icon={showIcon && <Icon icon={isOfficial ? BadgeCheck : CircleUser} />}
         size={'small'}
       >
-        {showText && (author || t('store.communityPlugin'))}
+        {showText && (authorName || t('store.communityPlugin'))}
       </Tag>
     );
   },

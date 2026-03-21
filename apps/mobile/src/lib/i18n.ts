@@ -397,6 +397,7 @@ type TranslationKeys = {
   workspaceConnected: string;
   workspaceNotConnected: string;
   workspaceProviders: string;
+  workspaceUserId: string;
 
   // Message Actions
   msgActionCopy: string;
@@ -1448,6 +1449,7 @@ const en: TranslationKeys = {
   workspaceConnected: 'Connected',
   workspaceNotConnected: 'Not connected',
   workspaceProviders: 'Providers',
+  workspaceUserId: 'User ID',
 
   msgActionCopy: 'Copy',
   msgActionEdit: 'Edit',
@@ -2480,6 +2482,7 @@ const zh_tw: TranslationKeys = {
   workspaceConnected: '已連線',
   workspaceNotConnected: '未連線',
   workspaceProviders: '服務商',
+  workspaceUserId: '使用者 ID',
 
   msgActionCopy: '複製',
   msgActionEdit: '編輯',
@@ -3508,6 +3511,7 @@ const zh: TranslationKeys = {
   workspaceConnected: '已连接',
   workspaceNotConnected: '未连接',
   workspaceProviders: '服务商',
+  workspaceUserId: '用户 ID',
 
   msgActionCopy: '复制',
   msgActionEdit: '编辑',

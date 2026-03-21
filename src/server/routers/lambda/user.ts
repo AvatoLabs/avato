@@ -227,6 +227,20 @@ export const userRouter = router({
 
     return ctx.userModel.updateUser({ username: input });
   }),
+
+  lookupUserByUsername: userProcedure
+    .input(z.object({ username: z.string().trim().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const user = await UserModel.findByUsername(ctx.serverDB, input.username);
+      if (!user?.id) return null;
+
+      return {
+        avatar: user.avatar,
+        fullName: user.fullName,
+        id: user.id,
+        username: user.username,
+      };
+    }),
 });
 
 export type UserRouter = typeof userRouter;

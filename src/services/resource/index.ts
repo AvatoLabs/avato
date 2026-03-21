@@ -109,6 +109,7 @@ export class ResourceService {
           name: params.name,
           parentId: params.parentId,
           size: params.size,
+          spaceId: params.spaceId,
           url: params.url,
         },
         params.knowledgeBaseId,
@@ -128,6 +129,7 @@ export class ResourceService {
         knowledgeBaseId: params.knowledgeBaseId,
         metadata: params.metadata,
         parentId: params.parentId,
+        spaceId: params.spaceId,
         slug: params.slug,
         title: params.title,
       };

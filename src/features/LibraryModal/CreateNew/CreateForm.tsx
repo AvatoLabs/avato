@@ -2,6 +2,7 @@ import { Button, Flexbox, Input, TextArea } from '@lobehub/ui';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useKnowledgeBaseStore } from '@/store/library';
 
 interface CreateFormProps {
@@ -9,9 +10,10 @@ interface CreateFormProps {
   initialValues?: { name?: string; description?: string };
   onClose?: () => void;
   onSuccess?: (id: string) => void;
+  spaceId?: string;
 }
 
-const CreateForm = memo<CreateFormProps>(({ id, initialValues, onClose, onSuccess }) => {
+const CreateForm = memo<CreateFormProps>(({ id, initialValues, onClose, onSuccess, spaceId }) => {
   const { t } = useTranslation('knowledgeBase');
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(initialValues?.name || '');
@@ -25,7 +27,7 @@ const CreateForm = memo<CreateFormProps>(({ id, initialValues, onClose, onSucces
     if (!name.trim()) return;
 
     setLoading(true);
-    const values = { name: name.trim(), description: description.trim() };
+    const values = { description: description.trim(), name: name.trim(), spaceId };
 
     try {
       if (isEditMode) {
@@ -40,7 +42,7 @@ const CreateForm = memo<CreateFormProps>(({ id, initialValues, onClose, onSucces
           onSuccess(newId);
           onClose?.();
         } else {
-          window.location.href = `/resource/library/${newId}`;
+          window.location.href = buildResourceLibraryPath(spaceId, newId);
         }
       }
     } catch (e) {

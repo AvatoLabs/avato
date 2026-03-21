@@ -1,0 +1,1 @@
+export { useResourceShareModal } from './useResourceShareModal';

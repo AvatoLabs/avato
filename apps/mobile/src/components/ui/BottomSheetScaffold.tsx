@@ -41,13 +41,12 @@ export function BottomSheetScaffold({
 
   const content = (
     <Animated.View entering={enteringModalContent()} style={{ maxHeight }}>
-      <Pressable
+      <View
         className="rounded-t-2xl"
         style={{
           backgroundColor: colors.card,
           paddingBottom: Math.max(insets.bottom, 16),
         }}
-        onPress={(event) => event.stopPropagation()}
       >
         <View className="items-center pb-1 pt-3">
           <View
@@ -78,7 +77,7 @@ export function BottomSheetScaffold({
         ) : null}
 
         {children}
-      </Pressable>
+      </View>
     </Animated.View>
   );
 
@@ -91,22 +90,28 @@ export function BottomSheetScaffold({
       onRequestClose={onClose}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable
-          className="flex-1 justify-end"
-          style={{ backgroundColor: colors.modalOverlay }}
-          onPress={onClose}
-        >
-          {keyboardAvoiding ? (
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ maxHeight }}
-            >
-              {content}
-            </KeyboardAvoidingView>
-          ) : (
-            content
-          )}
-        </Pressable>
+        {keyboardAvoiding ? (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+          >
+            <Pressable
+              className="absolute inset-0"
+              style={{ backgroundColor: colors.modalOverlay }}
+              onPress={onClose}
+            />
+            {content}
+          </KeyboardAvoidingView>
+        ) : (
+          <View className="flex-1 justify-end">
+            <Pressable
+              className="absolute inset-0"
+              style={{ backgroundColor: colors.modalOverlay }}
+              onPress={onClose}
+            />
+            {content}
+          </View>
+        )}
       </GestureHandlerRootView>
     </Modal>
   );

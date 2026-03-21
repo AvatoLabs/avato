@@ -7,10 +7,11 @@ import { type UIEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useFolderPath } from '@/routes/(main)/resource/features/hooks/useFolderPath';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { sortFileList } from '@/routes/(main)/resource/features/store/selectors';
 import { useFileStore } from '@/store/file';
-import { useFetchResources } from '@/store/file/slices/resource/hooks';
+import { useVisibleResources } from '@/store/file/slices/resource/hooks';
 import { type FileListItem } from '@/types/files';
 
 import { useMasonryColumnCount } from '../useMasonryColumnCount';
@@ -42,34 +43,22 @@ const MasonryView = memo(function MasonryView() {
   const { t } = useTranslation('file');
   const columnCount = useMasonryColumnCount();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // NEW: Read from resource store instead of fetching independently
-  const resourceList = useFileStore((s) => s.resourceList);
+  const { currentFolderSlug } = useFolderPath();
 
   const queryParams = useMemo(
     () => ({
       category: libraryId ? undefined : category,
       libraryId,
-      parentId: null,
+      parentId: currentFolderSlug || null,
       showFilesInKnowledgeBase: false,
       sortType,
       sorter,
     }),
-    [category, libraryId, sorter, sortType],
+    [category, currentFolderSlug, libraryId, sorter, sortType],
   );
 
-  const { isLoading, isValidating } = useFetchResources(queryParams);
-  const { queryParams: currentQueryParams, hasMore, loadMoreResources } = useFileStore();
-
-  const isNavigating = useMemo(() => {
-    if (!currentQueryParams || !queryParams) return false;
-
-    return (
-      currentQueryParams.libraryId !== queryParams.libraryId ||
-      currentQueryParams.parentId !== queryParams.parentId ||
-      currentQueryParams.category !== queryParams.category
-    );
-  }, [currentQueryParams, queryParams]);
+  const { hasMore, isLoading, items: resourceList } = useVisibleResources(queryParams);
+  const loadMoreResources = useFileStore((s) => s.loadMoreResources);
 
   // Map ResourceItem[] to FileListItem[] for compatibility
   const rawData = resourceList?.map(
@@ -101,14 +90,11 @@ const MasonryView = memo(function MasonryView() {
 
   const dataLength = data.length;
   const effectiveIsLoading = isLoading ?? false;
-  const effectiveIsNavigating = isNavigating ?? false;
-  const effectiveIsValidating = isValidating ?? false;
   const effectiveIsTransitioning = storeIsTransitioning ?? false;
   const effectiveIsMasonryReady = storeIsMasonryReady;
 
   const showSkeleton =
     (effectiveIsLoading && dataLength === 0) ||
-    (effectiveIsNavigating && effectiveIsValidating) ||
     effectiveIsTransitioning ||
     !effectiveIsMasonryReady;
 

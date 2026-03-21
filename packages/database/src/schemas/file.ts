@@ -18,8 +18,9 @@ import type { LobeDocumentPage } from '@/types/document';
 import type { FileSource } from '@/types/files';
 
 import { idGenerator, randomSlug } from '../utils/idGenerator';
-import { accessedAt, createdAt, timestamps } from './_helpers';
+import { accessedAt, createdAt, timestamps, timestamptz } from './_helpers';
 import { asyncTasks } from './asyncTask';
+import { resourceRegistry, spaceBlobs, spaces } from './resource';
 import { users } from './user';
 
 export const globalFiles = pgTable(
@@ -83,11 +84,17 @@ export const documents = pgTable(
     knowledgeBaseId: text('knowledge_base_id').references(() => knowledgeBases.id, {
       onDelete: 'set null',
     }),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
+    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+      onDelete: 'set null',
+    }),
 
     // Parent document (for folder hierarchy structure)
     parentId: varchar('parent_id', { length: 255 }).references((): AnyPgColumn => documents.id, {
       onDelete: 'set null',
     }),
+    inheritMode: text('inherit_mode', { enum: ['inherit', 'explicit_only'] }).default('inherit'),
+    deletedAt: timestamptz('deleted_at'),
 
     // User association
     userId: text('user_id')
@@ -110,9 +117,11 @@ export const documents = pgTable(
     index('documents_file_id_idx').on(table.fileId),
     index('documents_parent_id_idx').on(table.parentId),
     index('documents_knowledge_base_id_idx').on(table.knowledgeBaseId),
-    uniqueIndex('documents_client_id_user_id_unique').on(table.clientId, table.userId),
-    uniqueIndex('documents_slug_user_id_unique')
-      .on(table.slug, table.userId)
+    index('documents_space_id_idx').on(table.spaceId),
+    index('documents_resource_uid_idx').on(table.resourceUid),
+    uniqueIndex('documents_client_id_space_id_unique').on(table.clientId, table.spaceId),
+    uniqueIndex('documents_slug_space_id_unique')
+      .on(table.slug, table.spaceId)
       .where(isNotNull(table.slug)),
   ],
 );
@@ -145,11 +154,17 @@ export const files = pgTable(
     size: integer('size').notNull(),
     url: text('url').notNull(),
     source: text('source').$type<FileSource>(),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
+    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+      onDelete: 'set null',
+    }),
+    blobId: text('blob_id').references(() => spaceBlobs.id, { onDelete: 'set null' }),
 
     // Parent Folder or Document
     parentId: varchar('parent_id', { length: 255 }).references((): AnyPgColumn => documents.id, {
       onDelete: 'set null',
     }),
+    deletedAt: timestamptz('deleted_at'),
 
     clientId: text('client_id'),
     metadata: jsonb('metadata'),
@@ -164,12 +179,15 @@ export const files = pgTable(
     return {
       fileHashIdx: index('file_hash_idx').on(table.fileHash),
       userIdIdx: index('files_user_id_idx').on(table.userId),
+      spaceIdIdx: index('files_space_id_idx').on(table.spaceId),
+      resourceUidIdx: index('files_resource_uid_idx').on(table.resourceUid),
+      blobIdIdx: index('files_blob_id_idx').on(table.blobId),
       parentIdIdx: index('files_parent_id_idx').on(table.parentId),
       chunkTaskIdIdx: index('files_chunk_task_id_idx').on(table.chunkTaskId),
       embeddingTaskIdIdx: index('files_embedding_task_id_idx').on(table.embeddingTaskId),
-      clientIdUnique: uniqueIndex('files_client_id_user_id_unique').on(
+      clientIdUnique: uniqueIndex('files_client_id_space_id_unique').on(
         table.clientId,
-        table.userId,
+        table.spaceId,
       ),
     };
   },
@@ -190,6 +208,10 @@ export const knowledgeBases = pgTable(
 
     // different types of knowledge bases need to be distinguished
     type: text('type'),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
+    resourceUid: text('resource_uid').references(() => resourceRegistry.resourceUid, {
+      onDelete: 'set null',
+    }),
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
@@ -198,12 +220,15 @@ export const knowledgeBases = pgTable(
     isPublic: boolean('is_public').default(false),
 
     settings: jsonb('settings'),
+    deletedAt: timestamptz('deleted_at'),
 
     ...timestamps,
   },
   (t) => [
-    uniqueIndex('knowledge_bases_client_id_user_id_unique').on(t.clientId, t.userId),
+    uniqueIndex('knowledge_bases_client_id_space_id_unique').on(t.clientId, t.spaceId),
     index('knowledge_bases_user_id_idx').on(t.userId),
+    index('knowledge_bases_space_id_idx').on(t.spaceId),
+    index('knowledge_bases_resource_uid_idx').on(t.resourceUid),
   ],
 );
 
@@ -227,6 +252,8 @@ export const knowledgeBaseFiles = pgTable(
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
 
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'cascade' }),
+
     createdAt: createdAt(),
   },
   (t) => [
@@ -234,5 +261,6 @@ export const knowledgeBaseFiles = pgTable(
     index('knowledge_base_files_kb_id_idx').on(t.knowledgeBaseId),
     index('knowledge_base_files_user_id_idx').on(t.userId),
     index('knowledge_base_files_file_id_idx').on(t.fileId),
+    index('kbf_space_id_idx').on(t.spaceId),
   ],
 );

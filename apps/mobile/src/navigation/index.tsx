@@ -45,9 +45,10 @@ import TopicListScreen from '../screens/TopicListScreen';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
+import type { BootstrapRoute, MainTabParamList, RootStackParamList } from './types';
 
-const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const TAB_TRANSITION_ANIMATION = 'shift' as const;
 const STACK_CARD_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'default';
 const STACK_ENTRY_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'simple_push';
@@ -388,7 +389,7 @@ function BottomTabs() {
 }
 
 interface RootNavigatorProps {
-  initialRoute?: 'Login' | 'MainTabs' | 'OnboardingWelcome' | 'ServerConfig';
+  initialRoute?: BootstrapRoute;
 }
 
 export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigatorProps) {

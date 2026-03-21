@@ -25,6 +25,7 @@ export * from './message';
 export * from './meta';
 export * from './plugins';
 export * from './rag';
+export * from './resource';
 export * from './search';
 export * from './serverConfig';
 export * from './service';

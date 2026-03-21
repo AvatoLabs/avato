@@ -17,7 +17,10 @@ import { shallow } from 'zustand/shallow';
 import RepoIcon from '@/components/LibIcon';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
+import { useResourceShareModal } from '@/features/ResourceSharing';
+import { buildResourcePreviewPath } from '@/features/ResourceSpaces';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
+import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { documentService } from '@/services/document';
 import { useFileStore } from '@/store/file';
 import { useKnowledgeBaseStore } from '@/store/library';
@@ -52,9 +55,11 @@ export const useFileItemDropdown = ({
   sourceType,
   onRenameStart,
 }: UseFileItemDropdownParams): UseFileItemDropdownReturn => {
-  const { t } = useTranslation(['components', 'common', 'knowledgeBase']);
+  const { t } = useTranslation(['components', 'common', 'file', 'knowledgeBase']);
   const { message, modal } = App.useApp();
   const appOrigin = useAppOrigin();
+  const { open: openShareModal } = useResourceShareModal();
+  const spaceId = useResourceManagerStore((s) => s.spaceId);
 
   const { deleteResource, moveResource, refreshFileList } = useFileStore(
     (s) => ({
@@ -74,7 +79,7 @@ export const useFileItemDropdown = ({
   // Fetch knowledge bases - SWR caches this across all dropdown instances
   // Only the first call fetches from server, subsequent calls use cache
   // The expensive menu computation is deferred until dropdown opens (menuItems is a function)
-  const { data: libraries } = useFetchKnowledgeBaseList();
+  const { data: libraries } = useFetchKnowledgeBaseList(spaceId);
 
   const isInLibrary = !!libraryId;
   const isFolder = fileType === 'custom/folder';
@@ -231,6 +236,19 @@ export const useFileItemDropdown = ({
         },
         {
           icon: <Icon icon={LinkIcon} />,
+          key: 'share',
+          label: t('share.title', { ns: 'file' }),
+          onClick: async ({ domEvent }) => {
+            domEvent.stopPropagation();
+            openShareModal({
+              id,
+              kind: sourceType === 'document' ? 'document' : 'file',
+              name: filename,
+            });
+          },
+        },
+        {
+          icon: <Icon icon={LinkIcon} />,
           key: 'copyUrl',
           label: t('FileManager.actions.copyUrl'),
           onClick: async ({ domEvent }) => {
@@ -239,11 +257,7 @@ export const useFileItemDropdown = ({
             // For pages, use the route path instead of the storage URL
             let urlToCopy = url;
             if (isPage) {
-              if (libraryId) {
-                urlToCopy = `${appOrigin}/resource/library/${libraryId}?file=${id}`;
-              } else {
-                urlToCopy = `${appOrigin}/resource?file=${id}`;
-              }
+              urlToCopy = `${appOrigin}${buildResourcePreviewPath(spaceId, id, libraryId)}`;
             }
 
             await copyToClipboard(urlToCopy);
@@ -337,14 +351,17 @@ export const useFileItemDropdown = ({
     isFolder,
     isInLibrary,
     isPage,
+    appOrigin,
     libraries,
     libraryId,
     message,
     modal,
     moveResource,
+    openShareModal,
     onRenameStart,
     refreshFileList,
     removeFilesFromKnowledgeBase,
+    spaceId,
     t,
     url,
   ]);

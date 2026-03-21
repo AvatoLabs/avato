@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 
 import RepoIcon from '@/components/LibIcon';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { useResourceShareModal } from '@/features/ResourceSharing';
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useKnowledgeBaseStore } from '@/store/library';
 
@@ -20,13 +22,15 @@ interface KnowledgeBaseItemProps {
   description?: string | null;
   id: string;
   name: string;
+  spaceId?: string | null;
   style?: CSSProperties;
 }
 
 const KnowledgeBaseItem = memo<KnowledgeBaseItemProps>(
-  ({ id, name, description, active, style, className }) => {
+  ({ id, name, description, active, style, className, spaceId }) => {
     const setLibraryId = useResourceManagerStore((s) => s.setLibraryId);
     const navigate = useNavigate();
+    const { open: openShareModal } = useResourceShareModal();
 
     const [editing, isLoading] = useKnowledgeBaseStore((s) => [
       s.knowledgeBaseRenamingId === id,
@@ -46,10 +50,10 @@ const KnowledgeBaseItem = memo<KnowledgeBaseItemProps>(
 
     const handleClick = useCallback(() => {
       if (!editing) {
-        navigate(`/resource/library/${id}`);
+        navigate(buildResourceLibraryPath(spaceId, id));
         setLibraryId(id);
       }
-    }, [editing, navigate, id]);
+    }, [editing, navigate, id, setLibraryId, spaceId]);
 
     const handleDoubleClick = useCallback(
       (e: React.MouseEvent) => {
@@ -72,6 +76,8 @@ const KnowledgeBaseItem = memo<KnowledgeBaseItemProps>(
       description,
       id,
       name,
+      onShare: () => openShareModal({ id, kind: 'knowledge_base', name }),
+      spaceId: spaceId || undefined,
       toggleEditing,
     });
 

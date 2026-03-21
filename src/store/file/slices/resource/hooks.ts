@@ -1,13 +1,59 @@
 import { isEqual } from 'es-toolkit';
+import { useEffect } from 'react';
 import { shallow } from 'zustand/shallow';
 
 import { mutate, useClientDataSWR } from '@/libs/swr';
 import { resourceService } from '@/services/resource';
-import { type ResourceQueryParams } from '@/types/resource';
+import { type ResourceItem, type ResourceQueryParams } from '@/types/resource';
 
 import { useFileStore } from '../../store';
 
 const SWR_KEY_RESOURCES = 'SWR_RESOURCES';
+
+interface ResourceQueryResponse {
+  hasMore: boolean;
+  items: ResourceItem[];
+  total?: number;
+}
+
+const buildResourceMap = (items: ResourceItem[]) => new Map(items.map((item) => [item.id, item]));
+
+export const isSameResourceQueryParams = (
+  left?: ResourceQueryParams | null,
+  right?: ResourceQueryParams | null,
+) => isEqual(left ?? null, right ?? null);
+
+const syncResourceStore = (
+  params: ResourceQueryParams,
+  data: ResourceQueryResponse,
+  actionName: string,
+) => {
+  const { hasMore, resourceList, resourceMap, total } = useFileStore.getState();
+  const newResourceMap = buildResourceMap(data.items);
+
+  if (
+    isSameResourceQueryParams(useFileStore.getState().queryParams, params) &&
+    isEqual(data.items, resourceList) &&
+    isEqual(newResourceMap, resourceMap) &&
+    hasMore === data.hasMore &&
+    total === data.total
+  ) {
+    return;
+  }
+
+  useFileStore.setState(
+    {
+      hasMore: data.hasMore,
+      offset: data.items.length,
+      queryParams: params,
+      resourceList: data.items,
+      resourceMap: newResourceMap,
+      total: data.total,
+    },
+    false,
+    actionName,
+  );
+};
 
 /**
  * Revalidate resources with current or specific query params
@@ -37,32 +83,49 @@ export const useFetchResources = (params: ResourceQueryParams | null, enable: an
     {
       // SWR configuration for optimal UX
       dedupingInterval: 2000,
-      onSuccess: (data: { hasMore: boolean; items: any[]; total?: number }) => {
-        const { resourceList, resourceMap } = useFileStore.getState();
+      onSuccess: (data: ResourceQueryResponse) => {
+        if (!params) return;
 
-        const newResourceMap = new Map(data.items.map((item) => [item.id, item]));
-        const newResourceList = data.items;
-
-        // Only update store if data actually changed
-        if (!isEqual(newResourceList, resourceList) || !isEqual(newResourceMap, resourceMap)) {
-          useFileStore.setState(
-            {
-              hasMore: data.hasMore,
-              offset: data.items.length,
-              queryParams: params ?? undefined,
-              resourceList: newResourceList,
-              resourceMap: newResourceMap,
-              total: data.total,
-            },
-            false,
-            'useFetchResources/success',
-          );
-        }
+        syncResourceStore(params, data, 'useFetchResources/success');
       },
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
     },
   );
+};
+
+/**
+ * Use query-scoped SWR cache for rendering, but keep the resource store in sync
+ * so optimistic actions and pagination can continue to operate on the active query.
+ */
+export const useVisibleResources = (params: ResourceQueryParams | null, enable: any = true) => {
+  const swr = useFetchResources(params, enable);
+  const { hasMore, queryParams, resourceList, total } = useFileStore(
+    (s) => ({
+      hasMore: s.hasMore,
+      queryParams: s.queryParams,
+      resourceList: s.resourceList,
+      total: s.total,
+    }),
+    shallow,
+  );
+
+  const isStoreActive = !!params && isSameResourceQueryParams(queryParams, params);
+
+  useEffect(() => {
+    if (!enable || !params || !swr.data || isStoreActive) return;
+
+    syncResourceStore(params, swr.data, 'useVisibleResources/hydrateFromCache');
+  }, [enable, isStoreActive, params, swr.data]);
+
+  return {
+    ...swr,
+    hasMore: isStoreActive ? hasMore : (swr.data?.hasMore ?? false),
+    hasResolvedData: isStoreActive || swr.data !== undefined,
+    isStoreActive,
+    items: isStoreActive ? resourceList : (swr.data?.items ?? []),
+    total: isStoreActive ? total : swr.data?.total,
+  };
 };
 
 /**

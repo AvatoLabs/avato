@@ -28,6 +28,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { notebookApi, type NotebookDocument, topicApi } from '../lib/api';
+import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
@@ -35,6 +36,18 @@ import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
 const PERSONAL_TOPIC_KEY = 'avato_personal_notebook_topic_id';
+const NOTEBOOK_SESSION_TITLE = 'Notebook';
+const NOTEBOOK_PERSONAL_TOPIC_TITLE = 'Personal Notes';
+const NOTEBOOK_TOPIC_TITLE = 'Notebook';
+
+const isStaleNotebookTopicError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  return (
+    (message.includes('Failed query') && message.includes('topic_id')) ||
+    /topic_documents.*topics_id_fk/i.test(message)
+  );
+};
 
 function getMdStyles(colors: {
   foreground: string;
@@ -192,11 +205,7 @@ function DocEditor({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           onPress={handleBack}
         >
-          <ArrowLeft
-            color={colors.foreground}
-            size={22}
-            strokeWidth={tokens.icon.strokeWidth}
-          />
+          <ArrowLeft color={colors.foreground} size={22} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
 
         <View className="flex-row items-center gap-3">
@@ -219,7 +228,10 @@ function DocEditor({
             ) : (
               <>
                 <Eye color={colors.muted} size={14} strokeWidth={2} />
-                <Text className="text-[12px] font-semibold text-secondary/60 ml-1.5">
+                <Text
+                  className="ml-1.5 text-[12px] font-semibold"
+                  style={{ color: colors.secondaryText }}
+                >
                   {t.notebookPreview}
                 </Text>
               </>
@@ -248,14 +260,18 @@ function DocEditor({
         {/* Title */}
         <View className="px-5 pt-5 pb-2">
           {previewing ? (
-            <Text className="text-[22px] font-bold text-foreground tracking-tight">
+            <Text
+              className="text-[22px] font-bold tracking-tight"
+              style={{ color: colors.foreground }}
+            >
               {title || t.notebookDocTitle}
             </Text>
           ) : (
             <TextInput
-              className="text-[22px] font-bold text-foreground tracking-tight"
+              className="text-[22px] font-bold tracking-tight"
               placeholder={t.notebookDocTitlePlaceholder}
               placeholderTextColor={colors.secondaryText}
+              style={{ color: colors.foreground }}
               value={title}
               onChangeText={setTitle}
             />
@@ -270,17 +286,17 @@ function DocEditor({
                 {content}
               </Markdown>
             ) : (
-              <Text className="text-secondary/30 text-[15px] italic">
+              <Text className="text-[15px] italic" style={{ color: colors.tertiaryText }}>
                 {t.notebookDocContentPlaceholder}
               </Text>
             )
           ) : (
             <TextInput
               multiline
-              className="text-foreground text-[15px] leading-6"
+              className="text-[15px] leading-6"
               placeholder={t.notebookDocContentPlaceholder}
               placeholderTextColor={colors.secondaryText}
-              style={{ minHeight: 400, textAlignVertical: 'top' }}
+              style={{ color: colors.foreground, minHeight: 400, textAlignVertical: 'top' }}
               value={content}
               onChangeText={setContent}
             />
@@ -326,66 +342,105 @@ export default function NotebookScreen({ route, navigation }: any) {
     })();
   }, [isStandalone, topicId]);
 
-  const ensureTopic = useCallback(async () => {
-    if (topicId) return topicId;
-
+  const createTopic = useCallback(async () => {
     if (isStandalone) {
       // Need a session to create a topic — get or create a "Notebook" session
       const { sessionApi } = await import('../lib/api');
-      const sid = await sessionApi.create({ title: 'Notebook' });
-      const newTopicId = await topicApi.create(sid, 'Personal Notes');
+      const sid = await sessionApi.create({ title: NOTEBOOK_SESSION_TITLE });
+      const newTopicId = await topicApi.create(sid, NOTEBOOK_PERSONAL_TOPIC_TITLE);
+
       await AsyncStorage.setItem(PERSONAL_TOPIC_KEY, newTopicId);
       setTopicId(newTopicId);
+
       return newTopicId;
     }
 
-    const newTopicId = await topicApi.create(sessionId, 'Notebook');
-    setTopicId(newTopicId);
-    return newTopicId;
-  }, [sessionId, topicId, isStandalone]);
+    if (!sessionId) {
+      throw new Error('Missing sessionId for notebook topic creation');
+    }
 
-  const fetchDocuments = useCallback(async () => {
-    if (!topicId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await notebookApi.list(topicId);
-      setDocuments(result?.data || []);
-    } catch {
-      setDocuments([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [topicId]);
+    const newTopicId = await topicApi.create(sessionId, NOTEBOOK_TOPIC_TITLE);
+    setTopicId(newTopicId);
+
+    return newTopicId;
+  }, [isStandalone, sessionId]);
+
+  const ensureTopic = useCallback(
+    async (options?: { forceNew?: boolean }) => {
+      if (!options?.forceNew && topicId) return topicId;
+
+      return createTopic();
+    },
+    [createTopic, topicId],
+  );
+
+  const fetchDocuments = useCallback(
+    async (targetTopicId = topicId) => {
+      if (!targetTopicId) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const result = await notebookApi.list(targetTopicId);
+        setDocuments(result?.data || []);
+      } catch {
+        setDocuments([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [topicId],
+  );
 
   useEffect(() => {
-    fetchDocuments();
+    void fetchDocuments();
   }, [fetchDocuments]);
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
+    if (creating) return;
+
     setCreating(true);
     haptics.light();
-    try {
-      const tid = await ensureTopic();
-      if (!tid) return;
-      const doc = await notebookApi.create({
+
+    const createDocument = (nextTopicId: string) =>
+      notebookApi.create({
         content: '',
         description: '',
         title: '',
-        topicId: tid,
+        topicId: nextTopicId,
       });
-      if (doc) {
-        setEditingDoc(doc);
+
+    try {
+      let nextTopicId = await ensureTopic();
+      let doc: NotebookDocument;
+
+      try {
+        doc = await createDocument(nextTopicId);
+      } catch (error) {
+        if (!isStaleNotebookTopicError(error)) throw error;
+
+        if (isStandalone) {
+          await AsyncStorage.removeItem(PERSONAL_TOPIC_KEY);
+          setTopicId(null);
+        }
+
+        nextTopicId = await ensureTopic({ forceNew: true });
+        doc = await createDocument(nextTopicId);
       }
-      await fetchDocuments();
-    } catch {
-      toast.show('error', t.errorUnknown);
+
+      setEditingDoc(doc);
+      await fetchDocuments(nextTopicId);
+    } catch (error) {
+      console.error('Failed to create notebook document', error);
+      const { messageKey } = classifyError(error);
+      toast.show('error', t[messageKey] ?? t.errorUnknown);
     } finally {
       setCreating(false);
     }
-  };
+  }, [creating, ensureTopic, fetchDocuments, isStandalone, t, toast]);
 
   const handleDelete = useCallback(
     (doc: NotebookDocument) => {
@@ -447,11 +502,7 @@ export default function NotebookScreen({ route, navigation }: any) {
         <ScreenHeader
           title={t.notebookTitle}
           leftElement={
-            <ArrowLeft
-              color={colors.primary}
-              size={22}
-              strokeWidth={tokens.icon.strokeWidth}
-            />
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
           }
           onPressLeft={() => navigation.goBack()}
         />
@@ -475,33 +526,48 @@ export default function NotebookScreen({ route, navigation }: any) {
           }}
         >
           <View
-            className="items-center justify-center rounded-3xl bg-foreground/5 mb-5"
-            style={{ width: 80, height: 80 }}
+            className="mb-5 items-center justify-center rounded-3xl"
+            style={{ backgroundColor: colors.fillTertiary, height: 80, width: 80 }}
           >
             <NotebookPen color={colors.secondaryText} size={36} strokeWidth={1.5} />
           </View>
-          <Text className="text-foreground text-[17px] font-semibold text-center">
+          <Text
+            className="text-center text-[17px] font-semibold"
+            style={{ color: colors.foreground }}
+          >
             {t.notebookEmpty}
           </Text>
-          <Text className="text-secondary/40 text-[14px] text-center mt-2 mb-6">
+          <Text
+            className="mb-6 mt-2 text-center text-[14px]"
+            style={{ color: colors.secondaryText }}
+          >
             {t.notebookDesc}
           </Text>
           <PressableScale
             className="flex-row items-center gap-2 px-6 py-3.5 rounded-xl"
-            style={{ backgroundColor: colors.primary }}
+            disabled={creating}
+            style={{ backgroundColor: colors.primary, opacity: creating ? 0.7 : 1 }}
             onPress={handleCreate}
           >
-            <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
-            <Text className="text-white text-[15px] font-semibold">{t.notebookNewDoc}</Text>
+            {creating ? (
+              <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+            ) : (
+              <Plus color={colors.iconOnPrimary} size={18} strokeWidth={2.5} />
+            )}
+            <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+              {t.notebookNewDoc}
+            </Text>
           </PressableScale>
         </Animated.View>
       ) : (
         <FlatList
-          ItemSeparatorComponent={() => <View className="mx-5 h-px bg-foreground/5" />}
           className="flex-1"
           data={documents}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => (
+            <View className="mx-5 h-px" style={{ backgroundColor: colors.divider }} />
+          )}
           contentContainerStyle={{
             paddingBottom: 40 + insets.bottom,
             paddingTop: 12,
@@ -517,22 +583,30 @@ export default function NotebookScreen({ route, navigation }: any) {
               }}
             >
               <View
-                className="items-center justify-center rounded-xl bg-foreground/5 mr-3"
-                style={{ width: 44, height: 44 }}
+                className="mr-3 items-center justify-center rounded-xl"
+                style={{ backgroundColor: colors.fillTertiary, height: 44, width: 44 }}
               >
                 <FileText color={colors.primary} size={20} strokeWidth={1.5} />
               </View>
 
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text className="text-foreground text-[15px] font-semibold" numberOfLines={1}>
+                <Text
+                  className="text-[15px] font-semibold"
+                  numberOfLines={1}
+                  style={{ color: colors.foreground }}
+                >
                   {doc.title || 'Untitled'}
                 </Text>
                 {doc.content ? (
-                  <Text className="text-secondary/40 text-[13px] mt-0.5" numberOfLines={1}>
+                  <Text
+                    className="mt-0.5 text-[13px]"
+                    numberOfLines={1}
+                    style={{ color: colors.secondaryText }}
+                  >
                     {doc.content.slice(0, 80).replaceAll('\n', ' ')}
                   </Text>
                 ) : null}
-                <Text className="text-secondary/30 text-[11px] mt-1">
+                <Text className="mt-1 text-[11px]" style={{ color: colors.tertiaryText }}>
                   {formatDate(doc.updatedAt || doc.createdAt)}
                   {doc.totalCharCount ? `  ·  ${doc.totalCharCount} chars` : ''}
                 </Text>

@@ -682,6 +682,10 @@ const MessageBubble = memo<MessageBubbleProps>(
     const toast = useToast();
     const colors = useThemeColors();
     const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+    const editMessage = useChatStore((s) => s.editMessage);
+    const regenerateMessage = useChatStore((s) => s.regenerateMessage);
+    const deleteMessage = useChatStore((s) => s.deleteMessage);
+    const toggleMessageCollapsed = useChatStore((s) => s.toggleMessageCollapsed);
     const avatoLogoTint = effectiveTheme === 'dark' ? colors.foreground : undefined;
     const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
 
@@ -717,16 +721,16 @@ const MessageBubble = memo<MessageBubbleProps>(
 
     const handleEditSubmit = useCallback(() => {
       if (editText.trim() && editText !== message.content) {
-        useChatStore.getState().editMessage(sessionId, actionMessageId, editText.trim());
+        void editMessage(sessionId, actionMessageId, editText.trim());
         haptics.success();
       }
       setIsEditing(false);
-    }, [actionMessageId, editText, message.content, sessionId]);
+    }, [actionMessageId, editMessage, editText, message.content, sessionId]);
 
     const handleRegenerate = useCallback(() => {
       haptics.light();
-      useChatStore.getState().regenerateMessage(sessionId, actionMessageId);
-    }, [actionMessageId, sessionId]);
+      void regenerateMessage(sessionId, actionMessageId);
+    }, [actionMessageId, regenerateMessage, sessionId]);
 
     const handleShare = useCallback(async () => {
       haptics.light();
@@ -749,11 +753,11 @@ const MessageBubble = memo<MessageBubbleProps>(
           style: 'destructive',
           onPress: () => {
             haptics.warning();
-            useChatStore.getState().deleteMessage(sessionId, actionMessageId);
+            void deleteMessage(sessionId, actionMessageId);
           },
         },
       ]);
-    }, [actionMessageId, sessionId, t, dismissActions]);
+    }, [actionMessageId, deleteMessage, dismissActions, sessionId, t]);
 
     const handleSaveToTopic = useCallback(() => {
       haptics.light();
@@ -1414,12 +1418,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       )}
 
                       {!assistantChainChildren?.length && hasTools && message.tools && (
-                        <ToolCallsBlock
-                          messageId={message.id}
-                          sessionId={sessionId}
-                          tools={message.tools}
-                          topicId={topicId ?? undefined}
-                        />
+                        <ToolCallsBlock tools={message.tools} />
                       )}
 
                       {!assistantChainChildren?.length &&
@@ -1481,9 +1480,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-1 py-1"
                               onPress={() => {
                                 haptics.light();
-                                useChatStore
-                                  .getState()
-                                  .toggleMessageCollapsed(sessionId, message.id, false);
+                                toggleMessageCollapsed(sessionId, message.id, false);
                               }}
                             >
                               <Text
@@ -1522,9 +1519,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                               className="mt-2 py-2 rounded-xl bg-foreground/[0.04] items-center"
                               onPress={() => {
                                 haptics.light();
-                                useChatStore
-                                  .getState()
-                                  .toggleMessageCollapsed(sessionId, message.id, true);
+                                toggleMessageCollapsed(sessionId, message.id, true);
                               }}
                             >
                               <Text
@@ -1537,11 +1532,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                           </View>
                         )
                       ) : isToolMessage ? (
-                        <ToolResultBlock
-                          message={message}
-                          sessionId={sessionId}
-                          topicId={topicId ?? undefined}
-                        />
+                        <ToolResultBlock message={message} />
                       ) : !message.content && !multimodalContentParts && generating ? (
                         isReasoning ? null : (
                           <TypingIndicator color={colors.typingIndicator} />
@@ -2577,28 +2568,37 @@ const ToolCard = memo<{
                     {t.chatToolPendingDesc}
                   </Text>
                 )}
-                <View className="flex-row gap-2 mt-2">
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: colors.infoMuted }}
-                    onPress={onApprove}
-                  >
-                    <Text className="text-[12px] font-semibold" style={{ color: colors.info }}>
-                      {t.chatToolApprove}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="rounded-full px-4 py-1.5"
-                    style={{ backgroundColor: colors.dangerMuted }}
-                    onPress={onReject}
-                  >
-                    <Text className="text-[12px] font-semibold" style={{ color: colors.danger }}>
-                      {t.chatToolReject}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {(onApprove || onReject) && (
+                  <View className="flex-row gap-2 mt-2">
+                    {onApprove && (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        className="rounded-full px-4 py-1.5"
+                        style={{ backgroundColor: colors.infoMuted }}
+                        onPress={onApprove}
+                      >
+                        <Text className="text-[12px] font-semibold" style={{ color: colors.info }}>
+                          {t.chatToolApprove}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {onReject && (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        className="rounded-full px-4 py-1.5"
+                        style={{ backgroundColor: colors.dangerMuted }}
+                        onPress={onReject}
+                      >
+                        <Text
+                          className="text-[12px] font-semibold"
+                          style={{ color: colors.danger }}
+                        >
+                          {t.chatToolReject}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             )}
 
@@ -2705,23 +2705,18 @@ const ToolCard = memo<{
 
 ToolCard.displayName = 'ToolCard';
 
+const MOBILE_TOOL_INTERVENTION_ENABLED = false;
+
 const ToolCallsBlock = memo<{
-  messageId: string;
-  sessionId: string;
-  topicId?: string;
   tools: ChatToolPayload[];
-}>(({ tools, messageId, sessionId, topicId }) => {
+}>(({ tools }) => {
   const { t } = useI18n();
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
   const hasPending = tools.some((tool) => tool.intervention?.status === 'pending');
   const allCompleted = tools.every((tool) => isToolSettled(tool));
   const [expanded, setExpanded] = useState(true);
-  const approveToolCall = useChatStore((s) => s.approveToolCall);
-  const rejectToolCall = useChatStore((s) => s.rejectToolCall);
-  const updatePluginArguments = useChatStore((s) => s.updatePluginArguments);
   const locale = useI18n((s) => s.locale);
-  const beforeApproveRef = useRef<Map<string, () => void | Promise<void>>>(new Map());
 
   useEffect(() => {
     if (hasPending) {
@@ -2733,26 +2728,6 @@ const ToolCallsBlock = memo<{
       setExpanded(false);
     }
   }, [allCompleted, hasPending]);
-
-  const registerBeforeApprove = useCallback((toolId: string) => {
-    return (id: string, cb: () => void | Promise<void>) => {
-      beforeApproveRef.current.set(`${toolId}.${id}`, cb);
-      return () => beforeApproveRef.current.delete(`${toolId}.${id}`);
-    };
-  }, []);
-
-  const handleApproveWithBefore = useCallback(
-    async (toolId: string) => {
-      const keys = [...beforeApproveRef.current.keys()].filter((k) => k.startsWith(toolId));
-      for (const k of keys) {
-        const cb = beforeApproveRef.current.get(k);
-        if (cb) await cb();
-        beforeApproveRef.current.delete(k);
-      }
-      await approveToolCall(sessionId, messageId, topicId);
-    },
-    [sessionId, messageId, topicId, approveToolCall],
-  );
 
   return (
     <View
@@ -2818,7 +2793,8 @@ const ToolCallsBlock = memo<{
               );
 
             const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
-            const showIntervention = isPending && BuiltinIntervention;
+            const showIntervention =
+              MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
 
             const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
             const showStreaming = !hasResult && !isPending && BuiltinStreaming;
@@ -2830,16 +2806,12 @@ const ToolCallsBlock = memo<{
               //
             }
 
-            const handleArgsChange = (value: Record<string, unknown>) => {
-              updatePluginArguments(sessionId, messageId, tool.id, value, true);
-            };
-
             const interventionContent =
               showIntervention && BuiltinIntervention ? (
                 <BuiltinIntervention
                   args={parsedArgs}
-                  registerBeforeApprove={registerBeforeApprove(tool.id)}
-                  onArgsChange={handleArgsChange}
+                  registerBeforeApprove={() => () => {}}
+                  onArgsChange={() => {}}
                 />
               ) : undefined;
 
@@ -2875,10 +2847,6 @@ const ToolCallsBlock = memo<{
                       />
                     ) : undefined
                   }
-                  onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
-                  onReject={
-                    isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
-                  }
                 />
               );
             }
@@ -2894,10 +2862,6 @@ const ToolCallsBlock = memo<{
                 status={tool.intervention?.status ?? null}
                 streamingContent={streamingContent}
                 title={displayTitle}
-                onApprove={isPending ? () => handleApproveWithBefore(tool.id) : undefined}
-                onReject={
-                  isPending ? () => rejectToolCall(sessionId, messageId, tool.id) : undefined
-                }
               />
             );
           })}
@@ -2911,9 +2875,7 @@ ToolCallsBlock.displayName = 'ToolCallsBlock';
 
 const ToolResultBlock = memo<{
   message: ChatMessage;
-  sessionId: string;
-  topicId?: string;
-}>(({ message, sessionId, topicId }) => {
+}>(({ message }) => {
   const locale = useI18n((s) => s.locale);
   const toolName = message.plugin?.apiName || message.plugin?.identifier || 'Tool';
   const identifier = message.plugin?.identifier || '';
@@ -2934,8 +2896,6 @@ const ToolResultBlock = memo<{
     hasResult,
     isPending || hasError,
   );
-  const approveToolCall = useChatStore((s) => s.approveToolCall);
-  const rejectToolMessage = useChatStore((s) => s.rejectToolMessage);
 
   return (
     <ToolCard
@@ -2957,8 +2917,6 @@ const ToolResultBlock = memo<{
           />
         ) : undefined
       }
-      onApprove={isPending ? () => approveToolCall(sessionId, message.id, topicId) : undefined}
-      onReject={isPending ? () => rejectToolMessage(sessionId, message.id) : undefined}
     />
   );
 });
@@ -3070,14 +3028,7 @@ const AssistantChainBlock = memo<{
                 ) : null,
               )}
 
-              {childMessage.tools?.length ? (
-                <ToolCallsBlock
-                  messageId={childMessage.id}
-                  sessionId={sessionId}
-                  tools={childMessage.tools}
-                  topicId={topicId}
-                />
-              ) : null}
+              {childMessage.tools?.length ? <ToolCallsBlock tools={childMessage.tools} /> : null}
 
               {childMessage.search?.citations?.length ? (
                 <CitationFootnotesBlock

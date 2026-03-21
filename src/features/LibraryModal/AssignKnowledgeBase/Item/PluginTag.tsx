@@ -5,6 +5,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type InstallPluginMeta } from '@/types/tool/plugin';
+import { normalizePluginAuthor } from '@/utils/normalizePluginAuthor';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   community: css`
@@ -41,14 +42,15 @@ interface PluginTagProps extends Pick<InstallPluginMeta, 'author' | 'type'> {
 const PluginTag = memo<PluginTagProps>(({ showIcon = true, author, type, showText = true }) => {
   const { t } = useTranslation('plugin');
   const isCustom = type === 'customPlugin';
-  const isOfficial = author === 'Avato';
+  const authorName = normalizePluginAuthor(author);
+  const isOfficial = authorName === 'Avato';
 
   return (
     <Tag
       className={cx(isCustom ? styles.custom : isOfficial ? styles.official : styles.community)}
       icon={showIcon && <Icon icon={isCustom ? Package : isOfficial ? BadgeCheck : CircleUser} />}
     >
-      {showText && (author || t(isCustom ? 'store.customPlugin' : 'store.communityPlugin'))}
+      {showText && (authorName || t(isCustom ? 'store.customPlugin' : 'store.communityPlugin'))}
     </Tag>
   );
 });

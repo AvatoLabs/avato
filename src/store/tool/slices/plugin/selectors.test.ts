@@ -186,12 +186,40 @@ describe('pluginSelectors', () => {
     it('should return a list of meta information for installed plugins', () => {
       const result = pluginSelectors.installedPluginMetaList(mockState);
       const expectedMetaList = mockState.installedPlugins.map((p) => ({
+        author: undefined,
         identifier: p.identifier,
         meta: pluginSelectors.getPluginMetaById(p.identifier)(mockState),
         type: p.type,
         ...pluginSelectors.getPluginMetaById(p.identifier)(mockState),
       }));
       expect(result).toEqual(expectedMetaList);
+    });
+
+    it('should normalize object authors from installed manifests', () => {
+      const stateWithObjectAuthor = {
+        ...mockState,
+        installedPlugins: [
+          {
+            identifier: 'plugin-object-author',
+            manifest: {
+              api: [{ name: 'api-object-author' }],
+              author: { name: 'Object Author', url: 'https://example.com' } as any,
+              identifier: 'plugin-object-author',
+            } as LobeChatPluginManifest,
+            type: 'plugin',
+          },
+        ],
+        oldPluginItems: [],
+      } as ToolStoreState;
+
+      expect(pluginSelectors.installedPluginMetaList(stateWithObjectAuthor)).toEqual([
+        {
+          author: 'Object Author',
+          identifier: 'plugin-object-author',
+          meta: undefined,
+          type: 'plugin',
+        },
+      ]);
     });
   });
 

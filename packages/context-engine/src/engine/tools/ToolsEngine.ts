@@ -10,9 +10,17 @@ import type {
   ToolsGenerationResult,
   UniformTool,
 } from './types';
-import { generateToolName } from './utils';
+import { filterValidManifests, generateToolName, validateManifest } from './utils';
 
 const log = debug('context-engine:tools-engine');
+
+const getManifestDebugId = (manifest: unknown): string => {
+  if (!manifest || typeof manifest !== 'object') return '[unknown]';
+
+  const identifier = (manifest as { identifier?: unknown }).identifier;
+
+  return typeof identifier === 'string' ? identifier : '[unknown]';
+};
 
 /**
  * Tools Engine - Unified processing of tools array construction and transformation
@@ -27,16 +35,24 @@ export class ToolsEngine {
   constructor(options: ToolsEngineOptions) {
     this.options = options;
     this.defaultToolIds = options.defaultToolIds || [];
+    const { invalid, valid } = filterValidManifests(options.manifestSchemas);
+
     log(
       'Initializing ToolsEngine with %d manifest schemas and %d default tools',
-      options.manifestSchemas.length,
+      valid.length,
       this.defaultToolIds.length,
     );
 
+    if (invalid.length > 0) {
+      log(
+        'Ignoring %d invalid manifest schemas: %o',
+        invalid.length,
+        invalid.map(getManifestDebugId),
+      );
+    }
+
     // Convert manifest schemas to Map for improved lookup performance
-    this.manifestSchemas = new Map(
-      options.manifestSchemas.map((schema) => [schema.identifier, schema]),
-    );
+    this.manifestSchemas = new Map(valid.map((schema) => [schema.identifier, schema]));
     this.enableChecker = options.enableChecker;
     this.functionCallChecker = options.functionCallChecker;
 
@@ -251,16 +267,24 @@ export class ToolsEngine {
     log('Converting %d manifests to tools', manifests.length);
 
     // Use simplified conversion logic to avoid external package dependencies
-    const tools = manifests.flatMap((manifest) =>
-      manifest.api.map((api) => ({
+    const tools = manifests.flatMap((manifest) => {
+      if (!Array.isArray(manifest.api) || manifest.api.length === 0) {
+        log(
+          'Skipping manifest without valid api array during conversion: %s',
+          getManifestDebugId(manifest),
+        );
+        return [];
+      }
+
+      return manifest.api.map((api) => ({
         function: {
           description: api.description,
           name: this.generateToolName(manifest.identifier, api.name, manifest.type),
           parameters: api.parameters,
         },
         type: 'function' as const,
-      })),
-    );
+      }));
+    });
 
     log('Converted to %d tools', tools.length);
     return tools;
@@ -305,8 +329,18 @@ export class ToolsEngine {
    * Update plugin manifest schemas (for dynamically adding plugins)
    */
   updateManifestSchemas(manifestSchemas: LobeToolManifest[]): void {
+    const { invalid, valid } = filterValidManifests(manifestSchemas);
+
+    if (invalid.length > 0) {
+      log(
+        'Ignoring %d invalid manifest schemas during update: %o',
+        invalid.length,
+        invalid.map(getManifestDebugId),
+      );
+    }
+
     this.manifestSchemas.clear();
-    for (const schema of manifestSchemas) {
+    for (const schema of valid) {
       this.manifestSchemas.set(schema.identifier, schema);
     }
   }
@@ -315,6 +349,11 @@ export class ToolsEngine {
    * Add a single plugin manifest
    */
   addPluginManifest(manifest: LobeToolManifest): void {
+    if (!validateManifest(manifest)) {
+      log('Ignoring invalid manifest schema during add: %s', getManifestDebugId(manifest));
+      return;
+    }
+
     this.manifestSchemas.set(manifest.identifier, manifest);
   }
 

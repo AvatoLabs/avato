@@ -130,6 +130,14 @@ interface MobileToolExecutionEvent {
   state?: Record<string, unknown>;
 }
 
+interface ToolLoopFinalAssistantResponse {
+  content?: string;
+  grounding?: Record<string, unknown>;
+  performance?: Record<string, unknown>;
+  reasoning?: string;
+  usage?: Record<string, unknown>;
+}
+
 type StreamCompletionData = Parameters<NonNullable<ChatStreamCallbacks['onCompletion']>>[0];
 type StreamGroundingData = Parameters<NonNullable<ChatStreamCallbacks['onGrounding']>>[0];
 type StreamTextData = Parameters<NonNullable<ChatStreamCallbacks['onText']>>[0];
@@ -325,6 +333,75 @@ const isExecutionStateRecord = (value: unknown): value is Record<string, unknown
 const serializeToolExecutionContent = (content: unknown) =>
   typeof content === 'string' ? content : JSON.stringify(content);
 
+const hasMessageContent = (content: unknown) => {
+  if (typeof content === 'string') return content.trim().length > 0;
+  return Array.isArray(content) && content.length > 0;
+};
+
+const sanitizeToolCallHistory = (messages?: ChatStreamPayload['messages']) => {
+  if (!messages?.length) return messages;
+
+  const toolMessages = new Map<string, (typeof messages)[number]>();
+  for (const message of messages) {
+    if (message.role !== 'tool') continue;
+    if (!message.tool_call_id) continue;
+    if (!toolMessages.has(message.tool_call_id)) {
+      toolMessages.set(message.tool_call_id, message);
+    }
+  }
+
+  const consumedToolCallIds = new Set<string>();
+  const sanitized: NonNullable<ChatStreamPayload['messages']> = [];
+
+  for (const message of messages) {
+    if (message.role === 'tool') {
+      if (message.tool_call_id && consumedToolCallIds.has(message.tool_call_id)) continue;
+      continue;
+    }
+
+    if (
+      message.role === 'assistant' &&
+      Array.isArray(message.tool_calls) &&
+      message.tool_calls.length
+    ) {
+      const toolCalls = message.tool_calls.filter(
+        (toolCall): toolCall is MessageToolCall & { id: string } =>
+          typeof toolCall?.id === 'string',
+      );
+
+      const matchingToolMessages = toolCalls
+        .map((toolCall) => toolMessages.get(toolCall.id))
+        .filter((toolMessage): toolMessage is (typeof messages)[number] => !!toolMessage);
+
+      if (toolCalls.length > 0 && matchingToolMessages.length === toolCalls.length) {
+        sanitized.push(message);
+
+        for (const toolCall of toolCalls) {
+          const toolMessage = toolMessages.get(toolCall.id);
+          if (!toolMessage || consumedToolCallIds.has(toolCall.id)) continue;
+
+          sanitized.push(toolMessage);
+          consumedToolCallIds.add(toolCall.id);
+        }
+
+        continue;
+      }
+
+      if (hasMessageContent(message.content)) {
+        const { tool_calls, ...assistantWithoutToolCalls } = message;
+        void tool_calls;
+        sanitized.push(assistantWithoutToolCalls);
+      }
+
+      continue;
+    }
+
+    sanitized.push(message);
+  }
+
+  return sanitized;
+};
+
 const createToolExecutionEvent = (
   toolCall: ChatToolPayload,
   execution: { content: unknown; state?: unknown },
@@ -337,6 +414,58 @@ const createToolExecutionEvent = (
   result: serializeToolExecutionContent(execution.content),
   ...(isExecutionStateRecord(execution.state) ? { state: execution.state } : {}),
 });
+
+const createStaticSSETextResponse = (params: {
+  assistant?: ToolLoopFinalAssistantResponse;
+  toolExecutions?: MobileToolExecutionEvent[];
+}) => {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  const writeEvent = async (event: string, data: unknown) => {
+    await writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+  };
+
+  void (async () => {
+    try {
+      if (params.toolExecutions?.length) {
+        await writeEvent('tool_executions', params.toolExecutions);
+      }
+
+      if (params.assistant?.grounding) {
+        await writeEvent('grounding', params.assistant.grounding);
+      }
+
+      if (params.assistant?.reasoning) {
+        await writeEvent('reasoning', params.assistant.reasoning);
+      }
+
+      if (params.assistant?.content) {
+        await writeEvent('text', params.assistant.content);
+      }
+
+      if (params.assistant?.usage) {
+        await writeEvent('usage', params.assistant.usage);
+      }
+
+      if (params.assistant?.performance) {
+        await writeEvent('performance', params.assistant.performance);
+      }
+    } finally {
+      await writer.close();
+    }
+  })();
+
+  return new Response(readable, {
+    headers: {
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'Content-Type': 'text/event-stream; charset=utf-8',
+    },
+    status: 200,
+  });
+};
 
 const normalizeToolCalls = (
   toolCalls: any[],
@@ -431,6 +560,13 @@ export class MobileChatService {
     const generatedTools = [...(generated.tools || [])];
 
     for (const manifest of generated.enabledManifests) {
+      if (!Array.isArray(manifest.api) || manifest.api.length === 0) {
+        console.warn(
+          `[webapi/chat] plugin "${manifest.identifier}" was enabled without a valid api array, falling back to manifest/MCP resolution`,
+        );
+        continue;
+      }
+
       manifestMap[manifest.identifier] = manifest;
 
       if (builtinToolIdentifiers.has(manifest.identifier)) {
@@ -604,40 +740,42 @@ export class MobileChatService {
       !!skillContext ||
       (toolSet?.enabledToolIds.length ?? 0) > 0;
 
-    if (!shouldUseServerMessagesEngine) return payload.messages;
+    const messages = !shouldUseServerMessagesEngine
+      ? payload.messages
+      : await serverMessagesEngine({
+          enableHistoryCount: conversationConfig?.chatConfig?.enableHistoryCount,
+          historyCount: conversationConfig?.chatConfig?.historyCount,
+          inputTemplate: conversationConfig?.chatConfig?.inputTemplate,
+          knowledge: conversationConfig
+            ? {
+                fileContents: conversationConfig.files
+                  ?.filter((file) => file.enabled === true)
+                  .map((file) => ({
+                    content: file.content ?? '',
+                    fileId: file.id ?? '',
+                    filename: file.name ?? '',
+                  })),
+                knowledgeBases: conversationConfig.knowledgeBases
+                  ?.filter((kb) => kb.enabled === true)
+                  .map((kb) => ({
+                    id: kb.id ?? '',
+                    name: kb.name ?? '',
+                  })),
+              }
+            : undefined,
+          messages: payload.messages as any,
+          model: payload.model,
+          provider: this.provider,
+          systemRole: systemRole || undefined,
+          toolsConfig: toolSet
+            ? {
+                manifests: Object.values(toolSet.manifestMap),
+                tools: toolSet.enabledToolIds,
+              }
+            : undefined,
+        });
 
-    return serverMessagesEngine({
-      enableHistoryCount: conversationConfig?.chatConfig?.enableHistoryCount,
-      historyCount: conversationConfig?.chatConfig?.historyCount,
-      inputTemplate: conversationConfig?.chatConfig?.inputTemplate,
-      knowledge: conversationConfig
-        ? {
-            fileContents: conversationConfig.files
-              ?.filter((file) => file.enabled === true)
-              .map((file) => ({
-                content: file.content ?? '',
-                fileId: file.id ?? '',
-                filename: file.name ?? '',
-              })),
-            knowledgeBases: conversationConfig.knowledgeBases
-              ?.filter((kb) => kb.enabled === true)
-              .map((kb) => ({
-                id: kb.id ?? '',
-                name: kb.name ?? '',
-              })),
-          }
-        : undefined,
-      messages: payload.messages as any,
-      model: payload.model,
-      provider: this.provider,
-      systemRole: systemRole || undefined,
-      toolsConfig: toolSet
-        ? {
-            manifests: Object.values(toolSet.manifestMap),
-            tools: toolSet.enabledToolIds,
-          }
-        : undefined,
-    });
+    return sanitizeToolCallHistory(messages) || [];
   };
 
   private createToolExecutionService = () => {
@@ -677,9 +815,10 @@ export class MobileChatService {
 
     void (async () => {
       try {
-        let loopMessages = [...(payload.messages || [])];
+        let loopMessages = sanitizeToolCallHistory(payload.messages) || [];
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+          loopMessages = sanitizeToolCallHistory(loopMessages) || [];
           let roundContent = '';
           let roundReasoning = '';
           let roundGrounding: unknown;
@@ -757,8 +896,8 @@ export class MobileChatService {
             ...loopMessages,
             {
               content: roundContent,
-              reasoning: roundReasoning ? { content: roundReasoning } : undefined,
               role: 'assistant',
+              ...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
               tool_calls: rawToolCalls,
             } as any,
           ];
@@ -887,20 +1026,23 @@ export class MobileChatService {
       });
     }
 
-    const originalMessages = [...(data.messages || [])];
+    const originalMessages = sanitizeToolCallHistory(data.messages) || [];
+    data.messages = originalMessages;
     let toolLoopSucceeded = false;
     let toolExecutionsForResponse: MobileToolExecutionEvent[] = [];
+    let finalAssistantForResponse: ToolLoopFinalAssistantResponse | undefined;
 
     if (toolSet?.tools?.length) {
       try {
         const { boundProcessContentBlocks, toolExecutionService } =
           this.createToolExecutionService();
 
-        let loopMessages = [...(data.messages || [])];
+        let loopMessages = [...originalMessages];
         let toolsWereCalled = false;
         const loopToolExecutions: MobileToolExecutionEvent[] = [];
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+          loopMessages = sanitizeToolCallHistory(loopMessages) || [];
           console.info(
             `[webapi/chat] tool-loop round ${round + 1}: ${loopMessages.length} messages, ${data.tools?.length ?? 0} tools`,
           );
@@ -919,6 +1061,21 @@ export class MobileChatService {
           const result = await readChatCompletionResult(response);
           const choice = result?.choices?.[0];
           const assistantMessage = choice?.message;
+          const finalContent =
+            typeof assistantMessage?.content === 'string' ? assistantMessage.content : undefined;
+          const finalReasoning =
+            typeof (assistantMessage as any)?.reasoning_content === 'string'
+              ? (assistantMessage as any).reasoning_content
+              : undefined;
+          const finalGrounding = isExecutionStateRecord((result as any)?.grounding)
+            ? ((result as any).grounding as Record<string, unknown>)
+            : undefined;
+          const finalUsage = isExecutionStateRecord((result as any)?.usage)
+            ? ((result as any).usage as Record<string, unknown>)
+            : undefined;
+          const finalPerformance = isExecutionStateRecord((result as any)?.speed)
+            ? ((result as any).speed as Record<string, unknown>)
+            : undefined;
 
           if (!assistantMessage?.tool_calls?.length) {
             console.info(
@@ -929,6 +1086,20 @@ export class MobileChatService {
                 `[webapi/chat] round 1: unexpected response shape, keys=${Object.keys(result || {}).join(',')}`,
               );
             }
+
+            if (
+              toolsWereCalled &&
+              (finalContent || finalReasoning || finalGrounding || finalUsage || finalPerformance)
+            ) {
+              finalAssistantForResponse = {
+                ...(finalContent ? { content: finalContent } : {}),
+                ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+                ...(finalGrounding ? { grounding: finalGrounding } : {}),
+                ...(finalUsage ? { usage: finalUsage } : {}),
+                ...(finalPerformance ? { performance: finalPerformance } : {}),
+              };
+            }
+
             break;
           }
 
@@ -947,8 +1118,8 @@ export class MobileChatService {
             ...loopMessages,
             {
               content: assistantMessage.content || '',
-              reasoning: { content: (assistantMessage as any).reasoning_content || ' ' },
               role: 'assistant',
+              ...(finalReasoning ? { reasoning_content: finalReasoning } : {}),
               tool_calls: assistantMessage.tool_calls,
             } as any,
           ];
@@ -987,7 +1158,7 @@ export class MobileChatService {
         }
 
         if (toolsWereCalled) {
-          data.messages = loopMessages;
+          data.messages = sanitizeToolCallHistory(loopMessages) || [];
           toolExecutionsForResponse = loopToolExecutions;
           toolLoopSucceeded = true;
         }
@@ -998,6 +1169,16 @@ export class MobileChatService {
         );
         data.messages = originalMessages;
       }
+    }
+
+    if (toolLoopSucceeded && finalAssistantForResponse) {
+      console.info(
+        '[webapi/chat] returning tool-loop final assistant response without re-streaming',
+      );
+      return createStaticSSETextResponse({
+        assistant: finalAssistantForResponse,
+        toolExecutions: toolExecutionsForResponse,
+      });
     }
 
     if (toolSet?.tools?.length && toolLoopSucceeded) {

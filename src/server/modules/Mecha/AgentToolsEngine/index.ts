@@ -15,8 +15,12 @@ import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { builtinTools, defaultToolIds } from '@lobechat/builtin-tools';
-import { createEnableChecker, type LobeToolManifest } from '@lobechat/context-engine';
-import { ToolsEngine } from '@lobechat/context-engine';
+import {
+  createEnableChecker,
+  filterValidManifests,
+  type LobeToolManifest,
+  ToolsEngine,
+} from '@lobechat/context-engine';
 import debug from 'debug';
 
 import {
@@ -53,16 +57,28 @@ export const createServerToolsEngine = (
   const pluginManifests = context.installedPlugins
     .map((plugin) => plugin.manifest as LobeToolManifest)
     .filter(Boolean);
+  const { invalid: invalidPluginManifests, valid: validPluginManifests } =
+    filterValidManifests(pluginManifests);
 
   // Get all builtin tool manifests
   const builtinManifests = builtinTools.map((tool) => tool.manifest as LobeToolManifest);
 
   // Combine all manifests
-  const allManifests = [...pluginManifests, ...builtinManifests, ...additionalManifests];
+  const allManifests = [...validPluginManifests, ...builtinManifests, ...additionalManifests];
+
+  if (invalidPluginManifests.length > 0) {
+    log(
+      'Ignoring %d invalid installed plugin manifests: %o',
+      invalidPluginManifests.length,
+      invalidPluginManifests.map((manifest) =>
+        typeof manifest?.identifier === 'string' ? manifest.identifier : '[unknown]',
+      ),
+    );
+  }
 
   log(
     'Creating ToolsEngine with %d plugin manifests, %d builtin manifests, %d additional manifests',
-    pluginManifests.length,
+    validPluginManifests.length,
     builtinManifests.length,
     additionalManifests.length,
   );

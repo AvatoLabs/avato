@@ -43,12 +43,13 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
 import { isGroupSessionLike } from '../lib/session';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
 import { useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { Tag as TagItem } from '../types';
+import type { ChatMessage, Tag as TagItem } from '../types';
 
 const sortTags = (tags: TagItem[]) =>
   [...tags].sort((left, right) => {
@@ -64,6 +65,17 @@ const normalizeText = (value: string) => {
   const trimmed = value.trim();
   return trimmed || '';
 };
+
+const extractPersistedMessageIds = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => message.id)
+    .filter(
+      (id) =>
+        !id.startsWith('assistant-') &&
+        !id.startsWith('local-') &&
+        !id.startsWith('tmp_') &&
+        !id.startsWith('user-'),
+    );
 
 const splitLineList = (value: string) =>
   value
@@ -82,9 +94,12 @@ function SectionCard({ children, title }: { children: React.ReactNode; title: st
   );
 }
 
-export default function ChatSettingsScreen({ route, navigation }: any) {
+export default function ChatSettingsScreen({
+  route,
+  navigation,
+}: RootStackScreenProps<'ChatSettings'>) {
   const colors = useThemeColors();
-  const sessionId = route.params?.sessionId;
+  const sessionId = route.params.sessionId;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
@@ -96,6 +111,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
   const updateSessionTitle = useSessionStore((s) => s.updateSessionTitle);
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
   const clearMessages = useChatStore((s) => s.clearMessages);
+  const rawMessages = useChatStore((s) => s.messagesBySession[sessionId] ?? []);
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
   const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
@@ -426,7 +442,10 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
       try {
         let targetTopic = currentTopic;
         if (!targetTopic) {
-          const created = await createTopic(sessionId, t.chatListNewConversation);
+          const messageIds = extractPersistedMessageIds(rawMessages);
+          const created = await createTopic(sessionId, t.chatListNewConversation, {
+            ...(messageIds.length > 0 ? { messageIds } : {}),
+          });
           if (!created) {
             toast.show('error', t.errorNetwork);
             return;
@@ -445,7 +464,7 @@ export default function ChatSettingsScreen({ route, navigation }: any) {
         });
       }
     },
-    [createTopic, currentTopic, sessionId, t, toast, updateTopicTag],
+    [createTopic, currentTopic, rawMessages, sessionId, t, toast, updateTopicTag],
   );
 
   const handleCreateTag = useCallback(async () => {

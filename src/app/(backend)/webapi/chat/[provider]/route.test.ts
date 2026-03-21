@@ -11,8 +11,11 @@ import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 import { POST } from './route';
 
-const findSkillByIdentifierMock = vi.fn();
-const pluginQueryMock = vi.fn();
+const { findSkillByIdentifierMock, mcpListToolsMock, pluginQueryMock } = vi.hoisted(() => ({
+  findSkillByIdentifierMock: vi.fn(),
+  mcpListToolsMock: vi.fn(),
+  pluginQueryMock: vi.fn(),
+}));
 
 vi.mock('@/app/(backend)/middleware/auth/utils', () => ({
   checkAuthMethod: vi.fn(),
@@ -29,6 +32,12 @@ vi.mock('@/server/modules/ModelRuntime', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({})),
+}));
+
+vi.mock('@/server/services/mcp', () => ({
+  mcpService: {
+    listTools: mcpListToolsMock,
+  },
 }));
 
 vi.mock('@/database/models/agentSkill', () => ({
@@ -75,6 +84,7 @@ afterEach(() => {
   // 清除模拟调用历史
   vi.clearAllMocks();
   findSkillByIdentifierMock.mockReset();
+  mcpListToolsMock.mockReset();
   pluginQueryMock.mockReset();
 });
 
@@ -178,10 +188,13 @@ describe('POST handler', () => {
       const response = await POST(request as unknown as Request, { params: mockParams });
 
       expect(response).toEqual(mockChatResponse);
-      expect(mockRuntime.chat).toHaveBeenCalledWith(mockChatPayload, {
-        user: expect.any(String),
-        signal: expect.anything(),
-      });
+      expect(mockRuntime.chat).toHaveBeenCalledWith(
+        expect.objectContaining(mockChatPayload),
+        expect.objectContaining({
+          signal: expect.anything(),
+          user: expect.any(String),
+        }),
+      );
     });
 
     it('should return an error response when chat completion fails', async () => {
@@ -439,6 +452,310 @@ describe('POST handler', () => {
       expect(responseBody).toContain('event: tool_executions');
       expect(responseBody).toContain('"state":{"expression":"x^2","result":"2*x","variable":"x"}');
       expect(responseBody).toContain('The derivative is $2x$.');
+    });
+
+    it('should return the final assistant response from the tool loop without an extra streaming model call', async () => {
+      vi.mocked(getXorPayload).mockReturnValueOnce({
+        apiKey: 'test-api-key',
+        azureApiVersion: 'v1',
+        userId: 'abc',
+      });
+
+      pluginQueryMock.mockResolvedValue([]);
+
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      request = new Request(new URL('https://test.com'), {
+        headers: { [LOBE_CHAT_AUTH_HEADER]: 'Bearer some-valid-token' },
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ content: 'differentiate x^2', role: 'user' }],
+          model: 'test-model',
+          plugins: ['lobe-calculator'],
+          stream: true,
+        }),
+      });
+
+      const toolCalls = [
+        {
+          function: {
+            arguments: '{"expression":"x^2","variable":"x"}',
+            name: 'lobe-calculator____differentiate____builtin',
+          },
+          id: 'call_1',
+          type: 'function',
+        },
+      ];
+
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi
+          .fn()
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                choices: [
+                  {
+                    finish_reason: 'tool_calls',
+                    message: {
+                      content: '',
+                      reasoning_content: 'I should call the calculator first.',
+                      role: 'assistant',
+                      tool_calls: toolCalls,
+                    },
+                  },
+                ],
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                choices: [
+                  {
+                    finish_reason: 'stop',
+                    message: {
+                      content: 'The derivative is $2x$.',
+                      reasoning_content: 'I used the calculator result to answer directly.',
+                      role: 'assistant',
+                    },
+                  },
+                ],
+                usage: { totalInputTokens: 10, totalOutputTokens: 5, totalTokens: 15 },
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          ),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      const response = await POST(request as unknown as Request, { params: mockParams });
+      const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+      const responseBody = await response.text();
+
+      expect(response.headers.get('Content-Type')).toContain('text/event-stream');
+      expect(mockedChat).toHaveBeenCalledTimes(2);
+
+      const firstCallPayload = mockedChat.mock.calls[0]![0] as any;
+      const secondCallPayload = mockedChat.mock.calls[1]![0] as any;
+
+      expect(firstCallPayload.stream).toBe(false);
+      expect(secondCallPayload.stream).toBe(false);
+      expect(secondCallPayload.messages).toHaveLength(4);
+      expect(responseBody).toContain('event: tool_executions');
+      expect(responseBody).toContain('event: reasoning');
+      expect(responseBody).toContain('The derivative is $2x$.');
+      expect(responseBody).toContain('"state":{"expression":"x^2","result":"2*x","variable":"x"}');
+    });
+
+    it('should remove orphan assistant tool_calls from history before calling the provider', async () => {
+      vi.mocked(getXorPayload).mockReturnValueOnce({
+        apiKey: 'test-api-key',
+        azureApiVersion: 'v1',
+        userId: 'abc',
+      });
+
+      pluginQueryMock.mockResolvedValue([]);
+
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      request = new Request(new URL('https://test.com'), {
+        headers: { [LOBE_CHAT_AUTH_HEADER]: 'Bearer some-valid-token' },
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [
+            { content: 'use the calculator tool', role: 'user' },
+            {
+              content: '',
+              role: 'assistant',
+              tool_calls: [
+                {
+                  function: {
+                    arguments: '{"expression":"x^2","variable":"x"}',
+                    name: 'lobe-calculator____differentiate____builtin',
+                  },
+                  id: 'call_orphan',
+                  type: 'function',
+                },
+              ],
+            },
+            { content: 'That previous tool attempt failed.', role: 'assistant' },
+            { content: 'try again', role: 'user' },
+          ],
+          model: 'test-model',
+          plugins: ['lobe-calculator'],
+          stream: true,
+        }),
+      });
+
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi
+          .fn()
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                choices: [
+                  { finish_reason: 'stop', message: { content: 'Retrying.', role: 'assistant' } },
+                ],
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+          .mockImplementationOnce(async (_payload, options: any) => {
+            await options?.callback?.onText?.('Retry completed.');
+            await options?.callback?.onCompletion?.({
+              speed: { tps: 20, ttft: 100 },
+              text: 'Retry completed.',
+              usage: { totalInputTokens: 10, totalOutputTokens: 5, totalTokens: 15 },
+            });
+
+            return new Response('data: [DONE]\n\n', {
+              headers: { 'Content-Type': 'text/event-stream' },
+            });
+          }),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      const response = await POST(request as unknown as Request, { params: mockParams });
+      const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+      const firstCallPayload = mockedChat.mock.calls[0]![0] as any;
+
+      expect(response.headers.get('Content-Type')).toContain('text/event-stream');
+      expect(mockedChat).toHaveBeenCalledTimes(2);
+      expect(
+        firstCallPayload.messages.filter(
+          (message: any) => message.role === 'assistant' && Array.isArray(message.tool_calls),
+        ),
+      ).toEqual([]);
+      expect(firstCallPayload.messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            content: 'That previous tool attempt failed.',
+            role: 'assistant',
+          }),
+          expect.objectContaining({ content: 'try again', role: 'user' }),
+        ]),
+      );
+    });
+
+    it('should recover MCP tools when an installed plugin manifest has no api array', async () => {
+      vi.mocked(getXorPayload).mockReturnValueOnce({
+        apiKey: 'test-api-key',
+        azureApiVersion: 'v1',
+        userId: 'abc',
+      });
+
+      pluginQueryMock.mockResolvedValue([
+        {
+          customParams: {
+            mcp: {
+              type: 'http',
+              url: 'https://example.com/mcp',
+            },
+          },
+          identifier: 'openclaw-mcp',
+          manifest: {
+            identifier: 'openclaw-mcp',
+            meta: { title: 'OpenClaw MCP' },
+            type: 'mcp',
+          },
+          runtimeType: 'mcp',
+          type: 'plugin',
+        },
+      ]);
+      mcpListToolsMock.mockResolvedValue([
+        {
+          description: 'Search the OpenClaw service',
+          name: 'search',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'Search query' },
+            },
+            required: ['query'],
+          },
+        },
+      ]);
+
+      const mockParams = Promise.resolve({ provider: 'test-provider' });
+      request = new Request(new URL('https://test.com'), {
+        headers: { [LOBE_CHAT_AUTH_HEADER]: 'Bearer some-valid-token' },
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ content: 'search with openclaw', role: 'user' }],
+          model: 'test-model',
+          plugins: ['openclaw-mcp'],
+          stream: true,
+        }),
+      });
+
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi
+          .fn()
+          .mockResolvedValueOnce(
+            new Response(
+              JSON.stringify({
+                choices: [
+                  { finish_reason: 'stop', message: { content: 'Checking.', role: 'assistant' } },
+                ],
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+              },
+            ),
+          )
+          .mockImplementationOnce(async (_payload, options: any) => {
+            await options?.callback?.onText?.('Recovered MCP tools.');
+            await options?.callback?.onCompletion?.({
+              speed: { tps: 20, ttft: 100 },
+              text: 'Recovered MCP tools.',
+              usage: { totalInputTokens: 10, totalOutputTokens: 5, totalTokens: 15 },
+            });
+
+            return new Response('data: [DONE]\n\n', {
+              headers: { 'Content-Type': 'text/event-stream' },
+            });
+          }),
+      };
+
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
+
+      const response = await POST(request as unknown as Request, { params: mockParams });
+      const mockedChat = mockRuntime.chat as ReturnType<typeof vi.fn>;
+      const responseBody = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Type')).toContain('text/event-stream');
+      expect(mcpListToolsMock).toHaveBeenCalledWith({
+        name: 'openclaw-mcp',
+        type: 'http',
+        url: 'https://example.com/mcp',
+      });
+      expect(mockedChat).toHaveBeenCalledTimes(2);
+
+      const firstCallPayload = mockedChat.mock.calls[0]![0] as any;
+      const secondCallPayload = mockedChat.mock.calls[1]![0] as any;
+
+      expect(firstCallPayload.tools).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            function: expect.objectContaining({
+              name: 'openclaw-mcp____search____mcp',
+            }),
+          }),
+        ]),
+      );
+      expect(secondCallPayload.tools).toEqual(firstCallPayload.tools);
+      expect(responseBody).toContain('Recovered MCP tools.');
     });
   });
 });

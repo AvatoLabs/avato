@@ -66,6 +66,19 @@ const mockInstalledPlugins: InstalledPlugin[] = [
   },
 ];
 
+const invalidInstalledPlugin = {
+  identifier: 'broken-plugin',
+  type: 'plugin',
+  runtimeType: 'default',
+  manifest: {
+    identifier: 'broken-plugin',
+    meta: {
+      title: 'Broken Plugin',
+    },
+    type: 'default',
+  },
+} as InstalledPlugin;
+
 // Create mock context
 const createMockContext = (
   overrides: Partial<ServerAgentToolsContext> = {},
@@ -138,6 +151,23 @@ describe('createServerToolsEngine', () => {
 
     const availablePlugins = engine.getAvailablePlugins();
     expect(availablePlugins).toContain('additional-tool');
+  });
+
+  it('should ignore installed plugins with invalid manifests', () => {
+    const context = createMockContext({
+      installedPlugins: [...mockInstalledPlugins, invalidInstalledPlugin],
+    });
+    const engine = createServerToolsEngine(context);
+
+    const result = engine.generateToolsDetailed({
+      toolIds: ['broken-plugin'],
+      model: 'gpt-4',
+      provider: 'openai',
+    });
+
+    expect(engine.hasPlugin('broken-plugin')).toBe(false);
+    expect(result.enabledToolIds).toEqual([]);
+    expect(result.filteredTools).toEqual([{ id: 'broken-plugin', reason: 'not_found' }]);
   });
 });
 

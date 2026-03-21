@@ -5,20 +5,24 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { useCreateNewModal } from '@/features/LibraryModal';
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
+import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
 import LibraryList from './LibraryList';
 
 const SidebarBody = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
+  const spaceId = useResourceManagerStore((s) => s.spaceId);
 
   const { open } = useCreateNewModal();
 
   const handleCreate = () => {
     open({
       onSuccess: (id) => {
-        navigate(`/resource/library/${id}`);
+        navigate(buildResourceLibraryPath(spaceId, id));
       },
+      spaceId,
     });
   };
 

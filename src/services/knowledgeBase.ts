@@ -6,8 +6,8 @@ class KnowledgeBaseService {
     return lambdaClient.knowledgeBase.createKnowledgeBase.mutate(params);
   };
 
-  getKnowledgeBaseList = async () => {
-    return lambdaClient.knowledgeBase.getKnowledgeBases.query();
+  getKnowledgeBaseList = async (spaceId?: string) => {
+    return lambdaClient.knowledgeBase.getKnowledgeBases.query(spaceId ? { spaceId } : undefined);
   };
 
   getKnowledgeBaseById = async (id: string) => {

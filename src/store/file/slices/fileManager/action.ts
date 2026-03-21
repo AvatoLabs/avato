@@ -165,6 +165,7 @@ export class FileManageActionImpl {
     rawFiles: File[],
     knowledgeBaseId?: string,
     parentId?: string,
+    spaceId?: string,
   ): Promise<void> => {
     const { dispatchDockFileList } = this.#get();
 
@@ -216,6 +217,7 @@ export class FileManageActionImpl {
           knowledgeBaseId,
           onStatusUpdate: dispatchDockFileList,
           parentId,
+          spaceId,
         });
 
         // Note: Don't refresh after each file to avoid flickering
@@ -380,6 +382,7 @@ export class FileManageActionImpl {
     files: File[],
     knowledgeBaseId?: string,
     currentFolderId?: string,
+    spaceId?: string,
   ): Promise<void> => {
     const { dispatchDockFileList } = this.#get();
 
@@ -435,6 +438,7 @@ export class FileManageActionImpl {
             knowledgeBaseId,
             metadata: { createdAt: Date.now() },
             parentId,
+            spaceId,
             slug,
             title: sanitizedName,
           };
@@ -493,6 +497,7 @@ export class FileManageActionImpl {
             knowledgeBaseId,
             onStatusUpdate: dispatchDockFileList,
             parentId,
+            spaceId,
           });
 
           // Note: Don't refresh after each file to avoid flickering

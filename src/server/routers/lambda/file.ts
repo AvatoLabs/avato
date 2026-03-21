@@ -9,11 +9,18 @@ import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
 import { KnowledgeRepo } from '@/database/repositories/knowledge';
 import { appEnv } from '@/envs/app';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
+import {
+  AuthorizedResourceResolver,
+  ResourceAuthorizer,
+  TreeGuard,
+} from '@/server/services/resource';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
 import { type FileListItem } from '@/types/files';
 import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
@@ -44,16 +51,76 @@ const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
       knowledgeRepo: new KnowledgeRepo(ctx.serverDB, ctx.userId),
+      resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
+      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
+      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
+      treeGuard: new TreeGuard(ctx.serverDB, ctx.userId),
     },
   });
 });
 
+const resolveWriteSpaceId = async (
+  ctx: {
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  params: {
+    knowledgeBaseId?: string;
+    parentId?: string | null;
+    spaceId?: string;
+  },
+) => {
+  if (params.knowledgeBaseId) {
+    const knowledgeBase = await ctx.resolver.requireKnowledgeBase(
+      params.knowledgeBaseId,
+      'create_child',
+    );
+    return knowledgeBase.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  if (params.parentId) {
+    const parent = await ctx.resolver.requireDocument(params.parentId, 'create_child');
+    return parent.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  if (params.spaceId) {
+    const space = await ctx.spaceModel.findAccessibleSpaceById(params.spaceId);
+    if (!space?.id) throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+
+    if (space.membershipRole === 'viewer') {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_WRITE_DENIED' });
+    }
+
+    return space.id;
+  }
+
+  const personalSpace = await ctx.spaceModel.getOrCreatePersonalSpace();
+  return personalSpace.id;
+};
+
 export const fileRouter = router({
   checkFileHash: fileProcedure
     .use(checkFileStorageUsage)
-    .input(z.object({ hash: z.string() }))
+    .input(
+      z.object({
+        hash: z.string(),
+        spaceId: z.string().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
-      return ctx.fileModel.checkHash(input.hash);
+      const spaceId = await resolveWriteSpaceId(ctx, { spaceId: input.spaceId });
+      const blob = await ctx.resourceModel.findSpaceBlobByHash(spaceId, input.hash);
+
+      if (!blob) return { isExist: false };
+
+      return {
+        fileType: blob.fileType,
+        isExist: true,
+        metadata: blob.metadata,
+        size: blob.size,
+        url: blob.storageKey,
+      };
     }),
 
   createFile: fileProcedure
@@ -61,12 +128,11 @@ export const fileRouter = router({
     .input(
       UploadFileSchema.omit({ url: true }).extend({
         parentId: z.string().optional(),
+        spaceId: z.string().optional(),
         url: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { isExist } = await ctx.fileModel.checkHash(input.hash!);
-
       // Resolve parentId if it's a slug
       let resolvedParentId = input.parentId;
       if (input.parentId) {
@@ -75,6 +141,17 @@ export const fileRouter = router({
           resolvedParentId = docBySlug.id;
         }
       }
+
+      const spaceId = await resolveWriteSpaceId(ctx, {
+        knowledgeBaseId: input.knowledgeBaseId,
+        parentId: resolvedParentId,
+        spaceId: input.spaceId,
+      });
+
+      await ctx.treeGuard.assertParentAssignment({
+        currentSpaceId: spaceId,
+        parentId: resolvedParentId,
+      });
 
       let actualSize = input.size;
       let actualFileType = input.fileType;
@@ -109,8 +186,23 @@ export const fileRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File size cannot be negative' });
       }
 
+      const existingGlobal = input.hash ? await ctx.fileModel.checkHash(input.hash) : undefined;
+      const blob = await ctx.resourceModel.upsertSpaceBlob({
+        createdBy: ctx.userId,
+        etag: undefined,
+        fileType: actualFileType,
+        metadata: input.metadata,
+        sha256: input.hash!,
+        size: actualSize,
+        spaceId,
+        status: 'ready',
+        storageKey: input.url,
+        verifiedAt: new Date(),
+      });
+
       const { id } = await ctx.fileModel.create(
         {
+          blobId: blob.id,
           fileHash: input.hash,
           fileType: actualFileType,
           knowledgeBaseId: input.knowledgeBaseId,
@@ -118,11 +210,30 @@ export const fileRouter = router({
           name: input.name,
           parentId: resolvedParentId,
           size: actualSize,
+          spaceId,
           url: input.url,
         },
         // if the file is not exist in global file, create a new one
-        !isExist,
+        !existingGlobal?.isExist,
       );
+
+      const registry = await ctx.resourceModel.ensureResourceRegistry({
+        createdBy: ctx.userId,
+        kind: 'file',
+        localId: id,
+        spaceId,
+      });
+
+      await ctx.fileModel.update(id, {
+        blobId: blob.id,
+        resourceUid: registry.resourceUid,
+        spaceId,
+      } as any);
+
+      await ctx.resourceModel.ensureOwnerPermission({
+        resourceUid: registry.resourceUid,
+        spaceId,
+      });
 
       return { id, url: getFileProxyUrl(id) };
     }),
@@ -133,7 +244,13 @@ export const fileRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const item = await ctx.fileModel.findById(input.id);
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'read_metadata',
+        id: input.id,
+        kind: 'file',
+      });
+
+      const item = await ctx.resolver.requireFile(input.id, 'read_metadata');
       if (!item) throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
 
       return {
@@ -162,7 +279,7 @@ export const fileRouter = router({
       }),
     )
     .query(async ({ ctx, input }): Promise<FileListItem | undefined> => {
-      const item = await ctx.fileModel.findById(input.id);
+      const item = await ctx.resolver.requireFile(input.id, 'read_metadata');
 
       if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'File not found' });
 
@@ -240,6 +357,32 @@ export const fileRouter = router({
   }),
 
   getKnowledgeItems: fileProcedure.input(QueryFileListSchema).query(async ({ ctx, input }) => {
+    if (input.spaceId) {
+      const space = await ctx.spaceModel.findAccessibleSpaceById(input.spaceId);
+      if (!space?.id) {
+        let scopedSpaceId: string | null | undefined;
+
+        if (input.knowledgeBaseId) {
+          const knowledgeBase = await ctx.resolver.requireKnowledgeBase(
+            input.knowledgeBaseId,
+            'read_content',
+          );
+          scopedSpaceId = knowledgeBase.spaceId;
+        } else if (input.parentId) {
+          const folderBySlug = await ctx.documentModel.findBySlug(input.parentId);
+          const folder = await ctx.resolver.requireDocument(
+            folderBySlug?.id || input.parentId,
+            'read_content',
+          );
+          scopedSpaceId = folder.spaceId;
+        }
+
+        if (!scopedSpaceId || scopedSpaceId !== input.spaceId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+        }
+      }
+    }
+
     // Request one more item than limit to check if there are more items
     const limit = input.limit ?? 50;
     const knowledgeItems = await ctx.knowledgeRepo.query({

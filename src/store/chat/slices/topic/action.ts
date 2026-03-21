@@ -9,7 +9,6 @@ import useSWR from 'swr';
 import { message } from '@/components/AntdStaticMethods';
 import { LOADING_FLAT } from '@/const/message';
 import { mutate, useClientDataSWRWithSync } from '@/libs/swr';
-import { messageService } from '@/services/message';
 import { topicService } from '@/services/topic';
 import { type ChatStore } from '@/store/chat';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
@@ -182,7 +181,11 @@ export class ChatTopicActionImpl {
     }
   };
 
-  summaryTopicTitle = async (topicId: string, messages: UIChatMessage[]): Promise<void> => {
+  summaryTopicTitle = async (
+    topicId: string,
+    messages: UIChatMessage[],
+    options?: { force?: boolean },
+  ): Promise<void> => {
     void messages;
     const { internal_updateTopicTitleInSummary, internal_updateTopicLoading, refreshTopic } =
       this.#get();
@@ -193,7 +196,7 @@ export class ChatTopicActionImpl {
     internal_updateTopicLoading(topicId, true);
 
     try {
-      const title = await topicService.generateTopicTitle(topicId);
+      const title = await topicService.generateTopicTitle(topicId, options?.force);
 
       if (!title) {
         internal_updateTopicTitleInSummary(topicId, topic.title);
@@ -266,13 +269,7 @@ export class ChatTopicActionImpl {
   };
 
   autoRenameTopicTitle = async (id: string): Promise<void> => {
-    const { activeAgentId: agentId, summaryTopicTitle, internal_updateTopicLoading } = this.#get();
-
-    internal_updateTopicLoading(id, true);
-    const messages = await messageService.getMessages({ agentId, topicId: id });
-
-    await summaryTopicTitle(id, messages);
-    internal_updateTopicLoading(id, false);
+    await this.#get().summaryTopicTitle(id, [], { force: true });
   };
 
   useFetchTopics = (

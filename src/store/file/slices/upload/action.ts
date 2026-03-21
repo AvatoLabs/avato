@@ -41,6 +41,7 @@ interface UploadWithProgressParams {
    * Optional source identifier for the file (e.g., 'page-editor', 'image_generation')
    */
   source?: string;
+  spaceId?: string;
 }
 
 interface UploadWithProgressResult {
@@ -89,6 +90,7 @@ export class FileUploadActionImpl {
     knowledgeBaseId,
     skipCheckFileType,
     parentId,
+    spaceId,
     source,
     abortController,
   }: UploadWithProgressParams): Promise<UploadWithProgressResult | undefined> => {
@@ -101,7 +103,7 @@ export class FileUploadActionImpl {
       // 2. check file hash
       const hash = sha256(fileArrayBuffer);
 
-      const checkStatus = await fileService.checkFileHash(hash);
+      const checkStatus = await fileService.checkFileHash(hash, spaceId);
       let metadata: FileMetadata;
 
       // 3. if file exist, just skip upload
@@ -160,6 +162,7 @@ export class FileUploadActionImpl {
           metadata,
           name: file.name,
           parentId,
+          spaceId,
           size: file.size,
           source,
           url: metadata.path || checkStatus.url,

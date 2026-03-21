@@ -13,6 +13,7 @@ import {
 interface UseUploadFolderOptions {
   currentFolderId?: string | null;
   libraryId?: string | null;
+  spaceId?: string;
   t: TFunction<'file'>;
   uploadFolderWithStructure: FileManageAction['uploadFolderWithStructure'];
 }
@@ -20,6 +21,7 @@ interface UseUploadFolderOptions {
 const useUploadFolder = ({
   currentFolderId,
   libraryId,
+  spaceId,
   t,
   uploadFolderWithStructure,
 }: UseUploadFolderOptions) => {
@@ -31,7 +33,7 @@ const useUploadFolder = ({
       const targetFolderId = currentFolderId ?? undefined;
       const targetLibraryId = libraryId ?? undefined;
       const upload = async (fileList: File[]) =>
-        uploadFolderWithStructure(fileList, targetLibraryId, targetFolderId);
+        uploadFolderWithStructure(fileList, targetLibraryId, targetFolderId, spaceId);
 
       // Apply built-in block list first
       const originalCount = files.length;
@@ -96,7 +98,7 @@ const useUploadFolder = ({
 
       event.target.value = '';
     },
-    [currentFolderId, libraryId, t, uploadFolderWithStructure],
+    [currentFolderId, libraryId, spaceId, t, uploadFolderWithStructure],
   );
 
   return { handleFolderUpload };

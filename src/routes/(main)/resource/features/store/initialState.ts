@@ -61,6 +61,10 @@ export interface State {
    */
   sortType: SortType;
   /**
+   * Current space ID
+   */
+  spaceId?: string;
+  /**
    * File explorer view mode (list or masonry)
    */
   viewMode: ViewMode;
@@ -78,6 +82,7 @@ export const initialState: State = {
   mode: 'explorer',
   pendingRenameItemId: null,
   searchQuery: null,
+  spaceId: undefined,
   selectedFileIds: [],
   sortType: SortType.Desc,
   sorter: 'createdAt',

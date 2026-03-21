@@ -20,6 +20,7 @@ import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
 import { DocumentService } from '@/server/services/document';
+import { AuthorizedResourceResolver, ResourceAuthorizer } from '@/server/services/resource';
 
 const chunkProcedure = authedProcedure
   .use(serverDatabase)
@@ -37,6 +38,8 @@ const chunkProcedure = authedProcedure
         embeddingModel: new EmbeddingModel(ctx.serverDB, ctx.userId),
         fileModel: new FileModel(ctx.serverDB, ctx.userId),
         messageModel: new MessageModel(ctx.serverDB, ctx.userId),
+        resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
+        resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
       },
     });
   });
@@ -93,6 +96,12 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'read_content',
+        id: input.id,
+        kind: 'file',
+      });
+
       const asyncTaskId = await ctx.chunkService.asyncEmbeddingFileChunks(input.id);
 
       return { id: asyncTaskId, success: true };
@@ -106,6 +115,12 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'read_content',
+        id: input.id,
+        kind: 'file',
+      });
+
       const asyncTaskId = await ctx.chunkService.asyncParseFileToChunks(input.id, input.skipExist);
 
       return { id: asyncTaskId, success: true };
@@ -119,6 +134,12 @@ export const chunkRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'read_content',
+        id: input.id,
+        kind: 'file',
+      });
+
       return {
         items: await ctx.chunkModel.findByFileId(input.id, input.cursor || 0),
         nextCursor: input.cursor ? input.cursor + 1 : 1,
@@ -132,19 +153,13 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const readableFileIds = await ctx.resourceAuthorizer.filterReadableFileIds(input.fileIds);
+
       return await pMap(
-        input.fileIds,
+        readableFileIds,
         async (fileId) => {
           // 1. Find file information
-          const file = await ctx.fileModel.findById(fileId);
-          if (!file) {
-            return {
-              content: '',
-              error: 'File not found',
-              fileId,
-              filename: `Unknown file ${fileId}`,
-            };
-          }
+          const file = await ctx.resolver.requireFile(fileId, 'read_content');
 
           // 2. Find existing parsed document
           let document:
@@ -197,7 +212,7 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.fileModel.findById(input.id);
+      const result = await ctx.resolver.requireFile(input.id, 'read_content');
 
       if (!result) return;
 
@@ -221,6 +236,10 @@ export const chunkRouter = router({
     )
     .use(checkBudgetsUsage)
     .mutation(async ({ ctx, input }) => {
+      const readableFileIds = input.fileIds
+        ? await ctx.resourceAuthorizer.filterReadableFileIds(input.fileIds)
+        : undefined;
+
       const { model, provider } =
         getServerDefaultFilesConfig().embeddingModel || DEFAULT_FILE_EMBEDDING_MODEL_ITEM;
       // Read user's provider config from database
@@ -234,7 +253,7 @@ export const chunkRouter = router({
 
       return ctx.chunkModel.semanticSearch({
         embedding: embeddings![0],
-        fileIds: input.fileIds,
+        fileIds: readableFileIds,
         query: input.query,
       });
     }),
@@ -259,11 +278,17 @@ export const chunkRouter = router({
 
         const embedding = embeddings![0];
 
-        let finalFileIds = input.fileIds ?? [];
+        let finalFileIds = input.fileIds
+          ? await ctx.resourceAuthorizer.filterReadableFileIds(input.fileIds)
+          : [];
 
         if (input.knowledgeIds && input.knowledgeIds.length > 0) {
+          const readableKnowledgeIds = await ctx.resourceAuthorizer.filterReadableKnowledgeBaseIds(
+            input.knowledgeIds,
+          );
+
           const knowledgeFiles = await ctx.serverDB.query.knowledgeBaseFiles.findMany({
-            where: inArray(knowledgeBaseFiles.knowledgeBaseId, input.knowledgeIds),
+            where: inArray(knowledgeBaseFiles.knowledgeBaseId, readableKnowledgeIds),
           });
 
           finalFileIds = knowledgeFiles.map((f) => f.fileId).concat(finalFileIds);

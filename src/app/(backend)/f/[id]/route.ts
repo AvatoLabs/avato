@@ -1,10 +1,14 @@
+import bcrypt from 'bcryptjs';
 import debug from 'debug';
 
+import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
 import { getRedisConfig } from '@/envs/redis';
 import { initializeRedis, isRedisEnabled } from '@/libs/redis';
 import { FileService } from '@/server/services/file';
+import { ResourceAuthorizer } from '@/server/services/resource';
 
 const log = debug('lobe-file:proxy');
 
@@ -14,7 +18,8 @@ const FILE_PROXY_KEY_PREFIX = 'file-proxy:';
 // Cache presigned URL for 4 minutes (URL expires in 5 minutes)
 const PRESIGNED_URL_CACHE_TTL = 240;
 
-const buildCacheKey = (id: string) => `${FILE_PROXY_KEY_PREFIX}${id}`;
+const buildCacheKey = (id: string, identity: string, authzEpoch: number) =>
+  `${FILE_PROXY_KEY_PREFIX}${id}:${identity}:${authzEpoch}`;
 
 interface CachedFileData {
   redirectUrl: string;
@@ -50,14 +55,76 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
   try {
     const params = await segmentData.params;
     const { id } = params;
+    const { searchParams } = new URL(req.url);
+    const shareToken = searchParams.get('token');
+    const sharePassword = searchParams.get('password');
 
     log('File proxy request: %s', id);
+
+    const session =
+      process.env.NOAUTH_MODE === '1'
+        ? { user: { id: process.env.NOAUTH_USER_ID || 'local-user' } }
+        : await auth.api.getSession({ headers: req.headers });
+
+    const userId = session?.user?.id;
+
+    if (!userId && !shareToken) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
+    // Get database connection
+    const db = await getServerDB();
+
+    // Query file record without userId filter, then authorize against resource ACL.
+    const file = await FileModel.getFileById(db, id);
+
+    if (!file) {
+      log('File not found: %s', id);
+      return new Response('File not found', {
+        status: 404,
+      });
+    }
+
+    if (shareToken) {
+      const resourceModel = new ResourceModel(db, 'anonymous');
+      const link = await resourceModel.resolveShareLinkByToken(shareToken);
+
+      if (!link) {
+        return new Response('Not found', { status: 404 });
+      }
+
+      if (link.passwordHash) {
+        if (!sharePassword) {
+          return new Response('Password required', { status: 401 });
+        }
+
+        const isValid = await bcrypt.compare(sharePassword, link.passwordHash);
+        if (!isValid) {
+          return new Response('Not found', { status: 404 });
+        }
+      }
+    }
+
+    const principalId = userId || 'anonymous';
+    const cacheIdentity = shareToken ? `share:${shareToken}` : `user:${principalId}`;
+    const authorizer = new ResourceAuthorizer(db, principalId);
+    const access = await authorizer.getAccessMatch({
+      capability: 'download_blob',
+      id,
+      kind: 'file',
+      shareToken,
+    });
+
+    if (!access?.canAccess) {
+      log('Access denied for file: %s user: %s', id, principalId);
+      return new Response('Forbidden', { status: 403 });
+    }
 
     // Try to get cached presigned URL from Redis
     const redisConfig = getRedisConfig();
     const redisClient = isRedisEnabled(redisConfig) ? await initializeRedis(redisConfig) : null;
 
-    const cacheKey = buildCacheKey(id);
+    const cacheKey = buildCacheKey(id, cacheIdentity, access.authzEpoch);
     if (redisClient) {
       const cachedStr = await redisClient.get(cacheKey);
       const cached = cachedStr ? (JSON.parse(cachedStr) as CachedFileData) : null;
@@ -68,21 +135,7 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       log('Cache miss for file: %s', id);
     }
 
-    // Get database connection
-    const db = await getServerDB();
-
-    // Query file record without userId filter (public access)
-    const file = await FileModel.getFileById(db, id);
-
-    if (!file) {
-      log('File not found: %s', id);
-      return new Response('File not found', {
-        status: 404,
-      });
-    }
-
-    // Create file service with file owner's userId
-    const fileService = new FileService(db, file.userId);
+    const fileService = new FileService(db, userId || 'anonymous');
 
     // Web: Generate S3 presigned URL (5 minutes expiry)
     const redirectUrl = await fileService.createPreSignedUrlForPreview(file.url, 300);

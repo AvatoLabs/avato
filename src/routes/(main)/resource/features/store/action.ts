@@ -90,6 +90,10 @@ export interface Action {
    */
   setSortType: (sortType: SortType) => void;
   /**
+   * Set the current space ID
+   */
+  setSpaceId: (id?: string) => void;
+  /**
    * Set the file explorer view mode
    */
   setViewMode: (viewMode: ViewMode) => void;
@@ -240,6 +244,10 @@ export const store: CreateStore = (publicState) => (set, get) => ({
 
   setSearchQuery: (searchQuery) => {
     set({ searchQuery });
+  },
+
+  setSpaceId: (spaceId) => {
+    set({ spaceId });
   },
 
   setSelectedFileIds: (selectedFileIds) => {

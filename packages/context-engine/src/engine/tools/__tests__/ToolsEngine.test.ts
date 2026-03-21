@@ -48,6 +48,13 @@ const mockDalleManifest: LobeToolManifest = {
   type: 'builtin',
 };
 
+const invalidManifest = {
+  identifier: 'broken-plugin',
+  meta: {
+    title: 'Broken Plugin',
+  },
+} as LobeToolManifest;
+
 describe('ToolsEngine', () => {
   describe('constructor', () => {
     it('should initialize with manifest schemas', () => {
@@ -67,6 +74,59 @@ describe('ToolsEngine', () => {
 
       const availablePlugins = engine.getAvailablePlugins();
       expect(availablePlugins).toEqual(['lobe-web-browsing', 'dalle']);
+    });
+
+    it('should ignore invalid manifest schemas', () => {
+      const engine = new ToolsEngine({
+        manifestSchemas: [mockWebBrowsingManifest, invalidManifest],
+      });
+
+      const result = engine.generateToolsDetailed({
+        toolIds: ['lobe-web-browsing', 'broken-plugin'],
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      expect(engine.hasPlugin('broken-plugin')).toBe(false);
+      expect(result.tools).toHaveLength(1);
+      expect(result.filteredTools).toContainEqual({ id: 'broken-plugin', reason: 'not_found' });
+    });
+
+    it('should skip manifests whose api becomes invalid after initialization', () => {
+      const mutableManifest: LobeToolManifest = {
+        api: [
+          {
+            description: 'Search docs',
+            name: 'searchDocs',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: 'Search query' },
+              },
+              required: ['query'],
+            },
+          },
+        ],
+        identifier: 'mutable-plugin',
+        meta: {
+          title: 'Mutable Plugin',
+        },
+      };
+
+      const engine = new ToolsEngine({
+        manifestSchemas: [mutableManifest],
+      });
+
+      mutableManifest.api = undefined as unknown as LobeToolManifest['api'];
+
+      const result = engine.generateToolsDetailed({
+        toolIds: ['mutable-plugin'],
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      expect(result.enabledToolIds).toEqual(['mutable-plugin']);
+      expect(result.tools).toEqual([]);
     });
   });
 
@@ -311,6 +371,16 @@ describe('ToolsEngine', () => {
       expect(engine.getPluginManifest('dalle')).toBe(mockDalleManifest);
     });
 
+    it('should ignore invalid manifests when adding new plugins', () => {
+      const engine = new ToolsEngine({
+        manifestSchemas: [mockWebBrowsingManifest],
+      });
+
+      engine.addPluginManifest(invalidManifest);
+
+      expect(engine.hasPlugin('broken-plugin')).toBe(false);
+    });
+
     it('should allow removing plugin manifest', () => {
       const engine = new ToolsEngine({
         manifestSchemas: [mockWebBrowsingManifest, mockDalleManifest],
@@ -334,6 +404,17 @@ describe('ToolsEngine', () => {
       engine.updateManifestSchemas([mockDalleManifest]);
 
       expect(engine.getAvailablePlugins()).toEqual(['dalle']);
+    });
+
+    it('should ignore invalid manifests when updating all manifest schemas', () => {
+      const engine = new ToolsEngine({
+        manifestSchemas: [mockWebBrowsingManifest],
+      });
+
+      engine.updateManifestSchemas([mockDalleManifest, invalidManifest]);
+
+      expect(engine.getAvailablePlugins()).toEqual(['dalle']);
+      expect(engine.hasPlugin('broken-plugin')).toBe(false);
     });
   });
 

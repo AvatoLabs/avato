@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
-  ScrollView,
+  SectionList,
   Text,
   TouchableOpacity,
   View,
@@ -69,6 +69,13 @@ function getAbilityTags(m: RuntimeEnabledModel): string[] {
   return tags;
 }
 
+interface ModelSection {
+  data: RuntimeEnabledModel[];
+  logo?: string;
+  providerId: string;
+  title: string;
+}
+
 interface ModelDrawerProps {
   initialModel?: string;
   initialProvider?: string;
@@ -101,7 +108,7 @@ export function ModelDrawer({
   const loadSelection = useModelStore((s) => s.loadSelection);
 
   const selectedModel = initialModel ?? storeSelectedModel;
-  const _selectedProvider = initialProvider ?? storeSelectedProvider;
+  const selectedProvider = initialProvider ?? storeSelectedProvider;
 
   useEffect(() => {
     if (visible) {
@@ -124,6 +131,45 @@ export function ModelDrawer({
   );
 
   const filtered = useMemo(() => providers.filter((p) => p.children.length > 0), [providers]);
+  const sections = useMemo<ModelSection[]>(
+    () =>
+      filtered.map((provider) => ({
+        data: provider.children,
+        logo: provider.logo,
+        providerId: provider.id,
+        title: provider.name,
+      })),
+    [filtered],
+  );
+
+  const renderItem = useCallback(
+    ({
+      item,
+      index,
+      section,
+    }: {
+      index: number;
+      item: RuntimeEnabledModel;
+      section: ModelSection;
+    }) => {
+      const isSelected = selectedModel === item.id && selectedProvider === section.providerId;
+      const tags = getAbilityTags(item);
+
+      return (
+        <SelectionListItem
+          className={`mx-5 ${index === section.data.length - 1 ? '' : 'mb-2'}`}
+          leading={<ProviderLogo logo={section.logo} providerId={section.providerId} size={24} />}
+          selected={isSelected}
+          title={item.displayName || item.id}
+          meta={tags.map((tag) => (
+            <MetaTag key={tag} label={tag} />
+          ))}
+          onPress={() => handleSelect(item.id, section.providerId)}
+        />
+      );
+    },
+    [handleSelect, selectedModel, selectedProvider],
+  );
 
   return (
     <BottomSheetScaffold
@@ -141,54 +187,38 @@ export function ModelDrawer({
       }
       onClose={onClose}
     >
-      <ScrollView
-        className="pb-2"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {!isLoaded && loading ? (
-          <View className="items-center py-16">
-            <ActivityIndicator color={colors.primary} size="large" />
-          </View>
-        ) : filtered.length === 0 ? (
-          <View className="items-center py-16">
-            <Text className="text-[14px]" style={{ color: colors.secondaryText }}>
-              {providers.length === 0 ? t.modelPickerOffline : t.discoverNoResults}
-            </Text>
-          </View>
-        ) : (
-          filtered.map((provider) => (
-            <View className="mb-3" key={provider.id}>
+      {!isLoaded && loading ? (
+        <View className="items-center py-16">
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : filtered.length === 0 ? (
+        <View className="items-center py-16">
+          <Text className="text-[14px]" style={{ color: colors.secondaryText }}>
+            {providers.length === 0 ? t.modelPickerOffline : t.discoverNoResults}
+          </Text>
+        </View>
+      ) : (
+        <SectionList
+          showsVerticalScrollIndicator
+          contentContainerStyle={{ paddingBottom: 24, paddingTop: 4 }}
+          keyExtractor={(item) => `${item.providerId}-${item.id}`}
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderItem}
+          sections={sections}
+          stickySectionHeadersEnabled={false}
+          style={{ flexShrink: 1 }}
+          renderSectionHeader={({ section }) => (
+            <View className="mb-3">
               <SelectionSectionLabel
-                leading={<ProviderLogo logo={provider.logo} providerId={provider.id} size={16} />}
-                title={provider.name}
+                leading={
+                  <ProviderLogo logo={section.logo} providerId={section.providerId} size={16} />
+                }
+                title={section.title}
               />
-              <View className="px-5">
-                {provider.children.map((model, index) => {
-                  const isSelected = selectedModel === model.id;
-                  const tags = getAbilityTags(model);
-
-                  return (
-                    <SelectionListItem
-                      className={index === provider.children.length - 1 ? '' : 'mb-2'}
-                      key={model.id}
-                      selected={isSelected}
-                      title={model.displayName || model.id}
-                      leading={
-                        <ProviderLogo logo={provider.logo} providerId={provider.id} size={24} />
-                      }
-                      meta={tags.map((tag) => (
-                        <MetaTag key={tag} label={tag} />
-                      ))}
-                      onPress={() => handleSelect(model.id, provider.id)}
-                    />
-                  );
-                })}
-              </View>
             </View>
-          ))
-        )}
-      </ScrollView>
+          )}
+        />
+      )}
     </BottomSheetScaffold>
   );
 }

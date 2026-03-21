@@ -7,9 +7,12 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
 import { type LobeDocument } from '@/types/document';
 
 import { FileService } from '../file';
+import { AuthorizedResourceResolver, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
 
@@ -19,6 +22,10 @@ export class DocumentService {
   private documentModel: DocumentModel;
   private fileService: FileService;
   private db: LobeChatDatabase;
+  private resourceModel: ResourceModel;
+  private resolver: AuthorizedResourceResolver;
+  private spaceModel: SpaceModel;
+  private treeGuard: TreeGuard;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.userId = userId;
@@ -26,7 +33,45 @@ export class DocumentService {
     this.fileModel = new FileModel(db, userId);
     this.fileService = new FileService(db, userId);
     this.documentModel = new DocumentModel(db, userId);
+    this.resourceModel = new ResourceModel(db, userId);
+    this.resolver = new AuthorizedResourceResolver(db, userId);
+    this.spaceModel = new SpaceModel(db, userId);
+    this.treeGuard = new TreeGuard(db, userId);
   }
+
+  private resolveWriteSpaceId = async (params: {
+    knowledgeBaseId?: string;
+    parentId?: string;
+    spaceId?: string;
+  }) => {
+    if (params.knowledgeBaseId) {
+      const knowledgeBase = await this.resolver.requireKnowledgeBase(
+        params.knowledgeBaseId,
+        'create_child',
+      );
+      return knowledgeBase.spaceId || (await this.spaceModel.getOrCreatePersonalSpace()).id;
+    }
+
+    if (params.parentId) {
+      const parent = await this.resolver.requireDocument(params.parentId, 'create_child');
+      return parent.spaceId || (await this.spaceModel.getOrCreatePersonalSpace()).id;
+    }
+
+    if (params.spaceId) {
+      const space = await this.spaceModel.findAccessibleSpaceById(params.spaceId);
+      if (!space?.id) {
+        throw new Error('SPACE_ACCESS_DENIED');
+      }
+
+      if (space.membershipRole === 'viewer') {
+        throw new Error('SPACE_WRITE_DENIED');
+      }
+
+      return space.id;
+    }
+
+    return (await this.spaceModel.getOrCreatePersonalSpace()).id;
+  };
 
   /**
    * Create a document
@@ -40,6 +85,7 @@ export class DocumentService {
     parentId?: string;
     rawData?: string;
     slug?: string;
+    spaceId?: string;
     title: string;
   }): Promise<DocumentItem> {
     const {
@@ -50,8 +96,20 @@ export class DocumentService {
       metadata,
       knowledgeBaseId,
       parentId,
+      spaceId: inputSpaceId,
       slug,
     } = params;
+
+    const spaceId = await this.resolveWriteSpaceId({
+      knowledgeBaseId,
+      parentId,
+      spaceId: inputSpaceId,
+    });
+
+    await this.treeGuard.assertParentAssignment({
+      currentSpaceId: spaceId,
+      parentId,
+    });
 
     // Calculate character and line counts
     const totalCharCount = content?.length || 0;
@@ -65,16 +123,34 @@ export class DocumentService {
       const file = await this.fileModel.create(
         {
           fileType,
-          knowledgeBaseId,
           metadata,
+          knowledgeBaseId,
           name: title,
           parentId,
           size: totalCharCount,
+          spaceId,
           url: `internal://document/placeholder`, // Placeholder URL
         },
         false, // Do not insert to global files
       );
       fileId = file.id;
+
+      const fileRegistry = await this.resourceModel.ensureResourceRegistry({
+        createdBy: this.userId,
+        kind: 'file',
+        localId: file.id,
+        spaceId,
+      });
+
+      await this.fileModel.update(file.id, {
+        resourceUid: fileRegistry.resourceUid,
+        spaceId,
+      } as any);
+
+      await this.resourceModel.ensureOwnerPermission({
+        resourceUid: fileRegistry.resourceUid,
+        spaceId,
+      });
     }
 
     // Store knowledgeBaseId in metadata for folders (which don't have fileId)
@@ -91,12 +167,30 @@ export class DocumentService {
       metadata: finalMetadata,
       pages: undefined,
       parentId,
+      spaceId,
       slug,
       source: 'document',
       sourceType: 'api',
       title,
       totalCharCount,
       totalLineCount,
+    });
+
+    const registry = await this.resourceModel.ensureResourceRegistry({
+      createdBy: this.userId,
+      kind: 'document',
+      localId: document.id,
+      spaceId,
+    });
+
+    await this.documentModel.update(document.id, {
+      resourceUid: registry.resourceUid,
+      spaceId,
+    } as any);
+
+    await this.resourceModel.ensureOwnerPermission({
+      resourceUid: registry.resourceUid,
+      spaceId,
     });
 
     return document;
@@ -114,6 +208,7 @@ export class DocumentService {
       knowledgeBaseId?: string;
       metadata?: Record<string, any>;
       parentId?: string;
+      spaceId?: string;
       slug?: string;
       title: string;
     }>,
@@ -140,6 +235,7 @@ export class DocumentService {
    * Get document by ID
    */
   async getDocumentById(id: string) {
+    await this.resolver.requireDocument(id, 'read_metadata');
     return this.documentModel.findById(id);
   }
 
@@ -305,6 +401,15 @@ export class DocumentService {
       title?: string;
     },
   ) {
+    const currentDocument = await this.resolver.requireDocument(id, 'move');
+
+    if (params.parentId !== undefined) {
+      await this.treeGuard.assertParentAssignment({
+        currentSpaceId: currentDocument.spaceId,
+        parentId: params.parentId || null,
+      });
+    }
+
     const updates: any = {};
 
     if (params.content !== undefined) {
@@ -387,12 +492,32 @@ export class DocumentService {
         filename: title,
         metadata: fileDocument.metadata,
         parentId: file.parentId,
+        spaceId: file.spaceId,
         source: file.url,
         sourceType: 'file',
         title,
         totalCharCount: cleanContent.length,
         totalLineCount: cleanContent.split('\n').length,
       });
+
+      if (file.spaceId) {
+        const registry = await this.resourceModel.ensureResourceRegistry({
+          createdBy: this.userId,
+          kind: 'document',
+          localId: document.id,
+          spaceId: file.spaceId,
+        });
+
+        await this.documentModel.update(document.id, {
+          resourceUid: registry.resourceUid,
+          spaceId: file.spaceId,
+        } as any);
+
+        await this.resourceModel.ensureOwnerPermission({
+          resourceUid: registry.resourceUid,
+          spaceId: file.spaceId,
+        });
+      }
 
       return document as LobeDocument;
     } catch (error) {
@@ -436,12 +561,32 @@ export class DocumentService {
         metadata: fileDocument.metadata,
         pages: fileDocument.pages,
         parentId: file.parentId,
+        spaceId: file.spaceId,
         source: file.url,
         sourceType: 'file',
         title,
         totalCharCount: fileDocument.totalCharCount,
         totalLineCount: fileDocument.totalLineCount,
       });
+
+      if (file.spaceId) {
+        const registry = await this.resourceModel.ensureResourceRegistry({
+          createdBy: this.userId,
+          kind: 'document',
+          localId: document.id,
+          spaceId: file.spaceId,
+        });
+
+        await this.documentModel.update(document.id, {
+          resourceUid: registry.resourceUid,
+          spaceId: file.spaceId,
+        } as any);
+
+        await this.resourceModel.ensureOwnerPermission({
+          resourceUid: registry.resourceUid,
+          spaceId: file.spaceId,
+        });
+      }
 
       return document as LobeDocument;
     } catch (error) {

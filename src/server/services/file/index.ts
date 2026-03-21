@@ -7,6 +7,7 @@ import { serverDBEnv } from '@/config/db';
 import { FileModel } from '@/database/models/file';
 import { type FileItem } from '@/database/schemas';
 import { appEnv } from '@/envs/app';
+import { AuthorizedResourceResolver } from '@/server/services/resource';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { createFileServiceModule } from './impls';
@@ -19,12 +20,14 @@ import { type FileServiceImpl } from './impls/type';
 export class FileService {
   private userId: string;
   private fileModel: FileModel;
+  private resolver: AuthorizedResourceResolver;
 
   private impl: FileServiceImpl;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.userId = userId;
     this.fileModel = new FileModel(db, userId);
+    this.resolver = new AuthorizedResourceResolver(db, userId);
     this.impl = createFileServiceModule(db);
   }
 
@@ -332,10 +335,7 @@ export class FileService {
   async downloadFileToLocal(
     fileId: string,
   ): Promise<{ cleanup: () => void; file: FileItem; filePath: string }> {
-    const file = await this.fileModel.findById(fileId);
-    if (!file) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
-    }
+    const file = (await this.resolver.requireFile(fileId, 'read_content')) as FileItem;
 
     let content: Uint8Array | undefined;
     try {

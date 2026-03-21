@@ -8,7 +8,6 @@ import { eq, inArray } from 'drizzle-orm';
 import { after } from 'next/server';
 import { z } from 'zod';
 
-import { MessageModel } from '@/database/models/message';
 import { TopicModel } from '@/database/models/topic';
 import { TopicShareModel } from '@/database/models/topicShare';
 import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
@@ -16,7 +15,7 @@ import { TopicImporterRepo } from '@/database/repositories/topicImporter';
 import { agents, chatGroups, chatGroupsAgents } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { SystemAgentService } from '@/server/services/systemAgent';
+import { TopicTitleService } from '@/server/services/topicTitle';
 import { type BatchTaskResult } from '@/types/service';
 
 import {
@@ -24,7 +23,6 @@ import {
   resolveAgentIdFromSession,
   resolveContext,
 } from './_helpers/resolveContext';
-import { pickLatestTitleContext } from './_helpers/titleContext';
 import { basicContextSchema } from './_schema/context';
 
 const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -177,6 +175,17 @@ export const topicRouter = router({
 
       const data = await ctx.topicModel.create({ ...rest, sessionId: resolved.sessionId });
 
+      if ((rest.messages?.length ?? 0) > 0) {
+        after(async () => {
+          try {
+            const topicTitleService = new TopicTitleService(ctx.serverDB, ctx.userId);
+            await topicTitleService.summarizeTopicTitle({ topicId: data.id });
+          } catch (error) {
+            console.error('[topic.createTopic] auto topic title generation failed:', error);
+          }
+        });
+      }
+
       return data.id;
     }),
 
@@ -313,22 +322,13 @@ export const topicRouter = router({
   }),
 
   generateTopicTitle: topicProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ force: z.boolean().optional().default(false), id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
-      const messages = await messageModel.query({ topicId: input.id });
-      const titleContext = pickLatestTitleContext(messages);
-
-      if (!titleContext) return null;
-
-      const systemAgent = new SystemAgentService(ctx.serverDB, ctx.userId);
-      const title = await systemAgent.generateTopicTitle(titleContext);
-
-      if (!title) return null;
-
-      await ctx.topicModel.update(input.id, { title });
-
-      return title;
+      const topicTitleService = new TopicTitleService(ctx.serverDB, ctx.userId);
+      return topicTitleService.summarizeTopicTitle({
+        force: input.force,
+        topicId: input.id,
+      });
     }),
 
   importTopic: topicProcedure
@@ -481,12 +481,12 @@ export const topicRouter = router({
           return {
             agent: null,
             group: groupInfo ?? null,
-          id: topic.id,
-          sessionId: topic.groupId,
-          tagId: topic.tagId,
-          title: topic.title,
-          type: 'group' as const,
-          updatedAt: topic.updatedAt,
+            id: topic.id,
+            sessionId: topic.groupId,
+            tagId: topic.tagId,
+            title: topic.title,
+            type: 'group' as const,
+            updatedAt: topic.updatedAt,
           };
         }
 

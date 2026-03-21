@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { buildResourceFolderPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
 export interface UseFileItemClickOptions {
@@ -25,8 +26,11 @@ export const useFileItemClick = ({
 }: UseFileItemClickOptions) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const setMode = useResourceManagerStore((s) => s.setMode);
-  const setCurrentViewItemId = useResourceManagerStore((s) => s.setCurrentViewItemId);
+  const [setMode, setCurrentViewItemId, spaceId] = useResourceManagerStore((s) => [
+    s.setMode,
+    s.setCurrentViewItemId,
+    s.spaceId,
+  ]);
 
   const handleClick = useCallback(() => {
     if (isFolder) {
@@ -40,7 +44,7 @@ export const useFileItemClick = ({
         newParams.delete('file');
 
         const queryString = newParams.toString();
-        const basePath = `/resource/library/${libraryId}/${folderSlug}`;
+        const basePath = buildResourceFolderPath(spaceId, libraryId, folderSlug);
         navigate(queryString ? `${basePath}?${queryString}` : basePath);
       }
     } else if (isPage) {
@@ -72,7 +76,20 @@ export const useFileItemClick = ({
       // Call onOpen if provided for backwards compatibility
       onOpen?.(id);
     }
-  }, [isFolder, slug, id, libraryId, isPage, navigate, searchParams, setSearchParams, setMode, setCurrentViewItemId, onOpen]);
+  }, [
+    id,
+    isFolder,
+    isPage,
+    libraryId,
+    navigate,
+    onOpen,
+    searchParams,
+    setCurrentViewItemId,
+    setMode,
+    setSearchParams,
+    slug,
+    spaceId,
+  ]);
 
   return handleClick;
 };

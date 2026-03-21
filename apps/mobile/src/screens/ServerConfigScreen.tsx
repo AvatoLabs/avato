@@ -25,8 +25,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
@@ -46,16 +46,15 @@ import {
   setApiUrl,
   testConnection,
 } from '../lib/server';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
-interface Props {
-  navigation: any;
-  route?: any;
-}
-
-export default function ServerConfigScreen({ navigation, route }: Props) {
+export default function ServerConfigScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<'ServerConfig'>) {
   const isFirstLaunch = route?.params?.firstLaunch ?? false;
   const insets = useSafeAreaInsets();
   const { t } = useI18n();

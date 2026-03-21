@@ -221,15 +221,35 @@ export const mobileRoutes: RouteObject[] = [
       // Resource routes (Files & Knowledge Base)
       {
         children: [
-          // Home routes (resource list)
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource'),
+              'Mobile > Resource > Redirect',
+            ),
+            index: true,
+          },
           {
             children: [
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/resource/(home)'),
-                  'Mobile > Resource > Home',
+                  () => import('@/routes/(main)/resource/shared'),
+                  'Mobile > Resource > Shared',
                 ),
-                index: true,
+                path: 'shared',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/(home)'),
+                  'Mobile > Resource > Space Home',
+                ),
+                path: 'space/:spaceId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/space/[spaceId]/settings'),
+                  'Mobile > Resource > Space Settings',
+                ),
+                path: 'space/:spaceId/settings',
               },
             ],
             element: dynamicElement(
@@ -237,7 +257,6 @@ export const mobileRoutes: RouteObject[] = [
               'Mobile > Resource > Home > Layout',
             ),
           },
-          // Library routes (knowledge base detail)
           {
             children: [
               {
@@ -260,6 +279,29 @@ export const mobileRoutes: RouteObject[] = [
               'Mobile > Resource > Library > Layout',
             ),
             path: 'library/:id',
+          },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library'),
+                  'Mobile > Resource > Space Library',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/[slug]'),
+                  'Mobile > Resource > Space Library > Slug',
+                ),
+                path: ':slug',
+              },
+            ],
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource/library/_layout'),
+              'Mobile > Resource > Space Library > Layout',
+            ),
+            path: 'space/:spaceId/library/:id',
           },
         ],
         element: dynamicElement(
@@ -370,5 +412,17 @@ export const mobileRoutes: RouteObject[] = [
       'Mobile > Share > Topic > Layout',
     ),
     path: '/share/t',
+  },
+  {
+    children: [
+      {
+        element: dynamicElement(
+          () => import('@/routes/share/r/[token]'),
+          'Mobile > Share > Resource',
+        ),
+        path: ':token',
+      },
+    ],
+    path: '/share/r',
   },
 ];

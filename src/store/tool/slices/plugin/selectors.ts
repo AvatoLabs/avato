@@ -3,6 +3,7 @@ import { type LobeChatPluginManifest } from '@lobehub/chat-plugin-sdk';
 import { uniq } from 'es-toolkit/compat';
 
 import { type InstallPluginMeta, type LobeToolCustomPlugin } from '@/types/tool/plugin';
+import { normalizePluginAuthor } from '@/utils/normalizePluginAuthor';
 
 import { type ToolStoreState } from '../../initialState';
 
@@ -60,7 +61,7 @@ const installedPluginMetaList = (s: ToolStoreState) =>
     // Filter out stdio MCP plugins on non-desktop (stdio requires Electron IPC)
     .filter((p) => isDesktop || p.customParams?.mcp?.type !== 'stdio')
     .map<InstallPluginMeta>((p) => ({
-      author: p.manifest?.author,
+      author: normalizePluginAuthor(p.manifest?.author),
       createdAt: p.manifest?.createdAt || (p.manifest as any)?.createAt,
       homepage: p.manifest?.homepage,
       identifier: p.identifier,

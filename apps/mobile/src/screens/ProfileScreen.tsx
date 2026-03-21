@@ -140,6 +140,7 @@ export default function ProfileScreen({ navigation }: any) {
   const userAvatar = useUserStore((s) => s.avatar);
   const userEmail = useUserStore((s) => s.email);
   const userFullName = useUserStore((s) => s.fullName);
+  const userId = useUserStore((s) => s.profile?.id);
   const username = useUserStore((s) => s.username);
   const fetchUser = useUserStore((s) => s.fetchUser);
   const isUserLoaded = useUserStore((s) => s.isLoaded);
@@ -181,6 +182,17 @@ export default function ProfileScreen({ navigation }: any) {
   );
 
   const [defaultModel, setDefaultModel] = useState<string>('');
+
+  const serverDisplay = useMemo(() => {
+    if (!displayServerUrl) return '';
+
+    try {
+      const parsed = new URL(displayServerUrl);
+      return parsed.host || displayServerUrl;
+    } catch {
+      return displayServerUrl;
+    }
+  }, [displayServerUrl]);
 
   const loadDefaultModel = useCallback(async () => {
     try {
@@ -341,7 +353,9 @@ export default function ProfileScreen({ navigation }: any) {
               defaultModel={defaultModel || t.settingsNotConfigured}
               isConnected={isConnected}
               providerCount={providerCount}
+              serverDisplay={serverDisplay}
               userAvatar={userAvatar}
+              userId={userId}
               userName={userName || t.meUser || 'User'}
               onPress={() => navigation?.navigate?.('ProfileEdit')}
               onPressModel={() => navigation?.navigate?.('ModelPicker')}

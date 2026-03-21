@@ -672,6 +672,27 @@
       "when": 1773931025915,
       "tag": "0095_rename_session_tags_to_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1774091011796,
+      "tag": "0096_motionless_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1774176000000,
+      "tag": "0097_upload_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1774176100000,
+      "tag": "0098_knowledge_base_files_space_id",
+      "breakpoints": true
     }
   ],
   "version": "6"

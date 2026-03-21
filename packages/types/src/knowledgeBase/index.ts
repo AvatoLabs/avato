@@ -7,8 +7,9 @@ export enum KnowledgeBaseTabs {
 }
 
 export interface KnowledgeBaseItem {
-  avatar: string | null;
+  authzEpoch?: number;
 
+  avatar: string | null;
   createdAt: Date;
   description?: string | null;
   enabled?: boolean;
@@ -18,8 +19,10 @@ export interface KnowledgeBaseItem {
   isPublic: boolean | null;
 
   name: string;
+  resourceUid?: string | null;
 
   settings: any;
+  spaceId?: string | null;
   // different types of knowledge bases need to be distinguished
   type: string | null;
   updatedAt: Date;
@@ -29,6 +32,7 @@ export interface CreateKnowledgeBaseParams {
   avatar?: string;
   description?: string;
   name: string;
+  spaceId?: string;
 }
 
 export enum KnowledgeType {

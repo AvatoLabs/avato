@@ -59,6 +59,7 @@ import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type {
+  AiProviderRuntimeState,
   GenerationBatch,
   GenerationItem,
   ImageGenerationParams,
@@ -78,6 +79,57 @@ const ARTWORK_POLL_MAX_ATTEMPTS = 60;
 const ARTWORK_POLL_MAX_DELAY_MS = 15000;
 
 type ArtworkTaskStatus = 'pending' | 'processing' | 'success' | 'error';
+
+function buildImageProviderList(state?: AiProviderRuntimeState): ImageProviderWithModels[] {
+  if (!state) return [];
+
+  const imageProviders = Array.isArray(state.enabledImageAiProviders)
+    ? state.enabledImageAiProviders
+    : [];
+  const imageModels = Array.isArray(state.enabledAiModels)
+    ? state.enabledAiModels.filter((model) => model.type === 'image')
+    : [];
+
+  const providerMap = new Map<string, ImageProviderWithModels>();
+  const providerOrder = new Map<string, number>();
+  const modelSeenByProvider = new Map<string, Set<string>>();
+
+  for (const [index, provider] of imageProviders.entries()) {
+    providerOrder.set(provider.id, index);
+    providerMap.set(provider.id, {
+      children: [],
+      id: provider.id,
+      logo: provider.logo,
+      name: provider.name || provider.id,
+    });
+    modelSeenByProvider.set(provider.id, new Set<string>());
+  }
+
+  for (const model of imageModels) {
+    const providerId = model.providerId;
+    if (!providerMap.has(providerId)) continue;
+
+    const seen = modelSeenByProvider.get(providerId)!;
+    if (seen.has(model.id)) continue;
+    seen.add(model.id);
+
+    providerMap.get(providerId)!.children.push({
+      displayName: model.displayName || model.id,
+      id: model.id,
+      parameters: model.parameters,
+      type: 'image',
+    });
+  }
+
+  return [...providerMap.values()]
+    .filter((provider) => provider.children.length > 0)
+    .sort((left, right) => {
+      return (
+        (providerOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+        (providerOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+      );
+    });
+}
 
 function parseRatio(r: string) {
   const [a, b] = r.split(':').map(Number);
@@ -196,6 +248,30 @@ function isGenerationDisplaySuccess(generation: GenerationItem) {
 function isGenerationPending(generation: GenerationItem) {
   const status = normalizeGenerationTaskStatus(generation.task?.status);
   return !!generation.asyncTaskId && status !== 'error' && !isGenerationDisplaySuccess(generation);
+}
+
+function getGenerationTaskErrorDetail(generation: GenerationItem) {
+  const error = generation.task?.error;
+  if (!error) return undefined;
+
+  if (typeof error.message === 'string' && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (typeof error.body === 'string' && error.body.trim()) {
+    return error.body.trim();
+  }
+
+  if (
+    error.body &&
+    typeof error.body === 'object' &&
+    typeof error.body.detail === 'string' &&
+    error.body.detail.trim()
+  ) {
+    return error.body.detail.trim();
+  }
+
+  return undefined;
 }
 
 function applyRatioToDimensions(ratio: string, base = 1024) {
@@ -566,33 +642,7 @@ export default function ArtworkScreen({
       if (!isConnected) return;
       try {
         const state = await aiProviderApi.getRuntimeState();
-        const enabledModels = state?.enabledAiModels ?? [];
-        const enabledProviders = state?.enabledAiProviders ?? [];
-
-        // Filter image models and group by provider
-        const imgModels = enabledModels.filter((m: any) => m.type === 'image');
-        const providerMap = new Map<string, ImageProviderWithModels>();
-
-        for (const m of imgModels) {
-          const pid = m.providerId;
-          if (!providerMap.has(pid)) {
-            const pInfo = enabledProviders.find((p: any) => p.id === pid);
-            providerMap.set(pid, {
-              id: pid,
-              name: pInfo?.name || pid,
-              logo: pInfo?.logo,
-              children: [],
-            });
-          }
-          providerMap.get(pid)!.children.push({
-            id: m.id,
-            displayName: m.displayName || m.id,
-            parameters: m.parameters,
-            type: 'image',
-          });
-        }
-
-        const imgProviders = Array.from(providerMap.values());
+        const imgProviders = buildImageProviderList(state);
         setImageProviders(imgProviders);
 
         const preferredProvider = restoredConfig?.provider || configRef.current.provider;
@@ -1848,6 +1898,7 @@ function BatchCard({
           const status = normalizeGenerationTaskStatus(gen.task.status);
           const isDone = isGenerationDisplaySuccess(gen);
           const isErr = status === 'error';
+          const errorDetail = getGenerationTaskErrorDetail(gen);
           return (
             <View
               key={gen.id}
@@ -1874,6 +1925,20 @@ function BatchCard({
                   <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '600' }}>
                     {t.artworkError}
                   </Text>
+                  {errorDetail ? (
+                    <Text
+                      numberOfLines={3}
+                      style={{
+                        color: colors.secondaryText,
+                        fontSize: 10,
+                        lineHeight: 14,
+                        marginTop: 4,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {errorDetail}
+                    </Text>
+                  ) : null}
                 </View>
               ) : (
                 <View className="items-center">

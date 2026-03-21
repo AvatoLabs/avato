@@ -1,11 +1,12 @@
 'use client';
 
 import { memo, useLayoutEffect } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import NotFound from '@/components/404';
 import NProgress from '@/components/NProgress';
 import ResourceManager from '@/features/ResourceManager';
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import Container from '@/routes/(main)/resource/library/features/Container';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
@@ -13,9 +14,10 @@ import { useKnowledgeBaseItem } from '../features/hooks/useKnowledgeItem';
 import { useResourceManagerStore } from '../features/store';
 
 const MainContent = memo(() => {
-  const { id: knowledgeBaseId } = useParams<{ id: string }>();
+  const { id: knowledgeBaseId, spaceId } = useParams<{ id: string; spaceId?: string }>();
   const location = useLocation();
-  const setLibraryId = useResourceManagerStore((s) => s.setLibraryId);
+  const navigate = useNavigate();
+  const [setLibraryId, setSpaceId] = useResourceManagerStore((s) => [s.setLibraryId, s.setSpaceId]);
 
   // Load knowledge base data
   const { data, isLoading } = useKnowledgeBaseItem(knowledgeBaseId || '');
@@ -28,8 +30,17 @@ const MainContent = memo(() => {
     const isOnLibraryRoute = location.pathname.includes('/library/');
     if (isOnLibraryRoute) {
       setLibraryId(knowledgeBaseId);
+      setSpaceId(spaceId || data?.spaceId || undefined);
     }
-  }, [knowledgeBaseId, setLibraryId, location.pathname]);
+  }, [data?.spaceId, knowledgeBaseId, location.pathname, setLibraryId, setSpaceId, spaceId]);
+
+  useLayoutEffect(() => {
+    if (!knowledgeBaseId) return;
+
+    if (!spaceId && data?.spaceId) {
+      navigate(buildResourceLibraryPath(data.spaceId, knowledgeBaseId), { replace: true });
+    }
+  }, [data?.spaceId, knowledgeBaseId, navigate, spaceId]);
 
   // Sync file view mode from URL
   useInitFileCheck();

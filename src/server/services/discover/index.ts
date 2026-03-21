@@ -76,21 +76,31 @@ const log = debug('lobe-server:discover');
 export interface DiscoverServiceOptions {
   /** Access token from OIDC flow (legacy) */
   accessToken?: string;
+  /** User agent for marketplace M2M client registration */
+  userAgent?: string;
   /** User info for generating trusted client token */
   userInfo?: TrustedClientUserInfo;
 }
 
 export class DiscoverService {
+  private static m2mClientCredentials?: { clientId: string; clientSecret: string };
+  private static m2mClientPromise: Promise<{ clientId: string; clientSecret: string }> | null =
+    null;
+  private static m2mToken?: { accessToken: string; expiresAt: number };
+  private static m2mTokenPromise: Promise<string | undefined> | null = null;
+
   assistantStore = new AssistantStore();
   pluginStore = new PluginStore();
   market: MarketSDK;
+  private userAgent?: string;
 
   constructor(options: DiscoverServiceOptions = {}) {
-    const { accessToken, userInfo } = options;
+    const { accessToken, userAgent, userInfo } = options;
 
     // Use MarketService to initialize MarketSDK
     const marketService = new MarketService({ accessToken, userInfo });
     this.market = marketService.market;
+    this.userAgent = userAgent;
 
     log(
       'DiscoverService initialized with market baseURL: %s, hasAuth: %s, userId: %s',
@@ -98,6 +108,115 @@ export class DiscoverService {
       !!(accessToken || userInfo),
       userInfo?.userId,
     );
+  }
+
+  private getNormalizedMcpListParams(params: McpQueryParams = {}) {
+    const { category, locale, sort } = params;
+    const normalizedLocale = normalizeLocale(locale);
+    const shouldOmitCategory = [McpCategory.All, McpCategory.Discover].includes(
+      category as McpCategory,
+    );
+
+    return {
+      ...params,
+      category: shouldOmitCategory ? undefined : category,
+      locale: normalizedLocale,
+      sort: shouldOmitCategory ? McpSorts.Recommended : sort,
+    };
+  }
+
+  private getMcpListRequestOptions() {
+    return {
+      next: {
+        revalidate: CacheRevalidate.List,
+        tags: [CacheTag.Discover, CacheTag.MCP],
+      },
+    } satisfies RequestInit;
+  }
+
+  private isMissingBearerTokenError(error: unknown) {
+    if (!error || typeof error !== 'object') return false;
+
+    const marketError = error as {
+      errorBody?: { error?: string; error_description?: string };
+      message?: string;
+      status?: number;
+    };
+
+    const errorCode = marketError.errorBody?.error;
+    const errorDescription = marketError.errorBody?.error_description;
+    const message = marketError.message;
+
+    return (
+      marketError.status === 401 &&
+      errorCode === 'unauthorized' &&
+      (errorDescription === 'Missing bearer token' || message?.includes('Missing bearer token'))
+    );
+  }
+
+  private async getM2MClientCredentials() {
+    if (DiscoverService.m2mClientCredentials) return DiscoverService.m2mClientCredentials;
+    if (DiscoverService.m2mClientPromise) return DiscoverService.m2mClientPromise;
+
+    DiscoverService.m2mClientPromise = this.registerClient({
+      userAgent: this.userAgent,
+    })
+      .then((credentials) => {
+        DiscoverService.m2mClientCredentials = credentials;
+        return credentials;
+      })
+      .finally(() => {
+        DiscoverService.m2mClientPromise = null;
+      });
+
+    return DiscoverService.m2mClientPromise;
+  }
+
+  private async fetchFreshM2MAccessToken() {
+    const credentials = await this.getM2MClientCredentials();
+    const tokenInfo = await this.fetchM2MToken(credentials);
+
+    if (!tokenInfo.accessToken) {
+      DiscoverService.m2mToken = undefined;
+      DiscoverService.m2mClientCredentials = undefined;
+      return undefined;
+    }
+
+    const expiresAt = Date.now() + Math.max(tokenInfo.expiresIn - 60, 30) * 1000;
+    DiscoverService.m2mToken = {
+      accessToken: tokenInfo.accessToken,
+      expiresAt,
+    };
+
+    return tokenInfo.accessToken;
+  }
+
+  private async getM2MAccessToken() {
+    const now = Date.now();
+    if (DiscoverService.m2mToken && DiscoverService.m2mToken.expiresAt > now) {
+      return DiscoverService.m2mToken.accessToken;
+    }
+
+    if (DiscoverService.m2mTokenPromise) return DiscoverService.m2mTokenPromise;
+
+    DiscoverService.m2mTokenPromise = this.fetchFreshM2MAccessToken()
+      .catch(async (error) => {
+        log('getM2MAccessToken: refreshing token failed, retrying after re-register: %O', error);
+        DiscoverService.m2mClientCredentials = undefined;
+        return this.fetchFreshM2MAccessToken();
+      })
+      .finally(() => {
+        DiscoverService.m2mTokenPromise = null;
+      });
+
+    return DiscoverService.m2mTokenPromise;
+  }
+
+  private async getM2MMarketSDK() {
+    const accessToken = await this.getM2MAccessToken();
+    if (!accessToken) return undefined;
+
+    return new MarketService({ accessToken }).market;
   }
 
   async registerClient({ userAgent }: { userAgent?: string }) {
@@ -834,26 +953,24 @@ export class DiscoverService {
 
   getMcpList = async (params: McpQueryParams = {}): Promise<McpListResponse> => {
     log('getMcpList: params=%O', params);
-    const { category, locale, sort } = params;
-    const normalizedLocale = normalizeLocale(locale);
-    const shouldOmitCategory = [McpCategory.All, McpCategory.Discover].includes(
-      category as McpCategory,
-    );
+    const normalizedParams = this.getNormalizedMcpListParams(params);
+    const requestOptions = this.getMcpListRequestOptions();
 
-    const result = await this.market.plugins.getPluginList(
-      {
-        ...params,
-        category: shouldOmitCategory ? undefined : category,
-        locale: normalizedLocale,
-        sort: shouldOmitCategory ? McpSorts.Recommended : sort,
-      },
-      {
-        next: {
-          revalidate: CacheRevalidate.List,
-          tags: [CacheTag.Discover, CacheTag.MCP],
-        },
-      },
-    );
+    let result: McpListResponse;
+
+    try {
+      result = await this.market.plugins.getPluginList(normalizedParams, requestOptions);
+    } catch (error) {
+      if (!this.isMissingBearerTokenError(error)) throw error;
+
+      log('getMcpList: bearer token missing, retrying with server M2M token');
+
+      const fallbackMarket = await this.getM2MMarketSDK();
+      if (!fallbackMarket) throw error;
+
+      result = await fallbackMarket.plugins.getPluginList(normalizedParams, requestOptions);
+    }
+
     log('getMcpList: returning %d items on page %d', result.items.length, result.currentPage);
     return result;
   };

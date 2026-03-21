@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOADING_FLAT } from '@/const/message';
 import { mutate } from '@/libs/swr';
-import { messageService } from '@/services/message';
 import { topicService } from '@/services/topic';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
@@ -1058,25 +1057,16 @@ describe('topic action', () => {
     });
   });
   describe('autoRenameTopicTitle', () => {
-    it('should auto-rename the topic title based on the messages', async () => {
+    it('should force server-side smart rename for the topic', async () => {
       const { result } = renderHook(() => useChatStore());
       const topicId = 'topic-1';
-      const activeAgentId = 'test-session-id';
-      const messages = [{ id: 'message-1', content: 'Hello' }] as UIChatMessage[];
-
-      await act(async () => {
-        useChatStore.setState({ activeAgentId });
-      });
-
-      const getMessagesSpy = vi.spyOn(messageService, 'getMessages').mockResolvedValue(messages);
       const summaryTopicTitleSpy = vi.spyOn(result.current, 'summaryTopicTitle');
 
       await act(async () => {
         await result.current.autoRenameTopicTitle(topicId);
       });
 
-      expect(getMessagesSpy).toHaveBeenCalledWith({ agentId: activeAgentId, topicId });
-      expect(summaryTopicTitleSpy).toHaveBeenCalledWith(topicId, messages);
+      expect(summaryTopicTitleSpy).toHaveBeenCalledWith(topicId, [], { force: true });
     });
   });
 });

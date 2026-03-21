@@ -10,6 +10,7 @@
  *   POST /trpc/mobile/<procedure>  body: { json: input }
  */
 
+import { createSSEChunkParser } from '@lobechat/fetch-sse/sseParser';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import type {
@@ -71,8 +72,13 @@ const DEFAULT_UPLOAD_DIRECTORY = 'files';
 const MOBILE_UPLOAD_CACHE_DIR = `${FileSystem.cacheDirectory || ''}upload-cache/`;
 const MOBILE_DOWNLOAD_DIR = `${FileSystem.documentDirectory || FileSystem.cacheDirectory || ''}downloads/`;
 const COMMUNITY_MARKET_DEFAULT_PAGE_SIZE = 21;
+const COMMUNITY_MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
+const COMMUNITY_MARKET_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+const COMMUNITY_MARKET_MAX_RETRIES = 2;
+const COMMUNITY_MARKET_RETRY_DELAY_MS = 600;
+const COMMUNITY_MARKET_FALLBACK_LOCALE = 'en-US';
 
-const getCommunityMarketLocale = () => useI18n.getState().locale || 'en-US';
+const getCommunityMarketLocale = () => useI18n.getState().locale || COMMUNITY_MARKET_FALLBACK_LOCALE;
 
 const normalizeCommunityMarketPageSize = (pageSize?: number) => {
   if (!pageSize || Number.isNaN(pageSize) || pageSize <= 0) {
@@ -80,6 +86,146 @@ const normalizeCommunityMarketPageSize = (pageSize?: number) => {
   }
 
   return pageSize;
+};
+
+interface CommunityMarketCacheEntry<T> {
+  data: T;
+  fetchedAt: number;
+}
+
+interface CommunityMarketRequestOptions {
+  forceRefresh?: boolean;
+}
+
+interface CommunityMarketListResult {
+  currentPage: number;
+  items: MarketListItem[];
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+const communityMarketCache = new Map<string, CommunityMarketCacheEntry<unknown>>();
+const communityMarketInflight = new Map<string, Promise<unknown>>();
+
+const waitFor = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const buildCommunityMarketCacheKey = (
+  baseUrl: string,
+  scope: string,
+  params?: Record<string, unknown>,
+) => {
+  const normalizedParams = params
+    ? JSON.stringify(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, value]) => value !== undefined && value !== null && value !== '')
+            .sort(([left], [right]) => left.localeCompare(right)),
+        ),
+      )
+    : '';
+
+  return `${baseUrl}::${scope}::${normalizedParams}`;
+};
+
+const readCommunityMarketCache = <T>(key: string): CommunityMarketCacheEntry<T> | null => {
+  const entry = communityMarketCache.get(key);
+  if (!entry) return null;
+
+  if (Date.now() - entry.fetchedAt > COMMUNITY_MARKET_STALE_TTL_MS) {
+    communityMarketCache.delete(key);
+    return null;
+  }
+
+  return entry as CommunityMarketCacheEntry<T>;
+};
+
+const writeCommunityMarketCache = <T>(key: string, data: T) => {
+  communityMarketCache.set(key, {
+    data,
+    fetchedAt: Date.now(),
+  });
+};
+
+const isRetryableCommunityMarketError = (error: unknown) => {
+  const status =
+    typeof error === 'object' && error && 'status' in error
+      ? Number((error as { status?: number }).status)
+      : undefined;
+
+  if (!status || Number.isNaN(status)) return true;
+
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+};
+
+const fetchCommunityMarketWithRetry = async <T>(fetcher: () => Promise<T>): Promise<T> => {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= COMMUNITY_MARKET_MAX_RETRIES; attempt += 1) {
+    try {
+      return await fetcher();
+    } catch (error) {
+      lastError = error;
+
+      if (
+        attempt === COMMUNITY_MARKET_MAX_RETRIES ||
+        !isRetryableCommunityMarketError(error)
+      ) {
+        throw error;
+      }
+
+      await waitFor(COMMUNITY_MARKET_RETRY_DELAY_MS * 2 ** attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Community market request failed');
+};
+
+const shouldFallbackCommunityMarketLocale = (locale: string, error: unknown) => {
+  if (!locale || locale === COMMUNITY_MARKET_FALLBACK_LOCALE) return false;
+
+  const status =
+    typeof error === 'object' && error && 'status' in error
+      ? Number((error as { status?: number }).status)
+      : undefined;
+
+  return Boolean(status && !Number.isNaN(status) && status >= 500);
+};
+
+const requestCommunityMarket = async <T>(params: {
+  fetcher: () => Promise<T>;
+  options?: CommunityMarketRequestOptions;
+  scope: string;
+  values?: Record<string, unknown>;
+}): Promise<T> => {
+  const baseUrl = await getBaseUrl();
+  const key = buildCommunityMarketCacheKey(baseUrl, params.scope, params.values);
+  const cached = readCommunityMarketCache<T>(key);
+  const age = cached ? Date.now() - cached.fetchedAt : Number.POSITIVE_INFINITY;
+
+  if (!params.options?.forceRefresh && cached && age < COMMUNITY_MARKET_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const inflight = communityMarketInflight.get(key) as Promise<T> | undefined;
+  if (inflight) return inflight;
+
+  const next = (async () => {
+    try {
+      const data = await fetchCommunityMarketWithRetry(params.fetcher);
+      writeCommunityMarketCache(key, data);
+      return data;
+    } catch (error) {
+      if (cached) return cached.data;
+      throw error;
+    } finally {
+      communityMarketInflight.delete(key);
+    }
+  })();
+
+  communityMarketInflight.set(key, next);
+
+  return next;
 };
 
 const computeStringHash = (value: string) => {
@@ -390,12 +536,6 @@ interface MobileToolCallChunk {
   index?: number;
   thoughtSignature?: string;
   type?: string;
-}
-
-interface ParsedSSEChunk {
-  data: any;
-  event: string;
-  id?: string;
 }
 
 const mergeToolCallChunks = (origin: MobileToolCallChunk[], value: MobileToolCallChunk[]) => {
@@ -1278,55 +1418,6 @@ const stripTrailingTransportStopToken = (value: string) => {
   return lines.join('\n');
 };
 
-/**
- * Create a stateful SSE parser. The parser must be stateful because SSE fields
- * (id, event, data) often arrive in SEPARATE XHR onprogress chunks in React
- * Native, so `currentEvent` must persist across calls.
- */
-function createSSEParser() {
-  let lineBuffer = '';
-  let currentEvent = '';
-  let currentId = '';
-
-  return function parse(raw: string): ParsedSSEChunk[] {
-    const combined = lineBuffer + raw;
-    const lines = combined.split('\n');
-    lineBuffer = lines.pop() ?? '';
-
-    const chunks: ParsedSSEChunk[] = [];
-
-    for (const line of lines) {
-      const trimmed = line.replace(/\r$/, '');
-      if (trimmed.startsWith('id:')) {
-        currentId = trimmed.slice(3).trim();
-      } else if (trimmed.startsWith('event:')) {
-        currentEvent = trimmed.slice(6).trim();
-      } else if (trimmed.startsWith('data:')) {
-        const dataStr = trimmed.slice(5).trim();
-        if (!dataStr) continue;
-
-        let parsed: any;
-        try {
-          parsed = JSON.parse(dataStr);
-        } catch {
-          parsed = dataStr.replaceAll('\\n', '\n');
-        }
-
-        chunks.push({
-          data: parsed,
-          event: currentEvent || 'text',
-          id: currentId || undefined,
-        });
-      } else if (trimmed === '') {
-        currentEvent = '';
-        currentId = '';
-      }
-    }
-
-    return chunks;
-  };
-}
-
 const appendTextPart = (parts: MessageContentPart[], text: string): MessageContentPart[] => {
   if (!text) return parts;
 
@@ -1344,6 +1435,115 @@ const appendImagePart = (parts: MessageContentPart[], image: string): MessageCon
 ];
 
 const serializeContentParts = (parts: MessageContentPart[]) => JSON.stringify(parts);
+
+const getStreamErrorMessage = (payload: unknown) => {
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload.trim();
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return 'Unknown streaming error';
+  }
+
+  const errorPayload = payload as Record<string, any>;
+  const providerHint =
+    typeof errorPayload?.body?.provider === 'string' ? `[${errorPayload.body.provider}] ` : '';
+
+  const message =
+    errorPayload?.body?.error?.message ||
+    errorPayload?.body?.message ||
+    errorPayload?.body?.error?.errorMessage ||
+    errorPayload?.message ||
+    errorPayload?.error?.message ||
+    errorPayload?.errorType;
+
+  return typeof message === 'string' && message.trim()
+    ? `${providerHint}${message}`.trim()
+    : `${providerHint}Unknown streaming error`.trim();
+};
+
+const normalizeHeaderRecord = (value: unknown) => {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const entries = Object.entries(value).filter(([key, headerValue]) => {
+    return typeof key === 'string' && key.length > 0 && headerValue != null;
+  });
+
+  if (entries.length === 0) return undefined;
+
+  return entries.reduce<Record<string, string>>((acc, [key, headerValue]) => {
+    acc[key] = typeof headerValue === 'string' ? headerValue : String(headerValue);
+    return acc;
+  }, {});
+};
+
+const buildMarketCloudMcpManifest = (item: Record<string, any>) => {
+  const tools = Array.isArray(item.tools) ? item.tools : undefined;
+  const api =
+    Array.isArray(item.api) && item.api.length > 0
+      ? item.api
+      : tools?.map((tool) => ({
+          description: tool?.description || '',
+          name: tool?.name,
+          parameters: tool?.inputSchema || {},
+        }));
+
+  return {
+    api: Array.isArray(api) ? api : [],
+    author: item.author?.name || item.author || '',
+    createAt: item.createdAt || new Date().toISOString(),
+    homepage: item.homepage || '',
+    identifier: item.identifier,
+    manifest: item.manifestUrl || '',
+    meta: {
+      avatar: item.icon || item.avatar,
+      description: item.description,
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      title: item.name || item.identifier,
+    },
+    name: item.name || item.identifier,
+    type: 'mcp',
+    version: item.version,
+  };
+};
+
+const resolveMarketMcpConnection = (item: Record<string, any>) => {
+  const deploymentOptions = Array.isArray(item.deploymentOptions) ? item.deploymentOptions : [];
+
+  const httpOption =
+    deploymentOptions.find(
+      (option) => option?.connection?.url && option?.connection?.type === 'http',
+    ) ||
+    deploymentOptions.find((option) => option?.connection?.url && !option?.connection?.type);
+
+  if (httpOption?.connection?.url) {
+    const headers = normalizeHeaderRecord(httpOption.connection?.headers);
+
+    return {
+      ...(httpOption.connection?.auth ? { auth: httpOption.connection.auth } : {}),
+      ...(headers ? { headers } : {}),
+      type: 'http' as const,
+      url: httpOption.connection.url,
+    };
+  }
+
+  const stdioOption = deploymentOptions.find(
+    (option) =>
+      option?.connection?.type === 'stdio' ||
+      (!option?.connection?.type && !option?.connection?.url),
+  );
+
+  if (!stdioOption || !item.haveCloudEndpoint) return undefined;
+
+  const headers = normalizeHeaderRecord(stdioOption.connection?.headers);
+
+  return {
+    ...(stdioOption.connection?.auth ? { auth: stdioOption.connection.auth } : {}),
+    ...(headers ? { headers } : {}),
+    cloudEndPoint: item.haveCloudEndpoint,
+    type: 'cloud' as const,
+  };
+};
 
 export const aiChatApi = {
   /**
@@ -1370,6 +1570,7 @@ export const aiChatApi = {
       }
 
       return new Promise<StreamResult>((resolve, reject) => {
+        let didSettle = false;
         let allMessages = [...messages];
 
         if (shouldForceInlineImages(provider)) {
@@ -1379,7 +1580,7 @@ export const aiChatApi = {
 
         logFinalLastUserMessage(provider, allMessages);
 
-        if (options?.systemPrompt) {
+        if (options?.systemPrompt && !options?.sessionId) {
           allMessages.unshift({ role: 'system', content: options.systemPrompt });
         }
 
@@ -1444,7 +1645,19 @@ export const aiChatApi = {
         let reasoningParts: MessageContentPart[] = [];
         let rawToolCalls: MobileToolCallChunk[] = [];
         let rawTextBuffer = '';
-        const parseSSE = createSSEParser();
+        const parseSSE = createSSEChunkParser();
+
+        const rejectOnce = (error: Error) => {
+          if (didSettle) return;
+          didSettle = true;
+          reject(error);
+        };
+
+        const resolveOnce = (result: StreamResult) => {
+          if (didSettle) return;
+          didSettle = true;
+          resolve(result);
+        };
 
         const emitReasoningUpdate = () => {
           const hasReasoningImages = reasoningParts.some((part) => part.type === 'image');
@@ -1477,11 +1690,15 @@ export const aiChatApi = {
           });
         };
 
-        const processNewData = (newData: string) => {
-          const parsedChunks = parseSSE(newData);
+        const processNewData = (newData: string, options?: { flush?: boolean }) => {
+          const parsedChunks = parseSSE(newData, options);
 
           for (const chunk of parsedChunks) {
             switch (chunk.event) {
+              case 'error': {
+                rejectOnce(new Error(`AI chat failed: ${getStreamErrorMessage(chunk.data)}`));
+                return;
+              }
               case 'usage': {
                 if (chunk.data && typeof chunk.data === 'object') {
                   lastUsage = chunk.data;
@@ -1686,14 +1903,17 @@ export const aiChatApi = {
               : `AI chat failed: ${xhr.status}`;
             console.error('[aiChatApi]', msg);
             console.error('[aiChatApi] Full response body:', (xhr.responseText || '').slice(0, 1500));
-            reject(new Error(msg));
+            rejectOnce(new Error(msg));
             return;
           }
+          if (didSettle) return;
+
           const remaining = xhr.responseText.slice(processedLength);
-          if (remaining) processNewData(remaining);
-          processNewData('\n');
+          processNewData(remaining, { flush: true });
+          if (didSettle) return;
+
           const finalText = stripTrailingTransportStopToken(accText);
-          resolve({
+          resolveOnce({
             contentMetadata,
             images: accImages.length > 0 ? accImages : undefined,
             performance: lastPerformance,
@@ -1718,11 +1938,16 @@ export const aiChatApi = {
         };
 
         xhr.onerror = () => {
+          if (didSettle) return;
           const info = `status=${xhr.status} readyState=${xhr.readyState}`;
           console.error(`[aiChatApi] XHR onerror: ${info}`);
-          reject(new Error(`Network error (${info})`));
+          rejectOnce(new Error(`Network error (${info})`));
         };
-        xhr.ontimeout = () => reject(new Error(`AI chat timed out (${xhr.timeout}ms)`));
+        xhr.onabort = () => {
+          if (didSettle) return;
+          rejectOnce(new Error(signal?.aborted ? 'Request aborted' : 'Network request aborted'));
+        };
+        xhr.ontimeout = () => rejectOnce(new Error(`AI chat timed out (${xhr.timeout}ms)`));
 
         if (signal) {
           signal.addEventListener('abort', () => xhr.abort());
@@ -1783,7 +2008,8 @@ export const topicApi = {
   /** Server has no `favoriteTopic` — use `updateTopic` with favorite flag */
   favorite: (id: string, favorite = true) =>
     trpcMutate('topic.updateTopic', { id, value: { favorite } }),
-  generateTitle: (id: string) => trpcMutate<string | null>('topic.generateTopicTitle', { id }),
+  generateTitle: (id: string, options?: { force?: boolean }) =>
+    trpcMutate<string | null>('topic.generateTopicTitle', { force: options?.force, id }),
   update: (id: string, value: { favorite?: boolean; tagId?: string | null; title?: string }) =>
     trpcMutate('topic.updateTopic', { id, value }),
   search: (keywords: string) => trpcQuery<Topic[]>('topic.searchTopics', { keywords }),
@@ -2282,12 +2508,31 @@ const normalizeMarketCategoryItem = (item: any): MarketCategoryItem | null => {
 };
 
 const resolveMarketTotalCount = (result: {
+  currentPage?: number;
   items?: unknown[];
+  pageSize?: number;
   total?: number;
   totalCount?: number;
+  totalPages?: number;
 }) => {
   if (typeof result.totalCount === 'number') return result.totalCount;
   if (typeof result.total === 'number') return result.total;
+
+  if (typeof result.totalPages === 'number' && result.totalPages > 0) {
+    const resolvedPageSize =
+      typeof result.pageSize === 'number' && result.pageSize > 0
+        ? result.pageSize
+        : result.items?.length ?? 0;
+
+    const resolvedCurrentPage =
+      typeof result.currentPage === 'number' && result.currentPage > 0 ? result.currentPage : 1;
+
+    return Math.max(
+      Math.max(result.totalPages - 1, 0) * resolvedPageSize + (result.items?.length ?? 0),
+      resolvedCurrentPage * resolvedPageSize,
+    );
+  }
+
   return result.items?.length ?? 0;
 };
 
@@ -2297,7 +2542,7 @@ export const marketSkillApi = {
     page?: number;
     pageSize?: number;
     q?: string;
-  }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
     const input = {
       category: params?.category,
       locale: getCommunityMarketLocale(),
@@ -2308,8 +2553,33 @@ export const marketSkillApi = {
     };
 
     try {
-      const mcpResult = await trpcQuery<any>('market.getMcpList', input);
+      const mcpResult = await requestCommunityMarket({
+        fetcher: async () => {
+          try {
+            return await trpcQuery<any>('market.getMcpList', input);
+          } catch (error) {
+            if (!shouldFallbackCommunityMarketLocale(input.locale, error)) throw error;
+
+            return trpcQuery<any>('market.getMcpList', {
+              ...input,
+              locale: COMMUNITY_MARKET_FALLBACK_LOCALE,
+            });
+          }
+        },
+        options,
+        scope: 'market.getMcpList',
+        values: input,
+      });
+      const pageSize =
+        typeof mcpResult?.pageSize === 'number' && mcpResult.pageSize > 0
+          ? mcpResult.pageSize
+          : input.pageSize;
+
       return {
+        currentPage:
+          typeof mcpResult?.currentPage === 'number' && mcpResult.currentPage > 0
+            ? mcpResult.currentPage
+            : input.page,
         items: Array.isArray(mcpResult?.items)
           ? mcpResult.items.map((m: any) => ({
               ...m,
@@ -2322,7 +2592,12 @@ export const marketSkillApi = {
               name: m.meta?.title || m.name || m.title || m.identifier,
             }))
           : [],
+        pageSize,
         totalCount: resolveMarketTotalCount(mcpResult ?? {}),
+        totalPages:
+          typeof mcpResult?.totalPages === 'number' && mcpResult.totalPages > 0
+            ? mcpResult.totalPages
+            : Math.max(Math.ceil(resolveMarketTotalCount(mcpResult ?? {}) / pageSize), 1),
       };
     } catch (error) {
       throw error instanceof Error ? error : new Error('Failed to fetch MCP list');
@@ -2334,7 +2609,7 @@ export const marketSkillApi = {
     page?: number;
     pageSize?: number;
     q?: string;
-  }): Promise<{ items: MarketListItem[]; totalCount: number }> => {
+  }, options?: CommunityMarketRequestOptions): Promise<CommunityMarketListResult> => {
     const input = {
       category: params?.category,
       locale: getCommunityMarketLocale(),
@@ -2345,8 +2620,22 @@ export const marketSkillApi = {
     };
 
     try {
-      const result = await trpcQuery<any>('market.skill.getSkillList', input);
+      const result = await requestCommunityMarket({
+        fetcher: () => trpcQuery<any>('market.skill.getSkillList', input),
+        options,
+        scope: 'market.skill.getSkillList',
+        values: input,
+      });
+      const pageSize =
+        typeof result?.pageSize === 'number' && result.pageSize > 0
+          ? result.pageSize
+          : input.pageSize;
+
       return {
+        currentPage:
+          typeof result?.currentPage === 'number' && result.currentPage > 0
+            ? result.currentPage
+            : input.page,
         items: Array.isArray(result?.items)
           ? result.items.map((s: any) => ({
               ...s,
@@ -2358,7 +2647,12 @@ export const marketSkillApi = {
               name: s.name || s.meta?.title || s.identifier,
             }))
           : [],
+        pageSize,
         totalCount: resolveMarketTotalCount(result ?? {}),
+        totalPages:
+          typeof result?.totalPages === 'number' && result.totalPages > 0
+            ? result.totalPages
+            : Math.max(Math.ceil(resolveMarketTotalCount(result ?? {}) / pageSize), 1),
       };
     } catch (error) {
       throw error instanceof Error ? error : new Error('Failed to fetch skill list');
@@ -2432,13 +2726,45 @@ export const marketSkillApi = {
       return;
     }
 
+    const marketMcpDetail =
+      item._source === 'mcp'
+        ? await marketSkillApi.getMcpDetail(item.identifier).catch(() => undefined)
+        : undefined;
+    const marketMcpData =
+      item._source === 'mcp' ? ({ ...item, ...marketMcpDetail } as Record<string, any>) : undefined;
+    const connection = marketMcpData ? resolveMarketMcpConnection(marketMcpData) : undefined;
+
     let manifest = item.manifest;
     // Fetch manifest if missing or empty (no api/tools entries)
     const hasTools = manifest && (
       (Array.isArray(manifest.api) && manifest.api.length > 0) ||
       (Array.isArray(manifest.tools) && manifest.tools.length > 0)
     );
-    if (!hasTools && item.manifestUrl) {
+    if (!hasTools && connection?.type === 'cloud' && marketMcpData) {
+      manifest = buildMarketCloudMcpManifest(marketMcpData);
+    } else if (!hasTools && connection?.type === 'http') {
+      try {
+        manifest = await mcpApi.getStreamableMcpServerManifest({
+          ...(connection.auth ? { auth: connection.auth } : {}),
+          ...(connection.headers ? { headers: connection.headers } : {}),
+          identifier: item.identifier,
+          metadata: {
+            avatar: marketMcpData?.icon || marketMcpData?.avatar,
+            description: marketMcpData?.description,
+          },
+          url: connection.url,
+        });
+      } catch {
+        /* fall through to manifestUrl fetch */
+      }
+    }
+
+    if (
+      (!manifest ||
+        (!Array.isArray(manifest.api) && !Array.isArray(manifest.tools)) ||
+        (Array.isArray(manifest.api) && manifest.api.length === 0 && Array.isArray(manifest.tools) && manifest.tools.length === 0)) &&
+      item.manifestUrl
+    ) {
       try {
         const res = await fetch(item.manifestUrl);
         if (res.ok) {
@@ -2451,6 +2777,7 @@ export const marketSkillApi = {
 
     const customParams: Record<string, any> = {};
     if (item.manifestUrl) customParams.manifestUrl = item.manifestUrl;
+    if (connection) customParams.mcp = connection;
 
     await trpcMutate('plugin.createOrInstallPlugin', {
       customParams,
@@ -2470,18 +2797,42 @@ export const marketSkillApi = {
       locale: getCommunityMarketLocale(),
     }),
 
-  getCategories: () =>
-    trpcQuery<MarketCategoryItem[]>('market.skill.getSkillCategories', {
-      locale: getCommunityMarketLocale(),
+  getCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.skill.getSkillCategories', {
+          locale: getCommunityMarketLocale(),
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.skill.getSkillCategories',
+      values: { locale: getCommunityMarketLocale(), q: params?.q },
     }).then((items) =>
       (items ?? [])
         .map((item) => normalizeMarketCategoryItem(item))
         .filter((item): item is MarketCategoryItem => Boolean(item)),
     ),
 
-  getMcpCategories: () =>
-    trpcQuery<MarketCategoryItem[]>('market.getMcpCategories', {
-      locale: getCommunityMarketLocale(),
+  getMcpCategories: (
+    params?: {
+      q?: string;
+    },
+    options?: CommunityMarketRequestOptions,
+  ) =>
+    requestCommunityMarket({
+      fetcher: () =>
+        trpcQuery<MarketCategoryItem[]>('market.getMcpCategories', {
+          locale: getCommunityMarketLocale(),
+          q: params?.q,
+        }),
+      options,
+      scope: 'market.getMcpCategories',
+      values: { locale: getCommunityMarketLocale(), q: params?.q },
     }).then((items) =>
       (items ?? [])
         .map((item) => normalizeMarketCategoryItem(item))

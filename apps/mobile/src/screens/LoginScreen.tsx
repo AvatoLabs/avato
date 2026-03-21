@@ -13,6 +13,7 @@ import {
 } from '../lib/auth';
 import { useI18n } from '../lib/i18n';
 import { getApiUrl } from '../lib/server';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
@@ -120,7 +121,7 @@ const syncAfterMobileLogin = async () => {
   }
 };
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({ navigation }: RootStackScreenProps<'Login'>) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
@@ -291,8 +292,8 @@ export default function LoginScreen({ navigation }: any) {
           <TouchableOpacity
             activeOpacity={0.82}
             className="items-center rounded-2xl py-4"
-            style={{ backgroundColor: colors.primary }}
             disabled={isBusy}
+            style={{ backgroundColor: colors.primary }}
             onPress={() => void handlePrimaryPress()}
           >
             {isBusy ? (

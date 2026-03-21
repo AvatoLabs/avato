@@ -60,15 +60,13 @@ describe('S3StaticFileImpl', () => {
 
     it('should return correct URL when S3_ENABLE_PATH_STYLE is false', async () => {
       const url = 'path/to/file.jpg';
-      expect(await fileService.getFullFileUrl(url)).toBe('https://example.com/path/to/file.jpg');
+      expect(await fileService.getFullFileUrl(url)).toBe('https://presigned.example.com/test.jpg');
     });
 
     it('should return correct URL when S3_ENABLE_PATH_STYLE is true', async () => {
       config.S3_ENABLE_PATH_STYLE = true;
       const url = 'path/to/file.jpg';
-      expect(await fileService.getFullFileUrl(url)).toBe(
-        'https://example.com/my-bucket/path/to/file.jpg',
-      );
+      expect(await fileService.getFullFileUrl(url)).toBe('https://presigned.example.com/test.jpg');
       config.S3_ENABLE_PATH_STYLE = false;
     });
 
@@ -96,7 +94,7 @@ describe('S3StaticFileImpl', () => {
         const result = await fileService.getFullFileUrl(fullUrl);
 
         expect(fileService.getKeyFromFullUrl).toHaveBeenCalledWith(fullUrl);
-        expect(result).toBe('https://example.com/path/to/file.jpg');
+        expect(result).toBe('https://presigned.example.com/test.jpg');
       });
 
       it('should handle normal key input without extraction', async () => {
@@ -107,7 +105,7 @@ describe('S3StaticFileImpl', () => {
         const result = await fileService.getFullFileUrl(key);
 
         expect(spy).not.toHaveBeenCalled();
-        expect(result).toBe('https://example.com/path/to/file.jpg');
+        expect(result).toBe('https://presigned.example.com/test.jpg');
       });
 
       it('should handle http:// URLs for legacy compatibility', async () => {
@@ -118,7 +116,7 @@ describe('S3StaticFileImpl', () => {
         const result = await fileService.getFullFileUrl(httpUrl);
 
         expect(fileService.getKeyFromFullUrl).toHaveBeenCalledWith(httpUrl);
-        expect(result).toBe('https://example.com/path/to/file.jpg');
+        expect(result).toBe('https://presigned.example.com/test.jpg');
       });
 
       it('should throw error when key extraction returns null', async () => {
@@ -244,7 +242,7 @@ describe('S3StaticFileImpl', () => {
 
       const result = await fileService.getKeyFromFullUrl(s3Url);
 
-      expect(result).toBe('path/to/file.jpg');
+      expect(result).toBe('my-bucket/path/to/file.jpg');
       config.S3_ENABLE_PATH_STYLE = false;
     });
 

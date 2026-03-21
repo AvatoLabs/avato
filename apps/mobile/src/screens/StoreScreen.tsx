@@ -6,7 +6,6 @@
  * - Level 2 inside Explore: MCP | Skills
  * - Management actions stay inside Store via sheets/modals
  */
-import { useFocusEffect } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import {
   Box,
@@ -70,7 +69,6 @@ import {
 } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
-import { useSessionStore } from '../store/session';
 import { type ColorTokens, useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { AgentSkillItem, InstalledPlugin } from '../types';
@@ -112,6 +110,10 @@ interface StoreDetailItem {
   label: string;
   marketItem?: MarketListItem;
   name: string;
+}
+
+interface InstalledFetchOptions {
+  silent?: boolean;
 }
 
 const isEmojiAvatar = (avatar?: string) =>
@@ -1432,12 +1434,16 @@ export default function StoreScreen() {
   const [activeExploreCategory, setActiveExploreCategory] = useState(ALL_CATEGORY_KEY);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const searchRef = useRef<TextInput>(null);
 
   const [marketItems, setMarketItems] = useState<MarketListItem[]>([]);
-  const [marketCategories, setMarketCategories] = useState<MarketCategoryItem[]>([]);
+  const [marketCategoriesBySource, setMarketCategoriesBySource] = useState<
+    Record<ExploreSource, MarketCategoryItem[]>
+  >({
+    mcp: [],
+    skill: [],
+  });
   const [marketMcpTotal, setMarketMcpTotal] = useState(0);
   const [marketSkillTotal, setMarketSkillTotal] = useState(0);
   const [marketLoading, setMarketLoading] = useState(false);
@@ -1454,10 +1460,16 @@ export default function StoreScreen() {
   const [installedSkills, setInstalledSkills] = useState<AgentSkillItem[]>([]);
   const [uninstalledBuiltinTools, setUninstalledBuiltinTools] = useState<string[]>([]);
   const [installedLoading, setInstalledLoading] = useState(false);
+  const [installedCatalogLoaded, setInstalledCatalogLoaded] = useState(false);
   const marketSnapshotRef = useRef<Record<ExploreSource, MarketListItem[]>>({
     mcp: [],
     skill: [],
   });
+  const marketCategoryRequestIdRef = useRef<Record<ExploreSource, number>>({
+    mcp: 0,
+    skill: 0,
+  });
+  const installedRequestIdRef = useRef(0);
 
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [importUrlVisible, setImportUrlVisible] = useState(false);
@@ -1469,24 +1481,18 @@ export default function StoreScreen() {
   const installedIds = useMemo(
     () =>
       new Set([
-        ...MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
-          (item) => !uninstalledBuiltinTools.includes(item.identifier),
-        ).map((item) => item.identifier),
+        ...(installedCatalogLoaded
+          ? MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+              (item) => !uninstalledBuiltinTools.includes(item.identifier),
+            ).map((item) => item.identifier)
+          : []),
         ...installedPlugins.map((plugin) => plugin.identifier),
         ...installedSkills
           .map((skill) => skill.identifier)
           .filter((identifier): identifier is string => Boolean(identifier)),
       ]),
-    [installedPlugins, installedSkills, uninstalledBuiltinTools],
+    [installedCatalogLoaded, installedPlugins, installedSkills, uninstalledBuiltinTools],
   );
-
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setDebouncedQuery(searchQuery), 300);
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
-  }, [searchQuery]);
 
   useEffect(() => {
     if (!searchVisible) return;
@@ -1494,41 +1500,86 @@ export default function StoreScreen() {
     return () => clearTimeout(timer);
   }, [searchVisible]);
 
-  const fetchInstalled = useCallback(async () => {
-    setInstalledLoading(true);
-    try {
-      const [plugins, skills, builtinSkills, userState] = await Promise.all([
-        pluginApi.list().catch(() => []),
-        agentSkillApi.list().catch(() => []),
-        agentSkillApi.list('builtin').catch(() => []),
-        userApi.getState().catch(() => null),
-      ]);
-      const hiddenBuiltinIds = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
-      const builtinSkillList = Array.isArray(builtinSkills) ? builtinSkills : [];
-      const installedBuiltinSkills = builtinSkillList.filter((skill) => {
-        const identifier = skill.identifier || skill.id;
-        return Boolean(identifier) && !hiddenBuiltinIds.includes(identifier);
-      });
-
-      setInstalledPlugins(Array.isArray(plugins) ? plugins : []);
-      setInstalledSkills(
-        mergeSkillLists(Array.isArray(skills) ? skills : [], installedBuiltinSkills),
-      );
-      setUninstalledBuiltinTools(hiddenBuiltinIds);
-    } catch {
-      toast.show('error', t.errorNetwork);
-    } finally {
-      setInstalledLoading(false);
+  useEffect(() => {
+    if (searchQuery.trim().length === 0 && appliedSearchQuery.length > 0) {
+      setAppliedSearchQuery('');
     }
-  }, [t.errorNetwork, toast]);
+  }, [appliedSearchQuery, searchQuery]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void useSessionStore.getState().fetchSessions();
-    }, []),
+  const fetchInstalledSummary = useCallback(
+    async (options?: InstalledFetchOptions) => {
+      const requestId = ++installedRequestIdRef.current;
+
+      if (!options?.silent) {
+        setInstalledLoading(true);
+      }
+
+      try {
+        const [plugins, skills] = await Promise.all([
+          pluginApi.list().catch(() => []),
+          agentSkillApi.list().catch(() => []),
+        ]);
+
+        if (requestId !== installedRequestIdRef.current) return;
+
+        setInstalledPlugins(Array.isArray(plugins) ? plugins : []);
+        setInstalledSkills(Array.isArray(skills) ? skills : []);
+      } catch {
+        if (requestId !== installedRequestIdRef.current || options?.silent) return;
+        toast.show('error', t.errorNetwork);
+      } finally {
+        if (requestId === installedRequestIdRef.current && !options?.silent) {
+          setInstalledLoading(false);
+        }
+      }
+    },
+    [t.errorNetwork, toast],
+  );
+
+  const fetchInstalled = useCallback(
+    async (options?: InstalledFetchOptions) => {
+      const requestId = ++installedRequestIdRef.current;
+
+      if (!options?.silent) {
+        setInstalledLoading(true);
+      }
+
+      try {
+        const [plugins, skills, builtinSkills, userState] = await Promise.all([
+          pluginApi.list().catch(() => []),
+          agentSkillApi.list().catch(() => []),
+          agentSkillApi.list('builtin').catch(() => []),
+          userApi.getState().catch(() => null),
+        ]);
+        const hiddenBuiltinIds = userState?.settings?.tool?.uninstalledBuiltinTools ?? [];
+        const builtinSkillList = Array.isArray(builtinSkills) ? builtinSkills : [];
+        const installedBuiltinSkills = builtinSkillList.filter((skill) => {
+          const identifier = skill.identifier || skill.id;
+          return Boolean(identifier) && !hiddenBuiltinIds.includes(identifier);
+        });
+
+        if (requestId !== installedRequestIdRef.current) return;
+
+        setInstalledPlugins(Array.isArray(plugins) ? plugins : []);
+        setInstalledSkills(
+          mergeSkillLists(Array.isArray(skills) ? skills : [], installedBuiltinSkills),
+        );
+        setUninstalledBuiltinTools(hiddenBuiltinIds);
+        setInstalledCatalogLoaded(true);
+      } catch {
+        if (requestId !== installedRequestIdRef.current || options?.silent) return;
+        toast.show('error', t.errorNetwork);
+      } finally {
+        if (requestId === installedRequestIdRef.current && !options?.silent) {
+          setInstalledLoading(false);
+        }
+      }
+    },
+    [t.errorNetwork, toast],
   );
 
   const marketFetchError = marketSourceErrors[activeExploreSource];
+  const marketCategories = marketCategoriesBySource[activeExploreSource];
 
   const snapshotCategories = mergeCategoryBuckets(
     deriveCategoriesFromItems(marketSnapshotRef.current[activeExploreSource], activeExploreSource),
@@ -1538,11 +1589,11 @@ export default function StoreScreen() {
   const categoryOptions = useMemo(
     () =>
       buildCategoryOptions(
-        marketSourceErrors[activeExploreSource] ? snapshotCategories : marketCategories,
+        mergeCategoryBuckets([...marketCategories, ...snapshotCategories], activeExploreSource),
         activeExploreSource,
         locale,
       ),
-    [activeExploreSource, locale, marketCategories, marketSourceErrors, snapshotCategories],
+    [activeExploreSource, locale, marketCategories, snapshotCategories],
   );
 
   const updateBuiltinSkillInstallation = useCallback(
@@ -1564,57 +1615,51 @@ export default function StoreScreen() {
   );
 
   const fetchCategories = useCallback(
-    async (source: ExploreSource) => {
-      const fallback = mergeCategoryBuckets(
-        deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
-        source,
-      );
-      setMarketCategories(fallback);
+    async (source: ExploreSource, options?: { forceRefresh?: boolean }) => {
+      const requestId = marketCategoryRequestIdRef.current[source] + 1;
+      marketCategoryRequestIdRef.current[source] = requestId;
 
-      if (marketSourceErrors[source]) return;
+      setMarketCategoriesBySource((prev) => ({
+        ...prev,
+        [source]: mergeCategoryBuckets(
+          [
+            ...prev[source],
+            ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
+          ],
+          source,
+        ),
+      }));
 
       try {
         const list =
           source === 'mcp'
-            ? await marketSkillApi.getMcpCategories()
-            : await marketSkillApi.getCategories();
+            ? await marketSkillApi.getMcpCategories({ q: appliedSearchQuery || undefined }, options)
+            : await marketSkillApi.getCategories({ q: appliedSearchQuery || undefined }, options);
+
+        if (requestId !== marketCategoryRequestIdRef.current[source]) return;
+
         const items = Array.isArray(list) ? list : [];
-        setMarketCategories(
-          mergeCategoryBuckets(
+        setMarketCategoriesBySource((prev) => ({
+          ...prev,
+          [source]: mergeCategoryBuckets(
             [...items, ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source)],
             source,
           ),
-        );
+        }));
       } catch {
-        // keep fallback
+        if (requestId !== marketCategoryRequestIdRef.current[source]) return;
       }
     },
-    [marketSourceErrors],
+    [appliedSearchQuery],
   );
 
-  const fetchExploreTotals = useCallback(async () => {
-    const [mcpResult, skillResult] = await Promise.allSettled([
-      marketSkillApi.getMcpList({ page: 1, pageSize: 1 }),
-      marketSkillApi.getSkillList({ page: 1, pageSize: 1 }),
-    ]);
-
-    if (mcpResult.status === 'fulfilled') {
-      setMarketMcpTotal(mcpResult.value.totalCount ?? 0);
-      setMarketSourceErrors((prev) => ({ ...prev, mcp: false }));
-    } else {
-      setMarketSourceErrors((prev) => ({ ...prev, mcp: true }));
-    }
-
-    if (skillResult.status === 'fulfilled') {
-      setMarketSkillTotal(skillResult.value.totalCount ?? 0);
-      setMarketSourceErrors((prev) => ({ ...prev, skill: false }));
-    } else {
-      setMarketSourceErrors((prev) => ({ ...prev, skill: true }));
-    }
-  }, []);
-
   const fetchMarket = useCallback(
-    async (source: ExploreSource, page = 1, append = false) => {
+    async (
+      source: ExploreSource,
+      page = 1,
+      append = false,
+      options?: { forceRefresh?: boolean },
+    ) => {
       const requestId = ++marketRequestIdRef.current;
 
       if (append) {
@@ -1627,70 +1672,113 @@ export default function StoreScreen() {
       const categoryParam =
         activeExploreCategory === ALL_CATEGORY_KEY ? undefined : activeExploreCategory;
 
+      if (
+        !append &&
+        page === 1 &&
+        !options?.forceRefresh &&
+        !categoryParam &&
+        !appliedSearchQuery
+      ) {
+        const snapshotItems = marketSnapshotRef.current[source];
+        if (snapshotItems.length > 0) {
+          setMarketItems(snapshotItems);
+          setMarketPage(1);
+          setMarketHasMore(true);
+        }
+      }
+
       try {
         const result =
           source === 'mcp'
-            ? await marketSkillApi.getMcpList({
-                category: categoryParam,
-                page,
-                pageSize: MARKET_PAGE_SIZE,
-                q: debouncedQuery || undefined,
-              })
-            : await marketSkillApi.getSkillList({
-                category: categoryParam,
-                page,
-                pageSize: MARKET_PAGE_SIZE,
-                q: debouncedQuery || undefined,
-              });
+            ? await marketSkillApi.getMcpList(
+                {
+                  category: categoryParam,
+                  page,
+                  pageSize: MARKET_PAGE_SIZE,
+                  q: appliedSearchQuery || undefined,
+                },
+                options,
+              )
+            : await marketSkillApi.getSkillList(
+                {
+                  category: categoryParam,
+                  page,
+                  pageSize: MARKET_PAGE_SIZE,
+                  q: appliedSearchQuery || undefined,
+                },
+                options,
+              );
 
         if (requestId !== marketRequestIdRef.current) return;
 
         const remoteItems = result.items || [];
-        const shouldRefreshSnapshot = !append && page === 1 && !categoryParam && !debouncedQuery;
+        const shouldRefreshSnapshot =
+          !append && page === 1 && !categoryParam && !appliedSearchQuery;
+        const resolvedTotalCount = Math.max(result.totalCount ?? 0, remoteItems.length);
 
         if (shouldRefreshSnapshot) {
           marketSnapshotRef.current[source] = remoteItems;
         }
 
-        if (source === 'mcp') setMarketMcpTotal(result.totalCount ?? 0);
-        if (source === 'skill') setMarketSkillTotal(result.totalCount ?? 0);
+        if (source === 'mcp') {
+          setMarketMcpTotal((prev) =>
+            page === 1 ? resolvedTotalCount : prev || resolvedTotalCount,
+          );
+        }
+        if (source === 'skill') {
+          setMarketSkillTotal((prev) =>
+            page === 1 ? resolvedTotalCount : prev || resolvedTotalCount,
+          );
+        }
 
         if (!append && page === 1 && !categoryParam && remoteItems.length > 0) {
-          setMarketCategories((prev) =>
-            mergeCategoryBuckets(
-              [...prev, ...deriveCategoriesFromItems(remoteItems, source)],
+          setMarketCategoriesBySource((prev) => ({
+            ...prev,
+            [source]: mergeCategoryBuckets(
+              [...prev[source], ...deriveCategoriesFromItems(remoteItems, source)],
               source,
             ),
-          );
+          }));
         }
 
         setMarketItems((prev) =>
           append ? mergeMarketItems([...prev, ...remoteItems]) : remoteItems,
         );
         setMarketPage(page);
-        setMarketHasMore((result.totalCount ?? 0) > page * MARKET_PAGE_SIZE);
+        setMarketHasMore(
+          result.totalPages > 0
+            ? result.currentPage < result.totalPages
+            : remoteItems.length >= result.pageSize,
+        );
       } catch {
         if (requestId !== marketRequestIdRef.current) return;
+        if (append) return;
+
         setMarketSourceErrors((prev) => ({ ...prev, [source]: true }));
-        if (!append) {
-          const fallbackItems = filterMarketItemsByQuery(
-            filterMarketItemsByCategory(
-              marketSnapshotRef.current[source],
-              activeExploreCategory,
-              source,
-            ),
-            debouncedQuery,
-          );
-          setMarketItems(fallbackItems);
-          setMarketCategories(
-            mergeCategoryBuckets(
-              deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
-              source,
-            ),
-          );
-        }
+
+        const fallbackItems = filterMarketItemsByQuery(
+          filterMarketItemsByCategory(
+            marketSnapshotRef.current[source],
+            activeExploreCategory,
+            source,
+          ),
+          appliedSearchQuery,
+        );
+        setMarketItems(fallbackItems);
+        setMarketCategoriesBySource((prev) => ({
+          ...prev,
+          [source]: mergeCategoryBuckets(
+            [
+              ...prev[source],
+              ...deriveCategoriesFromItems(marketSnapshotRef.current[source], source),
+            ],
+            source,
+          ),
+        }));
+        if (source === 'mcp') setMarketMcpTotal(fallbackItems.length);
+        if (source === 'skill') setMarketSkillTotal(fallbackItems.length);
         setMarketHasMore(false);
-        toast.show('error', t.errorNetwork);
+        toast.show('error', t.storeLoadFailed || t.errorNetwork);
       } finally {
         if (requestId === marketRequestIdRef.current) {
           setMarketLoading(false);
@@ -1698,32 +1786,27 @@ export default function StoreScreen() {
         }
       }
     },
-    [activeExploreCategory, debouncedQuery, t.errorNetwork, toast],
+    [activeExploreCategory, appliedSearchQuery, t.errorNetwork, t.storeLoadFailed, toast],
   );
 
   useEffect(() => {
-    void fetchInstalled();
-  }, [fetchInstalled]);
+    void fetchInstalledSummary({ silent: true });
+  }, [fetchInstalledSummary]);
 
   // Fetch categories from API when switching explore source (MCP/Skills)
   useEffect(() => {
     if (activeTab !== 'explore') return;
     void fetchCategories(activeExploreSource);
-  }, [activeTab, activeExploreSource, fetchCategories]);
+  }, [activeTab, activeExploreSource, appliedSearchQuery, fetchCategories]);
 
   useEffect(() => {
-    if (activeTab !== 'explore') return;
-    void fetchExploreTotals();
-  }, [activeTab, fetchExploreTotals]);
-
-  useEffect(() => {
-    if (activeTab === 'installed') void fetchInstalled();
-  }, [activeTab, fetchInstalled]);
+    if (activeTab === 'installed' && !installedCatalogLoaded) void fetchInstalled();
+  }, [activeTab, fetchInstalled, installedCatalogLoaded]);
 
   useEffect(() => {
     if (activeTab !== 'explore') return;
     void fetchMarket(activeExploreSource, 1, false);
-  }, [activeExploreCategory, activeExploreSource, activeTab, debouncedQuery, fetchMarket]);
+  }, [activeExploreCategory, activeExploreSource, activeTab, appliedSearchQuery, fetchMarket]);
 
   useEffect(() => {
     if (!categoryOptions.some((item) => item.key === activeExploreCategory)) {
@@ -1733,8 +1816,11 @@ export default function StoreScreen() {
 
   const refreshMarket = useCallback(async () => {
     if (activeTab !== 'explore') return;
-    await fetchMarket(activeExploreSource, 1, false);
-  }, [activeExploreSource, activeTab, fetchMarket]);
+    await Promise.all([
+      fetchCategories(activeExploreSource, { forceRefresh: true }),
+      fetchMarket(activeExploreSource, 1, false, { forceRefresh: true }),
+    ]);
+  }, [activeExploreSource, activeTab, fetchCategories, fetchMarket]);
 
   const loadMoreMarket = useCallback(async () => {
     if (activeTab !== 'explore' || marketLoading || marketLoadingMore || !marketHasMore) return;
@@ -1783,24 +1869,33 @@ export default function StoreScreen() {
         .filter((identifier): identifier is string => Boolean(identifier)),
     );
 
-    const builtinInstalledItems = MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
-      (item) =>
-        !uninstalledBuiltinTools.includes(item.identifier) &&
-        !builtinIdsAlreadyShown.has(item.identifier),
-    )
-      .map((item) => buildInstalledBuiltinItem(item.identifier, t, colors))
-      .filter((item): item is StoreInstalledItem => Boolean(item));
+    const builtinInstalledItems = installedCatalogLoaded
+      ? MOBILE_RECOMMENDED_BUILTIN_SKILLS.filter(
+          (item) =>
+            !uninstalledBuiltinTools.includes(item.identifier) &&
+            !builtinIdsAlreadyShown.has(item.identifier),
+        )
+          .map((item) => buildInstalledBuiltinItem(item.identifier, t, colors))
+          .filter((item): item is StoreInstalledItem => Boolean(item))
+      : [];
 
     return [
       ...builtinInstalledItems,
       ...installedPlugins.map((plugin) => buildInstalledPluginItem(plugin, t, colors)),
       ...installedSkills.map((skill) => buildInstalledSkillItem(skill, t, colors)),
     ];
-  }, [colors, installedPlugins, installedSkills, t, uninstalledBuiltinTools]);
+  }, [
+    colors,
+    installedCatalogLoaded,
+    installedPlugins,
+    installedSkills,
+    t,
+    uninstalledBuiltinTools,
+  ]);
 
   const filteredInstalled = useMemo(() => {
-    if (!debouncedQuery) return allInstalled;
-    const query = debouncedQuery.toLowerCase();
+    if (!searchQuery.trim()) return allInstalled;
+    const query = searchQuery.trim().toLowerCase();
 
     return allInstalled.filter(
       (item) =>
@@ -1808,7 +1903,7 @@ export default function StoreScreen() {
         item.identifier.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query),
     );
-  }, [allInstalled, debouncedQuery]);
+  }, [allInstalled, searchQuery]);
 
   const selectedDetail = useMemo<StoreDetailItem | null>(() => {
     if (!selectedEntry) return null;
@@ -2119,16 +2214,19 @@ export default function StoreScreen() {
     [],
   );
 
-  const activeExploreTotalCount = marketFetchError
-    ? marketItems.length
-    : activeExploreSource === 'mcp'
-      ? marketMcpTotal
-      : marketSkillTotal;
+  const currentExploreTotal = activeExploreSource === 'mcp' ? marketMcpTotal : marketSkillTotal;
+  const activeExploreTotalCount =
+    currentExploreTotal > 0
+      ? Math.max(currentExploreTotal, marketItems.length)
+      : marketItems.length;
 
   const toggleSearch = useCallback(() => {
     setSearchVisible((value) => {
       const next = !value;
-      if (!next) setSearchQuery('');
+      if (!next) {
+        setSearchQuery('');
+        setAppliedSearchQuery('');
+      }
       return next;
     });
   }, []);
@@ -2176,10 +2274,13 @@ export default function StoreScreen() {
                 onPress={() => {
                   if (searchQuery.length > 0) {
                     setSearchQuery('');
+                    setAppliedSearchQuery('');
                     return;
                   }
 
                   setSearchVisible(false);
+                  setSearchQuery('');
+                  setAppliedSearchQuery('');
                 }}
               >
                 <X
@@ -2190,6 +2291,7 @@ export default function StoreScreen() {
               </TouchableOpacity>
             }
             onChangeText={setSearchQuery}
+            onSubmitEditing={() => setAppliedSearchQuery(searchQuery.trim())}
           />
         ) : null}
 

@@ -1,10 +1,5 @@
+import { parseSSEChunks } from '@lobechat/fetch-sse/sseParser';
 import type { MessageToolCall } from '@lobechat/types';
-
-interface ParsedSSEChunk {
-  data: unknown;
-  event: string;
-  id?: string;
-}
 
 interface ToolCallAccumulator {
   function: {
@@ -15,52 +10,6 @@ interface ToolCallAccumulator {
   index: number;
   type?: string;
 }
-
-const parseSSEChunks = (text: string): ParsedSSEChunk[] => {
-  let currentEvent = '';
-  let currentId = '';
-
-  return text
-    .split('\n')
-    .map((line) => line.replace(/\r$/, ''))
-    .reduce<ParsedSSEChunk[]>((chunks, line) => {
-      if (line.startsWith('id:')) {
-        currentId = line.slice(3).trim();
-        return chunks;
-      }
-
-      if (line.startsWith('event:')) {
-        currentEvent = line.slice(6).trim();
-        return chunks;
-      }
-
-      if (line.startsWith('data:')) {
-        const raw = line.slice(5).trim();
-        if (!raw) return chunks;
-
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(raw);
-        } catch {
-          parsed = raw.replaceAll('\\n', '\n');
-        }
-
-        chunks.push({
-          data: parsed,
-          event: currentEvent || 'text',
-          id: currentId || undefined,
-        });
-        return chunks;
-      }
-
-      if (line === '') {
-        currentEvent = '';
-        currentId = '';
-      }
-
-      return chunks;
-    }, []);
-};
 
 const mergeToolCallDelta = (
   toolCalls: Map<number, ToolCallAccumulator>,
@@ -117,7 +66,22 @@ export const parseChatCompletionTextResponse = (text: string) => {
   for (const chunk of chunks) {
     if (chunk.data === '[DONE]' || chunk.data === 'STOP') continue;
 
+    if (Array.isArray(chunk.data) && chunk.event === 'tool_calls') {
+      mergeToolCallDelta(toolCalls, chunk.data as Array<Record<string, any>>);
+      continue;
+    }
+
     if (typeof chunk.data === 'string') {
+      if (chunk.event === 'reasoning') {
+        reasoningContent += chunk.data;
+        continue;
+      }
+
+      if (chunk.event === 'stop') {
+        finishReason = chunk.data;
+        continue;
+      }
+
       if (chunk.event === 'text') content += chunk.data;
       continue;
     }

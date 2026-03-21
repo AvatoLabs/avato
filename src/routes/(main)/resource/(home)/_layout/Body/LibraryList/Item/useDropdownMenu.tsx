@@ -1,7 +1,7 @@
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
-import { FileText, PencilLine, Trash } from 'lucide-react';
+import { FileText, Link2Icon, PencilLine, Trash } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,10 +12,19 @@ interface ActionProps {
   description?: string | null;
   id: string;
   name: string;
+  onShare: () => void;
+  spaceId?: string;
   toggleEditing: (visible?: boolean) => void;
 }
 
-export const useDropdownMenu = ({ id, name, description, toggleEditing }: ActionProps): (() => MenuProps['items']) => {
+export const useDropdownMenu = ({
+  id,
+  name,
+  description,
+  onShare,
+  spaceId,
+  toggleEditing,
+}: ActionProps): (() => MenuProps['items']) => {
   const { t } = useTranslation(['file', 'common']);
   const { modal } = App.useApp();
   const removeKnowledgeBase = useKnowledgeBaseStore((s) => s.removeKnowledgeBase);
@@ -38,6 +47,7 @@ export const useDropdownMenu = ({ id, name, description, toggleEditing }: Action
     open({
       id,
       initialValues: { description: description || '', name },
+      spaceId,
     });
   };
 
@@ -62,6 +72,15 @@ export const useDropdownMenu = ({ id, name, description, toggleEditing }: Action
             handleEditDescription();
           },
         },
+        {
+          icon: <Icon icon={Link2Icon} />,
+          key: 'share',
+          label: t('share.title', { ns: 'file' }),
+          onClick: (info: any) => {
+            info.domEvent?.stopPropagation();
+            onShare();
+          },
+        },
         { type: 'divider' },
         {
           danger: true,
@@ -71,6 +90,18 @@ export const useDropdownMenu = ({ id, name, description, toggleEditing }: Action
           onClick: handleDelete,
         },
       ].filter(Boolean) as MenuProps['items'],
-    [t, id, name, description, modal, removeKnowledgeBase, toggleEditing, handleDelete, handleEditDescription, open],
+    [
+      description,
+      handleDelete,
+      handleEditDescription,
+      id,
+      modal,
+      name,
+      onShare,
+      open,
+      removeKnowledgeBase,
+      t,
+      toggleEditing,
+    ],
   );
 };

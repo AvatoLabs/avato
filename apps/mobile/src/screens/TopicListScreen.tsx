@@ -22,6 +22,7 @@ import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
 import { generateBestTitle } from '../lib/titleGeneration';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
 import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
@@ -29,8 +30,8 @@ import { useThemeColors } from '../theme/colors';
 import { enteringSection } from '../theme/motion';
 import { tokens } from '../theme/tokens';
 
-export default function TopicListScreen({ route, navigation }: any) {
-  const sessionId = route.params?.sessionId;
+export default function TopicListScreen({ route, navigation }: RootStackScreenProps<'TopicList'>) {
+  const sessionId = route.params.sessionId;
   const sessionKey = sessionId ?? '__invalid_session__';
   const { t } = useI18n();
   const toast = useToast();
@@ -64,7 +65,7 @@ export default function TopicListScreen({ route, navigation }: any) {
         .filter(Boolean)
         .join(' ');
       try {
-        const result = await generateBestTitle({ sessionId, topicId });
+        const result = await generateBestTitle({ force: true, sessionId, topicId });
         if (result?.title) {
           haptics.success();
           toast.show('success', result.target === 'topic' ? t.topicRenamed : t.sessionRenamed);

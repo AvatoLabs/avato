@@ -82,6 +82,11 @@ import {
   type ResourceCacheEntry,
   saveResourceCacheEntry,
 } from '../lib/resourceCache';
+import {
+  clearResourceListCache,
+  getResourceListCacheEntry,
+  saveResourceListCacheEntry,
+} from '../lib/resourceListCache';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -94,6 +99,8 @@ type SorterType = 'createdAt' | 'name' | 'size';
 type SortOrder = 'asc' | 'desc';
 type ViewMode = 'list' | 'grid';
 const ROOT_TREE_KEY = '__root__';
+const RESOURCE_LIST_PAGE_SIZE = 50;
+const RESOURCE_TREE_PAGE_SIZE = 200;
 
 interface ResourceTreeRow {
   depth: number;
@@ -138,6 +145,35 @@ function sortFileList(
     return sortOrder === 'asc' ? cmp : -cmp;
   });
   return sorted;
+}
+
+function areSameFileItems(left: FileListItem[] | undefined, right: FileListItem[]): boolean {
+  if (!left) return false;
+  if (left.length !== right.length) return false;
+
+  let index = 0;
+
+  for (const item of left) {
+    const target = right[index];
+    if (!target) return false;
+
+    if (
+      item.id !== target.id ||
+      item.name !== target.name ||
+      item.fileType !== target.fileType ||
+      item.parentId !== target.parentId ||
+      item.size !== target.size ||
+      item.createdAt !== target.createdAt ||
+      item.slug !== target.slug ||
+      item.sourceType !== target.sourceType
+    ) {
+      return false;
+    }
+
+    index += 1;
+  }
+
+  return true;
 }
 const IMAGE_EXTENSIONS = new Set([
   'avif',
@@ -1649,6 +1685,7 @@ export default function ResourceScreen() {
   const colors = useThemeColors();
 
   const [files, setFiles] = useState<FileListItem[]>([]);
+  const [hasResolvedFiles, setHasResolvedFiles] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1712,15 +1749,30 @@ export default function ResourceScreen() {
     },
     [],
   );
+  const treeChildrenByParentRef = useRef<Record<string, FileListItem[]>>({});
   const nextOffsetRef = useRef(0);
   const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
+
+  const resourceListQueryParams = useMemo(
+    () => ({
+      knowledgeBaseId: libraryId ?? undefined,
+      limit: RESOURCE_LIST_PAGE_SIZE,
+      parentId: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
+      q: searchText.trim() || undefined,
+    }),
+    [libraryId, currentFolderId, currentFolderSlug, searchText],
+  );
 
   useEffect(() => {
     if (!searchVisible) return;
     const timer = setTimeout(() => searchRef.current?.focus(), 120);
     return () => clearTimeout(timer);
   }, [searchVisible]);
+
+  useEffect(() => {
+    treeChildrenByParentRef.current = treeChildrenByParent;
+  }, [treeChildrenByParent]);
 
   const toggleSelect = useCallback((item: FileListItem) => {
     setSelectedIds((prev) => {
@@ -1881,30 +1933,87 @@ export default function ResourceScreen() {
     }
   }, []);
 
+  const syncVisibleTreeChildren = useCallback(
+    (parentId: string | null, items: FileListItem[]) => {
+      if (!libraryId || searchText.trim()) return;
+
+      const treeKey = parentId ?? ROOT_TREE_KEY;
+
+      setTreeChildrenByParent((prev) => {
+        if (areSameFileItems(prev[treeKey], items)) return prev;
+
+        return {
+          ...prev,
+          [treeKey]: items,
+        };
+      });
+    },
+    [libraryId, searchText],
+  );
+
   const loadFiles = useCallback(
     async (silent = false, append = false) => {
       const ticket = ++loadRequestRef.current;
       const loadOffset = append ? nextOffsetRef.current : 0;
-      if (!silent) setLoading(append ? false : true);
+      const cachedEntry = append ? null : getResourceListCacheEntry(resourceListQueryParams);
+      const hasCachedEntry = Boolean(cachedEntry);
+
+      if (!append) {
+        if (cachedEntry) {
+          nextOffsetRef.current = cachedEntry.items.length;
+          setFiles(cachedEntry.items);
+          setHasMore(cachedEntry.hasMore);
+          setHasResolvedFiles(true);
+          syncVisibleTreeChildren(resourceListQueryParams.parentId ?? null, cachedEntry.items);
+        } else if (!silent) {
+          nextOffsetRef.current = 0;
+          setFiles([]);
+          setHasMore(false);
+          setHasResolvedFiles(false);
+        }
+      }
+
+      setLoading(!silent && !append && !hasCachedEntry);
       if (append) setLoadingMore(true);
+
       try {
         const base = await getApiUrl();
         setApiBase(base);
         const result = await resourceApi.getKnowledgeItems({
-          knowledgeBaseId: libraryId ?? undefined,
-          limit: 50,
+          knowledgeBaseId: resourceListQueryParams.knowledgeBaseId,
+          limit: RESOURCE_LIST_PAGE_SIZE,
           offset: loadOffset,
-          parentId: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
-          q: searchText || undefined,
+          parentId: resourceListQueryParams.parentId,
+          q: resourceListQueryParams.q,
         });
         if (ticket !== loadRequestRef.current) return;
         const items = result?.items ?? [];
-        setHasMore(result?.hasMore ?? false);
+        const nextHasMore = result?.hasMore ?? false;
+
+        setHasMore(nextHasMore);
         nextOffsetRef.current = loadOffset + items.length;
-        setFiles(append ? (prev) => [...prev, ...items] : items);
+
+        if (append) {
+          setFiles((prev) => [...prev, ...items]);
+          setHasResolvedFiles(true);
+        } else {
+          saveResourceListCacheEntry(resourceListQueryParams, {
+            cachedAt: Date.now(),
+            hasMore: nextHasMore,
+            items,
+          });
+          setFiles(items);
+          setHasResolvedFiles(true);
+          syncVisibleTreeChildren(resourceListQueryParams.parentId ?? null, items);
+        }
       } catch {
         if (ticket !== loadRequestRef.current) return;
-        if (!append) setFiles([]);
+        if (!append && !hasCachedEntry && !silent) {
+          nextOffsetRef.current = 0;
+          setFiles([]);
+          setHasMore(false);
+          setHasResolvedFiles(true);
+        }
       } finally {
         if (ticket === loadRequestRef.current) {
           setLoading(false);
@@ -1913,7 +2022,7 @@ export default function ResourceScreen() {
         }
       }
     },
-    [searchText, libraryId, currentFolderId, currentFolderSlug],
+    [resourceListQueryParams, syncVisibleTreeChildren],
   );
 
   const loadTreeChildren = useCallback(
@@ -1921,8 +2030,28 @@ export default function ResourceScreen() {
       if (!libraryId) return;
 
       const treeKey = parentId ?? ROOT_TREE_KEY;
+      const cacheParams = {
+        knowledgeBaseId: libraryId,
+        limit: RESOURCE_TREE_PAGE_SIZE,
+        parentId,
+      };
 
-      if (!force && treeChildrenByParent[treeKey]) return;
+      if (!force) {
+        const cachedEntry = getResourceListCacheEntry(cacheParams);
+
+        if (cachedEntry) {
+          setTreeChildrenByParent((prev) => {
+            if (areSameFileItems(prev[treeKey], cachedEntry.items)) return prev;
+
+            return {
+              ...prev,
+              [treeKey]: cachedEntry.items,
+            };
+          });
+        } else if (treeChildrenByParentRef.current[treeKey]) {
+          return;
+        }
+      }
 
       setTreeLoadingIds((prev) => {
         const next = new Set(prev);
@@ -1933,14 +2062,21 @@ export default function ResourceScreen() {
       try {
         const result = await resourceApi.getKnowledgeItems({
           knowledgeBaseId: libraryId,
-          limit: 200,
+          limit: RESOURCE_TREE_PAGE_SIZE,
           offset: 0,
           parentId,
         });
 
+        const items = result?.items ?? [];
+        saveResourceListCacheEntry(cacheParams, {
+          cachedAt: Date.now(),
+          hasMore: result?.hasMore ?? false,
+          items,
+        });
+
         setTreeChildrenByParent((prev) => ({
           ...prev,
-          [treeKey]: sortFileList(result?.items ?? [], sorter, sortOrder, locale),
+          [treeKey]: items,
         }));
       } catch {
         setTreeChildrenByParent((prev) => ({
@@ -1955,7 +2091,7 @@ export default function ResourceScreen() {
         });
       }
     },
-    [libraryId, locale, sortOrder, sorter, treeChildrenByParent],
+    [libraryId],
   );
 
   const refreshTreeData = useCallback(async () => {
@@ -1999,6 +2135,7 @@ export default function ResourceScreen() {
             await purgeDeletedResources(ids);
             haptics.success();
             clearSelection();
+            clearResourceListCache();
             await loadFiles(true);
             await refreshTreeData();
           } catch {
@@ -2096,8 +2233,8 @@ export default function ResourceScreen() {
 
   useEffect(() => {
     if (!libraryId) return;
-    void loadTreeChildren(null, true);
-  }, [libraryId, loadTreeChildren, sorter, sortOrder]);
+    void loadTreeChildren(null);
+  }, [libraryId, loadTreeChildren]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -2143,6 +2280,7 @@ export default function ResourceScreen() {
         title: name,
       });
       haptics.success();
+      clearResourceListCache();
       await loadFiles(true);
       await refreshTreeData();
     } catch {
@@ -2182,6 +2320,7 @@ export default function ResourceScreen() {
         haptics.success();
         toast.show('success', t.done);
         clearSelection();
+        clearResourceListCache();
         await loadFiles(true);
         await refreshTreeData();
       } catch {
@@ -2235,6 +2374,7 @@ export default function ResourceScreen() {
           return [optimistic, ...prev];
         });
         await new Promise((r) => setTimeout(r, 200));
+        clearResourceListCache();
         await loadFiles(true);
         await refreshTreeData();
         await refreshCachedResources();
@@ -2315,6 +2455,7 @@ export default function ResourceScreen() {
               }
               haptics.success();
               await purgeDeletedResources([id]);
+              clearResourceListCache();
               await loadFiles(true);
               await refreshTreeData();
             } catch {
@@ -2351,6 +2492,7 @@ export default function ResourceScreen() {
         setFiles((prev) =>
           prev.map((f) => (f.id === actionItem.id ? { ...f, name: newName.trim() } : f)),
         );
+        clearResourceListCache();
         await refreshTreeData();
         toast.show('success', t.resourceRenamed);
       } catch {
@@ -2411,6 +2553,9 @@ export default function ResourceScreen() {
     sortOrder,
     locale,
   );
+  const hasResolvedTreeRoot =
+    treeMode && Object.prototype.hasOwnProperty.call(treeChildrenByParent, ROOT_TREE_KEY);
+  const showInitialSkeleton = loading && !hasResolvedFiles && !hasResolvedTreeRoot;
 
   const handleTreeFolderToggle = useCallback(
     async (item: FileListItem) => {
@@ -2777,7 +2922,7 @@ export default function ResourceScreen() {
       )}
 
       {/* Content */}
-      {loading && files.length === 0 ? (
+      {showInitialSkeleton ? (
         <FileGridSkeleton />
       ) : (
         <FlatList<ResourceListRow>

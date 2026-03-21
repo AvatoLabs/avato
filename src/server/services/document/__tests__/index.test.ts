@@ -9,7 +9,37 @@ import { DocumentService } from '../index';
 
 vi.mock('@/database/models/document');
 vi.mock('@/database/models/file');
+vi.mock('@/database/models/resource', () => ({
+  ResourceModel: vi.fn(() => ({
+    ensureOwnerPermission: vi.fn(),
+    ensureResourceRegistry: vi.fn().mockResolvedValue({ resourceUid: 'res_test' }),
+  })),
+}));
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: vi.fn(() => ({
+    findAccessibleSpaceById: vi.fn().mockResolvedValue(undefined),
+    getOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_test' }),
+  })),
+}));
 vi.mock('../../file');
+vi.mock('../../resource', () => ({
+  AuthorizedResourceResolver: vi.fn(() => ({
+    requireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
+    requireKnowledgeBase: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
+  })),
+  ResourceAuthorizer: vi.fn(() => ({
+    assertCapability: vi.fn(),
+    getAccessMatch: vi.fn().mockResolvedValue({
+      authzEpoch: 1,
+      canAccess: true,
+      resourceUid: 'res_test',
+      spaceId: 'spc_test',
+    }),
+  })),
+  TreeGuard: vi.fn(() => ({
+    assertParentAssignment: vi.fn(),
+  })),
+}));
 vi.mock('@lobechat/file-loaders', () => ({
   loadFile: vi.fn(),
 }));
@@ -31,6 +61,7 @@ describe('DocumentService', () => {
     mockDb = {
       query: {
         documents: {
+          findFirst: vi.fn(),
           findMany: vi.fn().mockResolvedValue([]),
         },
         files: {

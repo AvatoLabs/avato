@@ -260,15 +260,35 @@ export const desktopRoutes: RouteObject[] = [
       // Resource routes
       {
         children: [
-          // Home routes (resource list)
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource'),
+              'Desktop > Resource > Redirect',
+            ),
+            index: true,
+          },
           {
             children: [
               {
                 element: dynamicElement(
-                  () => import('@/routes/(main)/resource/(home)'),
-                  'Desktop > Resource > Home',
+                  () => import('@/routes/(main)/resource/shared'),
+                  'Desktop > Resource > Shared',
                 ),
-                index: true,
+                path: 'shared',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/(home)'),
+                  'Desktop > Resource > Space Home',
+                ),
+                path: 'space/:spaceId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/space/[spaceId]/settings'),
+                  'Desktop > Resource > Space Settings',
+                ),
+                path: 'space/:spaceId/settings',
               },
             ],
             element: dynamicElement(
@@ -276,7 +296,6 @@ export const desktopRoutes: RouteObject[] = [
               'Desktop > Resource > Home > Layout',
             ),
           },
-          // Library routes (knowledge base detail)
           {
             children: [
               {
@@ -299,6 +318,29 @@ export const desktopRoutes: RouteObject[] = [
               'Desktop > Resource > Library > Layout',
             ),
             path: 'library/:id',
+          },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library'),
+                  'Desktop > Resource > Space Library',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/[slug]'),
+                  'Desktop > Resource > Space Library > Slug',
+                ),
+                path: ':slug',
+              },
+            ],
+            element: dynamicElement(
+              () => import('@/routes/(main)/resource/library/_layout'),
+              'Desktop > Resource > Space Library > Layout',
+            ),
+            path: 'space/:spaceId/library/:id',
           },
         ],
         element: dynamicElement(
@@ -504,6 +546,18 @@ export const desktopRoutes: RouteObject[] = [
       'Desktop > Share > Topic > Layout',
     ),
     path: '/share/t',
+  },
+  {
+    children: [
+      {
+        element: dynamicElement(
+          () => import('@/routes/share/r/[token]'),
+          'Desktop > Share > Resource',
+        ),
+        path: ':token',
+      },
+    ],
+    path: '/share/r',
   },
 ];
 

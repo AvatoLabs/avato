@@ -864,7 +864,11 @@ export interface GenerationItem {
   id: string;
   seed?: number;
   task: {
-    error?: { name: string; message?: string } | null;
+    error?: {
+      body?: { detail?: string } | string;
+      message?: string;
+      name: string;
+    } | null;
     status: string;
   };
   updatedAt?: string;

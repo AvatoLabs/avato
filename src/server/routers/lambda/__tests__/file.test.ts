@@ -101,6 +101,7 @@ const mockFileModelDeleteMany = vi.fn();
 const mockFileModelFindById = vi.fn();
 const mockFileModelQuery = vi.fn();
 const mockFileModelClear = vi.fn();
+const mockFileModelUpdate = vi.fn();
 
 vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(() => ({
@@ -111,6 +112,33 @@ vi.mock('@/database/models/file', () => ({
     findById: mockFileModelFindById,
     query: mockFileModelQuery,
     clear: mockFileModelClear,
+    update: mockFileModelUpdate,
+  })),
+}));
+
+const mockResourceModelEnsureOwnerPermission = vi.fn();
+const mockResourceModelEnsureResourceRegistry = vi
+  .fn()
+  .mockResolvedValue({ resourceUid: 'res_test' });
+const mockResourceModelFindSpaceBlobByHash = vi.fn();
+const mockResourceModelUpsertSpaceBlob = vi.fn().mockResolvedValue({ id: 'blob_test' });
+
+vi.mock('@/database/models/resource', () => ({
+  ResourceModel: vi.fn(() => ({
+    ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
+    ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
+    findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
+    upsertSpaceBlob: mockResourceModelUpsertSpaceBlob,
+  })),
+}));
+
+const mockSpaceModelFindAccessibleSpaceById = vi.fn();
+const mockSpaceModelGetOrCreatePersonalSpace = vi.fn().mockResolvedValue({ id: 'spc_test' });
+
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: vi.fn(() => ({
+    findAccessibleSpaceById: mockSpaceModelFindAccessibleSpaceById,
+    getOrCreatePersonalSpace: mockSpaceModelGetOrCreatePersonalSpace,
   })),
 }));
 
@@ -127,6 +155,7 @@ vi.mock('@/server/services/file', () => ({
 }));
 
 const mockKnowledgeRepoQuery = vi.fn().mockResolvedValue([]);
+const mockDocumentModelFindBySlug = vi.fn();
 
 vi.mock('@/database/repositories/knowledge', () => ({
   KnowledgeRepo: vi.fn(() => ({
@@ -135,7 +164,29 @@ vi.mock('@/database/repositories/knowledge', () => ({
 }));
 
 vi.mock('@/database/models/document', () => ({
-  DocumentModel: vi.fn(() => ({})),
+  DocumentModel: vi.fn(() => ({
+    findBySlug: mockDocumentModelFindBySlug,
+  })),
+}));
+
+const mockResolverRequireDocument = vi.fn();
+const mockResolverRequireFile = vi.fn();
+const mockResolverRequireKnowledgeBase = vi.fn();
+const mockResourceAuthorizerAssertCapability = vi.fn();
+const mockTreeGuardAssertParentAssignment = vi.fn();
+
+vi.mock('@/server/services/resource', () => ({
+  AuthorizedResourceResolver: vi.fn(() => ({
+    requireDocument: mockResolverRequireDocument,
+    requireFile: mockResolverRequireFile,
+    requireKnowledgeBase: mockResolverRequireKnowledgeBase,
+  })),
+  ResourceAuthorizer: vi.fn(() => ({
+    assertCapability: mockResourceAuthorizerAssertCapability,
+  })),
+  TreeGuard: vi.fn(() => ({
+    assertParentAssignment: mockTreeGuardAssertParentAssignment,
+  })),
 }));
 
 describe('fileRouter', () => {
@@ -168,15 +219,23 @@ describe('fileRouter', () => {
       contentLength: 100,
       contentType: 'text/plain',
     });
+    mockResourceModelEnsureResourceRegistry.mockResolvedValue({ resourceUid: 'res_test' });
+    mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
+    mockResourceModelUpsertSpaceBlob.mockResolvedValue({ id: 'blob_test' });
+    mockDocumentModelFindBySlug.mockResolvedValue(undefined);
+    mockResolverRequireFile.mockResolvedValue(mockFile);
+    mockSpaceModelFindAccessibleSpaceById.mockResolvedValue(undefined);
 
     // Use actual context with default mocks
     ({ ctx, caller } = createCallerWithCtx());
   });
 
   describe('checkFileHash', () => {
-    it('should handle when fileModel.checkHash returns undefined', async () => {
-      ctx.fileModel.checkHash.mockResolvedValue(undefined);
-      await expect(caller.checkFileHash({ hash: 'test-hash' })).resolves.toBeUndefined();
+    it('should return not found when no space blob exists', async () => {
+      mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
+      await expect(caller.checkFileHash({ hash: 'test-hash' })).resolves.toEqual({
+        isExist: false,
+      });
     });
   });
 
@@ -239,7 +298,9 @@ describe('fileRouter', () => {
       // Verify create was called with actual size from S3, not client-provided size
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          blobId: 'blob_test',
           size: 5000, // Actual size from S3, not 100
+          spaceId: 'spc_test',
         }),
         true,
       );
@@ -267,7 +328,9 @@ describe('fileRouter', () => {
       // Verify create was called with input size as fallback
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          blobId: 'blob_test',
           size: 100,
+          spaceId: 'spc_test',
         }),
         true,
       );
@@ -309,7 +372,9 @@ describe('fileRouter', () => {
       // Verify create was called with input size since contentLength < 1
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
+          blobId: 'blob_test',
           size: 100,
+          spaceId: 'spc_test',
         }),
         true,
       );
@@ -337,7 +402,7 @@ describe('fileRouter', () => {
 
   describe('findById', () => {
     it('should throw error when file not found', async () => {
-      ctx.fileModel.findById.mockResolvedValue(null);
+      mockResolverRequireFile.mockResolvedValueOnce(null);
 
       await expect(caller.findById({ id: 'invalid-id' })).rejects.toThrow(TRPCError);
     });
@@ -353,7 +418,7 @@ describe('fileRouter', () => {
 
   describe('getFileItemById', () => {
     it('should throw error when file not found', async () => {
-      mockFileModelFindById.mockResolvedValue(null);
+      mockResolverRequireFile.mockResolvedValueOnce(null);
 
       await expect(caller.getFileItemById({ id: 'invalid-id' })).rejects.toThrow(TRPCError);
     });
@@ -394,6 +459,40 @@ describe('fileRouter', () => {
   });
 
   describe('getKnowledgeItems', () => {
+    it('should reject inaccessible unscoped space queries', async () => {
+      await expect(
+        caller.getKnowledgeItems({
+          spaceId: 'spc_shared',
+        }),
+      ).rejects.toThrow('SPACE_ACCESS_DENIED');
+    });
+
+    it('should allow shared knowledge base queries when the knowledge base itself is accessible', async () => {
+      mockResolverRequireKnowledgeBase.mockResolvedValue({
+        id: 'kb_shared',
+        spaceId: 'spc_shared',
+      });
+
+      await expect(
+        caller.getKnowledgeItems({
+          knowledgeBaseId: 'kb_shared',
+          spaceId: 'spc_shared',
+        }),
+      ).resolves.toEqual({
+        hasMore: false,
+        items: [],
+      });
+
+      expect(mockResolverRequireKnowledgeBase).toHaveBeenCalledWith('kb_shared', 'read_content');
+      expect(mockKnowledgeRepoQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          knowledgeBaseId: 'kb_shared',
+          limit: 51,
+          spaceId: 'spc_shared',
+        }),
+      );
+    });
+
     it('should return knowledge items with files and documents', async () => {
       const knowledgeItems = [
         {

@@ -1,8 +1,6 @@
 import { type LobeChatDatabase } from '@lobechat/database';
-import urlJoin from 'url-join';
 
 import { FileModel } from '@/database/models/file';
-import { fileEnv } from '@/envs/file';
 import { FileS3 } from '@/server/modules/S3';
 
 import { type FileServiceImpl } from './type';
@@ -65,16 +63,8 @@ export class S3StaticFileImpl implements FileServiceImpl {
       key = extractedKey;
     }
 
-    // If bucket is not set public read, the preview address needs to be regenerated each time
-    if (!fileEnv.S3_SET_ACL) {
-      return await this.createPreSignedUrlForPreview(key, expiresIn);
-    }
-
-    if (fileEnv.S3_ENABLE_PATH_STYLE) {
-      return urlJoin(fileEnv.S3_PUBLIC_DOMAIN!, fileEnv.S3_BUCKET!, key);
-    }
-
-    return urlJoin(fileEnv.S3_PUBLIC_DOMAIN!, key);
+    // User resources always stay private. Storage access must go through a presigned URL.
+    return this.createPreSignedUrlForPreview(key, expiresIn);
   }
 
   async getKeyFromFullUrl(url: string): Promise<string | null> {
@@ -89,19 +79,7 @@ export class S3StaticFileImpl implements FileServiceImpl {
         return file?.url ?? null;
       }
 
-      // Case 2: Legacy S3 URL - extract key from pathname
-      if (fileEnv.S3_ENABLE_PATH_STYLE) {
-        if (!fileEnv.S3_BUCKET) {
-          return pathname.startsWith('/') ? pathname.slice(1) : pathname;
-        }
-        const bucketPrefix = `/${fileEnv.S3_BUCKET}/`;
-        if (pathname.startsWith(bucketPrefix)) {
-          return pathname.slice(bucketPrefix.length);
-        }
-        return pathname.startsWith('/') ? pathname.slice(1) : pathname;
-      }
-
-      // Virtual-hosted-style: path is /<key>
+      // Legacy S3 URLs are reduced to the object key regardless of public/private mode.
       return pathname.slice(1);
     } catch {
       // If url is not a valid URL, return null

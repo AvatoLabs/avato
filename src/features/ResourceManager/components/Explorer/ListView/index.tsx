@@ -17,7 +17,7 @@ import {
 } from '@/routes/(main)/resource/features/store';
 import { sortFileList } from '@/routes/(main)/resource/features/store/selectors';
 import { useFileStore } from '@/store/file';
-import { useFetchResources } from '@/store/file/slices/resource/hooks';
+import { useVisibleResources } from '@/store/file/slices/resource/hooks';
 import { useGlobalStore } from '@/store/global';
 import { INITIAL_STATUS } from '@/store/global/initialState';
 import { type AsyncTaskStatus } from '@/types/asyncTask';
@@ -112,20 +112,8 @@ const ListView = memo(function ListView() {
     [category, currentFolderSlug, libraryId, sorter, sortType],
   );
 
-  const { isLoading, isValidating } = useFetchResources(queryParams);
-  const { queryParams: currentQueryParams, hasMore, loadMoreResources } = useFileStore();
-
-  const isNavigating = useMemo(() => {
-    if (!currentQueryParams || !queryParams) return false;
-
-    return (
-      currentQueryParams.libraryId !== queryParams.libraryId ||
-      currentQueryParams.parentId !== queryParams.parentId ||
-      currentQueryParams.category !== queryParams.category
-    );
-  }, [currentQueryParams, queryParams]);
-
-  const resourceList = useFileStore((s) => s.resourceList);
+  const { isLoading, items: resourceList } = useVisibleResources(queryParams);
+  const { hasMore, loadMoreResources } = useFileStore();
 
   // Map ResourceItem[] to FileListItem[] for compatibility
   const rawData =
@@ -145,14 +133,9 @@ const ListView = memo(function ListView() {
 
   const dataLength = data.length;
   const effectiveIsLoading = isLoading ?? false;
-  const effectiveIsNavigating = isNavigating ?? false;
   const effectiveIsTransitioning = storeIsTransitioning ?? false;
-  const effectiveIsValidating = isValidating ?? false;
 
-  const showSkeleton =
-    (effectiveIsLoading && dataLength === 0) ||
-    (effectiveIsNavigating && effectiveIsValidating) ||
-    effectiveIsTransitioning;
+  const showSkeleton = (effectiveIsLoading && dataLength === 0) || effectiveIsTransitioning;
 
   const dataRef = useRef<FileListItemType[]>(data);
 

@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useCreateNewModal } from '@/features/LibraryModal';
 import EmptyNavItem from '@/features/NavPanel/components/EmptyNavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
+import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
+import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useKnowledgeBaseStore } from '@/store/library';
 
 import Item from './Item';
@@ -17,8 +19,9 @@ import Item from './Item';
  */
 const LibraryList = memo(() => {
   const { t } = useTranslation('file');
+  const spaceId = useResourceManagerStore((s) => s.spaceId);
   const useFetchKnowledgeBaseList = useKnowledgeBaseStore((s) => s.useFetchKnowledgeBaseList);
-  const { data, isLoading } = useFetchKnowledgeBaseList();
+  const { data, isLoading } = useFetchKnowledgeBaseList(spaceId);
 
   const navigate = useNavigate();
 
@@ -27,8 +30,9 @@ const LibraryList = memo(() => {
   const handleCreate = () => {
     open({
       onSuccess: (id) => {
-        navigate(`/resource/library/${id}`);
+        navigate(buildResourceLibraryPath(spaceId, id));
       },
+      spaceId,
     });
   };
 
@@ -39,7 +43,13 @@ const LibraryList = memo(() => {
   return (
     <Flexbox gap={1} paddingInline={4}>
       {data?.map((item) => (
-        <Item description={item.description} id={item.id} key={item.id} name={item.name} />
+        <Item
+          description={item.description}
+          id={item.id}
+          key={item.id}
+          name={item.name}
+          spaceId={item.spaceId}
+        />
       ))}
     </Flexbox>
   );

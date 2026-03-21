@@ -55,6 +55,7 @@ const AddButton = () => {
     libraryId,
     category,
     currentFolderId,
+    spaceId,
     setCategory,
     setCurrentViewItemId,
     setMode,
@@ -63,6 +64,7 @@ const AddButton = () => {
     s.libraryId,
     s.category,
     s.currentFolderId,
+    s.spaceId,
     s.setCategory,
     s.setCurrentViewItemId,
     s.setMode,
@@ -82,6 +84,7 @@ const AddButton = () => {
       fileType: 'custom/document',
       knowledgeBaseId: libraryId,
       parentId: currentFolderId ?? undefined,
+      spaceId,
       sourceType: 'document',
       title: untitledTitle,
     });
@@ -97,6 +100,7 @@ const AddButton = () => {
     setCategory,
     setCurrentViewItemId,
     setMode,
+    spaceId,
     t,
   ]);
 
@@ -136,6 +140,7 @@ const AddButton = () => {
         fileType: 'custom/folder',
         knowledgeBaseId: libraryId,
         parentId: currentFolderId ?? undefined,
+        spaceId,
         sourceType: 'document',
         title: uniqueName,
       });
@@ -153,6 +158,7 @@ const AddButton = () => {
     libraryId,
     setCategory,
     setPendingRenameItemId,
+    spaceId,
     t,
   ]);
 
@@ -167,6 +173,7 @@ const AddButton = () => {
     createDocument,
     currentFolderId,
     libraryId,
+    spaceId,
     refetchResources: async () => {
       const { revalidateResources } = await import('@/store/file/slices/resource/hooks');
       await revalidateResources();
@@ -177,6 +184,7 @@ const AddButton = () => {
   const { handleFolderUpload } = useUploadFolder({
     currentFolderId,
     libraryId,
+    spaceId,
     t,
     uploadFolderWithStructure,
   });
@@ -220,7 +228,7 @@ const AddButton = () => {
             showUploadList={false}
             beforeUpload={async (file) => {
               setMenuOpen(false);
-              await pushDockFileList([file], libraryId, currentFolderId ?? undefined);
+              await pushDockFileList([file], libraryId, currentFolderId ?? undefined, spaceId);
 
               return false;
             }}
@@ -260,6 +268,7 @@ const AddButton = () => {
       handleOpenNotionGuide,
       libraryId,
       pushDockFileList,
+      spaceId,
       t,
     ],
   );

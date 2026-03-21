@@ -395,6 +395,23 @@ export const imageRouter = router({
           isEditingImage,
         );
 
+        console.error('[async image] generation failed', {
+          error:
+            error instanceof Error
+              ? {
+                  message: error.message,
+                  name: error.name,
+                  stack: error.stack,
+                }
+              : error,
+          errorMessage,
+          errorType,
+          generationId,
+          model,
+          provider,
+          taskId,
+        });
+
         await ctx.asyncTaskModel.update(taskId, {
           error: new AsyncTaskError(errorType, errorMessage),
           status: AsyncTaskStatus.Error,

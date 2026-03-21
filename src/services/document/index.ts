@@ -12,6 +12,7 @@ export interface CreateDocumentParams {
   metadata?: Record<string, any>;
   parentId?: string;
   slug?: string;
+  spaceId?: string;
   title: string;
 }
 

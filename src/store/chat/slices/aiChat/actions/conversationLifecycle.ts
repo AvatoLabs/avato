@@ -344,28 +344,6 @@ export class ConversationLifecycleActionImpl {
 
     if (data.topicId) this.#get().internal_updateTopicLoading(data.topicId, true);
 
-    const summaryTitle = async () => {
-      // check activeTopic and then auto update topic title
-      if (data.isCreateNewTopic) {
-        await this.#get().summaryTopicTitle(data.topicId, data.messages);
-        return;
-      }
-
-      if (!data.topicId) return;
-
-      const topic = topicSelectors.getTopicById(data.topicId)(this.#get());
-
-      if (topic && !topic.title) {
-        const chats = displayMessageSelectors
-          .getDisplayMessagesByKey(messageMapKey({ agentId, topicId: topic.id }))(this.#get())
-          .filter((item) => item.id !== data.assistantMessageId);
-
-        await this.#get().summaryTopicTitle(topic.id, chats);
-      }
-    };
-
-    summaryTitle().catch(console.error);
-
     // Complete sendMessage operation here - message creation is done
     // execAgentRuntime is a separate operation (child) that handles AI response generation
     this.#get().completeOperation(operationId);

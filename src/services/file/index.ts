@@ -11,12 +11,13 @@ import {
 interface CreateFileParams extends Omit<UploadFileParams, 'url'> {
   knowledgeBaseId?: string;
   parentId?: string;
+  spaceId?: string;
   url: string;
 }
 
 export class FileService {
   createFile = async (
-    params: UploadFileParams & { parentId?: string },
+    params: UploadFileParams & { parentId?: string; spaceId?: string },
     knowledgeBaseId?: string,
   ): Promise<{ id: string; url: string }> => {
     return lambdaClient.file.createFile.mutate({ ...params, knowledgeBaseId } as CreateFileParams);
@@ -99,8 +100,8 @@ export class FileService {
     return lambdaClient.document.getFolderBreadcrumb.query({ slug });
   };
 
-  checkFileHash = async (hash: string): Promise<CheckFileHashResult> => {
-    return lambdaClient.file.checkFileHash.mutate({ hash });
+  checkFileHash = async (hash: string, spaceId?: string): Promise<CheckFileHashResult> => {
+    return lambdaClient.file.checkFileHash.mutate(spaceId ? { hash, spaceId } : { hash });
   };
 
   removeFileAsyncTask = async (id: string, type: 'embedding' | 'chunk') => {

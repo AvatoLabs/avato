@@ -8,14 +8,21 @@ interface ModalContentProps {
   id?: string;
   initialValues?: { name?: string; description?: string };
   onSuccess?: (id: string) => void;
+  spaceId?: string;
 }
 
-const ModalContent = memo<ModalContentProps>(({ id, initialValues, onSuccess }) => {
+const ModalContent = memo<ModalContentProps>(({ id, initialValues, onSuccess, spaceId }) => {
   const { close } = useModalContext();
 
   return (
     <Flexbox paddingInline={8} style={{ paddingBottom: 8 }}>
-      <CreateForm id={id} initialValues={initialValues} onClose={close} onSuccess={onSuccess} />
+      <CreateForm
+        id={id}
+        initialValues={initialValues}
+        spaceId={spaceId}
+        onClose={close}
+        onSuccess={onSuccess}
+      />
     </Flexbox>
   );
 });
@@ -26,6 +33,7 @@ interface OpenParams {
   id?: string;
   initialValues?: { name?: string; description?: string };
   onSuccess?: (id: string) => void;
+  spaceId?: string;
 }
 
 export const useCreateNewModal = () => {
@@ -41,6 +49,7 @@ export const useCreateNewModal = () => {
             <ModalContent
               id={props?.id}
               initialValues={props?.initialValues}
+              spaceId={props?.spaceId}
               onSuccess={props?.onSuccess}
             />
           </Suspense>

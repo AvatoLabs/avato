@@ -1,4 +1,5 @@
 import { type InstallPluginMeta } from '@/types/tool/plugin';
+import { normalizePluginAuthor } from '@/utils/normalizePluginAuthor';
 
 import { type ToolStoreState } from '../../initialState';
 
@@ -10,7 +11,7 @@ const mcpPluginList = (s: ToolStoreState) => {
       : s.mcpPluginItems.filter((p) => installedPluginIds.has(p.identifier));
 
   return list.map<InstallPluginMeta>((p) => ({
-    author: p.author,
+    author: normalizePluginAuthor(p.author),
     createdAt: p.createdAt,
     homepage: p.homepage,
     identifier: p.identifier,

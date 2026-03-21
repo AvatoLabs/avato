@@ -3,23 +3,18 @@
  */
 import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
-import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import {
   ArrowDown,
-  ArrowLeft,
-  BookOpen,
   Brain,
   BrainCircuit,
   Cpu,
   Eraser,
   Globe,
-  MessageCircle,
   Paperclip,
   Puzzle,
   Send,
-  Settings,
   Square,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -49,6 +44,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ChatDetailHeader from '../components/ChatDetailHeader';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
 import {
   ComposerCountBadge,
@@ -88,7 +84,7 @@ import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
 import { isGroupSessionLike } from '../lib/session';
 import { loadSkillPickerSelection, saveSkillPickerSelection } from '../lib/skillPicker';
-import { generateBestTitle } from '../lib/titleGeneration';
+import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useFileStore } from '../store/file';
 import { buildDisplayMessages } from '../store/messageDisplay';
@@ -108,8 +104,66 @@ import type {
 } from '../types';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
+const MESSAGE_ESTIMATE_SAMPLE_SIZE = 12;
+const extractPersistedMessageIds = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => message.id)
+    .filter(
+      (id) =>
+        !id.startsWith('assistant-') &&
+        !id.startsWith('local-') &&
+        !id.startsWith('tmp_') &&
+        !id.startsWith('user-'),
+    );
 
-export default function ChatDetailScreen({ route, navigation }: any) {
+const getEstimatedMessageHeight = (message: ChatMessage) => {
+  let estimate = 96;
+  const textLength = message.content.trim().length;
+
+  if (textLength > 0) {
+    estimate += Math.min(144, Math.ceil(textLength / 42) * 18);
+  }
+
+  if (message.reasoning?.content) {
+    estimate += Math.min(72, Math.ceil(message.reasoning.content.length / 88) * 14);
+  }
+
+  if (message.imageList?.length) {
+    estimate += Math.min(message.imageList.length, 3) * 78;
+  }
+
+  if (message.fileList?.length) {
+    estimate += Math.min(message.fileList.length, 3) * 44;
+  }
+
+  if (message.tools?.length) {
+    estimate += Math.min(message.tools.length, 4) * 36;
+  }
+
+  if (message.children?.length) {
+    estimate += Math.min(message.children.length, 4) * 48;
+  }
+
+  if (message.tasks?.length) {
+    estimate += Math.min(message.tasks.length, 4) * 36;
+  }
+
+  return Math.min(Math.max(estimate, 96), 280);
+};
+
+const getEstimatedMessageItemSize = (messages: ChatMessage[]) => {
+  if (messages.length === 0) return 132;
+
+  const sample = messages.slice(-MESSAGE_ESTIMATE_SAMPLE_SIZE);
+  const total = sample.reduce((sum, message) => sum + getEstimatedMessageHeight(message), 0);
+
+  return Math.round(total / sample.length);
+};
+
+export default function ChatDetailScreen({
+  route,
+  navigation,
+}: RootStackScreenProps<'ChatDetail'>) {
   const sessionId = route.params?.sessionId as string | undefined;
   const sessionKey = sessionId ?? '__invalid_session__';
   const initialTopicId = route.params?.topicId ?? null;
@@ -133,7 +187,10 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   );
   const fetchingMessages = useChatStore((s) => s.fetchingMessagesBySession[sessionKey] ?? false);
   const generating = useChatStore((s) => s.generating && s.activeStreamingSessionId === sessionKey);
+  const activeOperationId = useChatStore((s) => s.activeOperationId);
+  const activeStreamingSessionId = useChatStore((s) => s.activeStreamingSessionId);
   const isReasoning = useChatStore((s) => s.isReasoning);
+  const generatingStartedAt = useChatStore((s) => s.generatingStartedAt);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGenerating = useChatStore((s) => s.stopGenerating);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
@@ -243,18 +300,17 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     (reason: string) => {
       if (!sessionId) return;
 
-      const state = useChatStore.getState();
       const shouldStop =
-        state.generating &&
-        state.activeStreamingSessionId === sessionId &&
-        typeof state.activeOperationId === 'string';
+        generating &&
+        activeStreamingSessionId === sessionId &&
+        typeof activeOperationId === 'string';
 
       if (!shouldStop) return;
 
       console.warn(`[ChatDetail] stopping active group operation on ${reason}`);
       stopGenerating();
     },
-    [sessionId, stopGenerating],
+    [activeOperationId, activeStreamingSessionId, generating, sessionId, stopGenerating],
   );
 
   useEffect(() => {
@@ -272,10 +328,8 @@ export default function ChatDetailScreen({ route, navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       if (!sessionId) return;
-      const state = useChatStore.getState();
-      if (state.generating && state.activeStreamingSessionId === sessionId) return;
-      const topicId =
-        initialTopicId ?? useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
+      if (generating && activeStreamingSessionId === sessionId) return;
+      const topicId = initialTopicId ?? activeTopic ?? undefined;
       void fetchSessions();
       fetchMessages(sessionId, topicId, { preferPopulatedTopic: true });
       void fetchTopics(sessionId).then(() => {
@@ -285,12 +339,14 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         }
       });
     }, [
+      activeStreamingSessionId,
+      activeTopic,
       initialTopicId,
-      sessionId,
-      sessionKey,
       fetchMessages,
       fetchSessions,
       fetchTopics,
+      generating,
+      sessionId,
       switchTopic,
     ]),
   );
@@ -402,14 +458,11 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         stopActiveGroupOperation(`appstate:${nextState}`);
         return;
       }
-      if (
-        useChatStore.getState().generating &&
-        useChatStore.getState().activeStreamingSessionId === sessionId
-      ) {
+      if (generating && activeStreamingSessionId === sessionId) {
         return;
       }
 
-      const topicId = useTopicStore.getState().activeTopicBySession[sessionKey] ?? undefined;
+      const topicId = activeTopic ?? undefined;
       void Promise.allSettled([
         fetchSessions(),
         fetchTopics(sessionId),
@@ -420,22 +473,30 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     return () => {
       subscription.remove();
     };
-  }, [fetchMessages, fetchSessions, fetchTopics, sessionId, sessionKey, stopActiveGroupOperation]);
+  }, [
+    activeStreamingSessionId,
+    activeTopic,
+    fetchMessages,
+    fetchSessions,
+    fetchTopics,
+    generating,
+    sessionId,
+    stopActiveGroupOperation,
+  ]);
 
   useEffect(() => {
     if (!generating) return;
     const WATCHDOG_MS = 180_000;
-    const startedAt = useChatStore.getState().generatingStartedAt;
-    const elapsed = startedAt ? Date.now() - startedAt : 0;
+    const elapsed = generatingStartedAt ? Date.now() - generatingStartedAt : 0;
     const remaining = Math.max(WATCHDOG_MS - elapsed, 0);
     const timer = setTimeout(() => {
-      if (useChatStore.getState().generating) {
+      if (generating) {
         console.warn('[ChatDetail] generating watchdog triggered, force-stopping');
         stopGenerating();
       }
     }, remaining);
     return () => clearTimeout(timer);
-  }, [generating, stopGenerating]);
+  }, [generating, generatingStartedAt, stopGenerating]);
 
   useEffect(() => {
     if (!focusMessageId || messages.length === 0) return;
@@ -885,17 +946,30 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       return;
     }
     try {
+      const messageIds = extractPersistedMessageIds(rawMessages);
       const topicId = await topicApi.create(sessionId, t.topicTitle, {
+        ...(messageIds.length > 0 ? { messageIds } : {}),
         sessionType: session?.type ?? 'agent',
       });
       if (topicId) {
         haptics.success();
-        fetchTopics(sessionId);
+        switchTopic(sessionId, topicId);
+        void Promise.allSettled([fetchTopics(sessionId), fetchMessages(sessionId, topicId)]);
       }
     } catch {
       toast.show('error', t.errorNetwork);
     }
-  }, [session?.type, sessionId, activeTopic, t, toast, fetchTopics]);
+  }, [
+    session?.type,
+    sessionId,
+    activeTopic,
+    rawMessages,
+    t,
+    toast,
+    fetchMessages,
+    fetchTopics,
+    switchTopic,
+  ]);
 
   const handleOpenNotebook = useCallback(async () => {
     if (!sessionId) return;
@@ -904,6 +978,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
     try {
       const currentTopicId = activeTopic ?? initialTopicId;
+      const messageIds = extractPersistedMessageIds(rawMessages);
 
       if (currentTopicId) {
         navigation.navigate('Notebook', { sessionId, topicId: currentTopicId });
@@ -911,6 +986,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       }
 
       const topicId = await topicApi.create(sessionId, t.topicTitle, {
+        ...(messageIds.length > 0 ? { messageIds } : {}),
         sessionType: session?.type ?? 'agent',
       });
 
@@ -927,6 +1003,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
     fetchTopics,
     initialTopicId,
     navigation,
+    rawMessages,
     session?.type,
     sessionId,
     switchTopic,
@@ -961,6 +1038,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
       sessionKey,
     ],
   );
+  const estimatedItemSize = useMemo(() => getEstimatedMessageItemSize(messages), [messages]);
 
   if (!sessionId) {
     return (
@@ -972,278 +1050,20 @@ export default function ChatDetailScreen({ route, navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      {/* Header */}
-      <View
-        className="z-10"
-        style={{
-          backgroundColor: Platform.OS === 'android' ? colors.background : undefined,
-          borderBottomColor: Platform.OS === 'android' ? colors.border : 'transparent',
-          borderBottomWidth: Platform.OS === 'android' ? 1 : 0,
-          paddingTop: insets.top,
-        }}
-      >
-        {Platform.OS !== 'android' ? (
-          <BlurView intensity={90} tint={effectiveTheme === 'dark' ? 'dark' : 'light'}>
-            <View className="flex-row items-center justify-between px-4 py-2.5">
-              <View className="flex-row items-center flex-1">
-                <PressableScale
-                  accessibilityLabel={t.accessibilityGoBack}
-                  accessibilityRole="button"
-                  className="w-9 h-9 items-center justify-center rounded-full mr-2"
-                  onPress={() => {
-                    haptics.light();
-                    navigation.goBack();
-                  }}
-                >
-                  <ArrowLeft
-                    color={colors.foreground}
-                    size={22}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                </PressableScale>
-                <View className="flex-1">
-                  <Text
-                    className="text-[16px] font-medium text-foreground tracking-tight"
-                    numberOfLines={1}
-                  >
-                    {activeTopicItem?.title || session?.title || t.chatTitle}
-                  </Text>
-                  {generating ? (
-                    <Text
-                      className="text-[12px] mt-0.5 font-medium"
-                      style={{ color: colors.primary }}
-                    >
-                      {isReasoning ? t.chatThinking : t.chatGenerating}
-                    </Text>
-                  ) : !isGroupSession && sessionModel ? (
-                    <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
-                      {toolbarProviderLogo && !providerLogoError ? (
-                        <RNImage
-                          source={{ uri: toolbarProviderLogo }}
-                          style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
-                          onError={() => setProviderLogoError(true)}
-                        />
-                      ) : (
-                        <Cpu
-                          color={colors.secondaryText}
-                          size={13}
-                          strokeWidth={tokens.icon.strokeWidth}
-                          style={{ marginRight: 6 }}
-                        />
-                      )}
-                      <Text
-                        className="flex-1 text-[12px] font-medium"
-                        numberOfLines={1}
-                        style={{ color: colors.muted, lineHeight: 14 }}
-                      >
-                        {sessionModel}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              <View className="flex-row items-center gap-1">
-                <PressableScale
-                  accessibilityLabel={t.topicTitle}
-                  accessibilityRole="button"
-                  className="w-9 h-9 items-center justify-center rounded-full"
-                  onLongPress={
-                    activeTopic
-                      ? async () => {
-                          haptics.medium();
-                          const failMessage = [
-                            t.toastTitleGenerationFailed,
-                            t.toastTitleGenerationFailedHint,
-                          ]
-                            .filter(Boolean)
-                            .join(' ');
-                          try {
-                            const result = await generateBestTitle({
-                              sessionId: sessionId!,
-                              topicId: activeTopic,
-                            });
-                            if (result?.title) {
-                              haptics.success();
-                              toast.show(
-                                'success',
-                                result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
-                              );
-                            } else {
-                              toast.show('error', failMessage || 'Failed to generate title');
-                            }
-                          } catch {
-                            toast.show('error', failMessage || 'Failed to generate title');
-                          }
-                        }
-                      : undefined
-                  }
-                  onPress={() => {
-                    haptics.light();
-                    navigation.navigate('TopicList', { sessionId });
-                  }}
-                >
-                  <MessageCircle
-                    color={colors.muted}
-                    size={20}
-                    strokeWidth={tokens.icon.strokeWidth}
-                  />
-                </PressableScale>
-                <PressableScale
-                  accessibilityLabel={t.notebookTitle}
-                  accessibilityRole="button"
-                  className="w-9 h-9 items-center justify-center rounded-full"
-                  onPress={() => {
-                    void handleOpenNotebook();
-                  }}
-                >
-                  <BookOpen color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </PressableScale>
-                <PressableScale
-                  accessibilityLabel={t.accessibilitySettings}
-                  accessibilityRole="button"
-                  className="w-9 h-9 items-center justify-center rounded-full"
-                  onPress={() => {
-                    haptics.light();
-                    navigation.navigate('ChatSettings', { sessionId });
-                  }}
-                >
-                  <Settings color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </PressableScale>
-              </View>
-            </View>
-          </BlurView>
-        ) : (
-          <View className="flex-row items-center justify-between px-4 py-2.5">
-            <View className="flex-row items-center flex-1">
-              <PressableScale
-                accessibilityLabel={t.accessibilityGoBack}
-                accessibilityRole="button"
-                className="w-9 h-9 items-center justify-center rounded-full mr-2"
-                onPress={() => {
-                  haptics.light();
-                  navigation.goBack();
-                }}
-              >
-                <ArrowLeft
-                  color={colors.foreground}
-                  size={22}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </PressableScale>
-              <View className="flex-1">
-                <Text
-                  className="text-[16px] font-medium text-foreground tracking-tight"
-                  numberOfLines={1}
-                >
-                  {activeTopicItem?.title || session?.title || t.chatTitle}
-                </Text>
-                {generating ? (
-                  <Text
-                    className="text-[12px] mt-0.5 font-medium"
-                    style={{ color: colors.primary }}
-                  >
-                    {isReasoning ? t.chatThinking : t.chatGenerating}
-                  </Text>
-                ) : !isGroupSession && sessionModel ? (
-                  <View className="mt-0.5 flex-row items-center" style={{ minHeight: 14 }}>
-                    {toolbarProviderLogo && !providerLogoError ? (
-                      <RNImage
-                        source={{ uri: toolbarProviderLogo }}
-                        style={{ borderRadius: 3, height: 13, marginRight: 6, width: 13 }}
-                        onError={() => setProviderLogoError(true)}
-                      />
-                    ) : (
-                      <Cpu
-                        color={colors.secondaryText}
-                        size={13}
-                        strokeWidth={tokens.icon.strokeWidth}
-                        style={{ marginRight: 6 }}
-                      />
-                    )}
-                    <Text
-                      className="flex-1 text-[12px] font-medium"
-                      numberOfLines={1}
-                      style={{ color: colors.muted, lineHeight: 14 }}
-                    >
-                      {sessionModel}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            <View className="flex-row items-center gap-1">
-              <PressableScale
-                accessibilityLabel={t.topicTitle}
-                accessibilityRole="button"
-                className="w-9 h-9 items-center justify-center rounded-full"
-                onLongPress={
-                  activeTopic
-                    ? async () => {
-                        haptics.medium();
-                        const failMessage = [
-                          t.toastTitleGenerationFailed,
-                          t.toastTitleGenerationFailedHint,
-                        ]
-                          .filter(Boolean)
-                          .join(' ');
-                        try {
-                          const result = await generateBestTitle({
-                            sessionId: sessionId!,
-                            topicId: activeTopic,
-                          });
-                          if (result?.title) {
-                            haptics.success();
-                            toast.show(
-                              'success',
-                              result.target === 'topic' ? t.topicRenamed : t.sessionRenamed,
-                            );
-                          } else {
-                            toast.show('error', failMessage || 'Failed to generate title');
-                          }
-                        } catch {
-                          toast.show('error', failMessage || 'Failed to generate title');
-                        }
-                      }
-                    : undefined
-                }
-                onPress={() => {
-                  haptics.light();
-                  navigation.navigate('TopicList', { sessionId });
-                }}
-              >
-                <MessageCircle
-                  color={colors.muted}
-                  size={20}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </PressableScale>
-              <PressableScale
-                accessibilityLabel={t.notebookTitle}
-                accessibilityRole="button"
-                className="w-9 h-9 items-center justify-center rounded-full"
-                onPress={() => {
-                  void handleOpenNotebook();
-                }}
-              >
-                <BookOpen color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </PressableScale>
-              <PressableScale
-                accessibilityLabel={t.accessibilitySettings}
-                accessibilityRole="button"
-                className="w-9 h-9 items-center justify-center rounded-full"
-                onPress={() => {
-                  haptics.light();
-                  navigation.navigate('ChatSettings', { sessionId });
-                }}
-              >
-                <Settings color={colors.muted} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </PressableScale>
-            </View>
-          </View>
-        )}
-      </View>
+      {/* Header - Using unified ChatDetailHeader component */}
+      <ChatDetailHeader
+        activeTopic={activeTopic}
+        activeTopicTitle={activeTopicItem?.title}
+        generating={generating}
+        isGroupSession={isGroupSession}
+        isReasoning={isReasoning}
+        navigation={navigation}
+        sessionId={sessionId}
+        sessionModel={sessionModel}
+        sessionTitle={session?.title}
+        toolbarProviderLogo={toolbarProviderLogo}
+        onOpenNotebook={handleOpenNotebook}
+      />
 
       {/* Message List + Input */}
       <View className="flex-1">
@@ -1254,7 +1074,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
             accessibilityLiveRegion="polite"
             contentContainerStyle={{ paddingBottom: 12, paddingTop: 12 }}
             data={messages}
-            estimatedItemSize={120}
+            estimatedItemSize={estimatedItemSize}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             ref={listRef}
@@ -1584,7 +1404,7 @@ export default function ChatDetailScreen({ route, navigation }: any) {
         skillsTitle={t.skillsTitle}
         visible={skillsSheetVisible && !isGroupSession}
         onClose={() => setSkillsSheetVisible(false)}
-        onOpenStore={() => navigation.getParent()?.navigate('MainTabs', { screen: 'Store' })}
+        onOpenStore={() => navigation.navigate('MainTabs', { screen: 'Store' })}
         onToggle={handleTogglePlugin}
       />
     </View>
