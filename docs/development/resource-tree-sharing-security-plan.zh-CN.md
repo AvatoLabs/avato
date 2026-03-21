@@ -20,7 +20,7 @@
 ### 授权与能力模型
 
 - **`preview_content`**：在 `ResourceAuthorizer` 中求值时，若请求能力为 `preview_content`，则具备 `preview_content` **或** `read_content` 即通过；单独请求 `read_content` 时仍只认 `read_content`（避免用「仅预览」顶替全文读）。
-- **转授 / 继续分享**：成员分享与分享链接相关 API 经 `assertCanDelegateSharing`；非 space `owner`/`admin` 时，`direct` / `inherited` 下的 **`editor` 须授权行 `can_reshare`**。
+- **转授 / 继续分享**：成员分享与分享链接相关 API 经 `assertCanDelegateSharing`；space `owner`/`admin` 直接放行；**space `editor`（仅凭空间成员身份命中 `share_member`）** 仍须在目标资源上具备 **`owner` 或 `editor + can_reshare`（直接授权或继承）**，否则 `RESOURCE_RESHARE_DENIED`；`direct` / `inherited` 路径下 **`editor` 须授权行 `can_reshare`** 的规则不变。
 - **分享链接**：viewer 能力集合包含 `preview_content`；与上述 `preview_content` OR `read_content` 规则一致。
 
 ### 读路径（预览 / 解析 / RAG）
@@ -42,9 +42,19 @@
 - **`FileService.getFileContentByHash` / `getFileByteArrayByHash`**：先 **`canAccessGlobalFileByHash`**，不通过则与「不存在」统一为 **`NOT_FOUND`**（降低存在性侧信道）。
 - **技能 ZIP 预签名 / `zipUrl`**：`agentSkills.getByIdWithZipUrl`、`routers/tools/market`（内置工具补 `zipUrl`）、`toolExecution/serverRuntimes/skills` 在取存储 `url` 并拼 **`getFullFileUrl`** 前同样先走 **`canAccessGlobalFileByHash`**。
 
+### OpenAPI 公开上传去重（Space 作用域）
+
+- **`packages/openapi/.../file.service.ts` `uploadFile`**：去重改为 **`findSpaceBlobByHash(spaceId, sha256)`**（同一 Space 内 **`status=ready`** 的 blob），**不再**预检全局 **`checkHash`**；新上传成功后 **`upsertSpaceBlob`**。`spaceId` 来自知识库或 **`getOrCreatePersonalSpace`**。
+- 仍 **`create(..., true)`** 写 **`global_files`**（`onConflictDoNothing`）以满足 **`files.file_hash`** 外键；跨 Space / 跨用户**不再**通过「先全局 `checkHash` 再挂接他人存储 key」暴露存在性。
+
+### 主站 `FileService.createFileRecord`
+
+- **不再调用 `checkHash`** 决定 `insertToGlobalFiles`；**始终** `create(..., true)`，依赖 **`global_files` 主键冲突即跳过**，避免预检侧信道。
+- 传入 **`spaceId`** 时额外 **`upsertSpaceBlob`**（`ready`），便于与 OpenAPI 策略一致；调用方按需逐步补 **`spaceId`**。
+
 ### 仍待办（与 §3.1、Phase 0～5 一致）
 
-- **上传去重侧信道**：`FileService.createFileRecord`、OpenAPI 等路径上的 **`checkHash` / 全局 `global_files` 去重**，仍可能暴露「系统内是否已有相同内容」；需按 Space / `space_blobs` 或产品策略收敛（见 Phase 0 / 5）。
+- **`FileService.createFileRecord` 调用方**：已改为**不再预检 `checkHash`**，并支持可选 **`spaceId` + `upsertSpaceBlob`**；尚未在所有调用点传入 **`spaceId`** 的，同 Space 内去重需逐步补全（见 Phase 5）。
 - **其余按原文推进**：Phase 3 **`space_blobs`** 与 `v2/spaces/...` key、Phase 4 **软删除与回收站**、**`knowledge_bases.isPublic`** 并入统一 ACL / 链接分享、异步 worker **执行时**与导出等路径对 **`authz_epoch`** 的强制复验等。
 
 ## 一、现状审计
@@ -566,6 +576,7 @@ v2/spaces/<spaceId>/blobs/<blobId>
 ### 6.3 分享
 
 - 创建成员分享：要求 `owner`，或 `editor + can_reshare`
+- **Space 成员维度**：space `owner` / `admin` 可在空间内代为发起成员分享/链接管理；**space `editor`（仅成员身份）** 不能仅凭成员资格转授，仍须在目标资源上满足上一条（资源 `owner` 或资源级 `editor + can_reshare`，含继承）。
 - 创建链接分享：要求 `owner`，且在匿名分享阶段之前不下放给普通 `editor`
 - 撤销分享：同一授权链上的 `owner` 可撤销，并 bump 相关 `authz_epoch`
 
@@ -589,7 +600,7 @@ v2/spaces/<spaceId>/blobs/<blobId>
 1. 将 `/f/:id` 改为登录态下载，并按当前主体校验资源权限。
 2. 把 Redis 缓存命中移动到权限判断之后，缓存键改为 `principal/shareLink + fileId + authz_epoch`。
 3. 强制用户资源对象走 private bucket /private object，禁用 `public-read` 与 `S3_PUBLIC_DOMAIN` 直链回退。
-4. 停止用户资源使用跨用户 `checkHash` 快速路径。（**进展**：按 hash 读字节与技能 ZIP 预签名已要求 `canAccessGlobalFileByHash`，见 **§〇**；**上传去重**仍可能侧信道，待 Phase 5 / `space_blobs` 收敛。）
+4. 停止用户资源使用跨用户 `checkHash` 快速路径。（**进展**：按 hash 读字节与技能 ZIP 预签名已要求 `canAccessGlobalFileByHash`；**OpenAPI `uploadFile`** 为 Space 内 `space_blobs` 去重；**`FileService.createFileRecord`** 已取消全局 `checkHash` 预检并支持 **`spaceId` → `upsertSpaceBlob`**，见 **§〇**。）
 5. 把 preview /parse/chunk /semantic search /provider read path 接到同一个 authorizer 入口。（**进展**：chunk、async file、document 解析与语义检索过滤已统一使用 **`preview_content`** 及 OR 规则，见 **§〇**；其余 provider / 导出等路径仍按清单收口。）
 6. 为 `/f/:id`、`checkHash`、preview、parse、search 补集成测试。
 

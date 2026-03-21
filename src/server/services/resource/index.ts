@@ -268,6 +268,37 @@ export class ResourceAuthorizer {
     return permission;
   };
 
+  /** First inherited row on the parent chain that grants `share_member` (if any). */
+  private resolveInheritedShareDelegatingGrant = async (resource: ResolvedResource) => {
+    const parentChain = await this.getParentChain(resource);
+    if (parentChain.length === 0) return null;
+
+    const parentUids = parentChain.map((item) => item.resourceUid);
+    const inheritedPermissions = await this.db
+      .select({
+        canReshare: resourcePermissions.canReshare,
+        resourceUid: resourcePermissions.resourceUid,
+        role: resourcePermissions.role,
+      })
+      .from(resourcePermissions)
+      .where(
+        and(
+          inArray(resourcePermissions.resourceUid, parentUids),
+          eq(resourcePermissions.subjectType, 'user'),
+          eq(resourcePermissions.subjectId, this.userId),
+          eq(resourcePermissions.inheritsToChildren, true),
+          or(isNull(resourcePermissions.expiresAt), gt(resourcePermissions.expiresAt, new Date())),
+        ),
+      );
+
+    return (
+      inheritedPermissions.find(
+        (item: { canReshare: boolean; resourceUid: string; role: ResourceRole }) =>
+          hasCapability(RESOURCE_ROLE_CAPABILITIES[item.role], 'share_member'),
+      ) ?? null
+    );
+  };
+
   private getShareLinkAccess = async (
     resource: ResolvedResource,
     shareToken?: string | null,
@@ -408,8 +439,9 @@ export class ResourceAuthorizer {
   };
 
   /**
-   * Member grants and share-link CRUD: space owner/admin always allowed; space editors (membership)
-   * allowed; direct or inherited **editor** must have `canReshare` on the granting row.
+   * Member grants and share-link CRUD: space owner/admin always allowed; space **editor** (membership
+   * only) must additionally have resource-level `owner` or `editor + canReshare` (direct or inherited);
+   * direct or inherited **editor** must have `canReshare` on the granting row.
    */
   assertCanDelegateSharing = async (resourceUid: string) => {
     const resource = await this.resolveByUid(resourceUid);
@@ -428,7 +460,20 @@ export class ResourceAuthorizer {
     }
 
     if (access.matchedBy === 'space_member') {
-      return;
+      // Owner/admin already returned. Only space `editor` can match share_member here (viewer lacks it).
+      if (spaceRole !== 'editor') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+      }
+
+      const direct = await this.getDirectPermissionForUser(resource.resourceUid);
+      if (direct?.role === 'owner') return;
+      if (direct?.role === 'editor' && direct.canReshare) return;
+
+      const inheritedSpace = await this.resolveInheritedShareDelegatingGrant(resource);
+      if (inheritedSpace?.role === 'owner') return;
+      if (inheritedSpace?.role === 'editor' && inheritedSpace.canReshare) return;
+
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
     }
 
     if (access.matchedBy === 'direct') {
@@ -449,29 +494,7 @@ export class ResourceAuthorizer {
     }
 
     if (access.matchedBy === 'inherited') {
-      const parentChain = await this.getParentChain(resource);
-      const parentUids = parentChain.map((item) => item.resourceUid);
-      const inheritedPermissions = await this.db
-        .select({
-          canReshare: resourcePermissions.canReshare,
-          resourceUid: resourcePermissions.resourceUid,
-          role: resourcePermissions.role,
-        })
-        .from(resourcePermissions)
-        .where(
-          and(
-            inArray(resourcePermissions.resourceUid, parentUids),
-            eq(resourcePermissions.subjectType, 'user'),
-            eq(resourcePermissions.subjectId, this.userId),
-            eq(resourcePermissions.inheritsToChildren, true),
-            or(isNull(resourcePermissions.expiresAt), gt(resourcePermissions.expiresAt, new Date())),
-          ),
-        );
-
-      const inherited = inheritedPermissions.find(
-        (item: { canReshare: boolean; resourceUid: string; role: ResourceRole }) =>
-          hasCapability(RESOURCE_ROLE_CAPABILITIES[item.role], 'share_member'),
-      );
+      const inherited = await this.resolveInheritedShareDelegatingGrant(resource);
 
       if (!inherited) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });

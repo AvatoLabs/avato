@@ -10,8 +10,9 @@ import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
+import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
 import type { FileItem } from '@/database/schemas';
 import {
   agentsToSessions,
@@ -672,91 +673,85 @@ export class FileUploadService extends BaseService {
       const fileArrayBuffer = await file.arrayBuffer();
       const hash = sha256(fileArrayBuffer);
       const resolvedSessionId = await this.resolveSessionId(options);
+      const uploadSpaceId = await this.resolveUploadSpaceId(options);
 
-      // 3. 检查文件是否已存在（去重逻辑）
+      // 3. 同一 Space 内去重：仅查询 space_blobs（不调用全局 global_files / checkHash，避免跨用户存在性侧信道）
       if (!options.skipDeduplication) {
-        const existingFileCheck = await this.fileModel.checkHash(hash);
+        const existingBlob = await this.resourceModel.findSpaceBlobByHash(uploadSpaceId, hash);
 
-        if (existingFileCheck.isExist) {
-          this.log('info', 'Public file already exists, checking user file record', {
-            existingUrl: existingFileCheck.url,
+        if (existingBlob) {
+          this.log('info', 'OpenAPI upload dedup: space_blobs hit in space', {
             hash,
             name: file.name,
+            spaceId: uploadSpaceId,
+            storageKey: existingBlob.storageKey,
           });
 
-          // 检查当前用户是否已经有这个文件的记录
           const existingUserFile = await this.findExistingUserFile(hash);
 
           if (existingUserFile) {
-            // 用户已有此文件记录，直接返回
-            this.log('info', 'User already has this public file record', {
+            this.log('info', 'User already has file row for this hash', {
               fileId: existingUserFile.id,
               name: existingUserFile.name,
             });
 
-            // 如果提供了 sessionId（支持 agentId 解析），创建文件和会话的关联关系
             if (resolvedSessionId) {
               await this.createFileSessionRelation(existingUserFile.id, resolvedSessionId);
-              this.log('info', 'Existing public file associated with session', {
+              this.log('info', 'Existing file associated with session', {
                 fileId: existingUserFile.id,
                 sessionId: resolvedSessionId,
               });
             }
 
             return await this.getFileDetail(existingUserFile.id);
-          } else {
-            // 文件在全局表中存在，但用户没有记录，创建用户文件记录
-            this.log('info', 'Public file exists globally, creating user file record', {
-              hash,
-              name: file.name,
-            });
-
-            const fileRecord = {
-              chunkTaskId: null,
-              clientId: null,
-              embeddingTaskId: null,
-              fileHash: hash,
-              fileType: file.type,
-              knowledgeBaseId: options.knowledgeBaseId,
-              metadata: existingFileCheck.metadata as FileMetadata,
-              name: file.name,
-              size: file.size,
-              url: existingFileCheck.url || '',
-              userId: this.userId,
-            };
-
-            const createResult = await this.fileModel.create(fileRecord, false); // 不插入全局表，因为已存在
-
-            // 如果提供了 sessionId（支持 agentId 解析），创建文件和会话的关联关系
-            if (resolvedSessionId) {
-              await this.createFileSessionRelation(createResult.id, resolvedSessionId);
-              this.log('info', 'Deduplicated public file associated with session', {
-                fileId: createResult.id,
-                sessionId: resolvedSessionId,
-              });
-            }
-
-            this.log('info', 'Deduplicated public file created successfully', {
-              fileId: createResult.id,
-              path: existingFileCheck.url,
-              sessionId: resolvedSessionId,
-              size: file.size,
-              url: existingFileCheck.url,
-            });
-
-            return await this.getFileDetail(createResult.id);
           }
+
+          const metaFromBlob =
+            (existingBlob.metadata as FileMetadata | undefined) ||
+            this.generateFileMetadata(file, options.directory);
+
+          const fileRecord = {
+            chunkTaskId: null,
+            clientId: null,
+            embeddingTaskId: null,
+            fileHash: hash,
+            fileType: file.type,
+            knowledgeBaseId: options.knowledgeBaseId,
+            metadata: metaFromBlob,
+            name: file.name,
+            size: file.size,
+            spaceId: uploadSpaceId,
+            url: existingBlob.storageKey,
+            userId: this.userId,
+          };
+
+          // 仍尝试写入 global_files（onConflictDoNothing），满足 files.file_hash 外键；对象实际复用 space_blobs.storageKey
+          const createResult = await this.fileModel.create(fileRecord, true);
+
+          if (resolvedSessionId) {
+            await this.createFileSessionRelation(createResult.id, resolvedSessionId);
+            this.log('info', 'Space-deduped file associated with session', {
+              fileId: createResult.id,
+              sessionId: resolvedSessionId,
+            });
+          }
+
+          this.log('info', 'Space-deduped public file created', {
+            fileId: createResult.id,
+            sessionId: resolvedSessionId,
+            storageKey: existingBlob.storageKey,
+          });
+
+          return await this.getFileDetail(createResult.id);
         }
       }
 
-      // 4. 文件不存在，正常上传流程
+      // 4. 本 Space 无就绪 blob：走完整上传，并登记 space_blobs（仍写 global_files 以满足 fileHash 外键）
       const metadata = this.generateFileMetadata(file, options.directory);
 
-      // 5. 上传到 S3
       const fileBuffer = Buffer.from(fileArrayBuffer);
       await this.s3Service.uploadBuffer(metadata.path, fileBuffer, file.type);
 
-      // 7. 保存文件记录到数据库
       const fileRecord = {
         chunkTaskId: null,
         clientId: null,
@@ -767,13 +762,25 @@ export class FileUploadService extends BaseService {
         metadata,
         name: file.name,
         size: file.size,
+        spaceId: uploadSpaceId,
         url: metadata.path,
         userId: this.userId,
       };
 
       const createResult = await this.fileModel.create(fileRecord, true);
 
-      // 如果提供了 sessionId（支持 agentId 解析），创建文件和会话的关联关系
+      await this.resourceModel.upsertSpaceBlob({
+        createdBy: this.userId!,
+        fileType: file.type,
+        metadata: metadata as Record<string, unknown>,
+        sha256: hash,
+        size: file.size,
+        spaceId: uploadSpaceId,
+        status: 'ready',
+        storageKey: metadata.path,
+        verifiedAt: new Date(),
+      });
+
       if (resolvedSessionId) {
         await this.createFileSessionRelation(createResult.id, resolvedSessionId);
         this.log('info', 'Public file associated with session', {
@@ -1120,6 +1127,23 @@ export class FileUploadService extends BaseService {
       filename,
       path,
     };
+  }
+
+  /**
+   * 上传归属的 Space：知识库优先其 spaceId，否则个人空间。
+   */
+  private async resolveUploadSpaceId(options: PublicFileUploadRequest): Promise<string> {
+    if (options.knowledgeBaseId) {
+      const kb = await this.knowledgeBaseModel.findById(options.knowledgeBaseId);
+      if (!kb) {
+        throw this.createBusinessError('知识库不存在或无权访问');
+      }
+      if (kb.spaceId) return kb.spaceId;
+    }
+
+    const spaceModel = new SpaceModel(this.db, this.userId!);
+    const personal = await spaceModel.getOrCreatePersonalSpace();
+    return personal.id;
   }
 
   /**

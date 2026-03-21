@@ -6,8 +6,9 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { FileService } from '../index';
 
-const { mockRequireFile } = vi.hoisted(() => ({
+const { mockRequireFile, mockUpsertSpaceBlob } = vi.hoisted(() => ({
   mockRequireFile: vi.fn(),
+  mockUpsertSpaceBlob: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/config/db', () => ({
@@ -42,6 +43,7 @@ vi.mock('@/database/models/file');
 vi.mock('@/database/models/resource', () => ({
   ResourceModel: vi.fn(() => ({
     invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
+    upsertSpaceBlob: mockUpsertSpaceBlob,
   })),
 }));
 
@@ -81,6 +83,7 @@ describe('FileService', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     mockRequireFile.mockReset();
+    mockUpsertSpaceBlob.mockClear();
     service = new FileService(mockDb, mockUserId);
   });
 
@@ -271,12 +274,10 @@ describe('FileService', () => {
 
   describe('createFileRecord', () => {
     beforeEach(() => {
-      mockFileModel.checkHash = vi.fn();
       mockFileModel.create = vi.fn();
     });
 
     it('should return proxy URL format ${APP_URL}/f/:id', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: false });
       mockFileModel.create.mockResolvedValue({ id: 'new-file-id' });
 
       const result = await service.createFileRecord({
@@ -294,7 +295,6 @@ describe('FileService', () => {
     });
 
     it('should use custom id when provided', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: true });
       mockFileModel.create.mockResolvedValue({ id: 'custom-id' });
 
       const result = await service.createFileRecord({
@@ -312,12 +312,11 @@ describe('FileService', () => {
       });
     });
 
-    it('should insert to global files when hash does not exist', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: false });
+    it('should always attempt global_files insert (onConflictDoNothing)', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'file-id' });
 
       await service.createFileRecord({
-        fileHash: 'new-hash',
+        fileHash: 'any-hash',
         fileType: 'text/plain',
         name: 'test.txt',
         size: 100,
@@ -326,29 +325,31 @@ describe('FileService', () => {
 
       expect(mockFileModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          fileHash: 'new-hash',
+          fileHash: 'any-hash',
         }),
-        true, // insertToGlobalFiles = true when hash doesn't exist
+        true,
       );
     });
 
-    it('should not insert to global files when hash already exists', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: true });
+    it('should upsert space_blobs when spaceId is set', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'file-id' });
 
       await service.createFileRecord({
-        fileHash: 'existing-hash',
+        fileHash: 'h1',
         fileType: 'text/plain',
         name: 'test.txt',
         size: 100,
+        spaceId: 'spc_1',
         url: 'files/test.txt',
       });
 
-      expect(mockFileModel.create).toHaveBeenCalledWith(
+      expect(mockUpsertSpaceBlob).toHaveBeenCalledWith(
         expect.objectContaining({
-          fileHash: 'existing-hash',
+          sha256: 'h1',
+          spaceId: 'spc_1',
+          status: 'ready',
+          storageKey: 'files/test.txt',
         }),
-        false, // insertToGlobalFiles = false when hash exists
       );
     });
   });

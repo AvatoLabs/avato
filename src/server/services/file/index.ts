@@ -130,7 +130,8 @@ export class FileService {
 
   /**
    * Create file record (common method)
-   * Automatically handles globalFiles deduplication logic
+   * Always attempts `global_files` insert with `onConflictDoNothing` (no pre-flight `checkHash`) to
+   * avoid cross-user existence side channels. Optional `spaceId` registers `space_blobs` for same-space dedup.
    *
    * @param params - File parameters
    * @param params.id - Optional custom file ID (defaults to auto-generated)
@@ -142,26 +143,36 @@ export class FileService {
     id?: string;
     name: string;
     size: number;
+    spaceId?: string | null;
     url: string;
   }): Promise<{ fileId: string; url: string }> {
-    // Check if hash already exists in globalFiles
-    const { isExist } = await this.fileModel.checkHash(params.fileHash);
-
-    // Create database record
-    // If hash doesn't exist, also create globalFiles record
     const { id } = await this.fileModel.create(
       {
         fileHash: params.fileHash,
         fileType: params.fileType,
-        id: params.id, // Use custom ID if provided
+        id: params.id,
         name: params.name,
         size: params.size,
+        spaceId: params.spaceId ?? undefined,
         url: params.url,
       },
-      !isExist, // insertToGlobalFiles
+      true,
     );
 
-    // Return unified proxy URL: ${APP_URL}/f/:id
+    if (params.spaceId) {
+      await this.resourceModel.upsertSpaceBlob({
+        createdBy: this.userId,
+        fileType: params.fileType,
+        metadata: {},
+        sha256: params.fileHash,
+        size: params.size,
+        spaceId: params.spaceId,
+        status: 'ready',
+        storageKey: params.url,
+        verifiedAt: new Date(),
+      });
+    }
+
     return {
       fileId: id,
       url: `${appEnv.APP_URL}/f/${id}`,
