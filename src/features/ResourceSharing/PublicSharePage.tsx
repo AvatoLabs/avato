@@ -77,9 +77,9 @@ const PublicSharePage = memo(() => {
   }
 
   const downloadUrl =
-    data.kind === 'file'
-      ? `/f/${data.localId}?token=${encodeURIComponent(token || '')}${
-          submittedPassword ? `&password=${encodeURIComponent(submittedPassword)}` : ''
+    data.kind === 'file' && token
+      ? `/share/f/${encodeURIComponent(token)}${
+          submittedPassword ? `?password=${encodeURIComponent(submittedPassword)}` : ''
         }`
       : undefined;
   const title = 'title' in data && data.title ? data.title : data.name;

@@ -27,14 +27,16 @@ export type FileType = z.infer<typeof fileSchema>;
 
 const DEFAULT_S3_REGION = 'us-east-1';
 
+/**
+ * App / user-bucket S3 client. PutObject calls do not set object ACLs: objects stay private at the
+ * bucket default, and reads go through presigned GET or the /f/:id proxy (see resource security model).
+ */
 export class S3 {
   private readonly client: S3Client;
 
   private readonly bucket: string;
 
   private readonly region: string;
-
-  private readonly setAcl: boolean;
 
   private isBucketReady = false;
 
@@ -48,7 +50,6 @@ export class S3 {
       bucket?: string;
       forcePathStyle?: boolean;
       region?: string;
-      setAcl?: boolean;
     },
   ) {
     if (!accessKeyId || !secretAccessKey || !endpoint)
@@ -57,7 +58,6 @@ export class S3 {
 
     this.bucket = options?.bucket;
     this.region = options?.region || DEFAULT_S3_REGION;
-    this.setAcl = options?.setAcl || false;
 
     this.client = new S3Client({
       credentials: {
@@ -202,7 +202,6 @@ export class S3 {
 
   public async createPreSignedUrl(key: string): Promise<string> {
     const command = new PutObjectCommand({
-      ACL: this.setAcl ? 'public-read' : undefined,
       Bucket: this.bucket,
       Key: key,
     });
@@ -232,7 +231,6 @@ export class S3 {
   ) {
     return this.withBucketAutoCreateRetry(async () => {
       const command = new PutObjectCommand({
-        ACL: this.setAcl ? 'public-read' : undefined,
         Body: buffer,
         Bucket: this.bucket,
         CacheControl: cacheControl,
@@ -247,7 +245,6 @@ export class S3 {
   public async uploadContent(path: string, content: string) {
     return this.withBucketAutoCreateRetry(async () => {
       const command = new PutObjectCommand({
-        ACL: this.setAcl ? 'public-read' : undefined,
         Body: content,
         Bucket: this.bucket,
         Key: path,
@@ -264,7 +261,6 @@ export class S3 {
     await this.withBucketAutoCreateRetry(async () => {
       const contentType = mime.getType(key) || 'application/octet-stream';
       const command = new PutObjectCommand({
-        ACL: this.setAcl ? 'public-read' : undefined,
         Body: buffer,
         Bucket: this.bucket,
         CacheControl: `public, max-age=${YEAR}`,
@@ -283,7 +279,6 @@ export class FileS3 extends S3 {
       bucket: fileEnv.S3_BUCKET,
       forcePathStyle: fileEnv.S3_ENABLE_PATH_STYLE,
       region: fileEnv.S3_REGION,
-      setAcl: fileEnv.S3_SET_ACL,
     });
   }
 }

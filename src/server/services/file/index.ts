@@ -5,9 +5,13 @@ import { sha256 } from 'js-sha256';
 
 import { serverDBEnv } from '@/config/db';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
 import { type FileItem } from '@/database/schemas';
 import { appEnv } from '@/envs/app';
-import { AuthorizedResourceResolver } from '@/server/services/resource';
+import {
+  AuthorizedResourceResolver,
+  type ResourceCapability,
+} from '@/server/services/resource';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { createFileServiceModule } from './impls';
@@ -20,6 +24,7 @@ import { type FileServiceImpl } from './impls/type';
 export class FileService {
   private userId: string;
   private fileModel: FileModel;
+  private resourceModel: ResourceModel;
   private resolver: AuthorizedResourceResolver;
 
   private impl: FileServiceImpl;
@@ -27,6 +32,7 @@ export class FileService {
   constructor(db: LobeChatDatabase, userId: string) {
     this.userId = userId;
     this.fileModel = new FileModel(db, userId);
+    this.resourceModel = new ResourceModel(db, userId);
     this.resolver = new AuthorizedResourceResolver(db, userId);
     this.impl = createFileServiceModule(db);
   }
@@ -212,6 +218,11 @@ export class FileService {
    * @returns File content as string
    */
   public async getFileContentByHash(fileHash: string): Promise<string> {
+    const allowed = await this.fileModel.canAccessGlobalFileByHash(fileHash);
+    if (!allowed) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: `Global file not found: ${fileHash}` });
+    }
+
     const result = await this.fileModel.checkHash(fileHash);
     if (!result.isExist || !result.url) {
       throw new TRPCError({ code: 'NOT_FOUND', message: `Global file not found: ${fileHash}` });
@@ -220,6 +231,11 @@ export class FileService {
   }
 
   public async getFileByteArrayByHash(fileHash: string): Promise<Uint8Array> {
+    const allowed = await this.fileModel.canAccessGlobalFileByHash(fileHash);
+    if (!allowed) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: `Global file not found: ${fileHash}` });
+    }
+
     const result = await this.fileModel.checkHash(fileHash);
     if (!result.isExist || !result.url) {
       throw new TRPCError({ code: 'NOT_FOUND', message: `Global file not found: ${fileHash}` });
@@ -334,8 +350,9 @@ export class FileService {
 
   async downloadFileToLocal(
     fileId: string,
+    capability: ResourceCapability = 'read_content',
   ): Promise<{ cleanup: () => void; file: FileItem; filePath: string }> {
-    const file = (await this.resolver.requireFile(fileId, 'read_content')) as FileItem;
+    const file = (await this.resolver.requireFile(fileId, capability)) as FileItem;
 
     let content: Uint8Array | undefined;
     try {
@@ -344,7 +361,10 @@ export class FileService {
       console.error(e);
       // if file not found, delete it from db
       if ((e as any).Code === 'NoSuchKey') {
-        await this.fileModel.delete(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+        await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+        await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
+          { resourceUid: file.resourceUid, spaceId: file.spaceId },
+        ]);
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
       }
     }

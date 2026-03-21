@@ -57,6 +57,7 @@ export const resourceShareRouter = router({
         capability: 'share_link',
         resourceUid: registry.resourceUid,
       });
+      await ctx.resourceAuthorizer.assertCanDelegateSharing(registry.resourceUid);
 
       const rawToken = nanoid();
       const passwordHash = input.password ? await bcrypt.hash(input.password, 10) : undefined;
@@ -80,6 +81,10 @@ export const resourceShareRouter = router({
 
       return {
         expiresAt,
+        fileShareDownloadUrl:
+          registry.kind === 'file'
+            ? `${appEnv.APP_URL}/share/f/${rawToken}`
+            : undefined,
         id: link.id,
         shareUrl: `${appEnv.APP_URL}/share/r/${rawToken}`,
       };
@@ -95,6 +100,7 @@ export const resourceShareRouter = router({
         capability: 'share_link',
         resourceUid: link.resourceUid,
       });
+      await ctx.resourceAuthorizer.assertCanDelegateSharing(link.resourceUid);
 
       await ctx.resourceModel.disableShareLink(input.shareLinkId);
 
@@ -197,10 +203,7 @@ export const resourceShareRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const registry = await resolveTargetResource(ctx.resourceModel, input);
-      await ctx.resourceAuthorizer.assertCapability({
-        capability: 'share_member',
-        resourceUid: registry.resourceUid,
-      });
+      await ctx.resourceAuthorizer.assertCanDelegateSharing(registry.resourceUid);
 
       const user = await UserModel.findByUsername(ctx.serverDB, input.username);
       if (!user?.id) throw new TRPCError({ code: 'NOT_FOUND', message: 'USER_NOT_FOUND' });
@@ -279,6 +282,7 @@ export const resourceShareRouter = router({
         capability: 'share_member',
         resourceUid: permission.resourceUid,
       });
+      await ctx.resourceAuthorizer.assertCanDelegateSharing(permission.resourceUid);
 
       await ctx.resourceModel.revokePermission(input.permissionId);
 

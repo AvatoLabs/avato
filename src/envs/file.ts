@@ -38,6 +38,7 @@ export const getFileConfig = () => {
       S3_PUBLIC_DOMAIN,
       S3_REGION: process.env.S3_REGION,
       S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+      // App bucket PutObject no longer sets object ACL; value kept for backward-compatible deployments.
       S3_SET_ACL: process.env.S3_SET_ACL !== '0',
     },
     server: {

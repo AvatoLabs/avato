@@ -1094,7 +1094,6 @@ export class MemoryExtractionExecutor {
           bucket: this.modelConfig.observabilityS3?.bucketName,
           forcePathStyle: this.modelConfig.observabilityS3?.forcePathStyle,
           region: this.modelConfig.observabilityS3?.region,
-          setAcl: false,
         },
       );
     }

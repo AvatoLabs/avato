@@ -11,6 +11,7 @@ import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
 import { EmbeddingModel } from '@/database/models/embedding';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
 import { type NewChunkItem, type NewEmbeddingsItem } from '@/database/schemas';
 import { fileEnv } from '@/envs/file';
 import { asyncAuthedProcedure, asyncRouter as router } from '@/libs/trpc/async';
@@ -18,6 +19,7 @@ import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
 import { FileService } from '@/server/services/file';
+import { ResourceAuthorizer } from '@/server/services/resource';
 import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { safeParseJSON } from '@/utils/safeParseJSON';
@@ -34,6 +36,8 @@ const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
       embeddingModel: new EmbeddingModel(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
+      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
+      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -49,7 +53,13 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const file = await ctx.fileModel.findById(input.fileId);
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.fileId,
+        kind: 'file',
+      });
+
+      const file = await ctx.fileModel.findByIdAny(input.fileId);
 
       if (!file) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
@@ -158,7 +168,13 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const file = await ctx.fileModel.findById(input.fileId);
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.fileId,
+        kind: 'file',
+      });
+
+      const file = await ctx.fileModel.findByIdAny(input.fileId);
       if (!file) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
       }
@@ -170,7 +186,10 @@ export const fileRouter = router({
         console.error(e);
         // if file not found, delete it from db
         if ((e as any).Code === 'NoSuchKey') {
-          await ctx.fileModel.delete(input.fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+          await ctx.fileModel.deleteAny(input.fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+          await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
+            { resourceUid: file.resourceUid, spaceId: file.spaceId },
+          ]);
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
         }
       }

@@ -6,6 +6,10 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { FileService } from '../index';
 
+const { mockRequireFile } = vi.hoisted(() => ({
+  mockRequireFile: vi.fn(),
+}));
+
 vi.mock('@/config/db', () => ({
   serverDBEnv: {
     REMOVE_GLOBAL_FILE: false,
@@ -35,6 +39,18 @@ vi.mock('../impls', () => ({
 
 vi.mock('@/database/models/file');
 
+vi.mock('@/database/models/resource', () => ({
+  ResourceModel: vi.fn(() => ({
+    invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+vi.mock('@/server/services/resource', () => ({
+  AuthorizedResourceResolver: vi.fn().mockImplementation(() => ({
+    requireFile: mockRequireFile,
+  })),
+}));
+
 vi.mock('@/server/utils/tempFileManager');
 
 vi.mock('@/utils/uuid', () => ({
@@ -51,8 +67,8 @@ describe('FileService', () => {
 
   beforeEach(() => {
     mockFileModel = {
+      deleteAny: vi.fn(),
       findById: vi.fn(),
-      delete: vi.fn(),
     };
     mockTempManager = {
       writeTempFile: vi.fn(),
@@ -64,6 +80,7 @@ describe('FileService', () => {
     // Mock console.error to test error logging
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    mockRequireFile.mockReset();
     service = new FileService(mockDb, mockUserId);
   });
 
@@ -80,15 +97,13 @@ describe('FileService', () => {
     };
 
     it('should throw error if file not found', async () => {
-      mockFileModel.findById.mockResolvedValue(undefined);
+      mockRequireFile.mockRejectedValue(new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' }));
 
-      await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
-        new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' }),
-      );
+      await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(TRPCError);
     });
 
     it('should throw error if file content is empty', async () => {
-      mockFileModel.findById.mockResolvedValue(mockFile);
+      mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockResolvedValue(undefined as any);
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
@@ -97,19 +112,19 @@ describe('FileService', () => {
     });
 
     it('should delete file from db and throw error if file not found in storage', async () => {
-      mockFileModel.findById.mockResolvedValue(mockFile);
+      mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockRejectedValue({ Code: 'NoSuchKey' });
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
         new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' }),
       );
 
-      expect(mockFileModel.delete).toHaveBeenCalledWith('test-file-id', false);
+      expect(mockFileModel.deleteAny).toHaveBeenCalledWith('test-file-id', false);
     });
 
     it('should log error and rethrow for non-NoSuchKey errors', async () => {
       const originalError = new Error('Network error');
-      mockFileModel.findById.mockResolvedValue(mockFile);
+      mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockRejectedValue(originalError);
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
@@ -119,11 +134,11 @@ describe('FileService', () => {
       // 验证错误被记录到控制台
       expect(consoleErrorSpy).toHaveBeenCalledWith(originalError);
       // 验证没有调用删除操作（因为不是NoSuchKey错误）
-      expect(mockFileModel.delete).not.toHaveBeenCalled();
+      expect(mockFileModel.deleteAny).not.toHaveBeenCalled();
     });
 
     it('should handle getFileByteArray returning null content', async () => {
-      mockFileModel.findById.mockResolvedValue(mockFile);
+      mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockResolvedValue(null as any);
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
@@ -135,7 +150,7 @@ describe('FileService', () => {
       const mockContent = new Uint8Array([1, 2, 3]);
       const mockFilePath = '/tmp/test.txt';
 
-      mockFileModel.findById.mockResolvedValue(mockFile);
+      mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockResolvedValue(mockContent);
       mockTempManager.writeTempFile.mockResolvedValue(mockFilePath);
 

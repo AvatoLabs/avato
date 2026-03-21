@@ -19,6 +19,7 @@ export type ResourceCapability =
   | 'download_blob'
   | 'manage_members'
   | 'move'
+  | 'preview_content'
   | 'read_content'
   | 'read_metadata'
   | 'share_link'
@@ -51,6 +52,7 @@ const RESOURCE_ROLE_CAPABILITIES: Record<ResourceRole, ResourceCapability[]> = {
     'delete',
     'download_blob',
     'move',
+    'preview_content',
     'read_content',
     'read_metadata',
     'share_link',
@@ -62,12 +64,13 @@ const RESOURCE_ROLE_CAPABILITIES: Record<ResourceRole, ResourceCapability[]> = {
     'download_blob',
     'manage_members',
     'move',
+    'preview_content',
     'read_content',
     'read_metadata',
     'share_link',
     'share_member',
   ],
-  viewer: ['download_blob', 'read_content', 'read_metadata'],
+  viewer: ['download_blob', 'preview_content', 'read_content', 'read_metadata'],
 };
 
 const SPACE_ROLE_CAPABILITIES: Record<SpaceRole, ResourceCapability[]> = {
@@ -77,6 +80,7 @@ const SPACE_ROLE_CAPABILITIES: Record<SpaceRole, ResourceCapability[]> = {
     'download_blob',
     'manage_members',
     'move',
+    'preview_content',
     'read_content',
     'read_metadata',
     'share_link',
@@ -87,6 +91,7 @@ const SPACE_ROLE_CAPABILITIES: Record<SpaceRole, ResourceCapability[]> = {
     'delete',
     'download_blob',
     'move',
+    'preview_content',
     'read_content',
     'read_metadata',
     'share_link',
@@ -98,16 +103,44 @@ const SPACE_ROLE_CAPABILITIES: Record<SpaceRole, ResourceCapability[]> = {
     'download_blob',
     'manage_members',
     'move',
+    'preview_content',
     'read_content',
     'read_metadata',
     'share_link',
     'share_member',
   ],
-  viewer: ['download_blob', 'read_content', 'read_metadata'],
+  viewer: ['download_blob', 'preview_content', 'read_content', 'read_metadata'],
 };
 
 const hasCapability = (capabilitySet: ResourceCapability[], capability: ResourceCapability) =>
   capabilitySet.includes(capability);
+
+/** Parse / preview / RAG / search: allow `preview_content` or stricter `read_content`. */
+const resourceRoleHasCapability = (role: ResourceRole, capability: ResourceCapability) => {
+  const caps = RESOURCE_ROLE_CAPABILITIES[role];
+  if (capability === 'preview_content') {
+    return hasCapability(caps, 'preview_content') || hasCapability(caps, 'read_content');
+  }
+  return hasCapability(caps, capability);
+};
+
+const spaceRoleHasCapability = (role: SpaceRole, capability: ResourceCapability) => {
+  const caps = SPACE_ROLE_CAPABILITIES[role];
+  if (capability === 'preview_content') {
+    return hasCapability(caps, 'preview_content') || hasCapability(caps, 'read_content');
+  }
+  return hasCapability(caps, capability);
+};
+
+const shareViewerAllowsCapability = (capability: ResourceCapability) => {
+  if (capability === 'preview_content') {
+    return (
+      hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, 'preview_content') ||
+      hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, 'read_content')
+    );
+  }
+  return hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, capability);
+};
 
 export class ResourceAuthorizer {
   private readonly db: LobeChatDatabase;
@@ -266,7 +299,7 @@ export class ResourceAuthorizer {
     capability: ResourceCapability,
   ): Promise<AccessMatch | null> => {
     const spaceRole = await this.getSpaceRole(resource.spaceId);
-    if (spaceRole && hasCapability(SPACE_ROLE_CAPABILITIES[spaceRole], capability)) {
+    if (spaceRole && spaceRoleHasCapability(spaceRole, capability)) {
       return {
         authzEpoch: Math.max(resource.authzEpoch, resource.spaceAuthzEpoch),
         canAccess: true,
@@ -279,10 +312,7 @@ export class ResourceAuthorizer {
     }
 
     const directPermission = await this.getDirectPermissionForUser(resource.resourceUid);
-    if (
-      directPermission &&
-      hasCapability(RESOURCE_ROLE_CAPABILITIES[directPermission.role], capability)
-    ) {
+    if (directPermission && resourceRoleHasCapability(directPermission.role, capability)) {
       return {
         authzEpoch: Math.max(resource.authzEpoch, resource.spaceAuthzEpoch),
         canAccess: true,
@@ -300,6 +330,7 @@ export class ResourceAuthorizer {
     const parentUids = parentChain.map((item) => item.resourceUid);
     const inheritedPermissions = await this.db
       .select({
+        canReshare: resourcePermissions.canReshare,
         inheritsToChildren: resourcePermissions.inheritsToChildren,
         resourceUid: resourcePermissions.resourceUid,
         role: resourcePermissions.role,
@@ -315,8 +346,13 @@ export class ResourceAuthorizer {
         ),
       );
 
-    const inherited = inheritedPermissions.find((item) =>
-      hasCapability(RESOURCE_ROLE_CAPABILITIES[item.role], capability),
+    const inherited = inheritedPermissions.find(
+      (item: {
+        canReshare: boolean;
+        inheritsToChildren: boolean;
+        resourceUid: string;
+        role: ResourceRole;
+      }) => resourceRoleHasCapability(item.role, capability),
     );
 
     if (!inherited) return null;
@@ -348,7 +384,7 @@ export class ResourceAuthorizer {
     if (!resource) return null;
 
     const shareLinkAccess = await this.getShareLinkAccess(resource, params.shareToken);
-    if (shareLinkAccess && hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, params.capability)) {
+    if (shareLinkAccess && shareViewerAllowsCapability(params.capability)) {
       return shareLinkAccess;
     }
 
@@ -369,6 +405,90 @@ export class ResourceAuthorizer {
     }
 
     return access;
+  };
+
+  /**
+   * Member grants and share-link CRUD: space owner/admin always allowed; space editors (membership)
+   * allowed; direct or inherited **editor** must have `canReshare` on the granting row.
+   */
+  assertCanDelegateSharing = async (resourceUid: string) => {
+    const resource = await this.resolveByUid(resourceUid);
+    if (!resource) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'RESOURCE_NOT_FOUND' });
+    }
+
+    const access = await this.getBestPermission(resource, 'share_member');
+    if (!access?.canAccess) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+    }
+
+    const spaceRole = await this.getSpaceRole(resource.spaceId);
+    if (spaceRole === 'owner' || spaceRole === 'admin') {
+      return;
+    }
+
+    if (access.matchedBy === 'space_member') {
+      return;
+    }
+
+    if (access.matchedBy === 'direct') {
+      const direct = await this.getDirectPermissionForUser(resource.resourceUid);
+      if (!direct) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+      }
+      if (direct.role === 'owner') {
+        return;
+      }
+      if (direct.role === 'editor' && !direct.canReshare) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
+      }
+      if (direct.role === 'viewer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+      }
+      return;
+    }
+
+    if (access.matchedBy === 'inherited') {
+      const parentChain = await this.getParentChain(resource);
+      const parentUids = parentChain.map((item) => item.resourceUid);
+      const inheritedPermissions = await this.db
+        .select({
+          canReshare: resourcePermissions.canReshare,
+          resourceUid: resourcePermissions.resourceUid,
+          role: resourcePermissions.role,
+        })
+        .from(resourcePermissions)
+        .where(
+          and(
+            inArray(resourcePermissions.resourceUid, parentUids),
+            eq(resourcePermissions.subjectType, 'user'),
+            eq(resourcePermissions.subjectId, this.userId),
+            eq(resourcePermissions.inheritsToChildren, true),
+            or(isNull(resourcePermissions.expiresAt), gt(resourcePermissions.expiresAt, new Date())),
+          ),
+        );
+
+      const inherited = inheritedPermissions.find(
+        (item: { canReshare: boolean; resourceUid: string; role: ResourceRole }) =>
+          hasCapability(RESOURCE_ROLE_CAPABILITIES[item.role], 'share_member'),
+      );
+
+      if (!inherited) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+      }
+      if (inherited.role === 'owner') {
+        return;
+      }
+      if (inherited.role === 'editor' && !inherited.canReshare) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
+      }
+      if (inherited.role === 'viewer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
+      }
+      return;
+    }
+
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
   };
 
   explainAccess = async (params: {
@@ -411,7 +531,7 @@ export class ResourceAuthorizer {
 
     for (const fileId of fileIds) {
       const match = await this.getAccessMatch({
-        capability: 'read_content',
+        capability: 'preview_content',
         id: fileId,
         kind: 'file',
       });
@@ -422,12 +542,45 @@ export class ResourceAuthorizer {
     return readable;
   };
 
+  /** List endpoints: only include files the caller may see at metadata level. */
+  filterVisibleFileIdsForList = async (fileIds: string[]) => {
+    const visible: string[] = [];
+
+    for (const fileId of fileIds) {
+      const match = await this.getAccessMatch({
+        capability: 'read_metadata',
+        id: fileId,
+        kind: 'file',
+      });
+
+      if (match?.canAccess) visible.push(fileId);
+    }
+
+    return visible;
+  };
+
+  filterVisibleDocumentIdsForList = async (documentIds: string[]) => {
+    const visible: string[] = [];
+
+    for (const documentId of documentIds) {
+      const match = await this.getAccessMatch({
+        capability: 'read_metadata',
+        id: documentId,
+        kind: 'document',
+      });
+
+      if (match?.canAccess) visible.push(documentId);
+    }
+
+    return visible;
+  };
+
   filterReadableKnowledgeBaseIds = async (knowledgeIds: string[]) => {
     const readable: string[] = [];
 
     for (const knowledgeId of knowledgeIds) {
       const match = await this.getAccessMatch({
-        capability: 'read_content',
+        capability: 'preview_content',
         id: knowledgeId,
         kind: 'knowledge_base',
       });

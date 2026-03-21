@@ -80,7 +80,6 @@ describe('S3', () => {
           bucket: testFileEnv.S3_BUCKET,
           forcePathStyle: testFileEnv.S3_ENABLE_PATH_STYLE,
           region: testFileEnv.S3_REGION,
-          setAcl: testFileEnv.S3_SET_ACL,
         },
       );
 
@@ -117,7 +116,6 @@ describe('S3', () => {
           bucket: testEnvWithoutRegion.S3_BUCKET,
           forcePathStyle: testEnvWithoutRegion.S3_ENABLE_PATH_STYLE,
           region: testEnvWithoutRegion.S3_REGION,
-          setAcl: testEnvWithoutRegion.S3_SET_ACL,
         },
       );
 
@@ -364,13 +362,12 @@ describe('FileS3', () => {
   });
 
   describe('createPreSignedUrl', () => {
-    it('should create presigned URL for upload with ACL', async () => {
+    it('should create presigned URL for upload without object ACL (private object)', async () => {
       const s3 = new FileS3();
 
       const result = await s3.createPreSignedUrl('upload-file.txt');
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Bucket: 'test-bucket',
         Key: 'upload-file.txt',
       });
@@ -417,7 +414,6 @@ describe('FileS3', () => {
       await s3.uploadBuffer('test-file.bin', buffer, 'application/octet-stream');
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: buffer,
         Bucket: 'test-bucket',
         ContentType: 'application/octet-stream',
@@ -434,7 +430,6 @@ describe('FileS3', () => {
       await s3.uploadBuffer('test-file.bin', buffer);
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: buffer,
         Bucket: 'test-bucket',
         ContentType: undefined,
@@ -460,7 +455,6 @@ describe('FileS3', () => {
         CreateBucketConfiguration: undefined,
       });
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: buffer,
         Bucket: 'test-bucket',
         ContentType: 'application/octet-stream',
@@ -497,7 +491,6 @@ describe('FileS3', () => {
       await s3.uploadContent('test-file.txt', content);
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: content,
         Bucket: 'test-bucket',
         Key: 'test-file.txt',
@@ -512,7 +505,6 @@ describe('FileS3', () => {
       await s3.uploadContent('empty.txt', '');
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: '',
         Bucket: 'test-bucket',
         Key: 'empty.txt',
@@ -529,7 +521,6 @@ describe('FileS3', () => {
       await s3.uploadMedia('image.jpg', buffer);
 
       expect(PutObjectCommand).toHaveBeenCalledWith({
-        ACL: 'public-read',
         Body: buffer,
         Bucket: 'test-bucket',
         CacheControl: expect.stringContaining('public, max-age='),

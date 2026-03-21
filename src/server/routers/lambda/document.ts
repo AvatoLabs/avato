@@ -7,6 +7,7 @@ import { MessageModel } from '@/database/models/message';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { DocumentService } from '@/server/services/document';
+import { ResourceAuthorizer } from '@/server/services/resource';
 
 const documentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -18,6 +19,7 @@ const documentProcedure = authedProcedure.use(serverDatabase).use(async (opts) =
       documentService: new DocumentService(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
+      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -122,23 +124,50 @@ export const documentRouter = router({
   getFolderBreadcrumb: documentProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
-      const chain = [];
-      let currentFolder = await ctx.documentModel.findBySlug(input.slug);
+      let candidates = await ctx.documentModel.findManyBySlug(input.slug);
+      if (candidates.length === 0) {
+        const byId = await ctx.documentModel.findByIdAny(input.slug);
+        if (byId) candidates = [byId];
+      }
 
-      // Build chain from current folder to root
-      while (currentFolder) {
-        chain.unshift({
-          id: currentFolder.id,
-          name: currentFolder.title || currentFolder.filename || 'Untitled',
-          slug: currentFolder.slug || currentFolder.id,
+      let start = undefined as (typeof candidates)[number] | undefined;
+      for (const doc of candidates) {
+        const m = await ctx.resourceAuthorizer.getAccessMatch({
+          capability: 'read_metadata',
+          id: doc.id,
+          kind: 'document',
         });
-
-        // Find parent folder
-        if (currentFolder.parentId) {
-          currentFolder = await ctx.documentModel.findById(currentFolder.parentId);
-        } else {
+        if (m?.canAccess) {
+          start = doc;
           break;
         }
+      }
+
+      if (!start) return [];
+
+      const chain: Array<{ id: string; name: string; slug: string }> = [];
+      let current: typeof start | undefined = start;
+
+      while (current) {
+        chain.unshift({
+          id: current.id,
+          name: current.title || current.filename || 'Untitled',
+          slug: current.slug || current.id,
+        });
+
+        if (!current.parentId) break;
+
+        const parent = await ctx.documentModel.findByIdAny(current.parentId);
+        if (!parent) break;
+
+        const parentAccess = await ctx.resourceAuthorizer.getAccessMatch({
+          capability: 'read_metadata',
+          id: parent.id,
+          kind: 'document',
+        });
+        if (!parentAccess?.canAccess) break;
+
+        current = parent;
       }
 
       return chain;
@@ -151,6 +180,12 @@ export const documentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.id,
+        kind: 'file',
+      });
+
       const lobeDocument = await ctx.documentService.parseDocument(input.id);
 
       return lobeDocument;
@@ -164,6 +199,12 @@ export const documentRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.id,
+        kind: 'file',
+      });
+
       const lobeDocument = await ctx.documentService.parseFile(input.id);
 
       return lobeDocument;

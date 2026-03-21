@@ -115,7 +115,10 @@ class SkillServerRuntimeService implements SkillRuntimeService {
 
         if (skill.zipFileHash) {
           // Get S3 key from globalFiles
-          const fileInfo = await this.fileModel.checkHash(skill.zipFileHash);
+          const canAccess = await this.fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
+          const fileInfo = canAccess
+            ? await this.fileModel.checkHash(skill.zipFileHash)
+            : { isExist: false };
 
           if (fileInfo.isExist && fileInfo.url) {
             // Convert S3 key to full URL

@@ -7,12 +7,17 @@ import { FileModel } from '@/database/models/file';
 import { FileService } from '../../file';
 import { DocumentService } from '../index';
 
+const { mockRequireDocument } = vi.hoisted(() => ({
+  mockRequireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
+}));
+
 vi.mock('@/database/models/document');
 vi.mock('@/database/models/file');
 vi.mock('@/database/models/resource', () => ({
   ResourceModel: vi.fn(() => ({
     ensureOwnerPermission: vi.fn(),
     ensureResourceRegistry: vi.fn().mockResolvedValue({ resourceUid: 'res_test' }),
+    invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 vi.mock('@/database/models/space', () => ({
@@ -22,9 +27,10 @@ vi.mock('@/database/models/space', () => ({
   })),
 }));
 vi.mock('../../file');
+
 vi.mock('../../resource', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
-    requireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
+    requireDocument: mockRequireDocument,
     requireKnowledgeBase: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
   })),
   ResourceAuthorizer: vi.fn(() => ({
@@ -73,16 +79,21 @@ describe('DocumentService', () => {
     mockDocumentModel = {
       create: vi.fn(),
       delete: vi.fn(),
+      deleteManyAny: vi.fn(),
       findById: vi.fn(),
+      findByIdAny: vi.fn(),
       query: vi.fn(),
       update: vi.fn(),
+      updateAny: vi.fn(),
     };
 
     mockFileModel = {
       create: vi.fn(),
       delete: vi.fn(),
+      deleteManyAny: vi.fn(),
       findById: vi.fn(),
       update: vi.fn(),
+      updateAny: vi.fn(),
     };
 
     mockFileService = {
@@ -318,18 +329,19 @@ describe('DocumentService', () => {
   });
 
   describe('getDocumentById', () => {
-    it('should delegate to documentModel.findById', async () => {
+    it('should load document after requireDocument using findByIdAny', async () => {
       const mockDoc = { id: 'doc-1', title: 'Test' };
-      mockDocumentModel.findById.mockResolvedValue(mockDoc);
+      mockDocumentModel.findByIdAny.mockResolvedValue(mockDoc);
 
       const result = await service.getDocumentById('doc-1');
 
       expect(result).toEqual(mockDoc);
-      expect(mockDocumentModel.findById).toHaveBeenCalledWith('doc-1');
+      expect(mockRequireDocument).toHaveBeenCalledWith('doc-1', 'read_metadata');
+      expect(mockDocumentModel.findByIdAny).toHaveBeenCalledWith('doc-1');
     });
 
     it('should return undefined when document not found', async () => {
-      mockDocumentModel.findById.mockResolvedValue(undefined);
+      mockDocumentModel.findByIdAny.mockResolvedValue(undefined);
 
       const result = await service.getDocumentById('non-existent');
 
@@ -339,84 +351,70 @@ describe('DocumentService', () => {
 
   describe('deleteDocument', () => {
     it('should return early if document not found', async () => {
-      mockDocumentModel.findById.mockResolvedValue(undefined);
+      (mockDb.query as any).documents.findMany.mockResolvedValue([]);
 
       await service.deleteDocument('non-existent');
 
-      expect(mockDocumentModel.delete).not.toHaveBeenCalled();
-      expect(mockFileModel.delete).not.toHaveBeenCalled();
+      expect(mockDocumentModel.deleteManyAny).not.toHaveBeenCalled();
+      expect(mockFileModel.deleteManyAny).not.toHaveBeenCalled();
     });
 
     it('should delete a simple document without fileId', async () => {
-      mockDocumentModel.findById.mockResolvedValue({
-        id: 'doc-1',
-        fileType: 'custom/document',
-        fileId: null,
-      });
-      mockDocumentModel.delete.mockResolvedValue(undefined);
+      (mockDb.query as any).documents.findMany.mockResolvedValue([
+        { fileId: null, fileType: 'custom/document', id: 'doc-1' },
+      ]);
 
       await service.deleteDocument('doc-1');
 
-      expect(mockFileModel.delete).not.toHaveBeenCalled();
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('doc-1');
+      expect(mockRequireDocument).toHaveBeenCalledWith('doc-1', 'delete');
+      expect(mockFileModel.deleteManyAny).not.toHaveBeenCalled();
+      expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1']);
     });
 
     it('should delete a simple document and its associated file', async () => {
-      mockDocumentModel.findById.mockResolvedValue({
-        id: 'doc-1',
-        fileType: 'custom/document',
-        fileId: 'file-1',
-      });
-      mockDocumentModel.delete.mockResolvedValue(undefined);
-      mockFileModel.delete.mockResolvedValue(undefined);
+      (mockDb.query as any).documents.findMany.mockResolvedValue([
+        { fileId: 'file-1', fileType: 'custom/document', id: 'doc-1' },
+      ]);
 
       await service.deleteDocument('doc-1');
 
-      expect(mockFileModel.delete).toHaveBeenCalledWith('file-1');
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('doc-1');
+      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-1']);
+      expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1']);
     });
 
     it('should recursively delete children when deleting a folder', async () => {
-      // Folder has two children: one regular doc and one folder
-      mockDocumentModel.findById
-        .mockResolvedValueOnce({ id: 'folder-1', fileType: 'custom/folder', fileId: null })
+      mockDocumentModel.findByIdAny
         .mockResolvedValueOnce({
-          id: 'child-doc-1',
-          fileType: 'custom/document',
           fileId: 'file-child-1',
+          fileType: 'custom/document',
+          id: 'child-doc-1',
         })
-        .mockResolvedValueOnce({ id: 'child-folder-2', fileType: 'custom/folder', fileId: null });
+        .mockResolvedValueOnce({ fileId: null, fileType: 'custom/folder', id: 'child-folder-2' });
 
-      // 1st call: root lookup by id (returns empty from query layer, fallback uses findById)
-      // 2nd call: children of folder-1
-      // 3rd call: children of child-folder-2 (empty)
       (mockDb.query as any).documents.findMany
-        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ fileId: null, fileType: 'custom/folder', id: 'folder-1' }])
         .mockResolvedValueOnce([{ id: 'child-doc-1' }, { id: 'child-folder-2' }])
         .mockResolvedValueOnce([]);
 
-      // Files in each folder
       (mockDb.query as any).files.findMany
-        .mockResolvedValueOnce([]) // files in folder-1
-        .mockResolvedValueOnce([]); // files in child-folder-2
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       await service.deleteDocument('folder-1');
 
-      // Should have deleted child-doc-1's associated file
-      expect(mockFileModel.delete).toHaveBeenCalledWith('file-child-1');
-      // Should have deleted all documents
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('child-doc-1');
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('child-folder-2');
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('folder-1');
+      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-child-1']);
+      expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith([
+        'folder-1',
+        'child-doc-1',
+        'child-folder-2',
+      ]);
     });
 
     it('should delete files in folder when folder has associated files', async () => {
-      mockDocumentModel.findById.mockResolvedValue({
-        id: 'folder-1',
-        fileType: 'custom/folder',
-        fileId: null,
-      });
-      (mockDb.query as any).documents.findMany.mockResolvedValue([]);
+      (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([{ fileId: null, fileType: 'custom/folder', id: 'folder-1' }])
+        .mockResolvedValueOnce([]);
+
       (mockDb.query as any).files.findMany.mockResolvedValue([
         { id: 'file-in-folder-1' },
         { id: 'file-in-folder-2' },
@@ -424,40 +422,44 @@ describe('DocumentService', () => {
 
       await service.deleteDocument('folder-1');
 
-      expect(mockFileModel.delete).toHaveBeenCalledWith('file-in-folder-1');
-      expect(mockFileModel.delete).toHaveBeenCalledWith('file-in-folder-2');
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('folder-1');
+      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith([
+        'file-in-folder-1',
+        'file-in-folder-2',
+      ]);
+      expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['folder-1']);
     });
   });
 
   describe('deleteDocuments', () => {
     it('should delete multiple documents in parallel', async () => {
-      mockDocumentModel.findById
-        .mockResolvedValueOnce({ id: 'doc-1', fileType: 'custom/document', fileId: null })
-        .mockResolvedValueOnce({ id: 'doc-2', fileType: 'custom/document', fileId: 'file-2' });
+      (mockDb.query as any).documents.findMany.mockResolvedValue([
+        { fileId: null, fileType: 'custom/document', id: 'doc-1' },
+        { fileId: 'file-2', fileType: 'custom/document', id: 'doc-2' },
+      ]);
 
       await service.deleteDocuments(['doc-1', 'doc-2']);
 
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('doc-1');
-      expect(mockDocumentModel.delete).toHaveBeenCalledWith('doc-2');
-      expect(mockFileModel.delete).toHaveBeenCalledWith('file-2');
+      expect(mockRequireDocument).toHaveBeenCalledWith('doc-1', 'delete');
+      expect(mockRequireDocument).toHaveBeenCalledWith('doc-2', 'delete');
+      expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1', 'doc-2']);
+      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-2']);
     });
 
     it('should handle empty ids array', async () => {
       await service.deleteDocuments([]);
-      expect(mockDocumentModel.findById).not.toHaveBeenCalled();
+      expect(mockRequireDocument).not.toHaveBeenCalled();
     });
   });
 
   describe('updateDocument', () => {
     it('should update content and recalculate char/line counts', async () => {
       const newContent = 'Updated\nContent';
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { content: newContent });
 
-      expect(mockDocumentModel.update).toHaveBeenCalledWith(
+      expect(mockDocumentModel.updateAny).toHaveBeenCalledWith(
         'doc-1',
         expect.objectContaining({
           content: newContent,
@@ -469,24 +471,24 @@ describe('DocumentService', () => {
 
     it('should update editorData', async () => {
       const editorData = { blocks: [{ type: 'paragraph', text: 'Hello' }] };
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { editorData });
 
-      expect(mockDocumentModel.update).toHaveBeenCalledWith(
+      expect(mockDocumentModel.updateAny).toHaveBeenCalledWith(
         'doc-1',
         expect.objectContaining({ editorData }),
       );
     });
 
     it('should update title and filename together', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { title: 'New Title' });
 
-      expect(mockDocumentModel.update).toHaveBeenCalledWith(
+      expect(mockDocumentModel.updateAny).toHaveBeenCalledWith(
         'doc-1',
         expect.objectContaining({
           title: 'New Title',
@@ -496,80 +498,80 @@ describe('DocumentService', () => {
     });
 
     it('should sync title update to associated file', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: 'file-1' });
-      mockFileModel.update.mockResolvedValue(undefined);
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.updateAny.mockResolvedValue(undefined);
 
       await service.updateDocument('doc-1', { title: 'New Title' });
 
-      expect(mockFileModel.update).toHaveBeenCalledWith('file-1', { name: 'New Title' });
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { name: 'New Title' });
     });
 
     it('should sync parentId update to associated file', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: 'file-1' });
-      mockFileModel.update.mockResolvedValue(undefined);
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.updateAny.mockResolvedValue(undefined);
 
       await service.updateDocument('doc-1', { parentId: 'new-parent' });
 
-      expect(mockFileModel.update).toHaveBeenCalledWith('file-1', { parentId: 'new-parent' });
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { parentId: 'new-parent' });
     });
 
     it('should sync both title and parentId to file when both are updated', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: 'file-1' });
-      mockFileModel.update.mockResolvedValue(undefined);
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.updateAny.mockResolvedValue(undefined);
 
       await service.updateDocument('doc-1', { title: 'New Title', parentId: 'new-parent' });
 
-      expect(mockFileModel.update).toHaveBeenCalledWith('file-1', {
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', {
         name: 'New Title',
         parentId: 'new-parent',
       });
     });
 
     it('should NOT update file when document has no associated file', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { title: 'New Title' });
 
-      expect(mockFileModel.update).not.toHaveBeenCalled();
+      expect(mockFileModel.updateAny).not.toHaveBeenCalled();
     });
 
     it('should update metadata', async () => {
       const metadata = { key: 'value' };
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { metadata });
 
-      expect(mockDocumentModel.update).toHaveBeenCalledWith(
+      expect(mockDocumentModel.updateAny).toHaveBeenCalledWith(
         'doc-1',
         expect.objectContaining({ metadata }),
       );
     });
 
     it('should update fileType', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: null });
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: null, id: 'doc-1' });
 
       await service.updateDocument('doc-1', { fileType: 'text/markdown' });
 
-      expect(mockDocumentModel.update).toHaveBeenCalledWith(
+      expect(mockDocumentModel.updateAny).toHaveBeenCalledWith(
         'doc-1',
         expect.objectContaining({ fileType: 'text/markdown' }),
       );
     });
 
     it('should handle parentId null (moving to root)', async () => {
-      mockDocumentModel.update.mockResolvedValue({ id: 'doc-1' });
-      mockDocumentModel.findById.mockResolvedValue({ id: 'doc-1', fileId: 'file-1' });
-      mockFileModel.update.mockResolvedValue(undefined);
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.updateAny.mockResolvedValue(undefined);
 
       await service.updateDocument('doc-1', { parentId: null });
 
-      expect(mockFileModel.update).toHaveBeenCalledWith('file-1', { parentId: null });
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { parentId: null });
     });
   });
 

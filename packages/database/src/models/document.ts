@@ -35,6 +35,17 @@ export class DocumentModel {
       .where(and(eq(documents.id, id), eq(documents.userId, this.userId)));
   };
 
+  /** Delete by ids only. Caller must enforce authorization first. */
+  deleteManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db.delete(documents).where(inArray(documents.id, chunk));
+    }
+  };
+
   deleteAll = async () => {
     return this.db.delete(documents).where(eq(documents.userId, this.userId));
   };
@@ -113,6 +124,13 @@ export class DocumentModel {
     });
   };
 
+  /** By primary key only. Caller must enforce authorization first. */
+  findByIdAny = async (id: string): Promise<DocumentItem | undefined> => {
+    return this.db.query.documents.findFirst({
+      where: eq(documents.id, id),
+    });
+  };
+
   findByFileId = async (fileId: string) => {
     return this.db.query.documents.findFirst({
       where: and(eq(documents.userId, this.userId), eq(documents.fileId, fileId)),
@@ -125,10 +143,27 @@ export class DocumentModel {
     });
   };
 
+  /**
+   * All rows with this slug (unique per space). Caller must filter by authorization.
+   */
+  findManyBySlug = async (slug: string): Promise<DocumentItem[]> => {
+    return this.db.query.documents.findMany({
+      where: eq(documents.slug, slug),
+    });
+  };
+
   update = async (id: string, value: Partial<DocumentItem>) => {
     return this.db
       .update(documents)
       .set({ ...value, updatedAt: new Date() })
       .where(and(eq(documents.userId, this.userId), eq(documents.id, id)));
+  };
+
+  /** Update by id only. Caller must enforce authorization first. */
+  updateAny = async (id: string, value: Partial<DocumentItem>) => {
+    return this.db
+      .update(documents)
+      .set({ ...value, updatedAt: new Date() })
+      .where(eq(documents.id, id));
   };
 }

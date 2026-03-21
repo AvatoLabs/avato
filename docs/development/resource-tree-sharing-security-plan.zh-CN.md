@@ -1,6 +1,6 @@
 # 资源树与分享能力安全工程方案
 
-> 复核时间：2026-03-21\
+> 复核时间：2026-03-21；**文档进展同步：2026-03-22**\
 > 范围：Resource / Knowledge Base / Page / File 相关能力，从 “单用户私有资源管理” 演进到 “每用户独立文件树 + 可分享” 的安全工程方案
 >
 > 执行摘要：
@@ -12,6 +12,40 @@
 > - 不建议一步到位重写成统一 `resource_nodes` 超表。第一阶段应保留 `documents/files` 双表，但补一个薄 `resource_registry`，给 ACL /share/audit /revoke cache 一个稳定锚点。
 > - Phase 0 不能只修 `/f/:id`，还要显式关闭私有资源的 public object /public domain 绕过路径，并把下载、预览、解析、检索统一收口到同一个 authorizer。
 > - 如果只补三样最关键的基础设施，优先级应是：`resource_registry`、`authz_epoch`、带状态机且强制 private-object 的 `space_blobs`。
+
+## 〇、落地进展（与下文 Phase 对照，截至 2026-03-22）
+
+以下已在主干代码中**部分落地**，用于与正文路线图对齐；**不等于**某一 Phase 整段验收已全部完成。
+
+### 授权与能力模型
+
+- **`preview_content`**：在 `ResourceAuthorizer` 中求值时，若请求能力为 `preview_content`，则具备 `preview_content` **或** `read_content` 即通过；单独请求 `read_content` 时仍只认 `read_content`（避免用「仅预览」顶替全文读）。
+- **转授 / 继续分享**：成员分享与分享链接相关 API 经 `assertCanDelegateSharing`；非 space `owner`/`admin` 时，`direct` / `inherited` 下的 **`editor` 须授权行 `can_reshare`**。
+- **分享链接**：viewer 能力集合包含 `preview_content`；与上述 `preview_content` OR `read_content` 规则一致。
+
+### 读路径（预览 / 解析 / RAG）
+
+- **Lambda `chunk` 路由**：创建嵌入任务、解析任务、按文件取 chunk、`getFileContents`、`retryParseFileTask` 等使用 **`preview_content`**。
+- **Async `file` 路由**：`embeddingChunks`、`parseFileToChunks` 使用 **`preview_content`**。
+- **`DocumentService`**：`parseDocument` / `parseFile` 通过 **`downloadFileToLocal(fileId, 'preview_content')`** 拉取对象。
+- **Lambda `document` 路由**：`parseDocument` / `parseFileContent` 在入口 **`assertCapability('preview_content', kind: file)`**。
+- **语义检索过滤**：`filterReadableFileIds`、`filterReadableKnowledgeBaseIds` 按 **`preview_content`** 过滤（与 §6.1「预览或全文读」一致）。
+
+### `authz_epoch` 与删除 / 移动
+
+- **`ResourceModel.invalidateAuthzEpochsAfterRemoval`**：物理删除或同类变更后 bump 相关 **`resource_registry`** 与 **`spaces`** 的 epoch，便于下载缓存等依赖 `authz_epoch` 的路径失效。
+- **已串联的典型入口**（非穷举）：`DocumentService.deleteDocuments`、文档 **`parentId` 变更**；lambda / async **file** 删除与存储 **`NoSuchKey`** 后的删行；lambda **notebook** 删文档等（以仓库内对 `invalidateAuthzEpochsAfterRemoval` 的调用为准）。
+
+### `global_files`（CAS）按 hash 读字节与 ZIP URL
+
+- **`FileModel.canAccessGlobalFileByHash`**：仅当满足以下之一才视为可读该 CAS：**`global_files.creator` 为当前用户**、当前用户有一条 **`files.fileHash` 命中**、或当前用户的 **`agent_skills`** 通过 **`zipFileHash`** 或 **`resources` JSON 内嵌的 `fileHash`** 引用该 hash。
+- **`FileService.getFileContentByHash` / `getFileByteArrayByHash`**：先 **`canAccessGlobalFileByHash`**，不通过则与「不存在」统一为 **`NOT_FOUND`**（降低存在性侧信道）。
+- **技能 ZIP 预签名 / `zipUrl`**：`agentSkills.getByIdWithZipUrl`、`routers/tools/market`（内置工具补 `zipUrl`）、`toolExecution/serverRuntimes/skills` 在取存储 `url` 并拼 **`getFullFileUrl`** 前同样先走 **`canAccessGlobalFileByHash`**。
+
+### 仍待办（与 §3.1、Phase 0～5 一致）
+
+- **上传去重侧信道**：`FileService.createFileRecord`、OpenAPI 等路径上的 **`checkHash` / 全局 `global_files` 去重**，仍可能暴露「系统内是否已有相同内容」；需按 Space / `space_blobs` 或产品策略收敛（见 Phase 0 / 5）。
+- **其余按原文推进**：Phase 3 **`space_blobs`** 与 `v2/spaces/...` key、Phase 4 **软删除与回收站**、**`knowledge_bases.isPublic`** 并入统一 ACL / 链接分享、异步 worker **执行时**与导出等路径对 **`authz_epoch`** 的强制复验等。
 
 ## 一、现状审计
 
@@ -45,6 +79,10 @@
 - 文件代理路由：`src/app/(backend)/f/[id]/route.ts`
 - 资源统一查询：`packages/database/src/repositories/knowledge/index.ts`
 - 会话分享模型：`packages/database/src/models/topicShare.ts`
+- **统一资源授权（capability、`preview_content`、转授、`filterReadable*`）**：`src/server/services/resource/index.ts`
+- **删除/移动后 bump epoch**：`packages/database/src/models/resource.ts`（`invalidateAuthzEpochsAfterRemoval`）
+- **全局 CAS 按 hash 访问控制**：`packages/database/src/models/file.ts`（`canAccessGlobalFileByHash`）
+- **按 hash 读字节（服务端）**：`src/server/services/file/index.ts`（`getFileContentByHash` / `getFileByteArrayByHash`）
 
 ## 二、方案审计与取舍
 
@@ -551,8 +589,8 @@ v2/spaces/<spaceId>/blobs/<blobId>
 1. 将 `/f/:id` 改为登录态下载，并按当前主体校验资源权限。
 2. 把 Redis 缓存命中移动到权限判断之后，缓存键改为 `principal/shareLink + fileId + authz_epoch`。
 3. 强制用户资源对象走 private bucket /private object，禁用 `public-read` 与 `S3_PUBLIC_DOMAIN` 直链回退。
-4. 停止用户资源使用跨用户 `checkHash` 快速路径。
-5. 把 preview /parse/chunk /semantic search /provider read path 接到同一个 authorizer 入口。
+4. 停止用户资源使用跨用户 `checkHash` 快速路径。（**进展**：按 hash 读字节与技能 ZIP 预签名已要求 `canAccessGlobalFileByHash`，见 **§〇**；**上传去重**仍可能侧信道，待 Phase 5 / `space_blobs` 收敛。）
+5. 把 preview /parse/chunk /semantic search /provider read path 接到同一个 authorizer 入口。（**进展**：chunk、async file、document 解析与语义检索过滤已统一使用 **`preview_content`** 及 OR 规则，见 **§〇**；其余 provider / 导出等路径仍按清单收口。）
 6. 为 `/f/:id`、`checkHash`、preview、parse、search 补集成测试。
 
 验收标准：

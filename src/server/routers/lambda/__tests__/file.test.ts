@@ -4,17 +4,50 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fileRouter } from '@/server/routers/lambda/file';
 import { AsyncTaskStatus } from '@/types/asyncTask';
 
+const mockResolverRequireDocument = vi.fn();
+const mockResolverRequireFile = vi.fn();
+const mockResolverRequireKnowledgeBase = vi.fn();
+const mockResourceAuthorizerAssertCapability = vi.fn();
+const mockFilterVisibleDocumentIdsForList = vi.fn(async (ids: string[]) => ids);
+const mockFilterVisibleFileIdsForList = vi.fn(async (ids: string[]) => ids);
+const mockTreeGuardAssertParentAssignment = vi.fn();
+
+const mockResourceModelEnsureOwnerPermission = vi.fn();
+const mockResourceModelEnsureResourceRegistry = vi
+  .fn()
+  .mockResolvedValue({ resourceUid: 'res_test' });
+const mockResourceModelFindSpaceBlobByHash = vi.fn();
+const mockResourceModelUpsertSpaceBlob = vi.fn().mockResolvedValue({ id: 'blob_test' });
+const mockResourceModelGetSpaceMemberRole = vi.fn().mockResolvedValue('owner');
+const mockResourceModelInvalidateAuthzEpochsAfterRemoval = vi.fn().mockResolvedValue(undefined);
+
+const mockSpaceModelFindAccessibleSpaceById = vi.fn();
+const mockSpaceModelGetOrCreatePersonalSpace = vi.fn().mockResolvedValue({ id: 'spc_test' });
+
+const mockFileModelCheckHash = vi.fn();
+const mockFileModelCreate = vi.fn();
+const mockFileModelDelete = vi.fn();
+const mockFileModelDeleteMany = vi.fn();
+const mockFileModelFindById = vi.fn();
+const mockFileModelQuery = vi.fn();
+const mockFileModelClear = vi.fn();
+const mockFileModelUpdate = vi.fn();
+
 // Patch: Use actual router context middleware to inject the correct models/services
 function createCallerWithCtx(partialCtx: any = {}) {
-  // All mocks are spies
   const fileModel = {
-    checkHash: vi.fn().mockResolvedValue({ isExist: true }),
-    create: vi.fn().mockResolvedValue({ id: 'test-id' }),
-    findById: vi.fn().mockResolvedValue(undefined),
-    query: vi.fn().mockResolvedValue([]),
-    delete: vi.fn().mockResolvedValue(undefined),
-    deleteMany: vi.fn().mockResolvedValue([]),
-    clear: vi.fn().mockResolvedValue({} as any),
+    checkHash: mockFileModelCheckHash,
+    create: mockFileModelCreate,
+    delete: mockFileModelDelete,
+    deleteAny: mockFileModelDelete,
+    deleteMany: mockFileModelDeleteMany,
+    deleteManyAny: mockFileModelDeleteMany,
+    findById: mockFileModelFindById,
+    findByIdAny: mockFileModelFindById,
+    query: mockFileModelQuery,
+    clear: mockFileModelClear,
+    update: mockFileModelUpdate,
+    updateAny: mockFileModelUpdate,
   };
 
   const fileService = {
@@ -41,7 +74,8 @@ function createCallerWithCtx(partialCtx: any = {}) {
   };
 
   const knowledgeRepo = {
-    query: vi.fn().mockResolvedValue([]),
+    query: mockKnowledgeRepoQuery,
+    queryRecent: mockKnowledgeRepoQueryRecent,
   };
 
   const documentModel = {};
@@ -55,6 +89,31 @@ function createCallerWithCtx(partialCtx: any = {}) {
     fileModel,
     fileService,
     knowledgeRepo,
+    resourceAuthorizer: {
+      assertCapability: mockResourceAuthorizerAssertCapability,
+      filterVisibleDocumentIdsForList: mockFilterVisibleDocumentIdsForList,
+      filterVisibleFileIdsForList: mockFilterVisibleFileIdsForList,
+    },
+    resourceModel: {
+      ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
+      ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
+      findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
+      getSpaceMemberRole: mockResourceModelGetSpaceMemberRole,
+      invalidateAuthzEpochsAfterRemoval: mockResourceModelInvalidateAuthzEpochsAfterRemoval,
+      upsertSpaceBlob: mockResourceModelUpsertSpaceBlob,
+    },
+    resolver: {
+      requireDocument: mockResolverRequireDocument,
+      requireFile: mockResolverRequireFile,
+      requireKnowledgeBase: mockResolverRequireKnowledgeBase,
+    },
+    spaceModel: {
+      findAccessibleSpaceById: mockSpaceModelFindAccessibleSpaceById,
+      getOrCreatePersonalSpace: mockSpaceModelGetOrCreatePersonalSpace,
+    },
+    treeGuard: {
+      assertParentAssignment: mockTreeGuardAssertParentAssignment,
+    },
     ...partialCtx,
   };
 
@@ -94,15 +153,6 @@ vi.mock('@/database/models/chunk', () => ({
   })),
 }));
 
-const mockFileModelCheckHash = vi.fn();
-const mockFileModelCreate = vi.fn();
-const mockFileModelDelete = vi.fn();
-const mockFileModelDeleteMany = vi.fn();
-const mockFileModelFindById = vi.fn();
-const mockFileModelQuery = vi.fn();
-const mockFileModelClear = vi.fn();
-const mockFileModelUpdate = vi.fn();
-
 vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(() => ({
     checkHash: mockFileModelCheckHash,
@@ -116,24 +166,15 @@ vi.mock('@/database/models/file', () => ({
   })),
 }));
 
-const mockResourceModelEnsureOwnerPermission = vi.fn();
-const mockResourceModelEnsureResourceRegistry = vi
-  .fn()
-  .mockResolvedValue({ resourceUid: 'res_test' });
-const mockResourceModelFindSpaceBlobByHash = vi.fn();
-const mockResourceModelUpsertSpaceBlob = vi.fn().mockResolvedValue({ id: 'blob_test' });
-
 vi.mock('@/database/models/resource', () => ({
   ResourceModel: vi.fn(() => ({
     ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
     ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
     findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
+    getSpaceMemberRole: mockResourceModelGetSpaceMemberRole,
     upsertSpaceBlob: mockResourceModelUpsertSpaceBlob,
   })),
 }));
-
-const mockSpaceModelFindAccessibleSpaceById = vi.fn();
-const mockSpaceModelGetOrCreatePersonalSpace = vi.fn().mockResolvedValue({ id: 'spc_test' });
 
 vi.mock('@/database/models/space', () => ({
   SpaceModel: vi.fn(() => ({
@@ -155,11 +196,13 @@ vi.mock('@/server/services/file', () => ({
 }));
 
 const mockKnowledgeRepoQuery = vi.fn().mockResolvedValue([]);
+const mockKnowledgeRepoQueryRecent = vi.fn().mockResolvedValue([]);
 const mockDocumentModelFindBySlug = vi.fn();
 
 vi.mock('@/database/repositories/knowledge', () => ({
   KnowledgeRepo: vi.fn(() => ({
     query: mockKnowledgeRepoQuery,
+    queryRecent: mockKnowledgeRepoQueryRecent,
   })),
 }));
 
@@ -169,12 +212,6 @@ vi.mock('@/database/models/document', () => ({
   })),
 }));
 
-const mockResolverRequireDocument = vi.fn();
-const mockResolverRequireFile = vi.fn();
-const mockResolverRequireKnowledgeBase = vi.fn();
-const mockResourceAuthorizerAssertCapability = vi.fn();
-const mockTreeGuardAssertParentAssignment = vi.fn();
-
 vi.mock('@/server/services/resource', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
     requireDocument: mockResolverRequireDocument,
@@ -183,6 +220,8 @@ vi.mock('@/server/services/resource', () => ({
   })),
   ResourceAuthorizer: vi.fn(() => ({
     assertCapability: mockResourceAuthorizerAssertCapability,
+    filterVisibleDocumentIdsForList: mockFilterVisibleDocumentIdsForList,
+    filterVisibleFileIdsForList: mockFilterVisibleFileIdsForList,
   })),
   TreeGuard: vi.fn(() => ({
     assertParentAssignment: mockTreeGuardAssertParentAssignment,
@@ -196,6 +235,21 @@ describe('fileRouter', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mockFileModelCheckHash.mockResolvedValue({ isExist: true });
+    mockFileModelCreate.mockResolvedValue({ id: 'test-id' });
+    mockFileModelFindById.mockResolvedValue(undefined);
+    mockFileModelQuery.mockResolvedValue([]);
+    mockFileModelDelete.mockResolvedValue(undefined);
+    mockFileModelDeleteMany.mockResolvedValue([]);
+    mockFileModelClear.mockResolvedValue({} as any);
+    mockFileModelUpdate.mockResolvedValue(undefined);
+
+    mockResourceAuthorizerAssertCapability.mockResolvedValue({ canAccess: true });
+    mockFilterVisibleDocumentIdsForList.mockImplementation(async (ids: string[]) => ids);
+    mockFilterVisibleFileIdsForList.mockImplementation(async (ids: string[]) => ids);
+    mockKnowledgeRepoQueryRecent.mockResolvedValue([]);
+    mockTreeGuardAssertParentAssignment.mockResolvedValue(undefined);
 
     mockFile = {
       id: 'test-id',
@@ -221,6 +275,7 @@ describe('fileRouter', () => {
     });
     mockResourceModelEnsureResourceRegistry.mockResolvedValue({ resourceUid: 'res_test' });
     mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
+    mockResourceModelGetSpaceMemberRole.mockResolvedValue('owner');
     mockResourceModelUpsertSpaceBlob.mockResolvedValue({ id: 'blob_test' });
     mockDocumentModelFindBySlug.mockResolvedValue(undefined);
     mockResolverRequireFile.mockResolvedValue(mockFile);
@@ -240,20 +295,6 @@ describe('fileRouter', () => {
   });
 
   describe('createFile', () => {
-    it('should throw if fileModel.checkHash returns undefined', async () => {
-      ctx.fileModel.checkHash.mockResolvedValue(undefined);
-      await expect(
-        caller.createFile({
-          hash: 'test-hash',
-          fileType: 'text',
-          name: 'test.txt',
-          size: 100,
-          url: 'test-url',
-          metadata: {},
-        }),
-      ).rejects.toThrow();
-    });
-
     it('should return proxy URL format ${APP_URL}/f/:id', async () => {
       mockFileModelCheckHash.mockResolvedValue({ isExist: false });
       mockFileModelCreate.mockResolvedValue({ id: 'new-file-id' });
@@ -299,10 +340,11 @@ describe('fileRouter', () => {
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           blobId: 'blob_test',
+          fileHash: null,
           size: 5000, // Actual size from S3, not 100
           spaceId: 'spc_test',
         }),
-        true,
+        false,
       );
     });
 
@@ -329,10 +371,11 @@ describe('fileRouter', () => {
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           blobId: 'blob_test',
+          fileHash: null,
           size: 100,
           spaceId: 'spc_test',
         }),
-        true,
+        false,
       );
     });
 
@@ -373,10 +416,11 @@ describe('fileRouter', () => {
       expect(mockFileModelCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           blobId: 'blob_test',
+          fileHash: null,
           size: 100,
           spaceId: 'spc_test',
         }),
-        true,
+        false,
       );
     });
 
@@ -455,6 +499,22 @@ describe('fileRouter', () => {
       expect(result).toHaveLength(2);
       expect(result[0].url).toBe('https://lobehub.com/f/file-1');
       expect(result[1].url).toBe('https://lobehub.com/f/file-2');
+    });
+
+    it('should omit files without read_metadata visibility', async () => {
+      const files = [
+        { ...mockFile, id: 'file-1' },
+        { ...mockFile, id: 'file-2' },
+      ];
+      mockFileModelQuery.mockResolvedValue(files);
+      mockFilterVisibleFileIdsForList.mockResolvedValueOnce(['file-2']);
+      mockChunkCountByFileIds.mockResolvedValue([{ id: 'file-2', count: 3 }]);
+
+      const result = await caller.getFiles({});
+
+      expect(mockFilterVisibleFileIdsForList).toHaveBeenCalledWith(['file-1', 'file-2']);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('file-2');
     });
   });
 
@@ -544,9 +604,33 @@ describe('fileRouter', () => {
     });
   });
 
+  describe('removeAllFiles', () => {
+    it('should clear files when personal space role allows write', async () => {
+      await caller.removeAllFiles();
+
+      expect(mockSpaceModelGetOrCreatePersonalSpace).toHaveBeenCalled();
+      expect(mockResourceModelGetSpaceMemberRole).toHaveBeenCalledWith('spc_test');
+      expect(mockFileModelClear).toHaveBeenCalled();
+    });
+
+    it('should reject when personal space membership is viewer-only', async () => {
+      mockResourceModelGetSpaceMemberRole.mockResolvedValueOnce('viewer');
+
+      await expect(caller.removeAllFiles()).rejects.toThrow(TRPCError);
+      expect(mockFileModelClear).not.toHaveBeenCalled();
+    });
+
+    it('should reject when personal space membership is missing', async () => {
+      mockResourceModelGetSpaceMemberRole.mockResolvedValueOnce(undefined);
+
+      await expect(caller.removeAllFiles()).rejects.toThrow(TRPCError);
+      expect(mockFileModelClear).not.toHaveBeenCalled();
+    });
+  });
+
   describe('removeFile', () => {
     it('should do nothing when file not found', async () => {
-      ctx.fileModel.delete.mockResolvedValue(null);
+      ctx.fileModel.deleteAny.mockResolvedValue(null);
 
       await caller.removeFile({ id: 'invalid-id' });
 
@@ -556,7 +640,7 @@ describe('fileRouter', () => {
 
   describe('removeFiles', () => {
     it('should do nothing when no files found', async () => {
-      ctx.fileModel.deleteMany.mockResolvedValue([]);
+      ctx.fileModel.deleteManyAny.mockResolvedValue([]);
 
       await caller.removeFiles({ ids: ['invalid-1', 'invalid-2'] });
 
@@ -566,7 +650,7 @@ describe('fileRouter', () => {
 
   describe('removeFileAsyncTask', () => {
     it('should do nothing when file not found', async () => {
-      ctx.fileModel.findById.mockResolvedValue(null);
+      ctx.fileModel.findByIdAny.mockResolvedValue(null);
 
       await caller.removeFileAsyncTask({ id: 'test-id', type: 'chunk' });
 
@@ -574,7 +658,7 @@ describe('fileRouter', () => {
     });
 
     it('should do nothing when task id is missing', async () => {
-      ctx.fileModel.findById.mockResolvedValue(mockFile);
+      ctx.fileModel.findByIdAny.mockResolvedValue(mockFile);
 
       await caller.removeFileAsyncTask({ id: 'test-id', type: 'embedding' });
 

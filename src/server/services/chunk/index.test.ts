@@ -39,8 +39,8 @@ vi.mock('@/database/models/asyncTask', () => ({
 
 vi.mock('@/database/models/file', () => ({
   FileModel: vi.fn(() => ({
-    findById: mockFileModelFindById,
-    update: mockFileModelUpdate,
+    findByIdAny: mockFileModelFindById,
+    updateAny: mockFileModelUpdate,
   })),
 }));
 

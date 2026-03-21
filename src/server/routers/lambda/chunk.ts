@@ -97,7 +97,7 @@ export const chunkRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.resourceAuthorizer.assertCapability({
-        capability: 'read_content',
+        capability: 'preview_content',
         id: input.id,
         kind: 'file',
       });
@@ -116,7 +116,7 @@ export const chunkRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.resourceAuthorizer.assertCapability({
-        capability: 'read_content',
+        capability: 'preview_content',
         id: input.id,
         kind: 'file',
       });
@@ -135,7 +135,7 @@ export const chunkRouter = router({
     )
     .query(async ({ ctx, input }) => {
       await ctx.resourceAuthorizer.assertCapability({
-        capability: 'read_content',
+        capability: 'preview_content',
         id: input.id,
         kind: 'file',
       });
@@ -159,7 +159,7 @@ export const chunkRouter = router({
         readableFileIds,
         async (fileId) => {
           // 1. Find file information
-          const file = await ctx.resolver.requireFile(fileId, 'read_content');
+          const file = await ctx.resolver.requireFile(fileId, 'preview_content');
 
           // 2. Find existing parsed document
           let document:
@@ -212,7 +212,7 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.resolver.requireFile(input.id, 'read_content');
+      const result = await ctx.resolver.requireFile(input.id, 'preview_content');
 
       if (!result) return;
 

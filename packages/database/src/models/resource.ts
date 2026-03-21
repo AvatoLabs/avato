@@ -63,6 +63,26 @@ export class ResourceModel {
       .where(eq(spaces.id, spaceId));
   };
 
+  /**
+   * After physical delete (or similar), bump registry + space epochs so authz caches drop stale grants.
+   */
+  invalidateAuthzEpochsAfterRemoval = async (
+    entries: Array<{ resourceUid?: string | null; spaceId?: string | null }>,
+  ) => {
+    const uids = new Set<string>();
+    const sids = new Set<string>();
+    for (const e of entries) {
+      if (e.resourceUid) uids.add(e.resourceUid);
+      if (e.spaceId) sids.add(e.spaceId);
+    }
+    for (const uid of uids) {
+      await this.bumpResourceEpoch(uid);
+    }
+    for (const sid of sids) {
+      await this.bumpSpaceEpoch(sid);
+    }
+  };
+
   upsertSpaceBlob = async (params: Omit<NewSpaceBlob, 'id'>) => {
     const [existing] = await this.db
       .select()
@@ -469,14 +489,21 @@ export class ResourceModel {
     resourceUid?: string | null;
     shareLinkId?: string | null;
     spaceId?: string | null;
+    sourceIp?: string | null;
+    userAgent?: string | null;
   }) => {
+    const actorId =
+      !this.userId || this.userId === 'anonymous' ? null : this.userId;
+
     await this.db.insert(resourceAccessEvents).values({
       accessType: params.accessType,
-      actorId: this.userId,
+      actorId,
       metadata: params.metadata,
       resourceUid: params.resourceUid ?? null,
       shareLinkId: params.shareLinkId ?? null,
       spaceId: params.spaceId ?? null,
+      sourceIp: params.sourceIp ?? null,
+      userAgent: params.userAgent ?? null,
     });
   };
 

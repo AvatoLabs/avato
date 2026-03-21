@@ -35,6 +35,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
   const { message } = App.useApp();
   const [expiresInDays, setExpiresInDays] = useState<1 | 7 | 30>(7);
   const [latestShareUrl, setLatestShareUrl] = useState<string | null>(null);
+  const [latestFileDownloadUrl, setLatestFileDownloadUrl] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('viewer');
   const [username, setUsername] = useState('');
@@ -85,6 +86,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     });
 
     setLatestShareUrl(link.shareUrl);
+    setLatestFileDownloadUrl(link.fileShareDownloadUrl ?? null);
     setPassword('');
     await refresh();
   };
@@ -93,6 +95,12 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     if (!latestShareUrl) return;
     await copyToClipboard(latestShareUrl);
     message.success(t('share.links.copied'));
+  };
+
+  const handleCopyDirectDownload = async () => {
+    if (!latestFileDownloadUrl) return;
+    await copyToClipboard(latestFileDownloadUrl);
+    message.success(t('share.links.directDownloadCopied'));
   };
 
   return (
@@ -204,6 +212,17 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
             <Text strong>{t('share.links.latest')}</Text>
             <Text style={{ wordBreak: 'break-all' }}>{latestShareUrl}</Text>
             <Button onClick={handleCopyLink}>{t('share.links.copy')}</Button>
+            {latestFileDownloadUrl && (
+              <Flexbox gap={6}>
+                <Text fontSize={12} type={'secondary'}>
+                  {t('share.links.directDownloadHint')}
+                </Text>
+                <Text style={{ wordBreak: 'break-all' }}>{latestFileDownloadUrl}</Text>
+                <Button onClick={handleCopyDirectDownload}>
+                  {t('share.links.copyDirectDownload')}
+                </Button>
+              </Flexbox>
+            )}
           </Flexbox>
         )}
 

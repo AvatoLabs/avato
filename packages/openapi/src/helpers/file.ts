@@ -6,13 +6,25 @@ import urlJoin from 'url-join';
 
 import { fileEnv } from '@/envs/file';
 
+const DEFAULT_S3_USER_FILES_PREFIX = 'files';
+
+function isPrivateUserUploadObjectKey(url: string): boolean {
+  const prefix = (process.env.NEXT_PUBLIC_S3_FILE_PATH || DEFAULT_S3_USER_FILES_PREFIX)
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+  const normalized = url.trim().replace(/^\/+/, '');
+
+  return normalized === prefix || normalized.startsWith(`${prefix}/`);
+}
+
 /**
  * 给文件添加URL前缀
  * @param file 文件对象
  * @returns 添加了URL前缀的文件对象
  */
 export function addFileUrlPrefix<T extends { url?: string }>(file: T): T {
-  // 从 fileEnv 中获取公共域名前缀
+  // Prefer app presigned/proxy URLs for private user files; this helper is for deployments that
+  // intentionally expose a CDN origin for specific object keys only.
   const publicDomain = fileEnv.S3_PUBLIC_DOMAIN;
 
   if (!publicDomain) {
@@ -21,6 +33,11 @@ export function addFileUrlPrefix<T extends { url?: string }>(file: T): T {
 
   // 如果已经有完整的URL，直接返回
   if (file.url && (file.url.startsWith('http://') || file.url.startsWith('https://'))) {
+    return file;
+  }
+
+  // 不把用户桶内对象键拼到公开 CDN 域名上（对象默认私有，拼接会误导调用方或造成错误预期）
+  if (file.url && isPrivateUserUploadObjectKey(file.url)) {
     return file;
   }
 

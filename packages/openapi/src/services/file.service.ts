@@ -3,12 +3,14 @@ import { AsyncTaskStatus, AsyncTaskType } from '@lobechat/types';
 import { and, count, desc, eq, gte, ilike, inArray, lte, sum } from 'drizzle-orm';
 import { sha256 } from 'js-sha256';
 
+import { serverDBEnv } from '@/config/db';
 import type { PERMISSION_ACTIONS } from '@/const/rbac';
 import { ALL_SCOPE } from '@/const/rbac';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
+import { ResourceModel } from '@/database/models/resource';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import type { FileItem } from '@/database/schemas';
 import {
@@ -61,6 +63,7 @@ import type {
  */
 export class FileUploadService extends BaseService {
   private fileModel: FileModel;
+  private resourceModel: ResourceModel;
   private documentModel: DocumentModel;
   private coreFileService: CoreFileService;
   private documentService: DocumentService;
@@ -74,6 +77,7 @@ export class FileUploadService extends BaseService {
   constructor(db: LobeChatDatabase, userId: string) {
     super(db, userId);
     this.fileModel = new FileModel(db, userId);
+    this.resourceModel = new ResourceModel(db, userId);
     this.documentModel = new DocumentModel(db, userId);
     this.coreFileService = new CoreFileService(db, userId!);
     this.documentService = new DocumentService(db, userId);
@@ -1001,8 +1005,11 @@ export class FileUploadService extends BaseService {
       // 删除S3文件
       await this.coreFileService.deleteFile(file.url);
 
-      // 删除数据库记录及关联 chunks / global_files
-      await this.fileModel.delete(fileId);
+      // 删除数据库记录及关联 chunks / global_files（权限已在上方校验）
+      await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
+      await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
+        { resourceUid: file.resourceUid, spaceId: file.spaceId },
+      ]);
 
       this.log('info', 'File deleted successfully', { fileId, key: file.url });
 

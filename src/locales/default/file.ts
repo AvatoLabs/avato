@@ -130,7 +130,11 @@ export default {
   'share.accessSummary': 'Current access reason: {{reason}} (epoch {{authzEpoch}})',
   'share.accessUnknown': 'Current access details are unavailable.',
   'share.links.copy': 'Copy Link',
+  'share.links.copyDirectDownload': 'Copy direct download link',
   'share.links.copied': 'Share link copied',
+  'share.links.directDownloadCopied': 'Direct download link copied',
+  'share.links.directDownloadHint':
+    'Token-only download URL (no file id in path). Append ?password=… if the link is password-protected.',
   'share.links.create': 'Create Link',
   'share.links.disable': 'Disable',
   'share.links.disabled': 'Disabled',

@@ -279,7 +279,8 @@ export const marketRouter = router({
             const fileService = ctx.fileService;
             // Get S3 key from globalFiles
             const fileModel = new FileModel(ctx.serverDB, userId);
-            const fileInfo = await fileModel.checkHash(skill.zipFileHash);
+            const canAccess = await fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
+            const fileInfo = canAccess ? await fileModel.checkHash(skill.zipFileHash) : { isExist: false };
 
             if (fileInfo.isExist && fileInfo.url) {
               // Convert S3 key to full URL

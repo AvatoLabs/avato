@@ -141,6 +141,11 @@ export const agentSkillsRouter = router({
         return { name: skill.name, url: null };
       }
 
+      const canAccess = await ctx.fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
+      if (!canAccess) {
+        return { name: skill.name, url: null };
+      }
+
       const fileInfo = await ctx.fileModel.checkHash(skill.zipFileHash);
       if (!fileInfo.isExist || !fileInfo.url) {
         return { name: skill.name, url: null };

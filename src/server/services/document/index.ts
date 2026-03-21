@@ -236,7 +236,7 @@ export class DocumentService {
    */
   async getDocumentById(id: string) {
     await this.resolver.requireDocument(id, 'read_metadata');
-    return this.documentModel.findById(id);
+    return this.documentModel.findByIdAny(id);
   }
 
   private chunk<T>(items: T[], size = 200): T[][] {
@@ -263,26 +263,10 @@ export class DocumentService {
         fileType: true,
         id: true,
       },
-      where: and(eq(documents.userId, this.userId), inArray(documents.id, dedupRootIds)),
+      where: inArray(documents.id, dedupRootIds),
     });
 
     const rootMap = new Map(rootDocuments.map((doc) => [doc.id, doc] as const));
-    if (rootMap.size < dedupRootIds.length) {
-      const missingRootIds = dedupRootIds.filter((id) => !rootMap.has(id));
-      const fallbackRoots = await Promise.all(
-        missingRootIds.map((id) => this.documentModel.findById(id)),
-      );
-
-      for (const fallbackRoot of fallbackRoots) {
-        if (!fallbackRoot) continue;
-        rootMap.set(fallbackRoot.id, {
-          fileId: fallbackRoot.fileId,
-          fileType: fallbackRoot.fileType,
-          id: fallbackRoot.id,
-        });
-      }
-    }
-
     const resolvedRootDocuments = [...rootMap.values()];
     if (resolvedRootDocuments.length === 0) return { documentIds: [], fileIds: [], folderIds: [] };
 
@@ -301,13 +285,13 @@ export class DocumentService {
             fileType: true,
             id: true,
           },
-          where: and(eq(documents.userId, this.userId), inArray(documents.parentId, folderChunk)),
+          where: inArray(documents.parentId, folderChunk),
         });
 
         for (const child of children) {
           let resolvedChild = child;
           if (!resolvedChild.fileType) {
-            const fallbackChild = await this.documentModel.findById(child.id);
+            const fallbackChild = await this.documentModel.findByIdAny(child.id);
             if (!fallbackChild) continue;
             resolvedChild = {
               fileId: fallbackChild.fileId,
@@ -338,7 +322,7 @@ export class DocumentService {
       for (const folderChunk of this.chunk(folderIds)) {
         const childFiles = await this.db.query.files.findMany({
           columns: { id: true },
-          where: and(eq(files.userId, this.userId), inArray(files.parentId, folderChunk)),
+          where: inArray(files.parentId, folderChunk),
         });
         for (const file of childFiles) {
           fileIds.add(file.id);
@@ -364,27 +348,50 @@ export class DocumentService {
    * Delete multiple documents in batch
    */
   async deleteDocuments(ids: string[]) {
-    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(ids);
+    const dedupIds = [...new Set(ids)].filter(Boolean);
+    if (dedupIds.length === 0) return;
+
+    for (const id of dedupIds) {
+      await this.resolver.requireDocument(id, 'delete');
+    }
+
+    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(dedupIds);
     if (documentIds.length === 0) return;
 
+    const bumpEntries: Array<{ resourceUid?: string | null; spaceId?: string | null }> = [];
+
     if (fileIds.length > 0) {
-      if (typeof this.fileModel.deleteMany === 'function') {
-        await this.fileModel.deleteMany(fileIds);
-      } else {
-        await Promise.all(fileIds.map((fileId) => this.fileModel.delete(fileId)));
-      }
+      const fileRows = await this.db.query.files.findMany({
+        columns: { resourceUid: true, spaceId: true },
+        where: inArray(files.id, fileIds),
+      });
+      bumpEntries.push(
+        ...fileRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })),
+      );
+    }
+
+    const docRows = await this.db.query.documents.findMany({
+      columns: { resourceUid: true, spaceId: true },
+      where: inArray(documents.id, documentIds),
+    });
+    bumpEntries.push(
+      ...docRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })),
+    );
+
+    if (fileIds.length > 0) {
+      await this.fileModel.deleteManyAny(fileIds);
     }
 
     if (typeof (this.db as any).delete === 'function') {
       for (const idChunk of this.chunk(documentIds)) {
-        await this.db
-          .delete(documents)
-          .where(and(eq(documents.userId, this.userId), inArray(documents.id, idChunk)));
+        await this.db.delete(documents).where(inArray(documents.id, idChunk));
       }
+      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
       return;
     }
 
-    await Promise.all(documentIds.map((id) => this.documentModel.delete(id)));
+    await this.documentModel.deleteManyAny(documentIds);
+    await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
   }
 
   /**
@@ -439,16 +446,23 @@ export class DocumentService {
       updates.parentId = params.parentId;
     }
 
-    const result = await this.documentModel.update(id, updates);
+    const result = await this.documentModel.updateAny(id, updates);
+
+    if (params.parentId !== undefined) {
+      const row = await this.documentModel.findByIdAny(id);
+      await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
+        { resourceUid: row?.resourceUid, spaceId: row?.spaceId },
+      ]);
+    }
 
     // If title was updated and this document has an associated file, update the file name too
     if (params.title !== undefined || params.parentId !== undefined) {
-      const document = await this.documentModel.findById(id);
+      const document = await this.documentModel.findByIdAny(id);
       if (document?.fileId) {
         const fileUpdates: any = {};
         if (params.title !== undefined) fileUpdates.name = params.title;
         if (params.parentId !== undefined) fileUpdates.parentId = params.parentId;
-        await this.fileModel.update(document.fileId, fileUpdates);
+        await this.fileModel.updateAny(document.fileId, fileUpdates);
       }
     }
 
@@ -459,7 +473,10 @@ export class DocumentService {
    * Parse file and create a document for page editor (without page tags)
    */
   async parseDocument(fileId: string): Promise<LobeDocument> {
-    const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(fileId);
+    const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(
+      fileId,
+      'preview_content',
+    );
 
     const logPrefix = `[${file.name}]`;
     log(`${logPrefix} Starting to parse file as document, path: ${filePath}`);
@@ -533,7 +550,10 @@ export class DocumentService {
    *
    */
   async parseFile(fileId: string): Promise<LobeDocument> {
-    const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(fileId);
+    const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(
+      fileId,
+      'preview_content',
+    );
 
     const logPrefix = `[${file.name}]`;
     log(`${logPrefix} Starting to parse file, path: ${filePath}`);

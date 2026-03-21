@@ -31,7 +31,7 @@ export class ChunkService {
   }
 
   async asyncEmbeddingFileChunks(fileId: string) {
-    const result = await this.fileModel.findById(fileId);
+    const result = await this.fileModel.findByIdAny(fileId);
 
     if (!result) return;
 
@@ -41,7 +41,7 @@ export class ChunkService {
       type: AsyncTaskType.Embedding,
     });
 
-    await this.fileModel.update(fileId, { embeddingTaskId: asyncTaskId });
+    await this.fileModel.updateAny(fileId, { embeddingTaskId: asyncTaskId });
 
     // Async router will read keyVaults from DB, no need to pass jwtPayload
     // Dynamic import to avoid circular dependency
@@ -70,7 +70,7 @@ export class ChunkService {
    * parse file to chunks with async task
    */
   async asyncParseFileToChunks(fileId: string, skipExist?: boolean) {
-    const result = await this.fileModel.findById(fileId);
+    const result = await this.fileModel.findByIdAny(fileId);
 
     if (!result) return;
 
@@ -83,7 +83,7 @@ export class ChunkService {
       type: AsyncTaskType.Chunking,
     });
 
-    await this.fileModel.update(fileId, { chunkTaskId: asyncTaskId });
+    await this.fileModel.updateAny(fileId, { chunkTaskId: asyncTaskId });
 
     // Async router will read keyVaults from DB, no need to pass jwtPayload
     // Dynamic import to avoid circular dependency

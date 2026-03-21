@@ -1,9 +1,23 @@
 import type { QueryFileListParams } from '@lobechat/types';
 import { FilesTabs, SortType } from '@lobechat/types';
-import { and, asc, count, desc, eq, ilike, inArray, like, notExists, or, sum } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  like,
+  notExists,
+  or,
+  sql,
+  sum,
+} from 'drizzle-orm';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 
 import type { FileItem, NewFile, NewGlobalFile } from '../schemas';
+import { agentSkills } from '../schemas/agentSkill';
 import {
   chunks,
   documentChunks,
@@ -105,13 +119,56 @@ export class FileModel {
     };
   };
 
+  /**
+   * Whether this user may read bytes for a global_files row (CAS by hash).
+   * Allows: creator, a `files` row owned by this user pointing at the hash, or a skill
+   * owned by this user whose zip or embedded resources reference the hash.
+   */
+  canAccessGlobalFileByHash = async (hash: string): Promise<boolean> => {
+    const [globalFile] = await this.db
+      .select({ creator: globalFiles.creator })
+      .from(globalFiles)
+      .where(eq(globalFiles.hashId, hash))
+      .limit(1);
+
+    if (!globalFile) return false;
+    if (globalFile.creator === this.userId) return true;
+
+    const [ownedFile] = await this.db
+      .select({ id: files.id })
+      .from(files)
+      .where(and(eq(files.fileHash, hash), eq(files.userId, this.userId)))
+      .limit(1);
+
+    if (ownedFile) return true;
+
+    const [skillRow] = await this.db
+      .select({ id: agentSkills.id })
+      .from(agentSkills)
+      .where(
+        and(
+          eq(agentSkills.userId, this.userId),
+          or(
+            eq(agentSkills.zipFileHash, hash),
+            sql`exists (
+              select 1 from jsonb_each(${agentSkills.resources}) as _je
+              where _je.value->>'fileHash' = ${hash}
+            )`,
+          ),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(skillRow);
+  };
+
   delete = async (id: string, removeGlobalFile: boolean = true, trx?: Transaction) => {
     const executeInTransaction = async (tx: Transaction) => {
       // In pglite environment, non-transactional operations cannot be used within a transaction as it will block
       const file = await this.findById(id, tx);
       if (!file) return;
 
-      const fileHash = file.fileHash!;
+      const fileHash = file.fileHash ?? null;
 
       // 2. Delete related chunks
       await this.deleteFileChunks(tx as any, [id]);
@@ -119,16 +176,56 @@ export class FileModel {
       // 3. Delete file record
       await tx.delete(files).where(and(eq(files.id, id), eq(files.userId, this.userId)));
 
+      // Space-scoped user files may omit file_hash (no global_files row)
+      if (!fileHash || !removeGlobalFile) {
+        return file;
+      }
+
       const result = await tx
         .select({ count: count() })
         .from(files)
-        .where(and(eq(files.fileHash, fileHash)));
+        .where(eq(files.fileHash, fileHash));
 
       const fileCount = result[0].count;
 
       // delete the file from global file if it is not used by other files
       // if `DISABLE_REMOVE_GLOBAL_FILE` is true, we will not remove the global file
-      if (fileCount === 0 && removeGlobalFile) {
+      if (fileCount === 0) {
+        await tx.delete(globalFiles).where(eq(globalFiles.hashId, fileHash));
+
+        return file;
+      }
+    };
+
+    return await (trx ? executeInTransaction(trx) : this.db.transaction(executeInTransaction));
+  };
+
+  /**
+   * Delete by id only. Caller must enforce authorization first.
+   */
+  deleteAny = async (id: string, removeGlobalFile: boolean = true, trx?: Transaction) => {
+    const executeInTransaction = async (tx: Transaction) => {
+      const file = await this.findByIdAny(id, tx);
+      if (!file) return;
+
+      const fileHash = file.fileHash ?? null;
+
+      await this.deleteFileChunks(tx as any, [id]);
+
+      await tx.delete(files).where(eq(files.id, id));
+
+      if (!fileHash || !removeGlobalFile) {
+        return file;
+      }
+
+      const result = await tx
+        .select({ count: count() })
+        .from(files)
+        .where(eq(files.fileHash, fileHash));
+
+      const fileCount = result[0].count;
+
+      if (fileCount === 0) {
         await tx.delete(globalFiles).where(eq(globalFiles.hashId, fileHash));
 
         return file;
@@ -196,6 +293,46 @@ export class FileModel {
       await trx.delete(globalFiles).where(inArray(globalFiles.hashId, hashesToDelete));
 
       // Return the list of deleted files
+      return fileList;
+    });
+  };
+
+  /**
+   * Batch delete by ids only (no `userId` filter). Caller must enforce authorization first.
+   */
+  deleteManyAny = async (ids: string[], removeGlobalFile: boolean = true) => {
+    if (ids.length === 0) return [];
+
+    return await this.db.transaction(async (trx) => {
+      const fileList = await trx.query.files.findMany({
+        where: inArray(files.id, ids),
+      });
+
+      if (fileList.length === 0) return [];
+
+      const hashList = fileList.map((file) => file.fileHash!).filter(Boolean);
+
+      await this.deleteFileChunks(trx as any, ids);
+
+      await trx.delete(files).where(inArray(files.id, ids));
+
+      if (!removeGlobalFile || hashList.length === 0) return fileList;
+
+      const remainingFiles = await trx
+        .select({
+          fileHash: files.fileHash,
+        })
+        .from(files)
+        .where(inArray(files.fileHash, hashList));
+
+      const usedHashes = new Set(remainingFiles.map((file) => file.fileHash));
+
+      const hashesToDelete = hashList.filter((hash) => !usedHashes.has(hash));
+
+      if (hashesToDelete.length === 0) return fileList;
+
+      await trx.delete(globalFiles).where(inArray(globalFiles.hashId, hashesToDelete));
+
       return fileList;
     });
   };
@@ -302,6 +439,16 @@ export class FileModel {
     });
   };
 
+  /**
+   * By primary key only (no `userId` filter). Caller must enforce authorization first.
+   */
+  findByIdAny = async (id: string, trx?: Transaction) => {
+    const database = trx || this.db;
+    return database.query.files.findFirst({
+      where: eq(files.id, id),
+    });
+  };
+
   countFilesByHash = async (hash: string) => {
     const result = await this.db
       .select({
@@ -318,6 +465,13 @@ export class FileModel {
       .update(files)
       .set({ ...value, updatedAt: new Date() })
       .where(and(eq(files.id, id), eq(files.userId, this.userId)));
+
+  /** Update by id only. Caller must enforce authorization first. */
+  updateAny = async (id: string, value: Partial<FileItem>) =>
+    this.db
+      .update(files)
+      .set({ ...value, updatedAt: new Date() })
+      .where(eq(files.id, id));
 
   /**
    * get the corresponding file type prefix according to FilesTabs

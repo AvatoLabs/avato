@@ -4,6 +4,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
+import { agentSkills } from '../../schemas/agentSkill';
 import {
   chunks,
   embeddings,
@@ -24,12 +25,14 @@ const fileModel = new FileModel(serverDB, userId);
 
 const knowledgeBase = { id: 'kb1', userId, name: 'knowledgeBase' };
 beforeEach(async () => {
+  await serverDB.delete(agentSkills);
   await serverDB.delete(users);
   await serverDB.insert(users).values([{ id: userId }, { id: 'user2' }]);
   await serverDB.insert(knowledgeBases).values(knowledgeBase);
 });
 
 afterEach(async () => {
+  await serverDB.delete(agentSkills);
   await serverDB.delete(users);
   await serverDB.delete(files);
   await serverDB.delete(globalFiles);
@@ -138,6 +141,72 @@ describe('FileModel', () => {
         url: 'https://example.com/existing-file.txt',
         metadata: { key: 'value' },
       });
+    });
+  });
+
+  describe('canAccessGlobalFileByHash', () => {
+    it('should deny when hash missing', async () => {
+      await expect(fileModel.canAccessGlobalFileByHash('missing')).resolves.toBe(false);
+    });
+
+    it('should allow creator', async () => {
+      await serverDB.insert(globalFiles).values({
+        creator: userId,
+        fileType: 'text/plain',
+        hashId: 'h-creator',
+        size: 1,
+        url: 'u',
+      });
+      await expect(fileModel.canAccessGlobalFileByHash('h-creator')).resolves.toBe(true);
+    });
+
+    it('should deny other user without link', async () => {
+      await serverDB.insert(globalFiles).values({
+        creator: 'user2',
+        fileType: 'text/plain',
+        hashId: 'h-other',
+        size: 1,
+        url: 'u',
+      });
+      await expect(fileModel.canAccessGlobalFileByHash('h-other')).resolves.toBe(false);
+    });
+
+    it('should allow when user owns a file row with same hash', async () => {
+      await serverDB.insert(globalFiles).values({
+        creator: 'user2',
+        fileType: 'text/plain',
+        hashId: 'h-shared',
+        size: 1,
+        url: 'u',
+      });
+      await fileModel.create({
+        fileHash: 'h-shared',
+        fileType: 'text/plain',
+        name: 'x.txt',
+        size: 1,
+        url: 'u2',
+      });
+      await expect(fileModel.canAccessGlobalFileByHash('h-shared')).resolves.toBe(true);
+    });
+
+    it('should allow when skill resources reference hash', async () => {
+      await serverDB.insert(globalFiles).values({
+        creator: 'user2',
+        fileType: 'text/plain',
+        hashId: 'h-res',
+        size: 1,
+        url: 'u',
+      });
+      await serverDB.insert(agentSkills).values({
+        description: 'd',
+        identifier: 'id1',
+        manifest: {},
+        name: 'n1',
+        resources: { '/a.md': { fileHash: 'h-res', size: 1 } },
+        source: 'user',
+        userId,
+      });
+      await expect(fileModel.canAccessGlobalFileByHash('h-res')).resolves.toBe(true);
     });
   });
 
