@@ -298,3 +298,22 @@ export const uploadSessions = pgTable(
 
 export type NewUploadSession = typeof uploadSessions.$inferInsert;
 export type UploadSessionItem = typeof uploadSessions.$inferSelect;
+
+export const resourceFavorites = pgTable(
+  'resource_favorites',
+  {
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    resourceId: text('resource_id').notNull(),
+    sourceType: text('source_type').$type<'file' | 'document'>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.resourceId] }),
+    index('resource_favorites_user_id_idx').on(t.userId),
+  ],
+);
+
+export type NewResourceFavorite = typeof resourceFavorites.$inferInsert;
+export type ResourceFavoriteItem = typeof resourceFavorites.$inferSelect;

@@ -13,8 +13,10 @@ import EmptyPlaceholder from './EmptyPlaceholder';
 import Header from './Header';
 import ListView from './ListView';
 import MasonryView from './MasonryView';
+import ResourceInfoPanel from './ResourceInfoPanel';
 import SearchResultsOverlay from './SearchResultsOverlay';
 import { useCheckTaskStatus } from './useCheckTaskStatus';
+import { useExplorerHotkeys } from './useExplorerHotkeys';
 import { useResourceExplorer } from './useResourceExplorer';
 
 /**
@@ -36,6 +38,7 @@ const ResourceExplorer = memo(() => {
     viewMode,
     searchQuery,
     setSelectedFileIds,
+    showInfoPanel,
     sorter,
     sortType,
     spaceId,
@@ -45,6 +48,7 @@ const ResourceExplorer = memo(() => {
     s.viewMode,
     s.searchQuery,
     s.setSelectedFileIds,
+    s.showInfoPanel,
     s.sorter,
     s.sortType,
     s.spaceId,
@@ -94,6 +98,10 @@ const ResourceExplorer = memo(() => {
   // Check task status
   useCheckTaskStatus(data);
 
+  // Keyboard shortcuts (Del, F2, Ctrl+A, Esc)
+  const visibleItemIds = useMemo(() => data.map((item) => item.id), [data]);
+  useExplorerHotkeys({ visibleItemIds });
+
   // Initialize folder/file navigation effects (still need hook for complex effects)
   useResourceExplorer({ category, hasResolvedData, isLoading, libraryId });
 
@@ -111,16 +119,19 @@ const ResourceExplorer = memo(() => {
   return (
     <Flexbox height={'100%'}>
       <Header />
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {showEmptyStatus ? (
-          <EmptyPlaceholder />
-        ) : viewMode === 'list' ? (
-          <ListView />
-        ) : (
-          <MasonryView />
-        )}
-        <SearchResultsOverlay />
-      </div>
+      <Flexbox horizontal style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {showEmptyStatus ? (
+            <EmptyPlaceholder />
+          ) : viewMode === 'list' ? (
+            <ListView />
+          ) : (
+            <MasonryView />
+          )}
+          <SearchResultsOverlay />
+        </div>
+        {showInfoPanel && <ResourceInfoPanel />}
+      </Flexbox>
     </Flexbox>
   );
 });

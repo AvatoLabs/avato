@@ -5,13 +5,18 @@ import {
   BookMinusIcon,
   BookPlusIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FolderInputIcon,
+  FolderOutputIcon,
   LinkIcon,
   PencilIcon,
+  StarIcon,
+  StarOffIcon,
   Trash,
 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { shallow } from 'zustand/shallow';
 
 import RepoIcon from '@/components/LibIcon';
@@ -20,6 +25,7 @@ import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
 import { useResourceShareModal, useSpaceCapabilities } from '@/features/ResourceSharing';
 import { buildResourcePreviewPath } from '@/features/ResourceSpaces';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
+import { lambdaClient } from '@/libs/trpc/client';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { documentService } from '@/services/document';
 import { useFileStore } from '@/store/file';
@@ -27,6 +33,7 @@ import { useKnowledgeBaseStore } from '@/store/library';
 import { downloadFile } from '@/utils/client/downloadFile';
 
 import MoveToFolderModal from '../MoveToFolderModal';
+import MoveToSpaceModal from '../MoveToSpaceModal';
 
 interface UseFileItemDropdownParams {
   enabled?: boolean;
@@ -81,6 +88,11 @@ export const useFileItemDropdown = ({
   // Only the first call fetches from server, subsequent calls use cache
   // The expensive menu computation is deferred until dropdown opens (menuItems is a function)
   const { data: libraries } = useFetchKnowledgeBaseList(spaceId);
+
+  const { data: favoriteIds } = useSWR('resource-favorite-ids', () =>
+    lambdaClient.favorite.listFavoriteIds.query(),
+  );
+  const isFavorited = (favoriteIds ?? []).includes(id);
 
   const isInLibrary = !!libraryId;
   const isFolder = fileType === 'custom/folder';
@@ -227,6 +239,19 @@ export const useFileItemDropdown = ({
               });
             },
           },
+        caps.canMove && {
+          icon: <Icon icon={FolderOutputIcon} />,
+          key: 'moveToSpace',
+          label: t('FileManager.actions.moveToSpace'),
+          onClick: async ({ domEvent }) => {
+            domEvent.stopPropagation();
+
+            createRawModal(MoveToSpaceModal, {
+              fileId: id,
+              sourceType,
+            });
+          },
+        },
         isFolder &&
           caps.canEdit && {
             icon: <Icon icon={PencilIcon} />,
@@ -248,6 +273,18 @@ export const useFileItemDropdown = ({
               kind: sourceType === 'document' ? 'document' : 'file',
               name: filename,
             });
+          },
+        },
+        !isFolder && {
+          icon: <Icon icon={ExternalLinkIcon} />,
+          key: 'openInNewTab',
+          label: t('FileManager.actions.openInNewTab'),
+          onClick: ({ domEvent }) => {
+            domEvent.stopPropagation();
+            const previewUrl = isPage
+              ? `${appOrigin}${buildResourcePreviewPath(spaceId, id, libraryId)}`
+              : url;
+            window.open(previewUrl, '_blank', 'noopener');
           },
         },
         {
@@ -316,6 +353,32 @@ export const useFileItemDropdown = ({
         {
           type: 'divider',
         },
+        sourceType && {
+          icon: <Icon icon={isFavorited ? StarOffIcon : StarIcon} />,
+          key: 'toggleFavorite',
+          label: isFavorited
+            ? t('FileManager.actions.unfavorite')
+            : t('FileManager.actions.favorite'),
+          onClick: async ({ domEvent }) => {
+            domEvent.stopPropagation();
+            try {
+              if (isFavorited) {
+                await lambdaClient.favorite.removeFavorite.mutate({ resourceId: id });
+                message.success(t('FileManager.actions.unfavoriteSuccess'));
+              } else {
+                await lambdaClient.favorite.addFavorite.mutate({
+                  resourceId: id,
+                  sourceType: sourceType as 'file' | 'document',
+                });
+                message.success(t('FileManager.actions.favoriteSuccess'));
+              }
+              await globalMutate('resource-favorite-ids');
+              await globalMutate('resource-favorites-list');
+            } catch {
+              message.error(t('FileManager.actions.restoreFailed'));
+            }
+          },
+        },
         caps.canDelete && {
           danger: true,
           icon: <Icon icon={Trash} />,
@@ -323,24 +386,58 @@ export const useFileItemDropdown = ({
           label: t('delete', { ns: 'common' }),
           onClick: async ({ domEvent }) => {
             domEvent.stopPropagation();
-            modal.confirm({
-              content: isFolder
-                ? t('FileManager.actions.confirmDeleteFolder')
-                : t('FileManager.actions.confirmDelete'),
-              okButtonProps: { danger: true },
-              onOk: async () => {
-                // Use optimistic delete - instant UI update, sync in background
-                await deleteResource(id);
 
-                // Ensure tree caches stay in sync with explorer
-                if (libraryId) {
-                  await clearTreeFolderCache(libraryId);
-                }
-                await refreshFileList();
+            // Documents (non-folder) support soft-delete → undo toast instead of confirm
+            const isDocument = sourceType === 'document' && !isFolder;
 
-                message.success(t('FileManager.actions.deleteSuccess'));
-              },
-            });
+            if (isDocument) {
+              // Optimistic delete first
+              await deleteResource(id);
+              if (libraryId) await clearTreeFolderCache(libraryId);
+              await refreshFileList();
+
+              // Show undo toast (5 s window)
+              const undoKey = `undo-delete-${id}`;
+              message.open({
+                content: (
+                  <span>
+                    {t('FileManager.actions.deleteSuccess')}{' '}
+                    <a
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={async () => {
+                        message.destroy(undoKey);
+                        try {
+                          await documentService.restoreDocument(id);
+                          await refreshFileList();
+                          message.success(t('FileManager.actions.undoSuccess'));
+                        } catch {
+                          message.error(t('FileManager.actions.restoreFailed'));
+                        }
+                      }}
+                    >
+                      {t('FileManager.actions.undo')}
+                    </a>
+                  </span>
+                ),
+                duration: 5,
+                key: undoKey,
+                type: 'success',
+              });
+            } else {
+              // Files / folders: confirm modal (irreversible hard-delete)
+              modal.confirm({
+                content: isFolder
+                  ? t('FileManager.actions.confirmDeleteFolder')
+                  : t('FileManager.actions.confirmDelete'),
+                okButtonProps: { danger: true },
+                onOk: async () => {
+                  await deleteResource(id);
+                  if (libraryId) await clearTreeFolderCache(libraryId);
+                  await refreshFileList();
+                  message.success(t('FileManager.actions.deleteSuccess'));
+                },
+              });
+            }
           },
         },
       ] as ItemType[]
@@ -350,8 +447,10 @@ export const useFileItemDropdown = ({
     caps,
     clearTreeFolderCache,
     deleteResource,
+    favoriteIds,
     filename,
     id,
+    isFavorited,
     isFolder,
     isInLibrary,
     isPage,
@@ -365,6 +464,7 @@ export const useFileItemDropdown = ({
     onRenameStart,
     refreshFileList,
     removeFilesFromKnowledgeBase,
+    sourceType,
     spaceId,
     t,
     url,

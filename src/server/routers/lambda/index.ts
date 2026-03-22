@@ -26,6 +26,7 @@ import { comfyuiRouter } from './comfyui';
 import { configRouter } from './config';
 import { documentRouter } from './document';
 import { exporterRouter } from './exporter';
+import { favoriteRouter } from './favorite';
 import { fileRouter } from './file';
 import { generationRouter } from './generation';
 import { generationBatchRouter } from './generationBatch';
@@ -76,6 +77,7 @@ export const lambdaRouter = router({
   config: configRouter,
   document: documentRouter,
   exporter: exporterRouter,
+  favorite: favoriteRouter,
   file: fileRouter,
   generation: generationRouter,
   generationBatch: generationBatchRouter,

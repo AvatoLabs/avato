@@ -24,6 +24,8 @@ export const buildResourcePreviewPath = (
 
 export const buildResourceSharedPath = () => '/resource/shared';
 
+export const buildResourceFavoritesPath = () => '/resource/favorites';
+
 export const buildSpaceSettingsPath = (spaceId: string) => `/resource/space/${spaceId}/settings`;
 
 export const buildPublicResourceSharePath = (token: string) => `/share/r/${token}`;

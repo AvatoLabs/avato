@@ -4,6 +4,10 @@ import type { AsyncTaskStatus } from '../asyncTask';
 import type { InheritMode, ResourceRole } from '../resource';
 
 export interface FileListItem {
+  /**
+   * Number of direct children for folders
+   */
+  childCount?: number | null;
   chunkCount: number | null;
   chunkingError: any | null;
   chunkingStatus?: AsyncTaskStatus | null;

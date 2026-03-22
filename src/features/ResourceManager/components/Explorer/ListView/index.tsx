@@ -375,7 +375,7 @@ const ListView = memo(function ListView() {
             style={{ flexShrink: 0, paddingInlineEnd: 16, position: 'relative' }}
             width={columnWidths.date}
           >
-            {t('FileManager.title.createdAt')}
+            {t('FileManager.title.modifiedAt')}
             <ColumnResizeHandle
               column="date"
               currentWidth={columnWidths.date}

@@ -53,6 +53,10 @@ export interface State {
    */
   selectedFileIds: string[];
   /**
+   * Whether the resource info sidebar panel is visible
+   */
+  showInfoPanel: boolean;
+  /**
    * Field to sort files by
    */
   sorter: 'name' | 'createdAt' | 'size';
@@ -84,6 +88,7 @@ export const initialState: State = {
   searchQuery: null,
   spaceId: undefined,
   selectedFileIds: [],
+  showInfoPanel: false,
   sortType: SortType.Desc,
   sorter: 'createdAt',
   viewMode: 'list',

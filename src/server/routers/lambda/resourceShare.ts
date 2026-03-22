@@ -1,12 +1,14 @@
-import { documents } from '@lobechat/database/schemas';
+import { documents, files, resourceRegistry } from '@lobechat/database/schemas';
 import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
+import { resourceAccessEvents, resourceAuditLogs, users } from '@/database/schemas';
 import { appEnv } from '@/envs/app';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -298,6 +300,87 @@ export const resourceShareRouter = router({
       return ctx.resourceModel.listShareLinks(registry.resourceUid);
     }),
 
+  listResourceActivity: shareProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        kind: z.enum(['document', 'file', 'knowledge_base']).optional(),
+        limit: z.number().min(1).max(100).default(50),
+        resourceUid: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const registry = await resolveTargetResource(ctx.resourceModel, input);
+
+      // Verify user has access to the resource before exposing activity
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'read_metadata',
+        resourceUid: registry.resourceUid,
+      });
+
+      // Query audit logs with user info
+      const auditLogs = await ctx.serverDB
+        .select({
+          action: resourceAuditLogs.action,
+          actorAvatar: users.avatar,
+          actorId: resourceAuditLogs.actorId,
+          actorName: users.fullName,
+          actorUsername: users.username,
+          createdAt: resourceAuditLogs.createdAt,
+          id: resourceAuditLogs.id,
+          metadata: resourceAuditLogs.metadata,
+        })
+        .from(resourceAuditLogs)
+        .leftJoin(users, eq(resourceAuditLogs.actorId, users.id))
+        .where(eq(resourceAuditLogs.resourceUid, registry.resourceUid))
+        .orderBy(desc(resourceAuditLogs.createdAt))
+        .limit(input.limit);
+
+      // Query access events with user info
+      const accessEvents = await ctx.serverDB
+        .select({
+          accessType: resourceAccessEvents.accessType,
+          actorAvatar: users.avatar,
+          actorId: resourceAccessEvents.actorId,
+          actorName: users.fullName,
+          actorUsername: users.username,
+          createdAt: resourceAccessEvents.createdAt,
+          id: resourceAccessEvents.id,
+          metadata: resourceAccessEvents.metadata,
+        })
+        .from(resourceAccessEvents)
+        .leftJoin(users, eq(resourceAccessEvents.actorId, users.id))
+        .where(eq(resourceAccessEvents.resourceUid, registry.resourceUid))
+        .orderBy(desc(resourceAccessEvents.createdAt))
+        .limit(input.limit);
+
+      // Merge and sort by createdAt desc
+      const combined = [
+        ...auditLogs.map((log) => ({
+          action: log.action,
+          actorAvatar: log.actorAvatar,
+          actorName: log.actorName ?? log.actorUsername ?? 'Unknown',
+          createdAt: log.createdAt,
+          id: log.id,
+          metadata: log.metadata,
+          type: 'audit' as const,
+        })),
+        ...accessEvents.map((evt) => ({
+          action: evt.accessType,
+          actorAvatar: evt.actorAvatar,
+          actorName: evt.actorName ?? evt.actorUsername ?? 'Anonymous',
+          createdAt: evt.createdAt,
+          id: evt.id,
+          metadata: evt.metadata,
+          type: 'access' as const,
+        })),
+      ]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, input.limit);
+
+      return combined;
+    }),
+
   listSharedWithMe: shareProcedure.query(async ({ ctx }) => {
     const items = await ctx.resourceModel.listSharedWithMe();
     return items.filter(Boolean);
@@ -323,6 +406,81 @@ export const resourceShareRouter = router({
         metadata: { permissionId: input.permissionId, targetUserId: permission.subjectId },
         resourceUid: permission.resourceUid,
         spaceId: permission.spaceId,
+      });
+
+      return { success: true };
+    }),
+
+  moveResourceToSpace: shareProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        kind: z.enum(['document', 'file']).optional(),
+        resourceUid: z.string().optional(),
+        targetSpaceId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const registry = await resolveTargetResource(ctx.resourceModel, {
+        id: input.id,
+        kind: input.kind,
+        resourceUid: input.resourceUid,
+      });
+
+      // Check user has move capability on the resource
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'move',
+        resourceUid: registry.resourceUid,
+      });
+
+      // Check user has at least editor role in target space
+      const spaceModel = new SpaceModel(ctx.serverDB, ctx.userId);
+      const targetSpace = await spaceModel.findAccessibleSpaceById(input.targetSpaceId);
+      if (!targetSpace?.id) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SPACE_NOT_FOUND' });
+      }
+      const role = targetSpace.membershipRole;
+      if (!role || role === 'viewer') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'INSUFFICIENT_TARGET_SPACE_ROLE' });
+      }
+
+      if (registry.spaceId === input.targetSpaceId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'ALREADY_IN_TARGET_SPACE' });
+      }
+
+      const oldSpaceId = registry.spaceId;
+
+      // Update resource_registry spaceId
+      await ctx.serverDB
+        .update(resourceRegistry)
+        .set({ spaceId: input.targetSpaceId, updatedAt: new Date() })
+        .where(eq(resourceRegistry.resourceUid, registry.resourceUid));
+
+      // Update the entity table
+      if (registry.kind === 'document') {
+        await ctx.serverDB
+          .update(documents)
+          .set({ parentId: null, spaceId: input.targetSpaceId, updatedAt: new Date() })
+          .where(eq(documents.id, registry.localId));
+      } else if (registry.kind === 'file') {
+        await ctx.serverDB
+          .update(files)
+          .set({ spaceId: input.targetSpaceId, updatedAt: new Date() })
+          .where(eq(files.id, registry.localId));
+      }
+
+      // Bump authz epochs on both old and new space
+      await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
+        { resourceUid: registry.resourceUid, spaceId: oldSpaceId },
+        { resourceUid: registry.resourceUid, spaceId: input.targetSpaceId },
+      ]);
+
+      // Audit log
+      await ctx.resourceModel.createAuditLog({
+        action: 'resource.move_space',
+        metadata: { fromSpaceId: oldSpaceId, toSpaceId: input.targetSpaceId },
+        resourceUid: registry.resourceUid,
+        spaceId: input.targetSpaceId,
       });
 
       return { success: true };

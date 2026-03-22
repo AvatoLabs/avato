@@ -3,7 +3,7 @@
 import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { App } from 'antd';
 import { cssVar } from 'antd-style';
-import { BookMinusIcon, FileBoxIcon, Trash2Icon } from 'lucide-react';
+import { BookMinusIcon, FileBoxIcon, PanelRightIcon, Trash2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,12 +26,15 @@ const Header = memo(() => {
   const { modal, message } = App.useApp();
 
   // Get state and actions from store
-  const [libraryId, category, onActionClick, selectFileIds] = useResourceManagerStore((s) => [
-    s.libraryId,
-    s.category,
-    s.onActionClick,
-    s.selectedFileIds,
-  ]);
+  const [libraryId, category, onActionClick, selectFileIds, showInfoPanel, setShowInfoPanel] =
+    useResourceManagerStore((s) => [
+      s.libraryId,
+      s.category,
+      s.onActionClick,
+      s.selectedFileIds,
+      s.showInfoPanel,
+      s.setShowInfoPanel,
+    ]);
   const selectCount = selectFileIds.length;
   const isMultiSelected = selectCount > 1;
 
@@ -105,6 +108,13 @@ const Header = memo(() => {
           <SortDropdown />
           <BatchActionsDropdown selectCount={selectCount} onActionClick={onActionClick} />
           <ViewSwitcher />
+          <ActionIcon
+            active={showInfoPanel}
+            icon={PanelRightIcon}
+            size={'small'}
+            title={t('FileManager.infoPanel.toggle')}
+            onClick={() => setShowInfoPanel(!showInfoPanel)}
+          />
           <Flexbox style={{ marginLeft: 8 }}>
             <AddButton />
           </Flexbox>

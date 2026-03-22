@@ -239,6 +239,13 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/favorites'),
+                  'Mobile > Resource > Favorites',
+                ),
+                path: 'favorites',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/(home)'),
                   'Mobile > Resource > Space Home',
                 ),

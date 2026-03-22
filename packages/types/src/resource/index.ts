@@ -102,6 +102,7 @@ export interface ResourceItem {
     lastSyncAttempt?: Date;
     retryCount: number;
   };
+  childCount?: number | null;
   chunkCount?: number | null;
   chunkingError?: any | null;
   chunkingStatus?: string | null;
@@ -122,6 +123,7 @@ export interface ResourceItem {
   size: number;
   slug?: string | null;
   sourceType: 'document' | 'file';
+  spaceId?: string;
   title?: string;
   updatedAt: Date;
   url?: string;

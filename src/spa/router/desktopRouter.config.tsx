@@ -278,6 +278,13 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/favorites'),
+                  'Desktop > Resource > Favorites',
+                ),
+                path: 'favorites',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/(home)'),
                   'Desktop > Resource > Space Home',
                 ),

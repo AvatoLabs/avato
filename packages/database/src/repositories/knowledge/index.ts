@@ -8,6 +8,10 @@ import { documents, files, knowledgeBaseFiles } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
 export interface KnowledgeItem {
+  /**
+   * Number of direct children (files + documents) for folders
+   */
+  childCount?: number | null;
   chunkTaskId?: string | null;
   content?: string | null;
   createdAt: Date;
@@ -136,6 +140,7 @@ export class KnowledgeRepo {
       }
 
       return {
+        childCount: row.child_count != null ? Number(row.child_count) : null,
         chunkTaskId: row.chunk_task_id,
         content: row.content,
         createdAt: new Date(row.created_at),
@@ -389,7 +394,9 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           COALESCE(d.metadata, f.metadata) as metadata,
-          'file' as source_type
+          'file' as source_type,
+          (SELECT COUNT(*) FROM ${files} f2 WHERE f2.parent_id = COALESCE(d.id, f.id)) +
+          (SELECT COUNT(*) FROM ${documents} d2 WHERE d2.parent_id = COALESCE(d.id, f.id) AND d2.source_type != 'file') as child_count
         FROM ${files} f
         INNER JOIN ${knowledgeBaseFiles} kbf
           ON f.id = kbf.file_id
@@ -427,7 +434,9 @@ export class KnowledgeRepo {
         d.content,
         d.slug,
         COALESCE(d.metadata, f.metadata) as metadata,
-        'file' as source_type
+        'file' as source_type,
+        (SELECT COUNT(*) FROM ${files} f2 WHERE f2.parent_id = COALESCE(d.id, f.id)) +
+        (SELECT COUNT(*) FROM ${documents} d2 WHERE d2.parent_id = COALESCE(d.id, f.id) AND d2.source_type != 'file') as child_count
       FROM ${files} f
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
@@ -496,7 +505,8 @@ export class KnowledgeRepo {
             NULL::text as content,
             NULL::varchar(255) as slug,
             NULL::jsonb as metadata,
-            NULL::text as source_type
+            NULL::text as source_type,
+            NULL::bigint as child_count
           WHERE false
         `;
       }
@@ -559,7 +569,8 @@ export class KnowledgeRepo {
               NULL::text as content,
               NULL::varchar(255) as slug,
               NULL::jsonb as metadata,
-              NULL::text as source_type
+              NULL::text as source_type,
+              NULL::bigint as child_count
             WHERE false
           `;
         }
@@ -585,7 +596,9 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           d.metadata,
-          'document' as source_type
+          'document' as source_type,
+          (SELECT COUNT(*) FROM ${files} f2 WHERE f2.parent_id = d.id) +
+          (SELECT COUNT(*) FROM ${documents} d2 WHERE d2.parent_id = d.id AND d2.source_type != 'file') as child_count
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
       `;
@@ -606,7 +619,9 @@ export class KnowledgeRepo {
         content,
         slug,
         metadata,
-        'document' as source_type
+        'document' as source_type,
+        (SELECT COUNT(*) FROM ${files} f2 WHERE f2.parent_id = ${documents.id}) +
+        (SELECT COUNT(*) FROM ${documents} d2 WHERE d2.parent_id = ${documents.id} AND d2.source_type != 'file') as child_count
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     `;

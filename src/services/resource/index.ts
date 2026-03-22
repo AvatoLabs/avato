@@ -15,6 +15,7 @@ import { fileService } from '../file';
  */
 const mapToResourceItem = (item: FileListItem): ResourceItem => {
   return {
+    childCount: item.childCount ?? null,
     chunkCount: item.chunkCount,
     chunkTaskId: item.chunkingStatus ? 'placeholder' : null,
     chunkingError: item.chunkingError,

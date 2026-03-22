@@ -181,6 +181,7 @@ interface MasonryFileItemProps extends FileListItem {
 
 const MasonryFileItem = memo<MasonryFileItemProps>(
   ({
+    childCount,
     chunkingError,
     embeddingError,
     embeddingStatus,
@@ -476,6 +477,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
               default: {
                 return (
                   <DefaultFileItem
+                    childCount={childCount}
                     chunkCount={chunkCount ?? undefined}
                     chunkingError={chunkingError}
                     chunkingStatus={chunkingStatus ?? undefined}

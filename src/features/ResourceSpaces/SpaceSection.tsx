@@ -11,7 +11,7 @@ import {
   TextArea,
   useModalContext,
 } from '@lobehub/ui';
-import { HouseIcon, PlusIcon, Settings2Icon, Share2Icon, Users2Icon } from 'lucide-react';
+import { HouseIcon, PlusIcon, Settings2Icon, Share2Icon, StarIcon, Users2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -20,8 +20,14 @@ import useSWR from 'swr';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { lambdaClient } from '@/libs/trpc/client';
+import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
-import { buildResourceRootPath, buildResourceSharedPath, buildSpaceSettingsPath } from './paths';
+import {
+  buildResourceFavoritesPath,
+  buildResourceRootPath,
+  buildResourceSharedPath,
+  buildSpaceSettingsPath,
+} from './paths';
 
 const SPACE_LIST_KEY = 'resource-space-list';
 
@@ -87,7 +93,11 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
   const location = useLocation();
   const navigate = useNavigate();
-  const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
+  const { spaceId: urlSpaceId } = useParams<{ spaceId?: string }>();
+  const storeSpaceId = useResourceManagerStore((s) => s.spaceId);
+  // When on /resource/shared the URL has no spaceId, so fall back to the
+  // store value so the previously-selected space stays highlighted.
+  const currentSpaceId = urlSpaceId ?? storeSpaceId;
 
   const { data, isLoading, mutate } = useSWR(
     SPACE_LIST_KEY,
@@ -136,10 +146,14 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
       ) : (
         <Flexbox gap={1} paddingInline={4}>
           <NavItem
-            active={location.pathname === buildResourceSharedPath()}
             icon={Share2Icon}
             title={t('shared.title')}
             onClick={() => navigate(buildResourceSharedPath())}
+          />
+          <NavItem
+            icon={StarIcon}
+            title={t('favorites.title')}
+            onClick={() => navigate(buildResourceFavoritesPath())}
           />
           {data?.map((space) => {
             const active = currentSpaceId === space.id && !location.pathname.endsWith('/settings');

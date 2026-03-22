@@ -141,6 +141,7 @@ interface FileListItemProps extends FileListItemType {
 const FileListItem = memo<FileListItemProps>(
   ({
     size,
+    childCount,
     chunkingError,
     columnWidths,
     embeddingError,
@@ -161,6 +162,7 @@ const FileListItem = memo<FileListItemProps>(
     slug,
     pendingRenameItemId,
     onHoverChange,
+    updatedAt,
   }) => {
     const { t } = useTranslation(['components', 'file']);
     const { message } = App.useApp();
@@ -275,14 +277,13 @@ const FileListItem = memo<FileListItemProps>(
       setIsOver(false);
     }, []);
 
-    // Memoize display time calculation
-    const displayTime = useMemo(
-      () =>
-        dayjs().diff(dayjs(createdAt), 'd') < 7
-          ? dayjs(createdAt).fromNow()
-          : dayjs(createdAt).format('YYYY-MM-DD'),
-      [createdAt],
-    );
+    // Memoize display time calculation - prefer updatedAt over createdAt
+    const displayTime = useMemo(() => {
+      const ts = updatedAt || createdAt;
+      return dayjs().diff(dayjs(ts), 'd') < 7
+        ? dayjs(ts).fromNow()
+        : dayjs(ts).format('YYYY-MM-DD');
+    }, [updatedAt, createdAt]);
 
     const handleRenameStart = useCallback(() => {
       setIsRenaming(true);
@@ -542,7 +543,13 @@ const FileListItem = memo<FileListItemProps>(
                 {displayTime}
               </Flexbox>
               <Flexbox className={styles.item} style={{ flexShrink: 0 }} width={columnWidths.size}>
-                {isFolder || isPage ? '-' : formatSize(size)}
+                {isFolder
+                  ? childCount
+                    ? t('FileManager.title.itemCount', { count: childCount })
+                    : '-'
+                  : isPage
+                    ? '-'
+                    : formatSize(size)}
               </Flexbox>
             </>
           )}
@@ -555,6 +562,7 @@ const FileListItem = memo<FileListItemProps>(
     return (
       prevProps.id === nextProps.id &&
       prevProps.name === nextProps.name &&
+      prevProps.childCount === nextProps.childCount &&
       prevProps.selected === nextProps.selected &&
       prevProps.chunkingStatus === nextProps.chunkingStatus &&
       prevProps.embeddingStatus === nextProps.embeddingStatus &&
@@ -565,6 +573,7 @@ const FileListItem = memo<FileListItemProps>(
       prevProps.pendingRenameItemId === nextProps.pendingRenameItemId &&
       prevProps.size === nextProps.size &&
       prevProps.createdAt === nextProps.createdAt &&
+      prevProps.updatedAt === nextProps.updatedAt &&
       prevProps.fileType === nextProps.fileType &&
       prevProps.sourceType === nextProps.sourceType &&
       prevProps.slug === nextProps.slug &&

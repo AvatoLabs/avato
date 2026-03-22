@@ -83,6 +83,10 @@ export interface Action {
    */
   setSelectedFileIds: (ids: string[]) => void;
   /**
+   * Toggle the resource info sidebar panel
+   */
+  setShowInfoPanel: (show: boolean) => void;
+  /**
    * Set the field to sort files by
    */
   setSorter: (sorter: 'name' | 'createdAt' | 'size') => void;
@@ -275,6 +279,11 @@ export const store: CreateStore = (publicState) => (set, get) => ({
     if (prev.length === selectedFileIds.length && prev.every((id, i) => id === selectedFileIds[i]))
       return;
     set({ selectedFileIds });
+  },
+
+  setShowInfoPanel: (showInfoPanel) => {
+    if (get().showInfoPanel === showInfoPanel) return;
+    set({ showInfoPanel });
   },
 
   setSortType: (sortType) => {

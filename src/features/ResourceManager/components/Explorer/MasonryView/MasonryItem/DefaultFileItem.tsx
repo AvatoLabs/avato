@@ -43,6 +43,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 interface DefaultFileItemProps {
+  childCount?: number | null;
   chunkCount?: number | null;
   chunkingError?: IAsyncTaskError | null;
   chunkingStatus?: AsyncTaskStatus | null;
@@ -57,6 +58,7 @@ interface DefaultFileItemProps {
 
 const DefaultFileItem = memo<DefaultFileItemProps>(
   ({
+    childCount,
     chunkCount,
     chunkingError,
     chunkingStatus,
@@ -104,6 +106,17 @@ const DefaultFileItem = memo<DefaultFileItemProps>(
               }}
             >
               {formatSize(size)}
+            </div>
+          )}
+          {isFolder && !!childCount && childCount > 0 && (
+            <div
+              style={{
+                color: 'var(--lobe-chat-text-tertiary)',
+                fontSize: 12,
+                textAlign: 'center',
+              }}
+            >
+              {t('FileManager.title.itemCount', { count: childCount })}
             </div>
           )}
         </Flexbox>

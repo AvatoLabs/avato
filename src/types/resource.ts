@@ -13,6 +13,10 @@ export interface ResourceItem {
     retryCount: number;
   };
 
+  /**
+   * Number of direct children for folders
+   */
+  childCount?: number | null;
   chunkCount?: number | null;
   chunkingError?: any | null;
   chunkingStatus?: string | null;
