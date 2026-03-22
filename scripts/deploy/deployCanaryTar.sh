@@ -9,8 +9,8 @@ BUILD_ENV_FILE="${BUILD_ENV_FILE:-.env.canary}"
 DEPLOY_HOST="${DEPLOY_HOST:-8.217.101.26}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
 DEPLOY_PASSWORD="${DEPLOY_PASSWORD:?DEPLOY_PASSWORD is required}"
-DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://canary.avatoturingmesh.com}"
-DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-canary.avatoturingmesh.com}"
+DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://canary.turingmesh.com}"
+DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-canary.turingmesh.com}"
 
 # Canary-specific paths (different from production)
 REMOTE_ARTIFACT_DIR="${REMOTE_ARTIFACT_DIR:-/data/canary}"
@@ -44,7 +44,9 @@ cd "${ROOT_DIR}"
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
 cp "${BUILD_ENV_FILE}" .env.production
 trap 'rm -f "${ROOT_DIR}/.env.production"' EXIT
-# Only build Next.js server + sitemap; skip desktop/mobile SPA builds
+# Build SPA (Vite), then copy, then Next.js server + sitemap
+bun run build:spa
+bun run build:spa:copy
 NODE_OPTIONS=--max-old-space-size=8192 DOCKER=true npx next build
 bun run build-sitemap
 
@@ -72,8 +74,6 @@ EXPOSE 3210
 CMD ["node", "server.js"]
 EOF
 
-# Auto-detect standalone app path (handles both lobehub/ and RustRoverProjects/minkhub/)
-STANDALONE_APP_DIR="$(dirname "$(find .next/standalone -maxdepth 5 -name server.js -type f | head -1)")"
 rsync -a \
   --exclude='dist/desktop/' \
   --exclude='dist/mobile/' \
@@ -81,18 +81,7 @@ rsync -a \
   --exclude='node_modules/.pnpm/@napi-rs+canvas-*-musl*' \
   --exclude='node_modules/.pnpm/@img+sharp-libvips-*musl*' \
   --exclude='node_modules/.pnpm/@img+sharp-linuxmusl*' \
-  "${STANDALONE_APP_DIR}/" "${TMP_BUILD_DIR}/app/"
-# Copy top-level external node_modules if present (Turbopack externals)
-if [ -d .next/standalone/node_modules ]; then
-  rsync -a .next/standalone/node_modules/ "${TMP_BUILD_DIR}/app/node_modules/"
-fi
-# Resolve any symlinks in .next/node_modules (Turbopack hashed module refs)
-if [ -d "${TMP_BUILD_DIR}/app/.next/node_modules" ]; then
-  find "${TMP_BUILD_DIR}/app/.next/node_modules" -type l | while read -r link; do
-    target="$(readlink -f "$link")"
-    if [ -e "$target" ]; then rm -f "$link" && cp -a "$target" "$link"; fi
-  done || true
-fi
+  .next/standalone/ "${TMP_BUILD_DIR}/app/"
 mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
 rsync -a public/ "${TMP_BUILD_DIR}/app/public/"

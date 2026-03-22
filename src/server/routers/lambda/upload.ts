@@ -24,11 +24,7 @@ const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
 function isS3HeadObjectMissingError(error: unknown): boolean {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return (
-    e?.name === 'NotFound' ||
-    e?.name === 'NoSuchKey' ||
-    e?.$metadata?.httpStatusCode === 404
-  );
+  return e?.name === 'NotFound' || e?.name === 'NoSuchKey' || e?.$metadata?.httpStatusCode === 404;
 }
 
 const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -36,6 +32,7 @@ const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
 
   return opts.next({
     ctx: {
+      db: ctx.serverDB,
       resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
       resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
       spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),

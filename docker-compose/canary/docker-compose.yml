@@ -18,7 +18,7 @@ services:
       - 'KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}'
       - 'AUTH_SECRET=${AUTH_SECRET}'
       - 'DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME}'
-      - 'INTERNAL_APP_URL=${INTERNAL_APP_URL:-http://127.0.0.1:3211}'
+      - 'INTERNAL_APP_URL=http://localhost:3210'
       - 'S3_ENDPOINT=${S3_ENDPOINT}'
       - 'S3_BUCKET=${RUSTFS_LOBE_BUCKET}'
       - 'S3_ENABLE_PATH_STYLE=1'
@@ -32,11 +32,15 @@ services:
       - 'REDIS_URL=redis://redis:6379'
       - 'REDIS_PREFIX=lobechat_canary'
       - 'REDIS_TLS=0'
+      - 'S3_ENDPOINT=http://rustfs:9000'
+      - 'VIRTUAL_HOST=canary.turingmesh.com'
+      - 'VIRTUAL_PORT=3210'
     env_file:
       - .env
     restart: always
     networks:
       - canary-network
+      - stack-network
 
   postgresql:
     image: paradedb/paradedb:latest-pg17
@@ -49,7 +53,7 @@ services:
       - 'POSTGRES_DB=${LOBE_DB_NAME}'
       - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: [ 'CMD-SHELL', 'pg_isready -U postgres' ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -66,7 +70,7 @@ services:
     volumes:
       - 'redis_data:/data'
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: [ 'CMD', 'redis-cli', 'ping' ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -87,12 +91,11 @@ services:
     volumes:
       - 'rustfs-data:/data'
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:9000/health >/dev/null 2>&1 || exit 1']
+      test: [ 'CMD-SHELL', 'wget -qO- http://localhost:9000/health >/dev/null 2>&1 || exit 1' ]
       interval: 5s
       timeout: 3s
       retries: 30
-    command:
-      ['--access-key', '${RUSTFS_ACCESS_KEY}', '--secret-key', '${RUSTFS_SECRET_KEY}', '/data']
+    command: [ '--access-key', '${RUSTFS_ACCESS_KEY}', '--secret-key', '${RUSTFS_SECRET_KEY}', '/data' ]
     networks:
       - canary-network
 
@@ -126,6 +129,8 @@ services:
 networks:
   canary-network:
     driver: bridge
+  stack-network:
+    external: true
 
 volumes:
   redis_data:

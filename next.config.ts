@@ -29,4 +29,10 @@ const nextConfig = defineConfig({
   ...(isVercel ? vercelConfig : {}),
 });
 
+// Force standalone output root to this project directory.
+// Without this, Next.js detects ~/package-lock.json as workspace root,
+// producing deep standalone paths (.next/standalone/RustRoverProjects/minkhub/)
+// that break Turbopack hashed-module symlinks after rsync.
+nextConfig.outputFileTracingRoot = import.meta.dirname;
+
 export default nextConfig;

@@ -32,6 +32,9 @@ export const useResourceManagerUrlSync = () => {
   }, []); // Only on mount
 
   // Sync store changes to URL (Store → URL)
+  // NOTE: setSearchParams is intentionally excluded from deps — React Router creates a new
+  // reference on every URL change, which would cause an infinite loop (effect → setSearchParams
+  // → URL change → new setSearchParams ref → effect re-runs).
   useEffect(() => {
     setSearchParams(
       (prev) => {
@@ -62,5 +65,5 @@ export const useResourceManagerUrlSync = () => {
       },
       { replace: true },
     ); // Use replace to avoid polluting history
-  }, [sorter, sortType, viewMode, setSearchParams]);
+  }, [sorter, sortType, viewMode]);
 };
