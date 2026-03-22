@@ -87,7 +87,7 @@ export const marketRouter = router({
         .object({
           locale: z.string().optional(),
           q: z.string().optional(),
-          source: marketSourceSchema.optional(),
+          source: z.string().optional(),
         })
         .optional(),
     )

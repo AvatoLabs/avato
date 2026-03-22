@@ -1,14 +1,22 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getCanonicalUrl } from '@/server/utils/url';
 
-import { LAST_MODIFIED, Sitemap, SitemapType } from './sitemap';
+import { LAST_MODIFIED, resetSitemapCache, Sitemap, SitemapType } from './sitemap';
 
 const LOCALE_COUNT = 18;
 
 describe('Sitemap', () => {
   const sitemap = new Sitemap();
+
+  beforeEach(() => {
+    resetSitemapCache();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   describe('getIndex', () => {
     it('should return a valid sitemap index with pagination', async () => {

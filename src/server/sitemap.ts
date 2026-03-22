@@ -10,6 +10,7 @@ import { type Locales } from '@/locales/resources';
 import { locales as allLocales } from '@/locales/resources';
 import { DiscoverService } from '@/server/services/discover';
 import { getCanonicalUrl } from '@/server/utils/url';
+import { type IdentifiersResponse } from '@/types/discover';
 import { isDev } from '@/utils/env';
 
 export interface SitemapItem {
@@ -36,26 +37,59 @@ export const LAST_MODIFIED = new Date().toISOString();
 // Number of items per page
 const ITEMS_PER_PAGE = 100;
 
+// Cache for identifiers to avoid repeated API calls during build
+let cachedPluginIdentifiers: IdentifiersResponse | null = null;
+let cachedAssistantIdentifiers: IdentifiersResponse | null = null;
+let cachedModelIdentifiers: IdentifiersResponse | null = null;
+
+// Reset cache (for testing purposes)
+export function resetSitemapCache() {
+  cachedPluginIdentifiers = null;
+  cachedAssistantIdentifiers = null;
+  cachedModelIdentifiers = null;
+}
+
 export class Sitemap {
   sitemapIndexs = [{ id: SitemapType.Pages }, { id: SitemapType.Providers }];
 
   private discoverService = new DiscoverService();
 
+  // Get cached plugin identifiers (fetch once, reuse across all pages)
+  private async _getPluginIdentifiers(): Promise<IdentifiersResponse> {
+    if (cachedPluginIdentifiers) return cachedPluginIdentifiers;
+    cachedPluginIdentifiers = await this.discoverService.getPluginIdentifiers();
+    return cachedPluginIdentifiers;
+  }
+
+  // Get cached assistant identifiers (fetch once, reuse across all pages)
+  private async _getAssistantIdentifiers(): Promise<IdentifiersResponse> {
+    if (cachedAssistantIdentifiers) return cachedAssistantIdentifiers;
+    cachedAssistantIdentifiers = await this.discoverService.getAssistantIdentifiers();
+    return cachedAssistantIdentifiers;
+  }
+
+  // Get cached model identifiers (fetch once, reuse across all pages)
+  private async _getModelIdentifiers(): Promise<IdentifiersResponse> {
+    if (cachedModelIdentifiers) return cachedModelIdentifiers;
+    cachedModelIdentifiers = await this.discoverService.getModelIdentifiers();
+    return cachedModelIdentifiers;
+  }
+
   // Get total number of plugin pages
   async getPluginPageCount(): Promise<number> {
-    const list = await this.discoverService.getPluginIdentifiers();
+    const list = await this._getPluginIdentifiers();
     return Math.ceil(list.length / ITEMS_PER_PAGE);
   }
 
   // Get total number of assistant pages
   async getAssistantPageCount(): Promise<number> {
-    const list = await this.discoverService.getAssistantIdentifiers();
+    const list = await this._getAssistantIdentifiers();
     return Math.ceil(list.length / ITEMS_PER_PAGE);
   }
 
   // Get total number of model pages
   async getModelPageCount(): Promise<number> {
-    const list = await this.discoverService.getModelIdentifiers();
+    const list = await this._getModelIdentifiers();
     return Math.ceil(list.length / ITEMS_PER_PAGE);
   }
 
@@ -204,7 +238,7 @@ export class Sitemap {
   }
 
   async getAssistants(page?: number): Promise<MetadataRoute.Sitemap> {
-    const list = await this.discoverService.getAssistantIdentifiers();
+    const list = await this._getAssistantIdentifiers();
 
     if (page !== undefined) {
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
@@ -233,7 +267,7 @@ export class Sitemap {
   }
 
   async getPlugins(page?: number): Promise<MetadataRoute.Sitemap> {
-    const list = await this.discoverService.getPluginIdentifiers();
+    const list = await this._getPluginIdentifiers();
 
     if (page !== undefined) {
       const startIndex = (page - 1) * ITEMS_PER_PAGE;
@@ -262,7 +296,7 @@ export class Sitemap {
   }
 
   async getModels(page?: number): Promise<MetadataRoute.Sitemap> {
-    const list = await this.discoverService.getModelIdentifiers();
+    const list = await this._getModelIdentifiers();
 
     if (page !== undefined) {
       const startIndex = (page - 1) * ITEMS_PER_PAGE;

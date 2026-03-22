@@ -44,7 +44,9 @@ cd "${ROOT_DIR}"
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
 cp "${BUILD_ENV_FILE}" .env.production
 trap 'rm -f "${ROOT_DIR}/.env.production"' EXIT
-bun run build:docker
+# Only build Next.js server + sitemap; skip desktop/mobile SPA builds
+NODE_OPTIONS=--max-old-space-size=8192 DOCKER=true npx next build
+bun run build-sitemap
 
 echo "==> Preparing runtime bundle"
 rm -rf "${TMP_BUILD_DIR}/app"
@@ -70,7 +72,27 @@ EXPOSE 3210
 CMD ["node", "server.js"]
 EOF
 
-rsync -a .next/standalone/lobehub/ "${TMP_BUILD_DIR}/app/"
+# Auto-detect standalone app path (handles both lobehub/ and RustRoverProjects/minkhub/)
+STANDALONE_APP_DIR="$(dirname "$(find .next/standalone -maxdepth 5 -name server.js -type f | head -1)")"
+rsync -a \
+  --exclude='dist/desktop/' \
+  --exclude='dist/mobile/' \
+  --exclude='packages/database/migrations/' \
+  --exclude='node_modules/.pnpm/@napi-rs+canvas-*-musl*' \
+  --exclude='node_modules/.pnpm/@img+sharp-libvips-*musl*' \
+  --exclude='node_modules/.pnpm/@img+sharp-linuxmusl*' \
+  "${STANDALONE_APP_DIR}/" "${TMP_BUILD_DIR}/app/"
+# Copy top-level external node_modules if present (Turbopack externals)
+if [ -d .next/standalone/node_modules ]; then
+  rsync -a .next/standalone/node_modules/ "${TMP_BUILD_DIR}/app/node_modules/"
+fi
+# Resolve any symlinks in .next/node_modules (Turbopack hashed module refs)
+if [ -d "${TMP_BUILD_DIR}/app/.next/node_modules" ]; then
+  find "${TMP_BUILD_DIR}/app/.next/node_modules" -type l | while read -r link; do
+    target="$(readlink -f "$link")"
+    if [ -e "$target" ]; then rm -f "$link" && cp -a "$target" "$link"; fi
+  done || true
+fi
 mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
 rsync -a public/ "${TMP_BUILD_DIR}/app/public/"
@@ -87,6 +109,30 @@ echo "==> Cleaning local build leftovers"
 docker image rm "${IMAGE_NAME}" >/dev/null 2>&1 || true
 docker image prune -f >/dev/null 2>&1 || true
 ls -1t "${TMP_ARTIFACT_DIR}"/canary-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
+
+echo "==> Ensuring remote directory structure"
+expect <<EOF
+log_user 1
+set timeout -1
+spawn ssh -F ${SSH_CONFIG_FILE} canary-deploy "mkdir -p ${REMOTE_ARTIFACT_DIR} ${REMOTE_DEPLOY_PATH}"
+expect {
+  -re ".*yes/no.*" { send "yes\r"; exp_continue }
+  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
+  eof
+}
+EOF
+
+echo "==> Uploading docker-compose config"
+expect <<EOF
+log_user 1
+set timeout -1
+spawn scp -F ${SSH_CONFIG_FILE} ${ROOT_DIR}/docker-compose/canary/docker-compose.yml ${ROOT_DIR}/docker-compose/canary/.env ${ROOT_DIR}/docker-compose/canary/bucket.config.json ${ROOT_DIR}/docker-compose/canary/searxng-settings.yml canary-deploy:${REMOTE_DEPLOY_PATH}/
+expect {
+  -re ".*yes/no.*" { send "yes\r"; exp_continue }
+  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
+  eof
+}
+EOF
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
 expect <<EOF
