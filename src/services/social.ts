@@ -74,15 +74,6 @@ export interface FavoritePluginItem {
 }
 
 class SocialService {
-  /**
-   * @deprecated This method is no longer needed as authentication is now handled
-   * automatically through tRPC middleware. Keeping for backward compatibility.
-   */
-   
-  setAccessToken(_token: string | undefined) {
-    // No-op: Authentication is now handled through tRPC authedProcedure middleware
-  }
-
   // ==================== Follow ====================
 
   async follow(followingId: number): Promise<void> {

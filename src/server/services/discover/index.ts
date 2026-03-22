@@ -9,7 +9,6 @@ import {
 import {
   type AgentStatus,
   type AssistantListResponse,
-  type AssistantMarketSource,
   type AssistantQueryParams,
   type DiscoverAssistantDetail,
   type DiscoverAssistantItem,
@@ -67,8 +66,6 @@ import urlJoin from 'url-join';
 
 import { type TrustedClientUserInfo } from '@/libs/trusted-client';
 import { normalizeLocale } from '@/locales/resources';
-import { AssistantStore } from '@/server/modules/AssistantStore';
-import { PluginStore } from '@/server/modules/PluginStore';
 import { MarketService } from '@/server/services/market';
 
 const log = debug('lobe-server:discover');
@@ -89,8 +86,6 @@ export class DiscoverService {
   private static m2mToken?: { accessToken: string; expiresAt: number };
   private static m2mTokenPromise: Promise<string | undefined> | null = null;
 
-  assistantStore = new AssistantStore();
-  pluginStore = new PluginStore();
   market: MarketSDK;
   private userAgent?: string;
 
@@ -132,6 +127,27 @@ export class DiscoverService {
         tags: [CacheTag.Discover, CacheTag.MCP],
       },
     } satisfies RequestInit;
+  }
+
+  /** Map classic plugin list query params to MCP market list (single backend). */
+  private mapPluginQueryToMcpParams(params: PluginQueryParams = {}): McpQueryParams {
+    const { sort = PluginSorts.CreatedAt, ...rest } = params;
+    let mcpSort: McpSorts = McpSorts.CreatedAt;
+    switch (sort) {
+      case PluginSorts.CreatedAt: {
+        mcpSort = McpSorts.CreatedAt;
+        break;
+      }
+      case PluginSorts.Identifier:
+      case PluginSorts.Title: {
+        mcpSort = McpSorts.Recommended;
+        break;
+      }
+      default: {
+        mcpSort = McpSorts.CreatedAt;
+      }
+    }
+    return { ...rest, sort: mcpSort };
   }
 
   private isMissingBearerTokenError(error: unknown) {
@@ -431,212 +447,11 @@ export class DiscoverService {
     return { name: '' };
   };
 
-  private isLegacySource = (source?: AssistantMarketSource) => source === 'legacy';
-
-  private legacyGetAssistantListRaw = async (locale?: string): Promise<DiscoverAssistantItem[]> => {
-    log('legacyGetAssistantListRaw: locale=%s', locale);
-    const normalizedLocale = normalizeLocale(locale);
-    const list = await this.assistantStore.getAgentIndex(normalizedLocale);
-    if (!list || !Array.isArray(list)) {
-      log('legacyGetAssistantListRaw: no valid list found, returning empty array');
-      return [];
-    }
-    const result = list.map(({ meta, ...item }) => ({ ...item, ...meta }));
-    log('legacyGetAssistantListRaw: returning %d items', result.length);
-    return result;
-  };
-
-  private legacyGetAssistantCategories = async (
-    params: CategoryListQuery = {},
-  ): Promise<CategoryItem[]> => {
-    log('legacyGetAssistantCategories: params=%O', params);
-    const { q, locale } = params;
-    let list = await this.legacyGetAssistantListRaw(locale);
-    if (q) {
-      const originalCount = list.length;
-      list = list.filter((item) => {
-        return [item.author, item.title, item.description, item?.tags]
-          .flat()
-          .filter(Boolean)
-          .join(',')
-          .toLowerCase()
-          .includes(decodeURIComponent(q).toLowerCase());
-      });
-      log(
-        'legacyGetAssistantCategories: filtered by query "%s", %d -> %d items',
-        q,
-        originalCount,
-        list.length,
-      );
-    }
-    const categoryCounts = countBy(list, (item) => item.category);
-    const result = Object.entries(categoryCounts)
-      .filter(([category]) => Boolean(category))
-      .map(([category, count]) => ({
-        category,
-        count,
-      }));
-    log('legacyGetAssistantCategories: returning %d categories', result.length);
-    return result;
-  };
-
-  private legacyGetAssistantDetail = async (params: {
-    identifier: string;
-    locale?: string;
-    version?: string;
-  }): Promise<DiscoverAssistantDetail | undefined> => {
-    log('legacyGetAssistantDetail: params=%O', params);
-    const { locale, identifier } = params;
-    const normalizedLocale = normalizeLocale(locale);
-    const data = await this.assistantStore.getAgent(identifier, normalizedLocale);
-    if (!data) {
-      log('legacyGetAssistantDetail: assistant not found for identifier=%s', identifier);
-      return;
-    }
-    const { meta, ...item } = data;
-    const assistant = merge(cloneDeep(DEFAULT_DISCOVER_ASSISTANT_ITEM), { ...item, ...meta });
-    const list = await this.getAssistantList({
-      category: assistant.category,
-      includeAgentGroup: true,
-      locale,
-      page: 1,
-      pageSize: 7,
-      source: 'legacy',
-    });
-    const result = {
-      ...assistant,
-      related: list.items.filter((item) => item.identifier !== assistant.identifier).slice(0, 6),
-    };
-    log(
-      'legacyGetAssistantDetail: returning assistant with %d related items',
-      result.related.length,
-    );
-    return result;
-  };
-
-  private legacyGetAssistantIdentifiers = async (): Promise<IdentifiersResponse> => {
-    log('legacyGetAssistantIdentifiers: fetching identifiers');
-    const list = await this.legacyGetAssistantListRaw();
-    const result = list.map((item) => {
-      return {
-        identifier: item.identifier,
-        lastModified: item.createdAt,
-      };
-    });
-    log('legacyGetAssistantIdentifiers: returning %d identifiers', result.length);
-    return result;
-  };
-
-  private legacyGetAssistantList = async (
-    params: AssistantQueryParams = {},
-  ): Promise<AssistantListResponse> => {
-    log('legacyGetAssistantList: params=%O', params);
-    const {
-      locale,
-      category,
-      order = 'desc',
-      page = 1,
-      pageSize = 20,
-      q,
-      sort = AssistantSorts.Recommended,
-      ownerId,
-    } = params;
-    const currentPage = Number(page) || 1;
-    const currentPageSize = Number(pageSize) || 20;
-
-    if (ownerId) {
-      log('legacyGetAssistantList: ownerId filter not supported in legacy source');
-      return {
-        currentPage,
-        items: [],
-        pageSize: currentPageSize,
-        totalCount: 0,
-        totalPages: 0,
-      };
-    }
-
-    let list = await this.legacyGetAssistantListRaw(locale);
-    const originalCount = list.length;
-
-    if (category) {
-      list = list.filter((item) => item.category === category);
-      log(
-        'legacyGetAssistantList: filtered by category "%s", %d -> %d items',
-        category,
-        originalCount,
-        list.length,
-      );
-    }
-
-    if (q) {
-      const beforeFilter = list.length;
-      list = list.filter((item) => {
-        return [item.author, item.title, item.description, item?.tags]
-          .flat()
-          .filter(Boolean)
-          .join(',')
-          .toLowerCase()
-          .includes(decodeURIComponent(q).toLowerCase());
-      });
-      log(
-        'legacyGetAssistantList: filtered by query "%s", %d -> %d items',
-        q,
-        beforeFilter,
-        list.length,
-      );
-    }
-
-    if (sort) {
-      log('legacyGetAssistantList: sorting by %s %s', sort, order);
-      switch (sort) {
-        case AssistantSorts.UpdatedAt: {
-          // Legacy source doesn't have updatedAt, fallback to createdAt
-          list = list.sort((a, b) => {
-            if (order === 'asc') {
-              return dayjs(a.createdAt).unix() - dayjs(b.createdAt).unix();
-            } else {
-              return dayjs(b.createdAt).unix() - dayjs(a.createdAt).unix();
-            }
-          });
-          break;
-        }
-        default: {
-          // Legacy source doesn't support these sorts (MostUsage, HaveSkills, Recommended), keep original order
-          break;
-        }
-      }
-    }
-
-    const start = (currentPage - 1) * currentPageSize;
-    const end = currentPage * currentPageSize;
-    const result = {
-      currentPage,
-      items: list.slice(start, end),
-      pageSize: currentPageSize,
-      totalCount: list.length,
-      totalPages: Math.ceil(list.length / currentPageSize),
-    };
-    log(
-      'legacyGetAssistantList: returning page %d/%d with %d items',
-      currentPage,
-      result.totalPages,
-      result.items.length,
-    );
-    return result;
-  };
-
   // ============================== Assistant Market ==============================
 
-  getAssistantCategories = async (
-    params: CategoryListQuery & { source?: AssistantMarketSource } = {},
-  ): Promise<CategoryItem[]> => {
+  getAssistantCategories = async (params: CategoryListQuery = {}): Promise<CategoryItem[]> => {
     log('getAssistantCategories: params=%O', params);
-    const { source, ...rest } = params;
-    if (this.isLegacySource(source)) {
-      return this.legacyGetAssistantCategories(rest);
-    }
-
-    const { q, locale } = rest;
+    const { q, locale } = params;
     const normalizedLocale = normalizeLocale(locale);
 
     try {
@@ -656,16 +471,10 @@ export class DiscoverService {
   getAssistantDetail = async (params: {
     identifier: string;
     locale?: string;
-    source?: AssistantMarketSource;
     version?: string;
   }): Promise<DiscoverAssistantDetail | undefined> => {
     log('getAssistantDetail: params=%O', params);
-    const { source, ...rest } = params;
-    if (this.isLegacySource(source)) {
-      return this.legacyGetAssistantDetail(rest);
-    }
-
-    const { locale, identifier, version } = rest;
+    const { locale, identifier, version } = params;
     const normalizedLocale = normalizeLocale(locale);
 
     try {
@@ -736,7 +545,6 @@ export class DiscoverService {
         locale,
         page: 1,
         pageSize: 7,
-        source,
       });
 
       const result = {
@@ -752,13 +560,8 @@ export class DiscoverService {
     }
   };
 
-  getAssistantIdentifiers = async (
-    params: { source?: AssistantMarketSource } = {},
-  ): Promise<IdentifiersResponse> => {
-    log('getAssistantIdentifiers: fetching identifiers with params=%O', params);
-    if (this.isLegacySource(params.source)) {
-      return this.legacyGetAssistantIdentifiers();
-    }
+  getAssistantIdentifiers = async (): Promise<IdentifiersResponse> => {
+    log('getAssistantIdentifiers: fetching identifiers');
 
     try {
       // @ts-ignore
@@ -778,11 +581,6 @@ export class DiscoverService {
 
   getAssistantList = async (params: AssistantQueryParams = {}): Promise<AssistantListResponse> => {
     log('getAssistantList: params=%O', params);
-    const { source, ...rest } = params;
-    if (this.isLegacySource(source)) {
-      return this.legacyGetAssistantList(rest);
-    }
-
     const {
       locale,
       category,
@@ -793,7 +591,7 @@ export class DiscoverService {
       sort = AssistantSorts.Recommended,
       ownerId,
       includeAgentGroup,
-    } = rest;
+    } = params;
     const shouldOmitCategory = [AssistantCategory.All, AssistantCategory.Discover].includes(
       category as AssistantCategory,
     );
@@ -802,7 +600,7 @@ export class DiscoverService {
       const normalizedLocale = normalizeLocale(locale);
 
       let apiSort: 'createdAt' | 'updatedAt' | 'name' | 'mostUsage' | 'recommended' = 'recommended';
-      let haveSkills: boolean | undefined = rest.haveSkills;
+      let haveSkills: boolean | undefined = params.haveSkills;
 
       switch (sort) {
         case AssistantSorts.UpdatedAt: {
@@ -1108,57 +906,9 @@ export class DiscoverService {
 
   // ============================== Plugin Market ==============================
 
-  private _getPluginList = async (locale?: string): Promise<DiscoverPluginItem[]> => {
-    log('_getPluginList: locale=%s', locale);
-    const normalizedLocale = normalizeLocale(locale);
-    const list = await this.pluginStore.getPluginList(normalizedLocale);
-    if (!list || !Array.isArray(list)) {
-      log('_getPluginList: no valid list found, returning empty array');
-      return [];
-    }
-    const result = list.map(({ meta, ...item }) => ({ ...item, ...meta }));
-    log('_getPluginList: returning %d items', result.length);
-    return result;
-  };
-
-  getLegacyPluginList = async ({ locale }: { locale?: string } = {}): Promise<any> => {
-    log('getLegacyPluginList: locale=%s', locale);
-    const normalizedLocale = normalizeLocale(locale);
-    const result = await this.pluginStore.getPluginList(normalizedLocale);
-    log('getLegacyPluginList: returning plugin list');
-    return result;
-  };
-
   getPluginCategories = async (params: CategoryListQuery = {}): Promise<CategoryItem[]> => {
     log('getPluginCategories: params=%O', params);
-    const { q, locale } = params;
-    let list = await this._getPluginList(locale);
-    if (q) {
-      const originalCount = list.length;
-      list = list.filter((item) => {
-        return [item.author, item.title, item.description, item?.tags]
-          .flat()
-          .filter(Boolean)
-          .join(',')
-          .toLowerCase()
-          .includes(decodeURIComponent(q).toLowerCase());
-      });
-      log(
-        'getPluginCategories: filtered by query "%s", %d -> %d items',
-        q,
-        originalCount,
-        list.length,
-      );
-    }
-    const categoryCounts = countBy(list, (item) => item.category);
-    const result = Object.entries(categoryCounts)
-      .filter(([category]) => Boolean(category)) // Filter out empty values
-      .map(([category, count]) => ({
-        category,
-        count,
-      }));
-    log('getPluginCategories: returning %d categories', result.length);
-    return result;
+    return this.getMcpCategories(params);
   };
 
   getPluginDetail = async (params: {
@@ -1169,38 +919,8 @@ export class DiscoverService {
     log('getPluginDetail: params=%O', params);
     const { locale, identifier, withManifest } = params;
 
-    // Step 1: Try to find in legacy plugin list
-    const all = await this._getPluginList(locale);
-    const raw = all.find((item) => item.identifier === identifier);
-    if (raw) {
-      log('getPluginDetail: found plugin in legacy list for identifier=%s', identifier);
-      const mergedRaw = merge(cloneDeep(DEFAULT_DISCOVER_PLUGIN_ITEM), raw);
-      const list = await this.getPluginList({
-        category: mergedRaw.category,
-        locale,
-        page: 1,
-        pageSize: 7,
-      });
-
-      const plugin: DiscoverPluginDetail = {
-        ...mergedRaw,
-        related: list.items.filter((item) => item.identifier !== mergedRaw.identifier).slice(0, 6),
-        source: 'legacy',
-      };
-
-      if (!withManifest || !plugin?.manifest || !isString(plugin?.manifest)) {
-        log('getPluginDetail: returning legacy plugin without manifest processing');
-        return plugin;
-      }
-
-      return plugin;
-    }
-
-    // Step 2: Try to find in Market MCP plugins
-    log(
-      'getPluginDetail: plugin not found in legacy store for identifier=%s, trying MCP plugin',
-      identifier,
-    );
+    // Step 1: Market MCP plugins
+    log('getPluginDetail: resolving via MCP market for identifier=%s', identifier);
     try {
       const mcpDetail = await this.getMcpDetail({ identifier, locale });
       const convertedMcp: Partial<DiscoverPluginDetail> = {
@@ -1229,12 +949,12 @@ export class DiscoverService {
           manifest: undefined,
           schemaVersion: 1,
           tags: (item as any).tags || [],
-          title: (item as any).name || item.identifier,
+          title: (item as any).name || (item as any).title || item.identifier,
         })) as unknown as DiscoverPluginItem[],
         schemaVersion: 1,
         source: 'market',
         tags: (mcpDetail as any).tags || [],
-        title: (mcpDetail as any).name || mcpDetail.identifier,
+        title: (mcpDetail as any).name || (mcpDetail as any).title || mcpDetail.identifier,
       };
       const plugin = merge(cloneDeep(DEFAULT_DISCOVER_PLUGIN_ITEM), convertedMcp);
       log('getPluginDetail: returning converted MCP plugin');
@@ -1246,7 +966,7 @@ export class DiscoverService {
       );
     }
 
-    // Step 3: Try to find in builtin tools
+    // Step 2: Builtin tools
     const { builtinTools } = await import('@lobechat/builtin-tools');
     const builtinTool = builtinTools.find((tool) => tool.identifier === identifier);
     if (builtinTool) {
@@ -1270,7 +990,7 @@ export class DiscoverService {
       return plugin;
     }
 
-    // Step 4: Try to find in Klavis server types (builtin tools that require env config)
+    // Step 3: Klavis server types (builtin tools that require env config)
     const klavisTool = KLAVIS_SERVER_TYPES.find((tool) => tool.identifier === identifier);
     if (klavisTool) {
       log('getPluginDetail: found Klavis tool for identifier=%s', identifier);
@@ -1302,105 +1022,29 @@ export class DiscoverService {
 
   getPluginIdentifiers = async (): Promise<IdentifiersResponse> => {
     log('getPluginIdentifiers: fetching identifiers');
-    const list = await this._getPluginList();
-    const result = list.map((item) => {
-      return {
+
+    try {
+      // @ts-ignore market-sdk plugins.getPublishedIdentifiers
+      const identifiers = await this.market.plugins.getPublishedIdentifiers();
+      if (!Array.isArray(identifiers)) {
+        log('getPluginIdentifiers: unexpected response shape');
+        return [];
+      }
+      const result = identifiers.map((item: { identifier: string; lastModified?: string }) => ({
         identifier: item.identifier,
-        lastModified: item.createdAt,
-      };
-    });
-    log('getPluginIdentifiers: returning %d identifiers', result.length);
-    return result;
+        lastModified: item.lastModified || new Date().toISOString(),
+      }));
+      log('getPluginIdentifiers: returning %d identifiers from market SDK', result.length);
+      return result;
+    } catch (error) {
+      log('getPluginIdentifiers: error fetching from market SDK: %O', error);
+      return [];
+    }
   };
 
   getPluginList = async (params: PluginQueryParams = {}): Promise<PluginListResponse> => {
     log('getPluginList: params=%O', params);
-    const {
-      locale,
-      category,
-      order = 'desc',
-      page = 1,
-      pageSize = 20,
-      q,
-      sort = PluginSorts.CreatedAt,
-    } = params;
-
-    let list = await this._getPluginList(locale);
-    const originalCount = list.length;
-
-    if (category) {
-      list = list.filter((item) => item.category === category);
-      log(
-        'getPluginList: filtered by category "%s", %d -> %d items',
-        category,
-        originalCount,
-        list.length,
-      );
-    }
-
-    if (q) {
-      const beforeFilter = list.length;
-      list = list.filter((item) => {
-        return [item.author, item.title, item.description, item?.tags]
-          .flat()
-          .filter(Boolean)
-          .join(',')
-          .toLowerCase()
-          .includes(decodeURIComponent(q).toLowerCase());
-      });
-      log('getPluginList: filtered by query "%s", %d -> %d items', q, beforeFilter, list.length);
-    }
-
-    if (sort) {
-      log('getPluginList: sorting by %s %s', sort, order);
-      switch (sort) {
-        case PluginSorts.CreatedAt: {
-          list = list.sort((a, b) => {
-            if (order === 'asc') {
-              return dayjs(a.createdAt).unix() - dayjs(b.createdAt).unix();
-            } else {
-              return dayjs(b.createdAt).unix() - dayjs(a.createdAt).unix();
-            }
-          });
-          break;
-        }
-        case PluginSorts.Identifier: {
-          list = list.sort((a, b) => {
-            if (order === 'desc') {
-              return a.identifier.localeCompare(b.identifier);
-            } else {
-              return b.identifier.localeCompare(a.identifier);
-            }
-          });
-          break;
-        }
-        case PluginSorts.Title: {
-          list = list.sort((a, b) => {
-            if (order === 'desc') {
-              return a.title.localeCompare(b.title);
-            } else {
-              return b.title.localeCompare(a.title);
-            }
-          });
-          break;
-        }
-      }
-    }
-
-    const result = {
-      currentPage: page,
-      items: list.slice((page - 1) * pageSize, page * pageSize),
-      pageSize,
-      totalCount: list.length,
-      totalPages: Math.ceil(list.length / pageSize),
-    };
-    log(
-      'getPluginList: returning page %d/%d with %d items',
-      page,
-      result.totalPages,
-      result.items.length,
-    );
-    return result;
+    return this.getMcpList(this.mapPluginQueryToMcpParams(params)) as Promise<PluginListResponse>;
   };
 
   // ============================== Providers ==============================

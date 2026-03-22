@@ -73,7 +73,7 @@ export class PluginStoreActionImpl {
   loadPluginStore = async (): Promise<DiscoverPluginItem[]> => {
     const locale = globalHelpers.getCurrentLanguage();
 
-    const data = await toolService.getOldPluginList({
+    const data = await toolService.getDiscoverPluginList({
       locale,
       page: 1,
       pageSize: 50,
@@ -152,7 +152,7 @@ export class PluginStoreActionImpl {
 
     return useSWR<PluginListResponse>(
       ['useFetchPluginList', locale, ...Object.values(params)].filter(Boolean).join('-'),
-      async () => toolService.getOldPluginList(params),
+      async () => toolService.getDiscoverPluginList(params),
       {
         onSuccess: (data) => {
           this.#set(

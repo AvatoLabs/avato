@@ -1,5 +1,5 @@
 import type { KnowledgeBaseItem } from '@lobechat/types';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import type { NewKnowledgeBase } from '../schemas';
 import { documents, knowledgeBaseFiles, knowledgeBases } from '../schemas';
@@ -36,7 +36,13 @@ export class KnowledgeBaseModel {
       const docsWithFiles = await this.db
         .select({ fileId: documents.fileId })
         .from(documents)
-        .where(and(inArray(documents.id, documentIds), eq(documents.userId, this.userId)));
+        .where(
+          and(
+            inArray(documents.id, documentIds),
+            eq(documents.userId, this.userId),
+            isNull(documents.deletedAt),
+          ),
+        );
 
       const mirrorFileIds = docsWithFiles
         .map((doc) => doc.fileId)
@@ -47,7 +53,13 @@ export class KnowledgeBaseModel {
       await this.db
         .update(documents)
         .set({ knowledgeBaseId: id })
-        .where(and(inArray(documents.id, documentIds), eq(documents.userId, this.userId)));
+        .where(
+          and(
+            inArray(documents.id, documentIds),
+            eq(documents.userId, this.userId),
+            isNull(documents.deletedAt),
+          ),
+        );
     }
 
     // Insert using resolved file IDs
@@ -97,7 +109,13 @@ export class KnowledgeBaseModel {
       const docsWithFiles = await this.db
         .select({ fileId: documents.fileId })
         .from(documents)
-        .where(and(inArray(documents.id, documentIds), eq(documents.userId, this.userId)));
+        .where(
+          and(
+            inArray(documents.id, documentIds),
+            eq(documents.userId, this.userId),
+            isNull(documents.deletedAt),
+          ),
+        );
 
       const mirrorFileIds = docsWithFiles
         .map((doc) => doc.fileId)
@@ -113,6 +131,7 @@ export class KnowledgeBaseModel {
             inArray(documents.id, documentIds),
             eq(documents.userId, this.userId),
             eq(documents.knowledgeBaseId, knowledgeBaseId),
+            isNull(documents.deletedAt),
           ),
         );
     }
@@ -140,7 +159,6 @@ export class KnowledgeBaseModel {
         createdAt: knowledgeBases.createdAt,
         description: knowledgeBases.description,
         id: knowledgeBases.id,
-        isPublic: knowledgeBases.isPublic,
         name: knowledgeBases.name,
         settings: knowledgeBases.settings,
         spaceId: knowledgeBases.spaceId,

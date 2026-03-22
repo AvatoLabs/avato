@@ -1,10 +1,9 @@
-import bcrypt from 'bcryptjs';
 import debug from 'debug';
 
 import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
+import { appEnv } from '@/envs/app';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 
 const log = debug('lobe-file:proxy');
@@ -16,7 +15,8 @@ type Params = Promise<{ id: string }>;
  * GET /f/:id
  *
  * Features:
- * - Load file by id, then authorize (session or share link token in query)
+ * - Session: GET /f/:id (login required)
+ * - Share: prefer GET /share/f/:token (token-first). Legacy GET /f/:id?token=… redirects there (Phase 5).
  * - Generate access URL based on platform (desktop → local file, web → S3 presigned URL)
  * - Cache presigned URL in Redis to reduce S3 API calls
  * - Return 302 redirect
@@ -42,6 +42,20 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       return new Response('Unauthorized', { status: 401 });
     }
 
+    // Token-first share download: do not keep resource id in the URL surface.
+    if (shareToken?.trim()) {
+      const base =
+        req.url.startsWith('http://') || req.url.startsWith('https://')
+          ? new URL(req.url)
+          : new URL(req.url, appEnv.APP_URL);
+      base.pathname = `/share/f/${encodeURIComponent(shareToken.trim())}`;
+      base.search = '';
+      if (sharePassword) {
+        base.searchParams.set('password', sharePassword);
+      }
+      return Response.redirect(base.toString(), 307);
+    }
+
     const db = await getServerDB();
 
     const file = await FileModel.getFileById(db, id);
@@ -53,38 +67,14 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
       });
     }
 
-    let shareLinkId: string | null = null;
-
-    if (shareToken) {
-      const resourceModel = new ResourceModel(db, 'anonymous');
-      const link = await resourceModel.resolveShareLinkByToken(shareToken);
-
-      if (!link) {
-        return new Response('Not found', { status: 404 });
-      }
-
-      if (link.passwordHash) {
-        if (!sharePassword) {
-          return new Response('Password required', { status: 401 });
-        }
-
-        const isValid = await bcrypt.compare(sharePassword, link.passwordHash);
-        if (!isValid) {
-          return new Response('Not found', { status: 404 });
-        }
-      }
-
-      shareLinkId = link.id;
-    }
-
     return serveAuthorizedFileDownload({
       db,
-      downloadVia: shareToken ? 'share_query' : 'session',
+      downloadVia: 'session',
       file,
       fileId: id,
       req,
-      shareLinkId,
-      shareToken,
+      shareLinkId: null,
+      shareToken: null,
       userId,
     });
   } catch (error) {

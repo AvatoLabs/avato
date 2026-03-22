@@ -12,11 +12,7 @@ const getCurrentView = (s: ChatStoreState): PortalViewData | null => {
 // Check if current view is Thread
 const showThread = (s: ChatStoreState) => {
   const view = getCurrentView(s);
-  if (view?.type === PortalViewType.Thread) {
-    return true;
-  }
-  // Also check legacy threadStartMessageId for backward compatibility during transition
-  return !!s.threadStartMessageId;
+  return view?.type === PortalViewType.Thread;
 };
 
 const newThreadMode = (s: ChatStoreState) => s.newThreadMode;
@@ -30,16 +26,16 @@ const currentThreadView = (s: ChatStoreState) => {
   return null;
 };
 
-// Get thread ID - from stack or legacy field
+// Get thread ID from stack
 const portalThreadId = (s: ChatStoreState): string | undefined => {
   const threadView = currentThreadView(s);
-  return threadView?.threadId ?? s.portalThreadId;
+  return threadView?.threadId;
 };
 
-// Get start message ID - from stack or legacy field
+// Get start message ID from stack
 const threadStartMessageId = (s: ChatStoreState): string | undefined => {
   const threadView = currentThreadView(s);
-  return threadView?.startMessageId ?? s.threadStartMessageId ?? undefined;
+  return threadView?.startMessageId ?? undefined;
 };
 
 const portalCurrentThread = (s: ChatStoreState) => {

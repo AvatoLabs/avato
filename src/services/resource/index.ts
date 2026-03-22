@@ -247,6 +247,11 @@ export class ResourceService {
   async moveResource(id: string, parentId: string | null): Promise<ResourceItem> {
     return this.updateResource(id, { parentId });
   }
+
+  /** Restore a soft-deleted document (same authorization as server `document.restoreDocument`). */
+  async restoreDocument(id: string) {
+    return documentService.restoreDocument(id);
+  }
 }
 
 export const resourceService = new ResourceService();

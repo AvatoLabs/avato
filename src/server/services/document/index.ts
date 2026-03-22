@@ -3,7 +3,8 @@ import { type DocumentItem } from '@lobechat/database/schemas';
 import { documents, files } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
 import debug from 'debug';
-import { and, eq, inArray } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
@@ -12,7 +13,7 @@ import { SpaceModel } from '@/database/models/space';
 import { type LobeDocument } from '@/types/document';
 
 import { FileService } from '../file';
-import { AuthorizedResourceResolver, TreeGuard } from '../resource';
+import { AuthorizedResourceResolver, ResourceAuthorizer, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
 
@@ -225,8 +226,10 @@ export class DocumentService {
   async queryDocuments(params?: {
     current?: number;
     fileTypes?: string[];
+    knowledgeBaseId?: string;
     pageSize?: number;
     sourceTypes?: string[];
+    trash?: boolean;
   }) {
     return this.documentModel.query(params);
   }
@@ -263,7 +266,7 @@ export class DocumentService {
         fileType: true,
         id: true,
       },
-      where: inArray(documents.id, dedupRootIds),
+      where: and(inArray(documents.id, dedupRootIds), isNull(documents.deletedAt)),
     });
 
     const rootMap = new Map(rootDocuments.map((doc) => [doc.id, doc] as const));
@@ -285,7 +288,7 @@ export class DocumentService {
             fileType: true,
             id: true,
           },
-          where: inArray(documents.parentId, folderChunk),
+          where: and(inArray(documents.parentId, folderChunk), isNull(documents.deletedAt)),
         });
 
         for (const child of children) {
@@ -383,8 +386,12 @@ export class DocumentService {
     }
 
     if (typeof (this.db as any).delete === 'function') {
+      const now = new Date();
       for (const idChunk of this.chunk(documentIds)) {
-        await this.db.delete(documents).where(inArray(documents.id, idChunk));
+        await this.db
+          .update(documents)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(and(inArray(documents.id, idChunk), isNull(documents.deletedAt)));
       }
       await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
       return;
@@ -392,6 +399,44 @@ export class DocumentService {
 
     await this.documentModel.deleteManyAny(documentIds);
     await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+  }
+
+  /**
+   * Clear soft-delete (restore). Requires same capability as delete; ACL rows are unchanged.
+   */
+  async restoreDocument(id: string) {
+    await this.resourceAuthorizer.assertCapability({
+      capability: 'delete',
+      documentIncludeDeleted: true,
+      id,
+      kind: 'document',
+    });
+
+    const [tomb] = await this.db
+      .select({
+        id: documents.id,
+        resourceUid: documents.resourceUid,
+        spaceId: documents.spaceId,
+      })
+      .from(documents)
+      .where(and(eq(documents.id, id), isNotNull(documents.deletedAt)))
+      .limit(1);
+
+    if (!tomb) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'DOCUMENT_NOT_FOUND' });
+    }
+
+    const now = new Date();
+    await this.db
+      .update(documents)
+      .set({ deletedAt: null, updatedAt: now })
+      .where(eq(documents.id, id));
+
+    await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
+      { resourceUid: tomb.resourceUid, spaceId: tomb.spaceId },
+    ]);
+
+    return this.documentModel.findByIdAny(id);
   }
 
   /**

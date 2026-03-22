@@ -180,7 +180,7 @@ export class ResourceAuthorizer {
           parentId: documents.parentId,
         })
         .from(documents)
-        .where(eq(documents.id, localId))
+        .where(and(eq(documents.id, localId), isNull(documents.deletedAt)))
         .limit(1);
 
       return {
@@ -401,6 +401,7 @@ export class ResourceAuthorizer {
 
   getAccessMatch = async (params: {
     capability: ResourceCapability;
+    documentIncludeDeleted?: boolean;
     kind?: ResourceKind;
     resourceUid?: string;
     shareToken?: string | null;
@@ -409,7 +410,9 @@ export class ResourceAuthorizer {
     const resource = params.resourceUid
       ? await this.resolveByUid(params.resourceUid)
       : params.kind && params.id
-        ? await this.resolveByKind(params.kind, params.id)
+        ? await this.resolveByKind(params.kind, params.id, {
+            documentIncludeDeleted: params.documentIncludeDeleted,
+          })
         : null;
 
     if (!resource) return null;
@@ -424,6 +427,7 @@ export class ResourceAuthorizer {
 
   assertCapability = async (params: {
     capability: ResourceCapability;
+    documentIncludeDeleted?: boolean;
     kind?: ResourceKind;
     resourceUid?: string;
     shareToken?: string | null;
@@ -635,7 +639,11 @@ export class AuthorizedResourceResolver {
   requireDocument = async (id: string, capability: ResourceCapability = 'read_content') => {
     await this.authorizer.assertCapability({ capability, id, kind: 'document' });
 
-    const [document] = await this.db.select().from(documents).where(eq(documents.id, id)).limit(1);
+    const [document] = await this.db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, id), isNull(documents.deletedAt)))
+      .limit(1);
     if (!document) throw new TRPCError({ code: 'NOT_FOUND', message: 'DOCUMENT_NOT_FOUND' });
     return document;
   };
@@ -678,7 +686,7 @@ export class TreeGuard {
         spaceId: documents.spaceId,
       })
       .from(documents)
-      .where(eq(documents.id, params.parentId))
+      .where(and(eq(documents.id, params.parentId), isNull(documents.deletedAt)))
       .limit(1);
 
     if (!parent?.id) {

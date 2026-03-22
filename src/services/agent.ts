@@ -9,10 +9,10 @@ import { lambdaClient } from '@/libs/trpc/client';
 type MarketAgentModel =
   | LobeAgentConfig['model']
   | {
-      model: LobeAgentConfig['model'];
-      parameters?: Partial<LobeAgentConfig['params']>;
-      provider?: LobeAgentConfig['provider'];
-    };
+    model: LobeAgentConfig['model'];
+    parameters?: Partial<LobeAgentConfig['params']>;
+    provider?: LobeAgentConfig['provider'];
+  };
 
 /**
  * Normalize market agent config to standard agent config.
@@ -156,13 +156,6 @@ class AgentService {
 
   getAgentConfigById = async (agentId: string) => {
     return lambdaClient.agent.getAgentConfigById.query({ agentId });
-  };
-
-  /**
-   * @deprecated use getAgentConfigById instead
-   */
-  getSessionConfig = async (sessionId: string) => {
-    return lambdaClient.agent.getAgentConfig.query({ sessionId });
   };
 
   /**

@@ -21,11 +21,6 @@ const FollowButton = memo<FollowButtonProps>(({ userId }) => {
   const follow = useDiscoverStore((s) => s.follow);
   const unfollow = useDiscoverStore((s) => s.unfollow);
 
-  // Set access token for social service
-  if (session?.accessToken) {
-    socialService.setAccessToken(session.accessToken);
-  }
-
   const { data: followStatus, mutate } = useFollowStatus(userId);
   const isFollowing = followStatus?.isFollowing ?? false;
 

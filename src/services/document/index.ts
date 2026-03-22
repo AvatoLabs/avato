@@ -38,8 +38,10 @@ export class DocumentService {
   async queryDocuments(params?: {
     current?: number;
     fileTypes?: string[];
+    knowledgeBaseId?: string;
     pageSize?: number;
     sourceTypes?: string[];
+    trash?: boolean;
   }): Promise<{ items: DocumentItem[]; total: number }> {
     return lambdaClient.document.queryDocuments.query(params);
   }
@@ -62,6 +64,10 @@ export class DocumentService {
 
   async deleteDocuments(ids: string[]): Promise<void> {
     await lambdaClient.document.deleteDocuments.mutate({ ids });
+  }
+
+  async restoreDocument(id: string): Promise<DocumentItem | undefined> {
+    return lambdaClient.document.restoreDocument.mutate({ id });
   }
 
   async updateDocument(params: UpdateDocumentParams): Promise<void> {

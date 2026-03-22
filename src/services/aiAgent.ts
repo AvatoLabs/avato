@@ -1,3 +1,4 @@
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { lambdaClient } from '@/libs/trpc/client';
 
 export interface ExecAgentTaskParams {
@@ -6,6 +7,7 @@ export interface ExecAgentTaskParams {
     groupId?: string | null;
     scope?: string | null;
     sessionId?: string;
+    spaceId?: string | null;
     threadId?: string | null;
     topicId?: string | null;
   };
@@ -93,7 +95,18 @@ class AiAgentService {
    * Execute a single Agent task
    */
   async execAgentTask(params: ExecAgentTaskParams) {
-    return await lambdaClient.aiAgent.execAgent.mutate(params);
+    const hint = getActiveWorkspaceSpaceId();
+    const base = params.appContext;
+    const resolvedSpaceId = base?.spaceId ?? hint ?? undefined;
+    const appContext =
+      base === undefined && resolvedSpaceId === undefined
+        ? undefined
+        : { ...base, ...(resolvedSpaceId ? { spaceId: resolvedSpaceId } : {}) };
+
+    return await lambdaClient.aiAgent.execAgent.mutate({
+      ...params,
+      appContext,
+    });
   }
 
   /**

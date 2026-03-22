@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
 
-import { fileEnv } from '@/envs/file';
 import { lambdaClient } from '@/libs/trpc/client';
 import { API_ENDPOINTS } from '@/services/_url';
 import { type FileMetadata, type UploadBase64ToS3Result } from '@/types/files';
@@ -14,46 +13,34 @@ export const UPLOAD_NETWORK_ERROR = 'NetWorkError';
 
 const log = debug('lobe-client:upload');
 
-/**
- * Generate file storage path metadata for S3-compatible storage
- * @param originalFilename - Original filename
- * @param options - Path generation options
- * @returns Path metadata including date, dirname, filename, and pathname
- */
-const generateFilePathMetadata = (
-  originalFilename: string,
-  options: { directory?: string; pathname?: string } = {},
-): {
-  date: string;
-  dirname: string;
-  filename: string;
-  pathname: string;
-} => {
-  // Generate unique filename with UUID prefix and original extension
-  const extension = originalFilename.split('.').at(-1);
-  const filename = `${uuid()}.${extension}`;
-
-  // Generate timestamp-based directory path
-  const date = (Date.now() / 1000 / 60 / 60).toFixed(0);
-  const dirname = `${options.directory || fileEnv.NEXT_PUBLIC_S3_FILE_PATH}/${date}`;
-  const pathname = options.pathname ?? `${dirname}/${filename}`;
+const fileMetadataFromStorageKey = (storageKey: string): FileMetadata => {
+  const parts = storageKey.split('/');
+  const filename = parts.at(-1) ?? '';
+  const dirname = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
 
   return {
-    date,
+    date: (Date.now() / 1000 / 60 / 60).toFixed(0),
     dirname,
     filename,
-    pathname,
+    path: storageKey,
   };
 };
 
 interface UploadFileToS3Options {
   abortController?: AbortController;
+  /** @deprecated Ignored; storage keys are server-generated from upload sessions. */
   directory?: string;
   filename?: string;
+  knowledgeBaseId?: string;
   onNotSupported?: () => void;
   onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
+  /** @deprecated Ignored; storage keys are server-generated from upload sessions. */
   pathname?: string;
+  parentId?: string;
+  /** Precomputed SHA-256 (hex) to avoid re-reading the file buffer. */
+  sha256?: string;
   skipCheckFileType?: boolean;
+  spaceId?: string;
 }
 
 const shouldUseSameOriginUpload = (preSignUrl: string): boolean => {
@@ -85,17 +72,12 @@ class UploadService {
    */
   uploadFileToS3 = async (
     file: File,
-    { onProgress, directory, pathname, abortController }: UploadFileToS3Options,
+    { onProgress, abortController, ...options }: UploadFileToS3Options,
   ): Promise<{ data: FileMetadata; success: boolean }> => {
-    // Server-side upload logic
-
-    // if is server mode, upload to server s3,
-
     const data = await this.uploadToServerS3(file, {
       abortController,
-      directory,
       onProgress,
-      pathname,
+      ...options,
     });
     return { data, success: true };
   };
@@ -104,18 +86,15 @@ class UploadService {
     base64Data: string,
     options: UploadFileToS3Options = {},
   ): Promise<UploadBase64ToS3Result> => {
-    // Parse base64 data
     const { base64, mimeType, type } = parseDataUri(base64Data);
 
     if (!base64 || !mimeType || type !== 'base64') {
       throw new Error('Invalid base64 data for image');
     }
 
-    // Convert base64 to Blob
     const byteCharacters = atob(base64);
     const byteArrays = [];
 
-    // Process in chunks to avoid memory issues
     for (let offset = 0; offset < byteCharacters.length; offset += 1024) {
       const slice = byteCharacters.slice(offset, offset + 1024);
 
@@ -130,14 +109,11 @@ class UploadService {
 
     const blob = new Blob(byteArrays, { type: mimeType });
 
-    // Determine file extension
     const fileExtension = mimeType.split('/')[1] || 'png';
     const fileName = `${options.filename || `image_${dayjs().format('YYYY-MM-DD-hh-mm-ss')}`}.${fileExtension}`;
 
-    // Create file object
     const file = new File([blob], fileName, { type: mimeType });
 
-    // Use unified upload method
     const { data: metadata } = await this.uploadFileToS3(file, options);
     const hash = sha256(await file.arrayBuffer());
 
@@ -159,90 +135,99 @@ class UploadService {
     file: File,
     {
       onProgress,
-      directory,
-      pathname,
       abortController,
-    }: {
-      abortController?: AbortController;
-      directory?: string;
-      onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
-      pathname?: string;
-    },
+      knowledgeBaseId,
+      parentId,
+      sha256: sha256Option,
+      spaceId,
+    }: UploadFileToS3Options,
   ): Promise<FileMetadata> => {
-    const { preSignUrl, ...result } = await this.getSignedUploadUrl(file, { directory, pathname });
+    const sha256Hex = sha256Option ?? sha256(new Uint8Array(await file.arrayBuffer()));
+
+    const prep = await lambdaClient.upload.prepareResourceUpload.mutate({
+      filename: file.name,
+      fileType: file.type || 'application/octet-stream',
+      knowledgeBaseId,
+      parentId,
+      sha256: sha256Hex,
+      size: file.size,
+      spaceId,
+    });
+
+    const result = fileMetadataFromStorageKey(prep.storageKey);
+    // Object key is opaque; keep user-facing name from the File (not the storage path segment).
+    result.filename = file.name;
     const startTime = Date.now();
 
-    if (shouldUseSameOriginUpload(preSignUrl)) {
-      log('Falling back to same-origin upload for mixed content path: %s', result.path);
-      await this.uploadToSameOrigin(file, result.path, {
+    if (shouldUseSameOriginUpload(prep.presignedUrl)) {
+      log('Falling back to same-origin upload for mixed content path: %s', prep.storageKey);
+      await this.uploadToSameOriginWithSession(file, prep.sessionId, {
         abortController,
         onProgress,
         startTime,
       });
+    } else {
+      const xhr = new XMLHttpRequest();
 
-      return result;
-    }
-
-    const xhr = new XMLHttpRequest();
-
-    // Setup abort listener
-    if (abortController) {
-      abortController.signal.addEventListener('abort', () => {
-        xhr.abort();
-      });
-    }
-
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        const progress = Number(((event.loaded / event.total) * 100).toFixed(1));
-
-        const speedInByte = event.loaded / ((Date.now() - startTime) / 1000);
-
-        onProgress?.('uploading', {
-          // if the progress is 100, it means the file is uploaded
-          // but the server is still processing it
-          // so make it as 99.9 and let users think it's still uploading
-          progress: progress === 100 ? 99.9 : progress,
-          restTime: (event.total - event.loaded) / speedInByte,
-          speed: speedInByte,
+      if (abortController) {
+        abortController.signal.addEventListener('abort', () => {
+          xhr.abort();
         });
       }
-    });
 
-    xhr.open('PUT', preSignUrl);
-    xhr.setRequestHeader('Content-Type', file.type);
-    const data = await file.arrayBuffer();
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = Number(((event.loaded / event.total) * 100).toFixed(1));
 
-    await new Promise((resolve, reject) => {
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress?.('success', {
-            progress: 100,
-            restTime: 0,
-            speed: file.size / ((Date.now() - startTime) / 1000),
+          const speedInByte = event.loaded / ((Date.now() - startTime) / 1000);
+
+          onProgress?.('uploading', {
+            progress: progress === 100 ? 99.9 : progress,
+            restTime: (event.total - event.loaded) / speedInByte,
+            speed: speedInByte,
           });
-          resolve(xhr.response);
-        } else {
-          reject(xhr.statusText);
         }
       });
-      xhr.addEventListener('error', () => {
-        if (xhr.status === 0) reject(UPLOAD_NETWORK_ERROR);
-        else reject(xhr.statusText);
+
+      xhr.open('PUT', prep.presignedUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      const data = await file.arrayBuffer();
+
+      await new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress?.('success', {
+              progress: 100,
+              restTime: 0,
+              speed: file.size / ((Date.now() - startTime) / 1000),
+            });
+            resolve(xhr.response);
+          } else {
+            reject(xhr.statusText);
+          }
+        });
+        xhr.addEventListener('error', () => {
+          if (xhr.status === 0) reject(UPLOAD_NETWORK_ERROR);
+          else reject(xhr.statusText);
+        });
+        xhr.addEventListener('abort', () => {
+          onProgress?.('cancelled', { progress: 0, restTime: 0, speed: 0 });
+          reject(new Error('Upload cancelled by user'));
+        });
+        xhr.send(data);
       });
-      xhr.addEventListener('abort', () => {
-        onProgress?.('cancelled', { progress: 0, restTime: 0, speed: 0 });
-        reject(new Error('Upload cancelled by user'));
-      });
-      xhr.send(data);
+    }
+
+    await lambdaClient.upload.completeResourceUpload.mutate({
+      uploadSessionId: prep.sessionId,
     });
 
     return result;
   };
 
-  private uploadToSameOrigin = async (
+  private uploadToSameOriginWithSession = async (
     file: File,
-    pathname: string,
+    uploadSessionId: string,
     {
       onProgress,
       abortController,
@@ -257,7 +242,7 @@ class UploadService {
     const formData = new FormData();
 
     formData.append('file', file, file.name);
-    formData.append('pathname', pathname);
+    formData.append('uploadSessionId', uploadSessionId);
 
     if (abortController) {
       abortController.signal.addEventListener('abort', () => {
@@ -278,7 +263,7 @@ class UploadService {
       });
     });
 
-    xhr.open('POST', API_ENDPOINTS.fileUpload);
+    xhr.open('POST', API_ENDPOINTS.fileUploadSession);
 
     await new Promise<void>((resolve, reject) => {
       xhr.addEventListener('load', () => {
@@ -320,28 +305,6 @@ class UploadService {
     const data = await res.arrayBuffer();
 
     return new File([data], filename, { lastModified: Date.now(), type: fileType });
-  };
-
-  private getSignedUploadUrl = async (
-    file: File,
-    options: { directory?: string; pathname?: string } = {},
-  ): Promise<
-    FileMetadata & {
-      preSignUrl: string;
-    }
-  > => {
-    // Generate file path metadata
-    const { date, dirname, filename, pathname } = generateFilePathMetadata(file.name, options);
-
-    const preSignUrl = await lambdaClient.upload.createS3PreSignedUrl.mutate({ pathname });
-
-    return {
-      date,
-      dirname,
-      filename,
-      path: pathname,
-      preSignUrl,
-    };
   };
 }
 

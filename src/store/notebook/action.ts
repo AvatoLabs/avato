@@ -8,6 +8,7 @@ import { mutate } from 'swr';
 import { useClientDataSWR } from '@/libs/swr';
 import { notebookService } from '@/services/notebook';
 import { useChatStore } from '@/store/chat';
+import { chatPortalSelectors } from '@/store/chat/selectors';
 import { type StoreSetter } from '@/store/types';
 import { setNamespace } from '@/utils/storeDebug';
 
@@ -61,9 +62,10 @@ export class NotebookActionImpl {
 
   deleteDocument = async (id: string, topicId: string): Promise<void> => {
     // If the deleted document is currently open, close it
-    const portalDocumentId = useChatStore.getState().portalDocumentId;
-    if (portalDocumentId === id) {
-      useChatStore.getState().closeDocument();
+    const chatState = useChatStore.getState();
+    const currentDocumentId = chatPortalSelectors.portalDocumentId(chatState);
+    if (currentDocumentId === id) {
+      chatState.closeDocument();
     }
 
     // Call API to delete

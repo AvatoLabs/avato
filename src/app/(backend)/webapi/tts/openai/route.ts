@@ -1,7 +1,7 @@
 import { type OpenAITTSPayload } from '@lobehub/tts';
 import { createOpenaiAudioSpeech } from '@lobehub/tts/server';
 
-import { createBizOpenAI } from '@/app/(backend)/_deprecated/createBizOpenAI';
+import { createBizOpenAI } from '@/server/utils/createBizOpenAI';
 import { createSpeechResponse } from '@/server/utils/createSpeechResponse';
 
 export const POST = async (req: Request) => {

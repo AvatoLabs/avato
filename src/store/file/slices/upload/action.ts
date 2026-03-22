@@ -119,6 +119,7 @@ export class FileUploadActionImpl {
       else {
         const { data, success } = await uploadService.uploadFileToS3(file, {
           abortController,
+          knowledgeBaseId,
           onNotSupported: () => {
             onStatusUpdate?.({ id: file.name, type: 'removeFile' });
             message.info({
@@ -137,7 +138,10 @@ export class FileUploadActionImpl {
               value: { status: status === 'success' ? 'processing' : status, uploadState: upload },
             });
           },
+          parentId,
+          sha256: hash,
           skipCheckFileType,
+          spaceId,
         });
         if (!success) return;
 

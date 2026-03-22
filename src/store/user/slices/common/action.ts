@@ -119,22 +119,21 @@ export class CommonActionImpl {
             const user =
               data.avatar || data.userId
                 ? merge(this.#get().user, {
-                    avatar: data.avatar,
-                    email: data.email,
-                    firstName: data.firstName,
-                    fullName: data.fullName,
-                    id: data.userId,
-                    interests: data.interests,
-                    latestName: data.lastName,
-                    username: data.username,
-                  } as LobeUser)
+                  avatar: data.avatar,
+                  email: data.email,
+                  firstName: data.firstName,
+                  fullName: data.fullName,
+                  id: data.userId,
+                  interests: data.interests,
+                  latestName: data.lastName,
+                  username: data.username,
+                } as LobeUser)
                 : this.#get().user;
 
             this.#set(
               {
                 defaultSettings,
                 isFreePlan: data.isFreePlan,
-                isOnboard: data.isOnboard,
                 isShowPWAGuide: data.canEnablePWAGuide,
                 isUserCanEnableTrace: data.canEnableTrace,
                 isUserHasConversation: data.hasConversation,
@@ -157,7 +156,7 @@ export class CommonActionImpl {
               if (detectedTimezone) {
                 this.#get()
                   .updateGeneralConfig({ timezone: detectedTimezone })
-                  .catch(() => {});
+                  .catch(() => { });
               }
             }
 

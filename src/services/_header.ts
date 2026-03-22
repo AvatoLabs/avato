@@ -3,17 +3,14 @@ import { aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
 import { useUserStore } from '@/store/user';
 
 /**
- * TODO: Need to be removed after tts refactor
- * @deprecated
+ * Create headers for OpenAI TTS/STT API requests
  */
- 
 export const createHeaderWithOpenAI = (header?: HeadersInit): HeadersInit => {
   const state = useUserStore.getState();
 
   const keyVaults: Record<string, any> =
     aiProviderSelectors.providerKeyVaults('openai')(useAiInfraStore.getState()) || {};
 
-   
   return {
     ...header,
     [LOBE_USER_ID]: state.user?.id || '',

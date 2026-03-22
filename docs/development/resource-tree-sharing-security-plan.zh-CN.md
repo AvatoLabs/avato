@@ -1,6 +1,6 @@
 # 资源树与分享能力安全工程方案
 
-> 复核时间：2026-03-21；**文档进展同步：2026-03-22**\
+> 复核时间：2026-03-21；**文档进展同步：2026-03-22（含 `S3_SET_ACL` 改为 opt-in 安全默认）**\
 > 范围：Resource / Knowledge Base / Page / File 相关能力，从 “单用户私有资源管理” 演进到 “每用户独立文件树 + 可分享” 的安全工程方案
 >
 > 执行摘要：
@@ -16,6 +16,20 @@
 ## 〇、落地进展（与下文 Phase 对照，截至 2026-03-22）
 
 以下已在主干代码中**部分落地**，用于与正文路线图对齐；**不等于**某一 Phase 整段验收已全部完成。
+
+### S3 与环境变量（第三轮审计对齐）
+
+- **`S3_SET_ACL`**（`src/envs/file.ts`）：**默认 `false`**，仅 **`process.env.S3_SET_ACL === '1'`** 时为 true（opt-in）。应用侧 **`FileS3` PutObject 不写对象 ACL**；该变量保留给历史/外部脚本读取，避免「未设置 env 却等价于允许 public-read 语义」的默认值陷阱。
+- **对象 ACL 代码路径**：`FileS3` / 基类 **已移除** `setAcl`、`public-read` 上传参数（与审计结论一致）。
+
+### 客户端上传（`prepareResourceUpload` 收口）
+
+- **`src/services/upload.ts`**：`uploadToServerS3` / `uploadFileToS3` 改为 **`prepareResourceUpload` → 客户端 PUT 预签名 URL（或 HTTPS 页对 HTTP 预签名时的同域回退）→ `completeResourceUpload`**，不再调用已废弃的 **`createS3PreSignedUrl`**。
+- **同域回退**：`POST /api/file/upload-session`（`uploadSessionId` + `file`），服务端用 **`PrivateBlobS3.uploadBuffer`** 写入会话 **`storageKey`**，与预签名 PUT 同一私有桶契约。
+- **遗留 pathname 同域上传**：`POST /api/file/upload`（`pathname` + `file`，供旧客户端 / 移动端等）已改为 **`getPrivateBlobS3().uploadBuffer`**，与私有 blob 桶一致；**Web 主路径**仍应以 **`upload-session` + 会话 key** 为主。
+- **带进度上传**：`uploadWithProgress` 向 prepare 传入 **`knowledgeBaseId` / `parentId` / `spaceId` / `sha256`**，与写库 **`createFile`** 的空间上下文一致。
+- **对象 key 不含展示文件名**：`lambda/upload` 的 **`generateStorageKey`** 为 **`uploads/{spaceId}/{sessionId}/{nanoid}`**；展示名仍在会话 **`metadata.filename`** 与 **`files.name`**。客户端 **`FileMetadata.filename`** 使用 **`File.name`**，避免 UI 误用路径末段。
+- **OpenAPI 公开上传**（`packages/openapi/.../file.service.ts`）：直传改为 **`getPrivateBlobS3().uploadBuffer`**，**`HeadObject`** 校验 **`contentLength === file.size`** 后再 **`upsertSpaceBlob`**（并写入 **`etag`**）；**`generateFileMetadata`** 路径末段为 **`nanoid()`**，**`metadata.filename`** 为用户 **`file.name`**。
 
 ### 授权与能力模型
 
@@ -50,12 +64,31 @@
 ### 主站 `FileService.createFileRecord`
 
 - **不再调用 `checkHash`** 决定 `insertToGlobalFiles`；**始终** `create(..., true)`，依赖 **`global_files` 主键冲突即跳过**，避免预检侧信道。
-- 传入 **`spaceId`** 时额外 **`upsertSpaceBlob`**（`ready`），便于与 OpenAPI 策略一致；调用方按需逐步补 **`spaceId`**。
+- **`space_blobs`**：未传 **`spaceId`** 时默认 **`getOrCreatePersonalSpace()`** 并写入文件行 **`spaceId`** + **`upsertSpaceBlob`**（`ready`）；显式 **`spaceId: null`** 则跳过个人空间解析与 blob 登记；传入具体 **`spaceId`** 时行为与 OpenAPI 一致。
+- **`quarantined`（最小闭环）**：**`upload.completeResourceUpload`** 在 S3 **Head 404/NoSuchKey** 或 **实际 size ≠ 会话 expectedSize** 时，若会话含 **`expectedSha256`**，则 **`ResourceModel.quarantineSpaceBlobAfterFailedVerify`** 写入 **`space_blobs.status=quarantined`**（已有 **`ready`** 同 hash 不降级）。**OpenAPI `uploadFile`** 在 PUT 后 HEAD **大小不一致**时同样隔离。**`findSpaceBlobByHash`** 仍只认 **`ready`**。通用 **`upsertSpaceBlob`** 对 **`quarantined`** 将 **`verifiedAt`** 置 **`null`**。
+- **沙盒 / Market 导出 / 服务端 Skills**：在能唯一解析时传入 **`spaceId`**——按话题关联 agent（含群聊多 agent）的**已启用知识库**推导单一 **`knowledge_bases.spaceId`**（`resolveSpaceIdForSandboxExport`）；**`tools.market.exportAndUploadFile`** 另支持可选 **`spaceId`**（须用户可访问）。**Web 客户端**：资源管理器 **`setSpaceId`** 同步 **`getActiveWorkspaceSpaceId`**（`src/helpers/activeWorkspaceSpace.ts`）。**`cloudSandboxService.exportAndUploadFile`**、**`agentRuntimeService.createOperation`**（`aiAgent.createOperation`）、**`aiAgentService.execAgentTask`** 在未显式传 **`spaceId` / `appContext.spaceId`** 时用其作为提示（服务端仍校验可访问性；KB 推导等为后备）。**`webapi/chat`**（`MobileChatPayload.spaceId`）在服务端工具循环里传入 **`ToolExecutionContext.spaceId`**。**CLI** `agent run` 支持 **`--space-id`** 或环境变量 **`LOBE_CLI_SPACE_ID`** 写入 **`execAgent.appContext.spaceId`**。**`execAgent` 的 `appContext.spaceId`** 与 **`createOperation` 的 `spaceId`** 进入 operation metadata，**`RuntimeExecutors`** 调用 **`executeTool`** 时注入 **`ToolExecutionContext.spaceId`**，与 Cloud Sandbox / Skills 的显式 Space 优先逻辑对齐。**`createGlobalFile`（技能 CAS）**仍走 **`checkHash`**，与用户上传路径分开迭代。
+
+### Phase 4（`documents` 软删除与恢复，已部分落地）
+
+- **`DocumentModel`**：`delete` / `deleteManyAny` / `deleteAll` 为 **`deleted_at` 软删除**；列表与按 id/slug/fileId 读取默认 **`deleted_at IS NULL`**（含 **`findByIdAny` / `findManyBySlug`**）。
+- **`DocumentService.deleteDocuments`**（含 PGLite 分支）、**notebook / KnowledgeRepo** 等与文档删除路径一致为软删除；检索、Topic 关联文档、Agent 按 fileId 拉正文、资源 **`requireDocument`** 等均排除软删行。
+- **`ResourceAuthorizer.resolveByKind('document')`**：无 **`documentIncludeDeleted`** 时若文档行已软删则 **整链返回 `null`**，避免仅靠 registry 仍命中 **`getAccessMatch`** 的授权缝隙。
+- **恢复**：**`DocumentService.restoreDocument`**（需 **`delete` 能力**；鉴权侧使用 **`documentIncludeDeleted: true`**）清空 **`deleted_at`**，并 **`invalidateAuthzEpochsAfterRemoval`** bump epoch；Lambda **`document.restoreDocument`** 已暴露。
+- **列表（回收站）**：**`document.queryDocuments`** 支持 **`trash: true`**，可选 **`knowledgeBaseId`**（资料库内仅看该库已删文档；不传则当前用户全部已删文档）。
+- **Web**：**`DocumentService`（客户端）** 含 **`restoreDocument`**、**`queryDocuments({ trash, knowledgeBaseId })`**；资源页 **`LibraryTrashButton`** + **`DocumentTrashModal`**（资料库头栏与资源首页侧栏）；恢复成功后 **`revalidateResources`**。
+- **唯一约束（partial）**：**`documents_slug_space_id_unique`** → 迁移 **`0099_...`**（**`slug IS NOT NULL AND deleted_at IS NULL`**）；**`documents_client_id_space_id_unique`** → 迁移 **`0100_...`**（**`client_id IS NOT NULL AND deleted_at IS NULL`**），软删后可再占用同一 **client_id+space**（需跑迁移）。
+
+### Phase 5（匿名链接与兼容，已部分落地）
+
+- **Token-first 文件下载**：`GET /share/f/:token`（可选 `?password=`）；**`GET /f/:id?token=…` 一律 307 重定向到 `/share/f/:token`**（仅保留 `password` query），避免在 URL 主路径暴露 `fileId`。单测见 `src/app/(backend)/f/[id]/route.test.ts`、`src/app/(backend)/share/f/[token]/route.test.ts`。
+- **统一失败形态**：带 **`shareToken`** 的下载在 **`serveAuthorizedFileDownload`** 鉴权失败时返回 **404**（与错误/撤销 token 一致），**不**再返回 **403**（减少与「资源不存在」的区分）。单测见 `src/server/modules/file-proxy/serveAuthorizedFileDownload.test.ts`。
+- **公开页**：资源分享页仍为 **`/share/r/:token`**（SPA）；文件直链为 **`/share/f/:token`**（与 `createResourceShareLink` 返回的 `fileShareDownloadUrl` 一致）。
+- **`knowledge_bases.isPublic`**：schema 上已标 **`@deprecated`**，**不得**再作为授权依据；完全收敛到 ACL / 分享链接需后续删字段或迁移。
 
 ### 仍待办（与 §3.1、Phase 0～5 一致）
 
-- **`FileService.createFileRecord` 调用方**：已改为**不再预检 `checkHash`**，并支持可选 **`spaceId` + `upsertSpaceBlob`**；尚未在所有调用点传入 **`spaceId`** 的，同 Space 内去重需逐步补全（见 Phase 5）。
-- **其余按原文推进**：Phase 3 **`space_blobs`** 与 `v2/spaces/...` key、Phase 4 **软删除与回收站**、**`knowledge_bases.isPublic`** 并入统一 ACL / 链接分享、异步 worker **执行时**与导出等路径对 **`authz_epoch`** 的强制复验等。
+- **`FileService.createFileRecord`**：默认已挂**个人空间** + **`space_blobs`**；若某类文件必须**不**绑定空间，可显式传 **`spaceId: null`**（慎用）。
+- **其余按原文推进**：Phase 3 **`v2/spaces/...` 存储 key**、Phase 4 **硬删除与 blob 延迟 GC**（Web 资料库/资源首页回收站与 **`0100` client_id 部分唯一**已落地；Notebook 侧仅提示至资源回收站）、**下线用户资源对 `global_files` 的依赖**、**`isPublic` 数据迁移**、异步 worker **执行时**对 **`authz_epoch`** 的强制复验等。
 
 ## 一、现状审计
 

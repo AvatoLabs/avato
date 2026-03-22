@@ -143,5 +143,15 @@
   "uploadDock.uploadStatus.pending": "等待上传",
   "uploadDock.uploadStatus.processing": "正在上传",
   "uploadDock.uploadStatus.success": "上传完成",
-  "uploadDock.uploadStatus.uploading": "正在上传"
+  "uploadDock.uploadStatus.uploading": "正在上传",
+  "trash.empty": "暂无已删除的页面或文件夹",
+  "trash.hint": "本资料库内已软删除的页面与文件夹，恢复后将重新出现在文件树中。",
+  "trash.hintAll": "你名下各资料库中已软删除的页面与文件夹，恢复后将重新出现在对应文件树中。",
+  "trash.loadError": "加载回收站失败",
+  "trash.loading": "加载中…",
+  "trash.open": "回收站",
+  "trash.restore": "恢复",
+  "trash.restored": "已恢复",
+  "trash.restoreError": "恢复失败",
+  "trash.title": "回收站"
 }

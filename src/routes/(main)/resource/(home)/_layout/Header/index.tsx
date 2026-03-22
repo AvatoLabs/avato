@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom';
 
 import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
 import { buildResourceRootPath } from '@/features/ResourceSpaces';
+import { LibraryTrashButton } from '@/routes/(main)/resource/features/LibraryTrashButton';
 
 import CategoryMenu from './CategoryMenu';
 
@@ -22,6 +23,7 @@ const Header = memo(() => {
             title: t('tab.resource'),
           },
         ]}
+        right={<LibraryTrashButton />}
       />
       <CategoryMenu />
     </>

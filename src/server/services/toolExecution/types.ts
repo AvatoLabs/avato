@@ -22,6 +22,8 @@ export interface ToolExecutionContext {
   /** Topic ID for sandbox session management */
   topicId?: string;
   userId?: string;
+  /** When set, preferred Space for sandbox exports (`createFileRecord` / `space_blobs`); must be user-accessible. */
+  spaceId?: string;
 }
 
 export interface ToolExecutionResult {

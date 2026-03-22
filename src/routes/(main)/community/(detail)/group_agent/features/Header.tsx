@@ -58,11 +58,6 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
   const displayAvatar = avatar || title?.[0] || '👥';
   const memberCount = memberAgents?.length || 0;
 
-  // Set access token for social service
-  if (session?.accessToken) {
-    socialService.setAccessToken(session.accessToken);
-  }
-
   // TODO: Use 'group_agent' type when social service supports it
   // Fetch favorite status
   const { data: favoriteStatus, mutate: mutateFavorite } = useSWR(

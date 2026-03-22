@@ -378,7 +378,6 @@ export class DocumentActionImpl {
     );
 
     try {
-      // Delete from documents table
       await documentService.deleteDocument(documentId);
       // No need to call fetchDocuments() - optimistic update is enough
     } catch (error) {

@@ -65,11 +65,6 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
   const { isAuthenticated, signIn, session } = useMarketAuth();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  // Set access token for social service
-  if (session?.accessToken) {
-    socialService.setAccessToken(session.accessToken);
-  }
-
   // Fetch favorite status
   const { data: favoriteStatus, mutate: mutateFavorite } = useSWR(
     identifier && isAuthenticated ? ['favorite-status', 'agent', identifier] : null,

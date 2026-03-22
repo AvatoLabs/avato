@@ -16,8 +16,6 @@ export interface KnowledgeBaseItem {
 
   id: string;
 
-  isPublic: boolean | null;
-
   name: string;
   resourceUid?: string | null;
 

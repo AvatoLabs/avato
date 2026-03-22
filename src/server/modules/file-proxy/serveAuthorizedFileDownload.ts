@@ -81,6 +81,10 @@ export async function serveAuthorizedFileDownload(
 
   if (!access?.canAccess) {
     log('Access denied for file: %s user: %s', fileId, principalId);
+    // Phase 5: share links use a single failure shape (no 403 vs 404 oracle)
+    if (shareToken) {
+      return new Response('Not found', { status: 404 });
+    }
     return new Response('Forbidden', { status: 403 });
   }
 

@@ -6,6 +6,7 @@ import { type ChatStoreState } from '@/store/chat';
 import { chatHelpers } from '@/store/chat/helpers';
 
 import { displayMessageSelectors } from '../../message/selectors';
+import { portalThreadSelectors } from '../../portal/selectors/thread';
 import { genParentMessages } from './util';
 
 // ============= Thread List Selectors ============= //
@@ -17,11 +18,7 @@ const currentTopicThreads = (s: ChatStoreState) => {
 };
 
 const currentPortalThread = (s: ChatStoreState): ThreadItem | undefined => {
-  if (!s.portalThreadId) return undefined;
-
-  const threads = currentTopicThreads(s);
-
-  return threads.find((t) => t.id === s.portalThreadId);
+  return portalThreadSelectors.portalCurrentThread(s);
 };
 
 const getThreadsByTopic = (topicId?: string) => (s: ChatStoreState) => {
@@ -51,7 +48,7 @@ const hasThreadBySourceMsgId = (id: string) => (s: ChatStoreState) => {
  */
 const getThreadParentMessages = (s: ChatStoreState, data: UIChatMessage[]) => {
   if (s.startToForkThread) {
-    const startMessageId = s.threadStartMessageId!;
+    const startMessageId = portalThreadSelectors.threadStartMessageId(s)!;
 
     // Filter out messages that belong to other threads
     const messages = data.filter((m) => !m.threadId);
@@ -67,10 +64,10 @@ const getThreadParentMessages = (s: ChatStoreState, data: UIChatMessage[]) => {
  */
 const getThreadChildMessages =
   (id?: string) =>
-  (s: ChatStoreState): UIChatMessage[] => {
-    const data = displayMessageSelectors.activeDisplayMessages(s);
-    return data.filter((m) => !!id && m.threadId === id);
-  };
+    (s: ChatStoreState): UIChatMessage[] => {
+      const data = displayMessageSelectors.activeDisplayMessages(s);
+      return data.filter((m) => !!id && m.threadId === id);
+    };
 
 /**
  * Portal AI chats - used for AI title summarization
@@ -78,7 +75,8 @@ const getThreadChildMessages =
 const portalAIChats = (s: ChatStoreState) => {
   const data = displayMessageSelectors.activeDisplayMessages(s);
   const parentMessages = getThreadParentMessages(s, data);
-  const childMessages = getThreadChildMessages(s.portalThreadId)(s);
+  const threadId = portalThreadSelectors.portalThreadId(s);
+  const childMessages = getThreadChildMessages(threadId)(s);
 
   return [...parentMessages, ...childMessages].filter(Boolean) as UIChatMessage[];
 };

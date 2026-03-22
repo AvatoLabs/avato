@@ -6,6 +6,8 @@ import { useParams } from 'react-router-dom';
 
 import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
 
+import { LibraryTrashButton } from '@/routes/(main)/resource/features/LibraryTrashButton';
+
 import LibraryHead from './LibraryHead';
 
 const Header = memo(() => {
@@ -14,13 +16,14 @@ const Header = memo(() => {
   return (
     <SideBarHeaderLayout
       backTo="/resource"
-      left={<LibraryHead id={id || ''} />}
       breadcrumb={[
         {
           href: `/resource/library/${id}`,
           title: t('tab.resource'),
         },
       ]}
+      left={<LibraryHead id={id || ''} />}
+      right={<LibraryTrashButton knowledgeBaseId={id} />}
     />
   );
 });

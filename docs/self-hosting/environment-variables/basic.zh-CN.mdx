@@ -209,8 +209,10 @@ SSRF_ALLOW_IP_ADDRESS_LIST=192.168.1.100,10.0.0.50
 ### `PLUGINS_INDEX_URL`
 
 - 类型：可选
-- 描述：LobeHub 插件市场的索引地址，如果你自行部署了插件市场的服务，可以使用该变量来覆盖默认的插件市场地址
+- 描述：**插件索引 / 注册表**的基址，供插件 Gateway 及相关服务端逻辑使用（**不是**社区 Discover 插件目录的数据源）。若自建该索引服务，可指向你的地址。**社区 Discover** 中的插件与 MCP 列表来自 **Market** 后端（见 `MARKET_BASE_URL` 等市场相关配置），与本变量无关。
 - 默认值：`https://chat-plugins.lobehub.com`
+
+Discover 插件数据路径与本文变量的区别见：`docs/development/discover-plugin-market.zh-CN.md`。
 
 ### `PLUGIN_SETTINGS`
 

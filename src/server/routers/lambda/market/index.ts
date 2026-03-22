@@ -27,8 +27,6 @@ import { userRouter } from './user';
 
 const log = debug('lambda-router:market');
 
-const marketSourceSchema = z.enum(['legacy', 'new']);
-
 // Public procedure with optional user info for trusted client token
 const marketProcedure = publicProcedure
   .use(serverDatabase)
@@ -114,7 +112,6 @@ export const marketRouter = router({
       z.object({
         identifier: z.string(),
         locale: z.string().optional(),
-        source: marketSourceSchema.optional(),
         version: z.string().optional(),
       }),
     )
@@ -135,19 +132,13 @@ export const marketRouter = router({
     }),
 
   getAssistantIdentifiers: marketProcedure
-    .input(
-      z
-        .object({
-          source: marketSourceSchema.optional(),
-        })
-        .optional(),
-    )
+    .input(z.object({}).optional())
     .query(async ({ input, ctx }) => {
       log('getAssistantIdentifiers called with input: %O', input);
 
       try {
         return await communityMarketCacheService.getCached('assistant-identifiers', input, () =>
-          ctx.discoverService.getAssistantIdentifiers(input),
+          ctx.discoverService.getAssistantIdentifiers(),
         );
       } catch (error) {
         log('Error fetching assistant identifiers: %O', error);
@@ -172,7 +163,6 @@ export const marketRouter = router({
           pageSize: z.number().optional(),
           q: z.string().optional(),
           sort: z.nativeEnum(AssistantSorts).optional(),
-          source: marketSourceSchema.optional(),
         })
         .optional(),
     )
@@ -285,27 +275,6 @@ export const marketRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch group agent list',
-        });
-      }
-    }),
-
-  getLegacyPluginList: marketProcedure
-    .input(
-      z
-        .object({
-          locale: z.string().optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      log('getLegacyPluginList input: %O', input);
-      try {
-        return await ctx.discoverService.getLegacyPluginList(input);
-      } catch (error) {
-        log('Error fetching legacy plugin list: %O', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch plugin list',
         });
       }
     }),

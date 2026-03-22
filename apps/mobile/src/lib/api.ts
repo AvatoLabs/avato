@@ -754,7 +754,7 @@ const pickFirstNonEmptyString = (...values: Array<string | null | undefined>) =>
   return '';
 };
 
-/** Session 默认标题（用于 resolveDisplaySessionTitle 判断）。含 legacy 值以兼容已有数据。 */
+/** 占位会话标题（用于 resolveDisplaySessionTitle 判断）。 */
 const DEFAULT_SESSION_TITLES = new Set([
   '',
   'New Chat',
@@ -2105,6 +2105,14 @@ export interface FolderCrumb {
   slug: string;
 }
 
+/** Soft-deleted documents from `document.queryDocuments` with `trash: true` (metadata only). */
+export interface TrashedDocumentItem {
+  fileType: string | null;
+  filename: string | null;
+  id: string;
+  title: string | null;
+}
+
 export const resourceApi = {
   getKnowledgeItems: (params: ResourceQueryParams) =>
     trpcQuery<ResourceListResponse>('file.getKnowledgeItems', {
@@ -2162,6 +2170,20 @@ export const resourceApi = {
     trpcMutate('document.updateDocument', { id, ...updates }),
 
   deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
+
+  queryTrashedDocuments: (params?: {
+    current?: number;
+    knowledgeBaseId?: string;
+    pageSize?: number;
+  }) =>
+    trpcQuery<{ items: TrashedDocumentItem[]; total: number }>('document.queryDocuments', {
+      current: params?.current ?? 0,
+      pageSize: params?.pageSize ?? 100,
+      trash: true,
+      ...(params?.knowledgeBaseId ? { knowledgeBaseId: params.knowledgeBaseId } : {}),
+    }),
+
+  restoreDocument: (id: string) => trpcMutate('document.restoreDocument', { id }),
 };
 
 // ── File / Upload API ──────────────────────────────────────────────
@@ -2458,7 +2480,7 @@ export const mcpApi = {
 
 // ── Market Skills API ───────────────────────────────────────────────
 export interface MarketListItem {
-  _source: 'builtin' | 'skill' | 'mcp' | 'legacy';
+  _source: 'builtin' | 'skill' | 'mcp';
   author?: string;
   avatar?: string;
   category?: string;
@@ -2679,36 +2701,7 @@ export const marketSkillApi = {
     }
 
     if (source === 'skill') {
-      const skillResult = await marketSkillApi.getSkillList(baseParams);
-      if (skillResult.items.length > 0) return skillResult;
-
-      try {
-        const legacyResult = await trpcQuery<any[]>('market.getLegacyPluginList', {});
-        if (Array.isArray(legacyResult) && legacyResult.length > 0) {
-          let items: MarketListItem[] = legacyResult.map((p: any) => ({
-            _source: 'legacy' as const,
-            author: p.author,
-            avatar: p.meta?.avatar,
-            description: p.meta?.description || '',
-            identifier: p.identifier,
-            manifest: typeof p.manifest === 'object' ? p.manifest : undefined,
-            manifestUrl: typeof p.manifest === 'string' ? p.manifest : undefined,
-            name: p.meta?.title || p.identifier,
-          }));
-          if (params?.q) {
-            const q = params.q.toLowerCase();
-            items = items.filter(
-              (i) =>
-                i.name?.toLowerCase().includes(q) ||
-                i.identifier.toLowerCase().includes(q) ||
-                i.description?.toLowerCase().includes(q),
-            );
-          }
-          return { items, totalCount: items.length };
-        }
-      } catch { /* legacy unavailable */ }
-
-      return { items: [], totalCount: 0 };
+      return marketSkillApi.getSkillList(baseParams);
     }
 
     const [mcpResult, skillResult] = await Promise.all([

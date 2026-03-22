@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 
 import {
   agents,
@@ -495,7 +495,10 @@ export class SearchRepo {
         url: files.url,
       })
       .from(files)
-      .leftJoin(documents, eq(files.id, documents.fileId))
+      .leftJoin(
+        documents,
+        and(eq(files.id, documents.fileId), isNull(documents.deletedAt)),
+      )
       .leftJoin(knowledgeBaseFiles, eq(files.id, knowledgeBaseFiles.fileId))
       .where(
         and(
@@ -536,6 +539,7 @@ export class SearchRepo {
         and(
           eq(documents.userId, this.userId),
           eq(documents.fileType, 'custom/folder'),
+          isNull(documents.deletedAt),
           or(
             ilike(sql`COALESCE(${documents.title}, '')`, searchTerm),
             ilike(sql`COALESCE(${documents.filename}, '')`, searchTerm),
@@ -575,6 +579,7 @@ export class SearchRepo {
         and(
           eq(documents.userId, this.userId),
           eq(documents.fileType, 'custom/document'),
+          isNull(documents.deletedAt),
           or(
             ilike(sql`COALESCE(${documents.title}, '')`, searchTerm),
             ilike(sql`COALESCE(${documents.filename}, '')`, searchTerm),

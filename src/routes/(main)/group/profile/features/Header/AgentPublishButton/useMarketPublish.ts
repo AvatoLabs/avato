@@ -56,7 +56,6 @@ export const useMarketPublish = ({ action, onSuccess }: UseMarketPublishOptions)
     try {
       setIsPublishing(true);
       message.loading({ content: loadingMessage, key: messageKey });
-      marketApiService.setAccessToken(session.accessToken);
 
       if (isSubmit) {
         identifier = generateMarketIdentifier();

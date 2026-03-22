@@ -14,7 +14,7 @@ const log = debug('lobe-file:share-f');
 type Params = Promise<{ token: string }>;
 
 /**
- * Token-first file download (no file id in URL). Same authorization as GET /f/:id?token=…
+ * Token-first file download (no file id in URL). Legacy GET /f/:id?token=… redirects here (307).
  * GET /share/f/:token — optional ?password= for protected links.
  */
 export const GET = async (req: Request, segmentData: { params: Params }) => {

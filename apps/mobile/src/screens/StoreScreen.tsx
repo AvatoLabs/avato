@@ -441,17 +441,11 @@ const ItemCard = memo<{
               {item.name || item.identifier}
             </Text>
             <MetaTag
-              label={item._source === 'mcp' || item._source === 'legacy' ? 'MCP' : 'Skill'}
+              label={item._source === 'mcp' ? 'MCP' : 'Skill'}
               backgroundColor={
-                item._source === 'mcp' || item._source === 'legacy'
-                  ? colors.sourceMarketMuted
-                  : colors.sourceBuiltinMuted
+                item._source === 'mcp' ? colors.sourceMarketMuted : colors.sourceBuiltinMuted
               }
-              textColor={
-                item._source === 'mcp' || item._source === 'legacy'
-                  ? colors.sourceMarket
-                  : colors.sourceBuiltin
-              }
+              textColor={item._source === 'mcp' ? colors.sourceMarket : colors.sourceBuiltin}
             />
           </View>
 
@@ -1930,7 +1924,7 @@ export default function StoreScreen() {
         label:
           item._source === 'builtin'
             ? t.storeBuiltIn
-            : item._source === 'mcp' || item._source === 'legacy'
+            : item._source === 'mcp'
               ? t.storeMcp
               : t.storeSkills,
         marketItem: item,

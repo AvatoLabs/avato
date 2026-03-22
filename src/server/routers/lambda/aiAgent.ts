@@ -29,6 +29,7 @@ const CreateAgentOperationSchema = z.object({
     model: z.string(),
     provider: z.string(),
   }),
+  spaceId: z.string().optional().nullable(),
   threadId: z.string().optional().nullable(),
   toolManifestMap: z.record(z.string(), z.any()).default({}),
   tools: z.array(z.any()).optional(),
@@ -85,6 +86,7 @@ const ExecAgentSchema = z
         groupId: z.string().optional().nullable(),
         scope: z.string().optional().nullable(),
         sessionId: z.string().optional(),
+        spaceId: z.string().optional().nullable(),
         threadId: z.string().optional().nullable(),
         topicId: z.string().optional().nullable(),
       })
@@ -441,6 +443,7 @@ export const aiAgentRouter = router({
         autoStart = true,
         messages = [],
         modelRuntimeConfig,
+        spaceId,
         threadId,
         topicId,
         tools,
@@ -479,6 +482,7 @@ export const aiAgentRouter = router({
         agentConfig,
         appContext: {
           agentId,
+          spaceId: spaceId ?? undefined,
           threadId,
           topicId,
         },

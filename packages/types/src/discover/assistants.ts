@@ -66,8 +66,6 @@ export interface DiscoverAssistantItem extends Omit<LobeAgentSettings, 'meta'>, 
   userName?: string;
 }
 
-export type AssistantMarketSource = 'legacy' | 'new';
-
 export interface AssistantQueryParams {
   category?: string;
   haveSkills?: boolean;
@@ -79,7 +77,6 @@ export interface AssistantQueryParams {
   pageSize?: number;
   q?: string;
   sort?: AssistantSorts;
-  source?: AssistantMarketSource;
 }
 
 export interface AssistantListResponse {

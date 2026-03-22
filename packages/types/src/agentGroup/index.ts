@@ -143,6 +143,11 @@ export interface ExecAgentAppContext {
   scope?: string | null;
   /** Session ID */
   sessionId?: string;
+  /**
+   * Current resource Space (e.g. team library). Passed to tool execution for sandbox export
+   * `space_blobs` / `createFileRecord` when KB-derived resolution is insufficient.
+   */
+  spaceId?: string | null;
   /** Target agent ID for DM (private message in group chat) */
   targetId?: string | null;
   /** Thread ID for threaded conversations */

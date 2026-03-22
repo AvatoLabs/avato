@@ -269,7 +269,7 @@ const syncTopicsForSession = (
   }));
 };
 
-/** Topic 默认标题（对话=Topic）。含 legacy 值以兼容已有数据。 */
+/** 占位话题标题（对话=Topic）。 */
 const DEFAULT_TOPIC_TITLES = [
   '',
   'New Chat',

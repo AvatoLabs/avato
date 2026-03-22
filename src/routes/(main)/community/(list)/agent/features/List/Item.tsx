@@ -1,16 +1,14 @@
 import { Avatar, Block, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { ClockIcon } from 'lucide-react';
-import qs from 'query-string';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
-import { useQuery } from '@/hooks/useQuery';
 import { discoverService } from '@/services/discover';
-import { type AssistantMarketSource, type DiscoverAssistantItem } from '@/types/discover';
+import { type DiscoverAssistantItem } from '@/types/discover';
 
 import TokenTag from './TokenTag';
 
@@ -72,16 +70,9 @@ const AssistantItem = memo<DiscoverAssistantItem>(
     type,
   }) => {
     const navigate = useNavigate();
-    const { source } = useQuery() as { source?: AssistantMarketSource };
     const isGroupAgent = type === 'agent-group';
     const basePath = isGroupAgent ? '/community/group_agent' : '/community/agent';
-    const link = qs.stringifyUrl(
-      {
-        query: { source },
-        url: urlJoin(basePath, identifier),
-      },
-      { skipNull: true },
-    );
+    const link = urlJoin(basePath, identifier);
 
     const { t } = useTranslation('discover');
 

@@ -38,7 +38,7 @@ interface DocumentItemProps {
 
 const DocumentItem = memo<DocumentItemProps>(({ document, topicId }) => {
   const { t } = useTranslation('portal');
-  const { modal } = App.useApp();
+  const { message, modal } = App.useApp();
   const [deleting, setDeleting] = useState(false);
 
   const openDocument = useChatStore((s) => s.openDocument);
@@ -58,6 +58,7 @@ const DocumentItem = memo<DocumentItemProps>(({ document, topicId }) => {
         setDeleting(true);
         try {
           await deleteDocument(document.id, topicId);
+          message.info(t('notebook.deletedRestoreHint'));
         } finally {
           setDeleting(false);
         }

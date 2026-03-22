@@ -28,7 +28,7 @@ vi.mock('@/services/tool', () => ({
   toolService: {
     getToolManifest: vi.fn(),
     getToolList: vi.fn(),
-    getOldPluginList: vi.fn(),
+    getDiscoverPluginList: vi.fn(),
   },
 }));
 
@@ -97,7 +97,7 @@ describe('useToolStore:pluginStore', () => {
     it('should load plugin list and update state', async () => {
       // Given
       const pluginListMock = [{ identifier: 'plugin1' }, { identifier: 'plugin2' }];
-      (toolService.getOldPluginList as Mock).mockResolvedValue({ items: pluginListMock });
+      (toolService.getDiscoverPluginList as Mock).mockResolvedValue({ items: pluginListMock });
 
       // When
       let pluginList;
@@ -106,7 +106,7 @@ describe('useToolStore:pluginStore', () => {
       });
 
       // Then
-      expect(toolService.getOldPluginList).toHaveBeenCalled();
+      expect(toolService.getDiscoverPluginList).toHaveBeenCalled();
       expect(pluginList).toEqual(pluginListMock);
       expect(useToolStore.getState().oldPluginItems).toEqual(pluginListMock);
     });
@@ -114,7 +114,7 @@ describe('useToolStore:pluginStore', () => {
     it('should handle errors when loading plugin list', async () => {
       // Given
       const error = new Error('Failed to load plugin list');
-      (toolService.getOldPluginList as Mock).mockRejectedValue(error);
+      (toolService.getDiscoverPluginList as Mock).mockRejectedValue(error);
 
       // When
       let pluginList;
@@ -128,7 +128,7 @@ describe('useToolStore:pluginStore', () => {
       }
 
       // Then
-      expect(toolService.getOldPluginList).toHaveBeenCalled();
+      expect(toolService.getDiscoverPluginList).toHaveBeenCalled();
       expect(errorOccurred).toBe(true);
       expect(pluginList).toBeUndefined();
       // Ensure the state is not updated with an undefined value
@@ -140,7 +140,7 @@ describe('useToolStore:pluginStore', () => {
     it('should fetch plugin store data', async () => {
       // Given
       const pluginListMock = [{ identifier: 'plugin1' }, { identifier: 'plugin2' }];
-      (toolService.getOldPluginList as Mock).mockResolvedValue({ items: pluginListMock });
+      (toolService.getDiscoverPluginList as Mock).mockResolvedValue({ items: pluginListMock });
 
       // When
       const { result } = renderHook(() => useToolStore().useFetchPluginStore());
@@ -151,7 +151,7 @@ describe('useToolStore:pluginStore', () => {
       });
 
       // Then
-      expect(toolService.getOldPluginList).toHaveBeenCalled();
+      expect(toolService.getDiscoverPluginList).toHaveBeenCalled();
       expect(result.current.error).toBeUndefined();
     });
 

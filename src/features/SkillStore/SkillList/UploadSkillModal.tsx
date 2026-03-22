@@ -34,11 +34,12 @@ const UploadSkillModal = memo<UploadSkillModalProps>(({ open, onOpenChange }) =>
     setError(null);
 
     try {
-      const { data: metadata } = await uploadService.uploadFileToS3(file, {
-        directory: 'skills',
-      });
-
-      const hash = sha256(await file.arrayBuffer());
+      const buf = await file.arrayBuffer();
+      const hash = sha256(buf);
+      const { data: metadata } = await uploadService.uploadFileToS3(
+        new File([buf], file.name, { type: file.type }),
+        { directory: 'skills', sha256: hash },
+      );
 
       const result = await lambdaClient.file.createFile.mutate({
         fileType: file.type || 'application/zip',

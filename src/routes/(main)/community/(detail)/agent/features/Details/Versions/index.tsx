@@ -8,8 +8,7 @@ import { useTranslation } from 'react-i18next';
 import InlineTable from '@/components/InlineTable';
 import PublishedTime from '@/components/PublishedTime';
 import Link from '@/libs/router/Link';
-import { usePathname, useQuery } from '@/libs/router/navigation';
-import { type AssistantMarketSource } from '@/types/discover';
+import { usePathname } from '@/libs/router/navigation';
 import { AssistantNavKey } from '@/types/discover';
 
 import Title from '../../../../../features/Title';
@@ -19,8 +18,6 @@ const Versions = memo(() => {
   const { t } = useTranslation('discover');
   const pathname = usePathname();
   const { versions = [], currentVersion } = useDetailContext();
-  const { source } = useQuery() as { source?: AssistantMarketSource };
-  const marketSource = source === 'legacy' ? 'legacy' : undefined;
 
   const statusTagMap = useMemo(
     () => ({
@@ -90,7 +87,6 @@ const Versions = memo(() => {
                         {
                           query: {
                             activeTab: AssistantNavKey.Version,
-                            source: marketSource,
                             version: record.version,
                           },
                           url: pathname,

@@ -273,6 +273,7 @@ export const uploadSessions = pgTable(
       .$defaultFn(() => idGenerator('uploadSessions'))
       .primaryKey(),
     spaceId: text('space_id').references(() => spaces.id, { onDelete: 'cascade' }),
+    blobId: text('blob_id').references(() => spaceBlobs.id, { onDelete: 'cascade' }),
     storageKey: text('storage_key').notNull(),
     expectedSize: integer('expected_size').notNull(),
     expectedSha256: varchar('expected_sha256', { length: 64 }),
@@ -289,6 +290,7 @@ export const uploadSessions = pgTable(
   },
   (t) => [
     index('upload_sessions_space_id_idx').on(t.spaceId),
+    index('upload_sessions_blob_id_idx').on(t.blobId),
     index('upload_sessions_expires_at_idx').on(t.expiresAt),
     index('upload_sessions_status_idx').on(t.status),
   ],

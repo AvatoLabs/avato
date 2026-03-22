@@ -362,7 +362,7 @@ export class MessageModel {
           fileId: documents.fileId,
         })
         .from(documents)
-        .where(inArray(documents.fileId, fileIds));
+        .where(and(inArray(documents.fileId, fileIds), isNull(documents.deletedAt)));
 
       documentsMap = documentsList.reduce(
         (acc, doc) => {
@@ -704,7 +704,7 @@ export class MessageModel {
           fileId: documents.fileId,
         })
         .from(documents)
-        .where(inArray(documents.fileId, fileIds));
+        .where(and(inArray(documents.fileId, fileIds), isNull(documents.deletedAt)));
 
       documentsMap = documentsList.reduce(
         (acc, doc) => {

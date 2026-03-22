@@ -95,8 +95,6 @@ export const userRouter = router({
 
       interests: state.interests,
 
-      // always return true for community version
-      isOnboard: state.isOnboarded ?? true,
       lastName: state.lastName,
       onboarding: state.onboarding,
       preference: state.preference as UserPreference,

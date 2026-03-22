@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { type CellProps } from '@/components/Cell';
 import Cell from '@/components/Cell';
-import { ProfileTabs } from '@/store/global/initialState';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/selectors';
 
@@ -18,13 +17,13 @@ const Category = memo(() => {
   const items: CellProps[] = [
     {
       icon: UserCircle,
-      key: ProfileTabs.Profile,
+      key: 'profile',
       label: t('tab.profile'),
       onClick: () => navigate('/settings/profile'),
     },
     {
       icon: ChartColumnBigIcon,
-      key: ProfileTabs.Stats,
+      key: 'stats',
       label: t('tab.stats'),
       onClick: () => navigate('/settings/stats'),
     },

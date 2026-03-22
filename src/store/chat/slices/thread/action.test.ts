@@ -65,7 +65,7 @@ beforeEach(() => {
       isCreatingThreadMessage: false,
       messagesMap: {},
       newThreadMode: ThreadType.Continuation,
-      portalThreadId: undefined,
+      portalStack: [],
       startToForkThread: undefined,
       threadInputMessage: '',
       threadLoadingIds: [],
@@ -120,7 +120,6 @@ describe('thread action', () => {
       });
 
       expect(result.current.threadStartMessageId).toBe('message-id');
-      expect(result.current.portalThreadId).toBeUndefined();
       expect(result.current.startToForkThread).toBe(true);
       expect(pushPortalViewSpy).toHaveBeenCalledWith({
         type: 'thread',
@@ -138,7 +137,6 @@ describe('thread action', () => {
         result.current.openThreadInPortal('thread-id', 'source-message-id');
       });
 
-      expect(result.current.portalThreadId).toBe('thread-id');
       expect(result.current.threadStartMessageId).toBe('source-message-id');
       expect(result.current.startToForkThread).toBe(false);
       expect(pushPortalViewSpy).toHaveBeenCalledWith({
@@ -155,7 +153,6 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: 'thread-id',
           startToForkThread: true,
           threadStartMessageId: 'message-id',
         });
@@ -167,7 +164,6 @@ describe('thread action', () => {
         result.current.closeThreadPortal();
       });
 
-      expect(result.current.portalThreadId).toBeUndefined();
       expect(result.current.threadStartMessageId).toBeUndefined();
       expect(result.current.startToForkThread).toBeUndefined();
       expect(clearPortalStackSpy).toHaveBeenCalled();
@@ -407,7 +403,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: 'thread-id',
+          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },
@@ -459,7 +455,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: 'thread-id',
+          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },
@@ -495,7 +491,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: 'thread-id',
+          portalStack: [{ threadId: 'thread-id', type: 'thread' }],
           threadMaps: {
             'test-topic-id': [mockThread],
           },
@@ -519,7 +515,7 @@ describe('thread action', () => {
 
       act(() => {
         useChatStore.setState({
-          portalThreadId: undefined,
+          portalStack: [],
         });
       });
 

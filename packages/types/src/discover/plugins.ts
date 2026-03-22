@@ -48,11 +48,10 @@ export interface PluginListResponse {
 
 /**
  * Plugin source types
- * - legacy: From old plugin list (_getPluginList)
- * - market: From Market SDK (getMcpDetail)
+ * - market: From Market SDK (MCP plugin list / detail)
  * - builtin: From LobeHub builtin tools
  */
-export type PluginSource = 'legacy' | 'market' | 'builtin';
+export type PluginSource = 'market' | 'builtin';
 
 export interface DiscoverPluginDetail extends Omit<DiscoverPluginItem, 'manifest'> {
   manifest?: LobeChatPluginManifest | string;

@@ -23,6 +23,7 @@ import {
   users,
 } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
+import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
 import type { S3 } from '@/server/modules/S3';
 import { FileS3 } from '@/server/modules/S3';
 import { DocumentService } from '@/server/services/document';
@@ -750,7 +751,23 @@ export class FileUploadService extends BaseService {
       const metadata = this.generateFileMetadata(file, options.directory);
 
       const fileBuffer = Buffer.from(fileArrayBuffer);
-      await this.s3Service.uploadBuffer(metadata.path, fileBuffer, file.type);
+      const privateBlobS3 = getPrivateBlobS3();
+      await privateBlobS3.uploadBuffer(metadata.path, fileBuffer, file.type);
+      const head = await privateBlobS3.getObjectMetadata(metadata.path);
+      if (head.contentLength !== file.size) {
+        await this.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+          actualSize: head.contentLength,
+          createdBy: this.userId!,
+          extraMetadata: { ...metadata, source: 'openapi_upload' } as Record<string, unknown>,
+          fileType: file.type,
+          reason: 'size_mismatch',
+          sha256: hash,
+          size: head.contentLength,
+          spaceId: uploadSpaceId,
+          storageKey: metadata.path,
+        });
+        throw this.createBusinessError('上传校验失败：存储对象大小与声明不一致');
+      }
 
       const fileRecord = {
         chunkTaskId: null,
@@ -771,6 +788,7 @@ export class FileUploadService extends BaseService {
 
       await this.resourceModel.upsertSpaceBlob({
         createdBy: this.userId!,
+        etag: head.etag,
         fileType: file.type,
         metadata: metadata as Record<string, unknown>,
         sha256: hash,
@@ -1118,13 +1136,13 @@ export class FileUploadService extends BaseService {
     const now = new Date();
     const datePath = now.toISOString().slice(0, 10); // YYYY-MM-DD
     const dir = directory || 'uploads';
-    const filename = `${nanoid()}_${file.name}`;
-    const path = `${dir}/${datePath}/${filename}`;
+    const objectId = nanoid();
+    const path = `${dir}/${datePath}/${objectId}`;
 
     return {
       date: now.toISOString(),
       dirname: dir,
-      filename,
+      filename: file.name,
       path,
     };
   }

@@ -4,7 +4,8 @@ import { type PluginQueryParams } from '@/types/discover';
 import { convertOpenAIManifestToLobeManifest, getToolManifest } from '@/utils/toolManifest';
 
 class ToolService {
-  getOldPluginList = async (params: PluginQueryParams): Promise<any> => {
+  /** Discover plugin list (Market SDK / same source as community MCP plugin list). */
+  getDiscoverPluginList = async (params: PluginQueryParams): Promise<any> => {
     const locale = globalHelpers.getCurrentLanguage();
 
     return lambdaClient.market.getPluginList.query({

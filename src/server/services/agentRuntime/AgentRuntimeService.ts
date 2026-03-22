@@ -1392,6 +1392,7 @@ export class AgentRuntimeService {
       operationId,
       serverDB: this.serverDB,
       stepIndex,
+      spaceId: metadata?.spaceId ?? undefined,
       stream: metadata?.stream,
       streamManager: this.streamManager,
       toolExecutionService: this.toolExecutionService,

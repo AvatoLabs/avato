@@ -328,6 +328,31 @@ describe('agent command', () => {
       );
     });
 
+    it('should pass --space-id as appContext', async () => {
+      mockTrpcClient.aiAgent.execAgent.mutate.mockResolvedValue({
+        operationId: 'op-space',
+        success: true,
+      });
+
+      const program = createProgram();
+      await program.parseAsync([
+        'node',
+        'test',
+        'agent',
+        'run',
+        '--agent-id',
+        'a1',
+        '--prompt',
+        'Hi',
+        '--space-id',
+        'sp_1',
+      ]);
+
+      expect(mockTrpcClient.aiAgent.execAgent.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({ appContext: { spaceId: 'sp_1' } }),
+      );
+    });
+
     it('should pass --json to stream options', async () => {
       mockTrpcClient.aiAgent.execAgent.mutate.mockResolvedValue({
         operationId: 'op-j',

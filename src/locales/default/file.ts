@@ -232,4 +232,15 @@ export default {
   'publicShare.passwordPlaceholder': 'Enter password',
   'publicShare.passwordSubtitle': 'This share link is protected. Enter the password to continue.',
   'publicShare.passwordTitle': 'Password Required',
+  'trash.empty': 'No deleted pages or folders.',
+  'trash.hint': 'Soft-deleted pages and folders in this library. Restored items reappear in the file tree.',
+  'trash.hintAll':
+    'Soft-deleted pages and folders you own (all libraries). Restored items reappear in the file tree.',
+  'trash.loadError': 'Failed to load recycle bin',
+  'trash.loading': 'Loading…',
+  'trash.open': 'Recycle bin',
+  'trash.restore': 'Restore',
+  'trash.restored': 'Restored',
+  'trash.restoreError': 'Failed to restore',
+  'trash.title': 'Recycle bin',
 };

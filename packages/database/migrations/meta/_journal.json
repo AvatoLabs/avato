@@ -693,6 +693,20 @@
       "when": 1774176100000,
       "tag": "0098_knowledge_base_files_space_id",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1774180000000,
+      "tag": "0099_documents_slug_unique_active_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1774181000000,
+      "tag": "0100_documents_client_space_unique_active_only",
+      "breakpoints": true
     }
   ],
   "version": "6"

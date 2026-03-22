@@ -6,16 +6,19 @@ import {
   SkillsExecutionRuntime,
 } from '@lobechat/builtin-tool-skills/executionRuntime';
 import type { SkillItem, SkillListItem, SkillResourceContent } from '@lobechat/types';
+import type { LobeChatDatabase } from '@lobechat/database';
 import type { CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { FileS3 } from '@/server/modules/S3';
 import { FileService } from '@/server/services/file';
+import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
 import { MarketService } from '@/server/services/market';
 import { SkillResourceService } from '@/server/services/skill/resource';
 
@@ -25,6 +28,8 @@ const log = debug('lobe-server:skills-runtime');
 
 class SkillServerRuntimeService implements SkillRuntimeService {
   private resourceService: SkillResourceService;
+  private serverDB: LobeChatDatabase;
+  private spaceId?: string;
   private skillModel: AgentSkillModel;
   private marketService: MarketService;
   private fileService: FileService;
@@ -37,12 +42,16 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     fileService: FileService;
     marketService: MarketService;
     resourceService: SkillResourceService;
+    serverDB: LobeChatDatabase;
+    spaceId?: string;
     skillModel: AgentSkillModel;
     topicId?: string;
     userId: string;
   }) {
     this.skillModel = options.skillModel;
     this.resourceService = options.resourceService;
+    this.serverDB = options.serverDB;
+    this.spaceId = options.spaceId;
     this.marketService = options.marketService;
     this.fileService = options.fileService;
     this.fileModel = options.fileModel;
@@ -220,11 +229,27 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       // Step 4: Create persistent file record
       const fileHash = sha256(key + Date.now().toString());
 
+      let exportSpaceId: string | undefined;
+      if (this.spaceId) {
+        const space = await new SpaceModel(this.serverDB, this.userId).findAccessibleSpaceById(
+          this.spaceId,
+        );
+        exportSpaceId = space?.id;
+      }
+      if (exportSpaceId === undefined) {
+        exportSpaceId = await resolveSpaceIdForSandboxExport(
+          this.serverDB,
+          this.userId,
+          this.topicId,
+        );
+      }
+
       const { fileId, url } = await this.fileService.createFileRecord({
         fileHash,
         fileType: mimeType,
         name: filename,
         size: fileSize,
+        ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
         url: key, // Store S3 key
       });
 
@@ -290,6 +315,8 @@ export const skillsRuntime: ServerRuntimeRegistration = {
       fileService,
       marketService,
       resourceService,
+      serverDB: context.serverDB,
+      spaceId: context.spaceId,
       skillModel,
       topicId: context.topicId,
       userId: context.userId,

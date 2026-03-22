@@ -6,9 +6,6 @@ import qs from 'query-string';
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useQuery } from '@/hooks/useQuery';
-import { type AssistantMarketSource } from '@/types/discover';
-
 const styles = createStaticStyles(({ cssVar, css }) => {
   return {
     tag: css`
@@ -23,8 +20,6 @@ const styles = createStaticStyles(({ cssVar, css }) => {
 });
 
 const TagList = memo<{ tags: string[] }>(({ tags }) => {
-  const { source } = useQuery() as { source?: AssistantMarketSource };
-  const marketSource = source === 'legacy' ? 'legacy' : undefined;
   const showTags = Boolean(tags?.length && tags?.length > 0);
   return (
     showTags && (
@@ -36,7 +31,6 @@ const TagList = memo<{ tags: string[] }>(({ tags }) => {
               {
                 query: {
                   q: tag,
-                  source: marketSource,
                 },
                 url: '/community/agent',
               },

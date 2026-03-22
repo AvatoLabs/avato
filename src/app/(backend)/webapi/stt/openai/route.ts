@@ -1,7 +1,7 @@
 import { type OpenAISTTPayload } from '@lobehub/tts';
 import { createOpenaiAudioTranscriptions } from '@lobehub/tts/server';
 
-import { createBizOpenAI } from '@/app/(backend)/_deprecated/createBizOpenAI';
+import { createBizOpenAI } from '@/server/utils/createBizOpenAI';
 
 export const POST = async (req: Request) => {
   const formData = await req.formData();

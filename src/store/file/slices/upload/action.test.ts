@@ -254,11 +254,15 @@ describe('FileUploadAction', () => {
         });
 
         expect(fileService.checkFileHash).toHaveBeenCalledWith('mock-hash-value');
-        expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(mockFile, {
-          onNotSupported: expect.any(Function),
-          onProgress: expect.any(Function),
-          skipCheckFileType: undefined,
-        });
+        expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(
+          mockFile,
+          expect.objectContaining({
+            onNotSupported: expect.any(Function),
+            onProgress: expect.any(Function),
+            sha256: 'mock-hash-value',
+            skipCheckFileType: undefined,
+          }),
+        );
         expect(fileService.createFile).toHaveBeenCalledWith(
           {
             fileType: mockFile.type,
@@ -531,6 +535,13 @@ describe('FileUploadAction', () => {
           });
         });
 
+        expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(
+          mockFile,
+          expect.objectContaining({
+            knowledgeBaseId,
+            sha256: 'mock-hash-value',
+          }),
+        );
         expect(fileService.createFile).toHaveBeenCalledWith(
           expect.objectContaining({
             name: mockFile.name,
@@ -572,6 +583,7 @@ describe('FileUploadAction', () => {
         expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(
           mockFile,
           expect.objectContaining({
+            sha256: 'mock-hash-value',
             skipCheckFileType: true,
           }),
         );

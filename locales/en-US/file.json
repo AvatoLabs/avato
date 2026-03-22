@@ -143,5 +143,15 @@
   "uploadDock.uploadStatus.pending": "Waiting to upload",
   "uploadDock.uploadStatus.processing": "Uploading",
   "uploadDock.uploadStatus.success": "Upload completed",
-  "uploadDock.uploadStatus.uploading": "Uploading"
+  "uploadDock.uploadStatus.uploading": "Uploading",
+  "trash.empty": "No deleted pages or folders.",
+  "trash.hint": "Soft-deleted pages and folders in this library. Restored items reappear in the file tree.",
+  "trash.hintAll": "Soft-deleted pages and folders you own (all libraries). Restored items reappear in the file tree.",
+  "trash.loadError": "Failed to load recycle bin",
+  "trash.loading": "Loading…",
+  "trash.open": "Recycle bin",
+  "trash.restore": "Restore",
+  "trash.restored": "Restored",
+  "trash.restoreError": "Failed to restore",
+  "trash.title": "Recycle bin"
 }

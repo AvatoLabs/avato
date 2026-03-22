@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { FilesTabs } from '@lobechat/types';
+import { and, eq, isNull } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
@@ -582,11 +583,17 @@ describe('KnowledgeRepo', () => {
     it('should delete a document by id', async () => {
       await knowledgeRepo.deleteItem('delete-doc', 'document');
 
-      // Verify document was deleted
-      const result = await serverDB.query.documents.findFirst({
-        where: (d, { eq }) => eq(d.id, 'delete-doc'),
+      const active = await serverDB.query.documents.findFirst({
+        where: and(eq(documents.id, 'delete-doc'), isNull(documents.deletedAt)),
       });
-      expect(result).toBeUndefined();
+      expect(active).toBeUndefined();
+
+      const tomb = await serverDB.query.documents.findFirst({
+        where: eq(documents.id, 'delete-doc'),
+      });
+      expect(tomb?.deletedAt).toBeTruthy();
+
+      expect(await knowledgeRepo.findById('delete-doc', 'document')).toBeUndefined();
     });
   });
 
@@ -640,13 +647,18 @@ describe('KnowledgeRepo', () => {
       const file2 = await serverDB.query.files.findFirst({
         where: (f, { eq }) => eq(f.id, 'delete-many-file-2'),
       });
-      const doc1 = await serverDB.query.documents.findFirst({
-        where: (d, { eq }) => eq(d.id, 'delete-many-doc-1'),
+      const doc1Active = await serverDB.query.documents.findFirst({
+        where: and(eq(documents.id, 'delete-many-doc-1'), isNull(documents.deletedAt)),
       });
 
       expect(file1).toBeUndefined();
       expect(file2).toBeUndefined();
-      expect(doc1).toBeUndefined();
+      expect(doc1Active).toBeUndefined();
+
+      const doc1Tomb = await serverDB.query.documents.findFirst({
+        where: eq(documents.id, 'delete-many-doc-1'),
+      });
+      expect(doc1Tomb?.deletedAt).toBeTruthy();
     });
 
     it('should handle empty items array', async () => {

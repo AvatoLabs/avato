@@ -278,7 +278,7 @@ class UserService {
 ```mermaid
 classDiagram
 class ToolService {
-+getOldPluginList(params) Promise
++getDiscoverPluginList(params) Promise
 +getToolManifest(...) Promise
 +convertOpenAIManifestToLobeManifest(...) Promise
 }

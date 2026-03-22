@@ -88,11 +88,6 @@ export const checkOwnership = async ({
     return cached.result;
   }
 
-  // Only set accessToken when not in trustedClient mode
-  if (!enableMarketTrustedClient && accessToken) {
-    marketApiService.setAccessToken(accessToken);
-  }
-
   const agentDetail = await marketApiService.getAgentDetail(marketIdentifier);
   console.info('[checkOwnership] Agent detail:', agentDetail);
 

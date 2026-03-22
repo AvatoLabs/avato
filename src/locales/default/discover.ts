@@ -157,9 +157,6 @@ export default {
   'assistants.empty.search': 'No matching Agents found',
   'assistants.empty.title': 'No Agents found',
   'assistants.list': 'Agent List',
-  'assistants.marketSource.label': 'Switch Community Source',
-  'assistants.marketSource.legacy': 'Legacy Community',
-  'assistants.marketSource.new': 'New Community',
   'assistants.more': 'More',
   'assistants.plugins': 'Integrated Skills',
   'assistants.recentSubmits': 'Recent Updates',
@@ -904,8 +901,6 @@ export default {
   'plugins.install': 'Install Skill',
 
   'plugins.installed': 'Installed',
-
-  'plugins.legacyTag': 'Legacy',
 
   'plugins.list': 'Skill List',
 

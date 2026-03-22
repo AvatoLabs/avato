@@ -215,11 +215,6 @@ const UserFavoritePlugins = memo<UserFavoritePluginsProps>(({ rows = 4 }) => {
 
   const { data, mutate } = useFavoritePlugins(user.id);
 
-  // Set access token for social service
-  if (session?.accessToken) {
-    socialService.setAccessToken(session.accessToken);
-  }
-
   const handleUnfavorite = useCallback(
     async (identifier: string) => {
       try {

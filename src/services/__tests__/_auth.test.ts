@@ -81,12 +81,8 @@ describe('getProviderAuthPayload', () => {
     const payload = getProviderAuthPayload(ModelProvider.Bedrock, mockBedrockConfig);
     expect(payload).toEqual({
       apiKey: mockBedrockConfig.secretAccessKey + mockBedrockConfig.accessKeyId,
-      awsAccessKeyId: mockBedrockConfig.accessKeyId,
-      awsRegion: mockBedrockConfig.region,
-      awsSecretAccessKey: mockBedrockConfig.secretAccessKey,
       accessKeyId: mockBedrockConfig.accessKeyId,
       accessKeySecret: mockBedrockConfig.secretAccessKey,
-      awsSessionToken: undefined,
       region: mockBedrockConfig.region,
       sessionToken: undefined,
     });
@@ -103,7 +99,6 @@ describe('getProviderAuthPayload', () => {
     const payload = getProviderAuthPayload(ModelProvider.Azure, mockAzureConfig);
     expect(payload).toEqual({
       apiKey: mockAzureConfig.apiKey,
-      azureApiVersion: mockAzureConfig.apiVersion,
       apiVersion: mockAzureConfig.apiVersion,
       baseURL: mockAzureConfig.endpoint,
     });
@@ -163,7 +158,6 @@ describe('getProviderAuthPayload', () => {
     expect(payload).toEqual({
       apiKey: mockCloudflareConfig.apiKey,
       baseURLOrAccountID: mockCloudflareConfig.baseURLOrAccountID,
-      cloudflareBaseURLOrAccountID: mockCloudflareConfig.baseURLOrAccountID,
     });
   });
 

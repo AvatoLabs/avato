@@ -1,3 +1,8 @@
+/**
+ * Legacy same-origin upload: client supplies `pathname` + `file` (e.g. mobile).
+ * Prefer `POST /api/file/upload-session` with `uploadSessionId` for server-issued keys.
+ * Uses PrivateBlobS3 (private objects, no per-object ACL) like presigned PUT / upload-session.
+ */
 import debug from 'debug';
 import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -5,12 +10,30 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
-import { FileS3 } from '@/server/modules/S3';
+import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const log = debug('lobe-server:file-upload');
+
+const MAX_LEGACY_PATHNAME_LEN = 2048;
+
+/**
+ * Reject path traversal and absolute keys. Exported for unit tests.
+ * Clients must send a relative object key (e.g. `files/<bucket>/…` as today).
+ */
+export function getLegacyUploadPathnameValidationError(pathname: unknown): string | null {
+  if (typeof pathname !== 'string' || !pathname) return 'Invalid pathname.';
+  if (pathname.startsWith('/')) return 'Invalid pathname.';
+  if (pathname.length > MAX_LEGACY_PATHNAME_LEN) return 'Invalid pathname.';
+  const norm = pathname.replaceAll('\\', '/');
+  if (norm.includes('\0')) return 'Invalid pathname.';
+  for (const segment of norm.split('/')) {
+    if (segment === '..') return 'Invalid pathname.';
+  }
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,23 +60,25 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const pathname = formData.get('pathname');
+    const pathnameField = formData.get('pathname');
     const file = formData.get('file');
 
-    if (typeof pathname !== 'string' || !pathname || pathname.startsWith('/')) {
-      return NextResponse.json({ error: 'Invalid pathname.' }, { status: 400 });
+    const pathError = getLegacyUploadPathnameValidationError(pathnameField);
+    if (pathError) {
+      return NextResponse.json({ error: pathError }, { status: 400 });
     }
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Invalid file payload.' }, { status: 400 });
     }
 
-    const s3 = new FileS3();
+    const objectKey = pathnameField as string;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const privateS3 = getPrivateBlobS3();
 
-    await s3.uploadBuffer(pathname, fileBuffer, file.type || 'application/octet-stream');
+    await privateS3.uploadBuffer(objectKey, fileBuffer, file.type || 'application/octet-stream');
 
-    log('Uploaded file through same-origin fallback: %s', pathname);
+    log('Uploaded file through legacy same-origin path (PrivateBlobS3): %s', objectKey);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

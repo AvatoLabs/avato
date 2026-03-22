@@ -89,9 +89,9 @@ export class ConversationLifecycleActionImpl {
     const newThread =
       isCreatingNewThread && context.sourceMessageId && context.threadType
         ? {
-            sourceMessageId: context.sourceMessageId,
-            type: context.threadType as ChatThreadType,
-          }
+          sourceMessageId: context.sourceMessageId,
+          type: context.threadType as ChatThreadType,
+        }
         : undefined;
 
     if (!agentId) return;
@@ -229,15 +229,15 @@ export class ConversationLifecycleActionImpl {
           // Support creating new thread along with message
           newThread: newThread
             ? {
-                sourceMessageId: newThread.sourceMessageId,
-                type: newThread.type,
-              }
+              sourceMessageId: newThread.sourceMessageId,
+              type: newThread.type,
+            }
             : undefined,
           newTopic: !topicId
             ? {
-                topicMessageIds: messages.map((m) => m.id),
-                title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
-              }
+              topicMessageIds: messages.map((m) => m.id),
+              title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
+            }
             : undefined,
           agentId: operationContext.agentId,
           // Pass groupId for group chat scenarios
@@ -281,7 +281,7 @@ export class ConversationLifecycleActionImpl {
       if (data.createdThreadId) {
         this.#get().updateOperationMetadata(operationId, { createdThreadId: data.createdThreadId });
 
-        // Update portalThreadId to switch from "new thread" mode to "existing thread" mode
+        // Update portal stack to switch from "new thread" mode to "existing thread" mode
         // This ensures the Portal Thread UI displays correctly with the real thread ID
         this.#get().openThreadInPortal(data.createdThreadId, context.sourceMessageId);
 

@@ -115,6 +115,12 @@ export const documentRouter = router({
       return ctx.documentService.deleteDocuments(input.ids);
     }),
 
+  restoreDocument: documentProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.documentService.restoreDocument(input.id);
+    }),
+
   getDocumentById: documentProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -216,8 +222,10 @@ export const documentRouter = router({
         .object({
           current: z.number().optional(),
           fileTypes: z.array(z.string()).optional(),
+          knowledgeBaseId: z.string().optional(),
           pageSize: z.number().optional(),
           sourceTypes: z.array(z.string()).optional(),
+          trash: z.boolean().optional(),
         })
         .optional(),
     )

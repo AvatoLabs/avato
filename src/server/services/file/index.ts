@@ -6,6 +6,7 @@ import { sha256 } from 'js-sha256';
 import { serverDBEnv } from '@/config/db';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
 import { type FileItem } from '@/database/schemas';
 import { appEnv } from '@/envs/app';
 import {
@@ -22,6 +23,7 @@ import { type FileServiceImpl } from './impls/type';
  * Provides file operation services using a modular implementation approach
  */
 export class FileService {
+  private readonly db: LobeChatDatabase;
   private userId: string;
   private fileModel: FileModel;
   private resourceModel: ResourceModel;
@@ -30,6 +32,7 @@ export class FileService {
   private impl: FileServiceImpl;
 
   constructor(db: LobeChatDatabase, userId: string) {
+    this.db = db;
     this.userId = userId;
     this.fileModel = new FileModel(db, userId);
     this.resourceModel = new ResourceModel(db, userId);
@@ -131,7 +134,8 @@ export class FileService {
   /**
    * Create file record (common method)
    * Always attempts `global_files` insert with `onConflictDoNothing` (no pre-flight `checkHash`) to
-   * avoid cross-user existence side channels. Optional `spaceId` registers `space_blobs` for same-space dedup.
+   * avoid cross-user existence side channels. `spaceId` registers `space_blobs` for same-space dedup; when omitted,
+   * resolves the caller's personal space (explicit `null` skips both file `spaceId` and `space_blobs`).
    *
    * @param params - File parameters
    * @param params.id - Optional custom file ID (defaults to auto-generated)
@@ -146,6 +150,11 @@ export class FileService {
     spaceId?: string | null;
     url: string;
   }): Promise<{ fileId: string; url: string }> {
+    const resolvedSpaceId =
+      params.spaceId === undefined
+        ? (await new SpaceModel(this.db, this.userId).getOrCreatePersonalSpace()).id
+        : (params.spaceId ?? undefined);
+
     const { id } = await this.fileModel.create(
       {
         fileHash: params.fileHash,
@@ -153,20 +162,20 @@ export class FileService {
         id: params.id,
         name: params.name,
         size: params.size,
-        spaceId: params.spaceId ?? undefined,
+        spaceId: resolvedSpaceId,
         url: params.url,
       },
       true,
     );
 
-    if (params.spaceId) {
+    if (resolvedSpaceId) {
       await this.resourceModel.upsertSpaceBlob({
         createdBy: this.userId,
         fileType: params.fileType,
         metadata: {},
         sha256: params.fileHash,
         size: params.size,
-        spaceId: params.spaceId,
+        spaceId: resolvedSpaceId,
         status: 'ready',
         storageKey: params.url,
         verifiedAt: new Date(),

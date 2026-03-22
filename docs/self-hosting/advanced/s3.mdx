@@ -48,7 +48,7 @@ The best practice in this area is to use a file storage service (S3) to store im
 
   ### `S3_SET_ACL`
 
-  Whether to set the ACL to `public-read` when uploading files. This option is enabled by default. If the service provider does not support setting individual ACLs for files (i.e., all files inherit the ACL of the storage bucket), enabling this option may cause request errors. Set `S3_SET_ACL` to `0` to disable it.
+  Legacy opt-in flag read from the environment. **Default is off** (unset or any value other than `1`). The application’s S3 uploads do **not** set per-object ACLs; objects rely on the bucket default and reads use presigned URLs or the `/f/:id` proxy. Set `S3_SET_ACL=1` only if external tooling still expects this variable to be enabled.
 
   ### `S3_ENABLE_PATH_STYLE`
 

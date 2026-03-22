@@ -1,6 +1,8 @@
+import { documents } from '@lobechat/database/schemas';
 import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { ResourceModel } from '@/database/models/resource';
@@ -152,7 +154,7 @@ export const resourceShareRouter = router({
 
       if (summary.kind === 'document') {
         const document = await ctx.serverDB.query.documents.findFirst({
-          where: (table, { eq }) => eq(table.id, summary.localId),
+          where: and(eq(documents.id, summary.localId), isNull(documents.deletedAt)),
         });
 
         return {

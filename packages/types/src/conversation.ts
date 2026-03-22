@@ -188,4 +188,9 @@ export interface ConversationContext {
    * When present, allows unauthenticated access to topic messages
    */
   topicShareId?: string;
+  /**
+   * Active resource Space (e.g. team library). Optional; callers may map to
+   * `ExecAgentAppContext.spaceId` or similar server payloads for tool/export scoping.
+   */
+  spaceId?: string | null;
 }

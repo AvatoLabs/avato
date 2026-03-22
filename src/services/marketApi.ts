@@ -24,15 +24,6 @@ interface GetOwnAgentsParams {
 }
 
 export class MarketApiService {
-  /**
-   * @deprecated This method is no longer needed as authentication is now handled
-   * automatically through tRPC middleware. Keeping for backward compatibility.
-   */
-
-  setAccessToken(_token: string) {
-    // No-op: Authentication is now handled through tRPC authedProcedure middleware
-  }
-
   // Create new agent
   async createAgent(agentData: {
     homepage?: string;

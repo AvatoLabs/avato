@@ -1,4 +1,4 @@
-import { isNotNull } from 'drizzle-orm';
+import { and, isNotNull, isNull } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   boolean,
@@ -119,10 +119,12 @@ export const documents = pgTable(
     index('documents_knowledge_base_id_idx').on(table.knowledgeBaseId),
     index('documents_space_id_idx').on(table.spaceId),
     index('documents_resource_uid_idx').on(table.resourceUid),
-    uniqueIndex('documents_client_id_space_id_unique').on(table.clientId, table.spaceId),
+    uniqueIndex('documents_client_id_space_id_unique')
+      .on(table.clientId, table.spaceId)
+      .where(and(isNotNull(table.clientId), isNull(table.deletedAt))),
     uniqueIndex('documents_slug_space_id_unique')
       .on(table.slug, table.spaceId)
-      .where(isNotNull(table.slug)),
+      .where(and(isNotNull(table.slug), isNull(table.deletedAt))),
   ],
 );
 
@@ -216,8 +218,6 @@ export const knowledgeBases = pgTable(
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
     clientId: text('client_id'),
-
-    isPublic: boolean('is_public').default(false),
 
     settings: jsonb('settings'),
     deletedAt: timestamptz('deleted_at'),

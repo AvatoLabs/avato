@@ -8,7 +8,6 @@ import { globalHelpers } from '@/store/global/helpers';
 import { type StoreSetter } from '@/store/types';
 import {
   type AssistantListResponse,
-  type AssistantMarketSource,
   type AssistantQueryParams,
   type DiscoverAssistantDetail,
   type IdentifiersResponse,
@@ -25,9 +24,7 @@ export class AssistantActionImpl {
     void get;
   }
 
-  useAssistantCategories = (
-    params: CategoryListQuery & { source?: AssistantMarketSource },
-  ): SWRResponse<CategoryItem[]> => {
+  useAssistantCategories = (params: CategoryListQuery): SWRResponse<CategoryItem[]> => {
     const locale = globalHelpers.getCurrentLanguage();
     return useSWR(
       ['assistant-categories', locale, ...Object.values(params)].filter(Boolean).join('-'),
@@ -40,14 +37,11 @@ export class AssistantActionImpl {
 
   useAssistantDetail = (params: {
     identifier: string;
-    source?: AssistantMarketSource;
     version?: string;
   }): SWRResponse<DiscoverAssistantDetail | undefined> => {
     const locale = globalHelpers.getCurrentLanguage();
     return useSWR(
-      ['assistant-details', locale, params.identifier, params.version, params.source]
-        .filter(Boolean)
-        .join('-'),
+      ['assistant-details', locale, params.identifier, params.version].filter(Boolean).join('-'),
       async () => discoverService.getAssistantDetail(params),
       {
         revalidateOnFocus: false,
@@ -55,13 +49,10 @@ export class AssistantActionImpl {
     );
   };
 
-  useAssistantIdentifiers = (params?: {
-    source?: AssistantMarketSource;
-  }): SWRResponse<IdentifiersResponse> => {
+  useAssistantIdentifiers = (): SWRResponse<IdentifiersResponse> => {
     return useSWR(
-      ['assistant-identifiers', params?.source].filter(Boolean).join('-') ||
-        'assistant-identifiers',
-      async () => discoverService.getAssistantIdentifiers(params),
+      'assistant-identifiers',
+      async () => discoverService.getAssistantIdentifiers(),
       {
         revalidateOnFocus: false,
       },

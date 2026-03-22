@@ -12,18 +12,13 @@ export const INBOX_SESSION_ID = 'inbox';
  * `useResolvedRemoteAsset` will resolve this against the configured server origin.
  */
 export const DEFAULT_INBOX_AVATAR = '/icons/icon-192x192.png';
-export const LEGACY_INBOX_AVATAR_PATHS = new Set([
-  '/icons/icon-192x192.maskable.png',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.maskable.png',
-  '/icons/icon-512x512.png',
-]);
 
 export const AVATO_INBOX_ICON_ASSET = require('../../assets/avato-icon.png');
 
+/** Builtin inbox avatar URL from the server (single canonical path). */
 export const isBuiltinInboxAvatar = (avatar?: string | null) => {
   const normalized = avatar?.trim();
   if (!normalized) return false;
 
-  return LEGACY_INBOX_AVATAR_PATHS.has(normalized);
+  return normalized === DEFAULT_INBOX_AVATAR;
 };

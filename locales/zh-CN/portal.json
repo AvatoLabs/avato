@@ -17,6 +17,7 @@
   "files": "文件",
   "messageDetail": "消息详情",
   "notebook.confirmDelete": "确定要删除这个文档吗？",
+  "notebook.deletedRestoreHint": "已从当前话题移除。如需找回，可在「资源」→「回收站」中恢复页面。",
   "notebook.delete": "删除",
   "notebook.empty": "暂无文档，当前话题关联的文档将会显示在这里",
   "notebook.title": "Notebook",

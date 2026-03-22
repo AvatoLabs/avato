@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
+import { SpaceModel } from '@/database/models/space';
 import { type ToolCallContent } from '@/libs/mcp';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { marketUserInfo, serverDatabase, telemetry } from '@/libs/trpc/lambda/middleware';
@@ -14,6 +15,7 @@ import { isTrustedClientEnabled } from '@/libs/trusted-client';
 import { FileS3 } from '@/server/modules/S3';
 import { DiscoverService } from '@/server/services/discover';
 import { FileService } from '@/server/services/file';
+import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
 import { MarketService } from '@/server/services/market';
 import {
   contentBlocksToString,
@@ -96,6 +98,8 @@ const callCodeInterpreterToolSchema = z.object({
 const exportAndUploadFileSchema = z.object({
   filename: z.string(),
   path: z.string(),
+  /** When set, must be a space the user can access; overrides KB-derived resolution. */
+  spaceId: z.string().optional(),
   topicId: z.string(),
 });
 
@@ -592,11 +596,28 @@ export const marketRouter = router({
   exportAndUploadFile: marketToolProcedure
     .input(exportAndUploadFileSchema)
     .mutation(async ({ input, ctx }) => {
-      const { path, filename, topicId } = input;
+      const { path, filename, spaceId: explicitSpaceId, topicId } = input;
 
       log('Exporting and uploading file: %s from path: %s in topic: %s', filename, path, topicId);
 
       try {
+        let exportSpaceId: string | undefined;
+        if (explicitSpaceId) {
+          const space = await new SpaceModel(ctx.serverDB, ctx.userId).findAccessibleSpaceById(
+            explicitSpaceId,
+          );
+          if (!space?.id) {
+            return {
+              error: { message: 'INVALID_SPACE_ID' },
+              filename,
+              success: false,
+            } as ExportAndUploadFileResult;
+          }
+          exportSpaceId = space.id;
+        } else {
+          exportSpaceId = await resolveSpaceIdForSandboxExport(ctx.serverDB, ctx.userId, topicId);
+        }
+
         const s3 = new FileS3();
 
         // Use date-based sharding for privacy compliance (GDPR, CCPA)
@@ -654,6 +675,7 @@ export const marketRouter = router({
           fileType: mimeType,
           name: filename,
           size: fileSize,
+          ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
           url: key, // Store S3 key
         });
 

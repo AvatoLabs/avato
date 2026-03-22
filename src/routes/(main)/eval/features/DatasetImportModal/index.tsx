@@ -2,6 +2,7 @@
 
 import { Modal } from '@lobehub/ui';
 import { App } from 'antd';
+import { sha256 } from 'js-sha256';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -82,12 +83,18 @@ const DatasetImportModal = memo<DatasetImportModalProps>(
         setUploadProgress(undefined);
         try {
           // 1. Upload to S3 with progress tracking
-          const metadata = await uploadService.uploadToServerS3(file, {
-            directory: 'eval-datasets',
-            onProgress: (status, state) => {
-              setUploadProgress(state);
+          const buf = await file.arrayBuffer();
+          const digest = sha256(buf);
+          const metadata = await uploadService.uploadToServerS3(
+            new File([buf], file.name, { type: file.type }),
+            {
+              directory: 'eval-datasets',
+              onProgress: (status, state) => {
+                setUploadProgress(state);
+              },
+              sha256: digest,
             },
-          });
+          );
 
           setPathname(metadata.path);
           setFilename(file.name);

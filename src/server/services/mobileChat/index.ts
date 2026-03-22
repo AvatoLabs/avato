@@ -85,6 +85,8 @@ export interface MobileChatPayload extends ChatStreamPayload {
   memory?: MobileMemoryPayload;
   plugins?: string[];
   sessionId?: string;
+  /** Optional Space for server builtin tools (sandbox export → `createFileRecord` / `space_blobs`). */
+  spaceId?: string;
   topicId?: string;
 }
 
@@ -909,6 +911,7 @@ export class MobileChatService {
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
+              spaceId: payload.spaceId,
               toolManifestMap: toolSet.manifestMap,
               topicId: payload.topicId,
               userId: this.userId,
@@ -1133,6 +1136,7 @@ export class MobileChatService {
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
+              spaceId: payload.spaceId,
               toolManifestMap: toolSet.manifestMap,
               topicId: payload.topicId,
               userId: this.userId,

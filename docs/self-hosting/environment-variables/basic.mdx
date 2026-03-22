@@ -214,8 +214,10 @@ This environment variable allows administrators to customize the default image g
 ### `PLUGINS_INDEX_URL`
 
 - Type: Optional
-- Description: Index address of the LobeHub plugin market. If you have deployed the plugin market service on your own, you can use this variable to override the default plugin market address.
+- Description: Base URL for the **plugin index / registry** used by the plugin gateway and related server flows (not the Community Discover catalog). If you self-host that index, set this to your endpoint. **Community Discover** plugin and MCP lists are served from the **Market** backend (see `MARKET_BASE_URL` / market configuration), not from this URL.
 - Default: `https://chat-plugins.lobehub.com`
+
+For how Discover plugin data is loaded vs this variable, see `docs/development/discover-plugin-market.md`.
 
 ### `PLUGIN_SETTINGS`
 

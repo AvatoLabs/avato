@@ -67,21 +67,13 @@ export class ChatThreadActionImpl {
       replaceMessages(parentMessages, { action: 'initThreadMessages', context });
     }
 
-    this.#set(
-      { threadStartMessageId: messageId, portalThreadId: undefined, startToForkThread: true },
-      false,
-      'openThreadCreator',
-    );
-    // Push Thread view to portal stack instead of togglePortal
+    this.#set({ threadStartMessageId: messageId, startToForkThread: true }, false, 'openThreadCreator');
+    // Push Thread view to portal stack
     this.#get().pushPortalView({ type: PortalViewType.Thread, startMessageId: messageId });
   };
 
   openThreadInPortal = (threadId: string, sourceMessageId?: string | null): void => {
-    this.#set(
-      { portalThreadId: threadId, threadStartMessageId: sourceMessageId, startToForkThread: false },
-      false,
-      'openThreadInPortal',
-    );
+    this.#set({ threadStartMessageId: sourceMessageId, startToForkThread: false }, false, 'openThreadInPortal');
     // Push Thread view to portal stack with threadId
     this.#get().pushPortalView({
       type: PortalViewType.Thread,
@@ -91,11 +83,7 @@ export class ChatThreadActionImpl {
   };
 
   closeThreadPortal = (): void => {
-    this.#set(
-      { threadStartMessageId: undefined, portalThreadId: undefined, startToForkThread: undefined },
-      false,
-      'closeThreadPortal',
-    );
+    this.#set({ threadStartMessageId: undefined, startToForkThread: undefined }, false, 'closeThreadPortal');
     this.#get().clearPortalStack();
   };
 

@@ -73,7 +73,6 @@ describe('createCommonSlice', () => {
     it('should fetch user state correctly when user is login', async () => {
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: {
           telemetry: true,
         },
@@ -109,7 +108,6 @@ describe('createCommonSlice', () => {
     it('should call switch language when language is auto', async () => {
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: {
           telemetry: true,
         },
@@ -129,7 +127,6 @@ describe('createCommonSlice', () => {
     it('should fetch use server config correctly', async () => {
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: {
           telemetry: true,
         },
@@ -153,7 +150,6 @@ describe('createCommonSlice', () => {
 
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: savedPreference,
         settings: {
           general: { fontSize: 14 },
@@ -177,7 +173,6 @@ describe('createCommonSlice', () => {
       const { result } = renderHook(() => useUserStore());
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: undefined as any,
         settings: null as any,
         avatar: 'abc',
@@ -206,7 +201,6 @@ describe('createCommonSlice', () => {
 
       const mockUserState: UserInitializationState = {
         userId: 'user-id',
-        isOnboard: true,
         preference: {} as any,
         settings: {
           general: { fontSize: 12 },

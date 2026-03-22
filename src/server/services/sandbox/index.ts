@@ -4,11 +4,14 @@ import {
   type SandboxExportFileResult,
 } from '@lobechat/builtin-tool-cloud-sandbox';
 import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
+import type { LobeChatDatabase } from '@lobechat/database';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
 
+import { SpaceModel } from '@/database/models/space';
 import { FileS3 } from '@/server/modules/S3';
 import { type FileService } from '@/server/services/file';
+import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
 import { type MarketService } from '@/server/services/market';
 
 const log = debug('lobe-server:sandbox-service');
@@ -16,8 +19,12 @@ const log = debug('lobe-server:sandbox-service');
 export interface ServerSandboxServiceOptions {
   fileService: FileService;
   marketService: MarketService;
+  /** Used to resolve topic → knowledge-base space for `space_blobs` on export. */
+  serverDB: LobeChatDatabase;
   topicId: string;
   userId: string;
+  /** When set, overrides KB-derived space (must be accessible by user). */
+  spaceId?: string;
 }
 
 /**
@@ -34,12 +41,16 @@ export interface ServerSandboxServiceOptions {
 export class ServerSandboxService implements ISandboxService {
   private fileService: FileService;
   private marketService: MarketService;
+  private serverDB: LobeChatDatabase;
+  private spaceId?: string;
   private topicId: string;
   private userId: string;
 
   constructor(options: ServerSandboxServiceOptions) {
     this.fileService = options.fileService;
     this.marketService = options.marketService;
+    this.serverDB = options.serverDB;
+    this.spaceId = options.spaceId;
     this.topicId = options.topicId;
     this.userId = options.userId;
   }
@@ -155,11 +166,27 @@ export class ServerSandboxService implements ISandboxService {
       // Generate a simple hash from the key (since we don't have the actual file content)
       const fileHash = sha256(key + Date.now().toString());
 
+      let exportSpaceId: string | undefined;
+      if (this.spaceId) {
+        const space = await new SpaceModel(this.serverDB, this.userId).findAccessibleSpaceById(
+          this.spaceId,
+        );
+        exportSpaceId = space?.id;
+      }
+      if (exportSpaceId === undefined) {
+        exportSpaceId = await resolveSpaceIdForSandboxExport(
+          this.serverDB,
+          this.userId,
+          this.topicId,
+        );
+      }
+
       const { fileId, url } = await this.fileService.createFileRecord({
         fileHash,
         fileType: mimeType,
         name: filename,
         size: fileSize,
+        ...(exportSpaceId !== undefined ? { spaceId: exportSpaceId } : {}),
         url: key, // Store S3 key
       });
 

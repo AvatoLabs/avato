@@ -68,18 +68,6 @@ export enum SettingsTabs {
   Usage = 'usage',
 }
 
-/**
- * @deprecated Use SettingsTabs instead
- */
-export enum ProfileTabs {
-  APIKey = 'apikey',
-  Memory = 'memory',
-  Profile = 'profile',
-  Security = 'security',
-  Stats = 'stats',
-  Usage = 'usage',
-}
-
 export interface SystemStatus {
   /**
    * Agent Builder panel width

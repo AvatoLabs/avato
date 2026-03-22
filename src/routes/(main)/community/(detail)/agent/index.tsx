@@ -6,8 +6,6 @@ import { useParams } from 'react-router-dom';
 
 import { useQuery } from '@/hooks/useQuery';
 import { useDiscoverStore } from '@/store/discover';
-import { type AssistantMarketSource } from '@/types/discover';
-
 import NotFound from '../components/NotFound';
 import { TocProvider } from '../features/Toc/useToc';
 import { DetailProvider } from './features/DetailProvider';
@@ -23,10 +21,10 @@ interface AssistantDetailPageProps {
 const AssistantDetailPage = memo<AssistantDetailPageProps>(({ mobile }) => {
   const params = useParams<{ slug: string }>();
   const identifier = decodeURIComponent(params.slug ?? '');
-  const { version, source } = useQuery() as { source?: AssistantMarketSource; version?: string };
+  const { version } = useQuery() as { version?: string };
 
   const useAssistantDetail = useDiscoverStore((s) => s.useAssistantDetail);
-  const { data, isLoading } = useAssistantDetail({ identifier, source, version });
+  const { data, isLoading } = useAssistantDetail({ identifier, version });
 
   if (isLoading) return <Loading />;
   if (!data) return <NotFound />;

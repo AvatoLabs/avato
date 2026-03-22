@@ -54,9 +54,9 @@ LobeHub supports multimodal AI sessions, including the ability to upload unstruc
 ### `S3_SET_ACL`
 
 - Type: Optional
-- Description: Whether to set ACL to `public-read` when uploading files
-- Default: `1`
-- Example: `0`
+- Description: Legacy opt-in; app uploads do not set object ACL. Set to `1` only for external tooling that reads this flag.
+- Default: off (unset)
+- Example: `1`
 
 ### `S3_ENABLE_PATH_STYLE`
 

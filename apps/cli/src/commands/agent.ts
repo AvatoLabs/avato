@@ -213,6 +213,7 @@ export function registerAgentCommand(program: Command) {
     .option('-s, --slug <slug>', 'Agent slug')
     .option('-p, --prompt <text>', 'User prompt')
     .option('-t, --topic-id <id>', 'Reuse an existing topic')
+    .option('--space-id <id>', 'Resource Space ID for tool/export scoping (or set LOBE_CLI_SPACE_ID)')
     .option('--no-auto-start', 'Do not auto-start the agent')
     .option('--json', 'Output full JSON event stream')
     .option('-v, --verbose', 'Show detailed tool call info')
@@ -255,7 +256,14 @@ export function registerAgentCommand(program: Command) {
         const input: Record<string, any> = { prompt: options.prompt };
         if (options.agentId) input.agentId = options.agentId;
         if (options.slug) input.slug = options.slug;
-        if (options.topicId) input.appContext = { topicId: options.topicId };
+        const spaceFromEnv = process.env.LOBE_CLI_SPACE_ID;
+        const resolvedSpaceId = options.spaceId || spaceFromEnv;
+        if (options.topicId || resolvedSpaceId) {
+          input.appContext = {
+            ...(options.topicId ? { topicId: options.topicId } : {}),
+            ...(resolvedSpaceId ? { spaceId: resolvedSpaceId } : {}),
+          };
+        }
         if (options.autoStart === false) input.autoStart = false;
 
         const result = await client.aiAgent.execAgent.mutate(input as any);

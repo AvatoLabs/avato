@@ -133,6 +133,7 @@ export interface OperationCreationParams {
   appContext: {
     agentId?: string;
     groupId?: string | null;
+    spaceId?: string | null;
     threadId?: string | null;
     topicId?: string | null;
   };

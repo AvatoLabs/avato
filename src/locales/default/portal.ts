@@ -17,6 +17,8 @@ export default {
   'files': 'Files',
   'messageDetail': 'Message Details',
   'notebook.confirmDelete': 'Delete this Page?',
+  'notebook.deletedRestoreHint':
+    'Removed from this topic. You can restore the page from Resources → recycle bin if needed.',
   'notebook.delete': 'Delete',
   'notebook.empty': 'No pages yet. Pages linked to this Topic will show up here.',
   'notebook.title': 'Notebook',

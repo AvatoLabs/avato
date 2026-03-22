@@ -39,25 +39,8 @@ export type PortalViewData =
 // ============== Portal State ==============
 
 export interface ChatPortalState {
-  // Legacy fields (kept for backward compatibility during migration)
-  // TODO: Remove after Phase 3 migration complete
-  /** @deprecated Use portalStack instead */
-  portalArtifact?: PortalArtifact;
   portalArtifactDisplayMode: ArtifactDisplayMode;
-  /** @deprecated Use portalStack instead */
-  portalDocumentId?: string;
-
-  /** @deprecated Use portalStack instead */
-  portalFile?: PortalFile;
-  /** @deprecated Use portalStack instead */
-  portalMessageDetail?: string;
   portalStack: PortalViewData[];
-  /** @deprecated Use portalStack instead */
-  portalThreadId?: string;
-  /** @deprecated Use portalStack instead */
-  portalToolMessage?: { id: string; identifier: string };
-  /** @deprecated Use portalStack instead */
-  showNotebook?: boolean;
   showPortal: boolean;
 }
 

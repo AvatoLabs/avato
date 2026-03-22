@@ -240,11 +240,6 @@ const UserFavoriteAgents = memo<UserFavoriteAgentsProps>(({ rows = 4 }) => {
 
   const { data, mutate } = useFavoriteAgents(user.id);
 
-  // Set access token for social service
-  if (session?.accessToken) {
-    socialService.setAccessToken(session.accessToken);
-  }
-
   const handleUnfavorite = useCallback(
     async (identifier: string) => {
       try {

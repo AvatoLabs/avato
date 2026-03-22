@@ -105,6 +105,8 @@ export interface LobeAgentConfig {
 +-------------------+--------------------------------------+------------------------------------------------------+
 ```
 
+**Discover 插件（技能）与 Market**：社区 Discover 的插件列表与 MCP 市场**同源**，由 `DiscoverService` 通过 Market SDK 提供；插件 Gateway 使用的 **`PLUGINS_INDEX_URL` 索引与此不是同一数据源**。说明见仓库内 `docs/development/discover-plugin-market.zh-CN.md`。
+
 **Client Service** 是前端代码，封装可复用的业务逻辑，通过 tRPC 客户端调用后端。例如 `src/services/session/index.ts`：
 
 ```typescript

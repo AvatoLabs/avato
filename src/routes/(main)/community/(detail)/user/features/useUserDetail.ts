@@ -42,7 +42,6 @@ export const useUserDetail = ({ onMutate }: UseUserDetailOptions = {}) => {
       ) {
         try {
           message.loading({ content: loadingText, key: messageKey });
-          marketApiService.setAccessToken(session!.accessToken);
 
           if (type === 'group') {
             switch (action) {

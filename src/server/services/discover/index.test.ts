@@ -1,15 +1,11 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AssistantStore } from '@/server/modules/AssistantStore';
-import { PluginStore } from '@/server/modules/PluginStore';
-import { ModelSorts, PluginSorts, ProviderSorts } from '@/types/discover';
+import { McpSorts, ModelSorts, PluginSorts, ProviderSorts } from '@/types/discover';
 
 import { DiscoverService } from './index';
 
 // Mock external dependencies
-vi.mock('@/server/modules/AssistantStore');
-vi.mock('@/server/modules/PluginStore');
 vi.mock('@lobehub/market-sdk');
 vi.mock('@/utils/toolManifest');
 vi.mock('@/locales/resources', () => ({
@@ -88,45 +84,6 @@ vi.mock('@/const/discover', () => ({
 }));
 
 // Mock data - moved after mocks to avoid hoisting issues
-const mockAssistantList = [
-  {
-    identifier: 'assistant-1',
-    title: 'Test Assistant 1',
-    description: 'A test assistant',
-    author: 'Test Author',
-    category: 'productivity',
-    createdAt: '2024-01-01T00:00:00Z',
-    knowledgeCount: 5,
-    pluginCount: 2,
-    tokenUsage: 1000,
-    tags: ['test', 'assistant'],
-  },
-  {
-    identifier: 'assistant-2',
-    title: 'Test Assistant 2',
-    description: 'Another test assistant',
-    author: 'Test Author 2',
-    category: 'productivity', // Changed to same category for related items test
-    createdAt: '2024-01-02T00:00:00Z',
-    knowledgeCount: 3,
-    pluginCount: 1,
-    tokenUsage: 500,
-    tags: ['test', 'creative'],
-  },
-  {
-    identifier: 'assistant-3',
-    title: 'Test Assistant 3',
-    description: 'A creative assistant',
-    author: 'Test Author 3',
-    category: 'creativity', // Keep this for category filtering tests
-    createdAt: '2024-01-03T00:00:00Z',
-    knowledgeCount: 2,
-    pluginCount: 0,
-    tokenUsage: 300,
-    tags: ['test', 'creative'],
-  },
-];
-
 const mockMarketAssistantList = [
   {
     identifier: 'market-assistant-1',
@@ -214,30 +171,10 @@ const mockPluginList = [
 
 describe('DiscoverService', () => {
   let service: DiscoverService;
-  let mockAssistantStore: any;
-  let mockPluginStore: any;
   let mockMarket: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Setup AssistantStore mock
-    mockAssistantStore = {
-      getAgentIndex: vi
-        .fn()
-        .mockResolvedValue(mockAssistantList.map((item) => ({ ...item, meta: {} }))),
-      getAgent: vi.fn().mockImplementation((identifier) => {
-        const agent = mockAssistantList.find((a) => a.identifier === identifier);
-        return Promise.resolve(agent ? { ...agent, meta: {} } : null);
-      }),
-    };
-
-    // Setup PluginStore mock
-    mockPluginStore = {
-      getPluginList: vi
-        .fn()
-        .mockResolvedValue(mockPluginList.map((item) => ({ ...item, meta: {} }))),
-    };
 
     // Setup MarketSDK mock
     mockMarket = {
@@ -268,12 +205,23 @@ describe('DiscoverService', () => {
           const plugin = mockPluginList.find((p) => p.identifier === params.identifier);
           return Promise.resolve(plugin || null);
         }),
-        getPluginList: vi.fn().mockResolvedValue({
-          items: mockPluginList,
-          totalCount: mockPluginList.length,
-          currentPage: 1,
-          pageSize: 20,
-          totalPages: 1,
+        getPluginList: vi.fn().mockImplementation((params: any) => {
+          let items = [...mockPluginList];
+          if (params?.category) {
+            items = items.filter((p) => p.category === params.category);
+          }
+          const pageSize = params?.pageSize ?? 20;
+          const page = params?.page ?? 1;
+          const totalCount = items.length;
+          const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+          const slice = items.slice((page - 1) * pageSize, page * pageSize);
+          return Promise.resolve({
+            currentPage: page,
+            items: slice,
+            pageSize,
+            totalCount,
+            totalPages,
+          });
         }),
         getPublishedIdentifiers: vi
           .fn()
@@ -284,14 +232,11 @@ describe('DiscoverService', () => {
       },
     };
 
-    (AssistantStore as any).mockImplementation(() => mockAssistantStore);
-    (PluginStore as any).mockImplementation(() => mockPluginStore);
-
     service = new DiscoverService();
     service.market = mockMarket;
   });
 
-  describe('Assistant Market (new source)', () => {
+  describe('Assistant Market', () => {
     it('getAssistantList should transform market SDK response', async () => {
       const result = await service.getAssistantList();
 
@@ -349,131 +294,6 @@ describe('DiscoverService', () => {
     });
   });
 
-  describe('Assistant Market (legacy source)', () => {
-    describe('getAssistantList', () => {
-      it('should return formatted assistant list with default parameters', async () => {
-        const result = await service.getAssistantList({ source: 'legacy' });
-
-        expect(result).toEqual({
-          currentPage: 1,
-          pageSize: 20,
-          totalCount: 3,
-          totalPages: 1,
-          items: expect.arrayContaining([
-            expect.objectContaining({
-              identifier: 'assistant-1',
-              title: 'Test Assistant 1',
-            }),
-            expect.objectContaining({
-              identifier: 'assistant-2',
-              title: 'Test Assistant 2',
-            }),
-            expect.objectContaining({
-              identifier: 'assistant-3',
-              title: 'Test Assistant 3',
-            }),
-          ]),
-        });
-      });
-
-      it('should filter by category', async () => {
-        const result = await service.getAssistantList({
-          category: 'productivity',
-          source: 'legacy',
-        });
-
-        expect(result.items).toHaveLength(2);
-        expect(result.items.map((item) => item.identifier)).toContain('assistant-1');
-        expect(result.items.map((item) => item.identifier)).toContain('assistant-2');
-      });
-
-      it('should filter by search query', async () => {
-        const result = await service.getAssistantList({ q: 'creative', source: 'legacy' });
-
-        expect(result.items).toHaveLength(2);
-        expect(result.items.map((item) => item.identifier)).toContain('assistant-2');
-        expect(result.items.map((item) => item.identifier)).toContain('assistant-3');
-      });
-
-      it('should paginate results', async () => {
-        const result = await service.getAssistantList({ page: 1, pageSize: 1, source: 'legacy' });
-
-        expect(result.items).toHaveLength(1);
-        expect(result.currentPage).toBe(1);
-        expect(result.pageSize).toBe(1);
-        expect(result.totalPages).toBe(3);
-      });
-    });
-
-    describe('getAssistantDetail', () => {
-      it('should return assistant detail with related items', async () => {
-        const result = await service.getAssistantDetail({
-          identifier: 'assistant-1',
-          source: 'legacy',
-        });
-
-        expect(result).toEqual(
-          expect.objectContaining({
-            identifier: 'assistant-1',
-            title: 'Test Assistant 1',
-            related: expect.any(Array),
-          }),
-        );
-        expect(result?.related).toHaveLength(1);
-        expect(result?.related[0].identifier).toBe('assistant-2');
-      });
-
-      it('should return undefined for non-existent assistant', async () => {
-        mockAssistantStore.getAgent.mockResolvedValue(null);
-
-        const result = await service.getAssistantDetail({
-          identifier: 'non-existent',
-          source: 'legacy',
-        });
-
-        expect(result).toBeUndefined();
-      });
-    });
-
-    describe('getAssistantCategories', () => {
-      it('should return category counts', async () => {
-        const result = await service.getAssistantCategories({ source: 'legacy' });
-
-        expect(result).toEqual([
-          { category: 'productivity', count: 2 },
-          { category: 'creativity', count: 1 },
-        ]);
-      });
-
-      it('should filter categories by search query', async () => {
-        const result = await service.getAssistantCategories({ q: 'creative', source: 'legacy' });
-
-        expect(result).toEqual([
-          {
-            category: 'productivity',
-            count: 1,
-          },
-          {
-            category: 'creativity',
-            count: 1,
-          },
-        ]);
-      });
-    });
-
-    describe('getAssistantIdentifiers', () => {
-      it('should return list of identifiers with lastModified dates', async () => {
-        const result = await service.getAssistantIdentifiers({ source: 'legacy' });
-
-        expect(result).toEqual([
-          { identifier: 'assistant-1', lastModified: '2024-01-01T00:00:00Z' },
-          { identifier: 'assistant-2', lastModified: '2024-01-02T00:00:00Z' },
-          { identifier: 'assistant-3', lastModified: '2024-01-03T00:00:00Z' },
-        ]);
-      });
-    });
-  });
-
   describe('Plugin Market', () => {
     describe('getPluginList', () => {
       it('should return formatted plugin list with default parameters', async () => {
@@ -504,15 +324,49 @@ describe('DiscoverService', () => {
         expect(result.items[0].identifier).toBe('plugin-1');
       });
 
-      it('should sort by identifier', async () => {
-        const result = await service.getPluginList({
+      it('should map identifier sort to MCP recommended and proxy to market SDK', async () => {
+        await service.getPluginList({
           sort: PluginSorts.Identifier,
           order: 'asc',
         });
 
-        // Note: The service has reversed logic for identifier sorting
-        expect(result.items[0].identifier).toBe('plugin-2');
-        expect(result.items[1].identifier).toBe('plugin-1');
+        expect(mockMarket.plugins.getPluginList).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sort: McpSorts.Recommended,
+            order: 'asc',
+          }),
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe('getPluginCategories', () => {
+      it('should proxy to MCP market getCategories', async () => {
+        const result = await service.getPluginCategories({ locale: 'en-US', q: 'tool' });
+
+        expect(mockMarket.plugins.getCategories).toHaveBeenCalledWith(
+          expect.objectContaining({
+            locale: 'en',
+            q: 'tool',
+          }),
+          expect.any(Object),
+        );
+        expect(result).toEqual([
+          { category: 'tools', count: 5 },
+          { category: 'utilities', count: 3 },
+        ]);
+      });
+    });
+
+    describe('getPluginIdentifiers', () => {
+      it('should read identifiers from market SDK getPublishedIdentifiers', async () => {
+        const result = await service.getPluginIdentifiers();
+
+        expect(mockMarket.plugins.getPublishedIdentifiers).toHaveBeenCalled();
+        expect(result).toEqual([
+          { identifier: 'plugin-1', lastModified: '2024-01-01T00:00:00Z' },
+          { identifier: 'plugin-2', lastModified: '2024-01-02T00:00:00Z' },
+        ]);
       });
     });
 

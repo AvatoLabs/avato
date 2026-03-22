@@ -52,6 +52,8 @@ export interface RuntimeExecutorContext {
   stream?: boolean;
   streamManager: IStreamEventManager;
   toolExecutionService: ToolExecutionService;
+  /** From execAgent `appContext.spaceId` — preferred Space for builtin tools (e.g. sandbox export). */
+  spaceId?: string;
   topicId?: string;
   userId?: string;
   userTimezone?: string;
@@ -625,6 +627,7 @@ export const createRuntimeExecutors = (
         activeDeviceId: state.metadata?.activeDeviceId,
         memoryToolPermission: agentConfig?.chatConfig?.memory?.toolPermission,
         serverDB: ctx.serverDB,
+        spaceId: ctx.spaceId,
         toolManifestMap: effectiveManifestMap,
         toolResultMaxLength,
         topicId: ctx.topicId,
@@ -843,6 +846,7 @@ export const createRuntimeExecutors = (
             activeDeviceId: state.metadata?.activeDeviceId,
             memoryToolPermission: batchAgentConfig?.chatConfig?.memory?.toolPermission,
             serverDB: ctx.serverDB,
+            spaceId: ctx.spaceId,
             toolManifestMap: batchManifestMap,
             toolResultMaxLength: batchAgentConfig?.chatConfig?.toolResultMaxLength,
             topicId: ctx.topicId,

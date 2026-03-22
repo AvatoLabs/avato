@@ -106,6 +106,8 @@ The project is divided into multiple frontend and backend layers by responsibili
 +-------------------+--------------------------------------+------------------------------------------------------+
 ```
 
+**Discover plugins (skills) and Market**: Community Discover plugin listings share the same backend as the MCP marketplace and are served via `DiscoverService` and the Market SDK. The plugin gateway’s **`PLUGINS_INDEX_URL` index is a different data source**. See `docs/development/discover-plugin-market.md` in the repo.
+
 **Client Service** is frontend code that encapsulates reusable business logic, calling the backend via tRPC client. For example, `src/services/session/index.ts`:
 
 ```typescript

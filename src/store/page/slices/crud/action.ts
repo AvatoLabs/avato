@@ -227,7 +227,6 @@ export class CrudActionImpl {
     }
 
     try {
-      // Delete from documents table
       await documentService.deleteDocument(pageId);
     } catch (error) {
       console.error('Failed to delete page:', error);

@@ -1,3 +1,5 @@
+import { sha256 } from 'js-sha256';
+
 import {
   type CreateNewEvalDatasets,
   type CreateNewEvalEvaluation,
@@ -41,7 +43,12 @@ class RAGEvalService {
   };
 
   importDatasetRecords = async (datasetId: string, file: File): Promise<void> => {
-    const { path } = await uploadService.uploadToServerS3(file, { directory: 'ragEval' });
+    const buf = await file.arrayBuffer();
+    const digest = sha256(buf);
+    const { path } = await uploadService.uploadToServerS3(
+      new File([buf], file.name, { type: file.type }),
+      { directory: 'ragEval', sha256: digest },
+    );
 
     await lambdaClient.ragEval.importDatasetRecords.mutate({ datasetId, pathname: path });
   };

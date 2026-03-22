@@ -1,6 +1,6 @@
 import { getAgentPersistConfig } from '@lobechat/builtin-agents';
 import { INBOX_SESSION_ID } from '@lobechat/const';
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { PartialDeep } from 'type-fest';
 
 import { merge } from '@/utils/merge';
@@ -139,7 +139,11 @@ export class AgentModel {
 
     if (enabledFileIds.length > 0) {
       const documentsData = await this.db.query.documents.findMany({
-        where: and(eq(documents.userId, this.userId), inArray(documents.fileId, enabledFileIds)),
+        where: and(
+          eq(documents.userId, this.userId),
+          inArray(documents.fileId, enabledFileIds),
+          isNull(documents.deletedAt),
+        ),
       });
 
       const documentMap = new Map(documentsData.map((doc) => [doc.fileId, doc.content]));

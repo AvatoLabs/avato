@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { lambdaClient } from '@/libs/trpc/client';
+import { globalHelpers } from '@/store/global/helpers';
+
 import { toolService } from '../tool';
 import OpenAIPlugin from './openai/plugin.json';
 
@@ -12,11 +15,9 @@ vi.mock('@/store/global/helpers', () => ({
 }));
 
 vi.mock('@/libs/trpc/client', () => ({
-  edgeClient: {
+  lambdaClient: {
     market: {
-      getLegacyPluginList: {
-        query: vi.fn(),
-      },
+      getPluginList: { query: vi.fn() },
     },
   },
 }));
@@ -26,6 +27,35 @@ beforeEach(() => {
 });
 
 describe('ToolService', () => {
+  describe('getDiscoverPluginList', () => {
+    it('should query market getPluginList with locale and numeric pagination', async () => {
+      vi.mocked(globalHelpers.getCurrentLanguage).mockReturnValue('en-US');
+      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue({ items: [] });
+
+      await toolService.getDiscoverPluginList({ category: 'tools', page: 2, pageSize: 10 });
+
+      expect(lambdaClient.market.getPluginList.query).toHaveBeenCalledWith({
+        category: 'tools',
+        locale: 'en-US',
+        page: 2,
+        pageSize: 10,
+      });
+    });
+
+    it('should default page and pageSize', async () => {
+      vi.mocked(globalHelpers.getCurrentLanguage).mockReturnValue('zh-CN');
+      vi.mocked(lambdaClient.market.getPluginList.query).mockResolvedValue({ items: [] });
+
+      await toolService.getDiscoverPluginList({});
+
+      expect(lambdaClient.market.getPluginList.query).toHaveBeenCalledWith({
+        locale: 'zh-CN',
+        page: 1,
+        pageSize: 20,
+      });
+    });
+  });
+
   describe('getToolManifest', () => {
     it('should return manifest', async () => {
       const manifestUrl = 'http://fake-url.com/manifest.json';

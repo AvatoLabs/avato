@@ -4,16 +4,29 @@
  * Accessible from:
  *   1. ProfileScreen (standalone — uses a personal notes topic)
  *   2. ChatDetailScreen (per-topic — uses the chat's active topic)
+ *
+ * List: tap opens editor; long-press opens a sheet (Open / Delete). Delete still uses Alert + recycle-bin copy.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ArrowLeft, Edit3, Eye, FileText, NotebookPen, Plus } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Edit3,
+  Eye,
+  FileText,
+  MoreHorizontal,
+  NotebookPen,
+  Plus,
+  Trash2,
+} from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -129,10 +142,12 @@ function getMdStyles(colors: {
 function DocEditor({
   doc,
   onBack,
+  onDeleted,
   onSaved,
 }: {
   doc: NotebookDocument;
   onBack: () => void;
+  onDeleted: () => void;
   onSaved: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -144,6 +159,7 @@ function DocEditor({
   const [content, setContent] = useState(doc.content || '');
   const [previewing, setPreviewing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editorMenuVisible, setEditorMenuVisible] = useState(false);
 
   const savedTitleRef = useRef(doc.title || '');
   const savedContentRef = useRef(doc.content || '');
@@ -189,6 +205,27 @@ function DocEditor({
     }
   }, [doc.id, title, content, t, toast, onSaved]);
 
+  const handleDelete = useCallback(() => {
+    haptics.warning();
+    Alert.alert(t.notebookDeleteConfirm, t.notebookDeleteDesc, [
+      { text: t.cancel, style: 'cancel' },
+      {
+        text: t.delete,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await notebookApi.remove(doc.id);
+            haptics.success();
+            toast.show('info', t.notebookDeletedToTrash);
+            onDeleted();
+          } catch {
+            toast.show('error', t.notebookDeleteFailed);
+          }
+        },
+      },
+    ]);
+  }, [doc.id, onDeleted, t, toast]);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -209,6 +246,17 @@ function DocEditor({
         </TouchableOpacity>
 
         <View className="flex-row items-center gap-3">
+          <TouchableOpacity
+            accessibilityLabel={t.notebookEditorMore}
+            className="h-9 w-9 items-center justify-center rounded-full active:bg-foreground/5"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => {
+              haptics.light();
+              setEditorMenuVisible(true);
+            }}
+          >
+            <MoreHorizontal color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          </TouchableOpacity>
           {/* Preview / Edit toggle */}
           <TouchableOpacity
             className="flex-row items-center rounded-full px-3 py-1.5"
@@ -303,6 +351,49 @@ function DocEditor({
           )}
         </View>
       </ScrollView>
+
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={editorMenuVisible}
+        onRequestClose={() => setEditorMenuVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setEditorMenuVisible(false)}
+        >
+          <Pressable
+            className="overflow-hidden rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16 }}
+            onPress={(e: { stopPropagation?: () => void }) => e.stopPropagation?.()}
+          >
+            <View className="items-center pb-2 pt-3">
+              <View className="h-1 w-9 rounded-full bg-foreground/10" />
+            </View>
+            <Pressable
+              className="active:bg-foreground/5 flex-row items-center px-5 py-3.5"
+              onPress={() => {
+                setEditorMenuVisible(false);
+                requestAnimationFrame(() => handleDelete());
+              }}
+            >
+              <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-base text-red-500">{t.notebookDeleteConfirm}</Text>
+            </Pressable>
+            <View className="mt-1 px-5">
+              <Pressable
+                className="items-center rounded-xl bg-foreground/[0.04] py-3.5"
+                onPress={() => setEditorMenuVisible(false)}
+              >
+                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                  {t.cancel}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -322,6 +413,7 @@ export default function NotebookScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editingDoc, setEditingDoc] = useState<NotebookDocument | null>(null);
+  const [listMenuDoc, setListMenuDoc] = useState<NotebookDocument | null>(null);
 
   const isStandalone = !sessionId;
 
@@ -455,14 +547,15 @@ export default function NotebookScreen({ route, navigation }: any) {
               await notebookApi.remove(doc.id);
               haptics.success();
               setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+              toast.show('info', t.notebookDeletedToTrash);
             } catch {
-              /* ignore */
+              toast.show('error', t.notebookDeleteFailed);
             }
           },
         },
       ]);
     },
-    [t],
+    [t, toast],
   );
 
   const handleOpenDoc = useCallback((doc: NotebookDocument) => {
@@ -476,6 +569,10 @@ export default function NotebookScreen({ route, navigation }: any) {
       <DocEditor
         doc={editingDoc}
         onBack={() => setEditingDoc(null)}
+        onDeleted={() => {
+          setEditingDoc(null);
+          void fetchDocuments();
+        }}
         onSaved={() => fetchDocuments()}
       />
     );
@@ -579,7 +676,7 @@ export default function NotebookScreen({ route, navigation }: any) {
               onPress={() => handleOpenDoc(doc)}
               onLongPress={() => {
                 haptics.medium();
-                handleDelete(doc);
+                setListMenuDoc(doc);
               }}
             >
               <View
@@ -615,6 +712,72 @@ export default function NotebookScreen({ route, navigation }: any) {
           )}
         />
       )}
+
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={listMenuDoc !== null}
+        onRequestClose={() => setListMenuDoc(null)}
+      >
+        <Pressable className="flex-1 justify-end bg-black/40" onPress={() => setListMenuDoc(null)}>
+          <Pressable
+            className="overflow-hidden rounded-t-2xl bg-card"
+            style={{ paddingBottom: insets.bottom + 16 }}
+            onPress={(e: { stopPropagation?: () => void }) => e.stopPropagation?.()}
+          >
+            <View className="items-center pb-2 pt-3">
+              <View className="h-1 w-9 rounded-full bg-foreground/10" />
+            </View>
+            {listMenuDoc ? (
+              <>
+                <Text
+                  className="px-5 pb-2 text-[13px]"
+                  numberOfLines={1}
+                  style={{ color: colors.tertiaryText }}
+                >
+                  {listMenuDoc.title?.trim() || 'Untitled'}
+                </Text>
+                <Pressable
+                  className="active:bg-foreground/5 flex-row items-center px-5 py-3.5"
+                  onPress={() => {
+                    const d = listMenuDoc;
+                    setListMenuDoc(null);
+                    if (d) {
+                      haptics.light();
+                      handleOpenDoc(d);
+                    }
+                  }}
+                >
+                  <FileText color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.notebookListOpenDoc}</Text>
+                </Pressable>
+                <Pressable
+                  className="active:bg-foreground/5 flex-row items-center px-5 py-3.5"
+                  onPress={() => {
+                    const d = listMenuDoc;
+                    setListMenuDoc(null);
+                    if (d) requestAnimationFrame(() => handleDelete(d));
+                  }}
+                >
+                  <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-red-500">{t.notebookDeleteConfirm}</Text>
+                </Pressable>
+              </>
+            ) : null}
+            <View className="mt-1 px-5">
+              <Pressable
+                className="items-center rounded-xl bg-foreground/[0.04] py-3.5"
+                onPress={() => setListMenuDoc(null)}
+              >
+                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                  {t.cancel}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

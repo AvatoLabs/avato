@@ -84,8 +84,6 @@ export interface UserInitializationState {
   hasConversation?: boolean;
   interests?: string[];
   isFreePlan?: boolean;
-  /** @deprecated Use onboarding field instead */
-  isOnboard?: boolean;
   lastName?: string;
   onboarding?: UserOnboarding;
   preference: UserPreference;

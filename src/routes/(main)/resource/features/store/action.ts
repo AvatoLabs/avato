@@ -1,6 +1,7 @@
 import { type StateCreator } from 'zustand/vanilla';
 
 import { type ResourceManagerMode } from '@/features/ResourceManager';
+import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type FilesTabs, type SortType } from '@/types/files';
 
 import { type State, type ViewMode } from './initialState';
@@ -247,6 +248,7 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setSpaceId: (spaceId) => {
+    setActiveWorkspaceSpaceId(spaceId);
     set({ spaceId });
   },
 

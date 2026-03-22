@@ -71,7 +71,14 @@ import PromptModal from '../components/ui/PromptModal';
 import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
 import { useToast } from '../components/ui/Toast';
-import { fileApi, type FolderCrumb, getApiUrl, knowledgeBaseApi, resourceApi } from '../lib/api';
+import {
+  fileApi,
+  type FolderCrumb,
+  getApiUrl,
+  knowledgeBaseApi,
+  resourceApi,
+  type TrashedDocumentItem,
+} from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -2108,6 +2115,52 @@ export default function ResourceScreen() {
     }
   }, [currentFolderId, libraryId, loadTreeChildren]);
 
+  useEffect(() => {
+    if (!trashModalVisible) return;
+    let cancelled = false;
+    void (async () => {
+      setTrashLoading(true);
+      try {
+        const res = await resourceApi.queryTrashedDocuments({
+          current: 0,
+          pageSize: 100,
+          ...(libraryId ? { knowledgeBaseId: libraryId } : {}),
+        });
+        if (!cancelled) setTrashedDocuments(res?.items ?? []);
+      } catch {
+        if (!cancelled) {
+          setTrashedDocuments([]);
+          toast.show('error', t.resourceTrashLoadFailed);
+        }
+      } finally {
+        if (!cancelled) setTrashLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [libraryId, t.resourceTrashLoadFailed, toast, trashModalVisible]);
+
+  const handleRestoreTrashed = useCallback(
+    async (id: string) => {
+      setRestoringTrashId(id);
+      try {
+        await resourceApi.restoreDocument(id);
+        haptics.success();
+        setTrashedDocuments((prev) => prev.filter((row) => row.id !== id));
+        clearResourceListCache();
+        await loadFiles(true);
+        await refreshTreeData();
+        toast.show('success', t.resourceTrashRestored);
+      } catch {
+        toast.show('error', t.resourceTrashRestoreFailed);
+      } finally {
+        setRestoringTrashId(null);
+      }
+    },
+    [loadFiles, refreshTreeData, t.resourceTrashRestored, t.resourceTrashRestoreFailed, toast],
+  );
+
   const handleBatchDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const hasFolders = ids.some((id) => {
@@ -2689,6 +2742,12 @@ export default function ResourceScreen() {
                 ) : (
                   <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 )}
+              </HeaderIconButton>
+              <HeaderIconButton
+                accessibilityLabel={t.resourceTrash}
+                onPress={() => setTrashModalVisible(true)}
+              >
+                <Trash2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
               </HeaderIconButton>
               <HeaderIconButton
                 onPress={() => setViewMode((m) => (m === 'list' ? 'grid' : 'list'))}
@@ -3330,6 +3389,103 @@ export default function ResourceScreen() {
           }));
         }}
       />
+
+      {/* Recycle bin (soft-deleted documents) */}
+      <Modal
+        accessibilityViewIsModal
+        animationType="slide"
+        transparent
+        visible={trashModalVisible}
+        onRequestClose={() => setTrashModalVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setTrashModalVisible(false)}
+        >
+          <Pressable
+            className="rounded-t-2xl bg-card overflow-hidden"
+            style={{ maxHeight: '82%', paddingBottom: insets.bottom + 12 }}
+            onPress={(e: { stopPropagation?: () => void }) => e.stopPropagation?.()}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="h-1 w-9 rounded-full bg-foreground/10" />
+            </View>
+            <View className="flex-row items-center border-b border-foreground/10 px-4 pb-3">
+              <TouchableOpacity
+                accessibilityRole="button"
+                className="h-10 w-10 items-center justify-center rounded-full active:bg-foreground/5"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => setTrashModalVisible(false)}
+              >
+                <X color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+              </TouchableOpacity>
+              <Text
+                className="flex-1 text-center text-[17px] font-bold text-foreground"
+                numberOfLines={1}
+              >
+                {t.resourceTrashTitle}
+              </Text>
+              <View className="h-10 w-10" />
+            </View>
+            {trashLoading ? (
+              <View className="items-center justify-center py-16">
+                <ActivityIndicator color={colors.primary} size="large" />
+              </View>
+            ) : trashedDocuments.length === 0 ? (
+              <View className="items-center px-6 py-16">
+                <Trash2 color={colors.muted} size={40} strokeWidth={1.5} />
+                <Text className="mt-4 text-center text-[16px] font-medium text-foreground">
+                  {t.resourceTrashEmpty}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={trashedDocuments}
+                keyExtractor={(row) => row.id}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item: row }) => {
+                  const isTrashedFolder = row.fileType === 'custom/folder';
+                  const displayName = row.title?.trim() || row.filename?.trim() || 'Untitled';
+                  const busy = restoringTrashId === row.id;
+                  return (
+                    <View className="flex-row items-center border-b border-foreground/5 px-4 py-3.5">
+                      {isTrashedFolder ? (
+                        <Folder color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                      ) : (
+                        <FileText color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                      )}
+                      <Text
+                        className="ml-3 flex-1 text-[15px] text-foreground"
+                        numberOfLines={2}
+                      >
+                        {displayName}
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        className="ml-2 rounded-xl px-3 py-2"
+                        disabled={restoringTrashId !== null}
+                        style={{
+                          backgroundColor: colors.primarySubtle,
+                          opacity: restoringTrashId !== null && !busy ? 0.5 : 1,
+                        }}
+                        onPress={() => void handleRestoreTrashed(row.id)}
+                      >
+                        {busy ? (
+                          <ActivityIndicator color={colors.primary} size="small" />
+                        ) : (
+                          <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+                            {t.resourceTrashRestore}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Item Action Sheet */}
       <Modal

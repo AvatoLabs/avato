@@ -1,3 +1,4 @@
+import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -8,7 +9,7 @@ import { SpaceModel } from '@/database/models/space';
 import { uploadSessions } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { getPrivateBlobS3, PrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
 import { AuthorizedResourceResolver } from '@/server/services/resource';
 import { HOUR } from '@/utils/units';
 
@@ -20,6 +21,15 @@ const UPLOAD_STORAGE_PREFIX = 'uploads/';
 
 /** Max file size: 500MB */
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
+
+function isS3HeadObjectMissingError(error: unknown): boolean {
+  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return (
+    e?.name === 'NotFound' ||
+    e?.name === 'NoSuchKey' ||
+    e?.$metadata?.httpStatusCode === 404
+  );
+}
 
 const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -34,14 +44,12 @@ const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
 });
 
 /**
- * Generate storage key for upload blob
- * Format: uploads/{spaceId}/{sessionId}/{filename}
+ * Generate storage key for upload blob.
+ * Does not embed the user-facing filename (only space + session + opaque id); original name stays in
+ * session metadata and `files.name` after createFile.
  */
-const generateStorageKey = (spaceId: string, sessionId: string, filename: string): string => {
-  // Sanitize filename - remove path separators and dangerous characters
-  const safeFilename = filename.replaceAll(/[/\\:*?"<>|]/g, '_');
-  return `${UPLOAD_STORAGE_PREFIX}${spaceId}/${sessionId}/${safeFilename}`;
-};
+const generateStorageKey = (spaceId: string, sessionId: string): string =>
+  `${UPLOAD_STORAGE_PREFIX}${spaceId}/${sessionId}/${nanoid()}`;
 
 export const uploadRouter = router({
   /**
@@ -125,7 +133,7 @@ export const uploadRouter = router({
       });
 
       // Generate storage key with session ID
-      const storageKey = generateStorageKey(targetSpaceId, session.id, filename);
+      const storageKey = generateStorageKey(targetSpaceId, session.id);
 
       // Update session with storage key
       // Note: In production, you'd want to do this atomically with the insert.
@@ -204,6 +212,19 @@ export const uploadRouter = router({
         actualSize = metadata.contentLength;
         actualEtag = metadata.etag;
       } catch (error) {
+        const meta = (session.metadata as Record<string, unknown> | null) ?? {};
+        if (isS3HeadObjectMissingError(error) && session.expectedSha256 && session.spaceId) {
+          await ctx.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+            createdBy: ctx.userId,
+            extraMetadata: { ...meta, uploadSessionId: session.id },
+            fileType: (meta.fileType as string) || 'application/octet-stream',
+            reason: 'object_not_found',
+            sha256: session.expectedSha256,
+            size: session.expectedSize,
+            spaceId: session.spaceId,
+            storageKey: session.storageKey,
+          });
+        }
         await ctx.resourceModel.expireUploadSession(uploadSessionId);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -213,6 +234,20 @@ export const uploadRouter = router({
 
       // Verify size matches
       if (actualSize !== session.expectedSize) {
+        const meta = (session.metadata as Record<string, unknown> | null) ?? {};
+        if (session.expectedSha256 && session.spaceId) {
+          await ctx.resourceModel.quarantineSpaceBlobAfterFailedVerify({
+            actualSize,
+            createdBy: ctx.userId,
+            extraMetadata: { ...meta, uploadSessionId: session.id },
+            fileType: (meta.fileType as string) || 'application/octet-stream',
+            reason: 'size_mismatch',
+            sha256: session.expectedSha256,
+            size: actualSize,
+            spaceId: session.spaceId,
+            storageKey: session.storageKey,
+          });
+        }
         await ctx.resourceModel.expireUploadSession(uploadSessionId);
         throw new TRPCError({
           code: 'CONFLICT',
@@ -294,26 +329,6 @@ export const uploadRouter = router({
         .where(eq(uploadSessions.id, uploadSessionId));
 
       return { success: true };
-    }),
-
-  /**
-   * Legacy endpoint: create presigned URL for direct S3 upload.
-   * @deprecated Use prepareResourceUpload instead
-   */
-  createS3PreSignedUrl: authedProcedure
-    .input(z.object({ pathname: z.string() }))
-    .mutation(async ({ input }) => {
-      try {
-        const s3 = new PrivateBlobS3();
-        return await s3.createPreSignedUploadUrl(input.pathname);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'File storage is not configured';
-
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message,
-        });
-      }
     }),
 });
 

@@ -239,6 +239,10 @@ type TranslationKeys = {
   notebookDocContentPlaceholder: string;
   notebookDeleteConfirm: string;
   notebookDeleteDesc: string;
+  notebookDeletedToTrash: string;
+  notebookDeleteFailed: string;
+  notebookEditorMore: string;
+  notebookListOpenDoc: string;
   notebookSaved: string;
   notebookUnsavedTitle: string;
   notebookUnsavedDesc: string;
@@ -781,6 +785,13 @@ type TranslationKeys = {
   resourceBatchDelete: string;
   resourceBatchMove: string;
   resourceCancelSelect: string;
+  resourceTrash: string;
+  resourceTrashTitle: string;
+  resourceTrashEmpty: string;
+  resourceTrashRestore: string;
+  resourceTrashRestored: string;
+  resourceTrashLoadFailed: string;
+  resourceTrashRestoreFailed: string;
 
   // Store
   tabStore: string;
@@ -1297,7 +1308,12 @@ const en: TranslationKeys = {
   notebookDocTitlePlaceholder: 'Document title...',
   notebookDocContentPlaceholder: 'Start writing in Markdown...',
   notebookDeleteConfirm: 'Delete Document',
-  notebookDeleteDesc: 'Are you sure you want to delete this document?',
+  notebookDeleteDesc:
+    'This document will be moved to the recycle bin. You can restore it from the Resources screen.',
+  notebookDeletedToTrash: 'Moved to recycle bin. Restore from Resources if needed.',
+  notebookDeleteFailed: 'Could not delete document',
+  notebookEditorMore: 'More options',
+  notebookListOpenDoc: 'Open',
   notebookSaved: 'Document saved',
   notebookUnsavedTitle: 'Unsaved Changes',
   notebookUnsavedDesc: 'You have unsaved changes. Discard them?',
@@ -1772,7 +1788,7 @@ const en: TranslationKeys = {
   resourceUploadFile: 'Choose File',
   resourceDeleting: 'Deleting…',
   resourceDeleteConfirm: 'Delete File',
-  resourceDeleteDesc: 'This file will be permanently deleted.',
+  resourceDeleteDesc: 'The file will be moved to the recycle bin. You can restore it from Resources.',
   resourceUploadFailed: 'Upload failed',
   resourceUploaded: 'Uploaded successfully',
   resourceDownload: 'Download',
@@ -1802,7 +1818,7 @@ const en: TranslationKeys = {
   resourceNewFolder: 'New Folder',
   resourceMoveToFolder: 'Move to Folder',
   resourceFolderDeleteConfirm: 'Delete Folder',
-  resourceFolderDeleteDesc: 'This folder and its contents will be permanently deleted.',
+  resourceFolderDeleteDesc: 'The folder will be moved to the recycle bin. You can restore it from Resources.',
   resourceCreateFolder: 'Create Folder',
   resourceCreateFolderPlaceholder: 'Folder name',
   resourceSortBy: 'Sort by',
@@ -1821,6 +1837,13 @@ const en: TranslationKeys = {
   resourceBatchDelete: 'Delete',
   resourceBatchMove: 'Move',
   resourceCancelSelect: 'Cancel',
+  resourceTrash: 'Recycle bin',
+  resourceTrashTitle: 'Recycle bin',
+  resourceTrashEmpty: 'Nothing in recycle bin',
+  resourceTrashRestore: 'Restore',
+  resourceTrashRestored: 'Restored',
+  resourceTrashLoadFailed: 'Could not load recycle bin',
+  resourceTrashRestoreFailed: 'Restore failed',
 
   tabStore: 'Store',
   storeSearch: 'Search extensions...',
@@ -2329,7 +2352,11 @@ const zh_tw: TranslationKeys = {
   notebookDocTitlePlaceholder: '文檔標題...',
   notebookDocContentPlaceholder: '開始用 Markdown 撰寫...',
   notebookDeleteConfirm: '刪除文檔',
-  notebookDeleteDesc: '確定要刪除此文檔嗎？',
+  notebookDeleteDesc: '此文檔將移至資源回收筒，可於「資源」頁的回收筒還原。',
+  notebookDeletedToTrash: '已移至資源回收筒。如需還原請至「資源」頁。',
+  notebookDeleteFailed: '無法刪除文檔',
+  notebookEditorMore: '更多選項',
+  notebookListOpenDoc: '開啟',
   notebookSaved: '文檔已儲存',
   notebookUnsavedTitle: '未儲存的變更',
   notebookUnsavedDesc: '你有未儲存的變更。確定要捨棄嗎？',
@@ -2803,7 +2830,7 @@ const zh_tw: TranslationKeys = {
   resourceUploadFile: '選擇檔案',
   resourceDeleting: '刪除中…',
   resourceDeleteConfirm: '刪除檔案',
-  resourceDeleteDesc: '該檔案將被永久刪除。',
+  resourceDeleteDesc: '檔案將移至資源回收筒，可於資源頁的回收筒還原。',
   resourceUploadFailed: '上傳失敗',
   resourceUploaded: '上傳成功',
   resourceDownload: '下載',
@@ -2833,7 +2860,7 @@ const zh_tw: TranslationKeys = {
   resourceNewFolder: '新建資料夾',
   resourceMoveToFolder: '移至資料夾',
   resourceFolderDeleteConfirm: '刪除資料夾',
-  resourceFolderDeleteDesc: '該資料夾及其內容將被永久刪除。',
+  resourceFolderDeleteDesc: '資料夾將移至資源回收筒，可於資源頁的回收筒還原。',
   resourceCreateFolder: '建立資料夾',
   resourceCreateFolderPlaceholder: '資料夾名稱',
   resourceSortBy: '排序',
@@ -2852,6 +2879,13 @@ const zh_tw: TranslationKeys = {
   resourceBatchDelete: '刪除',
   resourceBatchMove: '移動',
   resourceCancelSelect: '取消',
+  resourceTrash: '資源回收筒',
+  resourceTrashTitle: '資源回收筒',
+  resourceTrashEmpty: '資源回收筒是空的',
+  resourceTrashRestore: '還原',
+  resourceTrashRestored: '已還原',
+  resourceTrashLoadFailed: '無法載入資源回收筒',
+  resourceTrashRestoreFailed: '還原失敗',
 
   tabStore: '商店',
   storeSearch: '搜尋擴充項目...',
@@ -3359,7 +3393,11 @@ const zh: TranslationKeys = {
   notebookDocTitlePlaceholder: '文档标题...',
   notebookDocContentPlaceholder: '开始用 Markdown 撰写...',
   notebookDeleteConfirm: '删除文档',
-  notebookDeleteDesc: '确定要删除此文档吗？',
+  notebookDeleteDesc: '该文档将移至回收站，可在「资源」页的回收站中恢复。',
+  notebookDeletedToTrash: '已移至回收站。如需恢复请打开「资源」页。',
+  notebookDeleteFailed: '无法删除文档',
+  notebookEditorMore: '更多选项',
+  notebookListOpenDoc: '打开',
   notebookSaved: '文档已保存',
   notebookUnsavedTitle: '未保存的更改',
   notebookUnsavedDesc: '你有未保存的更改。确定要丢弃吗？',
@@ -3833,7 +3871,7 @@ const zh: TranslationKeys = {
   resourceUploadFile: '选择文件',
   resourceDeleting: '删除中…',
   resourceDeleteConfirm: '删除文件',
-  resourceDeleteDesc: '该文件将被永久删除。',
+  resourceDeleteDesc: '文件将移至回收站，可在资源页的回收站中恢复。',
   resourceUploadFailed: '上传失败',
   resourceUploaded: '上传成功',
   resourceDownload: '下载',
@@ -3863,7 +3901,7 @@ const zh: TranslationKeys = {
   resourceNewFolder: '新建文件夹',
   resourceMoveToFolder: '移动到文件夹',
   resourceFolderDeleteConfirm: '删除文件夹',
-  resourceFolderDeleteDesc: '该文件夹及其内容将被永久删除。',
+  resourceFolderDeleteDesc: '文件夹将移至回收站，可在资源页的回收站中恢复。',
   resourceCreateFolder: '创建文件夹',
   resourceCreateFolderPlaceholder: '文件夹名称',
   resourceSortBy: '排序',
@@ -3882,6 +3920,13 @@ const zh: TranslationKeys = {
   resourceBatchDelete: '删除',
   resourceBatchMove: '移动',
   resourceCancelSelect: '取消',
+  resourceTrash: '回收站',
+  resourceTrashTitle: '回收站',
+  resourceTrashEmpty: '回收站为空',
+  resourceTrashRestore: '恢复',
+  resourceTrashRestored: '已恢复',
+  resourceTrashLoadFailed: '无法加载回收站',
+  resourceTrashRestoreFailed: '恢复失败',
 
   tabStore: '商店',
   storeSearch: '搜索扩展...',

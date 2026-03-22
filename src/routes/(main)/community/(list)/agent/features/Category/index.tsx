@@ -16,12 +16,11 @@ import { useCategory } from './useCategory';
 
 const Category = memo(() => {
   const useAssistantCategories = useDiscoverStore((s) => s.useAssistantCategories);
-  const {
-    category = AssistantCategory.Discover,
-    q,
-    source,
-  } = useQuery() as { category?: AssistantCategory; q?: string; source?: string };
-  const { data: items = [] } = useAssistantCategories({ q, source: source as any });
+  const { category = AssistantCategory.Discover, q } = useQuery() as {
+    category?: AssistantCategory;
+    q?: string;
+  };
+  const { data: items = [] } = useAssistantCategories({ q });
   const navigate = useNavigate();
   const cates = useCategory();
 

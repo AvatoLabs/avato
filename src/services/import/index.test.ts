@@ -182,10 +182,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 
@@ -213,12 +213,11 @@ describe('ImportService', () => {
           mockData,
           expect.objectContaining({
             filename: 'mock-uuid-123.json',
-            pathname: 'import_config/mock-uuid-123.json',
           }),
         );
         expect(callbacks.onStageChange).toHaveBeenCalledWith(ImportStage.Importing);
         expect(lambdaClient.importer.importByFile.mutate).toHaveBeenCalledWith({
-          pathname: 'import_config/mock-uuid-123.json',
+          pathname: 'uploads/spc/sess/mock-uuid-123.json',
         });
         expect(callbacks.onStageChange).toHaveBeenCalledWith(ImportStage.Success);
         expect(callbacks.onSuccess).toHaveBeenCalled();
@@ -252,10 +251,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 
@@ -296,10 +295,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 
@@ -370,10 +369,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 
@@ -515,10 +514,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 
@@ -544,7 +543,6 @@ describe('ImportService', () => {
           mockData,
           expect.objectContaining({
             filename: 'mock-uuid-123.json',
-            pathname: 'import_config/mock-uuid-123.json',
           }),
         );
         expect(callbacks.onStageChange).toHaveBeenCalledWith(ImportStage.Importing);
@@ -565,10 +563,10 @@ describe('ImportService', () => {
         const mockUploadResult = {
           success: true as const,
           data: {
-            path: 'import_config/mock-uuid-123.json',
-            filename: 'mock-uuid-123.json',
-            dirname: 'import_config',
             date: '2024-01-01',
+            dirname: 'uploads/spc/sess',
+            filename: 'mock-uuid-123.json',
+            path: 'uploads/spc/sess/mock-uuid-123.json',
           },
         };
 

@@ -783,6 +783,7 @@ export class AiAgentService {
         appContext: {
           agentId: resolvedAgentId,
           groupId: appContext?.groupId,
+          spaceId: appContext?.spaceId ?? undefined,
           threadId: appContext?.threadId,
           topicId,
         },

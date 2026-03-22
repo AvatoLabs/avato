@@ -170,15 +170,6 @@ const PluginItem = memo<PluginItemProps>(({ identifier }) => {
           tagText: t('plugins.builtinTag'),
         };
       }
-      case 'legacy': {
-        return {
-          clickable: true,
-          href: data?.homepage,
-          isExternal: true,
-          tagColor: 'orange' as const,
-          tagText: t('plugins.legacyTag'),
-        };
-      }
       // eslint-disable-next-line unicorn/no-useless-switch-case
       case 'market':
       default: {
@@ -259,7 +250,7 @@ const PluginItem = memo<PluginItemProps>(({ identifier }) => {
     return content;
   }
 
-  // For external links (legacy plugins), use <a> tag
+  // External homepage URLs use a plain anchor (not in-app routing)
   if (sourceConfig.isExternal && sourceConfig.href) {
     return (
       <a href={sourceConfig.href} rel="noopener noreferrer" target="_blank">

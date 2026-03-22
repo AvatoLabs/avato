@@ -10,7 +10,6 @@ describe('chatDockSelectors', () => {
   const createState = (overrides?: Partial<ChatStoreState>) => {
     const state = {
       showPortal: false,
-      portalToolMessage: undefined,
       portalStack: [],
       dbMessagesMap: {},
       activeAgentId: 'test-id',

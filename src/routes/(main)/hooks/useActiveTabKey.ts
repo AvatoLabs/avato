@@ -1,6 +1,5 @@
 import { usePathname, useSearchParams } from '@/libs/router/navigation';
-import { type SidebarTabKey } from '@/store/global/initialState';
-import { ProfileTabs, SettingsTabs } from '@/store/global/initialState';
+import { type SidebarTabKey, SettingsTabs } from '@/store/global/initialState';
 
 /**
  * Returns the active tab key (chat/discover/settings/...)
@@ -30,7 +29,7 @@ export const useActiveProfileKey = () => {
   const pathname = usePathname();
   const tabs = pathname.split('/').findLast(Boolean);
 
-  if (tabs === 'profile') return ProfileTabs.Profile;
+  if (tabs === 'profile') return 'profile';
 
-  return tabs as ProfileTabs;
+  return tabs;
 };

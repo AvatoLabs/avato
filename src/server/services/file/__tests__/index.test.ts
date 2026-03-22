@@ -6,7 +6,8 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { FileService } from '../index';
 
-const { mockRequireFile, mockUpsertSpaceBlob } = vi.hoisted(() => ({
+const { mockGetOrCreatePersonalSpace, mockRequireFile, mockUpsertSpaceBlob } = vi.hoisted(() => ({
+  mockGetOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_personal_default' }),
   mockRequireFile: vi.fn(),
   mockUpsertSpaceBlob: vi.fn().mockResolvedValue(undefined),
 }));
@@ -39,6 +40,12 @@ vi.mock('../impls', () => ({
 }));
 
 vi.mock('@/database/models/file');
+
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: vi.fn(() => ({
+    getOrCreatePersonalSpace: mockGetOrCreatePersonalSpace,
+  })),
+}));
 
 vi.mock('@/database/models/resource', () => ({
   ResourceModel: vi.fn(() => ({
@@ -83,6 +90,7 @@ describe('FileService', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     mockRequireFile.mockReset();
+    mockGetOrCreatePersonalSpace.mockClear();
     mockUpsertSpaceBlob.mockClear();
     service = new FileService(mockDb, mockUserId);
   });
@@ -288,6 +296,19 @@ describe('FileService', () => {
         url: 'files/test.png',
       });
 
+      expect(mockGetOrCreatePersonalSpace).toHaveBeenCalled();
+      expect(mockFileModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'spc_personal_default' }),
+        true,
+      );
+      expect(mockUpsertSpaceBlob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sha256: 'test-hash',
+          spaceId: 'spc_personal_default',
+          status: 'ready',
+          storageKey: 'files/test.png',
+        }),
+      );
       expect(result).toEqual({
         fileId: 'new-file-id',
         url: 'https://lobehub.com/f/new-file-id',
@@ -306,6 +327,10 @@ describe('FileService', () => {
         url: 'files/test.png',
       });
 
+      expect(mockFileModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'spc_personal_default' }),
+        true,
+      );
       expect(result).toEqual({
         fileId: 'custom-id',
         url: 'https://lobehub.com/f/custom-id',
@@ -326,6 +351,7 @@ describe('FileService', () => {
       expect(mockFileModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           fileHash: 'any-hash',
+          spaceId: 'spc_personal_default',
         }),
         true,
       );
@@ -351,6 +377,26 @@ describe('FileService', () => {
           storageKey: 'files/test.txt',
         }),
       );
+    });
+
+    it('should skip personal space and space_blobs when spaceId is null', async () => {
+      mockFileModel.create.mockResolvedValue({ id: 'file-id' });
+
+      await service.createFileRecord({
+        fileHash: 'h2',
+        fileType: 'text/plain',
+        name: 'test.txt',
+        size: 10,
+        spaceId: null,
+        url: 'files/x.txt',
+      });
+
+      expect(mockGetOrCreatePersonalSpace).not.toHaveBeenCalled();
+      expect(mockFileModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: undefined }),
+        true,
+      );
+      expect(mockUpsertSpaceBlob).not.toHaveBeenCalled();
     });
   });
 

@@ -84,6 +84,13 @@ export class ResourceModel {
   };
 
   upsertSpaceBlob = async (params: Omit<NewSpaceBlob, 'id'>) => {
+    const resolvedVerifiedAt =
+      params.status === 'quarantined'
+        ? null
+        : params.verifiedAt !== undefined && params.verifiedAt !== null
+          ? params.verifiedAt
+          : new Date();
+
     const [existing] = await this.db
       .select()
       .from(spaceBlobs)
@@ -101,7 +108,7 @@ export class ResourceModel {
           status: params.status,
           storageKey: params.storageKey,
           updatedAt: new Date(),
-          verifiedAt: params.verifiedAt || new Date(),
+          verifiedAt: resolvedVerifiedAt,
         })
         .where(eq(spaceBlobs.id, existing.id));
 
@@ -113,12 +120,59 @@ export class ResourceModel {
         size: params.size,
         status: params.status,
         storageKey: params.storageKey,
-        verifiedAt: params.verifiedAt || new Date(),
+        verifiedAt: resolvedVerifiedAt,
       };
     }
 
-    const [created] = await this.db.insert(spaceBlobs).values(params).returning();
+    const [created] = await this.db
+      .insert(spaceBlobs)
+      .values({ ...params, verifiedAt: resolvedVerifiedAt })
+      .returning();
     return created;
+  };
+
+  /**
+   * After upload verification fails, persist `space_blobs.status = 'quarantined'` so the same
+   * `(spaceId, sha256)` is not returned by `findSpaceBlobByHash` (ready-only). Never downgrades
+   * an existing `ready` row.
+   */
+  quarantineSpaceBlobAfterFailedVerify = async (params: {
+    actualSize?: number;
+    createdBy: string;
+    extraMetadata?: Record<string, unknown>;
+    fileType: string;
+    reason: 'object_not_found' | 'size_mismatch';
+    sha256: string;
+    size: number;
+    spaceId: string;
+    storageKey: string;
+  }) => {
+    const { sha256, spaceId } = params;
+    if (!sha256 || sha256 === 'unknown' || sha256.length < 32) return;
+
+    const [existing] = await this.db
+      .select()
+      .from(spaceBlobs)
+      .where(and(eq(spaceBlobs.spaceId, spaceId), eq(spaceBlobs.sha256, sha256)))
+      .limit(1);
+
+    if (existing?.status === 'ready') return;
+
+    await this.upsertSpaceBlob({
+      createdBy: params.createdBy,
+      etag: null,
+      fileType: params.fileType,
+      metadata: {
+        ...params.extraMetadata,
+        actualSize: params.actualSize,
+        quarantineReason: params.reason,
+      },
+      sha256,
+      size: params.size,
+      spaceId,
+      status: 'quarantined',
+      storageKey: params.storageKey,
+    });
   };
 
   findSpaceBlobByHash = async (spaceId: string, hash: string) => {
@@ -226,7 +280,7 @@ export class ResourceModel {
           parentId: documents.parentId,
         })
         .from(documents)
-        .where(eq(documents.id, registry.localId))
+        .where(and(eq(documents.id, registry.localId), isNull(documents.deletedAt)))
         .limit(1);
 
       return { ...registry, name: doc?.name || 'Untitled', parentId: doc?.parentId || null };

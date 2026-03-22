@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 
 import type { DocumentItem, NewTopicDocument } from '../schemas';
 import { documents, topicDocuments } from '../schemas';
@@ -64,6 +64,7 @@ export class TopicDocumentModel {
         and(
           eq(topicDocuments.topicId, topicId),
           eq(topicDocuments.userId, this.userId),
+          isNull(documents.deletedAt),
           filter?.type ? eq(documents.fileType, filter.type) : undefined,
         ),
       )

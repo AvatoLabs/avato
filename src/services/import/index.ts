@@ -111,7 +111,6 @@ class ImportService {
         onProgress: (status, state) => {
           callbacks?.onFileUploading?.(state);
         },
-        pathname: `import_config/${filename}`,
       });
       pathname = result.data.path;
     } catch {

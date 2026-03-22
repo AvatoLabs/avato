@@ -31,23 +31,12 @@ export const getProviderAuthPayload = (
     case ModelProvider.Bedrock: {
       const { accessKeyId, region, secretAccessKey, sessionToken } = keyVaults;
 
-      const awsSecretAccessKey = secretAccessKey;
-      const awsAccessKeyId = accessKeyId;
-
-      const apiKey = (awsSecretAccessKey || '') + (awsAccessKeyId || '');
+      const apiKey = (secretAccessKey || '') + (accessKeyId || '');
 
       return {
         accessKeyId,
-        accessKeySecret: awsSecretAccessKey,
+        accessKeySecret: secretAccessKey,
         apiKey,
-        /** @deprecated */
-        awsAccessKeyId,
-        /** @deprecated */
-        awsRegion: region,
-        /** @deprecated */
-        awsSecretAccessKey,
-        /** @deprecated */
-        awsSessionToken: sessionToken,
         region,
         sessionToken,
       };
@@ -56,10 +45,7 @@ export const getProviderAuthPayload = (
     case ModelProvider.Azure: {
       return {
         apiKey: clientApiKeyManager.pick(keyVaults.apiKey),
-
         apiVersion: keyVaults.apiVersion,
-        /** @deprecated */
-        azureApiVersion: keyVaults.apiVersion,
         baseURL: keyVaults.baseURL || keyVaults.endpoint,
       };
     }
@@ -71,10 +57,7 @@ export const getProviderAuthPayload = (
     case ModelProvider.Cloudflare: {
       return {
         apiKey: clientApiKeyManager.pick(keyVaults?.apiKey),
-
         baseURLOrAccountID: keyVaults?.baseURLOrAccountID,
-        /** @deprecated */
-        cloudflareBaseURLOrAccountID: keyVaults?.baseURLOrAccountID,
       };
     }
 
