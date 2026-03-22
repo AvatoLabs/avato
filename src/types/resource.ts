@@ -46,6 +46,8 @@ export interface ResourceItem {
   slug?: string | null;
   // bytes for files, char count for documents
   sourceType: 'file' | 'document';
+  // Space the resource belongs to
+  spaceId?: string;
   title?: string;
 
   updatedAt: Date;
@@ -84,6 +86,7 @@ export interface ResourceQueryParams {
   showFilesInKnowledgeBase?: boolean;
   sorter?: 'name' | 'createdAt' | 'size';
   sortType?: SortType;
+  spaceId?: string;
 }
 
 /**
@@ -97,6 +100,7 @@ export interface CreateFileParams {
   parentId?: string;
   size: number;
   sourceType: 'file';
+  spaceId?: string;
   url: string;
 }
 
@@ -112,6 +116,7 @@ export interface CreateDocumentParams {
   parentId?: string;
   slug?: string;
   sourceType: 'document';
+  spaceId?: string;
   title: string;
 }
 

@@ -35,9 +35,10 @@ const LibraryHierarchy = memo(() => {
 
   const [resourceList, resourceQueryParams] = useFileStore((s) => [s.resourceList, s.queryParams]);
 
-  const [libraryId, currentViewItemId] = useResourceManagerStore((s) => [
+  const [libraryId, currentViewItemId, spaceId] = useResourceManagerStore((s) => [
     s.libraryId,
     s.currentViewItemId,
+    s.spaceId,
   ]);
 
   // Force re-render when tree state changes
@@ -191,6 +192,7 @@ const LibraryHierarchy = memo(() => {
               knowledgeBaseId: libraryId,
               parentId: folderId,
               showFilesInKnowledgeBase: false,
+              spaceId,
             },
           ],
           () =>
@@ -198,6 +200,7 @@ const LibraryHierarchy = memo(() => {
               knowledgeBaseId: libraryId,
               parentId: folderId,
               showFilesInKnowledgeBase: false,
+              spaceId,
             }),
           {
             revalidate: false, // Don't revalidate immediately after mutation

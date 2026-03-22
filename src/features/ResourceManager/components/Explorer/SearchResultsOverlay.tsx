@@ -16,6 +16,7 @@ import { useGlobalStore } from '@/store/global';
 import { INITIAL_STATUS } from '@/store/global/initialState';
 import type { AsyncTaskStatus } from '@/types/asyncTask';
 import type { FileListItem } from '@/types/files';
+import type { ResourceQueryParams } from '@/types/resource';
 
 import FileListItemComponent from './ListView/ListItem';
 import MasonryItemWrapper from './MasonryView/MasonryItem/MasonryItemWrapper';
@@ -25,11 +26,12 @@ const SWR_RESOURCE_SEARCH = 'SWR_RESOURCE_SEARCH';
 
 const SearchResultsOverlay = memo(() => {
   const { t } = useTranslation('components');
-  const [searchQuery, libraryId, category, viewMode] = useResourceManagerStore((s) => [
+  const [searchQuery, libraryId, category, viewMode, spaceId] = useResourceManagerStore((s) => [
     s.searchQuery,
     s.libraryId,
     s.category,
     s.viewMode,
+    s.spaceId,
   ]);
 
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
@@ -45,16 +47,16 @@ const SearchResultsOverlay = memo(() => {
     isActive
       ? [
           SWR_RESOURCE_SEARCH,
-          { category: libraryId ? undefined : category, libraryId, q: searchQuery },
+          { category: libraryId ? undefined : category, libraryId, q: searchQuery, spaceId },
         ]
       : null,
-    async ([, params]: [string, { category?: string; libraryId?: string; q: string }]) => {
+    async ([, params]) => {
       const response = await resourceService.queryResources({
-        ...params,
+        ...(params as ResourceQueryParams),
         limit: 50,
         offset: 0,
         showFilesInKnowledgeBase: false,
-      } as any);
+      });
       return response.items;
     },
   );

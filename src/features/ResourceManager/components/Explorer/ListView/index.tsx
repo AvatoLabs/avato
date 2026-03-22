@@ -65,6 +65,7 @@ const ListView = memo(function ListView() {
     pendingRenameItemId,
     sorter,
     sortType,
+    spaceId,
     storeIsTransitioning,
   ] = useResourceManagerStore((s) => [
     s.libraryId,
@@ -74,6 +75,7 @@ const ListView = memo(function ListView() {
     s.pendingRenameItemId,
     s.sorter,
     s.sortType,
+    s.spaceId,
     s.isTransitioning,
   ]);
 
@@ -106,10 +108,11 @@ const ListView = memo(function ListView() {
       libraryId,
       parentId: currentFolderSlug || null,
       showFilesInKnowledgeBase: false,
+      spaceId,
       sortType,
       sorter,
     }),
-    [category, currentFolderSlug, libraryId, sorter, sortType],
+    [category, currentFolderSlug, libraryId, sorter, sortType, spaceId],
   );
 
   const { isLoading, items: resourceList } = useVisibleResources(queryParams);

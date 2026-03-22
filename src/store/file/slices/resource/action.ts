@@ -243,7 +243,11 @@ export class ResourceActionImpl {
       }
     }
 
-    // 2. Optimistically remove all items from store in one set() call
+    // 2. Snapshot for rollback
+    const prevResourceList = resourceList;
+    const prevResourceMap = resourceMap;
+
+    // 3. Optimistically remove all items from store in one set() call
     const idsSet = new Set(ids);
     const newMap = new Map(resourceMap);
     for (const id of ids) {
@@ -259,14 +263,25 @@ export class ResourceActionImpl {
       'deleteResources/optimistic',
     );
 
-    // 3. Fire batch delete APIs in background (no await — UI already updated)
+    // 4. Fire batch delete APIs — rollback on failure
     const promises: Promise<void>[] = [];
     if (fileIds.length > 0) promises.push(fileService.removeFiles(fileIds));
     if (documentIds.length > 0) promises.push(documentService.deleteDocuments(documentIds));
 
-    Promise.all(promises).catch((error) => {
-      console.error('Failed to delete resources:', error);
-    });
+    try {
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Failed to delete resources, rolling back:', error);
+      // Restore previous state
+      this.#set(
+        {
+          resourceList: prevResourceList,
+          resourceMap: prevResourceMap,
+        },
+        false,
+        'deleteResources/rollback',
+      );
+    }
   };
 
   /**

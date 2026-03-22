@@ -262,9 +262,18 @@ export const store: CreateStore = (publicState) => (set, get) => ({
     setActiveWorkspaceSpaceId(spaceId);
     if (get().spaceId === spaceId) return;
     set({ spaceId });
+
+    // Clear stale resource data from previous space so it doesn't flash
+    import('@/store/file').then(({ useFileStore }) => {
+      const fileStore = useFileStore.getState();
+      fileStore.clearResources?.();
+    });
   },
 
   setSelectedFileIds: (selectedFileIds) => {
+    const prev = get().selectedFileIds;
+    if (prev.length === selectedFileIds.length && prev.every((id, i) => id === selectedFileIds[i]))
+      return;
     set({ selectedFileIds });
   },
 
