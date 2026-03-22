@@ -6,6 +6,18 @@ export type InheritMode = 'explicit_only' | 'inherit';
 
 export type ResourceKind = 'document' | 'file' | 'knowledge_base';
 
+export type ResourceCapability =
+  | 'create_child'
+  | 'delete'
+  | 'download_blob'
+  | 'manage_members'
+  | 'move'
+  | 'preview_content'
+  | 'read_content'
+  | 'read_metadata'
+  | 'share_link'
+  | 'share_member';
+
 export type ResourceRole = 'editor' | 'owner' | 'viewer';
 
 export type SpaceKind = 'personal' | 'team';
@@ -72,6 +84,7 @@ export interface ResourceShareLinkItem {
 export interface ExplainAccessResult {
   authzEpoch: number;
   canAccess: boolean;
+  capabilities: ResourceCapability[];
   matchedBy?: 'direct' | 'inherited' | 'share_link' | 'space_member';
   reason?: string;
   resourceUid: string;

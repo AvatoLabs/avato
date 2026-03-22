@@ -129,6 +129,9 @@ export default {
   'searchPagePlaceholder': 'Search Pages',
   'share.accessSummary': 'Current access reason: {{reason}} (epoch {{authzEpoch}})',
   'share.accessUnknown': 'Current access details are unavailable.',
+  'share.error.forbidden': 'You do not have permission to perform this action.',
+  'share.error.generic': 'Something went wrong. Please try again.',
+  'share.error.userNotFound': 'User not found. Check the username and try again.',
   'share.links.copy': 'Copy Link',
   'share.links.copyDirectDownload': 'Copy direct download link',
   'share.links.copied': 'Share link copied',
@@ -150,6 +153,7 @@ export default {
   'share.links.title': 'Anonymous Link Sharing',
   'share.members.add': 'Grant Access',
   'share.members.added': 'Access updated',
+  'share.members.canReshare': 'Allow this person to re-share with others',
   'share.members.empty': 'No direct member shares',
   'share.members.revoke': 'Revoke',
   'share.members.title': 'Direct Member Access',
@@ -233,7 +237,8 @@ export default {
   'publicShare.passwordSubtitle': 'This share link is protected. Enter the password to continue.',
   'publicShare.passwordTitle': 'Password Required',
   'trash.empty': 'No deleted pages or folders.',
-  'trash.hint': 'Soft-deleted pages and folders in this library. Restored items reappear in the file tree.',
+  'trash.hint':
+    'Soft-deleted pages and folders in this library. Restored items reappear in the file tree.',
   'trash.hintAll':
     'Soft-deleted pages and folders you own (all libraries). Restored items reappear in the file tree.',
   'trash.loadError': 'Failed to load recycle bin',

@@ -7,23 +7,19 @@ import {
   resourceRegistry,
   spaces,
 } from '@lobechat/database/schemas';
-import type { ExplainAccessResult, ResourceKind, ResourceRole, SpaceRole } from '@lobechat/types';
+import type {
+  ExplainAccessResult,
+  ResourceCapability,
+  ResourceKind,
+  ResourceRole,
+  SpaceRole,
+} from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 
 import { ResourceModel } from '@/database/models/resource';
 
-export type ResourceCapability =
-  | 'create_child'
-  | 'delete'
-  | 'download_blob'
-  | 'manage_members'
-  | 'move'
-  | 'preview_content'
-  | 'read_content'
-  | 'read_metadata'
-  | 'share_link'
-  | 'share_member';
+export type { ResourceCapability } from '@lobechat/types';
 
 interface ResolvedResource {
   authzEpoch: number;
@@ -549,9 +545,23 @@ export class ResourceAuthorizer {
         spaceId: resource.spaceId,
       } satisfies AccessMatch);
 
+    // Derive effective capabilities from the resolved role
+    let capabilities: ResourceCapability[] = [];
+    if (access.canAccess) {
+      if (access.matchedBy === 'share_link') {
+        capabilities = [...RESOURCE_ROLE_CAPABILITIES.viewer];
+      } else if (access.matchedBy === 'space_member') {
+        const spaceRole = await this.getSpaceRole(resource.spaceId);
+        if (spaceRole) capabilities = [...SPACE_ROLE_CAPABILITIES[spaceRole]];
+      } else if (access.resourceRole) {
+        capabilities = [...RESOURCE_ROLE_CAPABILITIES[access.resourceRole]];
+      }
+    }
+
     return {
       authzEpoch: access.authzEpoch,
       canAccess: access.canAccess,
+      capabilities,
       matchedBy: access.matchedBy,
       reason: access.reason,
       resourceUid: resource.resourceUid,

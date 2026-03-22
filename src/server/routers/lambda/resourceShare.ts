@@ -84,9 +84,7 @@ export const resourceShareRouter = router({
       return {
         expiresAt,
         fileShareDownloadUrl:
-          registry.kind === 'file'
-            ? `${appEnv.APP_URL}/share/f/${rawToken}`
-            : undefined,
+          registry.kind === 'file' ? `${appEnv.APP_URL}/share/f/${rawToken}` : undefined,
         id: link.id,
         shareUrl: `${appEnv.APP_URL}/share/r/${rawToken}`,
       };
@@ -188,6 +186,38 @@ export const resourceShareRouter = router({
         fileType: 'application/octet-stream',
         role: 'viewer' as const,
       };
+    }),
+
+  /**
+   * Combined endpoint: resolves the resource ONCE and returns access + permissions + links.
+   * Replaces 3 separate calls (explainAccess + listPermissions + listShareLinks)
+   * that each redundantly resolve the same resource + run authorization checks.
+   */
+  getResourceShareInfo: shareProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        kind: z.enum(['document', 'file', 'knowledge_base']).optional(),
+        resourceUid: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const registry = await resolveTargetResource(ctx.resourceModel, input);
+
+      // Run all three operations in parallel with a single resolved resourceUid
+      const [access, permissions, links] = await Promise.all([
+        ctx.resourceAuthorizer.explainAccess({ resourceUid: registry.resourceUid }),
+        ctx.resourceAuthorizer
+          .assertCapability({ capability: 'share_member', resourceUid: registry.resourceUid })
+          .then(() => ctx.resourceModel.listPermissions(registry.resourceUid))
+          .catch(() => [] as Awaited<ReturnType<typeof ctx.resourceModel.listPermissions>>),
+        ctx.resourceAuthorizer
+          .assertCapability({ capability: 'share_link', resourceUid: registry.resourceUid })
+          .then(() => ctx.resourceModel.listShareLinks(registry.resourceUid))
+          .catch(() => [] as Awaited<ReturnType<typeof ctx.resourceModel.listShareLinks>>),
+      ]);
+
+      return { access, links, permissions };
     }),
 
   grantResourcePermission: shareProcedure

@@ -1,8 +1,8 @@
 'use client';
 
-import { Button, copyToClipboard, Flexbox, Input, Select, Text } from '@lobehub/ui';
+import { Button, Checkbox, copyToClipboard, Flexbox, Input, Select, Text } from '@lobehub/ui';
 import { App } from 'antd';
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 
@@ -39,56 +39,80 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('viewer');
   const [username, setUsername] = useState('');
+  const [canReshare, setCanReshare] = useState(false);
 
-  const { data: permissions, mutate: mutatePermissions } = useSWR(
-    ['resource-share-permissions', kind, id],
-    () => lambdaClient.resourceShare.listResourcePermissions.query({ id, kind }),
+  // Single combined query — resolves resource once, runs all 3 in parallel server-side
+  const { data, mutate } = useSWR(
+    ['resource-share-info', kind, id],
+    () => lambdaClient.resourceShare.getResourceShareInfo.query({ id, kind }),
     { revalidateOnFocus: false },
   );
 
-  const { data: links, mutate: mutateLinks } = useSWR(
-    ['resource-share-links', kind, id],
-    () => lambdaClient.resourceShare.listResourceShareLinks.query({ id, kind }),
-    { revalidateOnFocus: false },
-  );
+  const permissions = data?.permissions;
+  const links = data?.links;
+  const access = data?.access;
 
-  const { data: access, mutate: mutateAccess } = useSWR(
-    ['resource-share-explain', kind, id],
-    () => lambdaClient.resourceShare.explainAccess.query({ id, kind }),
-    { revalidateOnFocus: false },
-  );
+  const caps = useMemo(() => {
+    const set = new Set(access?.capabilities ?? []);
+    return {
+      canShareLink: set.has('share_link'),
+      canShareMember: set.has('share_member'),
+    };
+  }, [access?.capabilities]);
 
   const refresh = async () => {
-    await Promise.all([mutatePermissions(), mutateLinks(), mutateAccess()]);
+    await mutate();
   };
 
   const handleGrant = async () => {
     if (!username.trim()) return;
 
-    await lambdaClient.resourceShare.grantResourcePermission.mutate({
-      id,
-      kind,
-      role,
-      username: username.trim(),
-    });
+    try {
+      await lambdaClient.resourceShare.grantResourcePermission.mutate({
+        canReshare,
+        id,
+        kind,
+        role,
+        username: username.trim(),
+      });
 
-    setUsername('');
-    await refresh();
-    message.success(t('share.members.added'));
+      setUsername('');
+      setCanReshare(false);
+      await refresh();
+      message.success(t('share.members.added'));
+    } catch (error: any) {
+      const code = error?.data?.code;
+      if (code === 'NOT_FOUND') {
+        message.error(t('share.error.userNotFound'));
+      } else if (code === 'FORBIDDEN') {
+        message.error(t('share.error.forbidden'));
+      } else {
+        message.error(t('share.error.generic'));
+      }
+    }
   };
 
   const handleCreateLink = async () => {
-    const link = await lambdaClient.resourceShare.createResourceShareLink.mutate({
-      expiresInDays,
-      id,
-      kind,
-      password: password.trim() || undefined,
-    });
+    try {
+      const link = await lambdaClient.resourceShare.createResourceShareLink.mutate({
+        expiresInDays,
+        id,
+        kind,
+        password: password.trim() || undefined,
+      });
 
-    setLatestShareUrl(link.shareUrl);
-    setLatestFileDownloadUrl(link.fileShareDownloadUrl ?? null);
-    setPassword('');
-    await refresh();
+      setLatestShareUrl(link.shareUrl);
+      setLatestFileDownloadUrl(link.fileShareDownloadUrl ?? null);
+      setPassword('');
+      await refresh();
+    } catch (error: any) {
+      const code = error?.data?.code;
+      if (code === 'FORBIDDEN') {
+        message.error(t('share.error.forbidden'));
+      } else {
+        message.error(t('share.error.generic'));
+      }
+    }
   };
 
   const handleCopyLink = async () => {
@@ -119,26 +143,36 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
 
       <Flexbox gap={8}>
         <Text strong>{t('share.members.title')}</Text>
-        <Flexbox horizontal gap={8} wrap={'wrap'}>
-          <Input
-            placeholder={t('share.members.usernamePlaceholder')}
-            style={{ flex: 1, minWidth: 220 }}
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
-          <Select
-            style={{ minWidth: 140 }}
-            value={role}
-            options={[
-              { label: t('share.roles.viewer'), value: 'viewer' },
-              { label: t('share.roles.editor'), value: 'editor' },
-            ]}
-            onChange={(value) => setRole(value as 'editor' | 'viewer')}
-          />
-          <Button type={'primary'} onClick={handleGrant}>
-            {t('share.members.add')}
-          </Button>
-        </Flexbox>
+        {caps.canShareMember && (
+          <Flexbox gap={8}>
+            <Flexbox horizontal gap={8} wrap={'wrap'}>
+              <Input
+                placeholder={t('share.members.usernamePlaceholder')}
+                style={{ flex: 1, minWidth: 220 }}
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <Select
+                style={{ minWidth: 140 }}
+                value={role}
+                options={[
+                  { label: t('share.roles.viewer'), value: 'viewer' },
+                  { label: t('share.roles.editor'), value: 'editor' },
+                ]}
+                onChange={(value) => setRole(value as 'editor' | 'viewer')}
+              />
+              <Button type={'primary'} onClick={handleGrant}>
+                {t('share.members.add')}
+              </Button>
+            </Flexbox>
+            <Checkbox
+              checked={canReshare}
+              onChange={(checked) => setCanReshare(checked as boolean)}
+            >
+              {t('share.members.canReshare')}
+            </Checkbox>
+          </Flexbox>
+        )}
         <Flexbox gap={8}>
           {permissions?.length ? (
             permissions.map((permission) => (
@@ -162,10 +196,19 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                 <Button
                   danger
                   onClick={async () => {
-                    await lambdaClient.resourceShare.revokeResourcePermission.mutate({
-                      permissionId: permission.id,
-                    });
-                    await refresh();
+                    try {
+                      await lambdaClient.resourceShare.revokeResourcePermission.mutate({
+                        permissionId: permission.id,
+                      });
+                      await refresh();
+                    } catch (error: any) {
+                      const code = error?.data?.code;
+                      if (code === 'FORBIDDEN') {
+                        message.error(t('share.error.forbidden'));
+                      } else {
+                        message.error(t('share.error.generic'));
+                      }
+                    }
                   }}
                 >
                   {t('share.members.revoke')}
@@ -180,28 +223,30 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
 
       <Flexbox gap={8}>
         <Text strong>{t('share.links.title')}</Text>
-        <Flexbox horizontal gap={8} wrap={'wrap'}>
-          <Select
-            style={{ minWidth: 160 }}
-            value={expiresInDays}
-            options={[
-              { label: t('share.links.expiry.1'), value: 1 },
-              { label: t('share.links.expiry.7'), value: 7 },
-              { label: t('share.links.expiry.30'), value: 30 },
-            ]}
-            onChange={(value) => setExpiresInDays(value as 1 | 7 | 30)}
-          />
-          <Input
-            placeholder={t('share.links.passwordPlaceholder')}
-            style={{ flex: 1, minWidth: 220 }}
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <Button type={'primary'} onClick={handleCreateLink}>
-            {t('share.links.create')}
-          </Button>
-        </Flexbox>
+        {caps.canShareLink && (
+          <Flexbox horizontal gap={8} wrap={'wrap'}>
+            <Select
+              style={{ minWidth: 160 }}
+              value={expiresInDays}
+              options={[
+                { label: t('share.links.expiry.1'), value: 1 },
+                { label: t('share.links.expiry.7'), value: 7 },
+                { label: t('share.links.expiry.30'), value: 30 },
+              ]}
+              onChange={(value) => setExpiresInDays(value as 1 | 7 | 30)}
+            />
+            <Input
+              placeholder={t('share.links.passwordPlaceholder')}
+              style={{ flex: 1, minWidth: 220 }}
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <Button type={'primary'} onClick={handleCreateLink}>
+              {t('share.links.create')}
+            </Button>
+          </Flexbox>
+        )}
 
         {latestShareUrl && (
           <Flexbox
@@ -252,10 +297,19 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                   danger
                   disabled={!!link.disabledAt}
                   onClick={async () => {
-                    await lambdaClient.resourceShare.disableResourceShareLink.mutate({
-                      shareLinkId: link.id,
-                    });
-                    await refresh();
+                    try {
+                      await lambdaClient.resourceShare.disableResourceShareLink.mutate({
+                        shareLinkId: link.id,
+                      });
+                      await refresh();
+                    } catch (error: any) {
+                      const code = error?.data?.code;
+                      if (code === 'FORBIDDEN') {
+                        message.error(t('share.error.forbidden'));
+                      } else {
+                        message.error(t('share.error.generic'));
+                      }
+                    }
                   }}
                 >
                   {link.disabledAt ? t('share.links.disabled') : t('share.links.disable')}

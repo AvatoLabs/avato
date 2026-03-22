@@ -1,6 +1,6 @@
 import type { ResourceKind, ResourceRole } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import { and, asc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, ne, or, sql } from 'drizzle-orm';
 import { sha256 } from 'js-sha256';
 
 import type {
@@ -437,7 +437,25 @@ export class ResourceModel {
   };
 
   listSharedWithMe = async () => {
-    const shared = await this.listDirectPermissionsForUser();
+    // Query permissions explicitly excluding self-created ones.
+    // When a user creates a resource, ensureOwnerPermission inserts a row with
+    // createdBy = userId. When someone else shares with the user, createdBy = sharer's id.
+    const shared = await this.db
+      .select({
+        expiresAt: resourcePermissions.expiresAt,
+        resourceUid: resourcePermissions.resourceUid,
+        spaceId: resourcePermissions.spaceId,
+      })
+      .from(resourcePermissions)
+      .where(
+        and(
+          eq(resourcePermissions.subjectType, 'user'),
+          eq(resourcePermissions.subjectId, this.userId),
+          ne(resourcePermissions.createdBy, this.userId),
+          or(isNull(resourcePermissions.expiresAt), gt(resourcePermissions.expiresAt, new Date())),
+        ),
+      );
+
     return Promise.all(shared.map((permission) => this.getResourceSummary(permission.resourceUid)));
   };
 
@@ -546,8 +564,7 @@ export class ResourceModel {
     sourceIp?: string | null;
     userAgent?: string | null;
   }) => {
-    const actorId =
-      !this.userId || this.userId === 'anonymous' ? null : this.userId;
+    const actorId = !this.userId || this.userId === 'anonymous' ? null : this.userId;
 
     await this.db.insert(resourceAccessEvents).values({
       accessType: params.accessType,

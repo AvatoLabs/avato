@@ -17,7 +17,7 @@ import { shallow } from 'zustand/shallow';
 import RepoIcon from '@/components/LibIcon';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
-import { useResourceShareModal } from '@/features/ResourceSharing';
+import { useResourceShareModal, useSpaceCapabilities } from '@/features/ResourceSharing';
 import { buildResourcePreviewPath } from '@/features/ResourceSpaces';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
@@ -60,6 +60,7 @@ export const useFileItemDropdown = ({
   const appOrigin = useAppOrigin();
   const { open: openShareModal } = useResourceShareModal();
   const spaceId = useResourceManagerStore((s) => s.spaceId);
+  const caps = useSpaceCapabilities(spaceId);
 
   const { deleteResource, moveResource, refreshFileList } = useFileStore(
     (s) => ({
@@ -212,29 +213,31 @@ export const useFileItemDropdown = ({
         hasKnowledgeBaseActions && {
           type: 'divider',
         },
-        isInLibrary && {
-          icon: <Icon icon={FolderInputIcon} />,
-          key: 'moveToFolder',
-          label: t('FileManager.actions.moveToFolder'),
-          onClick: async ({ domEvent }) => {
-            domEvent.stopPropagation();
+        isInLibrary &&
+          caps.canMove && {
+            icon: <Icon icon={FolderInputIcon} />,
+            key: 'moveToFolder',
+            label: t('FileManager.actions.moveToFolder'),
+            onClick: async ({ domEvent }) => {
+              domEvent.stopPropagation();
 
-            createRawModal(MoveToFolderModal, {
-              fileId: id,
-              knowledgeBaseId: libraryId,
-            });
+              createRawModal(MoveToFolderModal, {
+                fileId: id,
+                knowledgeBaseId: libraryId,
+              });
+            },
           },
-        },
-        isFolder && {
-          icon: <Icon icon={PencilIcon} />,
-          key: 'rename',
-          label: t('FileManager.actions.rename'),
-          onClick: async ({ domEvent }) => {
-            domEvent.stopPropagation();
-            onRenameStart?.();
+        isFolder &&
+          caps.canEdit && {
+            icon: <Icon icon={PencilIcon} />,
+            key: 'rename',
+            label: t('FileManager.actions.rename'),
+            onClick: async ({ domEvent }) => {
+              domEvent.stopPropagation();
+              onRenameStart?.();
+            },
           },
-        },
-        {
+        caps.canShareLink && {
           icon: <Icon icon={LinkIcon} />,
           key: 'share',
           label: t('share.title', { ns: 'file' }),
@@ -313,7 +316,7 @@ export const useFileItemDropdown = ({
         {
           type: 'divider',
         },
-        {
+        caps.canDelete && {
           danger: true,
           icon: <Icon icon={Trash} />,
           key: 'delete',
@@ -344,6 +347,7 @@ export const useFileItemDropdown = ({
     ).filter(Boolean);
   }, [
     addFilesToKnowledgeBase,
+    caps,
     clearTreeFolderCache,
     deleteResource,
     filename,
