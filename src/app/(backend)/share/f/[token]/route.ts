@@ -1,3 +1,4 @@
+import { resourceRegistry } from '@lobechat/database/schemas';
 import bcrypt from 'bcryptjs';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
@@ -6,7 +7,6 @@ import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
-import { resourceRegistry } from '@lobechat/database/schemas';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 
 const log = debug('lobe-file:share-f');
@@ -39,7 +39,8 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
 
     if (link.passwordHash) {
       if (!sharePassword) {
-        return new Response('Password required', { status: 401 });
+        // Unified 404 to avoid leaking that this token exists and requires a password.
+        return new Response('Not found', { status: 404 });
       }
 
       const isValid = await bcrypt.compare(sharePassword, link.passwordHash);

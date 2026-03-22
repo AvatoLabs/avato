@@ -5,7 +5,7 @@ import { App } from 'antd';
 import { cssVar } from 'antd-style';
 import { FileText, FolderIcon } from 'lucide-react';
 import { type PropsWithChildren } from 'react';
-import { createContext, memo, use, useEffect, useRef, useState } from 'react';
+import { createContext, memo, use, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -235,9 +235,15 @@ export const DndContextWrapper = memo<PropsWithChildren>(({ children }) => {
     };
   }, [currentDrag]);
 
+  // Memoize context value to avoid re-rendering all consumers on every parent render
+  const dragStateValue = useMemo(
+    () => ({ currentDrag, setCurrentDrag }),
+    [currentDrag, setCurrentDrag],
+  );
+
   return (
     <DragActiveContext value={currentDrag !== null}>
-      <DragStateContext value={{ currentDrag, setCurrentDrag }}>
+      <DragStateContext value={dragStateValue}>
         {children}
         {typeof document !== 'undefined' &&
           createPortal(

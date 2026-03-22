@@ -156,6 +156,7 @@ export class ResourceAuthorizer {
   private resolveByKind = async (
     kind: ResourceKind,
     localId: string,
+    options?: { documentIncludeDeleted?: boolean },
   ): Promise<ResolvedResource | null> => {
     const [registryRow] = await this.db
       .select({
@@ -174,19 +175,27 @@ export class ResourceAuthorizer {
     if (!registryRow) return null;
 
     if (kind === 'document') {
+      const docFilter = options?.documentIncludeDeleted
+        ? eq(documents.id, localId)
+        : and(eq(documents.id, localId), isNull(documents.deletedAt));
+
       const [doc] = await this.db
         .select({
           inheritMode: documents.inheritMode,
           parentId: documents.parentId,
         })
         .from(documents)
-        .where(and(eq(documents.id, localId), isNull(documents.deletedAt)))
+        .where(docFilter)
         .limit(1);
+
+      // If the document row is missing (soft-deleted and not including deleted), return null
+      // to prevent authorization from succeeding based solely on registry presence.
+      if (!doc) return null;
 
       return {
         ...registryRow,
-        inheritMode: doc?.inheritMode ?? null,
-        parentId: doc?.parentId ?? null,
+        inheritMode: doc.inheritMode ?? null,
+        parentId: doc.parentId ?? null,
       };
     }
 
@@ -307,9 +316,6 @@ export class ResourceAuthorizer {
 
     const link = await this.resourceModel.resolveShareLinkByToken(shareToken);
     if (!link || link.resourceUid !== resource.resourceUid) return null;
-
-    const capabilities = RESOURCE_ROLE_CAPABILITIES.viewer;
-    if (!hasCapability(capabilities, 'read_content')) return null;
 
     return {
       authzEpoch: Math.max(resource.authzEpoch, resource.spaceAuthzEpoch),

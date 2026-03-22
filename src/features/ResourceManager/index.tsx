@@ -3,7 +3,7 @@
 import { BRANDING_NAME } from '@lobechat/business-const';
 import { Flexbox } from '@lobehub/ui';
 import { createStaticStyles, useTheme } from 'antd-style';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import DragUploadZone from '@/components/DragUploadZone';
@@ -77,7 +77,12 @@ const ResourceManager = memo(() => {
     s.spaceId,
   ]);
 
-  const currentDocument = useFileStore(documentSelectors.getDocumentById(currentViewItemId));
+  // Memoize selector to avoid creating a new function reference on every render
+  const documentSelector = useMemo(
+    () => documentSelectors.getDocumentById(currentViewItemId),
+    [currentViewItemId],
+  );
+  const currentDocument = useFileStore(documentSelector);
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
   const updateDocumentOptimistically = useFileStore((s) => s.updateDocumentOptimistically);
 
@@ -94,15 +99,24 @@ const ResourceManager = memo(() => {
   );
 
   // Fetch specific document when switching to page mode if not already loaded
+  // Use a ref to track in-flight fetches to avoid duplicate requests
+  const fetchingDocRef = useRef<string | null>(null);
   useEffect(() => {
     if (mode === 'page' && currentViewItemId && !currentDocument) {
+      // Avoid re-fetching if already in-flight for this document
+      if (fetchingDocRef.current === currentViewItemId) return;
+      fetchingDocRef.current = currentViewItemId;
+
       // Document not in store, fetch it individually
       documentService.getDocumentById(currentViewItemId).then((doc) => {
+        fetchingDocRef.current = null;
         if (doc) {
           // Add the document to the store's documents array
-          useFileStore.setState((state) => ({
-            documents: [...state.documents, doc as any],
-          }));
+          useFileStore.setState((state) => {
+            // Avoid adding duplicates
+            if (state.documents.some((d) => d.id === doc.id)) return state;
+            return { documents: [...state.documents, doc as any] };
+          });
         }
       });
     }

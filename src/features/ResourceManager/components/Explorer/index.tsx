@@ -72,7 +72,7 @@ const ResourceExplorer = memo(() => {
   );
 
   // Use SWR for data fetching with automatic caching and revalidation
-  const { isLoading, isValidating, items } = useVisibleResources(queryParams);
+  const { isLoading, isValidating, items, hasResolvedData } = useVisibleResources(queryParams);
 
   // Map ResourceItem[] to FileListItem[] for compatibility
   // TODO: Eventually update all consumers to use ResourceItem directly
@@ -95,11 +95,15 @@ const ResourceExplorer = memo(() => {
   useCheckTaskStatus(data);
 
   // Initialize folder/file navigation effects (still need hook for complex effects)
-  useResourceExplorer({ category, libraryId });
+  useResourceExplorer({ category, hasResolvedData, isLoading, libraryId });
 
   // Clear selections when category/library/search changes
   useEffect(() => {
-    setSelectedFileIds([]);
+    // Only clear if there are selected items to avoid unnecessary store updates
+    const currentIds = useResourceManagerStore.getState().selectedFileIds;
+    if (currentIds.length > 0) {
+      setSelectedFileIds([]);
+    }
   }, [category, libraryId, searchQuery, setSelectedFileIds]);
 
   const showEmptyStatus = !isLoading && !isValidating && data.length === 0 && !currentFolderSlug;

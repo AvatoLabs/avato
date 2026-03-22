@@ -195,40 +195,48 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setCategory: (category) => {
+    if (get().category === category) return;
     set({ category });
   },
 
   setCurrentFolderId: (currentFolderId) => {
+    if (get().currentFolderId === currentFolderId) return;
     set({ currentFolderId });
   },
 
   setCurrentViewItemId: (currentViewItemId) => {
+    if (get().currentViewItemId === currentViewItemId) return;
     set({ currentViewItemId });
   },
 
   setFileListHasMore: (fileListHasMore) => {
+    if (get().fileListHasMore === fileListHasMore) return;
     set({ fileListHasMore });
   },
 
   setFileListOffset: (fileListOffset) => {
+    if (get().fileListOffset === fileListOffset) return;
     set({ fileListOffset });
   },
 
   setIsMasonryReady: (isMasonryReady) => {
+    if (get().isMasonryReady === isMasonryReady) return;
     set({ isMasonryReady });
   },
 
   setIsTransitioning: (isTransitioning) => {
+    if (get().isTransitioning === isTransitioning) return;
     set({ isTransitioning });
   },
 
   setLibraryId: (libraryId) => {
-    set({ libraryId });
-
-    // Reset pagination state when switching libraries to prevent showing stale data
+    const state = get();
+    if (state.libraryId === libraryId) return;
+    // Batch libraryId + pagination reset into a single set() call
     set({
       fileListHasMore: false,
       fileListOffset: 0,
+      libraryId,
     });
 
     // Note: No need to manually refresh - Explorer's useEffect will automatically
@@ -236,19 +244,23 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setMode: (mode) => {
+    if (get().mode === mode) return;
     set({ mode });
   },
 
   setPendingRenameItemId: (pendingRenameItemId) => {
+    if (get().pendingRenameItemId === pendingRenameItemId) return;
     set({ pendingRenameItemId });
   },
 
   setSearchQuery: (searchQuery) => {
+    if (get().searchQuery === searchQuery) return;
     set({ searchQuery });
   },
 
   setSpaceId: (spaceId) => {
     setActiveWorkspaceSpaceId(spaceId);
+    if (get().spaceId === spaceId) return;
     set({ spaceId });
   },
 
@@ -257,14 +269,17 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setSortType: (sortType) => {
+    if (get().sortType === sortType) return;
     set({ sortType });
   },
 
   setSorter: (sorter) => {
+    if (get().sorter === sorter) return;
     set({ sorter });
   },
 
   setViewMode: (viewMode) => {
+    if (get().viewMode === viewMode) return;
     set({ viewMode });
   },
 });

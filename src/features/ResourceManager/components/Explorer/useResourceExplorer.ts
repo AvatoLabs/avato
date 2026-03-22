@@ -1,62 +1,39 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 
 import { useFolderPath } from '@/routes/(main)/resource/features/hooks/useFolderPath';
 import {
   useResourceManagerFetchFolderBreadcrumb,
   useResourceManagerStore,
 } from '@/routes/(main)/resource/features/store';
-import { useVisibleResources } from '@/store/file/slices/resource/hooks';
 import { type FilesTabs } from '@/types/files';
 
 interface UseFileExplorerProps {
   category?: FilesTabs;
+  hasResolvedData: boolean;
+  isLoading: boolean;
   libraryId?: string;
 }
 
 export const useResourceExplorer = ({
   category: categoryProp,
+  hasResolvedData,
+  isLoading,
   libraryId,
 }: UseFileExplorerProps) => {
-  const [
-    viewMode,
-    isTransitioning,
-    setCurrentFolderId,
-    setIsTransitioning,
-    setIsMasonryReady,
-    spaceId,
-    sorter,
-    sortType,
-  ] = useResourceManagerStore((s) => [
-    s.viewMode,
-    s.isTransitioning,
-    s.setCurrentFolderId,
-    s.setIsTransitioning,
-    s.setIsMasonryReady,
-    s.spaceId,
-    s.sorter,
-    s.sortType,
-  ]);
+  const [viewMode, isTransitioning, setCurrentFolderId, setIsTransitioning, setIsMasonryReady] =
+    useResourceManagerStore((s) => [
+      s.viewMode,
+      s.isTransitioning,
+      s.setCurrentFolderId,
+      s.setIsTransitioning,
+      s.setIsMasonryReady,
+    ]);
 
   const categoryFromStore = useResourceManagerStore((s) => s.category);
   const category = categoryProp ?? categoryFromStore;
   const { currentFolderSlug } = useFolderPath();
 
   const { data: folderBreadcrumb } = useResourceManagerFetchFolderBreadcrumb(currentFolderSlug);
-
-  const queryParams = useMemo(
-    () => ({
-      category: libraryId ? undefined : category,
-      libraryId,
-      parentId: currentFolderSlug || null,
-      showFilesInKnowledgeBase: false,
-      spaceId,
-      sortType,
-      sorter,
-    }),
-    [category, currentFolderSlug, libraryId, sorter, sortType, spaceId],
-  );
-
-  const { hasResolvedData, isLoading } = useVisibleResources(queryParams);
 
   useEffect(() => {
     if (!currentFolderSlug) {
