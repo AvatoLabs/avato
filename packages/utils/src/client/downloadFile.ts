@@ -1,25 +1,16 @@
+import { getMediaFetchInit } from './getMediaFetchInit';
+
 export const downloadFile = async (
   url: string,
   fileName: string,
   fallbackToOpen: boolean = true,
 ) => {
   try {
-    let sameOrigin = false;
-    try {
-      sameOrigin = new URL(url, window.location.href).origin === window.location.origin;
-    } catch {
-      /* invalid url */
-    }
-
     // Use better CORS handling similar to download-image.ts
     const response = await fetch(url, {
       // Avoid image disk cache which can cause incorrect CORS headers
       cache: 'no-store',
-
-      // Same-origin `/f/:id` needs session cookies; presigned S3 URLs must not send credentials.
-      credentials: sameOrigin ? 'include' : 'omit',
-
-      mode: 'cors',
+      ...getMediaFetchInit(url),
     });
 
     if (!response.ok) {

@@ -594,12 +594,14 @@ export class ResourceModel {
    * Create an upload session
    */
   createUploadSession = async (
-    params: Omit<NewUploadSession, 'id' | 'createdBy' | 'status'>,
+    params: Omit<NewUploadSession, 'id' | 'createdBy' | 'status'> & { id?: string },
   ): Promise<UploadSessionItem> => {
+    const { id: explicitId, ...rest } = params;
     const [session] = await this.db
       .insert(uploadSessions)
       .values({
-        ...params,
+        ...rest,
+        ...(explicitId ? { id: explicitId } : {}),
         createdBy: this.userId,
         status: 'pending',
       })

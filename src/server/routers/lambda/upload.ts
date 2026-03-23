@@ -1,3 +1,4 @@
+import { idGenerator } from '@lobechat/database';
 import { nanoid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
@@ -24,11 +25,7 @@ const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
 
 function isS3HeadObjectMissingError(error: unknown): boolean {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  return (
-    e?.name === 'NotFound' ||
-    e?.name === 'NoSuchKey' ||
-    e?.$metadata?.httpStatusCode === 404
-  );
+  return e?.name === 'NotFound' || e?.name === 'NoSuchKey' || e?.$metadata?.httpStatusCode === 404;
 }
 
 const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
@@ -116,12 +113,16 @@ export const uploadRouter = router({
         }
       }
 
-      // Create upload session
+      // Create upload session with stable id + storage key in one insert (avoids a second DB round-trip
+      // and matches storageKey layout that embeds session id).
       const expiresAt = new Date(Date.now() + DEFAULT_UPLOAD_SESSION_EXPIRY_MS);
+      const sessionId = idGenerator('uploadSessions');
+      const storageKey = generateStorageKey(targetSpaceId, sessionId);
       const session = await ctx.resourceModel.createUploadSession({
         expectedSha256: sha256 || null,
         expectedSize: size,
         expiresAt,
+        id: sessionId,
         metadata: {
           filename,
           fileType,
@@ -129,19 +130,8 @@ export const uploadRouter = router({
           parentId,
         },
         spaceId: targetSpaceId,
-        storageKey: '', // Will be set below
+        storageKey,
       });
-
-      // Generate storage key with session ID
-      const storageKey = generateStorageKey(targetSpaceId, session.id);
-
-      // Update session with storage key
-      // Note: In production, you'd want to do this atomically with the insert.
-      // For now we update after creation.
-      await ctx.db
-        .update(uploadSessions)
-        .set({ storageKey })
-        .where(eq(uploadSessions.id, session.id));
 
       // Generate presigned upload URL
       let presignedUrl: string;
@@ -323,7 +313,7 @@ export const uploadRouter = router({
       }
 
       // Cancel the session
-      await ctx.db
+      await ctx.serverDB
         .update(uploadSessions)
         .set({ status: 'cancelled', updatedAt: new Date() })
         .where(eq(uploadSessions.id, uploadSessionId));

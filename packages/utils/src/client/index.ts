@@ -3,5 +3,6 @@ export * from './clipboard';
 export * from './downloadFile';
 export * from './exportFile';
 export * from './fetchEventSource';
+export * from './getMediaFetchInit';
 export * from './sanitize';
 export * from './videoValidation';

@@ -1,3 +1,4 @@
+import { getMediaFetchInit } from '@lobechat/utils/client';
 import { useEffect, useState } from 'react';
 
 export const useTextFileLoader = (url: string | null) => {
@@ -14,7 +15,10 @@ export const useTextFileLoader = (url: string | null) => {
     const loadFile = async () => {
       try {
         setLoading(true);
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          cache: 'no-store',
+          ...getMediaFetchInit(url),
+        });
         if (!response.ok) {
           throw new Error(`Failed to load file: ${response.statusText}`);
         }

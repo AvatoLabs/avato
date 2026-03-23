@@ -12,6 +12,7 @@
 
 import { createSSEChunkParser } from '@lobechat/fetch-sse/sseParser';
 import * as FileSystem from 'expo-file-system/legacy';
+import { sha256 } from 'js-sha256';
 
 import type {
   AgentSkillItem,
@@ -75,7 +76,6 @@ import {
 
 export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
 
-const DEFAULT_UPLOAD_DIRECTORY = 'files';
 const MOBILE_UPLOAD_CACHE_DIR = `${FileSystem.cacheDirectory || ''}upload-cache/`;
 const MOBILE_DOWNLOAD_DIR = `${FileSystem.documentDirectory || FileSystem.cacheDirectory || ''}downloads/`;
 const COMMUNITY_MARKET_DEFAULT_PAGE_SIZE = 21;
@@ -235,38 +235,11 @@ const requestCommunityMarket = async <T>(params: {
   return next;
 };
 
-const computeStringHash = (value: string) => {
-  let hash = 2166136261;
-
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return `mobile-${value.length.toString(16)}-${(hash >>> 0).toString(16)}`;
-};
-
 const toIsoString = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return new Date(value).toISOString();
   if (value instanceof Date) return value.toISOString();
   return new Date().toISOString();
-};
-
-const buildUploadMetadata = (name: string, directory?: string, pathname?: string) => {
-  const extension = name.includes('.') ? name.split('.').pop() : undefined;
-  const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  const filename = extension ? `${uniqueId}.${extension}` : uniqueId;
-  const date = Math.floor(Date.now() / 1000 / 60 / 60).toString();
-  const dirname = `${directory || DEFAULT_UPLOAD_DIRECTORY}/${date}`;
-  const path = pathname || `${dirname}/${filename}`;
-
-  return {
-    date,
-    dirname,
-    filename,
-    path,
-  };
 };
 
 const sanitizeFilename = (name: string) => name.replaceAll(/[^\w.-]+/g, '_');
@@ -304,23 +277,104 @@ const resolveRemoteFileUrl = (baseUrl: string, id: string, url?: string) => {
   return `${baseUrl}/f/${id}`;
 };
 
-const uploadFileToSameOrigin = async (
-  baseUrl: string,
-  uri: string,
-  name: string,
-  pathname: string,
-  type: string,
+const SHA256_CHUNK_BYTES = 4 * 1024 * 1024;
+
+const base64ToUint8Array = (base64: string): Uint8Array => {
+  const binaryString = globalThis.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const getLocalFileSize = async (uri: string): Promise<number> => {
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists) {
+    throw new Error('local file not found');
+  }
+  return info.size ?? 0;
+};
+
+/** SHA-256 (hex), chunked reads to limit peak memory. */
+const computeSha256HexFromFileUri = async (uri: string, size: number): Promise<string> => {
+  const hash = sha256.create();
+  if (size === 0) {
+    hash.update(new Uint8Array(0));
+    return hash.hex();
+  }
+  for (let offset = 0; offset < size; offset += SHA256_CHUNK_BYTES) {
+    const length = Math.min(SHA256_CHUNK_BYTES, size - offset);
+    const segment = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+      length,
+      position: offset,
+    });
+    hash.update(base64ToUint8Array(segment));
+  }
+  return hash.hex();
+};
+
+const fileMetadataFromStorageKey = (storageKey: string, displayFileName: string) => {
+  const parts = storageKey.split('/');
+  const filenameFromKey = parts.at(-1) ?? '';
+  const dirname = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+
+  return {
+    date: (Date.now() / 1000 / 60 / 60).toFixed(0),
+    dirname,
+    filename: displayFileName || filenameFromKey,
+    path: storageKey,
+  };
+};
+
+const putLocalFileToPresignedUrl = async (
+  presignedUrl: string,
+  fileUri: string,
+  fileType: string,
   onProgress?: (progress: number) => void,
-) => {
+): Promise<void> => {
   const uploadTask = FileSystem.createUploadTask(
-    new URL('/api/file/upload', `${baseUrl}/`).toString(),
-    uri,
+    presignedUrl,
+    fileUri,
+    {
+      headers: {
+        'Content-Type': fileType,
+      },
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    },
+    (progressData) => {
+      const { totalBytesExpectedToSend, totalBytesSent } = progressData;
+      if (!onProgress || totalBytesExpectedToSend <= 0) return;
+      onProgress(Math.min(99, Math.round((totalBytesSent / totalBytesExpectedToSend) * 100)));
+    },
+  );
+  const response = await uploadTask.uploadAsync();
+  if (!response || response.status < 200 || response.status >= 300) {
+    throw new Error(`presigned upload failed: ${response?.status ?? 'unknown'}`);
+  }
+};
+
+/** Same-origin multipart fallback when PUT to the presigned URL is not viable. */
+const uploadLocalFileViaUploadSession = async (
+  baseUrl: string,
+  fileUri: string,
+  name: string,
+  fileType: string,
+  uploadSessionId: string,
+  onProgress?: (progress: number) => void,
+): Promise<void> => {
+  const uploadTask = FileSystem.createUploadTask(
+    new URL('/api/file/upload-session', `${baseUrl}/`).toString(),
+    fileUri,
     {
       fieldName: 'file',
       headers: await getAuthHeaders(baseUrl),
       httpMethod: 'POST',
-      mimeType: type,
-      parameters: { pathname },
+      mimeType: fileType,
+      parameters: { uploadSessionId },
       uploadType: FileSystem.FileSystemUploadType.MULTIPART,
     },
     (progressData) => {
@@ -330,57 +384,18 @@ const uploadFileToSameOrigin = async (
     },
   );
   const response = await uploadTask.uploadAsync();
-
   if (!response) {
-    throw new Error('upload failed: empty response');
+    throw new Error('upload-session failed: empty response');
   }
-
   if (response.status < 200 || response.status >= 300) {
     let payload: { error?: string } | null;
-
     try {
       payload = response.body ? JSON.parse(response.body) : null;
     } catch {
       payload = null;
     }
-
-    throw new Error(payload?.error || `upload failed: ${response.status}`);
+    throw new Error(payload?.error || `upload-session failed: ${response.status}`);
   }
-};
-
-const LARGE_FILE_SKIP_HASH_BYTES = 10 * 1024 * 1024; // 10MB
-
-const getLocalFileDescriptor = async (uri: string) => {
-  const info = await FileSystem.getInfoAsync(uri, { md5: true });
-
-  if (!info.exists) {
-    throw new Error('local file not found');
-  }
-
-  const size = info.size ?? 0;
-
-  if (info.md5) {
-    return { hash: info.md5, size };
-  }
-
-  // Large files: skip base64 read to avoid OOM (sacrifice deduplication)
-  if (size > LARGE_FILE_SKIP_HASH_BYTES) {
-    return {
-      hash: `large-${size}-${Date.now()}`,
-      size,
-    };
-  }
-
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  const approxSize = size || Math.floor((base64.length * 3) / 4);
-
-  return {
-    hash: computeStringHash(base64),
-    size: approxSize,
-  };
 };
 
 interface MobileServerMessageTextPart {
@@ -2357,7 +2372,8 @@ export const fileApi = {
     }),
 
   /**
-   * Upload a file through the same signed-upload flow used by web.
+   * Upload a file through the same session + presigned URL flow used by web
+   * (`prepareResourceUpload` → PUT → `completeResourceUpload` → `createFile`).
    */
   upload: async (
     uri: string,
@@ -2372,47 +2388,93 @@ export const fileApi = {
       sessionId?: string;
       skipCheckFileType?: boolean;
       skipDeduplication?: boolean;
+      spaceId?: string;
     },
   ): Promise<{ id: string; url: string }> => {
     const baseUrl = await getBaseUrl();
     const uploadUri = await ensureUploadableUri(uri, name);
-    const fileInfo = await getLocalFileDescriptor(uploadUri);
+    const size = await getLocalFileSize(uploadUri);
     const fileType = type || 'application/octet-stream';
-    const hash = fileInfo.hash;
-    const metadata = buildUploadMetadata(name, options?.directory);
-    const hashCheck = await trpcMutate<{
-      isExist: boolean;
-      metadata?: { path?: string };
-      url?: string;
-    }>('file.checkFileHash', { hash });
+    const sha256Hex = await computeSha256HexFromFileUri(uploadUri, size);
 
-    let storagePath = hashCheck.metadata?.path || hashCheck.url;
+    let storagePath: string | undefined;
+    let metadata: ReturnType<typeof fileMetadataFromStorageKey> | undefined;
 
-    if (!hashCheck.isExist || !storagePath) {
+    if (!options?.skipDeduplication) {
+      const hashCheck = await trpcMutate<{
+        isExist: boolean;
+        metadata?: { path?: string };
+        url?: string;
+      }>('file.checkFileHash', { hash: sha256Hex, spaceId: options?.spaceId });
+
+      if (hashCheck.isExist) {
+        storagePath = hashCheck.metadata?.path || hashCheck.url;
+        if (storagePath) {
+          metadata = fileMetadataFromStorageKey(storagePath, name);
+        }
+      }
+    }
+
+    if (!storagePath) {
       options?.onProgress?.(5);
-      await uploadFileToSameOrigin(baseUrl, uploadUri, name, metadata.path, fileType, options?.onProgress);
-      storagePath = metadata.path;
+      const prep = await trpcMutate<{
+        presignedUrl: string;
+        sessionId: string;
+        storageKey: string;
+      }>('upload.prepareResourceUpload', {
+        filename: name,
+        fileType,
+        knowledgeBaseId: options?.knowledgeBaseId,
+        parentId: options?.parentId,
+        sha256: sha256Hex,
+        size,
+        spaceId: options?.spaceId,
+      });
+
+      metadata = fileMetadataFromStorageKey(prep.storageKey, name);
+
+      try {
+        await putLocalFileToPresignedUrl(
+          prep.presignedUrl,
+          uploadUri,
+          fileType,
+          options?.onProgress,
+        );
+      } catch {
+        await uploadLocalFileViaUploadSession(
+          baseUrl,
+          uploadUri,
+          name,
+          fileType,
+          prep.sessionId,
+          options?.onProgress,
+        );
+      }
+
+      await trpcMutate('upload.completeResourceUpload', { uploadSessionId: prep.sessionId });
+      storagePath = prep.storageKey;
     }
 
     if (!storagePath) {
       throw new Error('upload path missing');
     }
 
+    const fileMetadata =
+      metadata ?? fileMetadataFromStorageKey(storagePath, name);
+
     const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType,
-      hash,
+      hash: sha256Hex,
       knowledgeBaseId: options?.knowledgeBaseId,
-      metadata,
+      metadata: fileMetadata,
       name,
       parentId: options?.parentId,
-      size: fileInfo.size,
+      size,
+      spaceId: options?.spaceId,
       url: storagePath,
     });
 
-    const resolvedUrl =
-      created.url && !created.url.startsWith('http')
-        ? `${baseUrl}/f/${created.id}`
-        : created.url;
+    const resolvedUrl = resolveRemoteFileUrl(baseUrl, created.id, created.url);
 
     options?.onProgress?.(100);
 
