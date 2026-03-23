@@ -96,7 +96,7 @@ const GroupMessage = memo<GroupMessageProps>(({ id, index, disableEditing, isLat
   const setMessageItemActionElementPortialContext = useSetMessageItemActionElementPortialContext();
   const setMessageItemActionTypeContext = useSetMessageItemActionTypeContext();
 
-  const onMouseEnter: MouseEventHandler<HTMLDivElement> = useCallback(
+  const onShowActions: MouseEventHandler<HTMLDivElement> = useCallback(
     (e) => {
       if (disableEditing) return;
       setMessageItemActionElementPortialContext(e.currentTarget);
@@ -138,7 +138,8 @@ const GroupMessage = memo<GroupMessageProps>(({ id, index, disableEditing, isLat
           memberAvatars={memberAvatars}
         />
       )}
-      onMouseEnter={onMouseEnter}
+      onClick={onShowActions}
+      onMouseEnter={onShowActions}
     >
       {children && children.length > 0 && (
         <Group

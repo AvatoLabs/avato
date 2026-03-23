@@ -538,6 +538,19 @@ interface MobileToolCallChunk {
   type?: string;
 }
 
+/** Detect if payload is ChatToolPayload[] (server format) vs MobileToolCallChunk[] (LLM stream format) */
+const isChatToolPayloadArray = (payload: unknown[]): payload is ChatToolPayload[] =>
+  payload.length > 0 &&
+  payload.every(
+    (item): item is ChatToolPayload =>
+      typeof item === 'object' &&
+      item !== null &&
+      'apiName' in item &&
+      'identifier' in item &&
+      'arguments' in item &&
+      !('function' in item),
+  );
+
 const mergeToolCallChunks = (origin: MobileToolCallChunk[], value: MobileToolCallChunk[]) => {
   const next = [...origin];
 
@@ -1726,8 +1739,13 @@ export const aiChatApi = {
               }
               case 'tool_calls': {
                 const payload = Array.isArray(chunk.data) ? chunk.data : [];
-                rawToolCalls = mergeToolCallChunks(rawToolCalls, payload as MobileToolCallChunk[]);
-                accTools = transformToolCalls(rawToolCalls);
+                if (isChatToolPayloadArray(payload)) {
+                  accTools = payload;
+                  rawToolCalls = [];
+                } else {
+                  rawToolCalls = mergeToolCallChunks(rawToolCalls, payload as MobileToolCallChunk[]);
+                  accTools = transformToolCalls(rawToolCalls);
+                }
                 callbacks.onTools?.(accTools);
                 break;
               }
@@ -2107,8 +2125,8 @@ export interface FolderCrumb {
 
 /** Soft-deleted documents from `document.queryDocuments` with `trash: true` (metadata only). */
 export interface TrashedDocumentItem {
-  fileType: string | null;
   filename: string | null;
+  fileType: string | null;
   id: string;
   title: string | null;
 }

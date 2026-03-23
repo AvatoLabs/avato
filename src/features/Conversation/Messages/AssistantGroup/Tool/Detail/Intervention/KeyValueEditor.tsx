@@ -11,7 +11,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     position: relative;
 
     width: 100%;
-    min-width: 600px;
+    min-width: min(600px, 100%);
     padding: 8px;
     border-radius: ${cssVar.borderRadiusLG};
   `,

@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useUserStore } from '@/store/user';
 
 import { useConversationStore } from '../../../../../store';
@@ -26,6 +27,7 @@ interface ApprovalActionsProps {
 const ApprovalActions = memo<ApprovalActionsProps>(
   ({ approvalMode, messageId, identifier, apiName, onBeforeApprove }) => {
     const { t } = useTranslation(['chat', 'common']);
+    const isMobile = useIsMobile();
     const [rejectReason, setRejectReason] = useState('');
     const [rejectPopoverOpen, setRejectPopoverOpen] = useState(false);
     const [rejectLoading, setRejectLoading] = useState(false);
@@ -81,10 +83,10 @@ const ApprovalActions = memo<ApprovalActionsProps>(
       <Flexbox horizontal gap={8}>
         <Popover
           open={rejectPopoverOpen}
-          placement="bottomRight"
+          placement={isMobile ? 'top' : 'bottomRight'}
           trigger="click"
           content={
-            <Flexbox gap={12} style={{ width: 400 }}>
+            <Flexbox gap={12} style={{ width: isMobile ? 'min(400px, calc(100vw - 32px))' : 400 }}>
               <Flexbox horizontal align={'center'} justify={'space-between'}>
                 <div>{t('tool.intervention.rejectTitle')}</div>
 

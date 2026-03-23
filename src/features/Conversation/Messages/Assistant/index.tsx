@@ -75,7 +75,7 @@ const AssistantMessage = memo<AssistantMessageProps>(
       useSetMessageItemActionElementPortialContext();
     const setMessageItemActionTypeContext = useSetMessageItemActionTypeContext();
 
-    const onMouseEnter: MouseEventHandler<HTMLDivElement> = useCallback(
+    const onShowActions: MouseEventHandler<HTMLDivElement> = useCallback(
       (e) => {
         setMessageItemActionElementPortialContext(e.currentTarget);
         setMessageItemActionTypeContext({ id, index, type: 'assistant' });
@@ -123,8 +123,9 @@ const AssistantMessage = memo<AssistantMessageProps>(
             usage={usage! || metadata}
           />
         }
+        onClick={onShowActions}
         onDoubleClick={onDoubleClick}
-        onMouseEnter={onMouseEnter}
+        onMouseEnter={onShowActions}
       >
         <MessageContent {...item} />
       </ChatItem>

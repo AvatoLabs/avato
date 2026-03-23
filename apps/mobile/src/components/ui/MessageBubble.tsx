@@ -485,84 +485,95 @@ const CompareGroupBlock = memo<{
   childrenMessages: ChatMessage[];
   groupMembersById?: Record<string, GroupMessageSpeaker>;
   groupSupervisorId?: string;
+  markdownRules?: Record<string, any>;
   markdownStyles: Record<string, unknown>;
   onOpenLink: (url?: string) => void;
   t: I18nStore['t'];
-}>(({ childrenMessages, groupMembersById, groupSupervisorId, markdownStyles, onOpenLink, t }) => {
-  const colors = useThemeColors();
-  return (
-    <View className="gap-2">
-      {childrenMessages.map((child) => {
-        const speakerId = child.agentId || groupSupervisorId;
-        const speaker =
-          speakerId != null && groupMembersById ? groupMembersById[speakerId] : undefined;
-        const isSupervisor = Boolean(
-          speaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
-        );
-        const speakerName =
-          speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
-        const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
-        const childContent = preprocessMentionDisplay(
-          preprocessMathBlocks(injectCitationLinks(child.content, child.search?.citations)),
-          t.groupMentionAllMembers,
-        );
+}>(
+  ({
+    childrenMessages,
+    groupMembersById,
+    groupSupervisorId,
+    markdownRules,
+    markdownStyles,
+    onOpenLink,
+    t,
+  }) => {
+    const colors = useThemeColors();
+    return (
+      <View className="gap-2">
+        {childrenMessages.map((child) => {
+          const speakerId = child.agentId || groupSupervisorId;
+          const speaker =
+            speakerId != null && groupMembersById ? groupMembersById[speakerId] : undefined;
+          const isSupervisor = Boolean(
+            speaker?.isSupervisor || (speakerId && speakerId === groupSupervisorId),
+          );
+          const speakerName =
+            speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
+          const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
+          const childContent = preprocessMentionDisplay(
+            preprocessMathBlocks(injectCitationLinks(child.content, child.search?.citations)),
+            t.groupMentionAllMembers,
+          );
 
-        return (
-          <View
-            className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.02] px-3 py-2.5"
-            key={child.id}
-          >
-            <View className="mb-2 flex-row items-center">
-              <GroupSpeakerAvatar fallbackLabel={fallbackLabel} speaker={speaker} />
-              <View className="ml-2 min-w-0 flex-1">
-                <Text
-                  className="text-[12px] font-semibold"
-                  numberOfLines={1}
-                  style={{ color: colors.foreground }}
-                >
-                  {speakerName}
-                </Text>
-                {child.model ? (
+          return (
+            <View
+              className="rounded-2xl border border-foreground/[0.06] bg-foreground/[0.02] px-3 py-2.5"
+              key={child.id}
+            >
+              <View className="mb-2 flex-row items-center">
+                <GroupSpeakerAvatar fallbackLabel={fallbackLabel} speaker={speaker} />
+                <View className="ml-2 min-w-0 flex-1">
                   <Text
-                    className="text-[11px]"
+                    className="text-[12px] font-semibold"
                     numberOfLines={1}
                     style={{ color: colors.foreground }}
                   >
-                    {child.model}
+                    {speakerName}
+                  </Text>
+                  {child.model ? (
+                    <Text
+                      className="text-[11px]"
+                      numberOfLines={1}
+                      style={{ color: colors.foreground }}
+                    >
+                      {child.model}
+                    </Text>
+                  ) : null}
+                </View>
+                {child.createdAt ? (
+                  <Text className="ml-2 text-[10px]" style={{ color: colors.tertiaryText }}>
+                    {getTimeAgo(child.createdAt)}
                   </Text>
                 ) : null}
               </View>
-              {child.createdAt ? (
-                <Text className="ml-2 text-[10px]" style={{ color: colors.tertiaryText }}>
-                  {getTimeAgo(child.createdAt)}
-                </Text>
-              ) : null}
-            </View>
 
-            {childContent ? (
-              <Markdown
-                rules={codeInlineRules}
-                style={markdownStyles as any}
-                onLinkPress={(url) => {
-                  onOpenLink(url);
-                  return false;
-                }}
-              >
-                {childContent}
-              </Markdown>
-            ) : child.reasoning?.content ? (
-              <Text className="text-[14px] leading-6 text-foreground/60">
-                {child.reasoning.content}
-              </Text>
-            ) : (
-              <TypingIndicator color={colors.typingIndicator} />
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-});
+              {childContent ? (
+                <Markdown
+                  rules={markdownRules ?? codeInlineRules}
+                  style={markdownStyles as any}
+                  onLinkPress={(url) => {
+                    onOpenLink(url);
+                    return false;
+                  }}
+                >
+                  {childContent}
+                </Markdown>
+              ) : child.reasoning?.content ? (
+                <Text className="text-[14px] leading-6 text-foreground/60">
+                  {child.reasoning.content}
+                </Text>
+              ) : (
+                <TypingIndicator color={colors.typingIndicator} />
+              )}
+            </View>
+          );
+        })}
+      </View>
+    );
+  },
+);
 
 CompareGroupBlock.displayName = 'CompareGroupBlock';
 
@@ -1454,6 +1465,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                           childrenMessages={compareGroupChildren}
                           groupMembersById={groupMembersById}
                           groupSupervisorId={groupSupervisorId}
+                          markdownRules={markdownRules}
                           markdownStyles={markdownStyles}
                           t={t}
                           onOpenLink={handleOpenLink}
@@ -1471,6 +1483,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                               childrenMessages={compressedGroupMessages}
                               groupMembersById={groupMembersById}
                               groupSupervisorId={groupSupervisorId}
+                              markdownRules={markdownRules}
                               markdownStyles={markdownStyles}
                               t={t}
                               onOpenLink={handleOpenLink}
@@ -1760,7 +1773,7 @@ const formatToolDisplayTitle = (
   const args = safeParseJsonRecord(tool.arguments);
 
   const params = Object.entries(args)
-    .slice(0, 1)
+    .slice(0, 3)
     .map(([key, value]) => `${key}: ${formatToolArgumentValue(value)}`);
 
   return {
@@ -2829,6 +2842,7 @@ const ToolCallsBlock = memo<{
                 <ToolCard
                   collapsible
                   argumentsText={argumentsText || undefined}
+                  error={tool.pluginError}
                   interventionContent={interventionContent}
                   key={tool.id}
                   resultReady={hasResult}
@@ -2856,6 +2870,7 @@ const ToolCallsBlock = memo<{
                 collapsible
                 argumentsText={argumentsText || undefined}
                 content={tool.result_content || undefined}
+                error={tool.pluginError}
                 interventionContent={interventionContent}
                 key={tool.id}
                 resultReady={hasResult}

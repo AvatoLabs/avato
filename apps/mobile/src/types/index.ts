@@ -147,6 +147,7 @@ export interface ChatToolPayload {
   id: string;
   identifier: string;
   intervention?: ToolIntervention;
+  pluginError?: unknown;
   pluginState?: Record<string, unknown>;
   result_content?: string;
   result_msg_id?: string;

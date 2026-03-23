@@ -59,7 +59,7 @@ const UserMessage = memo<UserMessageProps>(({ id, disableEditing, index }) => {
   const setMessageItemActionElementPortialContext = useSetMessageItemActionElementPortialContext();
   const setMessageItemActionTypeContext = useSetMessageItemActionTypeContext();
 
-  const onMouseEnter: MouseEventHandler<HTMLDivElement> = useCallback(
+  const onShowActions: MouseEventHandler<HTMLDivElement> = useCallback(
     (e) => {
       if (disableEditing) return;
       setMessageItemActionElementPortialContext(e.currentTarget);
@@ -95,8 +95,9 @@ const UserMessage = memo<UserMessageProps>(({ id, disableEditing, index }) => {
           index={index}
         />
       }
+      onClick={onShowActions}
       onDoubleClick={onDoubleClick}
-      onMouseEnter={onMouseEnter}
+      onMouseEnter={onShowActions}
     >
       <UserMessageContent {...item} />
     </ChatItem>

@@ -7,6 +7,7 @@ import { memo, Suspense, useMemo } from 'react';
 import ChatMiniMap from '@/features/ChatMiniMap';
 import { ChatList, ConversationProvider, TodoProgress } from '@/features/Conversation';
 import ZenModeToast from '@/features/ZenModeToast';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useOperationState } from '@/hooks/useOperationState';
 import { useChatStore } from '@/store/chat';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
@@ -29,6 +30,7 @@ const log = debug('lobe-render:agent:ConversationArea');
  */
 const Conversation = memo(() => {
   const context = useAgentContext();
+  const isMobile = useIsMobile();
 
   // Get raw dbMessages from ChatStore for this context
   // ConversationStore will parse them internally to generate displayMessages
@@ -73,10 +75,14 @@ const Conversation = memo(() => {
       <MainChatInput />
       <ChatHydration />
       <ThreadHydration />
-      <ChatMiniMap />
-      <Suspense>
-        <MessageFromUrl />
-      </Suspense>
+      {!isMobile && (
+        <>
+          <ChatMiniMap />
+          <Suspense>
+            <MessageFromUrl />
+          </Suspense>
+        </>
+      )}
     </ConversationProvider>
   );
 });

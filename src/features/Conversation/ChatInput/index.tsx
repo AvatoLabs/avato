@@ -14,6 +14,7 @@ import {
   type SendButtonHandler,
   type SendButtonProps,
 } from '@/features/ChatInput/store/initialState';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useChatStore } from '@/store/chat';
 import { fileChatSelectors, useFileStore } from '@/store/file';
 
@@ -99,6 +100,7 @@ const ChatInput = memo<ChatInputProps>(
     skipScrollMarginWithList,
   }) => {
     const { t } = useTranslation('chat');
+    const mobile = useIsMobile();
 
     // ConversationStore state
     const [agentId, inputMessage, sendMessage, stopGenerating] = useConversationStore((s) => [
@@ -196,6 +198,7 @@ const ChatInput = memo<ChatInputProps>(
         allowExpand={allowExpand}
         leftActions={leftActions}
         mentionItems={mentionItems}
+        mobile={mobile}
         rightActions={rightActions}
         sendButtonProps={sendButtonProps}
         sendMenu={sendMenu}

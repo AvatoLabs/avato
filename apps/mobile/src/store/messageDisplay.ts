@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatToolPayload } from '../types';
+import { mergeToolPayloadsCore } from './chatHelpers';
 
 const MOBILE_ASSISTANT_CHAIN_ACTION_MESSAGE_ID = 'mobileAssistantChainActionMessageId';
 
@@ -11,39 +12,7 @@ const mergeToolPayloadLists = (
 ) => {
   if (!previous?.length) return incoming?.length ? [...incoming] : undefined;
   if (!incoming?.length) return [...previous];
-
-  const merged = new Map<string, ChatToolPayload>();
-  const order: string[] = [];
-  const ensureKey = (tool: ChatToolPayload) => tool.id || `${tool.identifier}:${tool.apiName}`;
-
-  for (const tool of previous) {
-    const key = ensureKey(tool);
-    order.push(key);
-    merged.set(key, tool);
-  }
-
-  for (const tool of incoming) {
-    const key = ensureKey(tool);
-
-    if (!merged.has(key)) {
-      order.push(key);
-      merged.set(key, tool);
-      continue;
-    }
-
-    const existing = merged.get(key)!;
-    merged.set(key, {
-      ...existing,
-      ...tool,
-      intervention: tool.intervention ?? existing.intervention,
-      pluginState: tool.pluginState ?? existing.pluginState,
-      result_content:
-        tool.result_content !== undefined ? tool.result_content : existing.result_content,
-      result_msg_id: tool.result_msg_id ?? existing.result_msg_id,
-    });
-  }
-
-  return order.map((key) => merged.get(key)!).filter(Boolean);
+  return mergeToolPayloadsCore(previous, incoming, { autoApproveOnResult: false });
 };
 
 const buildToolPayloadFromMessage = (message: ChatMessage) => {
@@ -56,6 +25,7 @@ const buildToolPayloadFromMessage = (message: ChatMessage) => {
     id: message.toolCallId || message.id,
     identifier,
     intervention: message.pluginIntervention ?? message.plugin?.intervention,
+    pluginError: message.pluginError,
     pluginState: isRecord(message.pluginState) ? message.pluginState : undefined,
     result_content: message.content !== undefined ? message.content : undefined,
     result_msg_id: message.id,

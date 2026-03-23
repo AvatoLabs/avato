@@ -55,7 +55,7 @@ const CouncilMember = memo<CouncilMemberProps>(({ item, index }) => {
   const setMessageItemActionElementPortialContext = useSetMessageItemActionElementPortialContext();
   const setMessageItemActionTypeContext = useSetMessageItemActionTypeContext();
 
-  const onMouseEnter: MouseEventHandler<HTMLDivElement> = useCallback(
+  const onShowActions: MouseEventHandler<HTMLDivElement> = useCallback(
     (e) => {
       setMessageItemActionElementPortialContext(e.currentTarget);
       setMessageItemActionTypeContext({ id, index, type: 'assistant' });
@@ -91,7 +91,8 @@ const CouncilMember = memo<CouncilMemberProps>(({ item, index }) => {
           usage={usage! || metadata}
         />
       }
-      onMouseEnter={onMouseEnter}
+      onClick={onShowActions}
+      onMouseEnter={onShowActions}
     >
       <AutoScrollShadow content={content} streaming={generating}>
         <MessageContent {...item} />

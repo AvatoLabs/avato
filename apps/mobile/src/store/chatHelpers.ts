@@ -34,26 +34,30 @@ export const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatT
     type: 'function',
   }));
 
-export const mergeToolPayloads = (
-  previous: ChatToolPayload[] | undefined,
-  incoming: ChatToolPayload[] | undefined,
-): ChatToolPayload[] | undefined => {
-  if (!previous?.length) return incoming?.length ? incoming : undefined;
-  if (!incoming?.length) return previous;
+const ensureToolKey = (tool: ChatToolPayload) => tool.id || `${tool.identifier}:${tool.apiName}`;
+
+/** Core merge logic for tool payload lists. Used by both mergeToolPayloads and mergeToolPayloadLists. */
+export const mergeToolPayloadsCore = (
+  previous: ChatToolPayload[],
+  incoming: ChatToolPayload[],
+  options?: { autoApproveOnResult?: boolean },
+): ChatToolPayload[] => {
+  if (previous.length === 0) return incoming;
+  if (incoming.length === 0) return previous;
 
   const merged = new Map<string, ChatToolPayload>();
   const order: string[] = [];
 
-  const ensureKey = (tool: ChatToolPayload) => tool.id || `${tool.identifier}:${tool.apiName}`;
-
   for (const tool of previous) {
-    const key = ensureKey(tool);
+    const key = ensureToolKey(tool);
     order.push(key);
     merged.set(key, tool);
   }
 
+  const autoApprove = options?.autoApproveOnResult !== false;
+
   for (const tool of incoming) {
-    const key = ensureKey(tool);
+    const key = ensureToolKey(tool);
     if (!merged.has(key)) {
       order.push(key);
       merged.set(key, tool);
@@ -61,12 +65,13 @@ export const mergeToolPayloads = (
     }
 
     const existing = merged.get(key)!;
-    const next = {
+    const hasResult = tool.result_content !== undefined || !!tool.result_msg_id;
+    const mergedTool = {
       ...existing,
       ...tool,
       intervention:
-        tool.result_content !== undefined || tool.result_msg_id
-          ? (tool.intervention ?? { status: 'approved' })
+        autoApprove && hasResult
+          ? (tool.intervention ?? { status: 'approved' as const })
           : (tool.intervention ?? existing.intervention),
       pluginState: tool.pluginState ?? existing.pluginState,
       result_content:
@@ -74,10 +79,19 @@ export const mergeToolPayloads = (
       result_msg_id: tool.result_msg_id ?? existing.result_msg_id,
     } satisfies ChatToolPayload;
 
-    merged.set(key, next);
+    merged.set(key, mergedTool);
   }
 
   return order.map((key) => merged.get(key)!).filter(Boolean);
+};
+
+export const mergeToolPayloads = (
+  previous: ChatToolPayload[] | undefined,
+  incoming: ChatToolPayload[] | undefined,
+): ChatToolPayload[] | undefined => {
+  if (!previous?.length) return incoming?.length ? incoming : undefined;
+  if (!incoming?.length) return previous;
+  return mergeToolPayloadsCore(previous, incoming, { autoApproveOnResult: true });
 };
 
 export const mergeResolvedToolPayloads = (
