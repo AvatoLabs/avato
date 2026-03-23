@@ -25,11 +25,14 @@ const MOBILE_NAV_ROUTES = new Set([
   '/me',
 ]);
 
+const isResourceRoute = (pathname: string) =>
+  pathname === '/resource' || pathname.startsWith('/resource/');
+
 const MobileMainLayout: FC = () => {
   const { showCloudPromotion } = useServerConfigStore(featureFlagsSelectors);
   const location = useLocation();
   const pathname = location.pathname;
-  const showNav = MOBILE_NAV_ROUTES.has(pathname);
+  const showNav = MOBILE_NAV_ROUTES.has(pathname) || isResourceRoute(pathname);
   return (
     <>
       <NavigatorRegistrar />

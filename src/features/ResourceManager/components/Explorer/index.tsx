@@ -8,7 +8,9 @@ import { useResourceManagerUrlSync } from '@/routes/(main)/resource/features/hoo
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { sortFileList } from '@/routes/(main)/resource/features/store/selectors';
 import { useVisibleResources } from '@/store/file/slices/resource/hooks';
+import { useServerConfigStore } from '@/store/serverConfig';
 
+import LibraryListSection from '../LibraryListSection';
 import EmptyPlaceholder from './EmptyPlaceholder';
 import Header from './Header';
 import ListView from './ListView';
@@ -103,10 +105,13 @@ const ResourceExplorer = memo(() => {
   }, [category, libraryId, searchQuery, setSelectedFileIds]);
 
   const showEmptyStatus = !isLoading && !isValidating && data.length === 0 && !currentFolderSlug;
+  const isMobile = useServerConfigStore((s) => s.isMobile);
+  const showLibraryListSection = isMobile && !libraryId;
 
   return (
     <Flexbox height={'100%'}>
       <Header />
+      {showLibraryListSection && <LibraryListSection />}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {showEmptyStatus ? (
           <EmptyPlaceholder />

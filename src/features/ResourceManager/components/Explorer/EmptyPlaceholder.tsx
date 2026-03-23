@@ -1,6 +1,7 @@
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,6 +10,7 @@ import { useCreateNewModal } from '@/features/LibraryModal';
 import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useFileStore } from '@/store/file';
+import { useServerConfigStore } from '@/store/serverConfig';
 
 const ICON_SIZE = 80;
 
@@ -62,8 +64,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
-const EmptyPlaceholder = () => {
+const EmptyPlaceholder = memo(() => {
   const { t } = useTranslation('components');
+  const isMobile = useServerConfigStore((s) => s.isMobile);
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
   const navigate = useNavigate();
@@ -78,7 +81,7 @@ const EmptyPlaceholder = () => {
         <Text as={'h4'}>{t('FileManager.emptyStatus.title')}</Text>
         <Text type={'secondary'}>{t('FileManager.emptyStatus.or')}</Text>
       </Flexbox>
-      <Flexbox horizontal gap={12}>
+      <Flexbox gap={12} horizontal={!isMobile}>
         {!libraryId && (
           <Flexbox
             className={styles.card}
@@ -150,6 +153,8 @@ const EmptyPlaceholder = () => {
       </Flexbox>
     </Center>
   );
-};
+});
+
+EmptyPlaceholder.displayName = 'EmptyPlaceholder';
 
 export default EmptyPlaceholder;

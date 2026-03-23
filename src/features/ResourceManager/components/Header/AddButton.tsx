@@ -3,7 +3,7 @@
 import { FILE_URL } from '@lobechat/business-const';
 import { Notion } from '@lobehub/icons';
 import { type MenuProps } from '@lobehub/ui';
-import { Button, DropdownMenu, Icon } from '@lobehub/ui';
+import { ActionIcon, Button, DropdownMenu, Icon } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { type ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
@@ -16,6 +16,7 @@ import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useFileStore } from '@/store/file';
+import { useServerConfigStore } from '@/store/serverConfig';
 import { FilesTabs } from '@/types/files';
 
 import useNotionImport from './hooks/useNotionImport';
@@ -41,8 +42,15 @@ const getAcceptedFileTypes = (category: FilesTabs): string | undefined => {
   }
 };
 
-const AddButton = () => {
+interface AddButtonProps {
+  /** Compact mode: icon-only, for mobile toolbars */
+  compact?: boolean;
+}
+
+const AddButton = ({ compact }: AddButtonProps) => {
   const { t } = useTranslation('file');
+  const isMobile = useServerConfigStore((s) => s.isMobile);
+  const useCompact = compact ?? isMobile;
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
   const uploadFolderWithStructure = useFileStore((s) => s.uploadFolderWithStructure);
   const createResourceAndSync = useFileStore((s) => s.createResourceAndSync);
@@ -274,6 +282,19 @@ const AddButton = () => {
     ],
   );
 
+  const trigger = useCompact ? (
+    <ActionIcon
+      data-no-highlight
+      icon={RESOURCE_ENTRY_ICONS.plus}
+      size="small"
+      title={t('addLibrary')}
+    />
+  ) : (
+    <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} type="primary">
+      {t('addLibrary')}
+    </Button>
+  );
+
   return (
     <>
       <DropdownMenu
@@ -283,9 +304,7 @@ const AddButton = () => {
         trigger="both"
         onOpenChange={setMenuOpen}
       >
-        <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} type="primary">
-          {t('addLibrary')}
-        </Button>
+        {trigger}
       </DropdownMenu>
       <GuideModal
         cancelText={t('header.actions.notionGuide.cancel')}

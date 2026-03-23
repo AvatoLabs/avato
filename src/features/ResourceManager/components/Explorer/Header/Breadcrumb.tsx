@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { buildResourceFolderPath, buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useFolderPath } from '@/routes/(main)/resource/features/hooks/useFolderPath';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useFileStore } from '@/store/file';
@@ -51,8 +52,11 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
   const [searchParams] = useSearchParams();
   const { currentFolderSlug, knowledgeBaseId: currentKnowledgeBaseId } = useFolderPath();
 
-  const setMode = useResourceManagerStore((s) => s.setMode);
-  const setCurrentViewItemId = useResourceManagerStore((s) => s.setCurrentViewItemId);
+  const [setMode, setCurrentViewItemId, spaceId] = useResourceManagerStore((s) => [
+    s.setMode,
+    s.setCurrentViewItemId,
+    s.spaceId,
+  ]);
 
   const baseKnowledgeBaseId = currentKnowledgeBaseId;
   const knowledgeBaseName = useKnowledgeBaseStore(
@@ -97,8 +101,8 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
 
     const queryString = newParams.toString();
     const basePath = slug
-      ? `/resource/library/${baseKnowledgeBaseId}/${slug}`
-      : `/resource/library/${baseKnowledgeBaseId}`;
+      ? buildResourceFolderPath(spaceId, baseKnowledgeBaseId!, slug)
+      : buildResourceLibraryPath(spaceId, baseKnowledgeBaseId!);
 
     navigate(queryString ? `${basePath}?${queryString}` : basePath);
   };

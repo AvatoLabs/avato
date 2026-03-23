@@ -450,7 +450,13 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                     }}
                   >
                     <Flexbox flex={1} gap={6}>
-                      <Text strong>{link.id}</Text>
+                      <Text strong>
+                        {link.createdAt
+                          ? t('share.links.createdAt', {
+                              date: new Date(link.createdAt).toLocaleString(),
+                            })
+                          : link.id}
+                      </Text>
                       <Flexbox horizontal gap={8} wrap={'wrap'}>
                         <Tag size={'small'}>
                           {t('share.links.expiresAt', { date: link.expiresAt.toLocaleString() })}

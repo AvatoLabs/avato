@@ -35,6 +35,7 @@
   "FileManager.actions.rename": "重命名",
   "FileManager.actions.renameError": "重命名遇到了问题，请重试",
   "FileManager.actions.renameSuccess": "重命名成功",
+  "FileManager.actions.showFolderTree": "文件夹树",
   "FileManager.bottom": "已到达页面底部。",
   "FileManager.config.showFilesInLibrary": "在资料库中显示内容",
   "FileManager.emptyStatus.actions.file": "上传文件",

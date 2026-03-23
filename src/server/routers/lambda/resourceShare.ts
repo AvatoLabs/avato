@@ -84,9 +84,7 @@ export const resourceShareRouter = router({
       return {
         expiresAt,
         fileShareDownloadUrl:
-          registry.kind === 'file'
-            ? `${appEnv.APP_URL}/share/f/${rawToken}`
-            : undefined,
+          registry.kind === 'file' ? `${appEnv.APP_URL}/share/f/${rawToken}` : undefined,
         id: link.id,
         shareUrl: `${appEnv.APP_URL}/share/r/${rawToken}`,
       };
@@ -265,7 +263,8 @@ export const resourceShareRouter = router({
         resourceUid: registry.resourceUid,
       });
 
-      return ctx.resourceModel.listShareLinks(registry.resourceUid);
+      const links = await ctx.resourceModel.listShareLinks(registry.resourceUid);
+      return links.map(({ tokenHash, passwordHash, ...rest }) => rest);
     }),
 
   listSharedWithMe: shareProcedure.query(async ({ ctx }) => {

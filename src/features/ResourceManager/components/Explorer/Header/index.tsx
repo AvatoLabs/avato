@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavHeader from '@/features/NavHeader';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
+import { useServerConfigStore } from '@/store/serverConfig';
 import { FilesTabs } from '@/types/files';
 
 import AddButton from '../../Header/AddButton';
@@ -34,6 +35,7 @@ const Header = memo(() => {
   ]);
   const selectCount = selectFileIds.length;
   const isMultiSelected = selectCount > 1;
+  const isMobile = useServerConfigStore((s) => s.isMobile);
 
   // If no libraryId, show category name or "Resource" for All
   const leftContent = isMultiSelected ? (
@@ -99,6 +101,7 @@ const Header = memo(() => {
   return (
     <NavHeader
       left={leftContent}
+      showTogglePanelButton={!isMobile}
       right={
         <>
           <SearchInput />

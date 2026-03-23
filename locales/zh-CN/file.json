@@ -133,6 +133,7 @@
   "share.links.copyDirectDownload": "复制直链下载地址",
   "share.links.create": "创建链接",
   "share.links.created": "分享链接已创建",
+  "share.links.createdAt": "创建于 {{date}}",
   "share.links.directDownloadCopied": "直链下载地址已复制",
   "share.links.directDownloadHint": "这是仅包含 token 的下载地址（路径中不含文件 id）。如果链接启用了密码保护，请追加 ?password=…",
   "share.links.disable": "停用",

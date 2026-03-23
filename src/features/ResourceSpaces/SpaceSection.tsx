@@ -29,7 +29,7 @@ interface CreateSpaceFormProps {
   onCreated: (spaceId: string) => void;
 }
 
-const CreateSpaceForm = memo<CreateSpaceFormProps>(({ onCreated }) => {
+export const CreateSpaceForm = memo<CreateSpaceFormProps>(({ onCreated }) => {
   const { t } = useTranslation('file');
   const { close } = useModalContext();
   const [description, setDescription] = useState('');

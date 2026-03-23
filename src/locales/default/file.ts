@@ -137,6 +137,7 @@ export default {
   'share.links.copyDirectDownload': 'Copy direct download link',
   'share.links.copied': 'Share link copied',
   'share.links.created': 'Share link created',
+  'share.links.createdAt': 'Created at {{date}}',
   'share.links.directDownloadCopied': 'Direct download link copied',
   'share.links.directDownloadHint':
     'Token-only download URL (no file id in path). Append ?password=… if the link is password-protected.',

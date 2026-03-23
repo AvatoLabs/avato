@@ -36,6 +36,7 @@ export default {
   'FileManager.actions.moveToOtherLibrary': 'Move to another Library',
   'FileManager.actions.moveToRoot': 'Move to root directory',
   'FileManager.actions.moving': 'Moving...',
+  'FileManager.actions.showFolderTree': 'Folder tree',
   'FileManager.actions.removeFromLibrary': 'Remove from Library',
   'FileManager.actions.removeFromLibrarySuccess': 'File removed successfully.',
   'FileManager.actions.rename': 'Rename',
