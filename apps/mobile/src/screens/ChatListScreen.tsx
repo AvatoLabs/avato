@@ -98,6 +98,7 @@ import {
   topicApi,
   userApi,
 } from '../lib/api';
+import { useMainTabBottomInsets } from '../lib/bottomChrome';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -175,6 +176,8 @@ const trimSearchSnippet = (value: string, maxLength = 88) => {
 };
 
 const DIRECTORY_DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 390);
+/** Max `absoluteX` from screen left to allow edge-swipe open (avoid a full-height hit overlay). */
+const DIRECTORY_EDGE_OPEN_MAX_X = 28;
 /** Collapsed recents in directory drawer before "Show all". */
 const SIDEBAR_RECENTS_VISIBLE = 20;
 const SIDEBAR_TAG_FILTER_ALL = '__all__';
@@ -435,6 +438,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
 
   const [heroText, setHeroText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const bottomChrome = useMainTabBottomInsets(keyboardOffset > 0);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SearchSessionResult[]>([]);
@@ -502,7 +506,6 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
   const [persistedSkillIdentifiers, setPersistedSkillIdentifiers] = useState<string[]>([]);
   const drawerTranslateX = useSharedValue(-DIRECTORY_DRAWER_WIDTH);
   const drawerBackdropOpacity = useSharedValue(0);
-  const inputPaddingBottom = Math.max(insets.bottom, 8);
   const hints = useMemo(
     () => [t.chatAskAnything, t.chatHint1, t.chatHint2, t.chatHint3, t.chatHint4],
     [t],
@@ -2288,1023 +2291,1032 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
       drawerBackdropOpacity.value = withTiming(1, { duration: 180 });
     });
 
-  const openDrawerGesture = Gesture.Pan()
-    .enabled(!directoryMounted)
-    .activeOffsetX([16, 999])
-    .failOffsetY([-18, 18])
-    .onEnd((event) => {
-      const shouldOpen = event.translationX > 56 || event.velocityX > 480;
+  const openDrawerGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!directoryMounted)
+        .manualActivation(true)
+        .onTouchesDown((e, stateManager) => {
+          'worklet';
+          const touch = e.allTouches[0];
+          if (touch !== undefined && touch.absoluteX <= DIRECTORY_EDGE_OPEN_MAX_X) {
+            stateManager.activate();
+          } else {
+            stateManager.fail();
+          }
+        })
+        .activeOffsetX([16, 999])
+        .failOffsetY([-18, 18])
+        .onEnd((event) => {
+          'worklet';
+          const shouldOpen = event.translationX > 56 || event.velocityX > 480;
 
-      if (shouldOpen) {
-        runOnJS(setDirectoryVisible)(true);
-      }
-    });
+          if (shouldOpen) {
+            runOnJS(setDirectoryVisible)(true);
+          }
+        }),
+    [directoryMounted],
+  );
 
   return (
-    <View className="flex-1 bg-background">
-      {!directoryMounted ? (
-        <GestureDetector gesture={openDrawerGesture}>
-          <View
-            pointerEvents="box-only"
-            style={{
-              bottom: 0,
-              left: 0,
-              position: 'absolute',
-              top: 0,
-              width: 52,
-              zIndex: 30,
-            }}
-          />
-        </GestureDetector>
-      ) : null}
-      <ChatListHeader
-        directoryVisible={directoryVisible}
-        subtitle={selectedModel}
-        title={getSessionDisplayTitle(draftSession)}
-        avatar={
-          <SessionLogo
-            isInbox={draftSessionIsInbox}
-            providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
-            size={34}
-            avatar={
-              draftSessionIsInbox
-                ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
-                : draftSession?.avatar
-            }
-            provider={
-              draftSessionIsInbox
-                ? undefined
-                : draftSession?.provider ||
-                  (draftSession?.model
-                    ? inferProviderFromModelId(draftSession.model)
-                    : undefined) ||
-                  selectedProvider ||
-                  undefined
-            }
-          />
-        }
-        onOpenAssistantPicker={() => {
-          haptics.light();
-          setDraftAssistantPickerVisible(true);
-        }}
-        onOpenDirectory={() => {
-          haptics.light();
-          setDirectoryVisible(true);
-        }}
-      />
-
-      <View className="flex-1">
-        <ScrollView
-          className="flex-1"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: insets.bottom + 116,
-            paddingTop: 18,
-          }}
-          refreshControl={
-            <RefreshControl
-              colors={[colors.primary]}
-              refreshing={refreshing}
-              tintColor={colors.primary}
-              onRefresh={onRefresh}
+    <GestureDetector gesture={openDrawerGesture}>
+      <View className="flex-1 bg-background">
+        <ChatListHeader
+          directoryVisible={directoryVisible}
+          subtitle={selectedModel}
+          title={getSessionDisplayTitle(draftSession)}
+          avatar={
+            <SessionLogo
+              isInbox={draftSessionIsInbox}
+              providerLogo={draftSessionIsInbox ? undefined : toolbarProviderLogo}
+              size={34}
+              avatar={
+                draftSessionIsInbox
+                  ? draftSession?.avatar || DEFAULT_INBOX_AVATAR
+                  : draftSession?.avatar
+              }
+              provider={
+                draftSessionIsInbox
+                  ? undefined
+                  : draftSession?.provider ||
+                    (draftSession?.model
+                      ? inferProviderFromModelId(draftSession.model)
+                      : undefined) ||
+                    selectedProvider ||
+                    undefined
+              }
             />
           }
-        >
-          <View
-            style={{
-              minHeight: homeHeroMinHeight,
-              paddingTop: 10,
-            }}
-          >
-            {sessionErrorMessage ? (
-              <Animated.View entering={enteringSection(180)}>
-                <View className="px-5 pt-4">
-                  <View
-                    className="rounded-2xl px-4 py-4"
-                    style={{ backgroundColor: colors.fillTertiary }}
-                  >
-                    <Text className="text-[14px] font-semibold text-foreground">
-                      {sessionErrorMessage}
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      className="mt-3 rounded-full self-start px-4 py-2"
-                      style={{ backgroundColor: colors.primary }}
-                      onPress={() => void onRefresh()}
-                    >
-                      <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Animated.View>
-            ) : (
-              <Animated.View entering={enteringEmptyState()}>
-                <EmptyState
-                  compact
-                  className="px-5 pb-2 pt-6"
-                  description={t.chatEmptyDesc}
-                  iconVariant="chat"
-                  title={t.chatEmptyWave}
-                  action={
-                    <Animated.View
-                      className="w-full items-center"
-                      entering={enteringSection(200)}
-                      style={{ alignSelf: 'center', maxWidth: 320 }}
-                    >
-                      <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
-                        {homeSuggestions.map(({ icon: Icon, label }) => (
-                          <QuickActionChip
-                            className="w-[48.5%] justify-center px-4 py-3"
-                            key={label}
-                            label={label}
-                            icon={
-                              <Icon
-                                color={colors.primary}
-                                size={15}
-                                strokeWidth={tokens.icon.strokeWidth}
-                              />
-                            }
-                            onPress={() => {
-                              haptics.light();
-                              setHeroText(label);
-                            }}
-                          />
-                        ))}
-                      </View>
-                    </Animated.View>
-                  }
-                />
-              </Animated.View>
-            )}
-          </View>
-        </ScrollView>
+          onOpenAssistantPicker={() => {
+            haptics.light();
+            setDraftAssistantPickerVisible(true);
+          }}
+          onOpenDirectory={() => {
+            haptics.light();
+            setDirectoryVisible(true);
+          }}
+        />
 
-        <Animated.View
-          style={[
-            {
-              paddingBottom: inputPaddingBottom,
-              paddingHorizontal: 16,
-              paddingTop: 4,
-            },
-            composerLiftStyle,
-          ]}
-        >
-          <ChatComposerBody
-            textEditable
-            active={composerActive}
-            canSend={Boolean(heroText.trim()) || pendingFiles.length > 0}
-            memoryEnabled={memoryEnabled}
-            modelDrawerVisible={modelDrawerVisible}
-            pendingFilesCount={pendingFiles.length}
-            placeholder={hints[hintIndex]}
-            pluginsEnabled={enabledSkills.size > 0}
-            providerLogoError={providerLogoError}
-            searchEnabled={webSearchEnabled}
-            toolbarProviderLogo={toolbarProviderLogo}
-            value={heroText}
-            variant="home"
-            topSlot={
-              pendingFiles.length > 0 ? (
-                <View className="px-3 pt-2">
-                  <FilePreview />
-                </View>
-              ) : undefined
-            }
-            onAttach={handleAttach}
-            onChangeText={setHeroText}
-            onMemoryPress={handleToggleMemory}
-            onModelPress={handleModelPress}
-            onPluginsPress={handlePluginsPress}
-            onProviderLogoError={() => setProviderLogoError(true)}
-            onSend={handleHeroSubmit}
-            onToggleSearch={handleToggleWebSearch}
-          />
-        </Animated.View>
-      </View>
-
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        accessibilityLabel={t.tabChats}
-        animationType="none"
-        visible={directoryMounted}
-        onRequestClose={() => setDirectoryVisible(false)}
-      >
         <View className="flex-1">
+          <ScrollView
+            className="flex-1"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: bottomChrome.homeScrollPaddingBottom,
+              paddingTop: 18,
+            }}
+            refreshControl={
+              <RefreshControl
+                colors={[colors.primary]}
+                refreshing={refreshing}
+                tintColor={colors.primary}
+                onRefresh={onRefresh}
+              />
+            }
+          >
+            <View
+              style={{
+                minHeight: homeHeroMinHeight,
+                paddingTop: 10,
+              }}
+            >
+              {sessionErrorMessage ? (
+                <Animated.View entering={enteringSection(180)}>
+                  <View className="px-5 pt-4">
+                    <View
+                      className="rounded-2xl px-4 py-4"
+                      style={{ backgroundColor: colors.fillTertiary }}
+                    >
+                      <Text className="text-[14px] font-semibold text-foreground">
+                        {sessionErrorMessage}
+                      </Text>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        className="mt-3 rounded-full self-start px-4 py-2"
+                        style={{ backgroundColor: colors.primary }}
+                        onPress={() => void onRefresh()}
+                      >
+                        <Text className="text-[13px] font-semibold text-white">{t.errorRetry}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Animated.View>
+              ) : (
+                <Animated.View entering={enteringEmptyState()}>
+                  <EmptyState
+                    compact
+                    className="px-5 pb-2 pt-6"
+                    description={t.chatEmptyDesc}
+                    iconVariant="chat"
+                    title={t.chatEmptyWave}
+                    action={
+                      <Animated.View
+                        className="w-full items-center"
+                        entering={enteringSection(200)}
+                        style={{ alignSelf: 'center', maxWidth: 320 }}
+                      >
+                        <View className="mt-3 w-full flex-row flex-wrap justify-between gap-y-3">
+                          {homeSuggestions.map(({ icon: Icon, label }) => (
+                            <QuickActionChip
+                              className="w-[48.5%] justify-center px-4 py-3"
+                              key={label}
+                              label={label}
+                              icon={
+                                <Icon
+                                  color={colors.primary}
+                                  size={15}
+                                  strokeWidth={tokens.icon.strokeWidth}
+                                />
+                              }
+                              onPress={() => {
+                                haptics.light();
+                                setHeroText(label);
+                              }}
+                            />
+                          ))}
+                        </View>
+                      </Animated.View>
+                    }
+                  />
+                </Animated.View>
+              )}
+            </View>
+          </ScrollView>
+
           <Animated.View
             style={[
               {
-                backgroundColor: colors.modalOverlay,
-                bottom: 0,
-                left: 0,
-                position: 'absolute',
-                right: 0,
-                top: 0,
+                paddingBottom: bottomChrome.composerPaddingBottom,
+                paddingHorizontal: 16,
+                paddingTop: 4,
               },
-              drawerBackdropStyle,
+              composerLiftStyle,
             ]}
           >
-            <Pressable
-              accessibilityElementsHidden
-              className="flex-1"
-              importantForAccessibility="no-hide-descendants"
-              onPress={() => {
-                haptics.light();
-                setDirectoryVisible(false);
-              }}
+            <ChatComposerBody
+              textEditable
+              active={composerActive}
+              canSend={Boolean(heroText.trim()) || pendingFiles.length > 0}
+              memoryEnabled={memoryEnabled}
+              modelDrawerVisible={modelDrawerVisible}
+              pendingFilesCount={pendingFiles.length}
+              placeholder={hints[hintIndex]}
+              pluginsEnabled={enabledSkills.size > 0}
+              providerLogoError={providerLogoError}
+              searchEnabled={webSearchEnabled}
+              toolbarProviderLogo={toolbarProviderLogo}
+              value={heroText}
+              variant="home"
+              topSlot={
+                pendingFiles.length > 0 ? (
+                  <View className="px-3 pt-2">
+                    <FilePreview />
+                  </View>
+                ) : undefined
+              }
+              onAttach={handleAttach}
+              onChangeText={setHeroText}
+              onMemoryPress={handleToggleMemory}
+              onModelPress={handleModelPress}
+              onPluginsPress={handlePluginsPress}
+              onProviderLogoError={() => setProviderLogoError(true)}
+              onSend={handleHeroSubmit}
+              onToggleSearch={handleToggleWebSearch}
             />
           </Animated.View>
-          <GestureDetector gesture={drawerGesture}>
+        </View>
+
+        <Modal
+          accessibilityViewIsModal
+          transparent
+          accessibilityLabel={t.tabChats}
+          animationType="none"
+          visible={directoryMounted}
+          onRequestClose={() => setDirectoryVisible(false)}
+        >
+          <View className="flex-1">
             <Animated.View
-              className="h-full overflow-hidden"
               style={[
                 {
-                  backgroundColor: colors.background,
-                  borderBottomRightRadius: 28,
-                  borderColor: colors.borderSubtle,
-                  borderRightWidth: StyleSheet.hairlineWidth,
-                  borderTopRightRadius: 28,
-                  elevation: 24,
-                  paddingTop: insets.top + 6,
-                  shadowColor: colors.shadow,
-                  shadowOffset: { height: 12, width: -4 },
-                  shadowOpacity: 0.14,
-                  shadowRadius: 20,
-                  width: DIRECTORY_DRAWER_WIDTH,
+                  backgroundColor: colors.modalOverlay,
+                  bottom: 0,
+                  left: 0,
+                  position: 'absolute',
+                  right: 0,
+                  top: 0,
                 },
-                drawerStyle,
+                drawerBackdropStyle,
               ]}
             >
-              <View
-                accessible={false}
-                className="items-center pb-2 pt-0.5"
+              <Pressable
+                accessibilityElementsHidden
+                className="flex-1"
                 importantForAccessibility="no-hide-descendants"
+                onPress={() => {
+                  haptics.light();
+                  setDirectoryVisible(false);
+                }}
+              />
+            </Animated.View>
+            <GestureDetector gesture={drawerGesture}>
+              <Animated.View
+                className="h-full overflow-hidden"
+                style={[
+                  {
+                    backgroundColor: colors.background,
+                    borderBottomRightRadius: 28,
+                    borderColor: colors.borderSubtle,
+                    borderRightWidth: StyleSheet.hairlineWidth,
+                    borderTopRightRadius: 28,
+                    elevation: 24,
+                    paddingTop: insets.top + 6,
+                    shadowColor: colors.shadow,
+                    shadowOffset: { height: 12, width: -4 },
+                    shadowOpacity: 0.14,
+                    shadowRadius: 20,
+                    width: DIRECTORY_DRAWER_WIDTH,
+                  },
+                  drawerStyle,
+                ]}
               >
                 <View
-                  style={{
-                    backgroundColor: withAlpha(colors.foreground, '16'),
-                    borderRadius: 100,
-                    height: 5,
-                    width: 42,
-                  }}
-                />
-              </View>
-
-              <View className="px-4 pb-2">
-                <View
-                  className="px-3.5 py-3"
-                  style={{
-                    backgroundColor: colors.fillQuaternary,
-                    borderColor: colors.borderSubtle,
-                    borderRadius: 20,
-                    borderWidth: 1,
-                  }}
+                  accessible={false}
+                  className="items-center pb-2 pt-0.5"
+                  importantForAccessibility="no-hide-descendants"
                 >
-                  <View className="flex-row items-center justify-between">
-                    <View className="min-w-0 flex-1 pr-2">
-                      <View className="flex-row items-center">
-                        <View
-                          className="h-10 w-10 items-center justify-center rounded-2xl"
-                          style={{ backgroundColor: withAlpha(colors.primary, '14') }}
-                        >
-                          <MessageCircle
-                            color={colors.primary}
-                            size={18}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                        </View>
-                        <View className="ml-3 min-w-0 flex-1">
-                          <Text className="text-[18px] font-semibold tracking-tight text-foreground">
-                            {t.tabChats}
-                          </Text>
-                          <View
-                            className="mt-1.5 flex-row flex-wrap items-center"
-                            style={{ gap: 6 }}
-                          >
-                            <View
-                              className="rounded-full px-2.5 py-1"
-                              style={{
-                                backgroundColor: colors.surfaceElevated,
-                                borderColor: colors.borderSubtle,
-                                borderWidth: 1,
-                              }}
-                            >
-                              <Text
-                                className="text-[11px] font-semibold"
-                                numberOfLines={1}
-                                style={{ color: colors.secondaryText }}
-                              >
-                                {activeTagFilterLabel}
-                              </Text>
-                            </View>
-                            <Text
-                              className="text-[12px] font-medium"
-                              style={{ color: colors.tertiaryText }}
-                            >
-                              {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                    <View className="flex-row items-center" style={{ gap: 4 }}>
-                      <HeaderIconButton
-                        accessibilityLabel={t.chatListSearch}
-                        active={searchEnabled}
-                        onPress={handleToggleSearch}
-                      >
-                        <Search
-                          color={searchEnabled ? colors.primary : colors.secondaryText}
-                          size={20}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      </HeaderIconButton>
-                      <HeaderIconButton
-                        accessibilityLabel={t.cancel}
-                        onPress={() => {
-                          haptics.light();
-                          setDirectoryVisible(false);
-                        }}
-                      >
-                        <X
-                          color={colors.secondaryText}
-                          size={20}
-                          strokeWidth={tokens.icon.strokeWidth}
-                        />
-                      </HeaderIconButton>
-                    </View>
-                  </View>
-
-                  <Text
-                    className="mt-3 text-[12px] font-medium leading-[18px]"
-                    numberOfLines={2}
-                    style={{ color: colors.tertiaryText }}
-                  >
-                    {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
-                  </Text>
-
-                  <View className="mt-3" style={{ gap: 10 }}>
-                    {(
-                      [
-                        [
-                          {
-                            accessibilityLabel: t.chatListNewAssistant,
-                            icon: Bot,
-                            label: t.chatListNewAssistant,
-                            onPress: handleCreateAgent,
-                            primary: true,
-                          },
-                          {
-                            accessibilityLabel: t.chatListNewConversation,
-                            icon: MessageSquarePlus,
-                            label: t.chatListNewConversation,
-                            onPress: handleCreateChat,
-                            primary: false,
-                          },
-                        ],
-                        [
-                          {
-                            accessibilityLabel: t.chatListCreateGroup,
-                            icon: UsersRound,
-                            label: t.chatListCreateGroup,
-                            onPress: handleCreateGroup,
-                            primary: false,
-                          },
-                          {
-                            accessibilityLabel: t.tagCreate,
-                            icon: Tag,
-                            label: t.tagCreate,
-                            onPress: openCreateTagEditor,
-                            primary: false,
-                          },
-                        ],
-                      ] as const
-                    ).map((row, rowIndex) => (
-                      <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
-                        {row.map(({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
-                          <TouchableOpacity
-                            accessibilityLabel={accessibilityLabel}
-                            accessibilityRole="button"
-                            activeOpacity={0.82}
-                            className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
-                            key={accessibilityLabel}
-                            style={{
-                              backgroundColor: primary
-                                ? colors.primarySubtle
-                                : colors.surfaceElevated,
-                              borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
-                              borderWidth: 1,
-                              minHeight: 76,
-                            }}
-                            onPress={() => {
-                              haptics.light();
-                              void onPress();
-                            }}
-                          >
-                            <Icon
-                              color={primary ? colors.primary : colors.foreground}
-                              size={18}
-                              strokeWidth={tokens.icon.strokeWidth}
-                            />
-                            <Text
-                              className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
-                              numberOfLines={2}
-                              style={{ color: primary ? colors.primary : colors.foreground }}
-                            >
-                              {label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-
-              {searchEnabled ? (
-                <Animated.View className="px-4 pb-2" entering={enteringSection()}>
                   <View
-                    className="flex-row items-center rounded-2xl px-3.5 py-3"
+                    style={{
+                      backgroundColor: withAlpha(colors.foreground, '16'),
+                      borderRadius: 100,
+                      height: 5,
+                      width: 42,
+                    }}
+                  />
+                </View>
+
+                <View className="px-4 pb-2">
+                  <View
+                    className="px-3.5 py-3"
                     style={{
                       backgroundColor: colors.fillQuaternary,
                       borderColor: colors.borderSubtle,
+                      borderRadius: 20,
                       borderWidth: 1,
                     }}
                   >
-                    <Search
-                      color={colors.secondaryText}
-                      size={tokens.icon.size.sm}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
-                    <TextInput
-                      className="ml-2.5 flex-1 text-[14px] text-foreground"
-                      clearButtonMode="while-editing"
-                      placeholder={t.chatListSearch}
-                      placeholderTextColor={colors.secondaryText}
-                      ref={searchInputRef}
-                      returnKeyType="search"
-                      value={searchText}
-                      onChangeText={setSearchText}
-                    />
-                    <TouchableOpacity
-                      accessibilityLabel={t.cancel}
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={() => {
-                        haptics.light();
-                        setSearchEnabled(false);
-                        setSearchText('');
+                    <View className="flex-row items-center justify-between">
+                      <View className="min-w-0 flex-1 pr-2">
+                        <View className="flex-row items-center">
+                          <View
+                            className="h-10 w-10 items-center justify-center rounded-2xl"
+                            style={{ backgroundColor: withAlpha(colors.primary, '14') }}
+                          >
+                            <MessageCircle
+                              color={colors.primary}
+                              size={18}
+                              strokeWidth={tokens.icon.strokeWidth}
+                            />
+                          </View>
+                          <View className="ml-3 min-w-0 flex-1">
+                            <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+                              {t.tabChats}
+                            </Text>
+                            <View
+                              className="mt-1.5 flex-row flex-wrap items-center"
+                              style={{ gap: 6 }}
+                            >
+                              <View
+                                className="rounded-full px-2.5 py-1"
+                                style={{
+                                  backgroundColor: colors.surfaceElevated,
+                                  borderColor: colors.borderSubtle,
+                                  borderWidth: 1,
+                                }}
+                              >
+                                <Text
+                                  className="text-[11px] font-semibold"
+                                  numberOfLines={1}
+                                  style={{ color: colors.secondaryText }}
+                                >
+                                  {activeTagFilterLabel}
+                                </Text>
+                              </View>
+                              <Text
+                                className="text-[12px] font-medium"
+                                style={{ color: colors.tertiaryText }}
+                              >
+                                {t.activeTopics.replace('{count}', String(activeTagFilterCount))}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      <View className="flex-row items-center" style={{ gap: 4 }}>
+                        <HeaderIconButton
+                          accessibilityLabel={t.chatListSearch}
+                          active={searchEnabled}
+                          onPress={handleToggleSearch}
+                        >
+                          <Search
+                            color={searchEnabled ? colors.primary : colors.secondaryText}
+                            size={20}
+                            strokeWidth={tokens.icon.strokeWidth}
+                          />
+                        </HeaderIconButton>
+                        <HeaderIconButton
+                          accessibilityLabel={t.cancel}
+                          onPress={() => {
+                            haptics.light();
+                            setDirectoryVisible(false);
+                          }}
+                        >
+                          <X
+                            color={colors.secondaryText}
+                            size={20}
+                            strokeWidth={tokens.icon.strokeWidth}
+                          />
+                        </HeaderIconButton>
+                      </View>
+                    </View>
+
+                    <Text
+                      className="mt-3 text-[12px] font-medium leading-[18px]"
+                      numberOfLines={2}
+                      style={{ color: colors.tertiaryText }}
+                    >
+                      {`${assistantCount} ${assistantSummaryLabel} · ${groupCount} ${t.chatListViewGroup} · ${t.activeTopics.replace('{count}', String(topicCount))}`}
+                    </Text>
+
+                    <View className="mt-3" style={{ gap: 10 }}>
+                      {(
+                        [
+                          [
+                            {
+                              accessibilityLabel: t.chatListNewAssistant,
+                              icon: Bot,
+                              label: t.chatListNewAssistant,
+                              onPress: handleCreateAgent,
+                              primary: true,
+                            },
+                            {
+                              accessibilityLabel: t.chatListNewConversation,
+                              icon: MessageSquarePlus,
+                              label: t.chatListNewConversation,
+                              onPress: handleCreateChat,
+                              primary: false,
+                            },
+                          ],
+                          [
+                            {
+                              accessibilityLabel: t.chatListCreateGroup,
+                              icon: UsersRound,
+                              label: t.chatListCreateGroup,
+                              onPress: handleCreateGroup,
+                              primary: false,
+                            },
+                            {
+                              accessibilityLabel: t.tagCreate,
+                              icon: Tag,
+                              label: t.tagCreate,
+                              onPress: openCreateTagEditor,
+                              primary: false,
+                            },
+                          ],
+                        ] as const
+                      ).map((row, rowIndex) => (
+                        <View className="flex-row" key={`dir-row-${rowIndex}`} style={{ gap: 10 }}>
+                          {row.map(
+                            ({ accessibilityLabel, icon: Icon, label, onPress, primary }) => (
+                              <TouchableOpacity
+                                accessibilityLabel={accessibilityLabel}
+                                accessibilityRole="button"
+                                activeOpacity={0.82}
+                                className="flex-1 items-center justify-center rounded-2xl px-2 py-2.5"
+                                key={accessibilityLabel}
+                                style={{
+                                  backgroundColor: primary
+                                    ? colors.primarySubtle
+                                    : colors.surfaceElevated,
+                                  borderColor: primary ? colors.primaryBorder : colors.borderSubtle,
+                                  borderWidth: 1,
+                                  minHeight: 76,
+                                }}
+                                onPress={() => {
+                                  haptics.light();
+                                  void onPress();
+                                }}
+                              >
+                                <Icon
+                                  color={primary ? colors.primary : colors.foreground}
+                                  size={18}
+                                  strokeWidth={tokens.icon.strokeWidth}
+                                />
+                                <Text
+                                  className="mt-1.5 text-center text-[11px] font-semibold leading-[14px]"
+                                  numberOfLines={2}
+                                  style={{ color: primary ? colors.primary : colors.foreground }}
+                                >
+                                  {label}
+                                </Text>
+                              </TouchableOpacity>
+                            ),
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+
+                {searchEnabled ? (
+                  <Animated.View className="px-4 pb-2" entering={enteringSection()}>
+                    <View
+                      className="flex-row items-center rounded-2xl px-3.5 py-3"
+                      style={{
+                        backgroundColor: colors.fillQuaternary,
+                        borderColor: colors.borderSubtle,
+                        borderWidth: 1,
                       }}
                     >
-                      <X
+                      <Search
                         color={colors.secondaryText}
                         size={tokens.icon.size.sm}
                         strokeWidth={tokens.icon.strokeWidth}
                       />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              ) : null}
-
-              {searchQuery ? (
-                searching ? (
-                  <View
-                    className="flex-1 items-center justify-center px-6"
-                    style={{ paddingBottom: insets.bottom + 48, paddingTop: 4 }}
-                  >
-                    <ActivityIndicator color={colors.primary} size="small" />
-                    <Text
-                      className="mt-3 text-center text-[14px] font-medium"
-                      style={{ color: colors.tertiaryText }}
-                    >
-                      {t.chatSearchSearching}
-                    </Text>
-                  </View>
-                ) : filteredSearchResults.length > 0 ? (
-                  <FlatList
-                    ListHeaderComponent={searchResultsListHeader}
-                    className="flex-1"
-                    contentContainerStyle={{ paddingBottom: insets.bottom + 48, paddingTop: 4 }}
-                    data={filteredSearchResults}
-                    keyExtractor={(item) => item.id}
-                    keyboardDismissMode="on-drag"
-                    keyboardShouldPersistTaps="handled"
-                    renderItem={renderSearchResultFlatItem}
-                    showsVerticalScrollIndicator={false}
-                    windowSize={10}
-                  />
-                ) : (
-                  <View
-                    className="flex-1"
-                    style={{ paddingBottom: insets.bottom + 48, paddingTop: 4 }}
-                  >
-                    <EmptyState
-                      compact
-                      className="px-2 py-6"
-                      description={t.chatSidebarSearchEmptyDesc}
-                      iconVariant="discover"
-                      title={t.chatSearchNoResults}
-                    />
-                  </View>
-                )
-              ) : (
-                <ScrollView
-                  className="flex-1"
-                  contentContainerStyle={{ paddingBottom: insets.bottom + 48, paddingTop: 4 }}
-                  keyboardDismissMode="on-drag"
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  <>
-                    <View className="px-4 pb-3 pt-1">
-                      <View className="mb-2 flex-row items-center justify-between px-1">
-                        <Text
-                          className="text-[11px] font-semibold uppercase tracking-[1.4px]"
-                          style={{ color: colors.secondaryText }}
-                        >
-                          {t.chatSidebarTags}
-                        </Text>
-                        <Text
-                          className="text-[11px] font-medium"
-                          style={{ color: colors.secondaryText }}
-                        >
-                          {activeTagFilterCount}/{topicCount}
-                        </Text>
-                      </View>
-                      <ScrollView
-                        horizontal
-                        contentContainerStyle={{ paddingRight: 4 }}
-                        keyboardShouldPersistTaps="handled"
-                        showsHorizontalScrollIndicator={false}
-                      >
-                        <View className="flex-row" style={{ gap: 8 }}>
-                          {renderSidebarTagFilterChip({
-                            count: topicCount,
-                            filterId: SIDEBAR_TAG_FILTER_ALL,
-                            label: t.homeAgentAll,
-                          })}
-                          {renderSidebarTagFilterChip({
-                            color: colors.secondaryText,
-                            count: tagTopicCounts.untaggedCount,
-                            filterId: SIDEBAR_TAG_FILTER_NONE,
-                            label: t.tagNone,
-                          })}
-                          {tags.map((tag) =>
-                            renderSidebarTagFilterChip({
-                              color: tag.color,
-                              count: tagTopicCounts.counts.get(tag.id) ?? 0,
-                              filterId: tag.id,
-                              label: tag.name,
-                            }),
-                          )}
-                        </View>
-                      </ScrollView>
-                      {tags.length === 0 ? (
-                        <TouchableOpacity
-                          accessibilityLabel={t.tagCreate}
-                          accessibilityRole="button"
-                          activeOpacity={0.72}
-                          className="mt-2.5 flex-row items-center rounded-xl px-2.5 py-2.5"
-                          style={{ backgroundColor: withAlpha(colors.primary, '0a') }}
-                          onPress={() => {
-                            haptics.light();
-                            openCreateTagEditor();
-                          }}
-                        >
-                          <Tag
-                            color={colors.primary}
-                            size={16}
-                            strokeWidth={tokens.icon.strokeWidth}
-                          />
-                          <Text
-                            className="ml-2.5 flex-1 text-[12px] font-medium leading-[17px]"
-                            style={{ color: colors.secondaryText }}
-                          >
-                            {t.chatSidebarTagsHint}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-
-                    {pinnedSessions.length > 0 ? (
-                      <SectionBlock compact title={t.groupPinned}>
-                        {pinnedSessions.map((session) => renderAssistantRow(session, true))}
-                      </SectionBlock>
-                    ) : null}
-
-                    {pinnedSessions.length > 0 && hasSidebarRecentsContent ? (
-                      <View
-                        className="mx-4 mb-1"
-                        style={{
-                          backgroundColor: colors.divider,
-                          height: StyleSheet.hairlineWidth,
-                        }}
+                      <TextInput
+                        className="ml-2.5 flex-1 text-[14px] text-foreground"
+                        clearButtonMode="while-editing"
+                        placeholder={t.chatListSearch}
+                        placeholderTextColor={colors.secondaryText}
+                        ref={searchInputRef}
+                        returnKeyType="search"
+                        value={searchText}
+                        onChangeText={setSearchText}
                       />
-                    ) : null}
+                      <TouchableOpacity
+                        accessibilityLabel={t.cancel}
+                        accessibilityRole="button"
+                        hitSlop={8}
+                        onPress={() => {
+                          haptics.light();
+                          setSearchEnabled(false);
+                          setSearchText('');
+                        }}
+                      >
+                        <X
+                          color={colors.secondaryText}
+                          size={tokens.icon.size.sm}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </Animated.View>
+                ) : null}
 
-                    {hasSidebarRecentsContent ? (
-                      <SectionBlock compact title={t.homeRecents}>
-                        {filteredInboxSession
-                          ? renderAssistantRow(filteredInboxSession, true)
-                          : null}
-                        {filteredSessions
-                          .slice(
-                            0,
-                            sidebarRecentsExpanded
-                              ? filteredSessions.length
-                              : SIDEBAR_RECENTS_VISIBLE,
-                          )
-                          .map((session) => renderAssistantRow(session, true))}
-                        {filteredSessions.length > SIDEBAR_RECENTS_VISIBLE ? (
-                          <TouchableOpacity
-                            accessibilityRole="button"
-                            activeOpacity={0.78}
-                            className="mx-4 mb-0.5 mt-0.5 items-center rounded-xl py-3"
-                            style={{
-                              backgroundColor: colors.fillTertiary,
-                              borderColor: colors.borderSubtle,
-                              borderWidth: 1,
-                            }}
-                            onPress={() => {
-                              haptics.light();
-                              setSidebarRecentsExpanded((expanded) => !expanded);
-                            }}
-                          >
-                            <Text
-                              className="text-[13px] font-semibold"
-                              style={{ color: colors.primary }}
-                            >
-                              {sidebarRecentsExpanded
-                                ? t.chatSidebarRecentsShowLess
-                                : t.chatSidebarRecentsShowAll.replace(
-                                    '{count}',
-                                    String(filteredSessions.length),
-                                  )}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </SectionBlock>
-                    ) : null}
-
-                    {!loading &&
-                    !hasFilteredSidebarSessions &&
-                    activeTagFilterId === SIDEBAR_TAG_FILTER_ALL ? (
+                {searchQuery ? (
+                  searching ? (
+                    <View
+                      className="flex-1 items-center justify-center px-6"
+                      style={{
+                        paddingBottom: bottomChrome.overlayListPaddingBottom,
+                        paddingTop: 4,
+                      }}
+                    >
+                      <ActivityIndicator color={colors.primary} size="small" />
+                      <Text
+                        className="mt-3 text-center text-[14px] font-medium"
+                        style={{ color: colors.tertiaryText }}
+                      >
+                        {t.chatSearchSearching}
+                      </Text>
+                    </View>
+                  ) : filteredSearchResults.length > 0 ? (
+                    <FlatList
+                      ListHeaderComponent={searchResultsListHeader}
+                      className="flex-1"
+                      data={filteredSearchResults}
+                      keyExtractor={(item) => item.id}
+                      keyboardDismissMode="on-drag"
+                      keyboardShouldPersistTaps="handled"
+                      renderItem={renderSearchResultFlatItem}
+                      showsVerticalScrollIndicator={false}
+                      windowSize={10}
+                      contentContainerStyle={{
+                        paddingBottom: bottomChrome.overlayListPaddingBottom,
+                        paddingTop: 4,
+                      }}
+                    />
+                  ) : (
+                    <View
+                      className="flex-1"
+                      style={{
+                        paddingBottom: bottomChrome.overlayListPaddingBottom,
+                        paddingTop: 4,
+                      }}
+                    >
                       <EmptyState
                         compact
-                        className="px-3 py-4"
-                        description={t.chatSidebarEmptyDesc}
-                        iconVariant="chat"
-                        title={t.chatSidebarEmptyTitle}
-                        action={
+                        className="px-2 py-6"
+                        description={t.chatSidebarSearchEmptyDesc}
+                        iconVariant="discover"
+                        title={t.chatSearchNoResults}
+                      />
+                    </View>
+                  )
+                ) : (
+                  <ScrollView
+                    className="flex-1"
+                    keyboardDismissMode="on-drag"
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{
+                      paddingBottom: bottomChrome.overlayListPaddingBottom,
+                      paddingTop: 4,
+                    }}
+                  >
+                    <>
+                      <View className="px-4 pb-3 pt-1">
+                        <View className="mb-2 flex-row items-center justify-between px-1">
+                          <Text
+                            className="text-[11px] font-semibold uppercase tracking-[1.4px]"
+                            style={{ color: colors.secondaryText }}
+                          >
+                            {t.chatSidebarTags}
+                          </Text>
+                          <Text
+                            className="text-[11px] font-medium"
+                            style={{ color: colors.secondaryText }}
+                          >
+                            {activeTagFilterCount}/{topicCount}
+                          </Text>
+                        </View>
+                        <ScrollView
+                          horizontal
+                          contentContainerStyle={{ paddingRight: 4 }}
+                          keyboardShouldPersistTaps="handled"
+                          showsHorizontalScrollIndicator={false}
+                        >
+                          <View className="flex-row" style={{ gap: 8 }}>
+                            {renderSidebarTagFilterChip({
+                              count: topicCount,
+                              filterId: SIDEBAR_TAG_FILTER_ALL,
+                              label: t.homeAgentAll,
+                            })}
+                            {renderSidebarTagFilterChip({
+                              color: colors.secondaryText,
+                              count: tagTopicCounts.untaggedCount,
+                              filterId: SIDEBAR_TAG_FILTER_NONE,
+                              label: t.tagNone,
+                            })}
+                            {tags.map((tag) =>
+                              renderSidebarTagFilterChip({
+                                color: tag.color,
+                                count: tagTopicCounts.counts.get(tag.id) ?? 0,
+                                filterId: tag.id,
+                                label: tag.name,
+                              }),
+                            )}
+                          </View>
+                        </ScrollView>
+                        {tags.length === 0 ? (
                           <TouchableOpacity
-                            accessibilityLabel={t.chatListNewConversation}
+                            accessibilityLabel={t.tagCreate}
                             accessibilityRole="button"
-                            activeOpacity={0.85}
-                            className="items-center self-center rounded-full px-6 py-3"
-                            style={{ backgroundColor: colors.primary }}
+                            activeOpacity={0.72}
+                            className="mt-2.5 flex-row items-center rounded-xl px-2.5 py-2.5"
+                            style={{ backgroundColor: withAlpha(colors.primary, '0a') }}
                             onPress={() => {
                               haptics.light();
-                              setDirectoryVisible(false);
-                              void handleCreateChat();
+                              openCreateTagEditor();
                             }}
-                          >
-                            <Text
-                              className="text-[15px] font-semibold"
-                              style={{ color: colors.iconOnPrimary }}
-                            >
-                              {t.chatListNewConversation}
-                            </Text>
-                          </TouchableOpacity>
-                        }
-                      />
-                    ) : null}
-
-                    {!loading &&
-                    !hasFilteredSidebarSessions &&
-                    activeTagFilterId !== SIDEBAR_TAG_FILTER_ALL ? (
-                      <View className="px-4">
-                        <View
-                          className="items-center rounded-[28px] px-5 py-8"
-                          style={{
-                            backgroundColor: colors.fillQuaternary,
-                            borderColor: colors.borderSubtle,
-                            borderWidth: 1,
-                          }}
-                        >
-                          <View
-                            className="h-12 w-12 items-center justify-center rounded-2xl"
-                            style={{ backgroundColor: colors.surfaceElevated }}
                           >
                             <Tag
                               color={colors.primary}
-                              size={20}
+                              size={16}
                               strokeWidth={tokens.icon.strokeWidth}
                             />
-                          </View>
-                          <Text className="mt-4 text-[16px] font-semibold text-foreground">
-                            {activeTagFilterLabel}
-                          </Text>
-                          <Text
-                            className="mt-2 text-center text-[13px] leading-5"
-                            style={{ color: colors.secondaryText }}
-                          >
-                            {t.chatSidebarTagEmpty}
-                          </Text>
-                          <TouchableOpacity
-                            activeOpacity={0.82}
-                            className="mt-4 rounded-full px-4 py-2.5"
-                            style={{ backgroundColor: colors.primarySubtle }}
-                            onPress={() => {
-                              haptics.light();
-                              setActiveTagFilterId(SIDEBAR_TAG_FILTER_ALL);
-                            }}
-                          >
                             <Text
-                              className="text-[13px] font-semibold"
-                              style={{ color: colors.primary }}
+                              className="ml-2.5 flex-1 text-[12px] font-medium leading-[17px]"
+                              style={{ color: colors.secondaryText }}
                             >
-                              {t.homeAgentAll}
+                              {t.chatSidebarTagsHint}
                             </Text>
                           </TouchableOpacity>
-                        </View>
+                        ) : null}
                       </View>
-                    ) : null}
 
-                    {loading && !hasFilteredSidebarSessions ? <ListSkeleton /> : null}
-                  </>
-                </ScrollView>
-              )}
-            </Animated.View>
-          </GestureDetector>
-        </View>
-      </Modal>
+                      {pinnedSessions.length > 0 ? (
+                        <SectionBlock compact title={t.groupPinned}>
+                          {pinnedSessions.map((session) => renderAssistantRow(session, true))}
+                        </SectionBlock>
+                      ) : null}
 
-      <AgentSelectionSheet
-        allowEmptySelection
-        showSupervisorModelPicker
-        showTitleInput
-        confirmLabel={t.done}
-        initialTitle={t.groupCreateDefaultTitle}
-        title={t.chatListCreateGroup}
-        titleInputLabel={t.agentConfigName}
-        titleInputPlaceholder={t.groupCreateDefaultTitle}
-        visible={createGroupSheetVisible}
-        onClose={() => setCreateGroupSheetVisible(false)}
-        onSubmit={handleCreateGroupSubmit}
-      />
+                      {pinnedSessions.length > 0 && hasSidebarRecentsContent ? (
+                        <View
+                          className="mx-4 mb-1"
+                          style={{
+                            backgroundColor: colors.divider,
+                            height: StyleSheet.hairlineWidth,
+                          }}
+                        />
+                      ) : null}
 
-      <ModelDrawer visible={modelDrawerVisible} onClose={() => setModelDrawerVisible(false)} />
-      <AttachmentSheet
-        visible={attachmentSheetVisible}
-        onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
-        onClose={() => setAttachmentSheetVisible(false)}
-        onDocument={() => void pickDocument()}
-        onFromWorkspace={handleFromWorkspace}
-        onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
-      />
-      <ResourcePickerSheet
-        visible={resourcePickerVisible}
-        onClose={() => setResourcePickerVisible(false)}
-        onSelect={handleWorkspaceSelect}
-      />
-      <MemoryToolSheet
-        effort={memoryEffort}
-        enabled={memoryEnabled}
-        visible={memorySheetVisible}
-        onChangeEffort={setMemoryEffort}
-        onChangeEnabled={setMemoryEnabled}
-        onClose={() => setMemorySheetVisible(false)}
-      />
-      <SkillsSheet
-        agentConfigOpenStore={t.agentConfigOpenStore}
-        agentSkillItems={agentSkillItems}
-        builtinItems={builtinSkillItems}
-        enabledIdentifiers={enabledSkills}
-        installedPlugins={installedPlugins}
-        loading={loadingSkills}
-        skillsEmpty={t.skillsEmpty}
-        skillsEmptyDesc={t.skillsEmptyDesc}
-        skillsTitle={t.skillsTitle}
-        visible={skillsVisible}
-        onClose={() => setSkillsVisible(false)}
-        onOpenStore={() => navigation.navigate('Store')}
-        onToggle={handleToggleSkill}
-      />
-      <TagEditorSheet
-        cancelLabel={t.cancel}
-        color={tagDraftColor}
-        colorLabel={t.tagColor}
-        deleteDescription={tagEditingTarget ? t.tagDeleteDesc : undefined}
-        deleteLabel={tagEditingTarget ? t.tagDeleteConfirm : undefined}
-        name={tagDraftName}
-        placeholder={t.tagPlaceholder}
-        submitLabel={tagEditingTarget ? t.save : t.tagCreate}
-        title={tagEditingTarget ? t.tagEdit : t.tagCreate}
-        visible={tagEditorVisible}
-        onCancel={closeTagEditor}
-        onChangeColor={setTagDraftColor}
-        onChangeName={setTagDraftName}
-        onDelete={tagEditingTarget ? handleDeleteTag : undefined}
-        onSubmit={() => void handleSubmitTag()}
-      />
+                      {hasSidebarRecentsContent ? (
+                        <SectionBlock compact title={t.homeRecents}>
+                          {filteredInboxSession
+                            ? renderAssistantRow(filteredInboxSession, true)
+                            : null}
+                          {filteredSessions
+                            .slice(
+                              0,
+                              sidebarRecentsExpanded
+                                ? filteredSessions.length
+                                : SIDEBAR_RECENTS_VISIBLE,
+                            )
+                            .map((session) => renderAssistantRow(session, true))}
+                          {filteredSessions.length > SIDEBAR_RECENTS_VISIBLE ? (
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              activeOpacity={0.78}
+                              className="mx-4 mb-0.5 mt-0.5 items-center rounded-xl py-3"
+                              style={{
+                                backgroundColor: colors.fillTertiary,
+                                borderColor: colors.borderSubtle,
+                                borderWidth: 1,
+                              }}
+                              onPress={() => {
+                                haptics.light();
+                                setSidebarRecentsExpanded((expanded) => !expanded);
+                              }}
+                            >
+                              <Text
+                                className="text-[13px] font-semibold"
+                                style={{ color: colors.primary }}
+                              >
+                                {sidebarRecentsExpanded
+                                  ? t.chatSidebarRecentsShowLess
+                                  : t.chatSidebarRecentsShowAll.replace(
+                                      '{count}',
+                                      String(filteredSessions.length),
+                                    )}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </SectionBlock>
+                      ) : null}
 
-      {/* Session Action Sheet */}
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
-        visible={!!actionSession}
-        onRequestClose={closeActionSheet}
-      >
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={closeActionSheet}>
-          <Pressable
-            className="bg-card rounded-t-2xl overflow-hidden"
-            style={{ maxHeight: '72%' }}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <View style={{ paddingBottom: 32, position: 'relative' }}>
-              <View className="px-5">
-                {!actionSessionIsInbox ? (
-                  <Pressable
-                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                    onPress={() => {
-                      if (actionSession) {
-                        haptics.light();
-                        if (actionSession.pinned) {
-                          unpinSession(actionSession.id);
-                        } else {
-                          pinSession(actionSession.id);
+                      {!loading &&
+                      !hasFilteredSidebarSessions &&
+                      activeTagFilterId === SIDEBAR_TAG_FILTER_ALL ? (
+                        <EmptyState
+                          compact
+                          className="px-3 py-4"
+                          description={t.chatSidebarEmptyDesc}
+                          iconVariant="chat"
+                          title={t.chatSidebarEmptyTitle}
+                          action={
+                            <TouchableOpacity
+                              accessibilityLabel={t.chatListNewConversation}
+                              accessibilityRole="button"
+                              activeOpacity={0.85}
+                              className="items-center self-center rounded-full px-6 py-3"
+                              style={{ backgroundColor: colors.primary }}
+                              onPress={() => {
+                                haptics.light();
+                                setDirectoryVisible(false);
+                                void handleCreateChat();
+                              }}
+                            >
+                              <Text
+                                className="text-[15px] font-semibold"
+                                style={{ color: colors.iconOnPrimary }}
+                              >
+                                {t.chatListNewConversation}
+                              </Text>
+                            </TouchableOpacity>
+                          }
+                        />
+                      ) : null}
+
+                      {!loading &&
+                      !hasFilteredSidebarSessions &&
+                      activeTagFilterId !== SIDEBAR_TAG_FILTER_ALL ? (
+                        <View className="px-4">
+                          <View
+                            className="items-center rounded-[28px] px-5 py-8"
+                            style={{
+                              backgroundColor: colors.fillQuaternary,
+                              borderColor: colors.borderSubtle,
+                              borderWidth: 1,
+                            }}
+                          >
+                            <View
+                              className="h-12 w-12 items-center justify-center rounded-2xl"
+                              style={{ backgroundColor: colors.surfaceElevated }}
+                            >
+                              <Tag
+                                color={colors.primary}
+                                size={20}
+                                strokeWidth={tokens.icon.strokeWidth}
+                              />
+                            </View>
+                            <Text className="mt-4 text-[16px] font-semibold text-foreground">
+                              {activeTagFilterLabel}
+                            </Text>
+                            <Text
+                              className="mt-2 text-center text-[13px] leading-5"
+                              style={{ color: colors.secondaryText }}
+                            >
+                              {t.chatSidebarTagEmpty}
+                            </Text>
+                            <TouchableOpacity
+                              activeOpacity={0.82}
+                              className="mt-4 rounded-full px-4 py-2.5"
+                              style={{ backgroundColor: colors.primarySubtle }}
+                              onPress={() => {
+                                haptics.light();
+                                setActiveTagFilterId(SIDEBAR_TAG_FILTER_ALL);
+                              }}
+                            >
+                              <Text
+                                className="text-[13px] font-semibold"
+                                style={{ color: colors.primary }}
+                              >
+                                {t.homeAgentAll}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      {loading && !hasFilteredSidebarSessions ? <ListSkeleton /> : null}
+                    </>
+                  </ScrollView>
+                )}
+              </Animated.View>
+            </GestureDetector>
+          </View>
+        </Modal>
+
+        <AgentSelectionSheet
+          allowEmptySelection
+          showSupervisorModelPicker
+          showTitleInput
+          confirmLabel={t.done}
+          initialTitle={t.groupCreateDefaultTitle}
+          title={t.chatListCreateGroup}
+          titleInputLabel={t.agentConfigName}
+          titleInputPlaceholder={t.groupCreateDefaultTitle}
+          visible={createGroupSheetVisible}
+          onClose={() => setCreateGroupSheetVisible(false)}
+          onSubmit={handleCreateGroupSubmit}
+        />
+
+        <ModelDrawer visible={modelDrawerVisible} onClose={() => setModelDrawerVisible(false)} />
+        <AttachmentSheet
+          visible={attachmentSheetVisible}
+          onCamera={modelSupportsVision ? () => void pickImage('camera') : undefined}
+          onClose={() => setAttachmentSheetVisible(false)}
+          onDocument={() => void pickDocument()}
+          onFromWorkspace={handleFromWorkspace}
+          onGallery={modelSupportsVision ? () => void pickImage('gallery') : undefined}
+        />
+        <ResourcePickerSheet
+          visible={resourcePickerVisible}
+          onClose={() => setResourcePickerVisible(false)}
+          onSelect={handleWorkspaceSelect}
+        />
+        <MemoryToolSheet
+          effort={memoryEffort}
+          enabled={memoryEnabled}
+          visible={memorySheetVisible}
+          onChangeEffort={setMemoryEffort}
+          onChangeEnabled={setMemoryEnabled}
+          onClose={() => setMemorySheetVisible(false)}
+        />
+        <SkillsSheet
+          agentConfigOpenStore={t.agentConfigOpenStore}
+          agentSkillItems={agentSkillItems}
+          builtinItems={builtinSkillItems}
+          enabledIdentifiers={enabledSkills}
+          installedPlugins={installedPlugins}
+          loading={loadingSkills}
+          skillsEmpty={t.skillsEmpty}
+          skillsEmptyDesc={t.skillsEmptyDesc}
+          skillsTitle={t.skillsTitle}
+          visible={skillsVisible}
+          onClose={() => setSkillsVisible(false)}
+          onOpenStore={() => navigation.navigate('Store')}
+          onToggle={handleToggleSkill}
+        />
+        <TagEditorSheet
+          cancelLabel={t.cancel}
+          color={tagDraftColor}
+          colorLabel={t.tagColor}
+          deleteDescription={tagEditingTarget ? t.tagDeleteDesc : undefined}
+          deleteLabel={tagEditingTarget ? t.tagDeleteConfirm : undefined}
+          name={tagDraftName}
+          placeholder={t.tagPlaceholder}
+          submitLabel={tagEditingTarget ? t.save : t.tagCreate}
+          title={tagEditingTarget ? t.tagEdit : t.tagCreate}
+          visible={tagEditorVisible}
+          onCancel={closeTagEditor}
+          onChangeColor={setTagDraftColor}
+          onChangeName={setTagDraftName}
+          onDelete={tagEditingTarget ? handleDeleteTag : undefined}
+          onSubmit={() => void handleSubmitTag()}
+        />
+
+        {/* Session Action Sheet */}
+        <Modal
+          accessibilityViewIsModal
+          transparent
+          animationType="slide"
+          visible={!!actionSession}
+          onRequestClose={closeActionSheet}
+        >
+          <Pressable className="flex-1 justify-end bg-black/40" onPress={closeActionSheet}>
+            <Pressable
+              className="bg-card rounded-t-2xl overflow-hidden"
+              style={{ maxHeight: '72%' }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View className="items-center pt-3 pb-2">
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
+              </View>
+              <View style={{ paddingBottom: 32, position: 'relative' }}>
+                <View className="px-5">
+                  {!actionSessionIsInbox ? (
+                    <Pressable
+                      className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                      onPress={() => {
+                        if (actionSession) {
+                          haptics.light();
+                          if (actionSession.pinned) {
+                            unpinSession(actionSession.id);
+                          } else {
+                            pinSession(actionSession.id);
+                          }
                         }
-                      }
-                      closeActionSheet();
-                    }}
+                        closeActionSheet();
+                      }}
+                    >
+                      <Pin color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                      <Text className="ml-3 text-base text-foreground">
+                        {actionSession?.pinned ? t.actionUnpin : t.actionPin}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {actionSession && !actionSessionIsGroup ? (
+                    <Pressable
+                      className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                      onPress={() => {
+                        closeActionSheet();
+                        navigation.navigate('AgentConfig', { sessionId: actionSession.id });
+                      }}
+                    >
+                      <Bot color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                      <Text className="ml-3 text-base text-foreground">{t.agentConfigTitle}</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {actionSessionIsGroup ? (
+                    <Pressable
+                      className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                      onPress={() => actionSession && handleRename(actionSession)}
+                    >
+                      <Pencil
+                        color={colors.muted}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {!actionSessionIsInbox ? (
+                    <Pressable
+                      className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                      onPress={() => {
+                        if (!actionSession) return;
+
+                        closeActionSheet();
+                        Alert.alert(
+                          actionSessionIsGroup ? t.deleteSessionConfirm : t.agentDeleteConfirm,
+                          actionSessionIsGroup ? t.deleteSessionDesc : t.agentDeleteDesc,
+                          [
+                            { text: t.cancel, style: 'cancel' },
+                            {
+                              text: t.delete,
+                              style: 'destructive',
+                              onPress: () => {
+                                haptics.warning();
+                                removeSession(actionSession.id);
+                              },
+                            },
+                          ],
+                        );
+                      }}
+                    >
+                      <Trash2
+                        color={colors.danger}
+                        size={18}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                      <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <View className="px-5 mt-2">
+                  <Pressable
+                    className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
+                    onPress={closeActionSheet}
                   >
-                    <Pin color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-foreground">
-                      {actionSession?.pinned ? t.actionUnpin : t.actionPin}
+                    <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                      {t.cancel}
                     </Text>
                   </Pressable>
-                ) : null}
-
-                {actionSession && !actionSessionIsGroup ? (
-                  <Pressable
-                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                    onPress={() => {
-                      closeActionSheet();
-                      navigation.navigate('AgentConfig', { sessionId: actionSession.id });
-                    }}
-                  >
-                    <Bot color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-foreground">{t.agentConfigTitle}</Text>
-                  </Pressable>
-                ) : null}
-
-                {actionSessionIsGroup ? (
-                  <Pressable
-                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                    onPress={() => actionSession && handleRename(actionSession)}
-                  >
-                    <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
-                  </Pressable>
-                ) : null}
-
-                {!actionSessionIsInbox ? (
-                  <Pressable
-                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                    onPress={() => {
-                      if (!actionSession) return;
-
-                      closeActionSheet();
-                      Alert.alert(
-                        actionSessionIsGroup ? t.deleteSessionConfirm : t.agentDeleteConfirm,
-                        actionSessionIsGroup ? t.deleteSessionDesc : t.agentDeleteDesc,
-                        [
-                          { text: t.cancel, style: 'cancel' },
-                          {
-                            text: t.delete,
-                            style: 'destructive',
-                            onPress: () => {
-                              haptics.warning();
-                              removeSession(actionSession.id);
-                            },
-                          },
-                        ],
-                      );
-                    }}
-                  >
-                    <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
-                  </Pressable>
-                ) : null}
+                </View>
               </View>
-
-              <View className="px-5 mt-2">
-                <Pressable
-                  className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
-                  onPress={closeActionSheet}
-                >
-                  <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
-                    {t.cancel}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-      <PromptModal
-        defaultValue={renameModalVisible ? (renameTarget?.title ?? '') : ''}
-        submitLabel={t.save}
-        title={t.sessionRenameTitle}
-        visible={renameModalVisible}
-        onCancel={() => {
-          setRenameModalVisible(false);
-          setRenameTarget(null);
-        }}
-        onSubmit={(value) => {
-          setRenameModalVisible(false);
-          if (renameTarget) {
-            haptics.success();
-            renameSession(renameTarget.id, value);
-          }
-        }}
-      />
+        <PromptModal
+          defaultValue={renameModalVisible ? (renameTarget?.title ?? '') : ''}
+          submitLabel={t.save}
+          title={t.sessionRenameTitle}
+          visible={renameModalVisible}
+          onCancel={() => {
+            setRenameModalVisible(false);
+            setRenameTarget(null);
+          }}
+          onSubmit={(value) => {
+            setRenameModalVisible(false);
+            if (renameTarget) {
+              haptics.success();
+              renameSession(renameTarget.id, value);
+            }
+          }}
+        />
 
-      <PromptModal
-        defaultValue={topicRenameTarget?.title ?? ''}
-        placeholder={t.topicRenamePlaceholder}
-        submitLabel={t.save}
-        title={t.topicRename}
-        visible={!!topicRenameTarget}
-        onCancel={() => setTopicRenameTarget(null)}
-        onSubmit={async (value) => {
-          if (topicRenameTarget) {
-            setTopicRenameTarget(null);
-            await handleTopicRename(topicRenameTarget.topicId, topicRenameTarget.sessionId, value);
-          }
-        }}
-      />
+        <PromptModal
+          defaultValue={topicRenameTarget?.title ?? ''}
+          placeholder={t.topicRenamePlaceholder}
+          submitLabel={t.save}
+          title={t.topicRename}
+          visible={!!topicRenameTarget}
+          onCancel={() => setTopicRenameTarget(null)}
+          onSubmit={async (value) => {
+            if (topicRenameTarget) {
+              setTopicRenameTarget(null);
+              await handleTopicRename(
+                topicRenameTarget.topicId,
+                topicRenameTarget.sessionId,
+                value,
+              );
+            }
+          }}
+        />
 
-      {/* Topic action sheet (long-press menu, same style as agent) */}
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
-        visible={!!topicActionTarget}
-        onRequestClose={closeTopicActionSheet}
-      >
-        <Pressable className="flex-1 justify-end bg-black/40" onPress={closeTopicActionSheet}>
-          <Pressable className="bg-card rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
-            <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <Text className="px-5 pb-3 text-[16px] font-semibold text-foreground" numberOfLines={1}>
-              {topicActionTarget?.topicTitle || t.chatListNewConversation}
-            </Text>
-            <View className="px-5">
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => {
-                  if (topicActionTarget) {
-                    closeTopicActionSheet();
-                    void handleTopicSmartRename(
-                      topicActionTarget.topicId,
-                      topicActionTarget.sessionId,
-                    );
-                  }
-                }}
+        {/* Topic action sheet (long-press menu, same style as agent) */}
+        <Modal
+          accessibilityViewIsModal
+          transparent
+          animationType="slide"
+          visible={!!topicActionTarget}
+          onRequestClose={closeTopicActionSheet}
+        >
+          <Pressable className="flex-1 justify-end bg-black/40" onPress={closeTopicActionSheet}>
+            <Pressable className="bg-card rounded-t-2xl pb-8" onPress={(e) => e.stopPropagation()}>
+              <View className="items-center pt-3 pb-2">
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
+              </View>
+              <Text
+                className="px-5 pb-3 text-[16px] font-semibold text-foreground"
+                numberOfLines={1}
               >
-                <Wand2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-foreground">{t.actionSmartRename}</Text>
-              </Pressable>
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() => {
-                  if (topicActionTarget) {
-                    closeTopicActionSheet();
-                    setTimeout(
-                      () =>
-                        setTopicRenameTarget({
-                          sessionId: topicActionTarget.sessionId,
-                          title: topicActionTarget.topicTitle ?? '',
-                          topicId: topicActionTarget.topicId,
-                        }),
-                      300,
-                    );
-                  }
-                }}
-              >
-                <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
-              </Pressable>
-              {topicActionTarget && topicActionTarget.topicType !== 'group' ? (
+                {topicActionTarget?.topicTitle || t.chatListNewConversation}
+              </Text>
+              <View className="px-5">
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => {
+                    if (topicActionTarget) {
+                      closeTopicActionSheet();
+                      void handleTopicSmartRename(
+                        topicActionTarget.topicId,
+                        topicActionTarget.sessionId,
+                      );
+                    }
+                  }}
+                >
+                  <Wand2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.actionSmartRename}</Text>
+                </Pressable>
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => {
@@ -3312,213 +3324,246 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
                       closeTopicActionSheet();
                       setTimeout(
                         () =>
-                          setTopicTagTarget({
+                          setTopicRenameTarget({
                             sessionId: topicActionTarget.sessionId,
+                            title: topicActionTarget.topicTitle ?? '',
                             topicId: topicActionTarget.topicId,
-                            currentTagId: topicActionTarget.topicTagId ?? null,
                           }),
                         300,
                       );
                     }
                   }}
                 >
-                  <Tag color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-3 text-base text-foreground">{t.tagMoveSession}</Text>
+                  <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                 </Pressable>
-              ) : null}
-              <Pressable
-                className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                onPress={() =>
-                  topicActionTarget &&
-                  handleTopicDeleteWithAlert(
-                    topicActionTarget.topicId,
-                    topicActionTarget.sessionId,
-                    topicActionTarget.onAfterDelete,
-                  )
-                }
-              >
-                <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
-              </Pressable>
-            </View>
-            <View className="px-5 mt-2">
-              <Pressable
-                className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
-                onPress={closeTopicActionSheet}
-              >
-                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
-                  {t.cancel}
-                </Text>
-              </Pressable>
-            </View>
+                {topicActionTarget && topicActionTarget.topicType !== 'group' ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      if (topicActionTarget) {
+                        closeTopicActionSheet();
+                        setTimeout(
+                          () =>
+                            setTopicTagTarget({
+                              sessionId: topicActionTarget.sessionId,
+                              topicId: topicActionTarget.topicId,
+                              currentTagId: topicActionTarget.topicTagId ?? null,
+                            }),
+                          300,
+                        );
+                      }
+                    }}
+                  >
+                    <Tag color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.tagMoveSession}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() =>
+                    topicActionTarget &&
+                    handleTopicDeleteWithAlert(
+                      topicActionTarget.topicId,
+                      topicActionTarget.sessionId,
+                      topicActionTarget.onAfterDelete,
+                    )
+                  }
+                >
+                  <Trash2 color={colors.danger} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-red-500">{t.delete}</Text>
+                </Pressable>
+              </View>
+              <View className="px-5 mt-2">
+                <Pressable
+                  className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
+                  onPress={closeTopicActionSheet}
+                >
+                  <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                    {t.cancel}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-      {/* Topic tag picker modal (for non-group topics in Topics tab) */}
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
-        visible={!!topicTagTarget}
-        onRequestClose={() => setTopicTagTarget(null)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setTopicTagTarget(null)}
+        {/* Topic tag picker modal (for non-group topics in Topics tab) */}
+        <Modal
+          accessibilityViewIsModal
+          transparent
+          animationType="slide"
+          visible={!!topicTagTarget}
+          onRequestClose={() => setTopicTagTarget(null)}
         >
           <Pressable
-            className="bg-card rounded-t-2xl pb-8 max-h-[70%]"
-            onPress={(e) => e.stopPropagation()}
+            className="flex-1 justify-end bg-black/40"
+            onPress={() => setTopicTagTarget(null)}
           >
-            <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <Text className="px-5 pb-3 text-[16px] font-semibold text-foreground">
-              {t.tagMoveSession}
-            </Text>
-            <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
-              <Pressable
-                className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
-                onPress={() =>
-                  topicTagTarget &&
-                  void handleMoveTopicToTag(topicTagTarget.topicId, topicTagTarget.sessionId, null)
-                }
-              >
-                <View className="flex-row items-center">
-                  <View
-                    className="mr-3 h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: colors.secondaryText }}
-                  />
-                  <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
-                </View>
-                {!topicTagTarget?.currentTagId ? (
-                  <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                ) : null}
-              </Pressable>
-              {tags.map((tag) => (
+            <Pressable
+              className="bg-card rounded-t-2xl pb-8 max-h-[70%]"
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View className="items-center pt-3 pb-2">
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
+              </View>
+              <Text className="px-5 pb-3 text-[16px] font-semibold text-foreground">
+                {t.tagMoveSession}
+              </Text>
+              <ScrollView className="px-5" contentContainerStyle={{ paddingBottom: 24 }}>
                 <Pressable
                   className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
-                  key={tag.id}
                   onPress={() =>
                     topicTagTarget &&
                     void handleMoveTopicToTag(
                       topicTagTarget.topicId,
                       topicTagTarget.sessionId,
-                      tag.id,
+                      null,
                     )
                   }
                 >
                   <View className="flex-row items-center">
                     <View
                       className="mr-3 h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: resolveTagColor(tag.color) }}
+                      style={{ backgroundColor: colors.secondaryText }}
                     />
-                    <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
+                    <Text className="text-[15px] font-medium text-foreground">{t.tagNone}</Text>
                   </View>
-                  {topicTagTarget?.currentTagId === tag.id ? (
+                  {!topicTagTarget?.currentTagId ? (
                     <Check color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   ) : null}
                 </Pressable>
-              ))}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal
-        accessibilityViewIsModal
-        transparent
-        animationType="slide"
-        visible={draftAssistantPickerVisible}
-        onRequestClose={() => setDraftAssistantPickerVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setDraftAssistantPickerVisible(false)}
-        >
-          <Pressable
-            className="bg-card rounded-t-2xl"
-            style={{ maxHeight: '72%', paddingBottom: insets.bottom + 16 }}
-            onPress={(event) => event.stopPropagation()}
-          >
-            <View className="items-center pt-3 pb-2">
-              <View className="w-9 h-1 rounded-full bg-foreground/10" />
-            </View>
-            <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
-              <Text className="text-[18px] font-semibold tracking-tight text-foreground">
-                {t.chatListAssistants}
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                className="h-10 w-10 items-center justify-center"
-                onPress={() => setDraftAssistantPickerVisible(false)}
-              >
-                <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              className="px-5"
-              contentContainerStyle={{ paddingBottom: 16 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {draftAgentSessions.map((session) => {
-                const isSelected = draftSession?.id === session.id;
-                const providerId =
-                  session.provider ||
-                  (session.model ? inferProviderFromModelId(session.model) : undefined);
-
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.72}
-                    className="mb-2 flex-row items-center rounded-2xl px-3 py-3"
-                    key={session.id}
-                    style={{
-                      backgroundColor: isSelected
-                        ? withAlpha(colors.primary, '14')
-                        : colors.fillTertiary,
-                    }}
-                    onPress={() => {
-                      haptics.light();
-                      setDraftSessionId(session.id);
-                      setDraftAssistantPickerVisible(false);
-                    }}
+                {tags.map((tag) => (
+                  <Pressable
+                    className="flex-row items-center justify-between rounded-xl px-3 py-3.5 active:bg-foreground/5"
+                    key={tag.id}
+                    onPress={() =>
+                      topicTagTarget &&
+                      void handleMoveTopicToTag(
+                        topicTagTarget.topicId,
+                        topicTagTarget.sessionId,
+                        tag.id,
+                      )
+                    }
                   >
-                    <View className="mr-3">
-                      <SessionLogo
-                        avatar={session.avatar}
-                        isGroup={false}
-                        isInbox={session.id === visibleInboxSession?.id}
-                        provider={providerId}
-                        size={38}
+                    <View className="flex-row items-center">
+                      <View
+                        className="mr-3 h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: resolveTagColor(tag.color) }}
                       />
+                      <Text className="text-[15px] font-medium text-foreground">{tag.name}</Text>
                     </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="text-[15px] font-semibold text-foreground" numberOfLines={1}>
-                        {getSessionDisplayTitle(session)}
-                      </Text>
-                      <Text
-                        className="mt-0.5 text-[12px]"
-                        numberOfLines={1}
-                        style={{ color: colors.secondaryText }}
-                      >
-                        {session.description || session.model || t.chatListTapToContinue}
-                      </Text>
-                    </View>
-                    {isSelected ? (
+                    {topicTagTarget?.currentTagId === tag.id ? (
                       <Check
                         color={colors.primary}
                         size={18}
                         strokeWidth={tokens.icon.strokeWidth}
                       />
                     ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+        </Modal>
+
+        <Modal
+          accessibilityViewIsModal
+          transparent
+          animationType="slide"
+          visible={draftAssistantPickerVisible}
+          onRequestClose={() => setDraftAssistantPickerVisible(false)}
+        >
+          <Pressable
+            className="flex-1 justify-end bg-black/40"
+            onPress={() => setDraftAssistantPickerVisible(false)}
+          >
+            <Pressable
+              className="bg-card rounded-t-2xl"
+              style={{ maxHeight: '72%', paddingBottom: insets.bottom + 16 }}
+              onPress={(event) => event.stopPropagation()}
+            >
+              <View className="items-center pt-3 pb-2">
+                <View className="w-9 h-1 rounded-full bg-foreground/10" />
+              </View>
+              <View className="flex-row items-center justify-between px-5 pb-3 pt-1">
+                <Text className="text-[18px] font-semibold tracking-tight text-foreground">
+                  {t.chatListAssistants}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  className="h-10 w-10 items-center justify-center"
+                  onPress={() => setDraftAssistantPickerVisible(false)}
+                >
+                  <X color={colors.secondaryText} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                className="px-5"
+                contentContainerStyle={{ paddingBottom: 16 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {draftAgentSessions.map((session) => {
+                  const isSelected = draftSession?.id === session.id;
+                  const providerId =
+                    session.provider ||
+                    (session.model ? inferProviderFromModelId(session.model) : undefined);
+
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.72}
+                      className="mb-2 flex-row items-center rounded-2xl px-3 py-3"
+                      key={session.id}
+                      style={{
+                        backgroundColor: isSelected
+                          ? withAlpha(colors.primary, '14')
+                          : colors.fillTertiary,
+                      }}
+                      onPress={() => {
+                        haptics.light();
+                        setDraftSessionId(session.id);
+                        setDraftAssistantPickerVisible(false);
+                      }}
+                    >
+                      <View className="mr-3">
+                        <SessionLogo
+                          avatar={session.avatar}
+                          isGroup={false}
+                          isInbox={session.id === visibleInboxSession?.id}
+                          provider={providerId}
+                          size={38}
+                        />
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text
+                          className="text-[15px] font-semibold text-foreground"
+                          numberOfLines={1}
+                        >
+                          {getSessionDisplayTitle(session)}
+                        </Text>
+                        <Text
+                          className="mt-0.5 text-[12px]"
+                          numberOfLines={1}
+                          style={{ color: colors.secondaryText }}
+                        >
+                          {session.description || session.model || t.chatListTapToContinue}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <Check
+                          color={colors.primary}
+                          size={18}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </View>
+    </GestureDetector>
   );
 }

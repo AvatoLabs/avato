@@ -45,6 +45,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, fileApi, getApiUrl, videoApi } from '../lib/api';
+import { useMainTabBottomInsets } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
@@ -500,6 +501,7 @@ export default function VideoScreen({
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const bottomChrome = useMainTabBottomInsets(keyboardOffset > 0);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
     const lift =
@@ -780,8 +782,6 @@ export default function VideoScreen({
     };
   }, [activeTopicId, isAppActive, isScreenFocused, pendingSignature, stopPolling]);
 
-  const inputPaddingBottom = Math.max(insets.bottom, 8);
-
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
       setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
@@ -1017,7 +1017,7 @@ export default function VideoScreen({
 
       <Animated.View
         className="px-4 pt-1"
-        style={[{ paddingBottom: inputPaddingBottom }, composerLiftStyle]}
+        style={[{ paddingBottom: bottomChrome.composerPaddingBottom }, composerLiftStyle]}
       >
         <ComposerShell active={composerActive}>
           <View className="flex-row items-end gap-2 px-3 pb-2 pt-2">
@@ -1093,7 +1093,7 @@ export default function VideoScreen({
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
-                paddingBottom: 40,
+                paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
                 paddingHorizontal: sidebarPad,
                 paddingTop: 60,
               }}

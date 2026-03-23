@@ -249,6 +249,8 @@ export const useFileItemDropdown = ({
             let urlToCopy = url;
             if (isPage) {
               urlToCopy = `${appOrigin}${buildResourcePreviewPath(spaceId, id, libraryId)}`;
+            } else if (urlToCopy.startsWith('/')) {
+              urlToCopy = new URL(urlToCopy, `${appOrigin}/`).href;
             }
 
             await copyToClipboard(urlToCopy);
@@ -335,7 +337,6 @@ export const useFileItemDropdown = ({
     ).filter(Boolean);
   }, [
     addFilesToKnowledgeBase,
-    clearTreeFolderCache,
     deleteResource,
     filename,
     id,
@@ -352,6 +353,7 @@ export const useFileItemDropdown = ({
     onRenameStart,
     refreshFileList,
     removeFilesFromKnowledgeBase,
+    sourceType,
     spaceId,
     t,
     url,

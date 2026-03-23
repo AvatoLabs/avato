@@ -108,7 +108,9 @@ describe('FileService', () => {
     };
 
     it('should throw error if file not found', async () => {
-      mockRequireFile.mockRejectedValue(new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' }));
+      mockRequireFile.mockRejectedValue(
+        new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' }),
+      );
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(TRPCError);
     });
@@ -285,7 +287,7 @@ describe('FileService', () => {
       mockFileModel.create = vi.fn();
     });
 
-    it('should return proxy URL format ${APP_URL}/f/:id', async () => {
+    it('should return same-origin proxy path /f/:id', async () => {
       mockFileModel.create.mockResolvedValue({ id: 'new-file-id' });
 
       const result = await service.createFileRecord({
@@ -311,7 +313,7 @@ describe('FileService', () => {
       );
       expect(result).toEqual({
         fileId: 'new-file-id',
-        url: 'https://lobehub.com/f/new-file-id',
+        url: '/f/new-file-id',
       });
     });
 
@@ -333,7 +335,7 @@ describe('FileService', () => {
       );
       expect(result).toEqual({
         fileId: 'custom-id',
-        url: 'https://lobehub.com/f/custom-id',
+        url: '/f/custom-id',
       });
     });
 

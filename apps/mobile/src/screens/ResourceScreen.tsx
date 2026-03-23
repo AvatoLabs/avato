@@ -86,6 +86,7 @@ import {
   type TrashedDocumentItem,
 } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
+import { mainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import {
@@ -3271,9 +3272,9 @@ export default function ResourceScreen() {
                   flex: 1,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingBottom: insets.bottom + 80,
+                  paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
                 }
-              : { paddingBottom: insets.bottom + 80 }
+              : { paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom) }
           }
           refreshControl={
             <RefreshControl

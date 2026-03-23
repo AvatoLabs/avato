@@ -4,12 +4,20 @@ export const downloadFile = async (
   fallbackToOpen: boolean = true,
 ) => {
   try {
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(url, window.location.href).origin === window.location.origin;
+    } catch {
+      /* invalid url */
+    }
+
     // Use better CORS handling similar to download-image.ts
     const response = await fetch(url, {
       // Avoid image disk cache which can cause incorrect CORS headers
       cache: 'no-store',
 
-      credentials: 'omit',
+      // Same-origin `/f/:id` needs session cookies; presigned S3 URLs must not send credentials.
+      credentials: sameOrigin ? 'include' : 'omit',
 
       mode: 'cors',
     });
@@ -35,7 +43,7 @@ export const downloadFile = async (
     link.remove();
     window.URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.log('Download failed:', error);
+    console.error('Download failed:', error);
 
     // Fallback: open in new tab if enabled
     if (fallbackToOpen) {

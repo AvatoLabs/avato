@@ -8,11 +8,7 @@ import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { type FileItem } from '@/database/schemas';
-import { appEnv } from '@/envs/app';
-import {
-  AuthorizedResourceResolver,
-  type ResourceCapability,
-} from '@/server/services/resource';
+import { AuthorizedResourceResolver, type ResourceCapability } from '@/server/services/resource';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { createFileServiceModule } from './impls';
@@ -184,7 +180,7 @@ export class FileService {
 
     return {
       fileId: id,
-      url: `${appEnv.APP_URL}/f/${id}`,
+      url: `/f/${id}`,
     };
   }
 

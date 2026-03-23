@@ -4,6 +4,7 @@ import { Block } from '@lobehub/ui';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import ImageItem from '@/components/ImageItem';
+import { resolveClientMediaUrl } from '@/utils/client/resolveClientMediaUrl';
 
 import { ActionButtons } from './ActionButtons';
 import { styles } from './styles';
@@ -37,7 +38,7 @@ export const SuccessState = memo<SuccessStateProps>(
           : undefined,
       ].filter(Boolean) as string[];
 
-      return [...new Set(urls)];
+      return [...new Set(urls)].map(resolveClientMediaUrl);
     }, [assetOriginalUrl, assetThumbnailUrl, assetUrl, generation.fileId]);
 
     const [activeUrlIndex, setActiveUrlIndex] = useState(0);

@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import path from 'node:path';
 
 import type { PluginOption, ViteDevServer } from 'vite';
 import { defineConfig, loadEnv } from 'vite';
@@ -26,7 +26,7 @@ export default defineConfig({
   build: {
     outDir: isMobile ? 'dist/mobile' : 'dist/desktop',
     rollupOptions: {
-      input: resolve(__dirname, isMobile ? 'index.mobile.html' : 'index.html'),
+      input: path.resolve(__dirname, isMobile ? 'index.mobile.html' : 'index.html'),
       output: sharedRollupOutput,
     },
   },
@@ -109,7 +109,9 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': 'http://localhost:3010',
+      '/f': { changeOrigin: true, target: 'http://localhost:3010' },
       '/oidc': 'http://localhost:3010',
+      '/share/f': { changeOrigin: true, target: 'http://localhost:3010' },
       '/trpc': 'http://localhost:3010',
       '/webapi': 'http://localhost:3010',
     },

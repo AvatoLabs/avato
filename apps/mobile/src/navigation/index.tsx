@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TAB_BAR_FLOAT_GAP, TAB_BAR_HEIGHT, TAB_BAR_HORIZONTAL_INSET } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import AgentConfigScreen from '../screens/AgentConfigScreen';
@@ -68,9 +69,6 @@ const IOS_STACK_GESTURE_OPTIONS =
       } as const);
 
 /** Floating tab bar layout — matte surfaces only, no specular / highlight treatments */
-const TAB_BAR_FLOAT_GAP = 10;
-const TAB_BAR_HORIZONTAL_INSET = 16;
-const TAB_BAR_HEIGHT = Platform.OS === 'android' ? 60 : 62;
 
 function MeTabIcon({
   focused,

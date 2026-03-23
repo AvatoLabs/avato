@@ -53,6 +53,7 @@ import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
+import { useMainTabBottomInsets } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { type TranslationKeys, useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
@@ -579,6 +580,7 @@ export default function ArtworkScreen({
   const [showPicker, setShowPicker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const bottomChrome = useMainTabBottomInsets(keyboardOffset > 0);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
     const lift =
@@ -815,7 +817,6 @@ export default function ArtworkScreen({
   }, []);
 
   // ── Keyboard lift: keep composer close to keyboard without double-counting bottom inset ──
-  const inputPaddingBottom = Math.max(insets.bottom, 8);
   useEffect(() => {
     const handleKeyboardShow = (event: any) => {
       setKeyboardOffset(getKeyboardOffset(event, insets.bottom));
@@ -1308,7 +1309,7 @@ export default function ArtworkScreen({
       {/* ── Sticky Prompt Bar — aligned with ChatDetail input pill, lifts with keyboard ── */}
       <Animated.View
         className="px-4 pt-1"
-        style={[{ paddingBottom: inputPaddingBottom }, composerLiftStyle]}
+        style={[{ paddingBottom: bottomChrome.composerPaddingBottom }, composerLiftStyle]}
       >
         <ComposerShell active={composerActive}>
           <View className="flex-row items-end gap-2 px-3 pt-2 pb-2">
@@ -1390,7 +1391,7 @@ export default function ArtworkScreen({
               contentContainerStyle={{
                 paddingHorizontal: sidebarPad,
                 paddingTop: Math.max(insets.top + 16, 52),
-                paddingBottom: Math.max(insets.bottom + 24, 40),
+                paddingBottom: Math.max(bottomChrome.overlayListPaddingBottom, 40),
               }}
             >
               {/* Sidebar header */}

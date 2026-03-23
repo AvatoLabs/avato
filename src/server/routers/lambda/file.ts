@@ -12,7 +12,6 @@ import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { KnowledgeRepo } from '@/database/repositories/knowledge';
-import { appEnv } from '@/envs/app';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
@@ -26,10 +25,11 @@ import { type FileListItem } from '@/types/files';
 import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
 
 /**
- * Generate file proxy URL
- * Returns a unified proxy URL format: ${APP_URL}/f/:id
+ * Same-origin file proxy path for the web/desktop SPA.
+ * Resolves against the current page origin so dev (Vite + `/f` proxy) and production both work.
+ * Mobile prepends API base when `url` starts with `/` (see `resolveRemoteFileUrl`).
  */
-const getFileProxyUrl = (fileId: string): string => `${appEnv.APP_URL}/f/${fileId}`;
+const getFileProxyUrl = (fileId: string): string => `/f/${fileId}`;
 
 const normalizeFileType = (fileType?: string | null, name?: string | null): string => {
   if (!fileType || fileType.toLowerCase().includes('octet-stream')) {
@@ -328,7 +328,9 @@ export const fileRouter = router({
     const fileIds = visibleList.map((item) => item.id);
     const chunks = await ctx.chunkModel.countByFileIds(fileIds);
 
-    const chunkTaskIds = visibleList.map((result) => result.chunkTaskId).filter(Boolean) as string[];
+    const chunkTaskIds = visibleList
+      .map((result) => result.chunkTaskId)
+      .filter(Boolean) as string[];
 
     const chunkTasks = await ctx.asyncTaskModel.findByIds(chunkTaskIds, AsyncTaskType.Chunking);
 
@@ -505,7 +507,9 @@ export const fileRouter = router({
           fileCandidates.map((item) => item.id),
         ),
       );
-      const fileItems = fileCandidates.filter((item) => visibleFileIds.has(item.id)).slice(0, limit);
+      const fileItems = fileCandidates
+        .filter((item) => visibleFileIds.has(item.id))
+        .slice(0, limit);
 
       if (fileItems.length === 0) return [];
 

@@ -61,6 +61,7 @@ import {
   topicApi,
   userApi,
 } from '../lib/api';
+import { stackScreenComposerPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
@@ -355,7 +356,7 @@ export default function ChatDetailScreen({
     };
   }, []);
 
-  const inputPaddingBottom = Math.max(insets.bottom, 8);
+  const inputPaddingBottom = stackScreenComposerPaddingBottom(insets.bottom);
   const composerLiftStyle = useAnimatedStyle(() => {
     const lift =
       Platform.OS === 'android'

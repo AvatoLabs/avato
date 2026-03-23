@@ -16,7 +16,7 @@ const withProxyUrl = <T extends { id: string; url: string }>(items?: T[]): T[] |
 
     return {
       ...item,
-      url: `${appEnv.APP_URL}/f/${item.id}`,
+      url: `/f/${item.id}`,
     };
   });
 };

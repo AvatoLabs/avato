@@ -9,6 +9,7 @@ import { useDownloadImage } from '@/hooks/useDownloadImage';
 import { useImageStore } from '@/store/image';
 import { imageGenerationConfigSelectors } from '@/store/image/selectors';
 import { AsyncTaskStatus } from '@/types/asyncTask';
+import { resolveClientMediaUrl } from '@/utils/client/resolveClientMediaUrl';
 import { inferFileExtensionFromImageUrl } from '@/utils/url';
 
 import { ErrorState } from './ErrorState';
@@ -68,7 +69,8 @@ export const GenerationItem = memo<GenerationItemProps>(
     }, [deleteGeneration, generation.id]);
 
     const handleDownloadImage = useCallback(async () => {
-      const downloadUrl = generation.fileId ? `/f/${generation.fileId}` : generation.asset?.url;
+      const rawUrl = generation.fileId ? `/f/${generation.fileId}` : generation.asset?.url;
+      const downloadUrl = rawUrl ? resolveClientMediaUrl(rawUrl) : '';
       if (!downloadUrl || !generation.asset?.url) return;
 
       // Generate filename with prompt and timestamp

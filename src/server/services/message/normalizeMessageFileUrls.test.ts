@@ -31,9 +31,9 @@ describe('normalizeMessageFileUrlsForClient', () => {
 
     const result = normalizeMessageFileUrlsForClient(messages);
 
-    expect(result[0].imageList?.[0].url).toBe('https://avato.turingmesh.com/f/img-1');
-    expect(result[0].fileList?.[0].url).toBe('https://avato.turingmesh.com/f/file-1');
-    expect(result[0].videoList?.[0].url).toBe('https://avato.turingmesh.com/f/vid-1');
+    expect(result[0].imageList?.[0].url).toBe('/f/img-1');
+    expect(result[0].fileList?.[0].url).toBe('/f/file-1');
+    expect(result[0].videoList?.[0].url).toBe('/f/vid-1');
   });
 
   it('should keep secure urls unchanged', () => {

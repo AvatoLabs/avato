@@ -67,6 +67,7 @@ import {
   pluginApi,
   userApi,
 } from '../lib/api';
+import { mainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
 import { type ColorTokens, useThemeColors } from '../theme/colors';
@@ -451,9 +452,9 @@ const ItemCard = memo<{
               {item.name || item.identifier}
             </Text>
             <MetaTag
+              backgroundColor={isMcp ? colors.sourceMarketMuted : colors.sourceBuiltinMuted}
               label={typeLabel}
               textColor={isMcp ? colors.sourceMarket : colors.sourceBuiltin}
-              backgroundColor={isMcp ? colors.sourceMarketMuted : colors.sourceBuiltinMuted}
             />
           </View>
 
@@ -2542,7 +2543,6 @@ export default function StoreScreen() {
         </View>
       ) : isExplore ? (
         <FlatList
-          contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 80 }}
           data={marketItems}
           keyExtractor={(item) => `${item._source}-${item.identifier}`}
           renderItem={renderMarketItem}
@@ -2570,6 +2570,10 @@ export default function StoreScreen() {
               ) : null}
             </View>
           }
+          contentContainerStyle={{
+            paddingTop: 12,
+            paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+          }}
           refreshControl={
             <RefreshControl
               refreshing={marketLoading}
@@ -2583,11 +2587,14 @@ export default function StoreScreen() {
       ) : (
         <FlatList
           ItemSeparatorComponent={InstalledSeparator}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 80 }}
           data={filteredInstalled}
           keyExtractor={(item) => `${item.kind}-${item.id}`}
           renderItem={renderInstalledItem}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingTop: 8,
+            paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+          }}
           refreshControl={
             <RefreshControl
               refreshing={installedLoading}

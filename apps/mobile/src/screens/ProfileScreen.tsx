@@ -43,6 +43,7 @@ import {
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LanguageSheet from '../components/ui/LanguageSheet';
 import PressableScale from '../components/ui/PressableScale';
@@ -54,6 +55,7 @@ import { aiProviderApi, statsApi, userApi } from '../lib/api';
 import { APP_NAME, APP_VERSION } from '../lib/appInfo';
 import { clearTransientAppState } from '../lib/appState';
 import { signOutFromBrowser } from '../lib/auth';
+import { mainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { LOCALE_DISPLAY_NAMES, useI18n } from '../lib/i18n';
 import { getAppLoggingEnabled, setAppLoggingEnabled } from '../lib/logger';
@@ -132,6 +134,7 @@ export default function ProfileScreen({ navigation }: any) {
   const { t, locale } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const themePreference = useThemeStore((s) => s.preference);
   const setThemePreference = useThemeStore((s) => s.setPreference);
   const colorScheme = useThemeStore((s) => s.colorScheme);
@@ -345,7 +348,9 @@ export default function ProfileScreen({ navigation }: any) {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{
+          paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
