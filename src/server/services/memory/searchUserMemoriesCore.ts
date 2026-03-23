@@ -4,8 +4,8 @@ import {
   MEMORY_SEARCH_TOP_K_LIMITS,
 } from '@lobechat/const';
 import { type LobeChatDatabase } from '@lobechat/database';
-import type { type SearchMemoryResult, searchMemorySchema } from '@lobechat/types';
-import { type z } from 'zod';
+import type { SearchMemoryResult, searchMemorySchema } from '@lobechat/types';
+import type { z } from 'zod';
 
 import type { UserMemoryModel } from '@/database/models/userMemory';
 import { getServerDefaultFilesConfig } from '@/server/globalConfig';
