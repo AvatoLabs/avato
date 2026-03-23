@@ -86,7 +86,7 @@ import {
   type TrashedDocumentItem,
 } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
-import { mainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
+import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import {
@@ -1756,6 +1756,7 @@ function fileListItemFromShared(params: {
 export default function ResourceScreen() {
   const { locale, t } = useI18n();
   const insets = useSafeAreaInsets();
+  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
   const toast = useToast();
   const colors = useThemeColors();
 
@@ -3272,9 +3273,9 @@ export default function ResourceScreen() {
                   flex: 1,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+                  paddingBottom: scrollListPaddingBottom,
                 }
-              : { paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom) }
+              : { paddingBottom: scrollListPaddingBottom }
           }
           refreshControl={
             <RefreshControl

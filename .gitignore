@@ -95,6 +95,7 @@ apps/mobile/src/lib/*
 !apps/mobile/src/lib/api.ts
 !apps/mobile/src/lib/appState.ts
 !apps/mobile/src/lib/auth.ts
+!apps/mobile/src/lib/bottomChrome.ts
 !apps/mobile/src/lib/i18n.ts
 !apps/mobile/src/lib/server.ts
 sitemap*.xml

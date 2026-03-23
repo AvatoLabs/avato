@@ -67,7 +67,7 @@ import {
   pluginApi,
   userApi,
 } from '../lib/api';
-import { mainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
+import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
 import { haptics } from '../lib/haptics';
 import { type I18nStore, type Locale, useI18n } from '../lib/i18n';
 import { type ColorTokens, useThemeColors } from '../theme/colors';
@@ -1440,6 +1440,7 @@ function StoreItemModal({
 
 export default function StoreScreen() {
   const insets = useSafeAreaInsets();
+  const scrollListPaddingBottom = useMainTabScrollableContentPaddingBottom();
   const colors = useThemeColors();
   const { t } = useI18n();
   const locale = useI18n((s) => s.locale);
@@ -2572,7 +2573,7 @@ export default function StoreScreen() {
           }
           contentContainerStyle={{
             paddingTop: 12,
-            paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+            paddingBottom: scrollListPaddingBottom,
           }}
           refreshControl={
             <RefreshControl
@@ -2593,7 +2594,7 @@ export default function StoreScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingTop: 8,
-            paddingBottom: mainTabScrollableContentPaddingBottom(insets.bottom),
+            paddingBottom: scrollListPaddingBottom,
           }}
           refreshControl={
             <RefreshControl

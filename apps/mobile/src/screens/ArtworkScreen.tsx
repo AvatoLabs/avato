@@ -580,7 +580,7 @@ export default function ArtworkScreen({
   const [showPicker, setShowPicker] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const bottomChrome = useMainTabBottomInsets(keyboardOffset > 0);
+  const bottomChrome = useMainTabBottomInsets(keyboardOffset);
   const animatedKeyboard = useAnimatedKeyboard();
   const composerLiftStyle = useAnimatedStyle(() => {
     const lift =

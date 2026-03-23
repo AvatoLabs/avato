@@ -438,7 +438,7 @@ export default function ChatListScreen({ navigation }: MainTabScreenProps<'Chats
 
   const [heroText, setHeroText] = useState('');
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const bottomChrome = useMainTabBottomInsets(keyboardOffset > 0);
+  const bottomChrome = useMainTabBottomInsets(keyboardOffset);
   const [providerLogoError, setProviderLogoError] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SearchSessionResult[]>([]);
