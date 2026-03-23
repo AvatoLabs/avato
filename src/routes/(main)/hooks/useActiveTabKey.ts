@@ -1,5 +1,5 @@
 import { usePathname, useSearchParams } from '@/libs/router/navigation';
-import { type SidebarTabKey, SettingsTabs } from '@/store/global/initialState';
+import { SettingsTabs, type SidebarTabKey } from '@/store/global/initialState';
 
 /**
  * Returns the active tab key (chat/discover/settings/...)

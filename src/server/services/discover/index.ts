@@ -1,6 +1,5 @@
 import {
   CURRENT_VERSION,
-  DEFAULT_DISCOVER_ASSISTANT_ITEM,
   DEFAULT_DISCOVER_PLUGIN_ITEM,
   DEFAULT_DISCOVER_PROVIDER_ITEM,
   isDesktop,
@@ -60,7 +59,7 @@ import {
 } from '@lobehub/market-types';
 import dayjs from 'dayjs';
 import debug from 'debug';
-import { cloneDeep, countBy, isString, merge, uniq, uniqBy } from 'es-toolkit/compat';
+import { cloneDeep, countBy, merge, uniq, uniqBy } from 'es-toolkit/compat';
 import matter from 'gray-matter';
 import urlJoin from 'url-join';
 
@@ -132,21 +131,10 @@ export class DiscoverService {
   /** Map classic plugin list query params to MCP market list (single backend). */
   private mapPluginQueryToMcpParams(params: PluginQueryParams = {}): McpQueryParams {
     const { sort = PluginSorts.CreatedAt, ...rest } = params;
-    let mcpSort: McpSorts = McpSorts.CreatedAt;
-    switch (sort) {
-      case PluginSorts.CreatedAt: {
-        mcpSort = McpSorts.CreatedAt;
-        break;
-      }
-      case PluginSorts.Identifier:
-      case PluginSorts.Title: {
-        mcpSort = McpSorts.Recommended;
-        break;
-      }
-      default: {
-        mcpSort = McpSorts.CreatedAt;
-      }
-    }
+    const mcpSort =
+      sort === PluginSorts.Identifier || sort === PluginSorts.Title
+        ? McpSorts.Recommended
+        : McpSorts.CreatedAt;
     return { ...rest, sort: mcpSort };
   }
 
@@ -917,7 +905,7 @@ export class DiscoverService {
     withManifest?: boolean;
   }): Promise<DiscoverPluginDetail | undefined> => {
     log('getPluginDetail: params=%O', params);
-    const { locale, identifier, withManifest } = params;
+    const { locale, identifier } = params;
 
     // Step 1: Market MCP plugins
     log('getPluginDetail: resolving via MCP market for identifier=%s', identifier);

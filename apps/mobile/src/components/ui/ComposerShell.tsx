@@ -45,6 +45,9 @@ interface ComposerPrimaryActionProps extends Omit<TouchableOpacityProps, 'style'
   active?: boolean;
   children: React.ReactNode;
   containerStyle?: ViewStyle;
+  /** When set, renders a wider pill with icon + label (e.g. Generate). */
+  label?: string;
+  labelStyle?: { color?: string; fontSize?: number; fontWeight?: '400' | '500' | '600' | '700' };
 }
 
 const COMPOSER_RADIUS = tokens.radius.xl;
@@ -267,11 +270,14 @@ export function ComposerPrimaryAction({
   active = false,
   children,
   containerStyle,
+  label,
+  labelStyle,
   ...props
 }: ComposerPrimaryActionProps) {
   const colors = useThemeColors();
   const progress = useComposerProgress(active, tokens.motion.spring.snappy);
   const actionSize = tokens.mobile.heights.composerAction;
+  const labeled = Boolean(label);
 
   const actionAnimatedStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
@@ -304,10 +310,14 @@ export function ComposerPrimaryAction({
         {
           alignItems: 'center',
           borderRadius: actionSize / 2,
+          flexDirection: labeled ? 'row' : undefined,
+          gap: labeled ? 6 : undefined,
           height: actionSize,
           justifyContent: 'center',
+          minWidth: labeled ? undefined : actionSize,
           overflow: 'hidden',
-          width: actionSize,
+          paddingHorizontal: labeled ? 12 : undefined,
+          width: labeled ? undefined : actionSize,
         },
         actionAnimatedStyle,
         containerStyle,
@@ -315,6 +325,20 @@ export function ComposerPrimaryAction({
       {...props}
     >
       {children}
+      {labeled ? (
+        <Text
+          numberOfLines={1}
+          style={{
+            color: labelStyle?.color ?? (active ? colors.iconOnPrimary : colors.muted),
+            fontSize: labelStyle?.fontSize ?? 13,
+            fontWeight: labelStyle?.fontWeight ?? '700',
+            letterSpacing: -0.2,
+            maxWidth: 120,
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
     </AnimatedTouchableOpacity>
   );
 }

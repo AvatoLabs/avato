@@ -86,7 +86,6 @@ const mapSortToLightmake = (sort?: SkillAggregatorSorts) => {
     case SkillAggregatorSorts.UpdatedAt: {
       return { order: 'desc', sortBy: 'updated_at' };
     }
-    case SkillAggregatorSorts.Relevance:
     default: {
       return { order: 'desc', sortBy: 'score' };
     }

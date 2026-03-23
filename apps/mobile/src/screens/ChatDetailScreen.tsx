@@ -5,29 +5,17 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FlashList } from '@shopify/flash-list';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import {
-  ArrowDown,
-  Brain,
-  BrainCircuit,
-  Cpu,
-  Eraser,
-  Globe,
-  Paperclip,
-  Puzzle,
-  Send,
-  Square,
-} from 'lucide-react-native';
+import { ArrowDown } from 'lucide-react-native';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   AppState,
-  Image as RNImage,
   Keyboard,
   LayoutAnimation,
   Platform,
+  RefreshControl,
   Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -46,15 +34,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ChatDetailHeader from '../components/ChatDetailHeader';
 import AttachmentSheet from '../components/ui/AttachmentSheet';
-import {
-  ComposerCountBadge,
-  ComposerIconButton,
-  ComposerPrimaryAction,
-  ComposerShell,
-} from '../components/ui/ComposerShell';
+import { ChatComposerBody } from '../components/ui/ChatComposerBody';
 import EmptyState from '../components/ui/EmptyState';
 import FilePreview from '../components/ui/FilePreview';
-import { GroupMentionInput } from '../components/ui/GroupMentionInput';
 import MemoryToolSheet from '../components/ui/MemoryToolSheet';
 import MessageBubble, { type GroupMessageSpeaker } from '../components/ui/MessageBubble';
 import MessageListSkeleton from '../components/ui/MessageListSkeleton';
@@ -94,7 +76,6 @@ import { useThemeStore } from '../store/theme';
 import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
 import { getUserMemorySettings } from '../store/user';
 import { useThemeColors } from '../theme/colors';
-import { tokens } from '../theme/tokens';
 import type {
   AgentSkillItem,
   ChatMessage,
@@ -174,7 +155,6 @@ export default function ChatDetailScreen({
   const toast = useToast();
   const colors = useThemeColors();
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
-  const primaryColor = colors.primary;
 
   const session = useSessionStore((s) => s.sessions.find((sess) => sess.id === sessionId));
   const fetchSessions = useSessionStore((s) => s.fetchSessions);
@@ -235,6 +215,7 @@ export default function ChatDetailScreen({
   >([]);
   const [agentSkillItems, setAgentSkillItems] = useState<AgentSkillItem[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
+  const [listRefreshing, setListRefreshing] = useState(false);
   const [enabledPlugins, setEnabledPlugins] = useState<Set<string>>(() => new Set());
   const [agentId, setAgentId] = useState<string | null>(null);
   const [groupDetail, setGroupDetail] = useState<AgentGroupDetail | null>(null);
@@ -1040,6 +1021,33 @@ export default function ChatDetailScreen({
   );
   const estimatedItemSize = useMemo(() => getEstimatedMessageItemSize(messages), [messages]);
 
+  const onListRefresh = useCallback(async () => {
+    if (!sessionId) return;
+    if (generating && activeStreamingSessionId === sessionId) return;
+    setListRefreshing(true);
+    try {
+      const topicId = initialTopicId ?? activeTopic ?? undefined;
+      await Promise.all([
+        fetchSessions(),
+        fetchTopics(sessionId),
+        fetchMessages(sessionId, topicId, { preferPopulatedTopic: true }),
+      ]);
+      void loadGroupDetail();
+    } finally {
+      setListRefreshing(false);
+    }
+  }, [
+    activeStreamingSessionId,
+    activeTopic,
+    fetchMessages,
+    fetchSessions,
+    fetchTopics,
+    generating,
+    initialTopicId,
+    loadGroupDetail,
+    sessionId,
+  ]);
+
   if (!sessionId) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
@@ -1098,6 +1106,8 @@ export default function ChatDetailScreen({
                     >
                       {emptyStateSuggestions.map((label) => (
                         <TouchableOpacity
+                          accessibilityLabel={label}
+                          accessibilityRole="button"
                           activeOpacity={0.7}
                           className="rounded-full px-4 py-2.5"
                           key={label}
@@ -1123,6 +1133,13 @@ export default function ChatDetailScreen({
                   }
                 />
               </View>
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={listRefreshing}
+                tintColor={colors.primary}
+                onRefresh={() => void onListRefresh()}
+              />
             }
             onContentSizeChange={autoScrollToEnd}
             onLayout={autoScrollToEnd}
@@ -1170,193 +1187,52 @@ export default function ChatDetailScreen({
             composerLiftStyle,
           ]}
         >
-          <ComposerShell active={composerActive}>
-            {pendingFiles.length > 0 && (
-              <View className="px-3 pt-2">
-                <FilePreview sessionId={sessionId} />
-              </View>
-            )}
-            {/* Text input — full width (GroupMentionInput for group chat @ mention) */}
-            <View className="px-3 pt-2">
-              {isGroupSession && groupDetail?.agents?.length ? (
-                <GroupMentionInput
-                  editable
-                  accessibilityLabel={generating ? t.chatGenerating : hints[hintIndex]}
-                  className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
-                  placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                  style={{ paddingVertical: 0, textAlignVertical: 'top' }}
-                  value={inputText}
-                  members={groupDetail.agents.map((a) => ({
+          <ChatComposerBody
+            textEditable
+            active={composerActive}
+            canSend={Boolean(inputText.trim()) || pendingFiles.length > 0}
+            generating={generating}
+            memoryEnabled={memoryEnabled}
+            modelDrawerVisible={modelDrawerVisible}
+            pendingFilesCount={pendingFiles.length}
+            placeholder={generating ? t.chatGenerating : hints[hintIndex]}
+            pluginsEnabled={enabledPlugins.size > 0}
+            providerLogoError={providerLogoError}
+            searchEnabled={searchEnabled}
+            sendAnimStyle={sendAnimStyle}
+            toolbarProviderLogo={toolbarProviderLogo}
+            value={inputText}
+            variant={isGroupSession ? 'detailGroup' : 'detailPersonal'}
+            groupMembers={
+              isGroupSession && groupDetail?.agents?.length
+                ? groupDetail.agents.map((a) => ({
                     avatar: a.avatar,
                     id: a.id,
                     title: a.title,
-                  }))}
-                  onChangeText={setInputText}
-                />
-              ) : (
-                <TextInput
-                  editable
-                  multiline
-                  accessibilityLabel={generating ? t.chatGenerating : hints[hintIndex]}
-                  className="text-foreground text-[16px] leading-[22px] min-h-[36px] max-h-28"
-                  placeholder={generating ? t.chatGenerating : hints[hintIndex]}
-                  placeholderTextColor={colors.secondaryText}
-                  style={{ paddingVertical: 0, textAlignVertical: 'top' }}
-                  underlineColorAndroid="transparent"
-                  value={inputText}
-                  onChangeText={setInputText}
-                />
-              )}
-            </View>
-            {/* Action toolbar row */}
-            <View
-              className="px-2 pb-1.5 pt-1"
-              style={{ alignItems: 'center', flexDirection: 'row' }}
-            >
-              {!isGroupSession && (
-                <View style={{ alignItems: 'center', flexDirection: 'row', flexShrink: 1 }}>
-                  <ComposerIconButton
-                    accessibilityLabel="Select model"
-                    active={modelDrawerVisible}
-                    containerStyle={{ marginRight: 6 }}
-                    onPress={handleModelPress}
-                  >
-                    {toolbarProviderLogo && !providerLogoError ? (
-                      <RNImage
-                        style={{ width: 16, height: 16, borderRadius: 4 }}
-                        source={{
-                          uri: toolbarProviderLogo,
-                        }}
-                        onError={() => setProviderLogoError(true)}
-                      />
-                    ) : (
-                      <Cpu
-                        color={modelDrawerVisible ? primaryColor : colors.secondaryText}
-                        size={16}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
-                    )}
-                  </ComposerIconButton>
-                  <ComposerIconButton
-                    accessibilityLabel="Toggle search"
-                    active={searchEnabled}
-                    containerStyle={{ marginLeft: 6 }}
-                    onPress={handleToggleSearch}
-                  >
-                    <Globe
-                      color={searchEnabled ? primaryColor : colors.muted}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
-                  </ComposerIconButton>
+                  }))
+                : undefined
+            }
+            topSlot={
+              pendingFiles.length > 0 ? (
+                <View className="px-3 pt-2">
+                  <FilePreview sessionId={sessionId} />
                 </View>
-              )}
-              {/* Attach */}
-              <ComposerIconButton
-                accessibilityLabel="Attach file"
-                active={pendingFiles.length > 0}
-                containerStyle={{ marginLeft: isGroupSession ? 0 : 6 }}
-                badge={
-                  pendingFiles.length > 0 ? (
-                    <ComposerCountBadge
-                      color={colors.primary}
-                      value={pendingFiles.length > 9 ? '9+' : pendingFiles.length}
-                    />
-                  ) : null
-                }
-                onPress={handleAttach}
-              >
-                <Paperclip
-                  color={pendingFiles.length > 0 ? primaryColor : colors.muted}
-                  size={18}
-                  strokeWidth={tokens.icon.strokeWidth}
-                />
-              </ComposerIconButton>
-              {!isGroupSession && (
-                <>
-                  {/* Tools */}
-                  <ComposerIconButton
-                    accessibilityLabel="Toggle tools"
-                    active={enabledPlugins.size > 0}
-                    containerStyle={{ marginLeft: 6 }}
-                    onPress={handlePluginsPress}
-                  >
-                    <Puzzle
-                      color={enabledPlugins.size > 0 ? primaryColor : colors.muted}
-                      size={18}
-                      strokeWidth={tokens.icon.strokeWidth}
-                    />
-                  </ComposerIconButton>
-                  {/* Memory */}
-                  <ComposerIconButton
-                    accessibilityLabel="Toggle memory"
-                    active={memoryEnabled}
-                    containerStyle={{ marginLeft: 6 }}
-                    onPress={() => {
-                      haptics.light();
-                      setMemorySheetVisible(true);
-                    }}
-                  >
-                    {memoryEnabled ? (
-                      <BrainCircuit
-                        color={primaryColor}
-                        size={18}
-                        strokeWidth={tokens.icon.strokeWidth}
-                      />
-                    ) : (
-                      <Brain color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    )}
-                  </ComposerIconButton>
-                </>
-              )}
-              {/* Separator */}
-              <View
-                style={{
-                  backgroundColor: colors.borderSubtle,
-                  height: 16,
-                  marginHorizontal: 8,
-                  width: 1,
-                }}
-              />
-              {/* Clear */}
-              <ComposerIconButton accessibilityLabel="Clear messages" onPress={handleClear}>
-                <Eraser color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-              </ComposerIconButton>
-              {/* Spacer */}
-              <View className="flex-1" />
-              {/* Send / Stop */}
-              {generating ? (
-                <Animated.View style={sendAnimStyle}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    className="w-9 h-9 rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.muted }}
-                    onPress={handleStop}
-                  >
-                    <Square
-                      color={colors.iconOnPrimary}
-                      fill={colors.iconOnPrimary}
-                      size={12}
-                      strokeWidth={0}
-                    />
-                  </TouchableOpacity>
-                </Animated.View>
-              ) : inputText.trim() || pendingFiles.length > 0 ? (
-                <Animated.View style={sendAnimStyle}>
-                  <ComposerPrimaryAction active onPress={handleSend}>
-                    <Send
-                      color={colors.iconOnPrimary}
-                      size={16}
-                      strokeWidth={tokens.icon.strokeWidth}
-                      style={{ marginLeft: 1 }}
-                    />
-                  </ComposerPrimaryAction>
-                </Animated.View>
-              ) : (
-                <View className="w-9 h-9" />
-              )}
-            </View>
-          </ComposerShell>
+              ) : undefined
+            }
+            onAttach={handleAttach}
+            onChangeText={setInputText}
+            onClear={handleClear}
+            onModelPress={handleModelPress}
+            onPluginsPress={handlePluginsPress}
+            onProviderLogoError={() => setProviderLogoError(true)}
+            onSend={handleSend}
+            onStop={handleStop}
+            onToggleSearch={handleToggleSearch}
+            onMemoryPress={() => {
+              haptics.light();
+              setMemorySheetVisible(true);
+            }}
+          />
         </Animated.View>
       </View>
 

@@ -5,9 +5,10 @@
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { colorScheme as nativeWindColorScheme } from 'nativewind';
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 
 import { navigationRef } from '../lib/navigation';
+import { handleIncomingShareUrl } from '../lib/shareLinkNavigation';
 import { useThemeStore } from '../store/theme';
 import { getThemeTokens } from '../theme/colors';
 
@@ -21,6 +22,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     nativeWindColorScheme.set(effectiveTheme);
   }, [effectiveTheme]);
+
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      handleIncomingShareUrl(url);
+    });
+    return () => sub.remove();
+  }, []);
 
   const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
   const navTheme = {
@@ -43,7 +51,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       className={[isDark ? 'dark' : '', themeClass].filter(Boolean).join(' ')}
       style={{ backgroundColor: tokens.background, flex: 1 }}
     >
-      <NavigationContainer ref={navigationRef} theme={navTheme}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navTheme}
+        onReady={() => {
+          void Linking.getInitialURL().then(handleIncomingShareUrl);
+        }}
+      >
         {children}
       </NavigationContainer>
     </View>

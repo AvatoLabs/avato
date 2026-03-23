@@ -23,6 +23,8 @@ export default {
   'workspace.resume.empty': 'No recent work yet. Start a task to see it here.',
   'workspace.resume.title': 'Resume Recent Work',
   'workspace.resume.untitled': 'Untitled Topic',
+  'workspace.secondary.collapse': 'Hide',
+  'workspace.secondary.expand': 'Show recent work & documents',
   'workspace.status.mcp': 'MCP',
   'workspace.status.model': 'Model',
   'workspace.status.off': 'Off',

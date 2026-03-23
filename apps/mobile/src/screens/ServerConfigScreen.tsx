@@ -201,6 +201,14 @@ export default function ServerConfigScreen({
               >
                 {t.serverDesc}
               </Text>
+              {isFirstLaunch ? (
+                <Text
+                  className="mt-3 text-center text-[13px] font-semibold leading-5"
+                  style={{ color: colors.primary, maxWidth: 300 }}
+                >
+                  {t.serverFirstLaunchNextStep}
+                </Text>
+              ) : null}
             </View>
           </Animated.View>
 

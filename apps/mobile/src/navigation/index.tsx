@@ -16,6 +16,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -37,6 +38,7 @@ import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProviderDetailScreen from '../screens/ProviderDetailScreen';
+import PublicResourceShareScreen from '../screens/PublicResourceShareScreen';
 import ResourceScreen from '../screens/ResourceScreen';
 import ServerConfigScreen from '../screens/ServerConfigScreen';
 import StatsScreen from '../screens/StatsScreen';
@@ -65,6 +67,11 @@ const IOS_STACK_GESTURE_OPTIONS =
         freezeOnBlur: true,
       } as const);
 
+/** Floating tab bar layout — matte surfaces only, no specular / highlight treatments */
+const TAB_BAR_FLOAT_GAP = 10;
+const TAB_BAR_HORIZONTAL_INSET = 16;
+const TAB_BAR_HEIGHT = Platform.OS === 'android' ? 60 : 62;
+
 function MeTabIcon({
   focused,
   size,
@@ -75,6 +82,7 @@ function MeTabIcon({
   trigger: number;
 }) {
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
+  const colors = useThemeColors();
   const logoSize = Math.round(Math.max(size + 1, 24) * 1.15);
   const rotation = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -124,7 +132,7 @@ function MeTabIcon({
           style={{
             height: logoSize,
             width: logoSize,
-            ...(effectiveTheme === 'dark' ? { tintColor: '#ffffff' } : {}),
+            ...(effectiveTheme === 'dark' ? { tintColor: colors.foreground } : {}),
           }}
         />
       </Animated.View>
@@ -178,34 +186,19 @@ function AnimatedTabLabel({ focused, label }: { focused: boolean; label: string 
 
 function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; focused: boolean }) {
   const colors = useThemeColors();
-  const haloOpacity = useSharedValue(focused ? 1 : 0);
-  const haloScale = useSharedValue(focused ? 1 : 0.92);
-  const iconScale = useSharedValue(focused ? 1 : 0.94);
-  const translateY = useSharedValue(focused ? -1.5 : 0);
+  const iconScale = useSharedValue(focused ? 1 : 0.96);
+  const translateY = useSharedValue(focused ? -1 : 0);
 
   useEffect(() => {
-    haloOpacity.value = withTiming(focused ? 1 : 0, {
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
+    iconScale.value = withSpring(focused ? 1 : 0.96, {
+      damping: 20,
+      stiffness: 220,
     });
-    haloScale.value = withSpring(focused ? 1 : 0.92, {
-      damping: 18,
-      stiffness: 210,
-    });
-    iconScale.value = withSpring(focused ? 1 : 0.94, {
-      damping: 16,
-      stiffness: 240,
-    });
-    translateY.value = withTiming(focused ? -1.5 : 0.5, {
-      duration: 180,
+    translateY.value = withTiming(focused ? -1 : 0.5, {
+      duration: 160,
       easing: Easing.out(Easing.quad),
     });
-  }, [focused, haloOpacity, haloScale, iconScale, translateY]);
-
-  const haloAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: haloOpacity.value,
-    transform: [{ scale: haloScale.value }],
-  }));
+  }, [focused, iconScale, translateY]);
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }, { scale: iconScale.value }],
@@ -214,24 +207,11 @@ function AnimatedTabIcon({ children, focused }: { children: React.ReactNode; foc
   return (
     <View style={{ alignItems: 'center', height: 34, justifyContent: 'center', width: 34 }}>
       <Animated.View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: colors.activeTabBg,
-            borderRadius: tokens.radius.full,
-          },
-          haloAnimatedStyle,
-        ]}
-      />
-      <Animated.View
         style={[
           {
             alignItems: 'center',
-            backgroundColor: focused ? 'transparent' : colors.fillQuaternary,
-            borderColor: focused ? 'transparent' : colors.borderSubtle,
+            backgroundColor: focused ? colors.fillTertiary : 'transparent',
             borderRadius: tokens.radius.full,
-            borderWidth: focused ? 0 : 1,
             height: 34,
             justifyContent: 'center',
             width: 34,
@@ -256,9 +236,10 @@ function FloatingTabBarBackground() {
         StyleSheet.absoluteFillObject,
         {
           backgroundColor: colors.surfaceElevated,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          opacity: Platform.OS === 'ios' ? 0.9 : 0.98,
+          borderColor: colors.borderSubtle,
+          borderRadius: tokens.radius.xl,
+          borderWidth: StyleSheet.hairlineWidth,
+          opacity: Platform.OS === 'ios' ? 0.88 : 0.96,
         },
       ]}
     />
@@ -266,19 +247,30 @@ function FloatingTabBarBackground() {
 
   if (Platform.OS === 'ios') {
     return (
-      <BlurView intensity={88} style={StyleSheet.absoluteFill} tint={blurTint}>
+      <BlurView
+        intensity={72}
+        style={[StyleSheet.absoluteFill, { borderRadius: tokens.radius.xl, overflow: 'hidden' }]}
+        tint={blurTint}
+      >
         {overlay}
       </BlurView>
     );
   }
 
-  return overlay;
+  return (
+    <View style={[StyleSheet.absoluteFill, { borderRadius: tokens.radius.xl, overflow: 'hidden' }]}>
+      {overlay}
+    </View>
+  );
 }
 
 function BottomTabs() {
   const themeColors = useThemeColors();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const [meIconTrigger, setMeIconTrigger] = useState(0);
+
+  const tabBarBottom = TAB_BAR_FLOAT_GAP + insets.bottom;
 
   return (
     <Tab.Navigator
@@ -296,19 +288,23 @@ function BottomTabs() {
         tabBarBackground: () => <FloatingTabBarBackground />,
         tabBarHideOnKeyboard: true,
         tabBarItemStyle: {
-          paddingTop: 6,
+          paddingTop: 4,
         },
         tabBarStyle: {
           backgroundColor: 'transparent',
           borderTopWidth: 0,
-          elevation: 0,
-          height: Platform.OS === 'android' ? 64 : 78,
-          paddingTop: 6,
+          bottom: tabBarBottom,
+          elevation: Platform.OS === 'android' ? 6 : 0,
+          height: TAB_BAR_HEIGHT,
+          left: TAB_BAR_HORIZONTAL_INSET,
+          overflow: 'hidden',
+          paddingTop: 4,
+          position: 'absolute',
+          right: TAB_BAR_HORIZONTAL_INSET,
           shadowColor: themeColors.shadow,
-          shadowOpacity: 0.12,
-          shadowOffset: { width: 0, height: -6 },
-          shadowRadius: 22,
-          ...(Platform.OS === 'android' ? { paddingBottom: 8 } : {}),
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: Platform.OS === 'ios' ? 0.07 : 0.09,
+          shadowRadius: 16,
         },
       }}
     >
@@ -322,7 +318,7 @@ function BottomTabs() {
             </AnimatedTabIcon>
           ),
           tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabChats} />,
-          tabBarAccessibilityLabel: 'Chats tab',
+          tabBarAccessibilityLabel: t.tabChats,
         }}
       />
       <Tab.Screen
@@ -335,7 +331,7 @@ function BottomTabs() {
             </AnimatedTabIcon>
           ),
           tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabArtwork} />,
-          tabBarAccessibilityLabel: 'Create tab',
+          tabBarAccessibilityLabel: t.tabArtwork,
         }}
       />
       <Tab.Screen
@@ -350,7 +346,7 @@ function BottomTabs() {
           tabBarLabel: ({ focused }) => (
             <AnimatedTabLabel focused={focused} label={t.resourceTitle} />
           ),
-          tabBarAccessibilityLabel: 'Resources tab',
+          tabBarAccessibilityLabel: t.resourceTitle,
         }}
       />
       <Tab.Screen
@@ -363,7 +359,7 @@ function BottomTabs() {
             </AnimatedTabIcon>
           ),
           tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabStore} />,
-          tabBarAccessibilityLabel: 'Store tab',
+          tabBarAccessibilityLabel: t.tabStore,
         }}
       />
       <Tab.Screen
@@ -381,7 +377,7 @@ function BottomTabs() {
             </AnimatedTabIcon>
           ),
           tabBarLabel: ({ focused }) => <AnimatedTabLabel focused={focused} label={t.tabMe} />,
-          tabBarAccessibilityLabel: 'Me tab',
+          tabBarAccessibilityLabel: t.tabMe,
         }}
       />
     </Tab.Navigator>
@@ -436,6 +432,7 @@ export default function RootNavigator({ initialRoute = 'MainTabs' }: RootNavigat
       <Stack.Screen component={ProviderDetailScreen} name="ProviderDetail" />
       <Stack.Screen component={ModelPickerScreen} name="ModelPicker" />
       <Stack.Screen component={ProfileEditScreen} name="ProfileEdit" />
+      <Stack.Screen component={PublicResourceShareScreen} name="PublicResourceShare" />
       <Stack.Screen component={DataManagementScreen} name="DataManagement" />
       <Stack.Screen component={AppLogsScreen} name="AppLogs" />
       <Stack.Screen component={StatsScreen} name="Stats" />

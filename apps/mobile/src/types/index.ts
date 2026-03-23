@@ -35,6 +35,8 @@ export interface ChatSession {
   pinned?: boolean;
   /** Provider identifier (e.g. 'openai', 'anthropic') */
   provider?: string;
+  /** Session slug when returned by the API (e.g. personal notebook) */
+  slug?: string | null;
   title: string;
   /** 'agent' for regular sessions, 'group' for multi-agent chat groups */
   type?: 'agent' | 'group';
@@ -398,12 +400,19 @@ export interface DiscoverProvider {
 
 export interface UserProfile {
   avatar?: string;
-  bio?: string;
   email?: string;
   fullName?: string;
   id: string;
   interests?: string[];
   username?: string;
+}
+
+/** Mirrors server `SSOProvider` from linked OAuth / SSO accounts (read-only). */
+export interface MobileSSOProvider {
+  email?: string;
+  expiresAt?: Date | number | null;
+  provider: string;
+  providerAccountId: string;
 }
 
 export interface MobileUserState extends UserProfile {
@@ -943,12 +952,17 @@ export interface FileListItem {
   fileType: string;
   finishEmbedding: boolean;
   id: string;
+  inheritMode?: 'explicit_only' | 'inherit' | null;
   metadata?: Record<string, any> | null;
   name: string;
   parentId?: string | null;
+  resourceRole?: 'owner' | 'editor' | 'viewer' | null;
+  resourceUid?: string | null;
   size: number;
   slug?: string | null;
   sourceType: 'file' | 'document';
+  spaceId?: string | null;
+  updatedAt?: string;
   url: string;
   userId?: string;
 }
@@ -958,4 +972,7 @@ export interface KnowledgeBaseItem {
   description?: string | null;
   id: string;
   name: string;
+  resourceUid?: string | null;
+  spaceId?: string | null;
+  type?: string | null;
 }

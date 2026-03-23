@@ -6,12 +6,20 @@ import { useFileStore } from '../store/file';
 import { useSessionStore } from '../store/session';
 import { useUserStore } from '../store/user';
 import { clearStoredAuthSession } from './auth';
+import { classifyError } from './errorHandler';
 
 export const ONBOARDING_KEY = 'avato_onboarding_complete';
 
-const isAuthInvalidReason = (reason: unknown) => {
+/** Session list + user state must agree on auth; align with `classifyError` (status + message heuristics). */
+const requiresReauthForBootstrap = (reason: unknown) => {
+  if (classifyError(reason).type === 'auth') return true;
   const message = reason instanceof Error ? reason.message : String(reason ?? '');
   return /\b401\b|user not found|unauthorized|forbidden|invalid token/i.test(message);
+};
+
+const handleBootstrapAuthFailure = async () => {
+  await clearStoredAuthSession().catch(() => {});
+  await clearTransientAppState().catch(() => {});
 };
 
 export const syncMobileBootstrapState = async () => {
@@ -25,14 +33,19 @@ export const syncMobileBootstrapState = async () => {
 
   if (sessionsResult.status === 'rejected') {
     console.warn('[appState] bootstrap sessions sync failed:', sessionsResult.reason);
+    if (requiresReauthForBootstrap(sessionsResult.reason)) {
+      requiresReauth = true;
+    }
   }
   if (userResult.status === 'rejected') {
     console.warn('[appState] bootstrap user sync failed:', userResult.reason);
-    if (isAuthInvalidReason(userResult.reason)) {
+    if (requiresReauthForBootstrap(userResult.reason)) {
       requiresReauth = true;
-      await clearStoredAuthSession().catch(() => {});
-      await clearTransientAppState().catch(() => {});
     }
+  }
+
+  if (requiresReauth) {
+    await handleBootstrapAuthFailure();
   }
   if (agentsResult.status === 'rejected') {
     console.warn('[appState] bootstrap agents sync failed:', agentsResult.reason);

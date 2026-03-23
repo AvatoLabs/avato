@@ -27,6 +27,7 @@ export const toolExecutionsToPayloads = (executions: ToolExecutionItem[]): ChatT
     id: exec.id,
     identifier: exec.identifier,
     intervention: exec.intervention ?? { status: 'approved' },
+    pluginError: exec.pluginError,
     pluginState: exec.state,
     result_content: exec.result,
     result_msg_id: exec.id,
@@ -66,11 +67,13 @@ export const mergeToolPayloadsCore = (
 
     const existing = merged.get(key)!;
     const hasResult = tool.result_content !== undefined || !!tool.result_msg_id;
+    const incomingRejected = tool.intervention?.status === 'rejected';
     const mergedTool = {
       ...existing,
       ...tool,
-      intervention:
-        autoApprove && hasResult
+      intervention: incomingRejected
+        ? tool.intervention
+        : autoApprove && hasResult
           ? (tool.intervention ?? { status: 'approved' as const })
           : (tool.intervention ?? existing.intervention),
       pluginState: tool.pluginState ?? existing.pluginState,

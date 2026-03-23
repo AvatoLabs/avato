@@ -14,6 +14,7 @@ import {
   Download,
   Globe,
   Hand,
+  Images,
   ListTodo,
   Pause,
   Pencil,
@@ -84,6 +85,55 @@ const getTimeAgo = (date?: string | Date): string => {
   if (h < 24) return `${h}h`;
   return `${Math.floor(h / 24)}d`;
 };
+
+const escapeMarkdownLinkLabel = (label: string) =>
+  label.replaceAll('[', '\\[').replaceAll(']', '\\]');
+
+const IMAGE_SEARCH_REF_REGEX = /\bimage_(\d+)\.(?:png|jpe?g|gif|webp)\b/gi;
+
+const injectCitationLinks = (content: string | undefined, citations?: CitationItem[] | null) => {
+  if (!content || !citations?.length) return content ?? '';
+
+  return content
+    .replaceAll(/\[\^(\d+)\^\]/g, (_token, rawIndex) => {
+      const citation = citations[Number(rawIndex) - 1];
+      if (!citation?.url) return `[${rawIndex}]`;
+      return `[^${rawIndex}](${citation.url})`;
+    })
+    .replaceAll(/\[\^(\d+)\]/g, (_token, rawIndex) => {
+      const citation = citations[Number(rawIndex) - 1];
+      if (!citation?.url) return `[${rawIndex}]`;
+      return `[^${rawIndex}](${citation.url})`;
+    })
+    .replaceAll(/\[(\d+)\]/g, (token, rawIndex) => {
+      const citation = citations[Number(rawIndex) - 1];
+      if (!citation?.url) return token;
+      return `[${escapeMarkdownLinkLabel(token)}](${citation.url})`;
+    });
+};
+
+const injectImageSearchRefLinks = (
+  content: string | undefined,
+  imageResults?: ImageCitationItem[] | null,
+): string | undefined => {
+  if (!content || !imageResults?.length) return content;
+  IMAGE_SEARCH_REF_REGEX.lastIndex = 0;
+  if (!IMAGE_SEARCH_REF_REGEX.test(content)) return content;
+  IMAGE_SEARCH_REF_REGEX.lastIndex = 0;
+  return content.replace(IMAGE_SEARCH_REF_REGEX, (match, indexStr) => {
+    const idx = Number.parseInt(indexStr, 10);
+    const item = imageResults[idx];
+    const url = item?.imageUri || item?.sourceUri;
+    if (!url) return match;
+    return `[${match}](${url})`;
+  });
+};
+
+const applyAssistantSearchInlineMarkdown = (
+  content: string | undefined,
+  citations?: CitationItem[] | null,
+  imageResults?: ImageCitationItem[] | null,
+) => injectCitationLinks(injectImageSearchRefLinks(content, imageResults), citations);
 
 const CodeCopyButton = memo<{ code: string }>(({ code }) => {
   const colors = useThemeColors();
@@ -513,7 +563,13 @@ const CompareGroupBlock = memo<{
             speaker?.title || (isSupervisor ? t.groupSettingsSupervisor : t.settingsDefaultAgent);
           const fallbackLabel = (speakerName || t.settingsDefaultAgent).slice(0, 1).toUpperCase();
           const childContent = preprocessMentionDisplay(
-            preprocessMathBlocks(injectCitationLinks(child.content, child.search?.citations)),
+            preprocessMathBlocks(
+              applyAssistantSearchInlineMarkdown(
+                child.content,
+                child.search?.citations,
+                child.search?.imageResults,
+              ),
+            ),
             t.groupMentionAllMembers,
           );
 
@@ -1152,7 +1208,13 @@ const MessageBubble = memo<MessageBubbleProps>(
       : null;
     const CONTENT_COLLAPSE_THRESHOLD = 3000;
     const fullContent = preprocessMentionDisplay(
-      preprocessMathBlocks(injectCitationLinks(message.content, message.search?.citations)),
+      preprocessMathBlocks(
+        applyAssistantSearchInlineMarkdown(
+          message.content,
+          message.search?.citations,
+          message.search?.imageResults,
+        ),
+      ),
       t.groupMentionAllMembers,
     );
     const hasArtifacts = !isUser && ARTIFACT_TAG_REGEX.test(fullContent);
@@ -1166,9 +1228,10 @@ const MessageBubble = memo<MessageBubbleProps>(
       isLongContent && contentCollapsed
         ? contentWithoutArtifacts.slice(0, CONTENT_COLLAPSE_THRESHOLD)
         : contentWithoutArtifacts;
-    const renderedReasoning = injectCitationLinks(
+    const renderedReasoning = applyAssistantSearchInlineMarkdown(
       message.reasoning?.content,
       message.search?.citations,
+      message.search?.imageResults,
     );
     const assistantContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
     const userContentWidth = { maxWidth: '100%' as const, minWidth: 0 };
@@ -1429,7 +1492,12 @@ const MessageBubble = memo<MessageBubbleProps>(
                       )}
 
                       {!assistantChainChildren?.length && hasTools && message.tools && (
-                        <ToolCallsBlock tools={message.tools} />
+                        <ToolCallsBlock
+                          assistantMessageId={message.id}
+                          sessionId={sessionId}
+                          tools={message.tools}
+                          topicId={topicId ?? undefined}
+                        />
                       )}
 
                       {!assistantChainChildren?.length &&
@@ -1443,6 +1511,8 @@ const MessageBubble = memo<MessageBubbleProps>(
                             markdownRules={markdownRules}
                             markdownStyles={reasoningMarkdownStyles}
                             model={message.model}
+                            searchCitations={message.search?.citations}
+                            searchImageResults={message.search?.imageResults}
                             tempDisplayContent={multimodalReasoningParts || undefined}
                             thinking={
                               generating && isReasoning && message.id.startsWith('assistant-')
@@ -1498,7 +1568,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[12px] font-medium"
-                                style={{ color: colors.info }}
+                                style={{ color: colors.primary }}
                               >
                                 {t.chatShowLess}
                               </Text>
@@ -1516,12 +1586,13 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               {preprocessMentionDisplay(
                                 preprocessMathBlocks(
-                                  injectCitationLinks(
+                                  applyAssistantSearchInlineMarkdown(
                                     (message.content || '').slice(0, 500) +
                                       (message.content && message.content.length > 500
                                         ? '...'
                                         : ''),
                                     message.search?.citations,
+                                    message.search?.imageResults,
                                   ),
                                 ),
                                 t.groupMentionAllMembers,
@@ -1537,7 +1608,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[13px] font-medium"
-                                style={{ color: colors.info }}
+                                style={{ color: colors.primary }}
                               >
                                 {t.chatShowMore}
                               </Text>
@@ -1553,6 +1624,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                       ) : multimodalContentParts?.length ? (
                         <RichContentPartsBlock
                           citations={message.search?.citations}
+                          imageResults={message.search?.imageResults}
                           markdownRules={markdownRules}
                           markdownStyles={isUser ? userMarkdownStyles : markdownStyles}
                           model={!isUser ? message.model : undefined}
@@ -1592,7 +1664,7 @@ const MessageBubble = memo<MessageBubbleProps>(
                             >
                               <Text
                                 className="text-[12px] font-medium"
-                                style={{ color: colors.info }}
+                                style={{ color: colors.primary }}
                               >
                                 {contentCollapsed ? t.chatShowMore : t.chatShowLess}
                               </Text>
@@ -1834,30 +1906,6 @@ const safeParseJsonRecord = (value?: string) => {
   }
 };
 
-const escapeMarkdownLinkLabel = (label: string) =>
-  label.replaceAll('[', '\\[').replaceAll(']', '\\]');
-
-const injectCitationLinks = (content: string | undefined, citations?: CitationItem[] | null) => {
-  if (!content || !citations?.length) return content ?? '';
-
-  return content
-    .replaceAll(/\[\^(\d+)\^\]/g, (token, rawIndex) => {
-      const citation = citations[Number(rawIndex) - 1];
-      if (!citation?.url) return `[${rawIndex}]`;
-      return `[^${rawIndex}](${citation.url})`;
-    })
-    .replaceAll(/\[\^(\d+)\]/g, (token, rawIndex) => {
-      const citation = citations[Number(rawIndex) - 1];
-      if (!citation?.url) return `[${rawIndex}]`;
-      return `[^${rawIndex}](${citation.url})`;
-    })
-    .replaceAll(/\[(\d+)\]/g, (token, rawIndex) => {
-      const citation = citations[Number(rawIndex) - 1];
-      if (!citation?.url) return token;
-      return `[${escapeMarkdownLinkLabel(token)}](${citation.url})`;
-    });
-};
-
 const parseMessageContentParts = (
   raw: MessageContentPart[] | string | null | undefined,
 ): MessageContentPart[] | null => {
@@ -1883,12 +1931,13 @@ const parseMessageContentParts = (
 
 const RichContentPartsBlock = memo<{
   citations?: CitationItem[] | null;
+  imageResults?: ImageCitationItem[] | null;
   markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
   model?: string;
   onOpenLink: (url?: string) => void;
   parts: MessageContentPart[];
-}>(({ parts, markdownStyles, markdownRules, onOpenLink, citations, model }) => {
+}>(({ parts, markdownStyles, markdownRules, onOpenLink, citations, imageResults, model }) => {
   const colors = useThemeColors();
   const imageCount = parts.filter((p) => p.type === 'image').length;
   const hasImageTags = model != null || imageCount > 0;
@@ -1949,7 +1998,7 @@ const RichContentPartsBlock = memo<{
                 return false;
               }}
             >
-              {injectCitationLinks(part.text, citations)}
+              {applyAssistantSearchInlineMarkdown(part.text, citations, imageResults)}
             </Markdown>
           );
         }
@@ -2094,6 +2143,7 @@ const CitationFootnotesBlock = memo<{
   const visibleCitations = citations.filter((item) => !!item.url);
 
   if (visibleCitations.length === 0) return null;
+  if (!visibleCitations.every((item) => item.title !== item.url)) return null;
 
   return (
     <View className="mt-3 gap-2">
@@ -2152,7 +2202,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
   const toast = useToast();
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const webCount = search.citations?.length ?? 0;
   const imageCount = search.imageResults?.length ?? 0;
@@ -2160,8 +2210,8 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
   const count = webCount || imageCount;
   const previewFavicons =
     webCount > 0
-      ? (search.citations || []).slice(0, 5).map(getCitationFavicon).filter(Boolean)
-      : (search.imageResults || []).slice(0, 5).map(getImageResultFavicon).filter(Boolean);
+      ? (search.citations || []).slice(0, 8).map(getCitationFavicon).filter(Boolean)
+      : (search.imageResults || []).slice(0, 8).map(getImageResultFavicon).filter(Boolean);
   const summaryText =
     search.searchQueries?.[0] || search.imageSearchQueries?.[0] || search.citations?.[0]?.title;
 
@@ -2191,7 +2241,11 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
         onPress={() => setExpanded((value) => !value)}
       >
         <View className="flex-row items-center flex-1">
-          <Globe color={colors.primary} size={14} strokeWidth={2} />
+          {webCount > 0 ? (
+            <Globe color={colors.primary} size={14} strokeWidth={2} />
+          ) : (
+            <Images color={colors.primary} size={14} strokeWidth={2} />
+          )}
           <Text className="ml-2 text-[12px] font-medium text-foreground/65">
             {title} {count > 0 ? `(${count})` : ''}
           </Text>
@@ -2261,7 +2315,7 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
               contentContainerStyle={{ gap: 10 }}
               showsHorizontalScrollIndicator={false}
             >
-              {search.citations.slice(0, 8).map((citation, index) => {
+              {search.citations.map((citation, index) => {
                 const host = citation.favicon || getUrlHost(citation.url);
                 const favicon = getCitationFavicon(citation);
 
@@ -2296,20 +2350,6 @@ const SearchGroundingBlock = memo<{ search: GroundingSearch }>(({ search }) => {
                   </TouchableOpacity>
                 );
               })}
-              {search.citations.length > 8 ? (
-                <View
-                  className="items-center justify-center rounded-2xl px-3 py-3"
-                  style={{
-                    backgroundColor: chatAccent.elevatedBg,
-                    width: 180,
-                  }}
-                >
-                  <Text className="text-[13px] font-semibold text-foreground/75">
-                    +{search.citations.length - 8}
-                  </Text>
-                  <Text className="mt-1 text-[11px] text-foreground/45">{t.chatSearchSources}</Text>
-                </View>
-              ) : null}
             </ScrollView>
           ) : null}
 
@@ -2413,7 +2453,7 @@ const ToolStatusIcon = memo<{
   }
 
   if (status === 'pending') {
-    return <Hand color={colors.info} size={12} strokeWidth={2.1} />;
+    return <Hand color={colors.primary} size={12} strokeWidth={2.1} />;
   }
 
   if (error) {
@@ -2447,6 +2487,7 @@ const ToolStatusLabel = memo<{
 ToolStatusLabel.displayName = 'ToolStatusLabel';
 
 const ToolContentCopyButton = memo<{ text: string }>(({ text }) => {
+  const { t } = useI18n();
   const colors = useThemeColors();
   const [copied, setCopied] = useState(false);
 
@@ -2459,6 +2500,7 @@ const ToolContentCopyButton = memo<{ text: string }>(({ text }) => {
 
   return (
     <TouchableOpacity
+      accessibilityLabel={t.msgActionCopy}
       activeOpacity={0.6}
       hitSlop={{ bottom: 4, left: 4, right: 4, top: 4 }}
       style={{ position: 'absolute', right: 8, top: 8 }}
@@ -2482,8 +2524,9 @@ const ToolCard = memo<{
   customContent?: React.ReactNode;
   error?: unknown;
   interventionContent?: React.ReactNode;
-  onApprove?: () => void;
+  onApprove?: () => void | Promise<void>;
   onReject?: () => void;
+  onRejectAndContinue?: () => void | Promise<void>;
   resultReady?: boolean;
   status?: 'aborted' | 'pending' | 'rejected' | string | null;
   streamingContent?: React.ReactNode;
@@ -2501,6 +2544,7 @@ const ToolCard = memo<{
     interventionContent,
     onApprove,
     onReject,
+    onRejectAndContinue,
     streamingContent,
   }) => {
     const { t } = useI18n();
@@ -2526,13 +2570,18 @@ const ToolCard = memo<{
     const truncatedContent =
       content && content.length > 500 && !contentExpanded ? content.slice(0, 500) + '...' : content;
 
+    const cardA11yLabel = collapsible
+      ? `${title}. ${expanded ? t.chatToolTapToCollapse : t.chatToolTapToExpand}`
+      : title;
+
     return (
       <TouchableOpacity
+        accessibilityLabel={cardA11yLabel}
         activeOpacity={collapsible ? 0.82 : 1}
         className="rounded-2xl px-3 py-3"
         disabled={!collapsible}
         style={{
-          backgroundColor: isPending ? colors.infoSubtle : chatAccent.elevatedBg,
+          backgroundColor: isPending ? colors.primarySubtle : chatAccent.elevatedBg,
         }}
         onPress={() => {
           if (collapsible) setExpanded((value) => !value);
@@ -2542,7 +2591,7 @@ const ToolCard = memo<{
           <View
             className="mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-lg"
             style={{
-              backgroundColor: isPending ? colors.infoMuted : chatAccent.badgeBg,
+              backgroundColor: isPending ? colors.primaryMuted : chatAccent.badgeBg,
             }}
           >
             <ToolStatusIcon error={error} resultReady={resultReady} status={status} />
@@ -2581,16 +2630,23 @@ const ToolCard = memo<{
                     {t.chatToolPendingDesc}
                   </Text>
                 )}
-                {(onApprove || onReject) && (
-                  <View className="flex-row gap-2 mt-2">
+                {(onApprove || onReject || onRejectAndContinue) && (
+                  <View className="mt-2 flex-row flex-wrap gap-2">
                     {onApprove && (
                       <TouchableOpacity
                         activeOpacity={0.7}
                         className="rounded-full px-4 py-1.5"
-                        style={{ backgroundColor: colors.infoMuted }}
-                        onPress={onApprove}
+                        style={{ backgroundColor: colors.primaryMuted }}
+                        onPress={() => {
+                          void Promise.resolve(onApprove()).catch((e) =>
+                            console.warn('[ToolCard] onApprove failed', e),
+                          );
+                        }}
                       >
-                        <Text className="text-[12px] font-semibold" style={{ color: colors.info }}>
+                        <Text
+                          className="text-[12px] font-semibold"
+                          style={{ color: colors.primary }}
+                        >
                           {t.chatToolApprove}
                         </Text>
                       </TouchableOpacity>
@@ -2607,6 +2663,29 @@ const ToolCard = memo<{
                           style={{ color: colors.danger }}
                         >
                           {t.chatToolReject}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {onRejectAndContinue && (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        className="rounded-full border px-3 py-1.5"
+                        style={{
+                          backgroundColor: colors.warningSubtle,
+                          borderColor: colors.warningMuted,
+                        }}
+                        onPress={() => {
+                          void Promise.resolve(onRejectAndContinue()).catch((e) =>
+                            console.warn('[ToolCard] onRejectAndContinue failed', e),
+                          );
+                        }}
+                      >
+                        <Text
+                          className="text-[11px] font-semibold"
+                          numberOfLines={2}
+                          style={{ color: colors.warning }}
+                        >
+                          {t.chatToolRejectAndContinue}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -2688,7 +2767,7 @@ const ToolCard = memo<{
                       setContentExpanded((v) => !v);
                     }}
                   >
-                    <Text className="text-[11px] font-medium" style={{ color: colors.info }}>
+                    <Text className="text-[11px] font-medium" style={{ color: colors.primary }}>
                       {contentExpanded ? t.chatShowLess : t.chatShowMore}
                     </Text>
                   </TouchableOpacity>
@@ -2702,6 +2781,7 @@ const ToolCard = memo<{
             ) : null}
             {!showDetail && argumentsText ? (
               <Text
+                accessibilityLabel={`${t.chatToolArguments}, ${t.chatToolTapToExpand}`}
                 className="mt-2 text-[11px] leading-4"
                 numberOfLines={2}
                 style={{ color: colors.secondaryText }}
@@ -2718,11 +2798,176 @@ const ToolCard = memo<{
 
 ToolCard.displayName = 'ToolCard';
 
-const MOBILE_TOOL_INTERVENTION_ENABLED = false;
+const MOBILE_TOOL_INTERVENTION_ENABLED = true;
+
+/** One tool row: keeps draft arguments in a ref (sync) so approve sees edits after registerBeforeApprove flush. */
+const ToolCallItem = memo<{
+  assistantMessageId?: string;
+  locale: string;
+  sessionId?: string;
+  tool: ChatToolPayload;
+  topicId?: string;
+}>(({ tool, sessionId, topicId, assistantMessageId, locale }) => {
+  const continueToolIntervention = useChatStore((s) => s.continueToolIntervention);
+  const rejectAndContinueToolIntervention = useChatStore(
+    (s) => s.rejectAndContinueToolIntervention,
+  );
+  const rejectToolCall = useChatStore((s) => s.rejectToolCall);
+  const mergedArgsRef = useRef(tool.arguments || '{}');
+  const beforeApproveCallbacksRef = useRef<Array<() => Promise<void>>>([]);
+  const [argsRenderKey, setArgsRenderKey] = useState(0);
+
+  useEffect(() => {
+    mergedArgsRef.current = tool.arguments || '{}';
+    setArgsRenderKey((k) => k + 1);
+  }, [tool.arguments]);
+
+  const parsedArgs = useMemo(() => {
+    try {
+      return JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }, [argsRenderKey]);
+
+  const onArgsChange = useCallback((partial: Record<string, unknown>) => {
+    let base: Record<string, unknown>;
+    try {
+      base = JSON.parse(mergedArgsRef.current) as Record<string, unknown>;
+    } catch {
+      base = {};
+    }
+    mergedArgsRef.current = JSON.stringify({ ...base, ...partial });
+    setArgsRenderKey((k) => k + 1);
+  }, []);
+
+  const registerBeforeApprove = useCallback(
+    (_hookId: string, callback: () => void | Promise<void>) => {
+      const wrapped = () => Promise.resolve(callback());
+      beforeApproveCallbacksRef.current.push(wrapped);
+      return () => {
+        beforeApproveCallbacksRef.current = beforeApproveCallbacksRef.current.filter(
+          (fn) => fn !== wrapped,
+        );
+      };
+    },
+    [],
+  );
+
+  const hasResult = isToolResultReady(tool);
+  const isPending = tool.intervention?.status === 'pending';
+  const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } = buildToolDisplayProps(
+    tool,
+    tool.apiName || tool.identifier || '',
+    locale,
+    hasResult,
+    isPending,
+  );
+
+  const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
+  const showIntervention = MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
+
+  const handleApprove = useCallback(async () => {
+    const callbacks = [...beforeApproveCallbacksRef.current];
+    for (const fn of callbacks) {
+      await fn();
+    }
+    const approvedTool: ChatToolPayload = {
+      ...tool,
+      arguments: mergedArgsRef.current || '{}',
+    };
+    await continueToolIntervention(sessionId!, topicId, assistantMessageId!, approvedTool);
+  }, [assistantMessageId, continueToolIntervention, sessionId, tool, topicId]);
+
+  const handleReject =
+    sessionId && assistantMessageId
+      ? () => rejectToolCall(sessionId, assistantMessageId, tool.id)
+      : undefined;
+
+  const handleRejectAndContinue = useCallback(async () => {
+    await rejectAndContinueToolIntervention(sessionId!, topicId, assistantMessageId!, tool.id);
+  }, [assistantMessageId, rejectAndContinueToolIntervention, sessionId, tool.id, topicId]);
+
+  const showApprovalButtons = showIntervention || (MOBILE_TOOL_INTERVENTION_ENABLED && isPending);
+
+  const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
+  const showStreaming = !hasResult && !isPending && BuiltinStreaming;
+
+  const interventionContent =
+    showIntervention && BuiltinIntervention ? (
+      <BuiltinIntervention
+        args={parsedArgs}
+        registerBeforeApprove={registerBeforeApprove}
+        onArgsChange={onArgsChange}
+      />
+    ) : undefined;
+
+  const streamingContent =
+    showStreaming && BuiltinStreaming ? (
+      <BuiltinStreaming apiName={tool.apiName} args={parsedArgs} identifier={tool.identifier} />
+    ) : undefined;
+
+  const onApprove =
+    sessionId && assistantMessageId && showApprovalButtons ? handleApprove : undefined;
+  const onRejectAndContinue =
+    sessionId && assistantMessageId && showApprovalButtons ? handleRejectAndContinue : undefined;
+
+  if (useBuiltinRender && BuiltinRender) {
+    return (
+      <ToolCard
+        collapsible
+        argumentsText={argumentsText || undefined}
+        error={tool.pluginError}
+        interventionContent={interventionContent}
+        resultReady={hasResult}
+        status={tool.intervention?.status ?? null}
+        streamingContent={streamingContent}
+        title={displayTitle}
+        customContent={
+          hasResult ? (
+            <BuiltinRender
+              apiName={tool.apiName}
+              arguments={tool.arguments}
+              content={tool.result_content}
+              identifier={tool.identifier}
+              pluginState={tool.pluginState}
+              toolCallId={tool.id}
+            />
+          ) : undefined
+        }
+        onApprove={onApprove}
+        onReject={showApprovalButtons ? handleReject : undefined}
+        onRejectAndContinue={onRejectAndContinue}
+      />
+    );
+  }
+
+  return (
+    <ToolCard
+      collapsible
+      argumentsText={argumentsText || undefined}
+      content={tool.result_content || undefined}
+      error={tool.pluginError}
+      interventionContent={interventionContent}
+      resultReady={hasResult}
+      status={tool.intervention?.status ?? null}
+      streamingContent={streamingContent}
+      title={displayTitle}
+      onApprove={onApprove}
+      onReject={showApprovalButtons ? handleReject : undefined}
+      onRejectAndContinue={onRejectAndContinue}
+    />
+  );
+});
+
+ToolCallItem.displayName = 'ToolCallItem';
 
 const ToolCallsBlock = memo<{
+  assistantMessageId?: string;
+  sessionId?: string;
+  topicId?: string;
   tools: ChatToolPayload[];
-}>(({ tools }) => {
+}>(({ tools, sessionId, topicId, assistantMessageId }) => {
   const { t } = useI18n();
   const colors = useThemeColors();
   const chatAccent = useMemo(() => getChatAccent(colors), [colors]);
@@ -2746,7 +2991,7 @@ const ToolCallsBlock = memo<{
     <View
       className="mb-2 rounded-2xl px-3 py-2"
       style={{
-        backgroundColor: hasPending ? colors.infoSubtle : chatAccent.sectionBg,
+        backgroundColor: hasPending ? colors.primarySubtle : chatAccent.sectionBg,
       }}
     >
       <TouchableOpacity
@@ -2756,7 +3001,9 @@ const ToolCallsBlock = memo<{
       >
         <View className="flex-row items-center flex-1">
           <Wrench
-            color={hasPending ? colors.info : allCompleted ? colors.iconSuccess : colors.textGray}
+            color={
+              hasPending ? colors.primary : allCompleted ? colors.iconSuccess : colors.textGray
+            }
             size={14}
             strokeWidth={2}
           />
@@ -2766,9 +3013,9 @@ const ToolCallsBlock = memo<{
           {hasPending && (
             <View
               className="ml-2 rounded-full px-2 py-0.5"
-              style={{ backgroundColor: colors.infoMuted }}
+              style={{ backgroundColor: colors.primaryMuted }}
             >
-              <Text className="text-[9px] font-semibold" style={{ color: colors.info }}>
+              <Text className="text-[9px] font-semibold" style={{ color: colors.primary }}>
                 {t.chatToolPending}
               </Text>
             </View>
@@ -2793,93 +3040,16 @@ const ToolCallsBlock = memo<{
 
       {expanded ? (
         <View className="mt-3 gap-2">
-          {tools.map((tool) => {
-            const hasResult = isToolResultReady(tool);
-            const isPending = tool.intervention?.status === 'pending';
-            const { argumentsText, BuiltinRender, displayTitle, useBuiltinRender } =
-              buildToolDisplayProps(
-                tool,
-                tool.apiName || tool.identifier || '',
-                locale,
-                hasResult,
-                isPending,
-              );
-
-            const BuiltinIntervention = getMobileBuiltinIntervention(tool.identifier, tool.apiName);
-            const showIntervention =
-              MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention;
-
-            const BuiltinStreaming = getMobileBuiltinStreaming(tool.identifier, tool.apiName);
-            const showStreaming = !hasResult && !isPending && BuiltinStreaming;
-
-            let parsedArgs: Record<string, unknown> = {};
-            try {
-              parsedArgs = JSON.parse(tool.arguments || '{}') as Record<string, unknown>;
-            } catch {
-              //
-            }
-
-            const interventionContent =
-              showIntervention && BuiltinIntervention ? (
-                <BuiltinIntervention
-                  args={parsedArgs}
-                  registerBeforeApprove={() => () => {}}
-                  onArgsChange={() => {}}
-                />
-              ) : undefined;
-
-            const streamingContent =
-              showStreaming && BuiltinStreaming ? (
-                <BuiltinStreaming
-                  apiName={tool.apiName}
-                  args={parsedArgs}
-                  identifier={tool.identifier}
-                />
-              ) : undefined;
-
-            if (useBuiltinRender && BuiltinRender) {
-              return (
-                <ToolCard
-                  collapsible
-                  argumentsText={argumentsText || undefined}
-                  error={tool.pluginError}
-                  interventionContent={interventionContent}
-                  key={tool.id}
-                  resultReady={hasResult}
-                  status={tool.intervention?.status ?? null}
-                  streamingContent={streamingContent}
-                  title={displayTitle}
-                  customContent={
-                    hasResult ? (
-                      <BuiltinRender
-                        apiName={tool.apiName}
-                        arguments={tool.arguments}
-                        content={tool.result_content}
-                        identifier={tool.identifier}
-                        pluginState={tool.pluginState}
-                        toolCallId={tool.id}
-                      />
-                    ) : undefined
-                  }
-                />
-              );
-            }
-
-            return (
-              <ToolCard
-                collapsible
-                argumentsText={argumentsText || undefined}
-                content={tool.result_content || undefined}
-                error={tool.pluginError}
-                interventionContent={interventionContent}
-                key={tool.id}
-                resultReady={hasResult}
-                status={tool.intervention?.status ?? null}
-                streamingContent={streamingContent}
-                title={displayTitle}
-              />
-            );
-          })}
+          {tools.map((tool) => (
+            <ToolCallItem
+              assistantMessageId={assistantMessageId}
+              key={tool.id}
+              locale={locale}
+              sessionId={sessionId}
+              tool={tool}
+              topicId={topicId}
+            />
+          ))}
         </View>
       ) : null}
     </View>
@@ -2964,16 +3134,21 @@ const AssistantChainBlock = memo<{
           const childHasSearch =
             !!childMessage.search &&
             !!(childMessage.search.citations?.length || childMessage.search.imageResults?.length);
-          const childRenderedReasoning = injectCitationLinks(
+          const childRenderedReasoning = applyAssistantSearchInlineMarkdown(
             childMessage.reasoning?.content,
             childMessage.search?.citations,
+            childMessage.search?.imageResults,
           );
           const childMultimodalContentParts = childMessage.metadata?.isMultimodal
             ? parseMessageContentParts(childMessage.metadata?.tempDisplayContent)
             : null;
           const childContent = preprocessMentionDisplay(
             preprocessMathBlocks(
-              injectCitationLinks(childMessage.content, childMessage.search?.citations),
+              applyAssistantSearchInlineMarkdown(
+                childMessage.content,
+                childMessage.search?.citations,
+                childMessage.search?.imageResults,
+              ),
             ),
             t.groupMentionAllMembers,
           );
@@ -2998,6 +3173,8 @@ const AssistantChainBlock = memo<{
                   markdownRules={markdownRules}
                   markdownStyles={reasoningMarkdownStyles}
                   model={childMessage.model}
+                  searchCitations={childMessage.search?.citations}
+                  searchImageResults={childMessage.search?.imageResults}
                   tempDisplayContent={
                     childMessage.reasoning?.isMultimodal
                       ? parseMessageContentParts(
@@ -3012,6 +3189,7 @@ const AssistantChainBlock = memo<{
               {childMultimodalContentParts?.length ? (
                 <RichContentPartsBlock
                   citations={childMessage.search?.citations}
+                  imageResults={childMessage.search?.imageResults}
                   markdownRules={markdownRules}
                   markdownStyles={markdownStyles}
                   model={childMessage.model}
@@ -3043,7 +3221,14 @@ const AssistantChainBlock = memo<{
                 ) : null,
               )}
 
-              {childMessage.tools?.length ? <ToolCallsBlock tools={childMessage.tools} /> : null}
+              {childMessage.tools?.length ? (
+                <ToolCallsBlock
+                  assistantMessageId={childMessage.id}
+                  sessionId={sessionId}
+                  tools={childMessage.tools}
+                  topicId={topicId}
+                />
+              ) : null}
 
               {childMessage.search?.citations?.length ? (
                 <CitationFootnotesBlock
@@ -3199,6 +3384,8 @@ interface ThinkingBlockProps {
   markdownRules?: Record<string, any>;
   markdownStyles: Record<string, any>;
   model?: string;
+  searchCitations?: CitationItem[] | null;
+  searchImageResults?: ImageCitationItem[] | null;
   tempDisplayContent?: MessageContentPart[];
   thinking?: boolean;
 }
@@ -3210,6 +3397,8 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
     isMultimodal,
     markdownRules,
     markdownStyles,
+    searchCitations,
+    searchImageResults,
     tempDisplayContent,
     thinking,
   }) => {
@@ -3263,6 +3452,8 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
           >
             {isMultimodal && tempDisplayContent?.length ? (
               <RichContentPartsBlock
+                citations={searchCitations}
+                imageResults={searchImageResults}
                 markdownRules={markdownRules}
                 markdownStyles={markdownStyles}
                 parts={tempDisplayContent}
@@ -3273,7 +3464,7 @@ const ThinkingBlock = memo<ThinkingBlockProps>(
               />
             ) : (
               <Markdown
-                rules={codeInlineRules}
+                rules={markdownRules ?? codeInlineRules}
                 style={markdownStyles}
                 onLinkPress={(url) => {
                   Linking.openURL(url).catch(() => undefined);

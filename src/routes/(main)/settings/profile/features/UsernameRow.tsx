@@ -27,13 +27,16 @@ const UsernameRow = ({ mobile }: UsernameRowProps) => {
 
   const usernameRegex = /^\w+$/;
 
-  const validateUsername = (value: string): string => {
-    const trimmed = value.trim();
-    if (!trimmed) return t('profile.usernameRequired');
-    if (trimmed.length > 64) return t('profile.usernameTooLong');
-    if (!usernameRegex.test(trimmed)) return t('profile.usernameRule');
-    return '';
-  };
+  const validateUsername = useCallback(
+    (value: string): string => {
+      const trimmed = value.trim();
+      if (!trimmed) return t('profile.usernameRequired');
+      if (trimmed.length > 64) return t('profile.usernameTooLong');
+      if (!usernameRegex.test(trimmed)) return t('profile.usernameRule');
+      return '';
+    },
+    [t],
+  );
 
   const handleSave = useCallback(async () => {
     const value = inputRef.current?.input?.value?.trim();
@@ -63,7 +66,7 @@ const UsernameRow = ({ mobile }: UsernameRowProps) => {
     } finally {
       setSaving(false);
     }
-  }, [username, updateUsername, t]);
+  }, [username, updateUsername, t, validateUsername]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -104,12 +107,12 @@ const UsernameRow = ({ mobile }: UsernameRowProps) => {
         )}
         {dirty && !saving && (
           <Button
+            size="small"
+            variant="outlined"
             onMouseDown={(e) => {
               e.preventDefault();
               handleCancel();
             }}
-            size="small"
-            variant="outlined"
           >
             {t('profile.cancel')}
           </Button>
@@ -125,13 +128,13 @@ const UsernameRow = ({ mobile }: UsernameRowProps) => {
           variant="filled"
           onBlur={handleSave}
           onChange={handleChange}
+          onPressEnter={handleSave}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
               e.preventDefault();
               handleCancel();
             }
           }}
-          onPressEnter={handleSave}
         />
       </Flexbox>
     </Flexbox>

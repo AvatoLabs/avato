@@ -7,6 +7,7 @@ import type React from 'react';
 
 import CalculatorRender from './calculator/Calculator';
 import CloudSandboxExecuteCode from './cloudSandbox/ExecuteCode';
+import GenericFallbackRender from './fallback/GenericFallback';
 import GroupManagementBroadcast from './groupManagement/Broadcast';
 import GroupManagementSpeak from './groupManagement/Speak';
 import GTDCreatePlan from './gtd/CreatePlan';
@@ -22,16 +23,20 @@ import SkillStoreSearchSkill from './skillStore/SearchSkill';
 import type { MobileBuiltinRender, MobileBuiltinRenderProps } from './types';
 import WebBrowsingSearchResult from './webBrowsing/SearchResult';
 
-const GTD_ID = 'lobe-gtd';
-const NOTEBOOK_ID = 'lobe-notebook';
+const AGENT_BUILDER_ID = 'lobe-agent-builder';
+const AGENT_MANAGEMENT_ID = 'lobe-agent-management';
 const CALCULATOR_ID = 'lobe-calculator';
-const MEMORY_ID = 'lobe-user-memory';
 const CLOUD_SANDBOX_ID = 'lobe-cloud-sandbox';
-const WEB_BROWSING_ID = 'lobe-web-browsing';
-const KNOWLEDGE_BASE_ID = 'lobe-knowledge-base';
+const GROUP_AGENT_BUILDER_ID = 'lobe-group-agent-builder';
+const GTD_ID = 'lobe-gtd';
 const GROUP_MANAGEMENT_ID = 'lobe-group-management';
-const SKILL_STORE_ID = 'lobe-skill-store';
+const KNOWLEDGE_BASE_ID = 'lobe-knowledge-base';
+const LOCAL_SYSTEM_ID = 'lobe-local-system';
+const MEMORY_ID = 'lobe-user-memory';
+const NOTEBOOK_ID = 'lobe-notebook';
 const SKILLS_ID = 'lobe-skills';
+const SKILL_STORE_ID = 'lobe-skill-store';
+const WEB_BROWSING_ID = 'lobe-web-browsing';
 
 const GTDApiName = {
   clearTodos: 'clearTodos',
@@ -68,6 +73,54 @@ const KnowledgeBaseApiName = { searchKnowledgeBase: 'searchKnowledgeBase' } as c
 const GroupManagementApiName = { broadcast: 'broadcast', speak: 'speak' } as const;
 const SkillStoreApiName = { searchSkill: 'searchSkill' } as const;
 const SkillsApiName = { searchSkill: 'searchSkill' } as const;
+
+/** API names for tools that use GenericFallbackRender (no custom RN implementation) */
+const AGENT_BUILDER_API_NAMES = [
+  'getAvailableModels',
+  'installPlugin',
+  'searchMarketTools',
+  'updateConfig',
+  'updatePrompt',
+] as const;
+const AGENT_MANAGEMENT_API_NAMES = [
+  'callAgent',
+  'createAgent',
+  'deleteAgent',
+  'searchAgent',
+  'updateAgent',
+] as const;
+const GROUP_AGENT_BUILDER_API_NAMES = [
+  'batchCreateAgents',
+  'createAgent',
+  'getAgentInfo',
+  'getAvailableModels',
+  'installPlugin',
+  'inviteAgent',
+  'removeAgent',
+  'searchAgent',
+  'searchMarketTools',
+  'updateAgentPrompt',
+  'updateConfig',
+  'updateGroup',
+  'updateGroupPrompt',
+] as const;
+const LOCAL_SYSTEM_API_NAMES = [
+  'editLocalFile',
+  'getCommandOutput',
+  'globLocalFiles',
+  'grepContent',
+  'killCommand',
+  'listLocalFiles',
+  'moveLocalFiles',
+  'readLocalFile',
+  'renameLocalFile',
+  'runCommand',
+  'searchLocalFiles',
+  'writeLocalFile',
+] as const;
+
+const createFallbackMap = (apiNames: readonly string[]) =>
+  Object.fromEntries(apiNames.map((name) => [name, GenericFallbackRender]));
 
 /** Registry: identifier -> apiName -> Render component */
 const BUILTIN_RENDERS: Record<
@@ -122,6 +175,10 @@ const BUILTIN_RENDERS: Record<
   [SKILLS_ID]: {
     [SkillsApiName.searchSkill]: SkillStoreSearchSkill,
   },
+  [AGENT_BUILDER_ID]: createFallbackMap(AGENT_BUILDER_API_NAMES),
+  [AGENT_MANAGEMENT_ID]: createFallbackMap(AGENT_MANAGEMENT_API_NAMES),
+  [GROUP_AGENT_BUILDER_ID]: createFallbackMap(GROUP_AGENT_BUILDER_API_NAMES),
+  [LOCAL_SYSTEM_ID]: createFallbackMap(LOCAL_SYSTEM_API_NAMES),
 };
 
 /**

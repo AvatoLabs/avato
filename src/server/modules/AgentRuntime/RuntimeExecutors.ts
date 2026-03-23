@@ -48,12 +48,12 @@ export interface RuntimeExecutorContext {
   messageModel: MessageModel;
   operationId: string;
   serverDB: LobeChatDatabase;
+  /** From execAgent `appContext.spaceId` — preferred Space for builtin tools (e.g. sandbox export). */
+  spaceId?: string;
   stepIndex: number;
   stream?: boolean;
   streamManager: IStreamEventManager;
   toolExecutionService: ToolExecutionService;
-  /** From execAgent `appContext.spaceId` — preferred Space for builtin tools (e.g. sandbox export). */
-  spaceId?: string;
   topicId?: string;
   userId?: string;
   userTimezone?: string;

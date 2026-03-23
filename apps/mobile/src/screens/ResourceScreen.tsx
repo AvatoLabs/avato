@@ -32,12 +32,14 @@ import {
   Folder,
   FolderOpen,
   Grid3X3,
+  Link2,
   List,
   Pencil,
   Plus,
   Search,
   Share2,
   Trash2,
+  Users,
   X,
 } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -51,7 +53,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StatusBar,
   Text,
   TextInput,
@@ -68,8 +69,13 @@ import { FilterChip, SelectionBadge } from '../components/ui/ChoiceControls';
 import EmptyState from '../components/ui/EmptyState';
 import FileGridSkeleton from '../components/ui/FileGridSkeleton';
 import PromptModal from '../components/ui/PromptModal';
+import ResourceShareManageSheet from '../components/ui/ResourceShareManageSheet';
+import ResourceShareOptionsSheet, {
+  type ResourceShareSheetTarget,
+} from '../components/ui/ResourceShareOptionsSheet';
 import { HeaderIconButton, ScreenHeader } from '../components/ui/ScreenHeader';
 import { SearchField } from '../components/ui/SearchField';
+import SharedWithMeSheet, { type SharedWithMeRow } from '../components/ui/SharedWithMeSheet';
 import { useToast } from '../components/ui/Toast';
 import {
   fileApi,
@@ -118,6 +124,10 @@ type ResourceListRow = FileListItem | ResourceTreeRow;
 
 const isResourceTreeRow = (value: ResourceListRow): value is ResourceTreeRow =>
   'depth' in value && 'item' in value;
+
+function ResourceListRowSeparator() {
+  return <View className="mx-4 h-px bg-foreground/5" />;
+}
 
 function sortFileList(
   list: FileListItem[],
@@ -694,6 +704,7 @@ const FilePreviewModal = memo(
     const [editingText, setEditingText] = useState(false);
     const [savingEdit, setSavingEdit] = useState(false);
     const [textDraft, setTextDraft] = useState('');
+    const [shareSheetOpen, setShareSheetOpen] = useState(false);
 
     const previewCandidates = item ? buildRemoteFileCandidates(apiBaseUrl, item) : [];
     const fileUrl = previewCandidates[previewIndex] || '';
@@ -722,6 +733,7 @@ const FilePreviewModal = memo(
       setDownloadProgress(0);
       setSavingEdit(false);
       setTextDraft('');
+      setShareSheetOpen(false);
     }, [apiBaseUrl, item?.id, visible]);
 
     const handlePreviewError = useCallback(() => {
@@ -956,13 +968,7 @@ const FilePreviewModal = memo(
             : undefined;
 
     const handleShare = () => {
-      const shareUrl = cachedEntry?.localUri || fileUrl;
-      const shareMessage = (textFile && textContent ? textContent : fileUrl) || item.name;
-      void Share.share({
-        message: shareMessage,
-        title: item.name,
-        ...(shareUrl ? { url: shareUrl } : {}),
-      });
+      setShareSheetOpen(true);
     };
 
     const handleDownload = async () => {
@@ -1024,365 +1030,403 @@ const FilePreviewModal = memo(
     };
 
     return (
-      <Modal
-        accessibilityViewIsModal
-        statusBarTranslucent
-        transparent
-        animationType="none"
-        visible={visible}
-        onRequestClose={onClose}
-      >
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={{ flex: 1, backgroundColor: imageFile ? '#000' : colors.inputBg }}
+      <>
+        <Modal
+          accessibilityViewIsModal
+          statusBarTranslucent
+          transparent
+          animationType="none"
+          visible={visible}
+          onRequestClose={onClose}
         >
-          <StatusBar barStyle={imageFile ? 'light-content' : 'dark-content'} />
-
-          {/* Header */}
-          <View
-            className="flex-row items-center px-4"
-            style={{
-              paddingTop: insets.top + 8,
-              paddingBottom: 10,
-              backgroundColor: imageFile ? colors.overlayDark : colors.background,
-              ...(imageFile
-                ? {}
-                : {
-                    shadowColor: colors.shadow,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.03,
-                    shadowRadius: 4,
-                    elevation: 1,
-                  }),
-            }}
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(150)}
+            style={{ flex: 1, backgroundColor: imageFile ? colors.mediaBackdrop : colors.inputBg }}
           >
-            <TouchableOpacity
-              className="flex-row items-center flex-1 min-w-0"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={onClose}
+            <StatusBar barStyle={imageFile ? 'light-content' : 'dark-content'} />
+
+            {/* Header */}
+            <View
+              className="flex-row items-center px-4"
+              style={{
+                paddingTop: insets.top + 8,
+                paddingBottom: 10,
+                backgroundColor: imageFile ? colors.overlayDark : colors.background,
+                ...(imageFile
+                  ? {}
+                  : {
+                      shadowColor: colors.shadow,
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.03,
+                      shadowRadius: 4,
+                      elevation: 1,
+                    }),
+              }}
             >
-              <ArrowLeft
-                color={imageFile ? '#fff' : colors.foreground}
-                size={22}
-                strokeWidth={tokens.icon.strokeWidth}
-              />
-              <View className="flex-1 min-w-0 ml-2 mr-2">
-                <Text
-                  className="text-[15px] font-semibold"
-                  numberOfLines={1}
-                  style={{ color: imageFile ? '#fff' : colors.foreground }}
-                >
-                  {item.name}
-                </Text>
-                <Text
-                  className="text-[11px] mt-0.5"
-                  style={{
-                    color: imageFile ? 'rgba(255,255,255,0.6)' : colors.secondaryText,
-                  }}
-                >
-                  {formatBytes(item.size)}
-                  {'  ·  '}
-                  {formatDate(item.createdAt)}
-                </Text>
-                {cachedEntry?.localUri || preparingPreview ? (
+              <TouchableOpacity
+                className="flex-row items-center flex-1 min-w-0"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={onClose}
+              >
+                <ArrowLeft
+                  color={imageFile ? colors.mediaOnBackdrop : colors.foreground}
+                  size={22}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+                <View className="flex-1 min-w-0 ml-2 mr-2">
                   <Text
-                    className="text-[10px] mt-1"
+                    className="text-[15px] font-semibold"
+                    numberOfLines={1}
+                    style={{ color: imageFile ? colors.mediaOnBackdrop : colors.foreground }}
+                  >
+                    {item.name}
+                  </Text>
+                  <Text
+                    className="text-[11px] mt-0.5"
                     style={{
-                      color: imageFile ? 'rgba(255,255,255,0.72)' : colors.secondaryText,
+                      color: imageFile ? colors.mediaOnBackdropSecondary : colors.secondaryText,
                     }}
                   >
-                    {cachedEntry?.localUri
-                      ? t.resourceCachedLocal
-                      : `${t.resourceCachingPreview} ${previewCacheProgress > 0 ? `${previewCacheProgress}%` : ''}`.trim()}
+                    {formatBytes(item.size)}
+                    {'  ·  '}
+                    {formatDate(item.createdAt)}
                   </Text>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-
-            <View className="flex-row items-center gap-3 flex-shrink-0">
-              {canEditText ? (
-                editingText ? (
-                  <TouchableOpacity
-                    disabled={savingEdit}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    onPress={() => void handleSaveEdit()}
-                  >
-                    {savingEdit ? (
-                      <ActivityIndicator color={imageFile ? '#fff' : colors.primary} size="small" />
-                    ) : (
-                      <Text
-                        className="text-[13px] font-semibold"
-                        style={{ color: imageFile ? '#fff' : colors.primary }}
-                      >
-                        {t.save}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    onPress={handleStartEdit}
-                  >
-                    <Pencil
-                      color={imageFile ? '#fff' : colors.primary}
-                      size={20}
-                      strokeWidth={1.8}
-                    />
-                  </TouchableOpacity>
-                )
-              ) : null}
-              <TouchableOpacity
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                onPress={handleShare}
-              >
-                <Share2 color={imageFile ? '#fff' : colors.primary} size={20} strokeWidth={1.8} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={downloading}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                onPress={() => void handleDownload()}
-              >
-                {downloading ? (
-                  <View className="min-w-[28px] items-center">
+                  {cachedEntry?.localUri || preparingPreview ? (
                     <Text
-                      className="text-[11px] font-medium"
-                      style={{ color: imageFile ? '#fff' : colors.primary }}
+                      className="text-[10px] mt-1"
+                      style={{
+                        color: imageFile ? colors.mediaOnBackdropTertiary : colors.secondaryText,
+                      }}
                     >
-                      {downloadProgress}%
+                      {cachedEntry?.localUri
+                        ? t.resourceCachedLocal
+                        : `${t.resourceCachingPreview} ${previewCacheProgress > 0 ? `${previewCacheProgress}%` : ''}`.trim()}
                     </Text>
-                  </View>
-                ) : (
-                  <Download
-                    color={imageFile ? '#fff' : colors.primary}
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+
+              <View className="flex-row items-center gap-3 flex-shrink-0">
+                {canEditText ? (
+                  editingText ? (
+                    <TouchableOpacity
+                      disabled={savingEdit}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={() => void handleSaveEdit()}
+                    >
+                      {savingEdit ? (
+                        <ActivityIndicator
+                          color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                          size="small"
+                        />
+                      ) : (
+                        <Text
+                          className="text-[13px] font-semibold"
+                          style={{ color: imageFile ? colors.mediaOnBackdrop : colors.primary }}
+                        >
+                          {t.save}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      onPress={handleStartEdit}
+                    >
+                      <Pencil
+                        color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                        size={20}
+                        strokeWidth={1.8}
+                      />
+                    </TouchableOpacity>
+                  )
+                ) : null}
+                <TouchableOpacity
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={handleShare}
+                >
+                  <Share2
+                    color={imageFile ? colors.mediaOnBackdrop : colors.primary}
                     size={20}
                     strokeWidth={1.8}
                   />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Content */}
-          <View style={{ flex: 1 }}>
-            {imageFile ? (
-              previewLoadFailed ? (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-white/80 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              ) : fileUrl ? (
-                <View className="flex-1 items-center justify-center">
-                  {imgLoading && (
-                    <ActivityIndicator
-                      color={colors.iconOnPrimary}
-                      size="large"
-                      style={{ position: 'absolute', zIndex: 1 }}
-                    />
-                  )}
-                  <ExpoImage
-                    cachePolicy="memory-disk"
-                    contentFit="contain"
-                    style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
-                    transition={120}
-                    source={
-                      cachedEntry?.localUri
-                        ? { uri: cachedEntry.localUri }
-                        : fileUrl
-                          ? {
-                              ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
-                                ? { headers: remoteHeaders }
-                                : {}),
-                              uri: fileUrl,
-                            }
-                          : undefined
-                    }
-                    onError={handlePreviewError}
-                    onLoad={() => setImgLoading(false)}
-                  />
-                </View>
-              ) : (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-white/80 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              )
-            ) : previewableDoc ? (
-              pdfFile && !fileUrl ? (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-foreground/70 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              ) : pdfFile &&
-                !cachedEntry?.localUri &&
-                fileUrl &&
-                !pdfDataUrl &&
-                !previewLoadFailed ? (
-                <View
-                  className="flex-1 items-center justify-center"
-                  style={{ backgroundColor: colors.inputBg }}
-                >
-                  <ActivityIndicator color={colors.primary} size="large" />
-                </View>
-              ) : pdfFile && previewLoadFailed ? (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-foreground/70 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              ) : textFile && editingText ? (
-                <View
-                  className="flex-1 px-4 pb-6 pt-4"
-                  style={{ backgroundColor: colors.background }}
-                >
-                  <TextInput
-                    multiline
-                    className="flex-1 rounded-3xl px-4 py-4 text-[15px]"
-                    placeholder={item.name}
-                    placeholderTextColor={colors.muted}
-                    value={textDraft}
-                    style={{
-                      backgroundColor: colors.inputBg,
-                      color: colors.foreground,
-                      textAlignVertical: 'top',
-                    }}
-                    onChangeText={setTextDraft}
-                  />
-                </View>
-              ) : textFile && textContent ? (
-                markdownHtml ? (
-                  <WebView
-                    originWhitelist={['*']}
-                    source={{ html: markdownHtml }}
-                    style={{ flex: 1, backgroundColor: colors.background }}
-                  />
-                ) : (
-                  <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-                    style={{ backgroundColor: colors.background }}
-                  >
-                    <Text
-                      selectable
-                      className="text-[15px] leading-6"
-                      style={{ color: colors.foreground }}
-                    >
-                      {textContent}
-                    </Text>
-                  </ScrollView>
-                )
-              ) : textFile && !textContent && !previewLoadFailed ? (
-                <View
-                  className="flex-1 items-center justify-center"
-                  style={{ backgroundColor: colors.inputBg }}
-                >
-                  <ActivityIndicator color={colors.primary} size="large" />
-                </View>
-              ) : textFile && previewLoadFailed ? (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-foreground/70 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              ) : documentSource ? (
-                <WebView
-                  cacheEnabled
-                  originWhitelist={['https://*', 'http://*', 'data:*']}
-                  source={documentSource}
-                  startInLoadingState={!pdfFile}
-                  style={{ flex: 1 }}
-                  renderLoading={() => (
-                    <View
-                      className="items-center justify-center"
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: colors.inputBg,
-                      }}
-                    >
-                      <ActivityIndicator color={colors.primary} size="large" />
-                    </View>
-                  )}
-                  onError={handlePreviewError}
-                />
-              ) : (
-                <View className="flex-1 items-center justify-center px-8">
-                  <Text className="text-center text-foreground/70 text-[14px]">
-                    {t.resourcePreviewUnavailable}
-                  </Text>
-                </View>
-              )
-            ) : (
-              <View className="flex-1 items-center justify-center px-8">
-                <View
-                  className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
-                  style={{ width: 96, height: 96 }}
-                >
-                  <FileTypeIcon
-                    color={colors.secondaryText}
-                    fileName={item.name}
-                    fileType={item.fileType}
-                    size={44}
-                  />
-                </View>
-                <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
-                  {item.name}
-                </Text>
-                <Text
-                  className="text-[14px] text-center mb-1"
-                  style={{ color: colors.secondaryText }}
-                >
-                  {item.fileType}
-                </Text>
-                <Text
-                  className="text-[14px] text-center mb-8"
-                  style={{ color: colors.secondaryText }}
-                >
-                  {formatBytes(item.size)}
-                  {'  ·  '}
-                  {formatDate(item.createdAt)}
-                </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
-                  className="flex-row items-center rounded-2xl px-8 py-3.5"
-                  style={{ backgroundColor: colors.primary }}
+                  disabled={downloading}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={() => void handleDownload()}
                 >
                   {downloading ? (
-                    <>
-                      <ActivityIndicator
-                        color={colors.iconOnPrimary}
-                        size="small"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text className="text-white text-[15px] font-semibold">
+                    <View className="min-w-[28px] items-center">
+                      <Text
+                        className="text-[11px] font-medium"
+                        style={{ color: imageFile ? colors.mediaOnBackdrop : colors.primary }}
+                      >
                         {downloadProgress}%
                       </Text>
-                    </>
+                    </View>
                   ) : (
-                    <>
-                      <Download
-                        color={colors.iconOnPrimary}
-                        size={18}
-                        strokeWidth={2}
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text className="text-white text-[15px] font-semibold">
-                        {t.resourceDownload}
-                      </Text>
-                    </>
+                    <Download
+                      color={imageFile ? colors.mediaOnBackdrop : colors.primary}
+                      size={20}
+                      strokeWidth={1.8}
+                    />
                   )}
                 </TouchableOpacity>
               </View>
-            )}
-          </View>
-        </Animated.View>
-      </Modal>
+            </View>
+
+            {/* Content */}
+            <View style={{ flex: 1 }}>
+              {imageFile ? (
+                previewLoadFailed ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text
+                      className="text-center text-[14px]"
+                      style={{ color: colors.mediaOnBackdropSecondary }}
+                    >
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                ) : fileUrl ? (
+                  <View className="flex-1 items-center justify-center">
+                    {imgLoading && (
+                      <ActivityIndicator
+                        color={colors.mediaOnBackdrop}
+                        size="large"
+                        style={{ position: 'absolute', zIndex: 1 }}
+                      />
+                    )}
+                    <ExpoImage
+                      cachePolicy="memory-disk"
+                      contentFit="contain"
+                      style={{ width: SCREEN_W, height: SCREEN_H * 0.75 }}
+                      transition={120}
+                      source={
+                        cachedEntry?.localUri
+                          ? { uri: cachedEntry.localUri }
+                          : fileUrl
+                            ? {
+                                ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+                                  ? { headers: remoteHeaders }
+                                  : {}),
+                                uri: fileUrl,
+                              }
+                            : undefined
+                      }
+                      onError={handlePreviewError}
+                      onLoad={() => setImgLoading(false)}
+                    />
+                  </View>
+                ) : (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text
+                      className="text-center text-[14px]"
+                      style={{ color: colors.mediaOnBackdropSecondary }}
+                    >
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                )
+              ) : previewableDoc ? (
+                pdfFile && !fileUrl ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-foreground/70 text-[14px]">
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                ) : pdfFile &&
+                  !cachedEntry?.localUri &&
+                  fileUrl &&
+                  !pdfDataUrl &&
+                  !previewLoadFailed ? (
+                  <View
+                    className="flex-1 items-center justify-center"
+                    style={{ backgroundColor: colors.inputBg }}
+                  >
+                    <ActivityIndicator color={colors.primary} size="large" />
+                  </View>
+                ) : pdfFile && previewLoadFailed ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-foreground/70 text-[14px]">
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                ) : textFile && editingText ? (
+                  <View
+                    className="flex-1 px-4 pb-6 pt-4"
+                    style={{ backgroundColor: colors.background }}
+                  >
+                    <TextInput
+                      multiline
+                      className="flex-1 rounded-3xl px-4 py-4 text-[15px]"
+                      placeholder={item.name}
+                      placeholderTextColor={colors.muted}
+                      value={textDraft}
+                      style={{
+                        backgroundColor: colors.inputBg,
+                        color: colors.foreground,
+                        textAlignVertical: 'top',
+                      }}
+                      onChangeText={setTextDraft}
+                    />
+                  </View>
+                ) : textFile && textContent ? (
+                  markdownHtml ? (
+                    <WebView
+                      originWhitelist={['*']}
+                      source={{ html: markdownHtml }}
+                      style={{ flex: 1, backgroundColor: colors.background }}
+                    />
+                  ) : (
+                    <ScrollView
+                      className="flex-1"
+                      contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+                      style={{ backgroundColor: colors.background }}
+                    >
+                      <Text
+                        selectable
+                        className="text-[15px] leading-6"
+                        style={{ color: colors.foreground }}
+                      >
+                        {textContent}
+                      </Text>
+                    </ScrollView>
+                  )
+                ) : textFile && !textContent && !previewLoadFailed ? (
+                  <View
+                    className="flex-1 items-center justify-center"
+                    style={{ backgroundColor: colors.inputBg }}
+                  >
+                    <ActivityIndicator color={colors.primary} size="large" />
+                  </View>
+                ) : textFile && previewLoadFailed ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-foreground/70 text-[14px]">
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                ) : documentSource ? (
+                  <WebView
+                    cacheEnabled
+                    originWhitelist={['https://*', 'http://*', 'data:*']}
+                    source={documentSource}
+                    startInLoadingState={!pdfFile}
+                    style={{ flex: 1 }}
+                    renderLoading={() => (
+                      <View
+                        className="items-center justify-center"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: colors.inputBg,
+                        }}
+                      >
+                        <ActivityIndicator color={colors.primary} size="large" />
+                      </View>
+                    )}
+                    onError={handlePreviewError}
+                  />
+                ) : (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-foreground/70 text-[14px]">
+                      {t.resourcePreviewUnavailable}
+                    </Text>
+                  </View>
+                )
+              ) : (
+                <View className="flex-1 items-center justify-center px-8">
+                  <View
+                    className="items-center justify-center rounded-3xl bg-foreground/5 mb-6"
+                    style={{ width: 96, height: 96 }}
+                  >
+                    <FileTypeIcon
+                      color={colors.secondaryText}
+                      fileName={item.name}
+                      fileType={item.fileType}
+                      size={44}
+                    />
+                  </View>
+                  <Text className="text-foreground text-[17px] font-semibold text-center mb-2">
+                    {item.name}
+                  </Text>
+                  <Text
+                    className="text-[14px] text-center mb-1"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {item.fileType}
+                  </Text>
+                  <Text
+                    className="text-[14px] text-center mb-8"
+                    style={{ color: colors.secondaryText }}
+                  >
+                    {formatBytes(item.size)}
+                    {'  ·  '}
+                    {formatDate(item.createdAt)}
+                  </Text>
+                  <TouchableOpacity
+                    className="flex-row items-center rounded-2xl px-8 py-3.5"
+                    style={{ backgroundColor: colors.primary }}
+                    onPress={() => void handleDownload()}
+                  >
+                    {downloading ? (
+                      <>
+                        <ActivityIndicator
+                          color={colors.iconOnPrimary}
+                          size="small"
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text
+                          className="text-[15px] font-semibold"
+                          style={{ color: colors.iconOnPrimary }}
+                        >
+                          {downloadProgress}%
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Download
+                          color={colors.iconOnPrimary}
+                          size={18}
+                          strokeWidth={2}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text
+                          className="text-[15px] font-semibold"
+                          style={{ color: colors.iconOnPrimary }}
+                        >
+                          {t.resourceDownload}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </Animated.View>
+        </Modal>
+        <ResourceShareOptionsSheet
+          apiBase={apiBaseUrl}
+          cachedLocalUri={cachedEntry?.localUri}
+          visible={shareSheetOpen && !!item}
+          target={
+            item
+              ? {
+                  id: item.id,
+                  kind: item.sourceType === 'file' ? 'file' : 'document',
+                  name: item.name || item.id,
+                }
+              : null
+          }
+          onClose={() => setShareSheetOpen(false)}
+          onFail={() => toast.show('error', t.resourceShareFailed)}
+          onSuccess={() => haptics.success()}
+        />
+      </>
     );
   },
 );
@@ -1683,6 +1727,29 @@ function FileRow({
   );
 }
 
+function fileListItemFromShared(params: {
+  fileType?: string;
+  kind: 'file' | 'document';
+  localId: string;
+  name: string;
+}): FileListItem {
+  const isFile = params.kind === 'file';
+  return {
+    id: params.localId,
+    name: params.name,
+    fileType: isFile ? 'application/octet-stream' : params.fileType || 'text/plain',
+    sourceType: isFile ? 'file' : 'document',
+    size: 0,
+    createdAt: new Date().toISOString(),
+    chunkCount: null,
+    chunkingError: null,
+    embeddingError: null,
+    embeddingStatus: null,
+    finishEmbedding: false,
+    url: '',
+  };
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────
 
 export default function ResourceScreen() {
@@ -1739,6 +1806,13 @@ export default function ResourceScreen() {
   );
   const [treeExpandedIds, setTreeExpandedIds] = useState<Set<string>>(() => new Set());
   const [treeLoadingIds, setTreeLoadingIds] = useState<Set<string>>(() => new Set());
+  const [trashModalVisible, setTrashModalVisible] = useState(false);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashedDocuments, setTrashedDocuments] = useState<TrashedDocumentItem[]>([]);
+  const [restoringTrashId, setRestoringTrashId] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<ResourceShareSheetTarget | null>(null);
+  const [manageShareTarget, setManageShareTarget] = useState<ResourceShareSheetTarget | null>(null);
+  const [sharedWithMeVisible, setSharedWithMeVisible] = useState(false);
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 10, minimumViewTime: 100 }),
     [],
@@ -1761,14 +1835,20 @@ export default function ResourceScreen() {
   const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
 
+  const librarySpaceId = useMemo(() => {
+    if (!libraryId) return undefined;
+    return libraries.find((l) => l.id === libraryId)?.spaceId ?? undefined;
+  }, [libraryId, libraries]);
+
   const resourceListQueryParams = useMemo(
     () => ({
       knowledgeBaseId: libraryId ?? undefined,
       limit: RESOURCE_LIST_PAGE_SIZE,
       parentId: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
       q: searchText.trim() || undefined,
+      ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
     }),
-    [libraryId, currentFolderId, currentFolderSlug, searchText],
+    [libraryId, currentFolderId, currentFolderSlug, librarySpaceId, searchText],
   );
 
   useEffect(() => {
@@ -1987,11 +2067,9 @@ export default function ResourceScreen() {
         const base = await getApiUrl();
         setApiBase(base);
         const result = await resourceApi.getKnowledgeItems({
-          knowledgeBaseId: resourceListQueryParams.knowledgeBaseId,
+          ...resourceListQueryParams,
           limit: RESOURCE_LIST_PAGE_SIZE,
           offset: loadOffset,
-          parentId: resourceListQueryParams.parentId,
-          q: resourceListQueryParams.q,
         });
         if (ticket !== loadRequestRef.current) return;
         const items = result?.items ?? [];
@@ -2041,6 +2119,7 @@ export default function ResourceScreen() {
         knowledgeBaseId: libraryId,
         limit: RESOURCE_TREE_PAGE_SIZE,
         parentId,
+        ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
       };
 
       if (!force) {
@@ -2072,6 +2151,7 @@ export default function ResourceScreen() {
           limit: RESOURCE_TREE_PAGE_SIZE,
           offset: 0,
           parentId,
+          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
         });
 
         const items = result?.items ?? [];
@@ -2098,7 +2178,7 @@ export default function ResourceScreen() {
         });
       }
     },
-    [libraryId],
+    [libraryId, librarySpaceId],
   );
 
   const refreshTreeData = useCallback(async () => {
@@ -2233,6 +2313,7 @@ export default function ResourceScreen() {
         .getKnowledgeItems({
           knowledgeBaseId: libraryId,
           parentId: moveFolderParentId,
+          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
         })
         .then((res) => {
           const folders = (res?.items ?? []).filter((i) => i.fileType === 'custom/folder');
@@ -2243,7 +2324,7 @@ export default function ResourceScreen() {
       setMoveTargetFolders([]);
       setMoveFolderStack([null]);
     }
-  }, [moveToFolderItem, libraryId, moveFolderParentId]);
+  }, [librarySpaceId, moveFolderParentId, moveToFolderItem, libraryId]);
 
   const handlePreview = useCallback((item: FileListItem) => {
     haptics.light();
@@ -2555,20 +2636,92 @@ export default function ResourceScreen() {
     [actionItem, refreshTreeData, t, toast],
   );
 
-  const handleShare = useCallback(
-    async (item: FileListItem) => {
+  const openItemShareSheet = useCallback((item: FileListItem) => {
+    setShareTarget({
+      id: item.id,
+      kind: item.sourceType === 'file' ? 'file' : 'document',
+      name: item.name || item.id,
+    });
+  }, []);
+
+  const handleShareFromActionSheet = useCallback(
+    (item: FileListItem) => {
       closeActionSheet();
-      const base = apiBase?.replace(/\/$/, '') || '';
-      const cachedLocalUri = cachedResourceMap[item.id]?.localUri;
-      const url = cachedLocalUri || (base ? `${base}/f/${item.id}` : '');
-      if (!url) return;
-      try {
-        await Share.share({ message: url, title: item.name, url });
-      } catch {
-        toast.show('error', t.resourceShareFailed);
-      }
+      openItemShareSheet(item);
     },
-    [apiBase, cachedResourceMap, closeActionSheet, t, toast],
+    [closeActionSheet, openItemShareSheet],
+  );
+
+  const handleShareLibrary = useCallback(() => {
+    if (!libraryId) return;
+    setShareTarget({
+      id: libraryId,
+      kind: 'knowledge_base',
+      name: libraries.find((l) => l.id === libraryId)?.name || t.resourceTitle,
+    });
+  }, [libraryId, libraries, t.resourceTitle]);
+
+  const openManageShareFromItem = useCallback(
+    (item: FileListItem) => {
+      closeActionSheet();
+      setManageShareTarget({
+        id: item.id,
+        kind: item.sourceType === 'file' ? 'file' : 'document',
+        name: item.name || item.id,
+      });
+    },
+    [closeActionSheet],
+  );
+
+  const openManageLibraryShare = useCallback(() => {
+    if (!libraryId) return;
+    setManageShareTarget({
+      id: libraryId,
+      kind: 'knowledge_base',
+      name: libraries.find((l) => l.id === libraryId)?.name || t.resourceTitle,
+    });
+  }, [libraryId, libraries, t.resourceTitle]);
+
+  const handleSharedWithMePick = useCallback(
+    async (row: SharedWithMeRow) => {
+      setSharedWithMeVisible(false);
+      if (row.kind === 'knowledge_base') {
+        setLibraryId(row.localId);
+        setCurrentFolderId(null);
+        setCurrentFolderSlug(null);
+        setTreeChildrenByParent({});
+        setTreeExpandedIds(new Set());
+        setFolderBreadcrumb([]);
+        clearResourceListCache();
+        haptics.success();
+        return;
+      }
+      if (row.kind === 'file') {
+        setPreviewItem(
+          fileListItemFromShared({ kind: 'file', localId: row.localId, name: row.name }),
+        );
+        setPreviewVisible(true);
+        haptics.light();
+        return;
+      }
+      const doc = await resourceApi.getDocument(row.localId).catch(() => null);
+      const ft = doc?.fileType ?? 'text/plain';
+      if (ft === 'custom/folder') {
+        toast.show('info', t.resourceSharedFolderHint);
+        return;
+      }
+      setPreviewItem(
+        fileListItemFromShared({
+          kind: 'document',
+          localId: row.localId,
+          name: row.name,
+          fileType: ft,
+        }),
+      );
+      setPreviewVisible(true);
+      haptics.light();
+    },
+    [toast, t.resourceSharedFolderHint],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
@@ -2609,6 +2762,27 @@ export default function ResourceScreen() {
   const hasResolvedTreeRoot =
     treeMode && Object.prototype.hasOwnProperty.call(treeChildrenByParent, ROOT_TREE_KEY);
   const showInitialSkeleton = loading && !hasResolvedFiles && !hasResolvedTreeRoot;
+
+  const listExtraData = useMemo(
+    () => ({
+      cachedResourceIds,
+      cachedResourceMap,
+      currentFolderId,
+      selectedIds,
+      selectMode,
+      treeExpandedIds,
+      visibleIds,
+    }),
+    [
+      cachedResourceIds,
+      cachedResourceMap,
+      currentFolderId,
+      selectedIds,
+      selectMode,
+      treeExpandedIds,
+      visibleIds,
+    ],
+  );
 
   const handleTreeFolderToggle = useCallback(
     async (item: FileListItem) => {
@@ -2656,6 +2830,7 @@ export default function ResourceScreen() {
           limit: 200,
           offset: 0,
           parentId,
+          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
         });
         children = sortFileList(result?.items ?? [], sorter, sortOrder, locale);
       }
@@ -2671,7 +2846,7 @@ export default function ResourceScreen() {
 
     setTreeChildrenByParent((prev) => ({ ...prev, ...nextChildren }));
     setTreeExpandedIds(expandedIds);
-  }, [libraryId, locale, sortOrder, sorter, treeChildrenByParent]);
+  }, [libraryId, librarySpaceId, locale, sortOrder, sorter, treeChildrenByParent]);
 
   const handleCollapseAllTree = useCallback(() => {
     setTreeExpandedIds(new Set());
@@ -2743,6 +2918,28 @@ export default function ResourceScreen() {
                   <Search color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
                 )}
               </HeaderIconButton>
+              <HeaderIconButton
+                accessibilityLabel={t.resourceSharedWithMe}
+                onPress={() => setSharedWithMeVisible(true)}
+              >
+                <Link2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+              </HeaderIconButton>
+              {libraryId ? (
+                <HeaderIconButton
+                  accessibilityLabel={t.resourceShareManage}
+                  onPress={openManageLibraryShare}
+                >
+                  <Users color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </HeaderIconButton>
+              ) : null}
+              {libraryId ? (
+                <HeaderIconButton
+                  accessibilityLabel={t.resourceShareLibrary}
+                  onPress={handleShareLibrary}
+                >
+                  <Share2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                </HeaderIconButton>
+              ) : null}
               <HeaderIconButton
                 accessibilityLabel={t.resourceTrash}
                 onPress={() => setTrashModalVisible(true)}
@@ -2986,14 +3183,13 @@ export default function ResourceScreen() {
       ) : (
         <FlatList<ResourceListRow>
           data={treeMode ? treeRows : filtered}
+          extraData={listExtraData}
           key={treeMode ? 'tree' : viewMode}
           keyExtractor={(item) => (isResourceTreeRow(item) ? item.item.id : item.id)}
           numColumns={!treeMode && viewMode === 'grid' ? 3 : 1}
           viewabilityConfig={treeMode ? undefined : viewabilityConfig}
           ItemSeparatorComponent={
-            !treeMode && viewMode === 'list'
-              ? () => <View className="mx-4 h-px bg-foreground/5" />
-              : undefined
+            !treeMode && viewMode === 'list' ? ResourceListRowSeparator : undefined
           }
           ListEmptyComponent={
             <EmptyState
@@ -3079,15 +3275,6 @@ export default function ResourceScreen() {
                 }
               : { paddingBottom: insets.bottom + 80 }
           }
-          extraData={{
-            cachedResourceIds,
-            cachedResourceMap,
-            currentFolderId,
-            selectedIds,
-            selectMode,
-            treeExpandedIds,
-            visibleIds,
-          }}
           refreshControl={
             <RefreshControl
               colors={[colors.primary]}
@@ -3390,11 +3577,34 @@ export default function ResourceScreen() {
         }}
       />
 
+      <ResourceShareOptionsSheet
+        apiBase={apiBase}
+        cachedLocalUri={shareTarget ? cachedResourceMap[shareTarget.id]?.localUri : undefined}
+        target={shareTarget}
+        visible={!!shareTarget}
+        onClose={() => setShareTarget(null)}
+        onFail={() => toast.show('error', t.resourceShareFailed)}
+        onSuccess={() => haptics.success()}
+      />
+
+      <ResourceShareManageSheet
+        target={manageShareTarget}
+        visible={!!manageShareTarget}
+        onActionError={() => toast.show('error', t.resourceShareFailed)}
+        onClose={() => setManageShareTarget(null)}
+      />
+
+      <SharedWithMeSheet
+        visible={sharedWithMeVisible}
+        onClose={() => setSharedWithMeVisible(false)}
+        onPick={handleSharedWithMePick}
+      />
+
       {/* Recycle bin (soft-deleted documents) */}
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
         transparent
+        animationType="slide"
         visible={trashModalVisible}
         onRequestClose={() => setTrashModalVisible(false)}
       >
@@ -3450,14 +3660,19 @@ export default function ResourceScreen() {
                   return (
                     <View className="flex-row items-center border-b border-foreground/5 px-4 py-3.5">
                       {isTrashedFolder ? (
-                        <Folder color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                        <Folder
+                          color={colors.muted}
+                          size={22}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
                       ) : (
-                        <FileText color={colors.muted} size={22} strokeWidth={tokens.icon.strokeWidth} />
+                        <FileText
+                          color={colors.muted}
+                          size={22}
+                          strokeWidth={tokens.icon.strokeWidth}
+                        />
                       )}
-                      <Text
-                        className="ml-3 flex-1 text-[15px] text-foreground"
-                        numberOfLines={2}
-                      >
+                      <Text className="ml-3 flex-1 text-[15px] text-foreground" numberOfLines={2}>
                         {displayName}
                       </Text>
                       <TouchableOpacity
@@ -3473,7 +3688,10 @@ export default function ResourceScreen() {
                         {busy ? (
                           <ActivityIndicator color={colors.primary} size="small" />
                         ) : (
-                          <Text className="text-[14px] font-semibold" style={{ color: colors.primary }}>
+                          <Text
+                            className="text-[14px] font-semibold"
+                            style={{ color: colors.primary }}
+                          >
                             {t.resourceTrashRestore}
                           </Text>
                         )}
@@ -3506,17 +3724,19 @@ export default function ResourceScreen() {
             </View>
             {actionItem ? (
               <View className="px-5">
-                <Pressable
-                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                  onPress={() => {
-                    haptics.light();
-                    handlePreview(actionItem);
-                    closeActionSheet();
-                  }}
-                >
-                  <Eye color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-3 text-base text-foreground">{t.notebookPreview}</Text>
-                </Pressable>
+                {!isFolder(actionItem) ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      haptics.light();
+                      handlePreview(actionItem);
+                      closeActionSheet();
+                    }}
+                  >
+                    <Eye color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.notebookPreview}</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => {
@@ -3537,15 +3757,20 @@ export default function ResourceScreen() {
                   <Pencil color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
                   <Text className="ml-3 text-base text-foreground">{t.actionRename}</Text>
                 </Pressable>
-                {!isFolder(actionItem) && (
-                  <Pressable
-                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                    onPress={() => void handleShare(actionItem)}
-                  >
-                    <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="ml-3 text-base text-foreground">{t.msgActionShare}</Text>
-                  </Pressable>
-                )}
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => handleShareFromActionSheet(actionItem)}
+                >
+                  <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.msgActionShare}</Text>
+                </Pressable>
+                <Pressable
+                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                  onPress={() => openManageShareFromItem(actionItem)}
+                >
+                  <Users color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <Text className="ml-3 text-base text-foreground">{t.resourceShareManage}</Text>
+                </Pressable>
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={() => {
@@ -3872,7 +4097,9 @@ export default function ResourceScreen() {
                 className="rounded-xl bg-primary px-4 py-2"
                 onPress={() => void handleCreateFolder()}
               >
-                <Text className="font-medium text-white">{t.done}</Text>
+                <Text className="font-medium" style={{ color: colors.iconOnPrimary }}>
+                  {t.done}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

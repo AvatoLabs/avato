@@ -19,17 +19,17 @@ export interface SuccessStateProps {
   aspectRatio: string;
   generation: Generation;
   generationBatch: GenerationBatch;
-  onImageLoadFailed: (url?: string) => void;
   onCopySeed?: () => void;
   onDelete: () => void;
   onDownload: () => void;
+  onImageLoadFailed: (url?: string) => void;
   prompt: string;
   seedTooltip?: string;
 }
 
 export interface ErrorStateProps {
-  aspectRatio: string;
   actionTitle?: string;
+  aspectRatio: string;
   errorMessage?: string;
   generation: Generation;
   generationBatch: GenerationBatch;

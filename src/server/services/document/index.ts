@@ -2,8 +2,8 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { type DocumentItem } from '@lobechat/database/schemas';
 import { documents, files } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
-import debug from 'debug';
 import { TRPCError } from '@trpc/server';
+import debug from 'debug';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { DocumentModel } from '@/database/models/document';
@@ -13,7 +13,7 @@ import { SpaceModel } from '@/database/models/space';
 import { type LobeDocument } from '@/types/document';
 
 import { FileService } from '../file';
-import { AuthorizedResourceResolver, ResourceAuthorizer, TreeGuard } from '../resource';
+import { AuthorizedResourceResolver, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
 
@@ -377,9 +377,7 @@ export class DocumentService {
       columns: { resourceUid: true, spaceId: true },
       where: inArray(documents.id, documentIds),
     });
-    bumpEntries.push(
-      ...docRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })),
-    );
+    bumpEntries.push(...docRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })));
 
     if (fileIds.length > 0) {
       await this.fileModel.deleteManyAny(fileIds);

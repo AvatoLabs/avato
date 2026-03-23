@@ -1,6 +1,6 @@
 /**
  * This file contains the root router of Lobe Chat tRPC-backend for Mobile App
- * Only includes routers that are actually used by the mobile client
+ * Only includes routers used by the mobile client (plus resourceShare for share links)
  */
 import { publicProcedure, router } from '@/libs/trpc/lambda';
 
@@ -24,6 +24,7 @@ import { marketRouter } from '../lambda/market';
 import { messageRouter } from '../lambda/message';
 import { notebookRouter } from '../lambda/notebook';
 import { pluginRouter } from '../lambda/plugin';
+import { resourceShareRouter } from '../lambda/resourceShare';
 import { sessionRouter } from '../lambda/session';
 import { sessionGroupRouter } from '../lambda/sessionGroup';
 import { tagRouter } from '../lambda/tag';
@@ -57,6 +58,7 @@ export const mobileRouter = router({
   message: messageRouter,
   notebook: notebookRouter,
   plugin: pluginRouter,
+  resourceShare: resourceShareRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
   tag: tagRouter,

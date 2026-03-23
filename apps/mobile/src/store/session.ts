@@ -14,6 +14,10 @@ import { agentGroupApi, sessionApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { useI18n } from '../lib/i18n';
 import { navigateToLogin } from '../lib/navigation';
+import {
+  PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
+  shouldHidePersonalNotebookSession,
+} from '../lib/personalNotebookSession';
 import type { ChatSession, CreateSessionConfig } from '../types';
 
 type FetchSessionsOptions = {
@@ -85,9 +89,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       try {
         const sessions = await sessionApi.list();
         const stored = await AsyncStorage.getItem('activeSessionId');
+        const personalNotebookSessionId = await AsyncStorage.getItem(
+          PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
+        );
 
         const pending = get().pendingDeletes;
-        const filtered = (sessions ?? []).filter((s) => !pending.has(s.id));
+        const filtered = (sessions ?? []).filter(
+          (s) =>
+            !pending.has(s.id) && !shouldHidePersonalNotebookSession(s, personalNotebookSessionId),
+        );
         const nextActiveSessionId =
           stored && filtered.some((session) => session.id === stored)
             ? stored

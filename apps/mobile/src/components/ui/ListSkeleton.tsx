@@ -2,7 +2,7 @@
  * ListSkeleton — Skeleton placeholder for session/topic lists.
  */
 import React from 'react';
-import { View } from 'react-native';
+import { type DimensionValue, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { useThemeColors } from '../../theme/colors';
@@ -24,14 +24,18 @@ export default function ListSkeleton() {
           <View className="flex-1">
             <View
               className="mb-2 rounded-lg"
-              style={{ backgroundColor: colors.fillTertiary, height: 16, width: titleWidth }}
+              style={{
+                backgroundColor: colors.fillTertiary,
+                height: 16,
+                width: titleWidth as DimensionValue,
+              }}
             />
             <View
               className="rounded-lg"
               style={{
                 backgroundColor: colors.fillQuaternary,
                 height: 12,
-                width: subtitleWidths[index],
+                width: subtitleWidths[index] as DimensionValue,
               }}
             />
           </View>

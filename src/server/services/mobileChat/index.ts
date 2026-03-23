@@ -24,7 +24,7 @@ import { AgentModel } from '@/database/models/agent';
 import { AgentSkillModel } from '@/database/models/agentSkill';
 import { PluginModel } from '@/database/models/plugin';
 import { SessionModel } from '@/database/models/session';
-import { UserMemoryIdentityModel } from '@/database/models/userMemory/identity';
+import { UserModel } from '@/database/models/user';
 import { type LobeChatDatabase } from '@/database/type';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { createServerAgentToolsEngine, serverMessagesEngine } from '@/server/modules/Mecha';
@@ -32,21 +32,21 @@ import { createTraceOptions } from '@/server/modules/ModelRuntime';
 import { FileService } from '@/server/services/file';
 import { mcpService } from '@/server/services/mcp';
 import { processContentBlocks } from '@/server/services/mcp/contentProcessor';
+import { buildMobileChatUserMemoryPrompt } from '@/server/services/memory/buildMobileChatUserMemoryPrompt';
 import { PluginGatewayService } from '@/server/services/pluginGateway';
 import { SearchService } from '@/server/services/search';
 import { ToolExecutionService } from '@/server/services/toolExecution';
 import { BuiltinToolsExecutor } from '@/server/services/toolExecution/builtin';
 import { type ChatStreamPayload } from '@/types/openai/chat';
 
+import { partitionToolsByIntervention } from './partitionToolsByIntervention';
 import { readChatCompletionResult } from './responseParser';
+import {
+  getMobileInterventionResumeStore,
+  type MobileInterventionResumeState,
+} from './resumeStore';
 
 const MAX_TOOL_ROUNDS = 5;
-
-const MEMORY_LIMIT_BY_EFFORT = {
-  high: 50,
-  low: 12,
-  medium: 30,
-} as const;
 
 const LEGACY_BUILTIN_ROLE_PATTERNS: Partial<Record<string, RegExp>> = {
   [BUILTIN_AGENT_SLUGS.agentBuilder]: /You are Lobe,\s+an Agent Builder integrated into LobeHub\./,
@@ -73,7 +73,7 @@ const builtinSkillMetaMap = new Map<string, SkillMeta>(
 
 const builtinToolIdentifiers = new Set(builtinTools.map((tool) => tool.identifier));
 
-type MobileMemoryEffort = keyof typeof MEMORY_LIMIT_BY_EFFORT;
+type MobileMemoryEffort = 'high' | 'low' | 'medium';
 type ToolSource = 'builtin' | 'klavis' | 'lobehubSkill' | 'mcp' | 'plugin';
 
 export interface MobileMemoryPayload {
@@ -127,7 +127,8 @@ interface MobileToolExecutionEvent {
   arguments: string;
   id: string;
   identifier: string;
-  intervention?: { status: 'approved' };
+  intervention?: { status: 'approved' } | { rejectedReason?: string; status: 'rejected' };
+  pluginError?: { message: string };
   result: string;
   state?: Record<string, unknown>;
 }
@@ -150,27 +151,6 @@ type StreamUsageData = Parameters<NonNullable<ChatStreamCallbacks['onUsage']>>[0
 const normalizeMemoryEffort = (effort?: string): MobileMemoryEffort => {
   if (effort === 'low' || effort === 'medium' || effort === 'high') return effort;
   return 'medium';
-};
-
-const buildMemoryContext = (
-  memories: Array<{
-    description?: string | null;
-    role?: string | null;
-    type?: string | null;
-  }>,
-) => {
-  const lines = memories
-    .map((item) => {
-      const role = item.role || item.type || 'user';
-      const content = item.description?.trim();
-      if (!content) return null;
-      return `[${role}] ${content}`;
-    })
-    .filter(Boolean);
-
-  if (lines.length === 0) return undefined;
-
-  return `## User Memory\n${lines.join('\n')}`;
 };
 
 const isLegacyBuiltinSystemRole = (slug: string, systemRole?: string | null) => {
@@ -276,6 +256,7 @@ const readMemoryContext = async (params: {
   conversationConfig?: ConversationConfig;
   explicitMemory?: MobileMemoryPayload;
   serverDB: LobeChatDatabase;
+  topicId?: string;
   userId: string;
 }) => {
   const memorySource = params.explicitMemory || params.conversationConfig?.chatConfig?.memory;
@@ -283,11 +264,12 @@ const readMemoryContext = async (params: {
 
   try {
     const effort = normalizeMemoryEffort(memorySource.effort);
-    const limit = MEMORY_LIMIT_BY_EFFORT[effort];
-    const memoryModel = new UserMemoryIdentityModel(params.serverDB, params.userId);
-    const memories = await memoryModel.queryForInjection(limit);
-
-    return buildMemoryContext(memories);
+    return await buildMobileChatUserMemoryPrompt({
+      effort,
+      serverDB: params.serverDB,
+      topicId: params.topicId,
+      userId: params.userId,
+    });
   } catch (error) {
     console.error('[webapi/chat] failed to inject memory context:', error);
     return undefined;
@@ -406,19 +388,41 @@ const sanitizeToolCallHistory = (messages?: ChatStreamPayload['messages']) => {
 
 const createToolExecutionEvent = (
   toolCall: ChatToolPayload,
-  execution: { content: unknown; state?: unknown },
+  execution: { content: unknown; error?: { message: string }; state?: unknown },
 ): MobileToolExecutionEvent => ({
   apiName: toolCall.apiName,
   arguments: toolCall.arguments,
   id: toolCall.id,
   identifier: toolCall.identifier,
   intervention: { status: 'approved' },
+  ...(execution.error ? { pluginError: execution.error } : {}),
   result: serializeToolExecutionContent(execution.content),
   ...(isExecutionStateRecord(execution.state) ? { state: execution.state } : {}),
 });
 
+const createToolRejectionExecutionEvent = (
+  toolCall: ChatToolPayload,
+  reason?: string,
+): MobileToolExecutionEvent => {
+  const content = reason
+    ? `User reject this tool calling with reason: ${reason}`
+    : 'User reject this tool calling without reason';
+  return {
+    apiName: toolCall.apiName,
+    arguments: toolCall.arguments,
+    id: toolCall.id,
+    identifier: toolCall.identifier,
+    intervention: { rejectedReason: reason, status: 'rejected' },
+    result: content,
+  };
+};
+
 const createStaticSSETextResponse = (params: {
   assistant?: ToolLoopFinalAssistantResponse;
+  interventionRequired?: {
+    payload: { pendingToolCalls: ChatToolPayload[]; sessionId?: string; topicId?: string };
+  };
+  toolCalls?: (ChatToolPayload & { intervention?: { status: string } })[];
   toolExecutions?: MobileToolExecutionEvent[];
 }) => {
   const encoder = new TextEncoder();
@@ -431,8 +435,16 @@ const createStaticSSETextResponse = (params: {
 
   void (async () => {
     try {
+      if (params.toolCalls?.length) {
+        await writeEvent('tool_calls', params.toolCalls);
+      }
+
       if (params.toolExecutions?.length) {
         await writeEvent('tool_executions', params.toolExecutions);
+      }
+
+      if (params.interventionRequired) {
+        await writeEvent('intervention_required', params.interventionRequired.payload);
       }
 
       if (params.assistant?.grounding) {
@@ -888,6 +900,95 @@ export class MobileChatService {
             break;
           }
 
+          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          try {
+            const userModel = new UserModel(this.serverDB, this.userId);
+            const settings = await userModel.getUserSettings();
+            userInterventionConfig = (settings as any)?.tool?.humanIntervention;
+          } catch {
+            //
+          }
+
+          const [toolsNeedingIntervention, toolsToExecute] = partitionToolsByIntervention(
+            normalizedToolCalls,
+            userInterventionConfig,
+            toolSet.manifestMap,
+          );
+
+          if (toolsNeedingIntervention.length > 0) {
+            const fallbackToolExecutions: MobileToolExecutionEvent[] = [];
+            loopMessages = [
+              ...loopMessages,
+              {
+                content: roundContent,
+                role: 'assistant',
+                ...(roundReasoning ? { reasoning_content: roundReasoning } : {}),
+                tool_calls: rawToolCalls,
+              } as any,
+            ];
+
+            for (const toolCall of toolsToExecute) {
+              const execution = await toolExecutionService.executeTool(toolCall, {
+                processContentBlocks:
+                  toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
+                serverDB: this.serverDB,
+                spaceId: payload.spaceId,
+                toolManifestMap: toolSet.manifestMap,
+                topicId: payload.topicId,
+                userId: this.userId,
+              });
+              const content =
+                typeof execution.content === 'string'
+                  ? execution.content
+                  : JSON.stringify(execution.content);
+              fallbackToolExecutions.push(createToolExecutionEvent(toolCall, execution));
+              loopMessages.push({
+                content,
+                role: 'tool',
+                tool_call_id: toolCall.id,
+              } as any);
+            }
+
+            const pendingWithStatus = toolsNeedingIntervention.map((t) => ({
+              ...t,
+              intervention: { status: 'pending' as const },
+            }));
+            const allToolCallsForClient = [
+              ...toolsToExecute.map((t) => ({
+                ...t,
+                intervention: { status: 'approved' as const },
+              })),
+              ...pendingWithStatus,
+            ].sort((a, b) => {
+              const ai = normalizedToolCalls.findIndex((n) => n.id === a.id);
+              const bi = normalizedToolCalls.findIndex((n) => n.id === b.id);
+              return ai - bi;
+            });
+
+            await writeEvent('tool_calls', allToolCallsForClient);
+            if (fallbackToolExecutions.length > 0)
+              await writeEvent('tool_executions', fallbackToolExecutions);
+            await writeEvent('intervention_required', {
+              pendingToolCalls: pendingWithStatus,
+              sessionId: payload.sessionId,
+              topicId: payload.topicId,
+            });
+
+            const resumeStore = getMobileInterventionResumeStore();
+            resumeStore.set(
+              resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId),
+              {
+                loopMessages,
+                payload: { ...payload, messages: loopMessages },
+                pendingToolCalls: pendingWithStatus,
+                round,
+                toolSet,
+                userId: this.userId,
+              },
+            );
+            break;
+          }
+
           console.info(
             `[webapi/chat] streaming fallback round ${round + 1}: executing ${normalizedToolCalls.length} tools`,
           );
@@ -982,6 +1083,7 @@ export class MobileChatService {
         conversationConfig,
         explicitMemory: payload.memory,
         serverDB: this.serverDB,
+        topicId: payload.topicId,
         userId: this.userId,
       }),
       resolveEnabledSkillMetas(pluginIds, this.serverDB, this.userId),
@@ -1116,6 +1218,97 @@ export class MobileChatService {
           console.info(
             `[webapi/chat] round ${round + 1}: model called ${normalizedToolCalls.length} tools: ${normalizedToolCalls.map((toolCall) => toolCall.apiName).join(', ')}`,
           );
+
+          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          try {
+            const userModel = new UserModel(this.serverDB, this.userId);
+            const settings = await userModel.getUserSettings();
+            userInterventionConfig = (settings as any)?.tool?.humanIntervention;
+          } catch (err) {
+            console.warn('[webapi/chat] failed to read user intervention config:', err);
+          }
+
+          const [toolsNeedingIntervention, toolsToExecute] = partitionToolsByIntervention(
+            normalizedToolCalls,
+            userInterventionConfig,
+            toolSet.manifestMap,
+          );
+
+          if (toolsNeedingIntervention.length > 0) {
+            loopMessages = [
+              ...loopMessages,
+              {
+                content: assistantMessage.content || '',
+                role: 'assistant',
+                ...(finalReasoning ? { reasoning_content: finalReasoning } : {}),
+                tool_calls: assistantMessage.tool_calls,
+              } as any,
+            ];
+
+            for (const toolCall of toolsToExecute) {
+              console.info(
+                `[webapi/chat] executing tool (auto): ${toolCall.identifier}:${toolCall.apiName}`,
+              );
+              const execution = await toolExecutionService.executeTool(toolCall, {
+                processContentBlocks:
+                  toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
+                serverDB: this.serverDB,
+                spaceId: payload.spaceId,
+                toolManifestMap: toolSet.manifestMap,
+                topicId: payload.topicId,
+                userId: this.userId,
+              });
+              const content =
+                typeof execution.content === 'string'
+                  ? execution.content
+                  : JSON.stringify(execution.content);
+              loopToolExecutions.push(createToolExecutionEvent(toolCall, execution));
+              loopMessages.push({
+                content,
+                role: 'tool',
+                tool_call_id: toolCall.id,
+              } as any);
+            }
+
+            const pendingWithStatus = toolsNeedingIntervention.map((t) => ({
+              ...t,
+              intervention: { status: 'pending' as const },
+            }));
+            const allToolCallsForClient = [
+              ...toolsToExecute.map((t) => ({
+                ...t,
+                intervention: { status: 'approved' as const },
+              })),
+              ...pendingWithStatus,
+            ].sort((a, b) => {
+              const ai = normalizedToolCalls.findIndex((n) => n.id === a.id);
+              const bi = normalizedToolCalls.findIndex((n) => n.id === b.id);
+              return ai - bi;
+            });
+
+            const resumeStore = getMobileInterventionResumeStore();
+            const rk = resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId);
+            resumeStore.set(rk, {
+              loopMessages: [...loopMessages],
+              payload: { ...data, messages: loopMessages },
+              pendingToolCalls: pendingWithStatus,
+              round,
+              toolSet,
+              userId: this.userId,
+            });
+
+            return createStaticSSETextResponse({
+              interventionRequired: {
+                payload: {
+                  pendingToolCalls: pendingWithStatus,
+                  sessionId: payload.sessionId,
+                  topicId: payload.topicId,
+                },
+              },
+              toolCalls: allToolCallsForClient,
+              toolExecutions: loopToolExecutions,
+            });
+          }
 
           loopMessages = [
             ...loopMessages,
@@ -1254,6 +1447,260 @@ export class MobileChatService {
     return new Response(readable, {
       headers: streamResponse.headers,
       status: streamResponse.status,
+    });
+  };
+
+  /**
+   * Continue after user approves a pending tool call, or rejects one and continues the loop
+   * (same as Web rejectAndContinue). Exactly one of approvedToolCall or rejectedToolCall applies.
+   */
+  continueIntervention = async (params: {
+    approvedToolCall?: ChatToolPayload;
+    payload: MobileChatPayload;
+    rejectedToolCall?: { id: string; reason?: string };
+    resumeState: MobileInterventionResumeState;
+  }) => {
+    const { approvedToolCall, rejectedToolCall, payload, resumeState } = params;
+    const hasApprove = Boolean(approvedToolCall);
+    const hasReject = Boolean(rejectedToolCall);
+    if (hasApprove === hasReject) {
+      throw new Error('Provide exactly one of approvedToolCall or rejectedToolCall');
+    }
+
+    const { loopMessages, pendingToolCalls, round, toolSet } = resumeState;
+    const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
+
+    let newLoopMessages: any[];
+    let toolExecEvent: MobileToolExecutionEvent;
+    let settledTool: ChatToolPayload;
+
+    if (approvedToolCall) {
+      const execution = await toolExecutionService.executeTool(approvedToolCall, {
+        processContentBlocks:
+          approvedToolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
+        serverDB: this.serverDB,
+        spaceId: payload.spaceId,
+        toolManifestMap: toolSet.manifestMap,
+        topicId: payload.topicId,
+        userId: this.userId,
+      });
+
+      const content =
+        typeof execution.content === 'string'
+          ? execution.content
+          : JSON.stringify(execution.content);
+
+      newLoopMessages = [
+        ...loopMessages,
+        {
+          content,
+          role: 'tool',
+          tool_call_id: approvedToolCall.id,
+        } as any,
+      ];
+
+      toolExecEvent = createToolExecutionEvent(approvedToolCall, execution);
+      settledTool = approvedToolCall;
+    } else {
+      const rt = pendingToolCalls.find((p) => p.id === rejectedToolCall!.id);
+      if (!rt) {
+        throw new Error('Rejected tool id is not in pending list');
+      }
+      const rejectContent = rejectedToolCall!.reason
+        ? `User reject this tool calling with reason: ${rejectedToolCall!.reason}`
+        : 'User reject this tool calling without reason';
+      newLoopMessages = [
+        ...loopMessages,
+        {
+          content: rejectContent,
+          role: 'tool',
+          tool_call_id: rejectedToolCall!.id,
+        } as any,
+      ];
+      toolExecEvent = createToolRejectionExecutionEvent(rt, rejectedToolCall!.reason);
+      settledTool = rt;
+    }
+
+    const settledId = settledTool.id;
+    const remainingPending = pendingToolCalls.filter((p) => p.id !== settledId);
+    const resumeStore = getMobileInterventionResumeStore();
+
+    const settledForClient: ChatToolPayload & {
+      intervention: { rejectedReason?: string; status: 'approved' | 'rejected' };
+    } = approvedToolCall
+      ? { ...settledTool, intervention: { status: 'approved' as const } }
+      : {
+          ...settledTool,
+          intervention: {
+            rejectedReason: rejectedToolCall!.reason,
+            status: 'rejected' as const,
+          },
+        };
+
+    if (remainingPending.length > 0) {
+      resumeStore.set(resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId), {
+        loopMessages: newLoopMessages,
+        payload: { ...payload, messages: newLoopMessages },
+        pendingToolCalls: remainingPending,
+        round,
+        toolSet,
+        userId: this.userId,
+      });
+
+      const allToolCallsForClient = [
+        settledForClient,
+        ...remainingPending.map((p) => ({
+          ...p,
+          intervention: { status: 'pending' as const },
+        })),
+      ];
+
+      return createStaticSSETextResponse({
+        interventionRequired: {
+          payload: {
+            pendingToolCalls: remainingPending,
+            sessionId: payload.sessionId,
+            topicId: payload.topicId,
+          },
+        },
+        toolCalls: allToolCallsForClient,
+        toolExecutions: [toolExecEvent],
+      });
+    }
+
+    resumeStore.delete(resumeStore.key(this.userId, payload.sessionId ?? '', payload.topicId));
+
+    const data: MobileChatPayload = {
+      ...payload,
+      messages: sanitizeToolCallHistory(newLoopMessages) || [],
+      ...(toolSet?.tools ? { tools: toolSet.tools } : {}),
+    };
+    delete (data as any).memory;
+    delete (data as any).plugins;
+    delete (data as any).sessionId;
+
+    const runtimeOptions = {
+      signal: this.requestSignal,
+      user: this.userId,
+    };
+
+    const response = await this.modelRuntime.chat(
+      {
+        ...data,
+        apiMode: 'chatCompletion',
+        messages: data.messages,
+        responseMode: 'json',
+        stream: false,
+      } as any,
+      runtimeOptions,
+    );
+
+    const result = await readChatCompletionResult(response);
+    const choice = result?.choices?.[0];
+    const assistantMessage = choice?.message;
+    const finalContent =
+      typeof assistantMessage?.content === 'string' ? assistantMessage.content : undefined;
+    const finalReasoning =
+      typeof (assistantMessage as any)?.reasoning_content === 'string'
+        ? (assistantMessage as any).reasoning_content
+        : undefined;
+    const finalGrounding = isExecutionStateRecord((result as any)?.grounding)
+      ? ((result as any).grounding as Record<string, unknown>)
+      : undefined;
+    const finalUsage = isExecutionStateRecord((result as any)?.usage)
+      ? ((result as any).usage as Record<string, unknown>)
+      : undefined;
+    const finalPerformance = isExecutionStateRecord((result as any)?.speed)
+      ? ((result as any).speed as Record<string, unknown>)
+      : undefined;
+
+    if (assistantMessage?.tool_calls?.length) {
+      const normalized = normalizeToolCalls(
+        assistantMessage.tool_calls,
+        toolSet.manifestMap,
+        toolSet.sourceMap,
+      );
+      let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+      try {
+        const userModel = new UserModel(this.serverDB, this.userId);
+        const settings = await userModel.getUserSettings();
+        userInterventionConfig = (settings as any)?.tool?.humanIntervention;
+      } catch {
+        //
+      }
+      const [needing, toExecute] = partitionToolsByIntervention(
+        normalized,
+        userInterventionConfig,
+        toolSet.manifestMap,
+      );
+      if (needing.length > 0) {
+        const fullLoop = [
+          ...newLoopMessages,
+          {
+            content: assistantMessage.content || '',
+            role: 'assistant',
+            ...(finalReasoning ? { reasoning_content: finalReasoning } : {}),
+            tool_calls: assistantMessage.tool_calls,
+          } as any,
+        ];
+        const execEvents: MobileToolExecutionEvent[] = [];
+        for (const tc of toExecute) {
+          const ex = await toolExecutionService.executeTool(tc, {
+            processContentBlocks: tc.source === 'mcp' ? boundProcessContentBlocks : undefined,
+            serverDB: this.serverDB,
+            spaceId: payload.spaceId,
+            toolManifestMap: toolSet.manifestMap,
+            topicId: payload.topicId,
+            userId: this.userId,
+          });
+          const c = typeof ex.content === 'string' ? ex.content : JSON.stringify(ex.content);
+          fullLoop.push({ content: c, role: 'tool', tool_call_id: tc.id } as any);
+          execEvents.push(createToolExecutionEvent(tc, ex));
+        }
+        const pendingWithStatus = needing.map((t) => ({
+          ...t,
+          intervention: { status: 'pending' as const },
+        }));
+        const allToolCalls = [
+          ...toExecute.map((t) => ({ ...t, intervention: { status: 'approved' as const } })),
+          ...pendingWithStatus,
+        ].sort((a, b) => {
+          const ai = normalized.findIndex((n) => n.id === a.id);
+          const bi = normalized.findIndex((n) => n.id === b.id);
+          return ai - bi;
+        });
+        const store = getMobileInterventionResumeStore();
+        store.set(store.key(this.userId, payload.sessionId ?? '', payload.topicId), {
+          loopMessages: fullLoop,
+          payload: { ...payload, messages: fullLoop },
+          pendingToolCalls: pendingWithStatus,
+          round: round + 1,
+          toolSet,
+          userId: this.userId,
+        });
+        return createStaticSSETextResponse({
+          interventionRequired: {
+            payload: {
+              pendingToolCalls: pendingWithStatus,
+              sessionId: payload.sessionId,
+              topicId: payload.topicId,
+            },
+          },
+          toolCalls: allToolCalls,
+          toolExecutions: [toolExecEvent, ...execEvents],
+        });
+      }
+    }
+
+    return createStaticSSETextResponse({
+      assistant: {
+        ...(finalContent ? { content: finalContent } : {}),
+        ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+        ...(finalGrounding ? { grounding: finalGrounding } : {}),
+        ...(finalUsage ? { usage: finalUsage } : {}),
+        ...(finalPerformance ? { performance: finalPerformance } : {}),
+      },
+      toolExecutions: [toolExecEvent],
     });
   };
 }

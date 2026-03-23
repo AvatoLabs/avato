@@ -47,11 +47,11 @@ const LanguageSheet = memo<LanguageSheetProps>(({ visible, onClose }) => {
 
             return (
               <SelectionListItem
-                className={lang.code === LANGUAGES.at(-1).code ? '' : 'mb-2'}
                 key={lang.code}
                 selected={active}
                 title={lang.name}
                 titleNumberOfLines={1}
+                className={lang.code === LANGUAGES.at(-1)?.code ? '' : 'mb-2'}
                 leading={
                   <View
                     className="h-10 w-10 items-center justify-center rounded-full"

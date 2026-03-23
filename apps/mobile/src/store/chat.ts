@@ -15,6 +15,7 @@ import type {
   MobileMessageToolCall,
   StreamContentState,
   StreamReasoningState,
+  ToolExecutionItem,
 } from '../lib/api';
 import {
   agentGroupApi,
@@ -800,11 +801,18 @@ interface ChatState {
     assistantGroupId?: string,
   ) => Promise<void>;
   clearMessages: (sessionId: string) => Promise<void>;
+  /** Mobile: continue tool execution after approving a pending tool (webapi/chat/continue) */
+  continueToolIntervention: (
+    sessionId: string,
+    topicId: string | undefined,
+    assistantMessageId: string,
+    approvedTool: ChatToolPayload,
+  ) => Promise<void>;
   deleteMessage: (sessionId: string, messageId: string) => Promise<void>;
   /** Message currently being edited (id) */
   editingMessageId: string | null;
-
   editMessage: (sessionId: string, messageId: string, content: string) => Promise<void>;
+
   /** Session IDs currently fetching messages (for skeleton) */
   fetchingMessagesBySession: Record<string, boolean>;
   // Actions
@@ -824,6 +832,14 @@ interface ChatState {
   /** Timestamp when reasoning started (for computing duration) */
   reasoningStartedAt: number | null;
   regenerateMessage: (sessionId: string, messageId: string) => Promise<void>;
+  /** Reject pending tool and resume LLM loop (mobile /webapi/chat/continue) */
+  rejectAndContinueToolIntervention: (
+    sessionId: string,
+    topicId: string | undefined,
+    assistantMessageId: string,
+    toolId: string,
+    reason?: string,
+  ) => Promise<void>;
   rejectToolCall: (sessionId: string, messageId: string, toolId: string, reason?: string) => void;
   /** Reject a tool message (role=tool) - updates plugin.intervention locally */
   rejectToolMessage: (sessionId: string, messageId: string, reason?: string) => void;
@@ -2784,6 +2800,179 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const msg = err instanceof Error ? err.message : String(err);
       const isNotSupported = msg.includes('not yet supported') || msg.includes('not implemented');
       useToast.getState().show('error', isNotSupported ? t.chatToolApproveNotSupported : msg);
+    }
+  },
+
+  continueToolIntervention: async (
+    sessionId: string,
+    topicId: string | undefined,
+    assistantMessageId: string,
+    approvedTool: ChatToolPayload,
+  ) => {
+    const t = useI18n.getState().t;
+    try {
+      const chatOptions = await getSessionChatOptions(sessionId);
+      const provider =
+        chatOptions.provider || resolveProviderByModel(chatOptions.model) || 'openai';
+
+      const result = await aiChatApi.continueToolIntervention(
+        provider,
+        { approvedToolCall: approvedTool, sessionId, topicId },
+        {
+          onContent: (state) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMessageId ? { ...m, content: state.content } : m,
+                ),
+              },
+            }));
+          },
+          onTools: (tools) => {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMessageId ? { ...m, tools } : m,
+                ),
+              },
+            }));
+          },
+          onToolExecutions: (executions) => {
+            const resolved = mergeResolvedToolPayloads(
+              (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
+                ?.tools ?? undefined,
+              executions,
+            );
+            if (resolved) {
+              set((s) => ({
+                messagesBySession: {
+                  ...s.messagesBySession,
+                  [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                    m.id === assistantMessageId ? { ...m, tools: resolved } : m,
+                  ),
+                },
+              }));
+            }
+          },
+        },
+      );
+
+      if (result.tools) {
+        const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
+        if (resolved) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
+              ),
+            },
+          }));
+        }
+      }
+      if (result.text) {
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMessageId ? { ...m, content: result.text } : m,
+            ),
+          },
+        }));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      useToast.getState().show('error', msg || t.errorSendFailed);
+    }
+  },
+
+  rejectAndContinueToolIntervention: async (
+    sessionId: string,
+    topicId: string | undefined,
+    assistantMessageId: string,
+    toolId: string,
+    reason?: string,
+  ) => {
+    const t = useI18n.getState().t;
+    try {
+      const chatOptions = await getSessionChatOptions(sessionId);
+      const provider =
+        chatOptions.provider || resolveProviderByModel(chatOptions.model) || 'openai';
+
+      const streamCallbacks = {
+        onContent: (state: { content: string }) => {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMessageId ? { ...m, content: state.content } : m,
+              ),
+            },
+          }));
+        },
+        onTools: (tools: ChatToolPayload[]) => {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMessageId ? { ...m, tools } : m,
+              ),
+            },
+          }));
+        },
+        onToolExecutions: (executions: ToolExecutionItem[]) => {
+          const resolved = mergeResolvedToolPayloads(
+            (get().messagesBySession[sessionId] || []).find((m) => m.id === assistantMessageId)
+              ?.tools ?? undefined,
+            executions,
+          );
+          if (resolved) {
+            set((s) => ({
+              messagesBySession: {
+                ...s.messagesBySession,
+                [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                  m.id === assistantMessageId ? { ...m, tools: resolved } : m,
+                ),
+              },
+            }));
+          }
+        },
+      };
+
+      const result = await aiChatApi.continueToolIntervention(
+        provider,
+        { rejectedToolCall: { id: toolId, reason }, sessionId, topicId },
+        streamCallbacks,
+      );
+
+      if (result.tools) {
+        const resolved = mergeResolvedToolPayloads(result.tools, result.toolExecutions);
+        if (resolved) {
+          set((s) => ({
+            messagesBySession: {
+              ...s.messagesBySession,
+              [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+                m.id === assistantMessageId ? { ...m, tools: resolved } : m,
+              ),
+            },
+          }));
+        }
+      }
+      if (result.text) {
+        set((s) => ({
+          messagesBySession: {
+            ...s.messagesBySession,
+            [sessionId]: (s.messagesBySession[sessionId] || []).map((m) =>
+              m.id === assistantMessageId ? { ...m, content: result.text } : m,
+            ),
+          },
+        }));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      useToast.getState().show('error', msg || t.errorSendFailed);
     }
   },
 

@@ -1,11 +1,10 @@
 'use client';
 
+import { type DocumentItem } from '@lobechat/database/schemas';
 import { Button, Flexbox, Modal, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { type DocumentItem } from '@lobechat/database/schemas';
 
 import { documentService } from '@/services/document';
 import { revalidateResources } from '@/store/file/slices/resource/hooks';
@@ -60,10 +59,10 @@ export const DocumentTrashModal = memo<{
     <Modal
       destroyOnClose
       footer={null}
-      onCancel={onClose}
       open={open}
       title={t('trash.title')}
       width={480}
+      onCancel={onClose}
     >
       <Text type="secondary">{t(knowledgeBaseId ? 'trash.hint' : 'trash.hintAll')}</Text>
       <Flexbox gap={8} style={{ marginTop: 16, maxHeight: 360, overflowY: 'auto' }}>
@@ -76,8 +75,8 @@ export const DocumentTrashModal = memo<{
             const label = doc.title || doc.filename || doc.id;
             return (
               <Flexbox
-                align="center"
                 horizontal
+                align="center"
                 justify="space-between"
                 key={doc.id}
                 padding={8}
@@ -91,9 +90,9 @@ export const DocumentTrashModal = memo<{
                 </Text>
                 <Button
                   loading={restoringId === doc.id}
-                  onClick={() => handleRestore(doc.id)}
                   size="small"
                   type="primary"
+                  onClick={() => handleRestore(doc.id)}
                 >
                   {t('trash.restore')}
                 </Button>

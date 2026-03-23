@@ -293,7 +293,9 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                 style={{ opacity: isUploading ? 0.5 : 1 }}
               >
                 <span className={styles.actionTitle}>
-                  {isUploading ? 'Uploading...' : t('pageEditor.empty.uploadFiles')}
+                  {isUploading
+                    ? t('uploadDock.uploadStatus.uploading')
+                    : t('pageEditor.empty.uploadFiles')}
                 </span>
                 <div className={styles.glow} style={{ background: cssVar.gold }} />
                 <FileTypeIcon

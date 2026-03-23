@@ -30,9 +30,12 @@ export type RootStackParamList = {
   Memory: undefined;
   MemoryDetail: Record<string, unknown> | undefined;
   ModelPicker: { sessionId?: string } | undefined;
-  Notebook: { sessionId: string; topicId: string };
+  /** Standalone: no params. From chat: pass session + topic. */
+  Notebook: { sessionId?: string; topicId?: string } | undefined;
   OnboardingWelcome: undefined;
   ProfileEdit: undefined;
+  /** Public share link `/share/r/:token` (deep link or in-app). */
+  PublicResourceShare: { initialPassword?: string; token: string };
   ProviderDetail: Record<string, unknown> | undefined;
   ServerConfig: { firstLaunch?: boolean } | undefined;
   Stats: undefined;

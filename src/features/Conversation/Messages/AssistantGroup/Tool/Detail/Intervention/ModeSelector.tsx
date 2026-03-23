@@ -5,6 +5,7 @@ import { Check, ChevronDown, Hand, ListChecks, Zap } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useUserStore } from '@/store/user';
 import { toolInterventionSelectors } from '@/store/user/selectors';
 
@@ -39,6 +40,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 const ModeSelector = memo(() => {
   const { t } = useTranslation('chat');
+  const isMobile = useIsMobile();
   const approvalMode = useUserStore(toolInterventionSelectors.approvalMode);
   const updateHumanIntervention = useUserStore((s) => s.updateHumanIntervention);
 
@@ -109,11 +111,11 @@ const ModeSelector = memo(() => {
         onClick: () => handleModeChange('manual'),
       },
     ],
-    [approvalMode, modeLabels, handleModeChange, styles, t],
+    [approvalMode, modeLabels, handleModeChange, t],
   );
 
   return (
-    <DropdownMenu items={menuItems} placement="bottomLeft">
+    <DropdownMenu items={menuItems} placement={isMobile ? 'top' : 'bottomLeft'}>
       <Button
         className={styles.modeButton}
         color={'default'}

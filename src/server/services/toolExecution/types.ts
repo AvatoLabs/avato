@@ -13,6 +13,8 @@ export interface ToolExecutionContext {
   processContentBlocks?: ProcessContentBlocksFn;
   /** Server database for LobeHub Skills execution */
   serverDB?: LobeChatDatabase;
+  /** When set, preferred Space for sandbox exports (`createFileRecord` / `space_blobs`); must be user-accessible. */
+  spaceId?: string;
   toolManifestMap: Record<string, LobeToolManifest>;
   /**
    * Maximum length for tool execution result content (in characters)
@@ -22,8 +24,6 @@ export interface ToolExecutionContext {
   /** Topic ID for sandbox session management */
   topicId?: string;
   userId?: string;
-  /** When set, preferred Space for sandbox exports (`createFileRecord` / `space_blobs`); must be user-accessible. */
-  spaceId?: string;
 }
 
 export interface ToolExecutionResult {

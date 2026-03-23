@@ -83,6 +83,20 @@ export function useAgentConfigByAgentId(agentId: string | undefined, enabled = t
   const config: AgentConfigCacheItem | undefined =
     cacheKey !== undefined ? configMap[cacheKey] : undefined;
 
+  const refetch = useCallback(async () => {
+    if (!agentId || !enabled) return undefined;
+    setLoading(true);
+    setError(null);
+    try {
+      return await fetchConfigByAgentId(agentId);
+    } catch (err) {
+      setError(err);
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  }, [agentId, enabled, fetchConfigByAgentId]);
+
   useEffect(() => {
     if (!agentId || !enabled) return;
     let cancelled = false;
@@ -104,6 +118,7 @@ export function useAgentConfigByAgentId(agentId: string | undefined, enabled = t
     config: config === undefined && agentId && enabled ? undefined : config,
     error,
     loading,
+    refetch,
     setConfig: useCallback(
       (value: AgentConfigCacheItem) => {
         if (cacheKey) setConfig(cacheKey, value);

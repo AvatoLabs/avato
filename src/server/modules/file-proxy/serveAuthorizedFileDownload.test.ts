@@ -3,6 +3,8 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { type FileItem } from '@lobechat/database/schemas';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { serveAuthorizedFileDownload } from './serveAuthorizedFileDownload';
+
 const mockGetAccessMatch = vi.fn();
 
 vi.mock('@/server/services/resource', () => ({
@@ -10,8 +12,6 @@ vi.mock('@/server/services/resource', () => ({
     getAccessMatch: mockGetAccessMatch,
   })),
 }));
-
-import { serveAuthorizedFileDownload } from './serveAuthorizedFileDownload';
 
 const minimalFile = {
   fileType: 'text/plain',

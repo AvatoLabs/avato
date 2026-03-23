@@ -2,6 +2,11 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { auth } from '@/auth';
+import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+
+import { getLegacyUploadPathnameValidationError, POST } from './route';
+
 vi.mock('@/auth', () => ({
   auth: {
     api: {
@@ -24,11 +29,6 @@ vi.mock('@/libs/oidc-provider/jwt', () => ({
 vi.mock('@/envs/auth', () => ({
   LOBE_CHAT_OIDC_AUTH_HEADER: 'x-lobe-oidc-auth',
 }));
-
-import { auth } from '@/auth';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
-
-import { getLegacyUploadPathnameValidationError, POST } from './route';
 
 function makeUploadRequest(pathname: string, fileContent: BlobPart = 'hi') {
   const fd = new FormData();

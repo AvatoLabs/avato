@@ -1,8 +1,9 @@
 'use client';
 
 import { Flexbox, Text } from '@lobehub/ui';
+import { Collapse } from 'antd';
 import { type ReactNode } from 'react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useFetchAiImageConfig } from '@/hooks/useFetchAiImageConfig';
@@ -58,6 +59,37 @@ const ConfigPanel = memo(() => {
 
   const { showDimensionControl } = useDimensionControl();
 
+  const hasAdvancedPanel = isSupportSteps || isSupportCfg || isSupportSeed;
+
+  const advancedPanelItems = useMemo(
+    () => [
+      {
+        children: (
+          <Flexbox gap={16}>
+            {isSupportSteps && (
+              <ConfigItemLayout label={t('config.steps.label')}>
+                <StepsSliderInput />
+              </ConfigItemLayout>
+            )}
+            {isSupportCfg && (
+              <ConfigItemLayout label={t('config.cfg.label')}>
+                <CfgSliderInput />
+              </ConfigItemLayout>
+            )}
+            {isSupportSeed && (
+              <ConfigItemLayout label={t('config.seed.label')}>
+                <SeedNumberInput />
+              </ConfigItemLayout>
+            )}
+          </Flexbox>
+        ),
+        key: 'advanced',
+        label: t('config.advanced.sectionTitle'),
+      },
+    ],
+    [isSupportCfg, isSupportSeed, isSupportSteps, t],
+  );
+
   // Show loading state if not initialized
   if (!isInit) {
     return <ImageConfigSkeleton />;
@@ -101,22 +133,14 @@ const ConfigPanel = memo(() => {
 
       {showDimensionControl && <DimensionControlGroup />}
 
-      {isSupportSteps && (
-        <ConfigItemLayout label={t('config.steps.label')}>
-          <StepsSliderInput />
-        </ConfigItemLayout>
-      )}
-
-      {isSupportCfg && (
-        <ConfigItemLayout label={t('config.cfg.label')}>
-          <CfgSliderInput />
-        </ConfigItemLayout>
-      )}
-
-      {isSupportSeed && (
-        <ConfigItemLayout label={t('config.seed.label')}>
-          <SeedNumberInput />
-        </ConfigItemLayout>
+      {hasAdvancedPanel && (
+        <Collapse
+          ghost
+          bordered={false}
+          items={advancedPanelItems}
+          size={'small'}
+          style={{ padding: 0 }}
+        />
       )}
 
       <ConfigItemLayout label={t('config.imageNum.label')}>

@@ -15,6 +15,7 @@ import {
   BrainCircuit,
   Bug,
   Check,
+  ChevronDown,
   ChevronRight,
   Cloud,
   Database,
@@ -69,7 +70,7 @@ import {
 } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { enteringSection } from '../theme/motion';
-import type { ColorSchemeId } from '../theme/palettes';
+import { COLOR_SCHEMES, type ColorSchemeId } from '../theme/palettes';
 import { tokens } from '../theme/tokens';
 import type { MobileMemoryEffort } from '../types';
 
@@ -79,16 +80,20 @@ const THEME_OPTIONS: { icon: typeof Sun; value: ThemePreference }[] = [
   { icon: Monitor, value: 'system' },
 ];
 
-const COLOR_SCHEME_OPTIONS: { color: string; value: ColorSchemeId }[] = [
-  { color: '#2563eb', value: 'blue' },
-  { color: '#d49a2a', value: 'amber' },
-  { color: '#7c4ee0', value: 'violet' },
-  { color: '#2f9b74', value: 'green' },
-  { color: '#5b6d82', value: 'slate' },
-  { color: '#c48c97', value: 'rose' },
-  { color: '#91a47f', value: 'sage' },
-  { color: '#7f95c1', value: 'dustBlue' },
+const COLOR_SCHEME_ORDER: ColorSchemeId[] = [
+  'blue',
+  'amber',
+  'violet',
+  'green',
+  'slate',
+  'rose',
+  'sage',
+  'dustBlue',
 ];
+
+const COLOR_SCHEME_OPTIONS: { color: string; value: ColorSchemeId }[] = COLOR_SCHEME_ORDER.map(
+  (value) => ({ color: COLOR_SCHEMES[value].primary, value }),
+);
 
 const getColorSchemeLabel = (
   value: ColorSchemeId,
@@ -159,6 +164,7 @@ export default function ProfileScreen({ navigation }: any) {
   const [languageSheetVisible, setLanguageSheetVisible] = useState(false);
   const [displayServerUrl, setDisplayServerUrl] = useState('');
   const [loggingEnabled, setLoggingEnabledState] = useState(false);
+  const [dataComingSoonExpanded, setDataComingSoonExpanded] = useState(false);
 
   useEffect(() => {
     if (serverUrl) {
@@ -331,7 +337,11 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader headerLevel="root" title={t.settingsTitle ?? 'Settings'} />
+      <ScreenHeader
+        headerLevel="root"
+        subtitle={t.settingsHeaderSubtitle}
+        title={t.settingsTitle ?? 'Settings'}
+      />
 
       <ScrollView
         className="flex-1"
@@ -531,6 +541,8 @@ export default function ProfileScreen({ navigation }: any) {
                   <ActivityIndicator color={colors.primary} />
                 ) : (
                   <Switch
+                    accessibilityHint={t.memoryDesc}
+                    accessibilityLabel={t.memoryTitle}
                     disabled={memorySaving}
                     value={memoryEnabled}
                     trackColor={{
@@ -551,7 +563,7 @@ export default function ProfileScreen({ navigation }: any) {
                   return (
                     <Pressable
                       className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
-                      disabled={memoryLoading || memorySaving}
+                      disabled={memoryLoading || memorySaving || !memoryEnabled}
                       key={opt.value}
                       style={{
                         backgroundColor: active ? colors.primarySubtle : colors.fillTertiary,
@@ -654,13 +666,17 @@ export default function ProfileScreen({ navigation }: any) {
         </SettingsSection>
 
         {/* Connection & AI — Server, Providers, Model */}
-        <SettingsSection delay={105} title={t.settingsGroupConnection}>
+        <SettingsSection
+          delay={105}
+          description={t.settingsConnectionAlsoInOverview}
+          title={t.settingsGroupConnection}
+        >
           <View className="mb-4">
             <View className="rounded-xl bg-foreground/[0.03] overflow-hidden">
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-row items-center px-5 py-3.5"
-                onPress={() => navigation?.navigate?.('ServerConfig')}
+                onPress={() => safeNavigate('ServerConfig')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
                   <Server color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -699,7 +715,7 @@ export default function ProfileScreen({ navigation }: any) {
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-row items-center px-5 py-3.5"
-                onPress={() => navigation?.navigate?.('AIProviders')}
+                onPress={() => safeNavigate('AIProviders')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
                   <Key color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -725,7 +741,7 @@ export default function ProfileScreen({ navigation }: any) {
               <TouchableOpacity
                 activeOpacity={0.6}
                 className="flex-row items-center px-5 py-3.5"
-                onPress={() => navigation?.navigate?.('ModelPicker')}
+                onPress={() => safeNavigate('ModelPicker')}
               >
                 <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
                   <Brain color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -757,7 +773,10 @@ export default function ProfileScreen({ navigation }: any) {
             <TouchableOpacity
               activeOpacity={0.6}
               className="flex-row items-center rounded-xl px-5 py-3.5 bg-foreground/[0.03]"
-              onPress={() => setLanguageSheetVisible(true)}
+              onPress={() => {
+                haptics.light();
+                setLanguageSheetVisible(true);
+              }}
             >
               <View className="w-8 h-8 rounded-full items-center justify-center mr-4">
                 <Globe color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
@@ -892,54 +911,95 @@ export default function ProfileScreen({ navigation }: any) {
                   strokeWidth={tokens.icon.strokeWidth}
                 />
               </TouchableOpacity>
-              <View className="flex-row items-center px-5 py-3.5 opacity-60">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
-                  <Cloud color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                    {t.settingsSyncBackup}
+              <TouchableOpacity
+                accessibilityHint={t.settingsComingSoonHint}
+                accessibilityLabel={t.settingsComingSoonSection}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: dataComingSoonExpanded }}
+                activeOpacity={0.65}
+                className="flex-row items-center px-5 py-3"
+                style={{ borderTopColor: colors.borderSubtle, borderTopWidth: 1 }}
+                onPress={() => {
+                  haptics.selection();
+                  setDataComingSoonExpanded((v) => !v);
+                }}
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-foreground text-[14px] font-semibold tracking-tight">
+                    {t.settingsComingSoonSection}
                   </Text>
                   <Text
                     className="text-[12px] font-medium mt-0.5"
-                    style={{ color: colors.secondaryText }}
+                    style={{ color: colors.tertiaryText }}
                   >
-                    {t.dataManageComingSoon}
+                    {t.settingsComingSoonHint}
                   </Text>
                 </View>
-              </View>
-              <View className="flex-row items-center px-5 py-3.5 opacity-60">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
-                  <Mic color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                    {t.settingsSpeechRecognition}
-                  </Text>
-                  <Text
-                    className="text-[12px] font-medium mt-0.5"
-                    style={{ color: colors.secondaryText }}
-                  >
-                    {t.dataManageComingSoon}
-                  </Text>
-                </View>
-              </View>
-              <View className="flex-row items-center px-5 py-3.5 opacity-60">
-                <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
-                  <Volume2 color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-foreground text-[15px] font-medium tracking-tight">
-                    {t.settingsTts}
-                  </Text>
-                  <Text
-                    className="text-[12px] font-medium mt-0.5"
-                    style={{ color: colors.secondaryText }}
-                  >
-                    {t.dataManageComingSoon}
-                  </Text>
-                </View>
-              </View>
+                <ChevronDown
+                  color={colors.secondaryText}
+                  size={20}
+                  strokeWidth={tokens.icon.strokeWidth}
+                  style={{
+                    transform: [{ rotate: dataComingSoonExpanded ? '180deg' : '0deg' }],
+                  }}
+                />
+              </TouchableOpacity>
+              {dataComingSoonExpanded ? (
+                <>
+                  <View className="flex-row items-center px-5 py-3.5 opacity-60">
+                    <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
+                      <Cloud color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                        {t.settingsSyncBackup}
+                      </Text>
+                      <Text
+                        className="text-[12px] font-medium mt-0.5"
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {t.dataManageComingSoon}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-center px-5 py-3.5 opacity-60">
+                    <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
+                      <Mic color={colors.muted} size={16} strokeWidth={tokens.icon.strokeWidth} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                        {t.settingsSpeechRecognition}
+                      </Text>
+                      <Text
+                        className="text-[12px] font-medium mt-0.5"
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {t.dataManageComingSoon}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="flex-row items-center px-5 py-3.5 opacity-60">
+                    <View className="w-8 h-8 rounded-full items-center justify-center mr-4 bg-foreground/[0.04]">
+                      <Volume2
+                        color={colors.muted}
+                        size={16}
+                        strokeWidth={tokens.icon.strokeWidth}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-foreground text-[15px] font-medium tracking-tight">
+                        {t.settingsTts}
+                      </Text>
+                      <Text
+                        className="text-[12px] font-medium mt-0.5"
+                        style={{ color: colors.secondaryText }}
+                      >
+                        {t.dataManageComingSoon}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              ) : null}
             </View>
           </View>
         </SettingsSection>
@@ -963,6 +1023,8 @@ export default function ProfileScreen({ navigation }: any) {
                   </Text>
                 </View>
                 <Switch
+                  accessibilityHint={t.logsCaptureDesc}
+                  accessibilityLabel={t.logsCapture}
                   value={loggingEnabled}
                   trackColor={{
                     false: colors.switchTrackOffAlt,

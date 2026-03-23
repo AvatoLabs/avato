@@ -4,11 +4,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Download, RotateCcw, Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ScreenHeader } from '../components/ui/ScreenHeader';
-import { SettingsSection } from '../components/ui/SettingsLayout';
+import { SettingsRow, SettingsSection } from '../components/ui/SettingsLayout';
 import { clearTransientAppState } from '../lib/appState';
 import { clearStoredAuthSession } from '../lib/auth';
 import { haptics } from '../lib/haptics';
@@ -21,7 +21,8 @@ export default function DataManagementScreen({ navigation }: any) {
   const colors = useThemeColors();
 
   const handleClearCache = () => {
-    Alert.alert(t.dataManageClearCache, 'Clear all cached data?', [
+    haptics.light();
+    Alert.alert(t.dataManageClearCache, t.dataManageClearCacheMessage, [
       { text: t.cancel, style: 'cancel' },
       {
         text: t.confirm,
@@ -34,10 +35,12 @@ export default function DataManagementScreen({ navigation }: any) {
   };
 
   const handleExport = () => {
+    haptics.light();
     Alert.alert(t.dataManageExport, t.dataManageComingSoon);
   };
 
   const handleReset = () => {
+    haptics.light();
     Alert.alert(t.dataManageResetConfirm, t.dataManageResetDesc, [
       { text: t.cancel, style: 'cancel' },
       {
@@ -58,26 +61,29 @@ export default function DataManagementScreen({ navigation }: any) {
 
   const items = [
     {
+      danger: false as const,
       icon: Trash2,
-      color: colors.warning,
+      iconBg: 'bg-orange-500/15' as const,
+      iconColor: colors.warning,
       label: t.dataManageClearCache,
-      subtitle: t.dataClearCacheSubtitle,
       onPress: handleClearCache,
+      subtitle: t.dataClearCacheSubtitle,
     },
     {
+      danger: false as const,
       icon: Download,
-      color: colors.primary,
       label: t.dataManageExport,
-      subtitle: t.dataManageComingSoon,
       onPress: handleExport,
+      subtitle: t.dataManageComingSoon,
     },
     {
+      danger: true as const,
       icon: RotateCcw,
-      color: colors.danger,
+      iconBg: 'bg-red-500/10' as const,
+      iconColor: colors.danger,
       label: t.dataManageResetApp,
-      subtitle: t.dataResetSubtitle,
       onPress: handleReset,
-      danger: true,
+      subtitle: t.dataResetSubtitle,
     },
   ];
 
@@ -98,27 +104,15 @@ export default function DataManagementScreen({ navigation }: any) {
         <SettingsSection delay={0} title={t.settingsDataStorage}>
           {items.map((item, index) => (
             <Animated.View entering={FadeInDown.delay(index * 50).duration(300)} key={item.label}>
-              <TouchableOpacity
-                activeOpacity={0.6}
-                className="flex-row items-center px-5 py-3.5 mb-2 rounded-xl bg-foreground/[0.02] active:bg-foreground/[0.04]"
+              <SettingsRow
+                danger={item.danger}
+                icon={item.icon}
+                iconBg={item.iconBg}
+                iconColor={item.iconColor}
+                label={item.label}
+                subtitle={item.subtitle}
                 onPress={item.onPress}
-              >
-                <View
-                  className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${item.danger ? 'bg-red-500/10' : 'bg-foreground/5'}`}
-                >
-                  <item.icon color={item.color} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className={`text-[15px] font-medium tracking-tight ${item.danger ? 'text-red-500' : 'text-foreground'}`}
-                  >
-                    {item.label}
-                  </Text>
-                  <Text className="text-secondary/50 text-[12px] font-medium mt-0.5">
-                    {item.subtitle}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              />
             </Animated.View>
           ))}
         </SettingsSection>

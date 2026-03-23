@@ -8,8 +8,9 @@ import { type ReactNode } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DESKTOP_CHAT_INPUT_BORDER_RADIUS } from '@/const/layoutTokens';
 import { type ActionKeys } from '@/features/ChatInput';
-import { ChatInputProvider, DesktopChatInput } from '@/features/ChatInput';
+import { ChatInputProvider, DesktopChatInput, MobileChatInput } from '@/features/ChatInput';
 import {
   type SendButtonHandler,
   type SendButtonProps,
@@ -182,13 +183,17 @@ const ChatInput = memo<ChatInputProps>(
             />
           </Flexbox>
         )}
-        <DesktopChatInput
-          actionBarStyle={actionBarStyle}
-          borderRadius={12}
-          extraActionItems={extraActionItems}
-          leftContent={leftContent}
-          sendAreaPrefix={sendAreaPrefix}
-        />
+        {mobile ? (
+          <MobileChatInput />
+        ) : (
+          <DesktopChatInput
+            actionBarStyle={actionBarStyle}
+            borderRadius={DESKTOP_CHAT_INPUT_BORDER_RADIUS}
+            extraActionItems={extraActionItems}
+            leftContent={leftContent}
+            sendAreaPrefix={sendAreaPrefix}
+          />
+        )}
       </WideScreenContainer>
     );
 

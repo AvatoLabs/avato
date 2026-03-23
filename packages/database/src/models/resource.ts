@@ -438,7 +438,19 @@ export class ResourceModel {
 
   listSharedWithMe = async () => {
     const shared = await this.listDirectPermissionsForUser();
-    return Promise.all(shared.map((permission) => this.getResourceSummary(permission.resourceUid)));
+    const rows = await Promise.all(
+      shared.map(async (permission) => {
+        const summary = await this.getResourceSummary(permission.resourceUid);
+        if (!summary) return null;
+        return {
+          ...summary,
+          sharedExpiresAt: permission.expiresAt,
+          sharedInheritsToChildren: permission.inheritsToChildren,
+          sharedRole: permission.resourceRole,
+        };
+      }),
+    );
+    return rows.filter((row): row is NonNullable<(typeof rows)[number]> => row != null);
   };
 
   createShareLink = async (
@@ -546,8 +558,7 @@ export class ResourceModel {
     sourceIp?: string | null;
     userAgent?: string | null;
   }) => {
-    const actorId =
-      !this.userId || this.userId === 'anonymous' ? null : this.userId;
+    const actorId = !this.userId || this.userId === 'anonymous' ? null : this.userId;
 
     await this.db.insert(resourceAccessEvents).values({
       accessType: params.accessType,

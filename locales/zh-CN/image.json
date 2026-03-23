@@ -1,4 +1,5 @@
 {
+  "config.advanced.sectionTitle": "高级",
   "config.aspectRatio.label": "宽高比",
   "config.aspectRatio.lock": "锁定宽高比",
   "config.aspectRatio.unlock": "解锁宽高比",
@@ -24,6 +25,9 @@
   "config.steps.label": "步数",
   "config.title": "AI 图像",
   "config.width.label": "宽度",
+  "empty.topic.desc": "该主题下还没有图片。在下方输入提示词即可开始首次生成。",
+  "empty.workspace.deepLink": "提示：可在链接中加入 ?prompt=…（以及可选的 &model=…）预填提示词与模型。",
+  "empty.workspace.desc": "使用右侧主题列表打开或新建主题，生成记录会按主题分组保存。",
   "generation.actions.applySeed": "应用种子",
   "generation.actions.copyError": "复制错误信息",
   "generation.actions.copyPrompt": "复制提示词",
@@ -37,8 +41,8 @@
   "generation.actions.generate": "生成",
   "generation.actions.promptCopied": "提示词已复制到剪贴板",
   "generation.actions.promptCopyFailed": "复制遇到了问题。你可以再试一次",
-  "generation.actions.reuseSettings": "复用设置",
   "generation.actions.retryLoad": "重试加载",
+  "generation.actions.reuseSettings": "复用设置",
   "generation.actions.seedApplied": "种子已应用到配置",
   "generation.actions.seedApplyFailed": "应用种子遇到了问题。你可以重试",
   "generation.actions.seedCopied": "种子已复制到剪贴板",
@@ -60,5 +64,6 @@
   "topic.deleteConfirmDesc": "确认删除该生成主题吗？删除后无法恢复",
   "topic.empty": "暂无生成主题",
   "topic.title": "绘画主题",
-  "topic.untitled": "默认主题"
+  "topic.untitled": "默认主题",
+  "workspace.activeTopic": "主题"
 }

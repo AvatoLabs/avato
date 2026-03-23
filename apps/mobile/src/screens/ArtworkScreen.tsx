@@ -26,6 +26,7 @@ import {
   Image as RNImage,
   Keyboard,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -47,12 +48,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ComposerPrimaryAction, ComposerShell } from '../components/ui/ComposerShell';
 import { CreateConfigBar } from '../components/ui/CreateConfigBar';
 import EmptyState from '../components/ui/EmptyState';
+import ImageViewer from '../components/ui/ImageViewer';
 import PromptModal from '../components/ui/PromptModal';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import { aiProviderApi, artworkApi, fileApi, getApiUrl } from '../lib/api';
 import { haptics } from '../lib/haptics';
-import { useI18n } from '../lib/i18n';
+import { type TranslationKeys, useI18n } from '../lib/i18n';
 import { ANDROID_COMPOSER_LIFT_ADJUSTMENT, getKeyboardOffset } from '../lib/keyboard';
 import { useArtworkStore } from '../store/artwork';
 import { useConnectionStore } from '../store/connection';
@@ -164,24 +166,45 @@ function clampNumericValue(value: number, item?: ImageParamSchemaItem) {
   return value;
 }
 
-function formatParamLabel(key: string) {
-  const labels: Record<string, string> = {
-    aspectRatio: 'Aspect Ratio',
-    cfg: 'CFG',
-    imageUrl: 'Reference Image',
-    imageUrls: 'Reference Images',
-    quality: 'Quality',
-    resolution: 'Resolution',
-    seed: 'Seed',
-    size: 'Size',
-    steps: 'Steps',
-    width: 'Width',
-    height: 'Height',
-  };
-
-  return (
-    labels[key] || key.replaceAll(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())
-  );
+function artworkParamLabel(key: string, t: TranslationKeys): string {
+  switch (key) {
+    case 'aspectRatio': {
+      return t.artworkAspectRatio;
+    }
+    case 'cfg': {
+      return t.artworkParamCfg;
+    }
+    case 'imageUrl': {
+      return t.artworkReferenceImage;
+    }
+    case 'imageUrls': {
+      return t.artworkReferenceImages;
+    }
+    case 'quality': {
+      return t.artworkParamQuality;
+    }
+    case 'resolution': {
+      return t.artworkResolution;
+    }
+    case 'seed': {
+      return t.artworkParamSeed;
+    }
+    case 'size': {
+      return t.artworkParamSize;
+    }
+    case 'steps': {
+      return t.artworkParamSteps;
+    }
+    case 'width': {
+      return t.artworkParamWidth;
+    }
+    case 'height': {
+      return t.artworkParamHeight;
+    }
+    default: {
+      return key.replaceAll(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+    }
+  }
 }
 
 function normalizeParamsForSchema(
@@ -1081,8 +1104,6 @@ export default function ArtworkScreen({
         };
         addBatch(batchToAdd);
       }
-
-      setPrompt('');
     } catch {
       toast.show('error', t.artworkErrorDesc);
     } finally {
@@ -1152,7 +1173,7 @@ export default function ArtworkScreen({
       : undefined,
     `×${imgCount}`,
   ].filter(Boolean);
-  const numericEditorTitle = editingParamKey ? formatParamLabel(editingParamKey) : '';
+  const numericEditorTitle = editingParamKey ? artworkParamLabel(editingParamKey, t) : '';
   const numericEditorDefaultValue =
     editingParamKey && generationParams[editingParamKey] != null
       ? String(generationParams[editingParamKey])
@@ -1196,54 +1217,87 @@ export default function ArtworkScreen({
         }
       >
         {batches.length > 0 ? (
-          batches.map((batch) => (
-            <BatchCard
-              availableWidth={screenWidth - containerPad * 2}
-              batch={batch}
-              key={batch.id}
-              resolveUrl={resolveUrl}
-              onCopyPrompt={async () => {
-                await Clipboard.setStringAsync(batch.prompt);
-                toast.show('success', t.artworkPromptCopied);
+          <>
+            <View
+              style={{
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginBottom: 12,
               }}
-              onDelete={async () => {
-                Alert.alert(t.artworkDeleteBatch, t.artworkDeleteBatchConfirm, [
-                  { text: t.cancel, style: 'cancel' },
-                  {
-                    text: t.delete,
-                    style: 'destructive',
-                    onPress: () => {
-                      removeBatch(batch.id);
+            >
+              <Text
+                style={{
+                  color: colors.foreground,
+                  fontSize: 17,
+                  fontWeight: '700',
+                  letterSpacing: -0.3,
+                }}
+              >
+                {t.artworkTopics}
+              </Text>
+              <TouchableOpacity
+                hitSlop={8}
+                onPress={() => {
+                  haptics.selection();
+                  setTopicId(null);
+                  toast.show('info', t.artworkNewTopicToast);
+                }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>
+                  {t.artworkNewTopic}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {batches.map((batch) => (
+              <BatchCard
+                availableWidth={screenWidth - containerPad * 2}
+                batch={batch}
+                key={batch.id}
+                resolveUrl={resolveUrl}
+                onCopyPrompt={async () => {
+                  await Clipboard.setStringAsync(batch.prompt);
+                  toast.show('success', t.artworkPromptCopied);
+                }}
+                onDelete={async () => {
+                  Alert.alert(t.artworkDeleteBatch, t.artworkDeleteBatchConfirm, [
+                    { text: t.cancel, style: 'cancel' },
+                    {
+                      text: t.delete,
+                      style: 'destructive',
+                      onPress: () => {
+                        removeBatch(batch.id);
+                      },
                     },
-                  },
-                ]);
-              }}
-              onReuseSettings={() => {
-                const nextProvider = imageProviders.find((item) => item.id === batch.provider);
-                const nextModel = nextProvider?.children.find((item) => item.id === batch.model);
-                if (!nextProvider || !nextModel) return;
+                  ]);
+                }}
+                onReuseSettings={() => {
+                  const nextProvider = imageProviders.find((item) => item.id === batch.provider);
+                  const nextModel = nextProvider?.children.find((item) => item.id === batch.model);
+                  if (!nextProvider || !nextModel) return;
 
-                const { seed, ...configWithoutSeed } = (batch.config ||
-                  {}) as ImageGenerationParams;
-                void seed;
+                  const { seed, ...configWithoutSeed } = (batch.config ||
+                    {}) as ImageGenerationParams;
+                  void seed;
 
-                applyModelSelection(
-                  nextModel,
-                  nextProvider.id,
-                  nextProvider.name,
-                  configWithoutSeed,
-                );
-                setPrompt(batch.prompt);
-                setRefImages([]);
-                setImgCount(batch.generations.length);
-                setShowSidebar(true);
-              }}
-            />
-          ))
+                  applyModelSelection(
+                    nextModel,
+                    nextProvider.id,
+                    nextProvider.name,
+                    configWithoutSeed,
+                  );
+                  setPrompt(batch.prompt);
+                  setRefImages([]);
+                  setImgCount(batch.generations.length);
+                  setShowSidebar(true);
+                }}
+              />
+            ))}
+          </>
         ) : (
           <View className="flex-1 items-center justify-center px-8">
             <EmptyState
-              description={t.artworkEmptyDesc}
+              description={`${t.artworkEmptyDesc}\n\n${t.artworkTopicsEmpty}`}
               iconVariant="artwork"
               title={t.artworkEmpty}
             />
@@ -1263,7 +1317,7 @@ export default function ArtworkScreen({
               className="flex-1 min-h-[36px]"
               maxLength={2000}
               placeholder={t.artworkPromptPlaceholder}
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={colors.secondaryText}
               underlineColorAndroid="transparent"
               value={prompt}
               style={{
@@ -1277,8 +1331,11 @@ export default function ArtworkScreen({
               onChangeText={setPrompt}
             />
             <ComposerPrimaryAction
+              accessibilityLabel={generating ? t.artworkGenerating : t.artworkA11yGenerate}
+              accessibilityState={{ disabled: !prompt.trim() || !model || generating }}
               active={!!prompt.trim() && !!model}
               disabled={!prompt.trim() || !model || generating}
+              label={generating ? undefined : t.artworkGenerate}
               onPress={handleGenerate}
             >
               {generating ? (
@@ -1332,8 +1389,8 @@ export default function ArtworkScreen({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 paddingHorizontal: sidebarPad,
-                paddingTop: 60,
-                paddingBottom: 40,
+                paddingTop: Math.max(insets.top + 16, 52),
+                paddingBottom: Math.max(insets.bottom + 24, 40),
               }}
             >
               {/* Sidebar header */}
@@ -1453,7 +1510,7 @@ export default function ArtworkScreen({
               {referenceEnabled && (
                 <>
                   <SidebarLabel
-                    text={formatParamLabel(supportsImageUrls ? 'imageUrls' : 'imageUrl')}
+                    text={supportsImageUrls ? t.artworkReferenceImages : t.artworkReferenceImage}
                   />
                   <TouchableOpacity
                     style={{
@@ -1514,7 +1571,7 @@ export default function ArtworkScreen({
 
               {resolutionOptions.length > 0 && (
                 <>
-                  <SidebarLabel text={formatParamLabel('resolution')} />
+                  <SidebarLabel text={artworkParamLabel('resolution', t)} />
                   <SidebarOptionStrip
                     getKey={(option) => String(option)}
                     itemWidth={116}
@@ -1541,7 +1598,7 @@ export default function ArtworkScreen({
 
               {sizeOptions.length > 0 && (
                 <>
-                  <SidebarLabel text={formatParamLabel('size')} />
+                  <SidebarLabel text={artworkParamLabel('size', t)} />
                   <SidebarOptionGrid
                     columns={2}
                     containerWidth={sidebarWidth - sidebarPad * 2}
@@ -1569,7 +1626,7 @@ export default function ArtworkScreen({
 
               {qualityOptions.length > 0 && (
                 <>
-                  <SidebarLabel text={formatParamLabel('quality')} />
+                  <SidebarLabel text={artworkParamLabel('quality', t)} />
                   <SidebarOptionGrid
                     columns={2}
                     containerWidth={sidebarWidth - sidebarPad * 2}
@@ -1597,7 +1654,7 @@ export default function ArtworkScreen({
 
               {effectiveAspectRatioOptions.length > 0 && (
                 <>
-                  <SidebarLabel text={formatParamLabel('aspectRatio')} />
+                  <SidebarLabel text={artworkParamLabel('aspectRatio', t)} />
                   <SidebarOptionStrip
                     getKey={(option) => String(option)}
                     itemWidth={86}
@@ -1652,7 +1709,7 @@ export default function ArtworkScreen({
                 getParamDefinition(paramsSchema, key),
               ).map((key) => (
                 <View key={key}>
-                  <SidebarLabel text={formatParamLabel(key)} />
+                  <SidebarLabel text={artworkParamLabel(key, t)} />
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
@@ -1667,7 +1724,7 @@ export default function ArtworkScreen({
                   >
                     <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600' }}>
                       {generationParams[key] === null || generationParams[key] === undefined
-                        ? 'Auto'
+                        ? t.artworkParamAuto
                         : String(generationParams[key])}
                     </Text>
                     <Text style={{ color: colors.muted, fontSize: 12 }}>
@@ -1684,18 +1741,18 @@ export default function ArtworkScreen({
               <SidebarLabel text={t.artworkImageCount} />
               <SidebarOptionStrip
                 getKey={(item) => String(item)}
-                itemWidth={58}
+                itemWidth={68}
                 items={[...IMAGE_COUNTS, 'custom']}
                 selectedValue={imageCountSelection}
                 renderContent={(item, active) => (
                   <Text
                     style={{
                       color: active ? colors.iconOnPrimary : colors.muted,
-                      fontSize: 12,
+                      fontSize: item === 'custom' ? 11 : 12,
                       fontWeight: '500',
                     }}
                   >
-                    {item === 'custom' ? '+' : item}
+                    {item === 'custom' ? t.artworkImageCountCustomShort : item}
                   </Text>
                 )}
                 onSelect={(item) => {
@@ -1774,12 +1831,16 @@ function GenerationPreview({
   generation,
   imgH,
   imgW,
+  onOpenPreview,
+  previewAccessibilityLabel,
   resolveUrl,
 }: {
   cols: number;
   generation: GenerationItem;
   imgH: number;
   imgW: number;
+  onOpenPreview: (uri: string) => void;
+  previewAccessibilityLabel: string;
   resolveUrl: (url?: string) => string | undefined;
 }) {
   const candidateUrls = getGenerationPreviewSources(generation)
@@ -1801,15 +1862,24 @@ function GenerationPreview({
   if (!activeUrl) return null;
 
   return (
-    <RNImage
-      resizeMode={cols === 1 ? 'contain' : 'cover'}
-      source={{ uri: activeUrl }}
-      style={{ width: imgW, height: imgH }}
-      onError={() => {
-        if (activeIndex >= candidateUrls.length - 1) return;
-        setActiveIndex((current) => Math.min(current + 1, candidateUrls.length - 1));
+    <Pressable
+      accessibilityLabel={previewAccessibilityLabel}
+      accessibilityRole="button"
+      style={{ height: imgH, width: imgW }}
+      onPress={() => {
+        onOpenPreview(activeUrl);
       }}
-    />
+    >
+      <RNImage
+        resizeMode={cols === 1 ? 'contain' : 'cover'}
+        source={{ uri: activeUrl }}
+        style={{ width: imgW, height: imgH }}
+        onError={() => {
+          if (activeIndex >= candidateUrls.length - 1) return;
+          setActiveIndex((current) => Math.min(current + 1, candidateUrls.length - 1));
+        }}
+      />
+    </Pressable>
   );
 }
 
@@ -1831,6 +1901,7 @@ function BatchCard({
 }) {
   const { t } = useI18n();
   const colors = useThemeColors();
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
   const gap = 6;
   const cols = batch.generations.length === 1 ? 1 : 2;
   const cardInnerPadding = 24;
@@ -1918,7 +1989,9 @@ function BatchCard({
                   generation={gen}
                   imgH={imgH}
                   imgW={imgW}
+                  previewAccessibilityLabel={t.artworkA11yOpenImagePreview}
                   resolveUrl={resolveUrl}
+                  onOpenPreview={setPreviewUri}
                 />
               ) : isErr ? (
                 <View className="items-center p-2">
@@ -1953,16 +2026,43 @@ function BatchCard({
 
       {/* Actions */}
       <View className="flex-row items-center justify-end mt-2 gap-3">
-        <TouchableOpacity hitSlop={8} onPress={onReuseSettings}>
+        <TouchableOpacity
+          accessibilityLabel={t.artworkA11yReuseSettings}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onReuseSettings}
+        >
           <Sparkles color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={8} onPress={onCopyPrompt}>
+        <TouchableOpacity
+          accessibilityLabel={t.artworkA11yCopyPrompt}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onCopyPrompt}
+        >
           <Copy color={colors.iconMuted} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={8} onPress={onDelete}>
+        <TouchableOpacity
+          accessibilityLabel={t.artworkA11yDeleteBatch}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onDelete}
+        >
           <Trash2 color={colors.danger} size={16} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
       </View>
+
+      {previewUri ? (
+        <ImageViewer
+          visible
+          accessibilityLabelClose={t.artworkA11yCloseImagePreview}
+          accessibilityLabelShare={t.artworkA11yShareImage}
+          uri={previewUri}
+          onClose={() => {
+            setPreviewUri(null);
+          }}
+        />
+      ) : null}
     </Animated.View>
   );
 }

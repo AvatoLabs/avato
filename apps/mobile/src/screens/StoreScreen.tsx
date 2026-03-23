@@ -94,6 +94,8 @@ interface StoreInstalledItem {
   name: string;
 }
 
+type InstalledKindFilter = 'all' | StoreInstalledItem['kind'];
+
 interface SelectedStoreEntry {
   item: MarketListItem | StoreInstalledItem;
   source: 'installed' | 'market';
@@ -410,6 +412,14 @@ const ItemCard = memo<{
   onPress: (item: MarketListItem) => void;
 }>(({ item, installed, onPress, onInstall }) => {
   const colors = useThemeColors();
+  const { t } = useI18n();
+  const typeLabel =
+    item._source === 'mcp'
+      ? t.storeMcp
+      : item._source === 'builtin'
+        ? t.storeBuiltIn
+        : t.storeSkills;
+  const isMcp = item._source === 'mcp';
   return (
     <PressableScale
       accessibilityLabel={item.name || item.identifier}
@@ -441,11 +451,9 @@ const ItemCard = memo<{
               {item.name || item.identifier}
             </Text>
             <MetaTag
-              label={item._source === 'mcp' ? 'MCP' : 'Skill'}
-              backgroundColor={
-                item._source === 'mcp' ? colors.sourceMarketMuted : colors.sourceBuiltinMuted
-              }
-              textColor={item._source === 'mcp' ? colors.sourceMarket : colors.sourceBuiltin}
+              label={typeLabel}
+              textColor={isMcp ? colors.sourceMarket : colors.sourceBuiltin}
+              backgroundColor={isMcp ? colors.sourceMarketMuted : colors.sourceBuiltinMuted}
             />
           </View>
 
@@ -470,15 +478,20 @@ const ItemCard = memo<{
 
         {installed ? (
           <View
+            accessibilityElementsHidden
             className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
+            importantForAccessibility="no-hide-descendants"
             style={{ backgroundColor: colors.primarySubtle }}
           >
             <Check color={colors.primary} size={14} strokeWidth={2.5} />
           </View>
         ) : (
           <TouchableOpacity
+            accessibilityLabel={`${t.storeInstall}: ${item.name || item.identifier}`}
+            accessibilityRole="button"
             activeOpacity={0.6}
             className="ml-2 mt-1 rounded-full w-7 h-7 items-center justify-center"
+            hitSlop={{ bottom: 10, left: 10, right: 10, top: 10 }}
             style={{ backgroundColor: colors.primarySubtle }}
             onPress={(e) => {
               e.stopPropagation();
@@ -500,7 +513,12 @@ const InstalledRow = memo<{
 }>(({ item, onPress }) => {
   const colors = useThemeColors();
   return (
-    <PressableScale className="flex-row items-center px-5 py-3 bg-background" onPress={onPress}>
+    <PressableScale
+      accessibilityLabel={`${item.name}, ${item.label}`}
+      accessibilityRole="button"
+      className="flex-row items-center px-5 py-3 bg-background"
+      onPress={onPress}
+    >
       <View
         className="w-9 h-9 rounded-xl items-center justify-center mr-3 overflow-hidden"
         style={{ backgroundColor: colors.fillTertiary }}
@@ -1398,14 +1416,17 @@ function StoreItemModal({
 
             {canUninstall ? (
               <PressableScale
-                className="rounded-xl py-3 items-center bg-red-500/10"
+                className="rounded-xl py-3 items-center"
                 disabled={actionLoading}
+                style={{ backgroundColor: colors.dangerSubtle }}
                 onPress={onUninstall}
               >
                 {actionLoading ? (
                   <ActivityIndicator color={colors.danger} size="small" />
                 ) : (
-                  <Text className="text-red-500 text-[14px] font-semibold">{t.storeRemove}</Text>
+                  <Text className="text-[14px] font-semibold" style={{ color: colors.danger }}>
+                    {t.storeRemove}
+                  </Text>
                 )}
               </PressableScale>
             ) : null}
@@ -1424,6 +1445,7 @@ export default function StoreScreen() {
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<StoreTab>('explore');
+  const [installedKindFilter, setInstalledKindFilter] = useState<InstalledKindFilter>('all');
   const [activeExploreSource, setActiveExploreSource] = useState<ExploreSource>('mcp');
   const [activeExploreCategory, setActiveExploreCategory] = useState(ALL_CATEGORY_KEY);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1464,6 +1486,8 @@ export default function StoreScreen() {
     skill: 0,
   });
   const installedRequestIdRef = useRef(0);
+  const exploreSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const categoryFetchHintShownRef = useRef<Set<ExploreSource>>(new Set());
 
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [importUrlVisible, setImportUrlVisible] = useState(false);
@@ -1499,6 +1523,37 @@ export default function StoreScreen() {
       setAppliedSearchQuery('');
     }
   }, [appliedSearchQuery, searchQuery]);
+
+  // Align server-side explore query when switching to Explore (same field filters Installed locally).
+  useEffect(() => {
+    if (activeTab !== 'explore') return;
+    setAppliedSearchQuery(searchQuery.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on tab change; keystrokes use debounced effect
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'explore' || !searchVisible) {
+      if (exploreSearchDebounceRef.current) {
+        clearTimeout(exploreSearchDebounceRef.current);
+        exploreSearchDebounceRef.current = null;
+      }
+      return;
+    }
+
+    const next = searchQuery.trim();
+    if (exploreSearchDebounceRef.current) clearTimeout(exploreSearchDebounceRef.current);
+    exploreSearchDebounceRef.current = setTimeout(() => {
+      setAppliedSearchQuery(next);
+      exploreSearchDebounceRef.current = null;
+    }, 400);
+
+    return () => {
+      if (exploreSearchDebounceRef.current) {
+        clearTimeout(exploreSearchDebounceRef.current);
+        exploreSearchDebounceRef.current = null;
+      }
+    };
+  }, [activeTab, searchQuery, searchVisible]);
 
   const fetchInstalledSummary = useCallback(
     async (options?: InstalledFetchOptions) => {
@@ -1633,6 +1688,7 @@ export default function StoreScreen() {
         if (requestId !== marketCategoryRequestIdRef.current[source]) return;
 
         const items = Array.isArray(list) ? list : [];
+        categoryFetchHintShownRef.current.delete(source);
         setMarketCategoriesBySource((prev) => ({
           ...prev,
           [source]: mergeCategoryBuckets(
@@ -1642,9 +1698,13 @@ export default function StoreScreen() {
         }));
       } catch {
         if (requestId !== marketCategoryRequestIdRef.current[source]) return;
+        if (!categoryFetchHintShownRef.current.has(source)) {
+          categoryFetchHintShownRef.current.add(source);
+          toast.show('info', t.storeCategoriesLoadHint);
+        }
       }
     },
-    [appliedSearchQuery],
+    [appliedSearchQuery, t.storeCategoriesLoadHint, toast],
   );
 
   const fetchMarket = useCallback(
@@ -1887,17 +1947,73 @@ export default function StoreScreen() {
     uninstalledBuiltinTools,
   ]);
 
+  const installedKindCounts = useMemo(
+    () => ({
+      all: allInstalled.length,
+      builtin: allInstalled.filter((item) => item.kind === 'builtin').length,
+      plugin: allInstalled.filter((item) => item.kind === 'plugin').length,
+      skill: allInstalled.filter((item) => item.kind === 'skill').length,
+    }),
+    [allInstalled],
+  );
+
+  const installedByKind = useMemo(() => {
+    if (installedKindFilter === 'all') return allInstalled;
+    return allInstalled.filter((item) => item.kind === installedKindFilter);
+  }, [allInstalled, installedKindFilter]);
+
   const filteredInstalled = useMemo(() => {
-    if (!searchQuery.trim()) return allInstalled;
+    if (!searchQuery.trim()) return installedByKind;
     const query = searchQuery.trim().toLowerCase();
 
-    return allInstalled.filter(
+    return installedByKind.filter(
       (item) =>
         item.name.toLowerCase().includes(query) ||
         item.identifier.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query),
     );
-  }, [allInstalled, searchQuery]);
+  }, [installedByKind, searchQuery]);
+
+  const emptyStatePresentation = useMemo(() => {
+    const onExplore = activeTab === 'explore';
+    if (onExplore && marketFetchError) {
+      return { iconVariant: 'warning' as const, title: t.storeLoadFailed };
+    }
+    if (onExplore && appliedSearchQuery.trim() && marketItems.length === 0) {
+      return { iconVariant: 'store' as const, title: t.storeSearchNoResults };
+    }
+    if (
+      !onExplore &&
+      allInstalled.length > 0 &&
+      searchQuery.trim() &&
+      filteredInstalled.length === 0
+    ) {
+      return { iconVariant: 'store' as const, title: t.storeSearchNoResults };
+    }
+    if (
+      !onExplore &&
+      installedKindFilter !== 'all' &&
+      allInstalled.length > 0 &&
+      !searchQuery.trim() &&
+      filteredInstalled.length === 0
+    ) {
+      return { iconVariant: 'store' as const, title: t.storeInstalledKindEmpty };
+    }
+    return { iconVariant: 'store' as const, title: t.storeEmpty };
+  }, [
+    activeTab,
+    allInstalled.length,
+    appliedSearchQuery,
+    filteredInstalled.length,
+    installedKindFilter,
+    marketFetchError,
+    marketItems.length,
+    searchQuery,
+    t.storeEmpty,
+    t.storeInstalledKindEmpty,
+    t.storeLoadFailed,
+    t.storeSearchNoResults,
+  ]);
 
   const selectedDetail = useMemo<StoreDetailItem | null>(() => {
     if (!selectedEntry) return null;
@@ -2225,6 +2341,11 @@ export default function StoreScreen() {
     });
   }, []);
 
+  const handleTabChange = useCallback((v: StoreTab) => {
+    setInstalledKindFilter('all');
+    setActiveTab(v);
+  }, []);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -2264,8 +2385,18 @@ export default function StoreScreen() {
             value={searchQuery}
             rightElement={
               <TouchableOpacity
+                accessibilityRole="button"
                 hitSlop={8}
+                accessibilityLabel={
+                  searchQuery.length > 0
+                    ? t.accessibilityStoreSearchClear
+                    : t.accessibilityStoreSearchClose
+                }
                 onPress={() => {
+                  if (exploreSearchDebounceRef.current) {
+                    clearTimeout(exploreSearchDebounceRef.current);
+                    exploreSearchDebounceRef.current = null;
+                  }
                   if (searchQuery.length > 0) {
                     setSearchQuery('');
                     setAppliedSearchQuery('');
@@ -2285,12 +2416,18 @@ export default function StoreScreen() {
               </TouchableOpacity>
             }
             onChangeText={setSearchQuery}
-            onSubmitEditing={() => setAppliedSearchQuery(searchQuery.trim())}
+            onSubmitEditing={() => {
+              if (exploreSearchDebounceRef.current) {
+                clearTimeout(exploreSearchDebounceRef.current);
+                exploreSearchDebounceRef.current = null;
+              }
+              setAppliedSearchQuery(searchQuery.trim());
+            }}
           />
         ) : null}
 
         <View className="px-6 pb-2">
-          <SegmentedControl items={tabs} value={activeTab} onChange={setActiveTab} />
+          <SegmentedControl items={tabs} value={activeTab} onChange={handleTabChange} />
         </View>
 
         {isExplore ? (
@@ -2334,7 +2471,51 @@ export default function StoreScreen() {
               })}
             </ScrollView>
           </>
-        ) : null}
+        ) : (
+          <ScrollView
+            horizontal
+            className="mb-1 px-6"
+            contentContainerStyle={{ gap: 6, paddingRight: 12 }}
+            showsHorizontalScrollIndicator={false}
+          >
+            <FilterChip
+              active={installedKindFilter === 'all'}
+              count={installedKindCounts.all > 0 ? installedKindCounts.all : undefined}
+              label={t.storeInstalledFilterAll}
+              onPress={() => {
+                haptics.selection();
+                setInstalledKindFilter('all');
+              }}
+            />
+            <FilterChip
+              active={installedKindFilter === 'builtin'}
+              count={installedKindCounts.builtin > 0 ? installedKindCounts.builtin : undefined}
+              label={t.storeBuiltIn}
+              onPress={() => {
+                haptics.selection();
+                setInstalledKindFilter('builtin');
+              }}
+            />
+            <FilterChip
+              active={installedKindFilter === 'plugin'}
+              count={installedKindCounts.plugin > 0 ? installedKindCounts.plugin : undefined}
+              label={t.storeMcp}
+              onPress={() => {
+                haptics.selection();
+                setInstalledKindFilter('plugin');
+              }}
+            />
+            <FilterChip
+              active={installedKindFilter === 'skill'}
+              count={installedKindCounts.skill > 0 ? installedKindCounts.skill : undefined}
+              label={t.storeSkills}
+              onPress={() => {
+                haptics.selection();
+                setInstalledKindFilter('skill');
+              }}
+            />
+          </ScrollView>
+        )}
       </ScreenHeader>
 
       {loading && isEmpty ? (
@@ -2342,10 +2523,10 @@ export default function StoreScreen() {
       ) : isEmpty && !loading ? (
         <View className="flex-1 items-center justify-center">
           <EmptyState
-            iconVariant={marketFetchError ? 'warning' : 'store'}
-            title={marketFetchError ? t.storeLoadFailed : t.storeEmpty}
+            iconVariant={emptyStatePresentation.iconVariant}
+            title={emptyStatePresentation.title}
             action={
-              marketFetchError ? (
+              isExplore && marketFetchError ? (
                 <TouchableOpacity
                   accessibilityLabel={t.errorRetry}
                   accessibilityRole="button"
@@ -2383,7 +2564,7 @@ export default function StoreScreen() {
                   onPress={() => void loadMoreMarket()}
                 >
                   <Text className="text-[12px] font-semibold" style={{ color: colors.primary }}>
-                    {t.resourceLoadMore}
+                    {t.storeLoadMore}
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -2425,7 +2606,7 @@ export default function StoreScreen() {
         onRequestClose={() => setShowCreateMenu(false)}
       >
         <Pressable
-          className="flex-1 justify-end bg-black/30"
+          className="flex-1 justify-end bg-black/40"
           onPress={() => setShowCreateMenu(false)}
         >
           <Pressable

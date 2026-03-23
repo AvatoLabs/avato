@@ -30,6 +30,8 @@ export interface ColorTokens {
   chatAccentSectionBorder: string;
   chatAccentSubtleBg: string;
   codeBlockLight: string;
+  /** iOS-style switch / control knob when “off” or neutral */
+  controlKnob: string;
   danger: string;
   dangerMuted: string;
   dangerSubtle: string;
@@ -56,6 +58,12 @@ export interface ColorTokens {
   markdownHeading: string;
   markdownLink: string;
   markdownText: string;
+  /** Fullscreen media chrome (fixed; not tinted by accent) */
+  mediaBackdrop: string;
+  mediaOnBackdrop: string;
+  mediaOnBackdropSecondary: string;
+  mediaOnBackdropTertiary: string;
+  mediaScrim: string;
   modalDarkBg: string;
   modalOverlay: string;
   muted: string;
@@ -126,6 +134,7 @@ interface BaseTokens {
   chatAccentSectionBorder: string;
   chatAccentSubtleBg: string;
   codeBlockLight: string;
+  controlKnob: string;
   danger: string;
   dangerMuted: string;
   dangerSubtle: string;
@@ -149,6 +158,11 @@ interface BaseTokens {
   markdownCodeInlineColor: string;
   markdownHeading: string;
   markdownText: string;
+  mediaBackdrop: string;
+  mediaOnBackdrop: string;
+  mediaOnBackdropSecondary: string;
+  mediaOnBackdropTertiary: string;
+  mediaScrim: string;
   modalDarkBg: string;
   modalOverlay: string;
   muted: string;
@@ -263,6 +277,12 @@ const lightBase: BaseTokens = {
   cachedToken: '#d97706',
   modalOverlay: 'rgba(15,23,42,0.32)',
   modalDarkBg: '#1c1c1e',
+  controlKnob: '#ffffff',
+  mediaBackdrop: '#000000',
+  mediaOnBackdrop: '#ffffff',
+  mediaOnBackdropSecondary: 'rgba(255,255,255,0.6)',
+  mediaOnBackdropTertiary: 'rgba(255,255,255,0.72)',
+  mediaScrim: 'rgba(0,0,0,0.45)',
   progressBarTrack: '#d7deea',
 };
 
@@ -334,6 +354,12 @@ const darkBase: BaseTokens = {
   cachedToken: '#ffb347',
   modalOverlay: 'rgba(3,6,12,0.62)',
   modalDarkBg: '#151c28',
+  controlKnob: '#ffffff',
+  mediaBackdrop: '#000000',
+  mediaOnBackdrop: '#ffffff',
+  mediaOnBackdropSecondary: 'rgba(255,255,255,0.6)',
+  mediaOnBackdropTertiary: 'rgba(255,255,255,0.72)',
+  mediaScrim: 'rgba(0,0,0,0.45)',
   progressBarTrack: '#2c3546',
 };
 
@@ -365,7 +391,6 @@ function mergeTokens(
     }),
     ...(palette.userBubbleHr != null && { userBubbleHr: palette.userBubbleHr }),
     ...(palette.iconOnPrimary != null && { iconOnPrimary: palette.iconOnPrimary }),
-    info: palette.primary,
     markdownLink: palette.markdownLink,
     chatAccentBadgeBg: palette.chatAccentBadgeBg,
     chatAccentBadgeText: palette.chatAccentBadgeText,
@@ -375,8 +400,6 @@ function mergeTokens(
     sourceMarket: palette.sourceMarket,
     sourceMarketMuted: palette.sourceMarketMuted,
     sliderThumb: palette.primary,
-    markdownCodeInlineBg: palette.primarySubtle,
-    markdownCodeInlineColor: palette.primary,
   };
 }
 

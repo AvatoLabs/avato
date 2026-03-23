@@ -3,7 +3,7 @@
  * Aligned with Memory/Settings subpage style: ScreenHeader + consistent content padding.
  */
 import { ArrowLeft, Check, MessageCircle, Plus } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -29,6 +29,75 @@ import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { enteringSection } from '../theme/motion';
 import { tokens } from '../theme/tokens';
+import type { Topic } from '../types';
+
+const TopicListRow = memo(function TopicListRow({
+  topic,
+  sessionId,
+  activeTopicId,
+  isGroupSession,
+  removeTopic,
+  favoriteTopic,
+  handleSwitchTopic,
+  updateTopic,
+  handleSmartRename,
+  setTopicTagTarget,
+}: {
+  activeTopicId: string | null;
+  favoriteTopic: (id: string) => Promise<void>;
+  handleSmartRename: (topicId: string) => Promise<void>;
+  handleSwitchTopic: (topicId: string | null) => void;
+  isGroupSession: boolean;
+  removeTopic: (id: string, sessionId: string) => Promise<void>;
+  sessionId: string;
+  setTopicTagTarget: React.Dispatch<
+    React.SetStateAction<{
+      currentTagId?: string | null;
+      sessionId: string;
+      topicId: string;
+    } | null>
+  >;
+  topic: Topic;
+  updateTopic: (id: string, sessionId: string, title: string) => Promise<void>;
+}) {
+  const onDelete = useCallback(
+    () => removeTopic(topic.id, sessionId),
+    [removeTopic, sessionId, topic.id],
+  );
+  const onFavorite = useCallback(() => favoriteTopic(topic.id), [favoriteTopic, topic.id]);
+  const onPress = useCallback(() => handleSwitchTopic(topic.id), [handleSwitchTopic, topic.id]);
+  const onRename = useCallback(
+    (newTitle: string) => updateTopic(topic.id, sessionId, newTitle),
+    [sessionId, topic.id, updateTopic],
+  );
+  const onSmartRename = useCallback(
+    () => handleSmartRename(topic.id),
+    [handleSmartRename, topic.id],
+  );
+  const onMoveToTag = useMemo(() => {
+    if (isGroupSession || !sessionId) return undefined;
+    return () =>
+      setTopicTagTarget({
+        sessionId,
+        topicId: topic.id,
+        currentTagId: topic.tagId ?? null,
+      });
+  }, [isGroupSession, sessionId, setTopicTagTarget, topic.id, topic.tagId]);
+
+  return (
+    <TopicItem
+      isActive={activeTopicId === topic.id}
+      isGroup={isGroupSession}
+      topic={topic}
+      onDelete={onDelete}
+      onFavorite={onFavorite}
+      onMoveToTag={onMoveToTag}
+      onPress={onPress}
+      onRename={onRename}
+      onSmartRename={onSmartRename}
+    />
+  );
+});
 
 export default function TopicListScreen({ route, navigation }: RootStackScreenProps<'TopicList'>) {
   const sessionId = route.params.sessionId;
@@ -162,6 +231,37 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
+  const renderTopicItem = useCallback(
+    ({ item }: { item: Topic }) => {
+      if (!sessionId) return null;
+
+      return (
+        <TopicListRow
+          activeTopicId={activeTopic}
+          favoriteTopic={favoriteTopic}
+          handleSmartRename={handleSmartRename}
+          handleSwitchTopic={handleSwitchTopic}
+          isGroupSession={isGroupSession}
+          removeTopic={removeTopic}
+          sessionId={sessionId}
+          setTopicTagTarget={setTopicTagTarget}
+          topic={item}
+          updateTopic={updateTopic}
+        />
+      );
+    },
+    [
+      activeTopic,
+      favoriteTopic,
+      handleSmartRename,
+      handleSwitchTopic,
+      isGroupSession,
+      removeTopic,
+      sessionId,
+      updateTopic,
+    ],
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -207,6 +307,7 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
       <FlatList
         data={sortedTopics}
         keyExtractor={(item) => item.id}
+        renderItem={renderTopicItem}
         ListEmptyComponent={
           loading ? (
             <ListSkeleton />
@@ -227,28 +328,6 @@ export default function TopicListScreen({ route, navigation }: RootStackScreenPr
             onRefresh={onRefresh}
           />
         }
-        renderItem={({ item }) => (
-          <TopicItem
-            isActive={activeTopic === item.id}
-            isGroup={isGroupSession}
-            topic={item}
-            onDelete={() => removeTopic(item.id, sessionId)}
-            onFavorite={() => favoriteTopic(item.id)}
-            onPress={() => handleSwitchTopic(item.id)}
-            onRename={(newTitle) => updateTopic(item.id, sessionId, newTitle)}
-            onSmartRename={() => handleSmartRename(item.id)}
-            onMoveToTag={
-              !isGroupSession && sessionId
-                ? () =>
-                    setTopicTagTarget({
-                      sessionId,
-                      topicId: item.id,
-                      currentTagId: item.tagId ?? null,
-                    })
-                : undefined
-            }
-          />
-        )}
       />
 
       <PromptModal

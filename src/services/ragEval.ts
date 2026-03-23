@@ -1,5 +1,3 @@
-import { sha256 } from 'js-sha256';
-
 import {
   type CreateNewEvalDatasets,
   type CreateNewEvalEvaluation,
@@ -8,6 +6,7 @@ import {
   type RAGEvalDataSetItem,
   type RAGEvalEvaluationItem,
 } from '@lobechat/types';
+import { sha256 } from 'js-sha256';
 
 import { lambdaClient } from '@/libs/trpc/client';
 import { uploadService } from '@/services/upload';

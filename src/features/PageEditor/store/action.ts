@@ -5,6 +5,7 @@ import { type StateCreator } from 'zustand';
 
 import { useDocumentStore } from '@/store/document';
 import { useFileStore } from '@/store/file';
+import { standardizeIdentifier } from '@/utils/identifier';
 
 import { type State } from './initialState';
 import { initialState } from './initialState';
@@ -63,11 +64,19 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
 
       handleCopyLink: (t, message) => {
         const { documentId } = get();
-        if (documentId) {
-          const url = `${window.location.origin}${window.location.pathname}`;
-          navigator.clipboard.writeText(url);
-          message.success(t('pageEditor.linkCopied'));
-        }
+        if (!documentId) return;
+
+        const debugProxyBase = '/_dangerous_local_dev_proxy';
+        const spaBase =
+          window.__DEBUG_PROXY__ || window.location.pathname.startsWith(debugProxyBase)
+            ? debugProxyBase
+            : '';
+
+        const pagePath = `/page/${standardizeIdentifier(documentId)}`;
+        const url = `${window.location.origin}${spaBase}${pagePath}`;
+
+        navigator.clipboard.writeText(url);
+        message.success(t('pageEditor.linkCopied'));
       },
 
       handleDelete: async (t, message, modal, onDeleteCallback) => {

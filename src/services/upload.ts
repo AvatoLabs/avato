@@ -1,5 +1,4 @@
 import { parseDataUri } from '@lobechat/model-runtime';
-import { uuid } from '@lobechat/utils';
 import dayjs from 'dayjs';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
@@ -34,9 +33,9 @@ interface UploadFileToS3Options {
   knowledgeBaseId?: string;
   onNotSupported?: () => void;
   onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
+  parentId?: string;
   /** @deprecated Ignored; storage keys are server-generated from upload sessions. */
   pathname?: string;
-  parentId?: string;
   /** Precomputed SHA-256 (hex) to avoid re-reading the file buffer. */
   sha256?: string;
   skipCheckFileType?: boolean;

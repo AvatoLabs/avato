@@ -24,6 +24,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -32,7 +33,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { withAlpha } from '../constants/tags';
 import { memoryApi } from '../lib/api';
+import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -119,9 +122,18 @@ function FieldSection({ children, label }: { children: React.ReactNode; label: s
 
 function FieldText({ value }: { value?: string | null }) {
   const colors = useThemeColors();
-  if (!value) return <Text className="text-sm leading-5" style={{ color: colors.tertiaryText }}>—</Text>;
+  if (!value)
+    return (
+      <Text className="text-sm leading-5" style={{ color: colors.tertiaryText }}>
+        —
+      </Text>
+    );
 
-  return <Text className="text-sm leading-5" style={{ color: colors.foreground }}>{value}</Text>;
+  return (
+    <Text className="text-sm leading-5" style={{ color: colors.foreground }}>
+      {value}
+    </Text>
+  );
 }
 
 function EditableField({
@@ -145,11 +157,11 @@ function EditableField({
           className="rounded-xl border px-3 py-2 text-sm"
           multiline={multiline}
           placeholderTextColor={colors.muted}
+          value={value}
           style={[
             { borderColor: colors.borderDefault, color: colors.foreground },
             multiline ? { minHeight: 80, textAlignVertical: 'top' } : undefined,
           ]}
-          value={value}
           onChangeText={onChangeText}
         />
       ) : (
@@ -166,7 +178,10 @@ function MetaChip({ color, label, subtle }: { color: string; label: string; subt
       className="mr-2 rounded-full px-2.5 py-1"
       style={{ backgroundColor: subtle ? colors.fillTertiary : `${color}15` }}
     >
-      <Text className="text-xs font-semibold" style={{ color: subtle ? colors.secondaryText : color }}>
+      <Text
+        className="text-xs font-semibold"
+        style={{ color: subtle ? colors.secondaryText : color }}
+      >
         {label}
       </Text>
     </View>
@@ -215,7 +230,9 @@ function ScoreBadge({
       <Text className="text-lg font-bold" style={{ color }}>
         {formatted}
       </Text>
-      <Text className="mt-0.5 text-[10px]" style={{ color: colors.secondaryText }}>{label}</Text>
+      <Text className="mt-0.5 text-[10px]" style={{ color: colors.secondaryText }}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -244,8 +261,8 @@ function SourceCard({
         activeOpacity={canOpen ? 0.7 : 1}
         className="flex-row items-center rounded-xl px-4 py-3"
         disabled={!canOpen}
-        onPress={onPress}
         style={{ backgroundColor: colors.fillTertiary }}
+        onPress={onPress}
       >
         <View
           className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
@@ -262,11 +279,19 @@ function SourceCard({
           )}
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-semibold" numberOfLines={1} style={{ color: colors.foreground }}>
+          <Text
+            className="text-sm font-semibold"
+            numberOfLines={1}
+            style={{ color: colors.foreground }}
+          >
             {title}
           </Text>
           {subtitle ? (
-            <Text className="mt-0.5 text-xs" numberOfLines={1} style={{ color: colors.secondaryText }}>
+            <Text
+              className="mt-0.5 text-xs"
+              numberOfLines={1}
+              style={{ color: colors.secondaryText }}
+            >
               {subtitle}
             </Text>
           ) : null}
@@ -312,6 +337,7 @@ export default function MemoryDetailScreen() {
   const [detailState, setDetailState] = useState<MemoryDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
   const [refreshingDetail, setRefreshingDetail] = useState(false);
+  const [detailFetchFailed, setDetailFetchFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editState, setEditState] = useState<Record<string, string>>({});
 
@@ -338,9 +364,12 @@ export default function MemoryDetailScreen() {
         const detail = await memoryApi.getMemoryDetail(itemId, layer);
         if (detail) {
           applyDetail(detail);
+          setDetailFetchFailed(false);
+        } else if (!options?.silent) {
+          setDetailFetchFailed(true);
         }
       } catch {
-        /* best-effort fallback to route param */
+        setDetailFetchFailed(true);
       } finally {
         setLoadingDetail(false);
         setRefreshingDetail(false);
@@ -734,8 +763,16 @@ export default function MemoryDetailScreen() {
               onChangeText={setField('currentStatus')}
             />
             <View className="flex-row flex-wrap">
-              <ScoreBadge color={colors.artworkPending} label={t.memoryImpact} value={context.scoreImpact} />
-              <ScoreBadge color={colors.danger} label={t.memoryUrgency} value={context.scoreUrgency} />
+              <ScoreBadge
+                color={colors.artworkPending}
+                label={t.memoryImpact}
+                value={context.scoreImpact}
+              />
+              <ScoreBadge
+                color={colors.danger}
+                label={t.memoryUrgency}
+                value={context.scoreUrgency}
+              />
             </View>
             {context.associatedSubjects?.length ? (
               <FieldSection label={t.memoryAssociatedSubjects}>
@@ -797,7 +834,11 @@ export default function MemoryDetailScreen() {
             <View className="mb-4 flex-row flex-wrap gap-4">
               {activity.startsAt ? (
                 <View className="flex-row items-center">
-                  <Calendar color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
+                  <Calendar
+                    color={colors.secondaryText}
+                    size={14}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                   <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>
                     {formatDate(activity.startsAt)}
                   </Text>
@@ -805,14 +846,26 @@ export default function MemoryDetailScreen() {
               ) : null}
               {activity.endsAt ? (
                 <View className="flex-row items-center">
-                  <Clock color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>{formatDate(activity.endsAt)}</Text>
+                  <Clock
+                    color={colors.secondaryText}
+                    size={14}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>
+                    {formatDate(activity.endsAt)}
+                  </Text>
                 </View>
               ) : null}
               {activity.timezone ? (
                 <View className="flex-row items-center">
-                  <MapPin color={colors.secondaryText} size={14} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>{activity.timezone}</Text>
+                  <MapPin
+                    color={colors.secondaryText}
+                    size={14}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
+                  <Text className="ml-1 text-xs" style={{ color: colors.secondaryText }}>
+                    {activity.timezone}
+                  </Text>
                 </View>
               ) : null}
             </View>
@@ -982,7 +1035,12 @@ export default function MemoryDetailScreen() {
     >
       <View className="flex-row items-center justify-between px-5 py-3">
         <View className="flex-1 flex-row items-center">
-          <TouchableOpacity className="mr-3" onPress={() => nav.goBack()}>
+          <TouchableOpacity
+            accessibilityLabel={t.accessibilityGoBack}
+            accessibilityRole="button"
+            className="mr-3"
+            onPress={() => nav.goBack()}
+          >
             <ChevronLeft color={colors.foreground} size={24} strokeWidth={1.8} />
           </TouchableOpacity>
           {editing && (layer === 'identity' || layer === 'context') ? (
@@ -994,7 +1052,11 @@ export default function MemoryDetailScreen() {
               onChangeText={setField('title')}
             />
           ) : (
-            <Text className="flex-1 text-lg font-bold" numberOfLines={1} style={{ color: colors.foreground }}>
+            <Text
+              className="flex-1 text-lg font-bold"
+              numberOfLines={1}
+              style={{ color: colors.foreground }}
+            >
               {getHeaderTitle()}
             </Text>
           )}
@@ -1026,11 +1088,45 @@ export default function MemoryDetailScreen() {
         </View>
       </View>
 
+      {detailFetchFailed ? (
+        <View
+          className="flex-row items-center justify-between px-4 py-2.5"
+          style={{ backgroundColor: withAlpha(layerColor, '18') }}
+        >
+          <Text
+            className="flex-1 pr-3 text-[13px] font-medium"
+            style={{ color: colors.foreground }}
+          >
+            {t.errorNetwork}
+          </Text>
+          <TouchableOpacity
+            accessibilityLabel={t.errorRetry}
+            accessibilityRole="button"
+            hitSlop={{ bottom: 8, left: 8, right: 8, top: 8 }}
+            onPress={() => {
+              haptics.light();
+              void loadDetail();
+            }}
+          >
+            <Text className="text-[13px] font-semibold" style={{ color: layerColor }}>
+              {t.errorRetry}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 20 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshingDetail}
+            tintColor={layerColor}
+            onRefresh={() => void loadDetail({ silent: true })}
+          />
+        }
       >
         {renderContent()}
       </ScrollView>

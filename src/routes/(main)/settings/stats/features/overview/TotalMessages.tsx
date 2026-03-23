@@ -11,7 +11,7 @@ import { lastMonth } from '@/utils/time';
 
 import TotalCard from './ShareButton/TotalCard';
 
-const TotalMessages = memo<{ inShare?: boolean; mobile?: boolean }>(({ inShare }) => {
+const TotalMessages = memo<{ inShare?: boolean }>(({ inShare }) => {
   const { t } = useTranslation('auth');
   const { data, isLoading } = useClientDataSWR('stats-messages', async () => ({
     count: await messageService.countMessages(),

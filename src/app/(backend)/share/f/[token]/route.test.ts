@@ -1,5 +1,11 @@
 // @vitest-environment node
+import bcrypt from 'bcryptjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { auth } from '@/auth';
+import { getServerDB } from '@/database/server';
+
+import { GET } from './route';
 
 vi.mock('@/auth', () => ({
   auth: {
@@ -38,12 +44,6 @@ vi.mock('bcryptjs', () => ({
   },
 }));
 
-import bcrypt from 'bcryptjs';
-import { auth } from '@/auth';
-import { getServerDB } from '@/database/server';
-
-import { GET } from './route';
-
 describe('GET /share/f/[token]', () => {
   const mockDb = {
     select: vi.fn(),
@@ -72,7 +72,12 @@ describe('GET /share/f/[token]', () => {
       passwordHash: null,
       resourceUid: 'ru1',
     });
-    mockGetFileById.mockResolvedValue({ id: 'f1', name: 'a.txt', url: 'k', fileType: 'text/plain' });
+    mockGetFileById.mockResolvedValue({
+      id: 'f1',
+      name: 'a.txt',
+      url: 'k',
+      fileType: 'text/plain',
+    });
     mockServeAuthorizedFileDownload.mockResolvedValue(
       new Response(null, { status: 302, headers: { Location: 'https://s3/x' } }),
     );
@@ -132,7 +137,9 @@ describe('GET /share/f/[token]', () => {
     mockDb.select.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ kind: 'document', localId: 'd1', resourceUid: 'ru1' }]),
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ kind: 'document', localId: 'd1', resourceUid: 'ru1' }]),
         }),
       }),
     });

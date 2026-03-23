@@ -3,9 +3,9 @@ import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
-import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
+import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
 import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
 
@@ -63,7 +63,10 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     if (buffer.length !== uploadSession.expectedSize) {
-      return NextResponse.json({ error: 'File size does not match upload session.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'File size does not match upload session.' },
+        { status: 400 },
+      );
     }
 
     const privateS3 = getPrivateBlobS3();

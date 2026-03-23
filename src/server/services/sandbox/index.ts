@@ -3,8 +3,8 @@ import {
   type SandboxCallToolResult,
   type SandboxExportFileResult,
 } from '@lobechat/builtin-tool-cloud-sandbox';
-import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
 import type { LobeChatDatabase } from '@lobechat/database';
+import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
 
@@ -21,10 +21,10 @@ export interface ServerSandboxServiceOptions {
   marketService: MarketService;
   /** Used to resolve topic → knowledge-base space for `space_blobs` on export. */
   serverDB: LobeChatDatabase;
-  topicId: string;
-  userId: string;
   /** When set, overrides KB-derived space (must be accessible by user). */
   spaceId?: string;
+  topicId: string;
+  userId: string;
 }
 
 /**

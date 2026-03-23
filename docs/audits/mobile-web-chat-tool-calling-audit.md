@@ -13,7 +13,7 @@
 | P2     | 拒绝 Popover 固定 width: 400                       | ✅ 已修复：小屏为 min (400px, calc (100vw - 32px))      |
 | P3     | Popover placement 固定 bottomRight                 | ✅ 已修复：小屏改为 top                                 |
 | M1     | ChatInput 未接收 mobile                            | ✅ 已修复：Conversation ChatInput 使用 useIsMobile 传入 |
-| M2     | MobileChatInput 未被使用                           | ⏸️ 待评估                                               |
+| M2     | MobileChatInput 未被使用                           | ✅ 已修复：小屏使用 MobileChatInput                     |
 | M3     | Agent ChatMiniMap、MessageFromUrl 在 Mobile 仍渲染 | ✅ 已修复：小屏隐藏                                     |
 
 ---
@@ -275,17 +275,17 @@ Group 支持 `mobile` 时隐藏 ChatMiniMap 和 MessageFromUrl，但 Mobile App 
 | 编号 | 问题                                                  | 状态                                                                      |
 | ---- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
 | M1   | ChatInput 未接收 `mobile`                             | ✅ 已修复：Conversation ChatInput 使用 useIsMobile 传入 ChatInputProvider |
-| M2   | MobileChatInput 未被使用                              | ⏸️ 待评估                                                                 |
+| M2   | MobileChatInput 未被使用                              | ✅ 已修复：Conversation ChatInput 小屏使用 MobileChatInput                |
 | M3   | Agent 端 ChatMiniMap、MessageFromUrl 在 Mobile 仍渲染 | ✅ 已修复：Agent ConversationArea 小屏隐藏                                |
 
 ### 8.3 低优先级（功能对等）
 
-| 编号 | 问题                            | 说明                                   |
-| ---- | ------------------------------- | -------------------------------------- |
-| L1   | Mobile 无 Group Chat            | 设计取舍，可后续支持                   |
-| L2   | ApprovalActions 水平布局        | 小屏可考虑 vertical 或 wrap            |
-| L3   | 工具 Accordion Actions 触控目标 | Debug/Settings/ 删除等图标偏小，易误触 |
-| L4   | ModeSelector Dropdown placement | `bottomLeft` 在小屏可能被裁切          |
+| 编号 | 问题                            | 状态                                |
+| ---- | ------------------------------- | ----------------------------------- |
+| L1   | Mobile 无 Group Chat            | 设计取舍，可后续支持                |
+| L2   | ApprovalActions 水平布局        | ✅ 已修复：小屏改为 vertical        |
+| L3   | 工具 Accordion Actions 触控目标 | 待优化                              |
+| L4   | ModeSelector Dropdown placement | ✅ 已修复：小屏改为 placement="top" |
 
 ---
 

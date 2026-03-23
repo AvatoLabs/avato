@@ -41,7 +41,7 @@ export default function CreateScreen() {
         title={t.tabArtwork}
         rightActions={
           <HeaderIconButton
-            accessibilityLabel={t.settingsTitle ?? 'Settings'}
+            accessibilityLabel={t.createOpenOptionsA11y}
             onPress={() => setConfigOpenVersion((value) => value + 1)}
           >
             <Settings2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />

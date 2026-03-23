@@ -1,3 +1,4 @@
+import { resourceRegistry } from '@lobechat/database/schemas';
 import bcrypt from 'bcryptjs';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
@@ -6,7 +7,6 @@ import { auth } from '@/auth';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
-import { resourceRegistry } from '@lobechat/database/schemas';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 
 const log = debug('lobe-file:share-f');

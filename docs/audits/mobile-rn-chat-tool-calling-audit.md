@@ -7,15 +7,20 @@
 
 **修复状态** (2025-03-23):
 
-| 优先级 | 问题                                            | 状态                                                                              |
-| ------ | ----------------------------------------------- | --------------------------------------------------------------------------------- |
-| P0     | tool_calls 格式不匹配（streamToolLoopFallback） | ✅ 已修复：api.ts 检测 ChatToolPayload \[] 直接使用                               |
-| P1     | formatToolDisplayTitle 只取第一个参数           | ✅ 已修复：改为 slice (0, 3)                                                      |
-| P1     | CompareGroupBlock 引用链接不渲染                | ✅ 已修复：传入 markdownRules（见 mobile-citation-links-audit）                   |
-| P2     | mergeToolPayloads 与 mergeToolPayloadLists 重复 | ✅ 已修复：抽成 mergeToolPayloadsCore                                             |
-| P2     | 工具错误展示路径不清晰                          | ✅ 已修复：buildToolPayloadFromMessage 映射 pluginError，ToolCard 接收 error prop |
-| P3     | chatHelpers 无单测                              | ✅ 已修复：apps/mobile/src/store/chatHelpers.test.ts                              |
-| P3     | 启用干预时需传入 onApprove/onReject             | ⏸️ 预留（MOBILE_TOOL_INTERVENTION_ENABLED=false 时无影响）                        |
+| 优先级 | 问题                                                  | 状态                                                                                                |
+| ------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| P0     | tool_calls 格式不匹配（streamToolLoopFallback）       | ✅ 已修复：api.ts 检测 ChatToolPayload \[] 直接使用                                                 |
+| P1     | formatToolDisplayTitle 只取第一个参数                 | ✅ 已修复：改为 slice (0, 3)                                                                        |
+| P1     | CompareGroupBlock 引用链接不渲染                      | ✅ 已修复：传入 markdownRules（见 mobile-citation-links-audit）                                     |
+| P2     | mergeToolPayloads 与 mergeToolPayloadLists 重复       | ✅ 已修复：抽成 mergeToolPayloadsCore                                                               |
+| P2     | 工具错误展示路径不清晰                                | ✅ 已修复：buildToolPayloadFromMessage 映射 pluginError，ToolCard 接收 error prop                   |
+| P2     | tool_executions 流式错误无 pluginError                | ✅ 已修复：服务端 createToolExecutionEvent 传递 execution.error；RN toolExecutionsToPayloads 映射   |
+| P2     | RN 缺失内置工具 displayNames                          | ✅ 已修复：lobe-agent-management、lobe-group-agent-builder、lobe-local-system 添加中英 displayNames |
+| P3     | chatHelpers 无单测                                    | ✅ 已修复：apps/mobile/src/store/chatHelpers.test.ts                                                |
+| P3     | messageDisplay 无单测                                 | ✅ 已修复：apps/mobile/src/store/messageDisplay.test.ts                                             |
+| P3     | api.ts transformToolCalls、mergeToolCallChunks 无单测 | ✅ 已修复：抽离至 toolCallUtils.ts，toolCallUtils.test.ts                                           |
+| P3     | ToolCard 可访问性缺失                                 | ✅ 已修复：主卡片、折叠参数、复制按钮添加 accessibilityLabel                                        |
+| P3     | 启用干预时需传入 onApprove/onReject                   | ✅ 已修复：MOBILE_TOOL_INTERVENTION_ENABLED=true，continue API + onApprove/onReject                 |
 
 ---
 
@@ -23,13 +28,13 @@
 
 ### 1.1 React Native vs 移动 Web
 
-| 项目     | React Native App (`apps/mobile`)                   | 移动 Web SPA (`src/routes/(mobile)/`)                |
-| -------- | -------------------------------------------------- | ---------------------------------------------------- |
-| 入口     | `apps/mobile/App.tsx`                              | `src/spa/entry.mobile.tsx`                           |
-| 路由     | React Navigation                                   | React Router                                         |
-| Chat UI  | `MessageBubble.tsx`, `ToolCallsBlock`, `ToolCard`  | 复用 Web `ConversationArea`                          |
-| API      | `/webapi/chat/${provider}` (MobileChatService)     | tRPC `sendMessageInServer` + 客户端 execAgentRuntime |
-| 工具批准 | `MOBILE_TOOL_INTERVENTION_ENABLED = false`（禁用） | 支持                                                 |
+| 项目     | React Native App (`apps/mobile`)                    | 移动 Web SPA (`src/routes/(mobile)/`)                |
+| -------- | --------------------------------------------------- | ---------------------------------------------------- |
+| 入口     | `apps/mobile/App.tsx`                               | `src/spa/entry.mobile.tsx`                           |
+| 路由     | React Navigation                                    | React Router                                         |
+| Chat UI  | `MessageBubble.tsx`, `ToolCallsBlock`, `ToolCard`   | 复用 Web `ConversationArea`                          |
+| API      | `/webapi/chat/${provider}` (MobileChatService)      | tRPC `sendMessageInServer` + 客户端 execAgentRuntime |
+| 工具批准 | `MOBILE_TOOL_INTERVENTION_ENABLED = true`（已启用） | 支持                                                 |
 
 ### 1.2 工具数据流
 
@@ -136,8 +141,8 @@ const params = Object.entries(args)
 
 见 **§18 Web vs RN 工具调用深度对比** 获取完整矩阵与差异分析。本节为摘要：
 
-- **内置工具**：RN 缺 AgentBuilder、AgentManagement、GroupAgentBuilder、LocalSystem
-- **批准**：RN 禁用，Web 支持完整干预流程
+- **内置工具**：RN 缺 Render 的 AgentBuilder、AgentManagement、GroupAgentBuilder、LocalSystem 现已补全 displayNames，退回到 ToolCard 时展示友好名称
+- **批准**：~~RN 禁用~~ RN 已启用（MOBILE_TOOL_INTERVENTION_ENABLED=true），Web 支持完整干预流程
 - **流式参数**：Web 无 StreamingRenderer 时 `return null`；RN 仍展示 argumentsText
 
 ---
@@ -146,11 +151,11 @@ const params = Object.entries(args)
 
 ### 5.1 参数细节未渲染
 
-| 编号 | 问题                               | 位置                                                | 建议                                      |
-| ---- | ---------------------------------- | --------------------------------------------------- | ----------------------------------------- |
-| P1   | params 仅展示第一个参数            | `formatToolDisplayTitle`                            | 增加 `slice(0, 3)` 或提供「显示全部」入口 |
-| P2   | `tool.arguments` 缺失时仅剩 `'{}'` | `transformToolCalls`、`buildToolPayloadFromMessage` | 校验服务端是否始终返回 `arguments`        |
-| P3   | 折叠时 `numberOfLines={2}` 截断    | ToolCard                                            | 保留折叠时的摘要，或支持点击展开参数      |
+| 编号   | 问题                               | 位置                                                | 建议                                 |
+| ------ | ---------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| ~~P1~~ | ~~params 仅展示第一个参数~~        | `formatToolDisplayTitle`                            | ✅ 已修复：`slice(0, 3)`             |
+| P2     | `tool.arguments` 缺失时仅剩 `'{}'` | `transformToolCalls`、`buildToolPayloadFromMessage` | 校验服务端是否始终返回 `arguments`   |
+| P3     | 折叠时 `numberOfLines={2}` 截断    | ToolCard                                            | 保留折叠时的摘要，或支持点击展开参数 |
 
 ### 5.2 数据来源一致性
 
@@ -169,9 +174,9 @@ const params = Object.entries(args)
 
 ## 6. 深度审计：SSE 格式、合并逻辑与内置工具矩阵
 
-### 6.1 tool_calls 事件格式不匹配（P0）
+### 6.1 tool_calls 事件格式不匹配（P0）✅ 已修复
 
-**问题**：`streamToolLoopFallback` 发送的 `tool_calls` 使用 `ChatToolPayload[]`，而 RN 期望 `MobileToolCallChunk[]`。
+**原问题（已修复）**：`streamToolLoopFallback` 发送的 `tool_calls` 使用 `ChatToolPayload[]`，RN 曾期望 `MobileToolCallChunk[]`。
 
 | 来源                                                   | 格式                    | 字段                                                 |
 | ------------------------------------------------------ | ----------------------- | ---------------------------------------------------- |
@@ -183,11 +188,9 @@ const params = Object.entries(args)
 - 服务端：`src/server/services/mobileChat/index.ts` 约 894 行
 - RN：`apps/mobile/src/lib/api.ts` 约 533–643 行
 
-**影响**：当 RN 收到 `ChatToolPayload[]` 时，`transformToolCalls` 会取 `toolCall.function?.arguments` 为 `undefined`，最终使用 `'{}'`；`function?.name` 为 `undefined`，退化为 `tool_1` 等占位名。参数与工具名在 `tool_calls` 阶段均错误。
+**~~影响~~（已消除）**：~~当 RN 收到 `ChatToolPayload[]` 时，transformToolCalls 会取 function?.arguments 为 undefined...~~
 
-**缓解**：`tool_executions` 随后到达，`mergeToolPayloads` 会用 `toolExecutionsToPayloads` 的结果覆盖，最终展示正确。但 `tool_calls` 到 `tool_executions` 之间会短暂显示错误（参数空、名称占位）。
-
-**修复建议**：在 `tool_calls` 分支判断 `chunk.data` 是否为 `ChatToolPayload[]`（存在 `apiName` / `arguments` 顶层级），若是则直接作为 `ChatToolPayload[]` 传给 `onTools`，跳过 `mergeToolCallChunks` 与 `transformToolCalls`。
+**修复**：api.ts 检测 `ChatToolPayload[]`（`isChatToolPayloadArray`），若匹配则直接传给 `onTools`，跳过 `mergeToolCallChunks` 与 `transformToolCalls`。
 
 ### 6.2 mergeToolPayloads 覆盖逻辑（已确认）
 
@@ -214,26 +217,26 @@ const params = Object.entries(args)
 
 - 只发送 `tool_executions`，不发送 `tool_calls`，无格式冲突
 
-### 6.4 Web vs RN 内置工具矩阵
+### 6.4 Web vs RN 内置工具矩阵 ✅ 已对齐
 
-| identifier               | apiName 示例                                               | Web Render | RN Render | RN Streaming                             |
-| ------------------------ | ---------------------------------------------------------- | ---------- | --------- | ---------------------------------------- |
-| lobe-agent-builder       | -                                                          | ✅         | ❌ 未注册 | ❌                                       |
-| lobe-agent-management    | -                                                          | ✅         | ❌ 未注册 | ❌                                       |
-| lobe-cloud-sandbox       | executeCode                                                | ✅         | ✅        | ✅                                       |
-| lobe-group-agent-builder | -                                                          | ✅         | ❌ 未注册 | ❌                                       |
-| lobe-group-management    | broadcast, speak                                           | ✅         | ✅        | ❌                                       |
-| lobe-gtd                 | createPlan, execTask, execTasks, ...                       | ✅         | ✅        | createPlan, execTask, execTasks          |
-| lobe-knowledge-base      | searchKnowledgeBase                                        | ✅         | ✅        | ✅                                       |
-| lobe-local-system        | -                                                          | ✅         | ❌ 未注册 | ❌                                       |
-| lobe-user-memory         | addExperienceMemory, addPreferenceMemory, searchUserMemory | ✅         | ✅        | addExperienceMemory, addPreferenceMemory |
-| lobe-notebook            | createDocument                                             | ✅         | ✅        | ✅                                       |
-| lobe-skill-store         | searchSkill                                                | ✅         | ✅        | ✅                                       |
-| lobe-skills              | searchSkill                                                | ✅         | ✅        | ✅                                       |
-| lobe-web-browsing        | search                                                     | ✅         | ✅        | ✅                                       |
-| lobe-calculator          | evaluate, execute, ...                                     | -          | ✅        | ❌（计算器通常无流式）                   |
+| identifier               | apiName 示例                                                  | Web Render | RN Render | RN Streaming                             | RN Intervention                     |
+| ------------------------ | ------------------------------------------------------------- | ---------- | --------- | ---------------------------------------- | ----------------------------------- |
+| lobe-agent-builder       | getAvailableModels, installPlugin, updateConfig, updatePrompt | ✅         | ✅ 通用   | ✅ 通用                                  | installPlugin                       |
+| lobe-agent-management    | createAgent, searchAgent, callAgent, ...                      | ✅         | ✅ 通用   | ✅ 通用                                  | -                                   |
+| lobe-cloud-sandbox       | executeCode                                                   | ✅         | ✅        | ✅                                       | executeCode                         |
+| lobe-group-agent-builder | createAgent, inviteAgent, updateConfig, ...                   | ✅         | ✅ 通用   | ✅ 通用                                  | -                                   |
+| lobe-group-management    | broadcast, speak, executeAgentTask, executeAgentTasks         | ✅         | ✅        | ✅ broadcast, speak, executeAgentTask(s) | executeAgentTask, executeAgentTasks |
+| lobe-gtd                 | createPlan, execTask, execTasks, ...                          | ✅         | ✅        | createPlan, execTask, execTasks          | createPlan, createTodos             |
+| lobe-knowledge-base      | searchKnowledgeBase                                           | ✅         | ✅        | ✅                                       | -                                   |
+| lobe-local-system        | listLocalFiles, runCommand, searchLocalFiles, ...             | ✅         | ✅ 通用   | ✅ 通用                                  | 全 API                              |
+| lobe-user-memory         | addExperienceMemory, addPreferenceMemory, searchUserMemory    | ✅         | ✅        | addExperienceMemory, addPreferenceMemory | addExperienceMemory                 |
+| lobe-notebook            | createDocument                                                | ✅         | ✅        | ✅                                       | createDocument                      |
+| lobe-skill-store         | searchSkill                                                   | ✅         | ✅        | ✅                                       | -                                   |
+| lobe-skills              | searchSkill                                                   | ✅         | ✅        | ✅                                       | -                                   |
+| lobe-web-browsing        | search                                                        | ✅         | ✅        | ✅                                       | -                                   |
+| lobe-calculator          | evaluate, execute, ...                                        | -          | ✅        | -（计算器通常无流式）                    | -                                   |
 
-**RN 缺失**：AgentBuilder、AgentManagement、GroupAgentBuilder、LocalSystem。这些在 RN 上会退回到 `ToolCard` + `argumentsText`，若 `arguments` 缺失则参数不展示。
+**RN 通用**：GenericFallbackRender（arguments + result）、GenericFallbackStreaming（执行中…）、GenericFallbackIntervention（参数展示 + 批准 / 拒绝）。
 
 ### 6.5 消息持久化
 
@@ -247,16 +250,24 @@ const params = Object.entries(args)
 
 ## 7. 文件索引
 
-| 路径                                                  | 职责                                                                                    |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `apps/mobile/src/components/ui/MessageBubble.tsx`     | ToolCallsBlock、ToolCard、buildToolDisplayProps、formatToolArguments                    |
-| `apps/mobile/src/features/BuiltinTools/index.ts`      | BUILTIN_RENDERS、getMobileBuiltinRender                                                 |
-| `apps/mobile/src/features/BuiltinTools/streamings.ts` | BUILTIN_STREAMINGS、getMobileBuiltinStreaming                                           |
-| `apps/mobile/src/store/messageDisplay.ts`             | mergeToolPayloadLists、buildToolPayloadFromMessage、collapseStandaloneToolMessages      |
-| `apps/mobile/src/store/chatHelpers.ts`                | toolExecutionsToPayloads、mergeToolPayloads、mergeResolvedToolPayloads                  |
-| `apps/mobile/src/lib/api.ts`                          | transformToolCalls、mergeToolCallChunks、SSE tool_calls/tool_executions                 |
-| `apps/mobile/src/types/index.ts`                      | ChatToolPayload、ToolExecutionItem                                                      |
-| `src/server/services/mobileChat/index.ts`             | MobileChatService、createToolExecutionEvent、normalizeToolCalls、streamToolLoopFallback |
+| 路径                                                                             | 职责                                                                                                                                        |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/mobile/src/components/ui/MessageBubble.tsx`                                | ToolCallsBlock、ToolCard、buildToolDisplayProps、formatToolArguments                                                                        |
+| `apps/mobile/src/features/BuiltinTools/index.ts`                                 | BUILTIN_RENDERS、getMobileBuiltinRender、GenericFallbackRender（agent-builder 等）                                                          |
+| `apps/mobile/src/features/BuiltinTools/fallback/GenericFallback.tsx`             | 通用 Render，用于 agent-builder、agent-management、group-agent-builder、local-system                                                        |
+| `apps/mobile/src/features/BuiltinTools/fallback/GenericFallbackStreaming.tsx`    | 通用 Streaming 占位（执行中…）                                                                                                              |
+| `apps/mobile/src/features/BuiltinTools/fallback/GenericFallbackIntervention.tsx` | 通用 Intervention（参数展示 + 批准 / 拒绝）                                                                                                 |
+| `apps/mobile/src/features/BuiltinTools/streamings.ts`                            | BUILTIN_STREAMINGS、getMobileBuiltinStreaming（含 agent-builder、agent-management、group-agent-builder、group-management、local-system 等） |
+| `apps/mobile/src/features/BuiltinTools/interventions.ts`                         | BUILTIN_INTERVENTIONS、getMobileBuiltinIntervention（GTD、Notebook、Memory、CloudSandbox、GenericFallback 等）                              |
+| `apps/mobile/src/lib/toolCallUtils.ts`                                           | isChatToolPayloadArray、mergeToolCallChunks、transformToolCalls（纯函数，可单测）                                                           |
+| `apps/mobile/src/store/messageDisplay.ts`                                        | mergeToolPayloadLists、buildToolPayloadFromMessage、collapseStandaloneToolMessages                                                          |
+| `apps/mobile/src/store/chatHelpers.ts`                                           | toolExecutionsToPayloads、mergeToolPayloads、mergeResolvedToolPayloads                                                                      |
+| `apps/mobile/src/lib/api.ts`                                                     | transformToolCalls、mergeToolCallChunks、SSE tool_calls/tool_executions                                                                     |
+| `apps/mobile/src/types/index.ts`                                                 | ChatToolPayload、ToolExecutionItem                                                                                                          |
+| `src/server/services/mobileChat/index.ts`                                        | MobileChatService、createToolExecutionEvent、normalizeToolCalls、streamToolLoopFallback、partitionToolsByIntervention                       |
+| `src/server/services/mobileChat/partitionToolsByIntervention.ts`                 | 按 userInterventionConfig + manifest 分区需批准的工具                                                                                       |
+| `src/server/services/mobileChat/resumeStore.ts`                                  | 干预状态存储（TTL 30min）                                                                                                                   |
+| `src/app/(backend)/webapi/chat/[provider]/continue/route.ts`                     | POST continue 端点（审批后继续执行）                                                                                                        |
 
 ---
 
@@ -269,9 +280,8 @@ const params = Object.entries(args)
 2. 创建 assistant 占位消息 (assistantMsgId)
 3. aiChatApi.streamChat() → /webapi/chat/${provider} (api.ts)
 4. createSSEChunkParser 解析 SSE
-   ├─ event: tool_calls → mergeToolCallChunks(rawToolCalls, payload)
-   │                    → transformToolCalls(rawToolCalls) → accTools
-   │                    → callbacks.onTools(accTools)
+   ├─ event: tool_calls → isChatToolPayloadArray? 直接 onTools(payload)
+   │                    : mergeToolCallChunks → transformToolCalls → onTools(accTools)
    └─ event: tool_executions → callbacks.onToolExecutions(payload)
 5. chat.ts onTools: mergeToolPayloads(m.tools, tools) → 更新 message.tools
    onToolExecutions: toolExecutionsToPayloads → mergeToolPayloads(m.tools, toolPayloads)
@@ -343,24 +353,26 @@ raw messages
 
 ---
 
-## 11. 干预与批准流程（当前禁用）
+## 11. 干预与批准流程（已实现）
 
-### 11.1 MOBILE_TOOL_INTERVENTION_ENABLED = false
+### 11.1 MOBILE_TOOL_INTERVENTION_ENABLED = true
 
-- **ToolCallsBlock** 不向 ToolCard 传入 `onApprove`、`onReject`，批准 / 拒绝按钮永不渲染
-- **showIntervention**：`MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention` → 恒为 false
-- **BuiltinIntervention** 已注册（GTD、Notebook、Memory、CloudSandbox），但 never 渲染
+- **ToolCallsBlock** 向 ToolCard 传入 `onApprove`、`onReject`，需 `sessionId`、`topicId`、`assistantMessageId`
+- **showIntervention**：`MOBILE_TOOL_INTERVENTION_ENABLED && isPending && BuiltinIntervention`
+- **BuiltinIntervention** 已注册（GTD、Notebook、Memory、CloudSandbox），pending 时渲染批准 / 拒绝按钮
 
 ### 11.2 干预相关 API 与 Store
 
-- **chatToolApi.approveToolCall**、**rejectToolCall**：tRPC 调用，RN 端存在
-- **chat.approveToolCall**：调用 chatToolApi，用于群聊等场景；单聊 `/webapi/chat` 不触发
-- **chat.rejectToolCall** / **rejectToolMessage**：本地更新 `intervention.status = 'rejected'`，不调用服务端
+- **chat.continueToolIntervention**：调用 `POST /webapi/chat/:provider/continue`，传入 `approvedToolCall`、`sessionId`、`topicId`，流式更新 tools
+- **chat.rejectToolCall**：本地更新 `intervention.status = 'rejected'`
+- **chat.approveToolCall**：tRPC，群聊等场景；单聊使用 `continueToolIntervention`
 
-### 11.3 启用干预时需补齐
+### 11.3 后端实现
 
-1. ToolCallsBlock 在 `MOBILE_TOOL_INTERVENTION_ENABLED` 时传入 `onApprove`、`onReject`，并需 `toolMessageId` / `toolCallId` 以调用 API
-2. `/webapi/chat` 当前工具自动执行，如需人工批准需改服务端或改用 tRPC chat 路径
+1. **MobileChatService**：`partitionToolsByIntervention` 根据 `userInterventionConfig` + manifest 分区工具
+2. 需人工批准的 tools 不执行，emit `tool_calls`（含 `intervention: { status: 'pending' }`）、`intervention_required`
+3. 状态存入 `resumeStore`（in-memory，TTL 30min）
+4. `POST /webapi/chat/:provider/continue`：执行 approved tool，若有剩余 pending 则再次 emit intervention_required，否则继续 LLM 循环
 
 ---
 
@@ -403,22 +415,26 @@ raw messages
 
 ---
 
-## 14. RN 内置工具干预 / 流式矩阵（补充）
+## 14. RN 内置工具干预 / 流式矩阵 ✅ 已对齐 Web
 
-| identifier            | Intervention            | Streaming                                |
-| --------------------- | ----------------------- | ---------------------------------------- |
-| lobe-gtd              | createPlan, createTodos | createPlan, execTask, execTasks          |
-| lobe-notebook         | createDocument          | createDocument                           |
-| lobe-user-memory      | addExperienceMemory     | addExperienceMemory, addPreferenceMemory |
-| lobe-cloud-sandbox    | executeCode             | executeCode                              |
-| lobe-knowledge-base   | -                       | searchKnowledgeBase                      |
-| lobe-web-browsing     | -                       | search                                   |
-| lobe-skill-store      | -                       | searchSkill                              |
-| lobe-skills           | -                       | searchSkill                              |
-| lobe-group-management | -                       | -                                        |
-| lobe-calculator       | -                       | -                                        |
+| identifier               | Intervention                                                       | Streaming                                             |
+| ------------------------ | ------------------------------------------------------------------ | ----------------------------------------------------- |
+| lobe-gtd                 | createPlan, createTodos                                            | createPlan, execTask, execTasks                       |
+| lobe-notebook            | createDocument                                                     | createDocument                                        |
+| lobe-user-memory         | addExperienceMemory                                                | addExperienceMemory, addPreferenceMemory              |
+| lobe-cloud-sandbox       | executeCode                                                        | executeCode                                           |
+| lobe-knowledge-base      | -                                                                  | searchKnowledgeBase                                   |
+| lobe-web-browsing        | -                                                                  | search                                                |
+| lobe-skill-store         | -                                                                  | searchSkill                                           |
+| lobe-skills              | -                                                                  | searchSkill                                           |
+| lobe-group-management    | executeAgentTask, executeAgentTasks（GenericFallbackIntervention） | broadcast, speak, executeAgentTask, executeAgentTasks |
+| lobe-agent-builder       | installPlugin（GenericFallbackIntervention）                       | 通用（GenericFallbackStreaming）                      |
+| lobe-agent-management    | -                                                                  | 通用                                                  |
+| lobe-group-agent-builder | -                                                                  | 通用                                                  |
+| lobe-local-system        | 全 API（GenericFallbackIntervention）                              | 通用                                                  |
+| lobe-calculator          | -                                                                  | -                                                     |
 
-**GroupManagement** 无 Streaming，执行中显示通用状态；**Calculator** 无 Streaming，通常快速完成。
+**Calculator** 无 Streaming，通常快速完成。
 
 ---
 
@@ -428,34 +444,35 @@ raw messages
 
 `chatToolsTitle`, `chatToolRunning`, `chatToolDone`, `chatToolFailed`, `chatToolArguments`, `chatToolCompleted`, `chatToolPending`, `chatToolRejected`, `chatToolResponse`, `chatToolAborted`, `chatToolApprove`, `chatToolReject`, `chatToolPendingDesc`, `chatToolRejectedDesc`, `chatToolAbortedDesc`，以及各内置工具的 placeholder、streaming 文案。
 
-### 15.2 可访问性
+### 15.2 可访问性（✅ 已修复）
 
 - ToolCard 使用 TouchableOpacity，支持 `onPress` 展开 / 收起
-- `numberOfLines={2}` 截断时无 `accessibilityLabel` 说明
-- 复制按钮无明确 a11y 标签
+- ToolCard 主卡片：`accessibilityLabel` 含标题与「点击展开 / 收起」提示
+- 折叠时 `numberOfLines={2}` 截断的 argumentsText：`accessibilityLabel` 为「参数，点击展开」
+- 复制按钮：`accessibilityLabel={t.msgActionCopy}`（复用消息操作栏「复制」）
 
 ---
 
 ## 16. 测试覆盖
 
 - **chatHelpers**: `mergeToolPayloadsCore`、`mergeToolPayloads`、`toolExecutionsToPayloads`、`mergeResolvedToolPayloads` 已有单测（`chatHelpers.test.ts`）
-- **messageDisplay**: `mergeToolPayloadLists`、`collapseStandaloneToolMessages`、`collapseAssistantToolChains` 无单测
-- **api.ts**: `transformToolCalls`、`mergeToolCallChunks` 无单测
+- **messageDisplay**: `buildDisplayMessages`、`getAssistantChainActionMessageId` 已有单测（`messageDisplay.test.ts`）
+- **toolCallUtils**: `isChatToolPayloadArray`、`mergeToolCallChunks`、`transformToolCalls` 已有单测（`toolCallUtils.test.ts`，由 api.ts 抽离）
 - **MessageBubble ToolCallsBlock/ToolCard**: 无组件测试
 
 ---
 
 ## 17. 优先级建议（按 P0 → P3）
 
-| 优先级 | 问题                                                | 建议                                                                                        |
-| ------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **P0** | tool_calls 格式不匹配（streamToolLoopFallback）     | 在 tool_calls 分支检测 ChatToolPayload \[]，若匹配则直接传 onTools，跳过 transformToolCalls |
-| **P1** | formatToolDisplayTitle 只取第一个参数               | 改为 slice (0, 3) 或提供「全部参数」入口                                                    |
-| **P1** | 折叠时 argumentsText 截断                           | 考虑摘要优化或点击展开                                                                      |
-| **P2** | mergeToolPayloads 与 mergeToolPayloadLists 重复实现 | 抽成共用函数，减少分支                                                                      |
-| **P2** | 工具错误展示路径不清晰                              | 明确 pluginError/result_content 流入 ToolCard 的路径，补全 error prop                       |
-| **P3** | messageDisplay、chatHelpers、api 无单测             | 为关键合并与转换逻辑补充单测                                                                |
-| **P3** | 启用干预时需传入 onApprove/onReject                 | 预留或实现干预分支，避免后续改动过大                                                        |
+| 优先级     | 问题                                                    | 建议                                                           |
+| ---------- | ------------------------------------------------------- | -------------------------------------------------------------- |
+| ~~**P0**~~ | ~~tool_calls 格式不匹配（streamToolLoopFallback）~~     | ✅ 已修复：api.ts 检测 ChatToolPayload \[]                     |
+| ~~**P1**~~ | ~~formatToolDisplayTitle 只取第一个参数~~               | ✅ 已修复：slice (0, 3)                                        |
+| **P1**     | 折叠时 argumentsText 截断                               | 考虑摘要优化或点击展开                                         |
+| ~~**P2**~~ | ~~mergeToolPayloads 与 mergeToolPayloadLists 重复实现~~ | ✅ 已修复：mergeToolPayloadsCore                               |
+| ~~**P2**~~ | ~~工具错误展示路径不清晰~~                              | ✅ 已修复：buildToolPayloadFromMessage 映射 pluginError        |
+| ~~**P3**~~ | ~~messageDisplay、chatHelpers、api 无单测~~             | ✅ 已修复：单测已补充                                          |
+| ~~**P3**~~ | ~~启用干预时需传入 onApprove/onReject~~                 | ✅ 已修复：MOBILE_TOOL_INTERVENTION_ENABLED=true，continue API |
 
 ---
 
@@ -463,13 +480,13 @@ raw messages
 
 ### 18.1 整体架构
 
-| 维度             | Web                                                                                         | RN                                                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| **API 入口**     | tRPC `sendMessageInServer` + 客户端 `execAgentRuntime`（fetch-sse、model-runtime protocol） | HTTP `POST /webapi/chat/${provider}`（MobileChatService）                                    |
-| **工具执行位置** | 客户端 Agent Runtime（可暂停等待批准）                                                      | 服务端 MobileChatService（自动执行，无批准）                                                 |
-| **Store**        | ChatStore（`dbMessagesMap`、`operations`）、ConversationStore、useChatStore                 | 本地 useChatStore（`messagesBySession`），无 operations                                      |
-| **消息结构**     | `conversation-flow` 解析为 `assistantGroup`，含 `children[]`、每个 child 有 `tools`         | 扁平 `message.tools`，`collapseStandaloneToolMessages`、`collapseAssistantToolChains` 做合并 |
-| **工具结果来源** | 每条 tool 对应独立 `role: tool` 消息，由 FlatListBuilder 合并为 `toolsWithResults`          | 服务端 `tool_executions` 事件一次性返回，或从持久化 `message.plugin` 构建                    |
+| 维度             | Web                                                                                         | RN                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **API 入口**     | tRPC `sendMessageInServer` + 客户端 `execAgentRuntime`（fetch-sse、model-runtime protocol） | HTTP `POST /webapi/chat/${provider}`（MobileChatService）                                               |
+| **工具执行位置** | 客户端 Agent Runtime（可暂停等待批准）                                                      | 服务端 MobileChatService（~~自动执行，无批准~~ ✅ 支持干预，需批准时暂停并 emit intervention_required） |
+| **Store**        | ChatStore（`dbMessagesMap`、`operations`）、ConversationStore、useChatStore                 | 本地 useChatStore（`messagesBySession`），无 operations                                                 |
+| **消息结构**     | `conversation-flow` 解析为 `assistantGroup`，含 `children[]`、每个 child 有 `tools`         | 扁平 `message.tools`，`collapseStandaloneToolMessages`、`collapseAssistantToolChains` 做合并            |
+| **工具结果来源** | 每条 tool 对应独立 `role: tool` 消息，由 FlatListBuilder 合并为 `toolsWithResults`          | 服务端 `tool_executions` 事件一次性返回，或从持久化 `message.plugin` 构建                               |
 
 ### 18.2 数据流对比
 
@@ -499,39 +516,39 @@ SSE tool_calls (或 tool_executions)
 
 ### 18.3 组件层级对比
 
-| 层级         | Web                                                                  | RN                                                 |
-| ------------ | -------------------------------------------------------------------- | -------------------------------------------------- |
-| **列表**     | VirtualizedList → MessageItem                                        | FlashList → MessageBubble                          |
-| **消息聚合** | assistantGroup（conversation-flow）                                  | 无；单条 assistant 或 collapse 后的链              |
-| **工具容器** | `Tools`（Flexbox gap=8）                                             | `ToolCallsBlock`（可折叠区块）                     |
-| **单工具**   | `Tool`（Accordion + Detail）                                         | `ToolCard`（TouchableOpacity 展开 / 收起）         |
-| **详情渲染** | Detail → Intervention / ToolRender / LoadingPlaceholder              | ToolCard → BuiltinRender / content / argumentsText |
-| **参数编辑** | Intervention（KeyValueEditor、BuiltinIntervention、ApprovalActions） | MOBILE_TOOL_INTERVENTION_ENABLED=false，无编辑     |
+| 层级         | Web                                                                  | RN                                                                             |
+| ------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **列表**     | VirtualizedList → MessageItem                                        | FlashList → MessageBubble                                                      |
+| **消息聚合** | assistantGroup（conversation-flow）                                  | 无；单条 assistant 或 collapse 后的链                                          |
+| **工具容器** | `Tools`（Flexbox gap=8）                                             | `ToolCallsBlock`（可折叠区块）                                                 |
+| **单工具**   | `Tool`（Accordion + Detail）                                         | `ToolCard`（TouchableOpacity 展开 / 收起）                                     |
+| **详情渲染** | Detail → Intervention / ToolRender / LoadingPlaceholder              | ToolCard → BuiltinRender / content / argumentsText                             |
+| **参数编辑** | Intervention（KeyValueEditor、BuiltinIntervention、ApprovalActions） | ✅ MOBILE_TOOL_INTERVENTION_ENABLED=true，GenericFallbackIntervention 展示参数 |
 
 ### 18.4 工具名称与参数解析
 
-| 环节           | Web                                                                                                      | RN                                                                                                    |     |                             |
-| -------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --- | --------------------------- |
-| **transform**  | `internal_transformToolCalls`：ToolNameResolver + 全量 manifest（plugin、builtin、klavis、lobehubSkill） | `transformToolCalls`：从 `function.name` 解析 `identifier/apiName`（`/` 或 `____` 分隔），无 manifest |     |                             |
-| **arguments**  | 来自 MessageToolCall，JSON 字符串                                                                        | \`toolCall.function?.arguments                                                                        |     | '{}'`，或 `exec.arguments\` |
-| **格式不匹配** | 无；Web 协议统一                                                                                         | streamToolLoopFallback 发 ChatToolPayload \[]，RN 期望 function.name/arguments → P0 问题              |     |                             |
+| 环节               | Web                                                                                                      | RN                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **transform**      | `internal_transformToolCalls`：ToolNameResolver + 全量 manifest（plugin、builtin、klavis、lobehubSkill） | `transformToolCalls` 或 `isChatToolPayloadArray` 直接使用 ChatToolPayload \[]（✅ P0 已修复） |
+| **arguments**      | 来自 MessageToolCall，JSON 字符串                                                                        | `toolCall.function?.arguments` 或 `exec.arguments` 或 ChatToolPayload.arguments               |
+| ~~**格式不匹配**~~ | ~~streamToolLoopFallback 发 ChatToolPayload \[]，RN 期望 function.name/arguments~~                       | ✅ 已修复：api.ts 检测并直接使用 ChatToolPayload \[]                                          |
 
-### 18.5 批准与干预
+### 18.5 批准与干预 ✅ 已实现
 
-| 能力                  | Web                                                                               | RN                                                       |
-| --------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| **pending 状态**      | `intervention?.status === 'pending'` → 展示 Intervention                          | MOBILE_TOOL_INTERVENTION_ENABLED=false，never 展示       |
-| **ApprovalActions**   | 批准、拒绝、拒绝并继续、allow-list 记忆                                           | chatToolApi 存在但不触发                                 |
-| **Intervention 组件** | Fallback（JSON 编辑）、BuiltinIntervention（GTD、Notebook、Memory、CloudSandbox） | BUILTIN_INTERVENTIONS 已注册但 showIntervention 恒 false |
-| **参数编辑**          | `updatePluginArguments`、`waitForPendingArgsUpdate`                               | 无                                                       |
-| **继续生成**          | `rejectAndContinueToolCall`                                                       | 无                                                       |
+| 能力                  | Web                                                                               | RN                                                                    |
+| --------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **pending 状态**      | `intervention?.status === 'pending'` → 展示 Intervention                          | ~~MOBILE_TOOL_INTERVENTION_ENABLED=false~~ ✅ true，展示 Intervention |
+| **ApprovalActions**   | 批准、拒绝、拒绝并继续、allow-list 记忆                                           | ✅ chat.continueToolIntervention、chat.rejectToolCall                 |
+| **Intervention 组件** | Fallback（JSON 编辑）、BuiltinIntervention（GTD、Notebook、Memory、CloudSandbox） | ✅ GenericFallbackIntervention + GTD/Notebook/Memory/CloudSandbox 等  |
+| **参数编辑**          | `updatePluginArguments`、`waitForPendingArgsUpdate`                               | GenericFallbackIntervention 展示参数（编辑待接入 onArgsChange）       |
+| **继续生成**          | `rejectAndContinueToolCall`                                                       | ✅ POST /webapi/chat/:provider/continue                               |
 
 ### 18.6 参数与结果渲染
 
 | 场景                | Web                                                         | RN                                                               |
 | ------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
 | **流式中无 result** | 有 StreamingRenderer → 展示；无则 `return null`，参数不展示 | 有 BuiltinStreaming → 展示；无则 ToolCard 仍展示 `argumentsText` |
-| **params 摘要**     | ArgumentRender / ToolRender 内部实现                        | `formatToolDisplayTitle` 仅 `slice(0, 1)` 第一个参数             |
+| **params 摘要**     | ArgumentRender / ToolRender 内部实现                        | `formatToolDisplayTitle` 已改为 `slice(0, 3)`                    |
 | **完整 JSON**       | KeyValueEditor、ArgumentRender                              | `formatToolArguments` 美化 JSON，折叠时 `numberOfLines={2}`      |
 | **BuiltinRender**   | `getBuiltinRender`（packages/builtin-tools）                | `getMobileBuiltinRender`（apps/mobile BuiltinTools）             |
 | **无 Render 时**    | ArgumentRender（KeyValue 表格）                             | content + argumentsText 纯文本                                   |
@@ -541,7 +558,7 @@ SSE tool_calls (或 tool_executions)
 | 来源                   | Web                                                                  | RN                                                                           |
 | ---------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **tool 消息 error**    | `toolMsg.error`、`toolMsg.pluginError` → `result.error` → ToolRender | buildToolPayloadFromMessage 映射 pluginError；ToolResultBlock 传 pluginError |
-| **assistant 嵌 tools** | FlatListBuilder 合并 toolMsg，有 error 时写入 result                 | ToolCallsBlock 传 error={tool.pluginError}（已修复）                         |
+| **assistant 嵌 tools** | FlatListBuilder 合并 toolMsg，有 error 时写入 result                 | ✅ ToolCallsBlock 传 error={tool.pluginError}                                |
 | **展示**               | ToolRender 可接收 result.error                                       | ToolCard error prop 两路径均传入                                             |
 
 ### 18.8 消息持久化
@@ -554,27 +571,39 @@ SSE tool_calls (或 tool_executions)
 
 ### 18.9 内置工具对比（细化）
 
-| identifier               | Web | RN Render | RN Streaming                    | RN Intervention         |
-| ------------------------ | --- | --------- | ------------------------------- | ----------------------- |
-| lobe-agent-builder       | ✅  | ❌        | ❌                              | ❌                      |
-| lobe-agent-management    | ✅  | ❌        | ❌                              | ❌                      |
-| lobe-cloud-sandbox       | ✅  | ✅        | ✅                              | ✅ executeCode          |
-| lobe-group-agent-builder | ✅  | ❌        | ❌                              | ❌                      |
-| lobe-group-management    | ✅  | ✅        | ❌                              | ❌                      |
-| lobe-gtd                 | ✅  | ✅        | createPlan, execTask, execTasks | createPlan, createTodos |
-| lobe-knowledge-base      | ✅  | ✅        | searchKnowledgeBase             | ❌                      |
-| lobe-local-system        | ✅  | ❌        | ❌                              | ❌                      |
-| lobe-user-memory         | ✅  | ✅        | addExperience, addPreference    | addExperienceMemory     |
-| lobe-notebook            | ✅  | ✅        | createDocument                  | createDocument          |
-| lobe-skill-store         | ✅  | ✅        | searchSkill                     | ❌                      |
-| lobe-skills              | ✅  | ✅        | searchSkill                     | ❌                      |
-| lobe-web-browsing        | ✅  | ✅        | search                          | ❌                      |
-| lobe-calculator          | -   | ✅        | ❌                              | ❌                      |
+**RN Intervention 列「❌」含义**：
+
+- **与 Web 一致无专用 Builtin**：`knowledge-base`、`skill-store`、`skills`、`web-browsing`、`calculator` 等在 `packages/builtin-tools` 的 `BuiltinToolInterventions` 中**无注册**；RN 同样无专用组件。若需人工批准，Web 走通用 Fallback（JSON），非 per-tool 表单。
+- **有意简化（工程取舍）**：`installPlugin`、`executeAgentTask(s)`、`local-system` 各 API 在 RN 使用 **GenericFallbackIntervention**（参数 JSON + 批准 / 拒绝），未移植 Web 的 antd /agentGroup 等富表单；**流程**与 Web 对齐，**UI** 非像素级对齐。
+- **待补小缺口**：Web GTD 有 `clearTodos` 的 Intervention，RN 若 manifest 对该 API 开人工批准，可补注册 **ClearTodos** 与 Web 对齐。
+
+| identifier               | Web | RN Render | RN Streaming                                          | RN Intervention                                                      |
+| ------------------------ | --- | --------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| lobe-agent-builder       | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ✅ installPlugin (GenericFallbackIntervention)                       |
+| lobe-agent-management    | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ❌ (Web 无 intervention)                                             |
+| lobe-cloud-sandbox       | ✅  | ✅        | ✅ executeCode                                        | ✅ executeCode                                                       |
+| lobe-group-agent-builder | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ❌ (Web 无 intervention)                                             |
+| lobe-group-management    | ✅  | ✅        | broadcast, speak, executeAgentTask, executeAgentTasks | ✅ executeAgentTask, executeAgentTasks (GenericFallbackIntervention) |
+| lobe-gtd                 | ✅  | ✅        | createPlan, execTask, execTasks                       | createPlan, createTodos                                              |
+| lobe-knowledge-base      | ✅  | ✅        | searchKnowledgeBase                                   | ❌                                                                   |
+| lobe-local-system        | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ✅ 全 API (GenericFallbackIntervention)                              |
+| lobe-user-memory         | ✅  | ✅        | addExperience, addPreference                          | addExperienceMemory                                                  |
+| lobe-notebook            | ✅  | ✅        | createDocument                                        | createDocument                                                       |
+| lobe-skill-store         | ✅  | ✅        | searchSkill                                           | ❌                                                                   |
+| lobe-skills              | ✅  | ✅        | searchSkill                                           | ❌                                                                   |
+| lobe-web-browsing        | ✅  | ✅        | search                                                | ❌                                                                   |
+| lobe-calculator          | -   | ✅        | ❌                                                    | ❌                                                                   |
+
+**RN 通用**：
+
+- **Render**：AgentBuilder、AgentManagement、GroupAgentBuilder、LocalSystem 使用 GenericFallbackRender 展示 arguments + result。
+- **Streaming**：agent-builder、agent-management、group-agent-builder、local-system、group-management（executeAgentTask/executeAgentTasks）使用 GenericFallbackStreaming 占位（执行中显示「执行中…」）。
+- **Intervention**：agent-builder（installPlugin）、group-management（executeAgentTask/executeAgentTasks）、local-system（全部需批准的 API）使用 GenericFallbackIntervention 展示参数并支持批准 / 拒绝。
 
 ### 18.10 对齐建议汇总
 
-1. **P0 格式**：RN 检测 ChatToolPayload \[]，直接使用，跳过 transformToolCalls
-2. **参数摘要**：RN 改为 slice (0, 3) 或与 Web ArgumentRender 行为对齐
+1. ~~**P0 格式**：RN 检测 ChatToolPayload \[]~~ ✅ 已修复
+2. ~~**参数摘要**：RN 改为 slice (0, 3)~~ ✅ 已修复
 3. **流式无 Render**：决策 RN 是否与 Web 一致（无 Streaming 时暂不展示参数）或保持现状
-4. **错误展示**：ToolCallsBlock 补充 error 流入路径（如 pluginError → tool）
-5. **干预启用**：若开启 RN 批准，需接 `/webapi/chat` 的人为批准或切换 tRPC 路径
+4. ~~**错误展示**：ToolCallsBlock 补充 error 流入路径~~ ✅ 已修复（pluginError → tool）
+5. ~~**干预启用**：若开启 RN 批准，需接 `/webapi/chat` 的人为批准~~ ✅ 已实现（continue API）

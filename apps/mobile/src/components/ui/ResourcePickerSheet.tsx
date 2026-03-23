@@ -1,8 +1,8 @@
 /**
- * ResourcePickerSheet — Pick files from workspace to attach to chat.
+ * ResourcePickerSheet — Pick files from workspace (inbox or library, folders, paginated).
  */
-import { Check, FolderOpen } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Check, ChevronRight, FolderOpen } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,12 +15,14 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { resourceApi } from '../../lib/api';
+import { knowledgeBaseApi, resourceApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
-import type { FileListItem } from '../../types';
+import type { FileListItem, KnowledgeBaseItem } from '../../types';
+
+const PAGE_SIZE = 50;
 
 interface ResourcePickerSheetProps {
   onClose: () => void;
@@ -40,38 +42,119 @@ export default function ResourcePickerSheet({
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const [libraries, setLibraries] = useState<KnowledgeBaseItem[]>([]);
+  const [activeKb, setActiveKb] = useState<KnowledgeBaseItem | null>(null);
+  const [folderStack, setFolderStack] = useState<string[]>([]);
+  const [rows, setRows] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<FileListItem[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [locationMenuVisible, setLocationMenuVisible] = useState(false);
 
-  const loadItems = useCallback(async () => {
+  const parentId = folderStack.length === 0 ? null : folderStack.at(-1)!;
+
+  const locationLabel = useMemo(() => {
+    if (!activeKb) return t.resourceLibraryInbox;
+    return activeKb.name || t.resourceLibrarySelect;
+  }, [activeKb, t.resourceLibraryInbox, t.resourceLibrarySelect]);
+
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+
+  const mergeById = useCallback((prev: FileListItem[], next: FileListItem[]) => {
+    const seen = new Set(prev.map((r) => r.id));
+    const added = next.filter((r) => !seen.has(r.id));
+    return [...prev, ...added];
+  }, []);
+
+  const queryParams = useMemo(
+    () => ({
+      limit: PAGE_SIZE,
+      parentId,
+      ...(activeKb
+        ? {
+            knowledgeBaseId: activeKb.id,
+            ...(activeKb.spaceId ? { spaceId: activeKb.spaceId } : {}),
+          }
+        : {}),
+    }),
+    [activeKb, parentId],
+  );
+
+  const loadInitial = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await resourceApi.getKnowledgeItems({
-        limit: 100,
-        offset: 0,
-      });
-      // Chat attachment requires files.id (messages_files.file_id FK -> files.id).
-      const files = (result?.items ?? []).filter(
-        (i) => !isFolder(i) && i.sourceType === 'file' && !i.id.startsWith('docs_'),
-      );
-      setItems(files);
+      const result = await resourceApi.getKnowledgeItems({ ...queryParams, offset: 0 });
+      const items = result?.items ?? [];
+      setRows(items);
+      setHasMore(result?.hasMore ?? false);
     } catch {
-      setItems([]);
+      setRows([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryParams]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const offset = rowsRef.current.length;
+      const result = await resourceApi.getKnowledgeItems({ ...queryParams, offset });
+      const items = result?.items ?? [];
+      setHasMore(result?.hasMore ?? false);
+      setRows((prev) => mergeById(prev, items));
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasMore, loading, loadingMore, mergeById, queryParams]);
 
   useEffect(() => {
-    if (visible) {
-      setSelected(new Set());
-      void loadItems();
-    }
-  }, [visible, loadItems]);
+    if (!visible) return;
+    void (async () => {
+      try {
+        const list = await knowledgeBaseApi.list();
+        setLibraries(list ?? []);
+      } catch {
+        setLibraries([]);
+      }
+    })();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    setSelected(new Set());
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    void loadInitial();
+  }, [visible, loadInitial]);
+
+  const openFolder = useCallback((id: string) => {
+    haptics.selection();
+    setFolderStack((s) => [...s, id]);
+  }, []);
+
+  const goBackFolder = useCallback(() => {
+    haptics.selection();
+    setFolderStack((s) => (s.length > 0 ? s.slice(0, -1) : s));
+  }, []);
+
+  const pickLocation = useCallback((kb: KnowledgeBaseItem | null) => {
+    haptics.selection();
+    setActiveKb(kb);
+    setFolderStack([]);
+    setLocationMenuVisible(false);
+  }, []);
 
   const toggleSelect = useCallback((item: FileListItem) => {
     if (isFolder(item)) return;
+    if (item.sourceType !== 'file' || item.id.startsWith('docs_')) return;
     haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
@@ -82,19 +165,43 @@ export default function ResourcePickerSheet({
   }, []);
 
   const handleConfirm = useCallback(() => {
+    const pickable = rows.filter(
+      (i) => !isFolder(i) && i.sourceType === 'file' && !i.id.startsWith('docs_'),
+    );
+    const picked = pickable.filter((i) => selected.has(i.id));
     haptics.success();
-    const picked = items.filter((i) => selected.has(i.id));
     onClose();
     onSelect(picked);
-  }, [items, selected, onClose, onSelect]);
+  }, [onClose, onSelect, rows, selected]);
+
+  const selectableFiles = useMemo(
+    () => rows.filter((i) => !isFolder(i) && i.sourceType === 'file' && !i.id.startsWith('docs_')),
+    [rows],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: FileListItem }) => {
+      if (isFolder(item)) {
+        return (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-row items-center px-4 py-3 border-b border-foreground/5"
+            onPress={() => openFolder(item.id)}
+          >
+            <FolderOpen color={colors.primary} size={20} strokeWidth={2} />
+            <Text className="text-foreground text-[15px] font-medium flex-1 ml-3" numberOfLines={1}>
+              {item.name}
+            </Text>
+            <ChevronRight color={colors.muted} size={18} />
+          </TouchableOpacity>
+        );
+      }
+
       const isSelected = selected.has(item.id);
       return (
         <TouchableOpacity
           activeOpacity={0.7}
-          className="flex-row items-center px-4 py-3"
+          className="flex-row items-center px-4 py-3 border-b border-foreground/5"
           onPress={() => toggleSelect(item)}
         >
           <View
@@ -117,8 +224,16 @@ export default function ResourcePickerSheet({
         </TouchableOpacity>
       );
     },
-    [selected, colors, toggleSelect],
+    [colors, openFolder, selected, toggleSelect],
   );
+
+  const listData = useMemo(() => {
+    const folders = rows.filter((i) => isFolder(i));
+    const files = rows.filter(
+      (i) => !isFolder(i) && i.sourceType === 'file' && !i.id.startsWith('docs_'),
+    );
+    return [...folders, ...files];
+  }, [rows]);
 
   return (
     <Modal
@@ -131,29 +246,55 @@ export default function ResourcePickerSheet({
       <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
         <Animated.View
           entering={enteringModalContent()}
-          style={{ maxHeight: '80%', paddingBottom: Math.max(insets.bottom, 16) }}
+          style={{ maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 16) }}
         >
-          <Pressable
-            className="bg-card rounded-t-2xl"
-            onPress={(e) => e.stopPropagation()}
-          >
+          <Pressable className="bg-card rounded-t-2xl" onPress={(e) => e.stopPropagation()}>
             <View className="items-center pt-3 pb-1">
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
 
             <View className="px-5 pb-2 pt-2">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="text-foreground text-[18px] font-bold tracking-tight">
-                    {t.fileFromWorkspace}
-                  </Text>
-                  <Text className="text-[13px] leading-5 mt-1" style={{ color: colors.secondaryText }}>
-                    {t.fileFromWorkspaceDesc}
-                  </Text>
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center gap-2 flex-1 min-w-0">
+                  {(folderStack.length > 0 || activeKb) && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      className="p-1"
+                      hitSlop={10}
+                      onPress={() => {
+                        if (folderStack.length > 0) goBackFolder();
+                        else setActiveKb(null);
+                      }}
+                    >
+                      <ArrowLeft color={colors.primary} size={22} strokeWidth={2} />
+                    </TouchableOpacity>
+                  )}
+                  <View className="flex-1 min-w-0">
+                    <Text
+                      className="text-foreground text-[18px] font-bold tracking-tight"
+                      numberOfLines={1}
+                    >
+                      {t.fileFromWorkspace}
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      className="mt-1"
+                      onPress={() => setLocationMenuVisible(true)}
+                    >
+                      <Text
+                        className="text-[13px] font-medium"
+                        numberOfLines={1}
+                        style={{ color: colors.primary }}
+                      >
+                        {t.resourcePickerPickLocation}: {locationLabel}
+                        {folderStack.length > 0 ? ` · ${folderStack.length}` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  className="rounded-full px-4 py-2"
+                  className="rounded-full px-4 py-2 ml-2"
                   disabled={selected.size === 0}
                   style={{
                     backgroundColor: selected.size > 0 ? colors.primary : colors.fillTertiary,
@@ -171,23 +312,51 @@ export default function ResourcePickerSheet({
                 </TouchableOpacity>
               </View>
 
-              <View className="mt-4 max-h-72 rounded-2xl overflow-hidden bg-foreground/5">
+              <Text className="text-[13px] leading-5 mb-2" style={{ color: colors.secondaryText }}>
+                {t.fileFromWorkspaceDesc}
+              </Text>
+
+              <View className="mt-1 max-h-[420px] rounded-2xl overflow-hidden bg-foreground/5">
                 {loading ? (
                   <View className="items-center justify-center py-12">
                     <ActivityIndicator color={colors.primary} size="large" />
-                    <Text className="text-[14px] mt-3" style={{ color: colors.secondaryText }}>{t.loading}</Text>
+                    <Text className="text-[14px] mt-3" style={{ color: colors.secondaryText }}>
+                      {t.loading}
+                    </Text>
                   </View>
-                ) : items.length === 0 ? (
+                ) : listData.length === 0 && selectableFiles.length === 0 ? (
                   <View className="items-center justify-center py-12">
                     <FolderOpen color={colors.muted} size={40} strokeWidth={1.5} />
-                    <Text className="text-[14px] mt-3" style={{ color: colors.secondaryText }}>{t.resourceEmpty}</Text>
+                    <Text className="text-[14px] mt-3" style={{ color: colors.secondaryText }}>
+                      {t.resourceEmpty}
+                    </Text>
                   </View>
                 ) : (
                   <FlatList
-                    data={items}
+                    data={listData}
                     keyExtractor={(i) => i.id}
                     renderItem={renderItem}
                     showsVerticalScrollIndicator={false}
+                    ListFooterComponent={
+                      hasMore ? (
+                        <TouchableOpacity
+                          className="py-3 items-center"
+                          disabled={loadingMore}
+                          onPress={() => void loadMore()}
+                        >
+                          {loadingMore ? (
+                            <ActivityIndicator color={colors.primary} size="small" />
+                          ) : (
+                            <Text
+                              className="text-[14px] font-semibold"
+                              style={{ color: colors.primary }}
+                            >
+                              {t.resourceLoadMore}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null
+                    }
                   />
                 )}
               </View>
@@ -195,6 +364,44 @@ export default function ResourcePickerSheet({
           </Pressable>
         </Animated.View>
       </Pressable>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={locationMenuVisible}
+        onRequestClose={() => setLocationMenuVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 justify-end"
+          onPress={() => setLocationMenuVisible(false)}
+        >
+          <Pressable
+            className="bg-card rounded-t-2xl max-h-[60%]"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-foreground text-[16px] font-bold px-5 pt-4 pb-2">
+              {t.resourceLibrarySelect}
+            </Text>
+            <FlatList
+              data={[
+                { id: '__inbox__', name: t.resourceLibraryInbox } as KnowledgeBaseItem,
+                ...libraries,
+              ]}
+              keyExtractor={(i) => i.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  className="px-5 py-3.5 border-b border-foreground/5"
+                  onPress={() => pickLocation(item.id === '__inbox__' ? null : item)}
+                >
+                  <Text className="text-[15px] text-foreground" numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Modal>
   );
 }

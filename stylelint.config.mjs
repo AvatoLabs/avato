@@ -9,5 +9,7 @@ export default {
     'declaration-property-value-no-unknown': null,
     'selector-class-pattern': null,
     'selector-id-pattern': null,
+    // antd-style / Emotion `:global(...)` for third-party class names
+    'selector-pseudo-class-no-unknown': [true, { ignorePseudoClasses: ['global'] }],
   },
 };

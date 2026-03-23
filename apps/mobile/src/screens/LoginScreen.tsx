@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image as RNImage, Text, TouchableOpacity, View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import AmbientOrbBackground from '../components/ui/AmbientOrbBackground';
 import { useToast } from '../components/ui/Toast';
 import { clearTransientAppState } from '../lib/appState';
 import {
@@ -16,6 +17,7 @@ import { getApiUrl } from '../lib/server';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useAgentStore } from '../store/agent';
 import { useSessionStore } from '../store/session';
+import { useThemeStore } from '../store/theme';
 import { useUserStore } from '../store/user';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
@@ -126,6 +128,7 @@ export default function LoginScreen({ navigation }: RootStackScreenProps<'Login'
   const { t } = useI18n();
   const toast = useToast();
   const colors = useThemeColors();
+  const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const [authConfig, setAuthConfig] = useState<MobileAuthConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingInProvider, setSigningInProvider] = useState<string | null>(null);
@@ -164,6 +167,16 @@ export default function LoginScreen({ navigation }: RootStackScreenProps<'Login'
   }, [loadAuthConfig]);
 
   const primaryProvider = useMemo(() => getPrimaryProvider(authConfig), [authConfig]);
+
+  const signingProgressMessage = useMemo(() => {
+    if (!signingInProvider) return '';
+    if (signingInProvider === PASSWORD_SIGNIN_KEY) return t.loginOpenInBrowser;
+    const provider =
+      authConfig?.authProviders.find((p) => p.id === signingInProvider) ?? primaryProvider;
+    if (provider) return t.loginOpenInProviderApp.replace('{provider}', provider.label);
+
+    return t.loginOpenInBrowser;
+  }, [authConfig?.authProviders, primaryProvider, signingInProvider, t]);
 
   const handleSignIn = useCallback(
     async (providerId?: string) => {
@@ -233,88 +246,102 @@ export default function LoginScreen({ navigation }: RootStackScreenProps<'Login'
   const isBusy = loading || !!signingInProvider;
 
   return (
-    <View
-      className="flex-1 px-8"
-      style={{
-        backgroundColor: colors.background,
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom + 8,
-      }}
-    >
-      <View className="flex-1 items-center justify-center">
-        <Animated.View
-          className="items-center"
-          entering={FadeInUp.delay(80)
-            .duration(tokens.motion.duration.hero)
-            .springify()
-            .damping(15)
-            .mass(0.9)}
-        >
-          <View
-            className="h-32 w-32 items-center justify-center rounded-[34px]"
-            style={{
-              backgroundColor: colors.surface,
-              elevation: 12,
-              shadowColor: colors.shadow,
-              shadowOffset: { height: 20, width: 0 },
-              shadowOpacity: 0.12,
-              shadowRadius: 36,
-            }}
+    <View className="flex-1" style={{ backgroundColor: colors.background }}>
+      <AmbientOrbBackground />
+      <View
+        className="flex-1 px-8"
+        style={{
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom + 8,
+          zIndex: 1,
+        }}
+      >
+        <View className="flex-1 items-center justify-center">
+          <Animated.View
+            className="items-center"
+            entering={FadeInUp.delay(80)
+              .duration(tokens.motion.duration.hero)
+              .springify()
+              .damping(15)
+              .mass(0.9)}
           >
-            <RNImage
-              className="h-28 w-28"
-              source={require('../../assets/avato-logo.png')}
-              style={{ tintColor: colors.foreground }}
-            />
-          </View>
+            <View
+              className="h-32 w-32 items-center justify-center rounded-[34px]"
+              style={{
+                backgroundColor: colors.surface,
+                elevation: 12,
+                shadowColor: colors.shadow,
+                shadowOffset: { height: 20, width: 0 },
+                shadowOpacity: 0.12,
+                shadowRadius: 36,
+              }}
+            >
+              <RNImage
+                className="h-28 w-28"
+                source={require('../../assets/avato-logo.png')}
+                style={effectiveTheme === 'dark' ? { tintColor: colors.foreground } : undefined}
+              />
+            </View>
 
-          <Text
-            className="mt-3 text-center text-[36px] font-bold tracking-tight"
-            style={{ color: colors.foreground }}
-          >
-            Avato
-          </Text>
-          <Text
-            className="mt-4 text-center text-[17px] font-medium leading-7"
-            style={{ color: colors.secondaryText }}
-          >
-            {t.loginDesc}
-          </Text>
-        </Animated.View>
-
-        <Animated.View
-          className="mt-10 w-full"
-          entering={FadeInDown.delay(180)
-            .duration(tokens.motion.duration.hero)
-            .springify()
-            .damping(16)}
-        >
-          <TouchableOpacity
-            activeOpacity={0.82}
-            className="items-center rounded-2xl py-4"
-            disabled={isBusy}
-            style={{ backgroundColor: colors.primary }}
-            onPress={() => void handlePrimaryPress()}
-          >
-            {isBusy ? (
-              <ActivityIndicator color={colors.iconOnPrimary} size="small" />
-            ) : (
-              <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>
-                {primaryLabel}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            className="mt-4 items-center"
-            onPress={() => navigation.navigate('ServerConfig')}
-          >
-            <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
-              {t.loginChangeServer}
+            <Text
+              className="mt-3 text-center text-[36px] font-bold tracking-tight"
+              style={{ color: colors.foreground }}
+            >
+              Avato
             </Text>
-          </TouchableOpacity>
-        </Animated.View>
+            <Text
+              className="mt-4 text-center text-[17px] font-medium leading-7"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.loginDesc}
+            </Text>
+          </Animated.View>
+
+          <Animated.View
+            className="mt-10 w-full"
+            entering={FadeInDown.delay(180)
+              .duration(tokens.motion.duration.hero)
+              .springify()
+              .damping(16)}
+          >
+            <TouchableOpacity
+              activeOpacity={0.82}
+              className="items-center rounded-2xl py-4"
+              disabled={isBusy}
+              style={{ backgroundColor: colors.primary }}
+              onPress={() => void handlePrimaryPress()}
+            >
+              {isBusy ? (
+                <ActivityIndicator color={colors.iconOnPrimary} size="small" />
+              ) : (
+                <Text className="text-[16px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+                  {primaryLabel}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            {(loading || signingInProvider) && (
+              <Animated.View className="mt-4 px-1" entering={FadeIn.duration(240)}>
+                <Text
+                  className="text-center text-[13px] font-medium leading-5"
+                  style={{ color: colors.secondaryText }}
+                >
+                  {signingInProvider ? signingProgressMessage : t.loginLoadingAuthConfig}
+                </Text>
+              </Animated.View>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="mt-4 items-center"
+              onPress={() => navigation.navigate('ServerConfig')}
+            >
+              <Text className="text-[14px] font-medium" style={{ color: colors.primary }}>
+                {t.loginChangeServer}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </View>
     </View>
   );

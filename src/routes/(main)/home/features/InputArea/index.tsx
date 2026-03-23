@@ -3,6 +3,7 @@ import { AnimatePresence, m as motion } from 'motion/react';
 import { useEffect, useMemo, useRef } from 'react';
 
 import DragUploadZone, { useUploadFiles } from '@/components/DragUploadZone';
+import { DESKTOP_CHAT_INPUT_BORDER_RADIUS } from '@/const/layoutTokens';
 import { type ActionKeys } from '@/features/ChatInput';
 import { ChatInputProvider, DesktopChatInput } from '@/features/ChatInput';
 import { useAgentStore } from '@/store/agent';
@@ -48,20 +49,6 @@ const InputArea = () => {
   );
   const { handleUploadFiles } = useUploadFiles({ model, provider });
 
-  // A slot to insert content above the chat input
-  // Override some default behavior of the chat input
-  const inputContainerProps = useMemo(
-    () => ({
-      minHeight: 88,
-      resize: false,
-      style: {
-        borderRadius: 20,
-        boxShadow: '0 12px 32px rgba(0,0,0,.04)',
-      },
-    }),
-    [],
-  );
-
   const showSuggestQuestions =
     inputActiveMode && ['agent', 'group', 'write'].includes(inputActiveMode);
 
@@ -101,7 +88,6 @@ const InputArea = () => {
               disabled: loading,
               generating: loading,
               onStop: () => {},
-              shape: 'round',
             }}
             onSend={send}
             onMarkdownContentChange={(content) => {
@@ -109,9 +95,8 @@ const InputArea = () => {
             }}
           >
             <DesktopChatInput
-              dropdownPlacement="bottomLeft"
+              borderRadius={DESKTOP_CHAT_INPUT_BORDER_RADIUS}
               extraActionItems={extraActionItems}
-              inputContainerProps={inputContainerProps}
             />
           </ChatInputProvider>
         </DragUploadZone>

@@ -229,17 +229,28 @@ export function ScreenHeader({
                       {titleIcon}
                     </View>
                   ) : null}
-                  <Text
-                    className="flex-1 font-bold tracking-tight"
-                    numberOfLines={1}
-                    style={{
-                      color: colors.foreground,
-                      fontSize: HEADER_DISPLAY_SIZE,
-                      lineHeight: HEADER_DISPLAY_SIZE + tokens.spacing.xs,
-                    }}
-                  >
-                    {title}
-                  </Text>
+                  <View className="flex-1">
+                    <Text
+                      className="font-bold tracking-tight"
+                      numberOfLines={1}
+                      style={{
+                        color: colors.foreground,
+                        fontSize: HEADER_DISPLAY_SIZE,
+                        lineHeight: HEADER_DISPLAY_SIZE + tokens.spacing.xs,
+                      }}
+                    >
+                      {title}
+                    </Text>
+                    {subtitle ? (
+                      <Text
+                        className="mt-1 font-medium"
+                        numberOfLines={2}
+                        style={{ color: colors.muted, fontSize: HEADER_META_SIZE }}
+                      >
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               )}
             </View>

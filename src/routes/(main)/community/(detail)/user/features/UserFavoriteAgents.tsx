@@ -21,9 +21,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
-import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
 import { type FavoriteAgentItem } from '@/services/social';
-import { socialService } from '@/services/social';
 import { useDiscoverStore } from '@/store/discover';
 import { formatIntergerNumber } from '@/utils/format';
 
@@ -233,8 +231,6 @@ const UserFavoriteAgents = memo<UserFavoriteAgentsProps>(({ rows = 4 }) => {
   const { t } = useTranslation('discover');
   const { message } = App.useApp();
   const { user, isOwner } = useUserDetailContext();
-  const { session } = useMarketAuth();
-
   const useFavoriteAgents = useDiscoverStore((s) => s.useFavoriteAgents);
   const removeFavorite = useDiscoverStore((s) => s.removeFavorite);
 

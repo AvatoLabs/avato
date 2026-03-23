@@ -7,7 +7,7 @@ import { ResourceModel } from '@/database/models/resource';
 import { TopicDocumentModel } from '@/database/models/topicDocument';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { type ResourceCapability, ResourceAuthorizer } from '@/server/services/resource';
+import { ResourceAuthorizer, type ResourceCapability } from '@/server/services/resource';
 
 const assertNotebookDocumentAccess = async (params: {
   capability: ResourceCapability;

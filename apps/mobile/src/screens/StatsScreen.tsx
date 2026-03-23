@@ -3,13 +3,13 @@
  *
  * Sections:
  *  1. Welcome banner (registration duration)
- *  2. Overview cards (Messages, Assistants, Topics, Words) — from server
+ *  2. Overview cards (Assistants, Topics, Messages, Words) — from server, same order as web
  *  3. Activity heatmap (simplified grid for React Native)
  *  4. Rankings: Models / Assistants / Topics top-5
  */
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
-  BarChart3,
   BookOpen,
   CalendarDays,
   Clock3,
@@ -21,24 +21,29 @@ import {
   Trophy,
   Zap,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image as RNImage,
+  Pressable,
   RefreshControl,
   ScrollView,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { getProviderIconUrl } from '../constants/cdn';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
+import { getProviderIconUrl } from '../constants/cdn';
+import { INBOX_SESSION_ID } from '../constants/session';
 import { statsApi } from '../lib/api';
+import { useI18n } from '../lib/i18n';
+import type { RootStackParamList } from '../navigation/types';
 import { useThemeStore } from '../store/theme';
 import { useThemeColors } from '../theme/colors';
-import { useI18n } from '../lib/i18n';
 import { tokens } from '../theme/tokens';
 import type {
   HeatmapDay,
@@ -47,6 +52,13 @@ import type {
   TopicRankItem,
   UserRegistrationDuration,
 } from '../types';
+
+interface StatsRankRow {
+  count: number;
+  name: string;
+  sessionId?: string;
+  topicId?: string;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -62,9 +74,9 @@ function lastMonthEnd(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function percentChange(current: number, prev: number): string | null {
+function percentChange(current: number, prev: number, newSincePrevLabel: string): string | null {
   if (prev === 0 && current === 0) return null;
-  if (prev === 0) return '+∞';
+  if (prev === 0) return newSincePrevLabel;
   const pct = Math.round(((current - prev) / prev) * 100);
   return pct >= 0 ? `+${pct}%` : `${pct}%`;
 }
@@ -75,9 +87,23 @@ function formatDate(iso?: string): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function settledNumber(r: PromiseSettledResult<unknown>, fallback = 0): number {
+  if (r.status !== 'fulfilled' || typeof r.value !== 'number') return fallback;
+  return r.value;
+}
+
+function settledRegistration(r: PromiseSettledResult<unknown>): UserRegistrationDuration | null {
+  if (r.status !== 'fulfilled') return null;
+  return r.value as UserRegistrationDuration | null;
+}
+
+function settledArray<T>(r: PromiseSettledResult<unknown>): T[] {
+  if (r.status !== 'fulfilled' || !Array.isArray(r.value)) return [];
+  return r.value as T[];
+}
+
 // ── Sub-components ───────────────────────────────────────────────────
 
-const STAT_ICON_KEYS = ['messages', 'sessions', 'topics', 'words'] as const;
 const STAT_ICONS: Record<string, { icon: any }> = {
   messages: { icon: MessageSquare },
   sessions: { icon: Sparkles },
@@ -98,19 +124,17 @@ function StatCard({
   title: string;
   value: number;
 }) {
+  const { t } = useI18n();
   const colors = useThemeColors();
-  const pct = prevValue !== undefined ? percentChange(value, prevValue) : null;
-  const isPositive = pct?.startsWith('+');
+  const pct = prevValue !== undefined ? percentChange(value, prevValue, t.statsVsNew) : null;
+  const isPositive = Boolean(pct && (pct.startsWith('+') || pct === t.statsVsNew));
   const meta = STAT_ICONS[iconKey] || STAT_ICONS.messages;
   const IconComp = meta.icon;
   const iconColor = colors.primary;
   const iconBg = colors.primarySubtle;
 
   return (
-    <View
-      className="flex-1 items-center rounded-2xl py-3 mx-1"
-      style={{ backgroundColor: iconBg }}
-    >
+    <View className="flex-1 items-center rounded-2xl py-3 mx-1" style={{ backgroundColor: iconBg }}>
       {loading ? (
         <ActivityIndicator color={colors.primary} size="small" />
       ) : (
@@ -203,22 +227,42 @@ function MiniHeatmap({ data, loading }: { data: HeatmapDay[]; loading: boolean }
           </View>
         </View>
       </View>
+      <Text className="text-[11px] leading-4 mb-2 px-0.5" style={{ color: colors.tertiaryText }}>
+        {t.statsHeatmapHint}
+      </Text>
       {/* Center the grid precisely */}
       <View style={{ alignItems: 'center' }}>
         <View style={{ flexDirection: 'row', gap: GAP, width: gridWidth }}>
           {weeks.map((week, wi) => (
             <View key={wi} style={{ gap: GAP }}>
-              {week.map((day, di) => (
-                <View
-                  key={`${wi}-${di}`}
-                  style={{
-                    backgroundColor: heatmapColors[day.level] || heatmapColors[0],
-                    borderRadius: 3,
-                    height: cellSize,
-                    width: cellSize,
-                  }}
-                />
-              ))}
+              {week.map((day, di) => {
+                const cellStyle = {
+                  backgroundColor: heatmapColors[day.level] || heatmapColors[0],
+                  borderRadius: 3,
+                  height: cellSize,
+                  width: cellSize,
+                };
+                return (
+                  <Pressable
+                    delayLongPress={380}
+                    key={`${wi}-${di}`}
+                    accessibilityLabel={t.statsHeatmapCellA11y
+                      .replace('{date}', day.date)
+                      .replace('{level}', String(day.level))}
+                    onLongPress={() => {
+                      Alert.alert(
+                        t.statsHeatmapDayTitle,
+                        t.statsHeatmapDayMessage
+                          .replace('{date}', formatDate(day.date))
+                          .replace('{count}', String(day.count))
+                          .replace('{level}', String(day.level)),
+                      );
+                    }}
+                  >
+                    <View style={cellStyle} />
+                  </Pressable>
+                );
+              })}
               {Array.from({ length: 7 - week.length }).map((_, pi) => (
                 <View
                   key={`pad-${wi}-${pi}`}
@@ -253,7 +297,12 @@ function ModelLogo({ providerId }: { providerId: string }) {
   const [err, setErr] = React.useState(false);
   const effectiveTheme = useThemeStore((s) => s.effectiveTheme);
   const url = getProviderIconUrl(providerId, effectiveTheme);
-  if (err) return <Text className="text-[10px] font-bold" style={{ color: colors.primary }}>{providerId.slice(0, 2)}</Text>;
+  if (err)
+    return (
+      <Text className="text-[10px] font-bold" style={{ color: colors.primary }}>
+        {providerId.slice(0, 2)}
+      </Text>
+    );
   return (
     <RNImage
       source={{ uri: url }}
@@ -267,12 +316,14 @@ function RankSection({
   data,
   icon,
   loading,
+  onRowPress,
   title,
   modelLogos,
 }: {
-  data: { count: number; name: string }[];
+  data: StatsRankRow[];
   icon: React.ReactNode;
   loading: boolean;
+  onRowPress?: (row: StatsRankRow) => void;
   title: string;
   modelLogos?: Array<{ providerId?: string }>;
 }) {
@@ -304,9 +355,13 @@ function RankSection({
         <View className="rounded-2xl overflow-hidden bg-foreground/[0.02] px-3 py-2">
           {data.slice(0, 5).map((item, i) => {
             const providerId = modelLogos?.[i]?.providerId ?? getProviderFromModelId(item.name);
-            return (
-              <View className="flex-row items-center py-2" key={i}>
-                <View className="w-8 h-8 items-center justify-center rounded-full mr-2" style={{ backgroundColor: colors.primarySubtle }}>
+            const rowKey = item.topicId ? `topic-${item.topicId}` : `rank-${i}-${item.name}`;
+            const rowBody = (
+              <>
+                <View
+                  className="w-8 h-8 items-center justify-center rounded-full mr-2"
+                  style={{ backgroundColor: colors.primarySubtle }}
+                >
                   {providerId ? (
                     <ModelLogo providerId={providerId} />
                   ) : i < 3 ? (
@@ -325,20 +380,37 @@ function RankSection({
                     >
                       {item.name}
                     </Text>
-<Text
-                    className="text-[12px] font-semibold tabular-nums ml-2"
-                    style={{ color: colors.secondaryText }}
-                  >
-                    {item.count}
-                  </Text>
+                    <Text
+                      className="text-[12px] font-semibold tabular-nums ml-2"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {item.count}
+                    </Text>
                   </View>
                   <View className="h-1.5 rounded-full bg-foreground/5 overflow-hidden">
                     <View
                       className="h-full rounded-full"
-                      style={{ backgroundColor: colors.primary, width: `${Math.max((item.count / maxCount) * 100, 4)}%` }}
+                      style={{
+                        backgroundColor: colors.primary,
+                        width: `${Math.max((item.count / maxCount) * 100, 4)}%`,
+                      }}
                     />
                   </View>
                 </View>
+              </>
+            );
+            return onRowPress ? (
+              <TouchableOpacity
+                activeOpacity={0.65}
+                className="flex-row items-center py-2"
+                key={rowKey}
+                onPress={() => onRowPress(item)}
+              >
+                {rowBody}
+              </TouchableOpacity>
+            ) : (
+              <View className="flex-row items-center py-2" key={rowKey}>
+                {rowBody}
               </View>
             );
           })}
@@ -366,10 +438,13 @@ interface StatsData {
   words: number;
 }
 
-export default function StatsScreen({ navigation }: any) {
+type StatsScreenNavigation = NativeStackNavigationProp<RootStackParamList, 'Stats'>;
+
+export default function StatsScreen({ navigation }: { navigation: StatsScreenNavigation }) {
   const { t } = useI18n();
   const colors = useThemeColors();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<StatsData>({
     messages: 0,
@@ -389,73 +464,118 @@ export default function StatsScreen({ navigation }: any) {
 
   const prevMonthEnd = lastMonthEnd();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [
-        messages,
-        prevMessages,
-        sessions,
-        prevSessions,
-        topics,
-        prevTopics,
-        words,
-        prevWords,
-        registration,
-        heatmap,
-        modelRank,
-        sessionRank,
-        topicRank,
-      ] = await Promise.all([
-        statsApi.countMessages().catch(() => 0),
-        statsApi.countMessages({ endDate: prevMonthEnd }).catch(() => 0),
-        statsApi.countSessions().catch(() => 0),
-        statsApi.countSessions({ endDate: prevMonthEnd }).catch(() => 0),
-        statsApi.countTopics().catch(() => 0),
-        statsApi.countTopics({ endDate: prevMonthEnd }).catch(() => 0),
-        statsApi.countWords().catch(() => 0),
-        statsApi.countWords({ endDate: prevMonthEnd }).catch(() => 0),
-        statsApi.getRegistrationDuration().catch(() => null),
-        statsApi.getHeatmaps().catch(() => []),
-        statsApi.rankModels().catch(() => []),
-        statsApi.rankSessions().catch(() => []),
-        statsApi.rankTopics().catch(() => []),
-      ]);
-      setData({
-        messages: messages as number,
-        prevMessages: prevMessages as number,
-        sessions: sessions as number,
-        prevSessions: prevSessions as number,
-        topics: topics as number,
-        prevTopics: prevTopics as number,
-        words: words as number,
-        prevWords: prevWords as number,
-        registration: registration as UserRegistrationDuration | null,
-        heatmap: (heatmap || []) as HeatmapDay[],
-        modelRank: (modelRank || []) as ModelRankItem[],
-        sessionRank: (sessionRank || []) as SessionRankItem[],
-        topicRank: (topicRank || []) as TopicRankItem[],
-      });
-    } catch {
-      /* ignore */
+  const fetchAll = useCallback(async (): Promise<boolean> => {
+    const settled = await Promise.allSettled([
+      statsApi.countMessages(),
+      statsApi.countMessages({ endDate: prevMonthEnd }),
+      statsApi.countSessions(),
+      statsApi.countSessions({ endDate: prevMonthEnd }),
+      statsApi.countTopics(),
+      statsApi.countTopics({ endDate: prevMonthEnd }),
+      statsApi.countWords(),
+      statsApi.countWords({ endDate: prevMonthEnd }),
+      statsApi.getRegistrationDuration(),
+      statsApi.getHeatmaps(),
+      statsApi.rankModels(),
+      statsApi.rankSessions(),
+      statsApi.rankTopics(),
+    ]);
+
+    if (settled.every((s) => s.status === 'rejected')) {
+      return false;
     }
+
+    setData({
+      messages: settledNumber(settled[0]),
+      prevMessages: settledNumber(settled[1]),
+      sessions: settledNumber(settled[2]),
+      prevSessions: settledNumber(settled[3]),
+      topics: settledNumber(settled[4]),
+      prevTopics: settledNumber(settled[5]),
+      words: settledNumber(settled[6]),
+      prevWords: settledNumber(settled[7]),
+      registration: settledRegistration(settled[8]),
+      heatmap: settledArray<HeatmapDay>(settled[9]),
+      modelRank: settledArray<ModelRankItem>(settled[10]),
+      sessionRank: settledArray<SessionRankItem>(settled[11]),
+      topicRank: settledArray<TopicRankItem>(settled[12]),
+    });
+    return true;
   }, [prevMonthEnd]);
 
   useEffect(() => {
-    fetchAll().then(() => setLoading(false));
+    void (async () => {
+      const ok = await fetchAll();
+      setLoading(false);
+      setLoadError(!ok);
+    })();
   }, [fetchAll]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchAll();
+    const ok = await fetchAll();
+    setLoadError(!ok);
     setRefreshing(false);
   }, [fetchAll]);
+
+  const handleRetry = useCallback(async () => {
+    setLoadError(false);
+    setLoading(true);
+    const ok = await fetchAll();
+    setLoading(false);
+    setLoadError(!ok);
+  }, [fetchAll]);
+
+  const modelRankSectionData = useMemo(
+    () => data.modelRank.map((m) => ({ count: m.count, name: m.id })),
+    [data.modelRank],
+  );
+  const modelRankLogos = useMemo(
+    () =>
+      data.modelRank.map((m) => {
+        const pid = getProviderFromModelId(m.id);
+        return pid ? { providerId: pid } : {};
+      }),
+    [data.modelRank],
+  );
+  const sessionRankSectionData = useMemo(
+    () =>
+      data.sessionRank.map((s) => ({
+        count: s.count,
+        name: s.title || t.statsRankUntitled,
+      })),
+    [data.sessionRank, t.statsRankUntitled],
+  );
+  const topicRankSectionData = useMemo(
+    () =>
+      data.topicRank.map((tp) => ({
+        count: tp.count,
+        name: tp.title || t.statsRankUntitled,
+        sessionId: tp.sessionId,
+        topicId: tp.id,
+      })),
+    [data.topicRank, t.statsRankUntitled],
+  );
+
+  const handleTopicRankPress = useCallback(
+    (row: StatsRankRow) => {
+      if (!row.topicId) return;
+      navigation.navigate('ChatDetail', {
+        sessionId: row.sessionId || INBOX_SESSION_ID,
+        topicId: row.topicId,
+      });
+    },
+    [navigation],
+  );
 
   const regDays = data.registration?.duration;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        leftElement={<ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />}
+        leftElement={
+          <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+        }
         title={t.statsTitle}
         onPressLeft={() => navigation.goBack()}
       />
@@ -473,46 +593,73 @@ export default function StatsScreen({ navigation }: any) {
           />
         }
       >
-        {/* Welcome Banner */}
-        {regDays && (
+        {loadError && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            className="mx-4 mb-3 px-3 py-2.5 rounded-xl flex-row items-center justify-between"
+            style={{ backgroundColor: colors.primarySubtle }}
+            onPress={() => void handleRetry()}
+          >
+            <Text
+              className="text-[13px] font-medium flex-1 pr-2"
+              style={{ color: colors.secondaryText }}
+            >
+              {t.statsLoadFailed}
+            </Text>
+            <Text className="text-[13px] font-semibold" style={{ color: colors.primary }}>
+              {t.statsRetry}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Welcome Banner — show whenever load succeeded (full or partial) */}
+        {!loading && !loadError && (
           <Animated.View entering={FadeInDown.delay(30).duration(300)}>
-            <View className="mx-5 mb-5 p-4 rounded-2xl" style={{ backgroundColor: colors.primarySubtle }}>
+            <View
+              className="mx-5 mb-5 p-4 rounded-2xl"
+              style={{ backgroundColor: colors.primarySubtle }}
+            >
               <Text className="text-foreground text-[16px] font-semibold leading-6">
-                {t.statsWelcome.replace('{days}', String(regDays))}
+                {regDays != null && regDays > 0
+                  ? t.statsWelcome.replace('{days}', String(regDays))
+                  : t.statsWelcomeFallback}
               </Text>
-              <View className="flex-row gap-4 mt-2">
-                {data.registration?.createdAt && (
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1 mt-2">
+                {data.registration?.createdAt ? (
                   <View className="flex-row items-center gap-1">
                     <Clock3 color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
-                      {formatDate(data.registration.createdAt)}
+                    <Text
+                      className="text-[11px] font-medium"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.statsCreatedAt} · {formatDate(data.registration.createdAt)}
                     </Text>
                   </View>
-                )}
-                {data.registration?.updatedAt && (
+                ) : null}
+                {data.registration?.updatedAt ? (
                   <View className="flex-row items-center gap-1">
-                    <ClockArrowUp color={colors.muted} size={11} strokeWidth={tokens.icon.strokeWidth} />
-                    <Text className="text-[11px] font-medium" style={{ color: colors.secondaryText }}>
-                      {formatDate(data.registration.updatedAt)}
+                    <ClockArrowUp
+                      color={colors.muted}
+                      size={11}
+                      strokeWidth={tokens.icon.strokeWidth}
+                    />
+                    <Text
+                      className="text-[11px] font-medium"
+                      style={{ color: colors.secondaryText }}
+                    >
+                      {t.statsUpdatedAt} · {formatDate(data.registration.updatedAt)}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
             </View>
           </Animated.View>
         )}
 
-        {/* Overview Cards */}
+        {/* Overview Cards — order matches web: Assistants, Topics, Messages, Words */}
         <Animated.View entering={FadeInDown.delay(60).duration(300)}>
           <View className="px-4 mb-5">
             <View className="flex-row">
-              <StatCard
-                iconKey="messages"
-                loading={loading}
-                prevValue={data.prevMessages}
-                title={t.statsTotalMessages}
-                value={data.messages}
-              />
               <StatCard
                 iconKey="sessions"
                 loading={loading}
@@ -528,6 +675,13 @@ export default function StatsScreen({ navigation }: any) {
                 value={data.topics}
               />
               <StatCard
+                iconKey="messages"
+                loading={loading}
+                prevValue={data.prevMessages}
+                title={t.statsTotalMessages}
+                value={data.messages}
+              />
+              <StatCard
                 iconKey="words"
                 loading={loading}
                 prevValue={data.prevWords}
@@ -535,6 +689,14 @@ export default function StatsScreen({ navigation }: any) {
                 value={data.words}
               />
             </View>
+            {!loading && !loadError ? (
+              <Text
+                className="text-center text-[10px] font-medium mt-1.5"
+                style={{ color: colors.tertiaryText }}
+              >
+                {t.statsVsPrevMonth}
+              </Text>
+            ) : null}
           </View>
         </Animated.View>
 
@@ -549,32 +711,34 @@ export default function StatsScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(120).duration(300)}>
           <View className="px-5">
             <RankSection
-              data={data.modelRank.map((m) => ({ count: m.count, name: m.id }))}
-              icon={<Trophy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              data={modelRankSectionData}
+              icon={
+                <Trophy color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              }
               loading={loading}
-              modelLogos={data.modelRank.map((m) => {
-                const pid = getProviderFromModelId(m.id);
-                return pid ? { providerId: pid } : {};
-              })}
+              modelLogos={modelRankLogos}
               title={t.statsModelsRank}
             />
             <RankSection
+              data={sessionRankSectionData}
+              icon={
+                <MessageSquare
+                  color={colors.primary}
+                  size={16}
+                  strokeWidth={tokens.icon.strokeWidth}
+                />
+              }
               loading={loading}
               title={t.statsAssistantsRank}
-              data={data.sessionRank.map((s) => ({
-                count: s.count,
-                name: s.title || 'Untitled',
-              }))}
-              icon={<MessageSquare color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
             />
             <RankSection
+              data={topicRankSectionData}
+              icon={
+                <BookOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />
+              }
               loading={loading}
               title={t.statsTopicsRank}
-              data={data.topicRank.map((tp) => ({
-                count: tp.count,
-                name: tp.title || 'Untitled',
-              }))}
-              icon={<BookOpen color={colors.primary} size={16} strokeWidth={tokens.icon.strokeWidth} />}
+              onRowPress={handleTopicRankPress}
             />
           </View>
         </Animated.View>

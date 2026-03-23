@@ -2,6 +2,7 @@ export default {
   'config.aspectRatio.label': 'Aspect Ratio',
   'config.aspectRatio.lock': 'Lock Aspect Ratio',
   'config.aspectRatio.unlock': 'Unlock Aspect Ratio',
+  'config.advanced.sectionTitle': 'Advanced',
   'config.cfg.label': 'Guidance Intensity',
   'config.header.desc': 'Brief description, create instantly',
   'config.header.title': 'Painting',
@@ -61,6 +62,12 @@ export default {
     'Supports multiple AI image generation providers, including OpenAI gpt-image-1, Google Imagen, FAL.ai, and more, offering a wide selection of models.',
   'notSupportGuide.features.multiProviders.title': 'Multi-Provider Support',
   'notSupportGuide.title': 'Current Deployment Mode Does Not Support AI Image Generation',
+  'empty.topic.desc':
+    'No images in this topic yet. Enter a prompt below to create your first generation.',
+  'empty.workspace.deepLink':
+    'Tip: you can open this page with ?prompt=… (and optionally &model=…) to prefill settings.',
+  'empty.workspace.desc':
+    'Use the topic list on the right to open or create a topic. Your generations are grouped by topic.',
   'topic.createNew': 'New Topic',
   'topic.deleteConfirm': 'Delete Generation Topic',
   'topic.deleteConfirmDesc':
@@ -68,4 +75,5 @@ export default {
   'topic.empty': 'No generation topics',
   'topic.title': 'Painting Theme',
   'topic.untitled': 'Default Topic',
+  'workspace.activeTopic': 'Topic',
 };

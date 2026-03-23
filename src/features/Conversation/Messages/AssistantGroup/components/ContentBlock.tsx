@@ -3,10 +3,12 @@ import { memo, useCallback } from 'react';
 
 import { LOADING_FLAT } from '@/const/message';
 import { useErrorContent } from '@/features/Conversation/Error';
+import SearchGrounding from '@/features/Conversation/Messages/components/SearchGrounding';
 import { type AssistantContentBlock } from '@/types/index';
 
 import ErrorContent from '../../../ChatItem/components/ErrorContent';
 import { messageStateSelectors, useConversationStore } from '../../../store';
+import FileChunks from '../../components/FileChunks';
 import ImageFileListViewer from '../../components/ImageFileListViewer';
 import Reasoning from '../../components/Reasoning';
 import { Tools } from '../Tools';
@@ -17,9 +19,21 @@ interface ContentBlockProps extends AssistantContentBlock {
   disableEditing?: boolean;
 }
 const ContentBlock = memo<ContentBlockProps>(
-  ({ id, tools, content, imageList, reasoning, error, assistantId, disableEditing }) => {
+  ({
+    id,
+    tools,
+    content,
+    imageList,
+    reasoning,
+    error,
+    assistantId,
+    disableEditing,
+    search,
+    chunksList,
+  }) => {
     const errorContent = useErrorContent(error);
     const showImageItems = !!imageList && imageList.length > 0;
+    const showFileChunks = !!chunksList && chunksList.length > 0;
     const [isReasoning, deleteMessage, continueGeneration] = useConversationStore((s) => [
       messageStateSelectors.isMessageInReasoning(id)(s),
       s.deleteDBMessage,
@@ -28,11 +42,12 @@ const ContentBlock = memo<ContentBlockProps>(
     const hasTools = tools && tools.length > 0;
     const showReasoning =
       (!!reasoning && reasoning.content?.trim() !== '') || (!reasoning && isReasoning);
+    const showSearch = !!search && (!!search.citations?.length || !!search.imageResults?.length);
 
     const handleRegenerate = useCallback(async () => {
       await deleteMessage(id);
       continueGeneration(assistantId);
-    }, [id]);
+    }, [assistantId, continueGeneration, deleteMessage, id]);
 
     if (error && (content === LOADING_FLAT || !content)) {
       return (
@@ -62,6 +77,15 @@ const ContentBlock = memo<ContentBlockProps>(
 
     return (
       <Flexbox gap={8} id={id}>
+        {showSearch && (
+          <SearchGrounding
+            citations={search?.citations}
+            imageResults={search?.imageResults}
+            imageSearchQueries={search?.imageSearchQueries}
+            searchQueries={search?.searchQueries}
+          />
+        )}
+        {showFileChunks && <FileChunks data={chunksList} />}
         {showReasoning && <Reasoning {...reasoning} id={id} />}
 
         {/* Content - markdown text */}

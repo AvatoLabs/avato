@@ -9,6 +9,9 @@ export const CHAT_TEXTAREA_HEIGHT_MOBILE = 108;
 export const CHAT_SIDEBAR_WIDTH = 280;
 export const CONVERSATION_MIN_WIDTH = 960;
 
+/** Desktop chat composer (home workspace + agent conversation) — keep chrome consistent. */
+export const DESKTOP_CHAT_INPUT_BORDER_RADIUS = 12;
+
 export const CHAT_PORTAL_WIDTH = 400;
 export const CHAT_PORTAL_MAX_WIDTH = 1280;
 export const CHAT_PORTAL_TOOL_UI_WIDTH = 600;

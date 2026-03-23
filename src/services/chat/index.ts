@@ -141,8 +141,10 @@ class ChatService {
     const searchConfig = getSearchConfig(payload.model, payload.provider!, targetAgentId);
 
     // =================== 1.1 process user memories =================== //
-
-    const enableUserMemories = settingsSelectors.memoryEnabled(getUserStoreState());
+    // Global toggle + per-agent `memory.enabled` (explicit `false` from chat Memory control disables injection).
+    const userGlobalMemoryEnabled = settingsSelectors.memoryEnabled(getUserStoreState());
+    const agentMemoryAllowsInjection = chatConfig.memory?.enabled !== false;
+    const enableUserMemories = userGlobalMemoryEnabled && agentMemoryAllowsInjection;
     const userMemorySettings = settingsSelectors.currentMemorySettings(getUserStoreState());
     const effectiveMemoryEffort =
       chatConfig.memory?.effort ?? userMemorySettings.effort ?? 'medium';

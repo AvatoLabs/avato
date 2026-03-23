@@ -28,9 +28,9 @@ export const normalizeUserMemorySettings = (
 
 let cachedUserMemorySettings: MobileUserMemorySettings | null = null;
 
-export const getUserMemorySettings = async (
-  options?: { force?: boolean },
-): Promise<MobileUserMemorySettings> => {
+export const getUserMemorySettings = async (options?: {
+  force?: boolean;
+}): Promise<MobileUserMemorySettings> => {
   if (!options?.force && cachedUserMemorySettings) return cachedUserMemorySettings;
 
   try {
@@ -58,7 +58,6 @@ const normalizeUserProfile = (profile?: MobileUserProfile | null): UserProfile |
 
   return {
     avatar: typeof profile.avatar === 'string' ? profile.avatar : undefined,
-    bio: profile.bio,
     email: profile.email,
     fullName: profile.fullName,
     id: profile.id || profile.userId || 'me',
@@ -150,8 +149,8 @@ export const useUserStore = create<UserState>((set, get) => ({
     const updated = { ...profile, ...field };
     set({
       ...(field.avatar !== undefined && {
-      avatar: typeof field.avatar === 'string' ? field.avatar : null,
-    }),
+        avatar: typeof field.avatar === 'string' ? field.avatar : null,
+      }),
       ...(field.email !== undefined && { email: field.email || null }),
       ...(field.fullName !== undefined && { fullName: field.fullName || null }),
       ...(field.interests !== undefined && { interests: field.interests || [] }),

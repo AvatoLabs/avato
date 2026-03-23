@@ -2,7 +2,7 @@ import { ProviderIcon } from '@lobehub/icons';
 import { Flexbox, Tag, Text, Tooltip } from '@lobehub/ui';
 import { type TableColumnType } from 'antd';
 import { cssVar } from 'antd-style';
-import { memo, useEffect } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import InlineTable from '@/components/InlineTable';
@@ -16,7 +16,7 @@ import { type UsageChartProps } from '../../types';
 const UsageTable = memo<UsageChartProps>(({ dateStrings }) => {
   const { t } = useTranslation('auth');
 
-  const { data, isLoading, mutate } = useClientDataSWR('usage-logs', async () =>
+  const { data, isLoading } = useClientDataSWR(['usage-logs', dateStrings], async () =>
     usageService.findByMonth(dateStrings),
   );
 
@@ -26,12 +26,6 @@ const UsageTable = memo<UsageChartProps>(({ dateStrings }) => {
   const [pageSize, setPageSize] = useQueryParam('pageSize', parseAsInteger.withDefault(5), {
     clearOnDefault: true,
   });
-
-  useEffect(() => {
-    if (dateStrings) {
-      mutate();
-    }
-  }, [dateStrings]);
 
   const columns: TableColumnType<any>[] = [
     {

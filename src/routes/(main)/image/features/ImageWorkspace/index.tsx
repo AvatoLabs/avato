@@ -12,7 +12,8 @@ const ImageWorkspace = () => {
 
   // 如果没有 topic 参数，或者正在创建新 topic 的图片，显示空状态布局
   if (!topic || isCreatingWithNewTopic) {
-    return <EmptyState />;
+    const emptyHint = !topic && !isCreatingWithNewTopic ? ('workspace' as const) : undefined;
+    return <EmptyState emptyHint={emptyHint} />;
   }
 
   // 有 topic 参数且不在创建新 topic 状态时显示主要内容

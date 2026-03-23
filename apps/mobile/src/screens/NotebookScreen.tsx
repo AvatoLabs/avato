@@ -2,7 +2,7 @@
  * NotebookScreen — Personal documents and notes with Markdown support.
  *
  * Accessible from:
- *   1. ProfileScreen (standalone — uses a personal notes topic)
+ *   1. ProfileScreen (standalone — personal topic under a fixed-slug session, hidden from Chats list)
  *   2. ChatDetailScreen (per-topic — uses the chat's active topic)
  *
  * List: tap opens editor; long-press opens a sheet (Open / Delete). Delete still uses Alert + recycle-bin copy.
@@ -18,7 +18,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -40,11 +41,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PressableScale from '../components/ui/PressableScale';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
-import { notebookApi, type NotebookDocument, topicApi } from '../lib/api';
+import { notebookApi, type NotebookDocument, sessionApi, topicApi } from '../lib/api';
 import { classifyError } from '../lib/errorHandler';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { codeInlineRules } from '../lib/markdownRules';
+import {
+  PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY,
+  PERSONAL_NOTEBOOK_STANDALONE_SLUG,
+} from '../lib/personalNotebookSession';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 
@@ -52,6 +57,11 @@ const PERSONAL_TOPIC_KEY = 'avato_personal_notebook_topic_id';
 const NOTEBOOK_SESSION_TITLE = 'Notebook';
 const NOTEBOOK_PERSONAL_TOPIC_TITLE = 'Personal Notes';
 const NOTEBOOK_TOPIC_TITLE = 'Notebook';
+
+const NotebookDocListSeparator = memo(function NotebookDocListSeparator() {
+  const colors = useThemeColors();
+  return <View className="mx-5 h-px" style={{ backgroundColor: colors.divider }} />;
+});
 
 const isStaleNotebookTopicError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -166,6 +176,22 @@ function DocEditor({
 
   const hasChanges = title !== savedTitleRef.current || content !== savedContentRef.current;
 
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await notebookApi.update({ id: doc.id, title, content });
+      savedTitleRef.current = title;
+      savedContentRef.current = content;
+      haptics.success();
+      toast.show('success', t.notebookSaved);
+      onSaved();
+    } catch {
+      toast.show('error', t.errorUnknown);
+    } finally {
+      setSaving(false);
+    }
+  }, [doc.id, title, content, t, toast, onSaved]);
+
   const handleBack = useCallback(() => {
     if (!hasChanges) {
       onBack();
@@ -187,23 +213,7 @@ function DocEditor({
         },
       },
     ]);
-  }, [hasChanges, onBack, t]);
-
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      await notebookApi.update({ id: doc.id, title, content });
-      savedTitleRef.current = title;
-      savedContentRef.current = content;
-      haptics.success();
-      toast.show('success', t.notebookSaved);
-      onSaved();
-    } catch {
-      toast.show('error', t.errorUnknown);
-    } finally {
-      setSaving(false);
-    }
-  }, [doc.id, title, content, t, toast, onSaved]);
+  }, [hasChanges, onBack, t, handleSave]);
 
   const handleDelete = useCallback(() => {
     haptics.warning();
@@ -354,8 +364,8 @@ function DocEditor({
 
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
         transparent
+        animationType="slide"
         visible={editorMenuVisible}
         onRequestClose={() => setEditorMenuVisible(false)}
       >
@@ -411,6 +421,7 @@ export default function NotebookScreen({ route, navigation }: any) {
   const [topicId, setTopicId] = useState<string | null>(initialTopicId || null);
   const [documents, setDocuments] = useState<NotebookDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingDoc, setEditingDoc] = useState<NotebookDocument | null>(null);
   const [listMenuDoc, setListMenuDoc] = useState<NotebookDocument | null>(null);
@@ -436,9 +447,12 @@ export default function NotebookScreen({ route, navigation }: any) {
 
   const createTopic = useCallback(async () => {
     if (isStandalone) {
-      // Need a session to create a topic — get or create a "Notebook" session
-      const { sessionApi } = await import('../lib/api');
-      const sid = await sessionApi.create({ title: NOTEBOOK_SESSION_TITLE });
+      // Agent-bound session is required for topics; fixed slug dedupes and keeps it out of Chats list.
+      const sid = await sessionApi.create({
+        slug: PERSONAL_NOTEBOOK_STANDALONE_SLUG,
+        title: NOTEBOOK_SESSION_TITLE,
+      });
+      await AsyncStorage.setItem(PERSONAL_NOTEBOOK_SESSION_STORAGE_KEY, sid);
       const newTopicId = await topicApi.create(sid, NOTEBOOK_PERSONAL_TOPIC_TITLE);
 
       await AsyncStorage.setItem(PERSONAL_TOPIC_KEY, newTopicId);
@@ -467,21 +481,29 @@ export default function NotebookScreen({ route, navigation }: any) {
   );
 
   const fetchDocuments = useCallback(
-    async (targetTopicId = topicId) => {
+    async (targetTopicId = topicId, options?: { silent?: boolean }) => {
       if (!targetTopicId) {
-        setLoading(false);
+        if (!options?.silent) setLoading(false);
         return;
       }
 
-      setLoading(true);
+      if (options?.silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
       try {
         const result = await notebookApi.list(targetTopicId);
         setDocuments(result?.data || []);
       } catch {
-        setDocuments([]);
+        if (!options?.silent) setDocuments([]);
       } finally {
-        setLoading(false);
+        if (options?.silent) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
       }
     },
     [topicId],
@@ -569,11 +591,11 @@ export default function NotebookScreen({ route, navigation }: any) {
       <DocEditor
         doc={editingDoc}
         onBack={() => setEditingDoc(null)}
+        onSaved={() => fetchDocuments()}
         onDeleted={() => {
           setEditingDoc(null);
           void fetchDocuments();
         }}
-        onSaved={() => fetchDocuments()}
       />
     );
   }
@@ -641,6 +663,8 @@ export default function NotebookScreen({ route, navigation }: any) {
             {t.notebookDesc}
           </Text>
           <PressableScale
+            accessibilityLabel={t.notebookNewDoc}
+            accessibilityRole="button"
             className="flex-row items-center gap-2 px-6 py-3.5 rounded-xl"
             disabled={creating}
             style={{ backgroundColor: colors.primary, opacity: creating ? 0.7 : 1 }}
@@ -658,19 +682,28 @@ export default function NotebookScreen({ route, navigation }: any) {
         </Animated.View>
       ) : (
         <FlatList
+          ItemSeparatorComponent={NotebookDocListSeparator}
           className="flex-1"
           data={documents}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => (
-            <View className="mx-5 h-px" style={{ backgroundColor: colors.divider }} />
-          )}
           contentContainerStyle={{
             paddingBottom: 40 + insets.bottom,
             paddingTop: 12,
           }}
+          refreshControl={
+            topicId ? (
+              <RefreshControl
+                refreshing={refreshing}
+                tintColor={colors.primary}
+                onRefresh={() => void fetchDocuments(topicId, { silent: true })}
+              />
+            ) : undefined
+          }
           renderItem={({ item: doc }) => (
             <TouchableOpacity
+              accessibilityLabel={doc.title?.trim() || t.notebookTitle}
+              accessibilityRole="button"
               activeOpacity={0.6}
               className="flex-row items-center px-5 py-4 bg-background"
               onPress={() => handleOpenDoc(doc)}
@@ -715,8 +748,8 @@ export default function NotebookScreen({ route, navigation }: any) {
 
       <Modal
         accessibilityViewIsModal
-        animationType="slide"
         transparent
+        animationType="slide"
         visible={listMenuDoc !== null}
         onRequestClose={() => setListMenuDoc(null)}
       >
@@ -749,7 +782,11 @@ export default function NotebookScreen({ route, navigation }: any) {
                     }
                   }}
                 >
-                  <FileText color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                  <FileText
+                    color={colors.primary}
+                    size={18}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                   <Text className="ml-3 text-base text-foreground">{t.notebookListOpenDoc}</Text>
                 </Pressable>
                 <Pressable

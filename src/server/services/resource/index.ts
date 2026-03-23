@@ -558,68 +558,68 @@ export class ResourceAuthorizer {
   };
 
   filterReadableFileIds = async (fileIds: string[]) => {
-    const readable: string[] = [];
+    if (fileIds.length === 0) return [];
 
-    for (const fileId of fileIds) {
-      const match = await this.getAccessMatch({
-        capability: 'preview_content',
-        id: fileId,
-        kind: 'file',
-      });
+    const matches = await Promise.all(
+      fileIds.map((fileId) =>
+        this.getAccessMatch({
+          capability: 'preview_content',
+          id: fileId,
+          kind: 'file',
+        }),
+      ),
+    );
 
-      if (match?.canAccess) readable.push(fileId);
-    }
-
-    return readable;
+    return fileIds.filter((_, i) => matches[i]?.canAccess);
   };
 
   /** List endpoints: only include files the caller may see at metadata level. */
   filterVisibleFileIdsForList = async (fileIds: string[]) => {
-    const visible: string[] = [];
+    if (fileIds.length === 0) return [];
 
-    for (const fileId of fileIds) {
-      const match = await this.getAccessMatch({
-        capability: 'read_metadata',
-        id: fileId,
-        kind: 'file',
-      });
+    const matches = await Promise.all(
+      fileIds.map((fileId) =>
+        this.getAccessMatch({
+          capability: 'read_metadata',
+          id: fileId,
+          kind: 'file',
+        }),
+      ),
+    );
 
-      if (match?.canAccess) visible.push(fileId);
-    }
-
-    return visible;
+    return fileIds.filter((_, i) => matches[i]?.canAccess);
   };
 
   filterVisibleDocumentIdsForList = async (documentIds: string[]) => {
-    const visible: string[] = [];
+    if (documentIds.length === 0) return [];
 
-    for (const documentId of documentIds) {
-      const match = await this.getAccessMatch({
-        capability: 'read_metadata',
-        id: documentId,
-        kind: 'document',
-      });
+    const matches = await Promise.all(
+      documentIds.map((documentId) =>
+        this.getAccessMatch({
+          capability: 'read_metadata',
+          id: documentId,
+          kind: 'document',
+        }),
+      ),
+    );
 
-      if (match?.canAccess) visible.push(documentId);
-    }
-
-    return visible;
+    return documentIds.filter((_, i) => matches[i]?.canAccess);
   };
 
   filterReadableKnowledgeBaseIds = async (knowledgeIds: string[]) => {
-    const readable: string[] = [];
+    if (knowledgeIds.length === 0) return [];
 
-    for (const knowledgeId of knowledgeIds) {
-      const match = await this.getAccessMatch({
-        capability: 'preview_content',
-        id: knowledgeId,
-        kind: 'knowledge_base',
-      });
+    const matches = await Promise.all(
+      knowledgeIds.map((knowledgeId) =>
+        this.getAccessMatch({
+          capability: 'preview_content',
+          id: knowledgeId,
+          kind: 'knowledge_base',
+        }),
+      ),
+    );
 
-      if (match?.canAccess) readable.push(knowledgeId);
-    }
-
-    return readable;
+    return knowledgeIds.filter((_, i) => matches[i]?.canAccess);
   };
 }
 

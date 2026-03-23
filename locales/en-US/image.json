@@ -1,4 +1,5 @@
 {
+  "config.advanced.sectionTitle": "Advanced",
   "config.aspectRatio.label": "Aspect Ratio",
   "config.aspectRatio.lock": "Lock Aspect Ratio",
   "config.aspectRatio.unlock": "Unlock Aspect Ratio",
@@ -24,6 +25,9 @@
   "config.steps.label": "Steps",
   "config.title": "AI Image",
   "config.width.label": "Width",
+  "empty.topic.desc": "No images in this topic yet. Enter a prompt below to create your first generation.",
+  "empty.workspace.deepLink": "Tip: open this page with ?prompt=… (and optionally &model=…) to prefill settings.",
+  "empty.workspace.desc": "Use the topic list on the right to open or create a topic. Generations are grouped by topic.",
   "generation.actions.applySeed": "Apply Seed",
   "generation.actions.copyError": "Copy Error Message",
   "generation.actions.copyPrompt": "Copy Prompt",
@@ -58,5 +62,6 @@
   "topic.deleteConfirmDesc": "You are about to delete this generation topic. This action cannot be undone, please proceed with caution.",
   "topic.empty": "No generation topics",
   "topic.title": "Painting Theme",
-  "topic.untitled": "Default Topic"
+  "topic.untitled": "Default Topic",
+  "workspace.activeTopic": "Topic"
 }

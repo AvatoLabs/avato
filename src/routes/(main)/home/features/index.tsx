@@ -2,10 +2,10 @@
 
 import { GROUP_CHAT_URL, SESSION_CHAT_URL } from '@lobechat/const';
 import { type RecentTopic, type SidebarAgentItem } from '@lobechat/types';
-import { Avatar, Block, Flexbox, Tabs, Tag, Text } from '@lobehub/ui';
+import { Avatar, Block, Button, Flexbox, Tabs, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { BotMessageSquareIcon, ChevronRightIcon } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+import { BotMessageSquareIcon, ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -234,9 +234,16 @@ const Home = memo(() => {
   const { isRevalidating: isTopicRevalidating } = useInitRecentTopic();
 
   const [activeTab, setActiveTab] = useState<'assistants' | 'community' | 'documents'>('documents');
+  const [secondaryExpanded, setSecondaryExpanded] = useState(false);
 
-  // Hide heavy modules when a starter mode is active
+  // De-emphasize heavy modules when a starter mode is active (user can still expand)
   const hideOtherModules = inputActiveMode && ['agent', 'group', 'write'].includes(inputActiveMode);
+
+  useEffect(() => {
+    if (!hideOtherModules) setSecondaryExpanded(false);
+  }, [hideOtherModules]);
+
+  const showSecondarySections = !hideOtherModules || secondaryExpanded;
 
   return (
     <Flexbox gap={24}>
@@ -251,49 +258,68 @@ const Home = memo(() => {
 
       <InputArea />
 
-      <Flexbox
-        gap={16}
-        horizontal={!isMobile}
-        style={{ display: hideOtherModules ? 'none' : undefined }}
-      >
-        {isLogin && <ResumeWorkPanel isRevalidating={isTopicRevalidating} />}
-      </Flexbox>
+      {hideOtherModules && !secondaryExpanded && (
+        <Button
+          block
+          icon={<ChevronDownIcon size={16} />}
+          style={{ borderColor: cssVar.colorBorderSecondary }}
+          type={'default'}
+          onClick={() => setSecondaryExpanded(true)}
+        >
+          {t('workspace.secondary.expand')}
+        </Button>
+      )}
 
-      <Block
-        padding={16}
-        variant={'outlined'}
-        style={{
-          borderRadius: 16,
-          display: hideOtherModules ? 'none' : undefined,
-        }}
-      >
-        <Tabs
-          activeKey={activeTab}
-          items={[
-            {
-              children: (
-                <Flexbox gap={24}>
-                  {isLogin && <RecentPage />}
-                  {isLogin && <RecentResource />}
-                </Flexbox>
-              ),
-              key: 'documents',
-              label: t('workspace.tabs.documents'),
-            },
-            {
-              children: <MyAssistantsPanel />,
-              key: 'assistants',
-              label: t('workspace.tabs.assistants'),
-            },
-            {
-              children: <CommunityAgents />,
-              key: 'community',
-              label: t('workspace.tabs.community'),
-            },
-          ]}
-          onChange={(value) => setActiveTab(value as 'assistants' | 'community' | 'documents')}
-        />
-      </Block>
+      {showSecondarySections && (
+        <Flexbox gap={16} width={'100%'}>
+          {hideOtherModules && secondaryExpanded && (
+            <Flexbox horizontal align={'center'} justify={'flex-end'} width={'100%'}>
+              <Button type={'text'} onClick={() => setSecondaryExpanded(false)}>
+                {t('workspace.secondary.collapse')}
+              </Button>
+            </Flexbox>
+          )}
+
+          <Flexbox gap={16} horizontal={!isMobile} width={'100%'}>
+            {isLogin && <ResumeWorkPanel isRevalidating={isTopicRevalidating} />}
+          </Flexbox>
+
+          <Block
+            padding={16}
+            variant={'outlined'}
+            style={{
+              borderRadius: 16,
+            }}
+          >
+            <Tabs
+              activeKey={activeTab}
+              items={[
+                {
+                  children: (
+                    <Flexbox gap={24}>
+                      {isLogin && <RecentPage />}
+                      {isLogin && <RecentResource />}
+                    </Flexbox>
+                  ),
+                  key: 'documents',
+                  label: t('workspace.tabs.documents'),
+                },
+                {
+                  children: <MyAssistantsPanel />,
+                  key: 'assistants',
+                  label: t('workspace.tabs.assistants'),
+                },
+                {
+                  children: <CommunityAgents />,
+                  key: 'community',
+                  label: t('workspace.tabs.community'),
+                },
+              ]}
+              onChange={(value) => setActiveTab(value as 'assistants' | 'community' | 'documents')}
+            />
+          </Block>
+        </Flexbox>
+      )}
     </Flexbox>
   );
 });

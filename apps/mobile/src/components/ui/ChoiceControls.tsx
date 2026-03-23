@@ -68,7 +68,9 @@ export function SegmentedControl<T extends string>({
 
         return (
           <TouchableOpacity
+            accessibilityLabel={item.label}
             accessibilityRole="button"
+            accessibilityState={{ selected: active }}
             activeOpacity={0.82}
             className="flex-1 flex-row items-center justify-center rounded-full"
             key={item.value}
@@ -113,7 +115,11 @@ export function FilterChip({ active = false, count, icon, label, ...props }: Fil
 
   return (
     <TouchableOpacity
+      accessibilityLabel={
+        count !== undefined && count !== null && count !== '' ? `${label} ${count}` : label
+      }
       accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       activeOpacity={0.72}
       className="flex-row items-center justify-center rounded-full px-3"
       style={{

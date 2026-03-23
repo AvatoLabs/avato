@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { auth } from '@/auth';
+
+import { GET } from './route';
+
 vi.mock('@/auth', () => ({
   auth: {
     api: {
@@ -32,10 +36,6 @@ vi.mock('@/server/modules/file-proxy/serveAuthorizedFileDownload', () => ({
   serveAuthorizedFileDownload: (...args: unknown[]) => mockServeAuthorizedFileDownload(...args),
 }));
 
-import { auth } from '@/auth';
-
-import { GET } from './route';
-
 describe('GET /f/[id]', () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
@@ -60,9 +60,7 @@ describe('GET /f/[id]', () => {
     });
 
     it('should preserve password query on redirect', async () => {
-      const req = new Request(
-        'https://app.example.com/f/x?token=tok&password=secret&extra=1',
-      );
+      const req = new Request('https://app.example.com/f/x?token=tok&password=secret&extra=1');
       const res = await GET(req, { params: Promise.resolve({ id: 'x' }) });
 
       expect(res.status).toBe(307);

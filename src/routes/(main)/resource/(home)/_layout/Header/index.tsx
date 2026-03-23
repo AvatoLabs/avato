@@ -17,13 +17,13 @@ const Header = memo(() => {
   return (
     <>
       <SideBarHeaderLayout
+        right={<LibraryTrashButton />}
         breadcrumb={[
           {
             href: buildResourceRootPath(spaceId),
             title: t('tab.resource'),
           },
         ]}
-        right={<LibraryTrashButton />}
       />
       <CategoryMenu />
     </>

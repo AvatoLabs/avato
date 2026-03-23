@@ -109,10 +109,16 @@ export const PageEditor: FC<PageEditorProps> = ({
   onSave,
   onTitleChange,
   onBack,
+  onDelete: onDeleteAfter,
   title,
   emoji,
 }) => {
   const deletePage = usePageStore((s) => s.deletePage);
+
+  const handleDeleteNavigate = () => {
+    if (pageId) void deletePage(pageId);
+    onDeleteAfter?.();
+  };
 
   return (
     <PageAgentProvider>
@@ -123,7 +129,7 @@ export const PageEditor: FC<PageEditorProps> = ({
           pageId={pageId}
           title={title}
           onBack={onBack}
-          onDelete={() => deletePage(pageId || '')}
+          onDelete={handleDeleteNavigate}
           onDocumentIdChange={onDocumentIdChange}
           onEmojiChange={onEmojiChange}
           onSave={onSave}

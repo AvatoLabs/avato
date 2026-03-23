@@ -21,7 +21,7 @@ export class FlatListBuilder {
     private branchResolver: BranchResolver,
     private messageCollector: MessageCollector,
     private messageTransformer: MessageTransformer,
-  ) { }
+  ) {}
 
   /**
    * Generate flatList from messages array
@@ -841,6 +841,12 @@ export class FlatListBuilder {
       if (assistant.reasoning) childBlock.reasoning = assistant.reasoning;
       if (toolsWithResults.length > 0) childBlock.tools = toolsWithResults;
       if (msgUsage) childBlock.usage = msgUsage;
+      if (assistant.search) {
+        childBlock.search = assistant.search;
+      }
+      if (assistant.chunksList && assistant.chunksList.length > 0) {
+        childBlock.chunksList = assistant.chunksList;
+      }
       if (Object.keys(otherMetadata).length > 0) {
         childBlock.metadata = otherMetadata;
       }

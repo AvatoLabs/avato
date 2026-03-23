@@ -11,7 +11,7 @@ import { messageService } from '@/services/message';
 
 import StatsFormGroup from '../components/StatsFormGroup';
 
-export const TopicsRank = memo(() => {
+export const ModelsRank = memo(() => {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('auth');
   const { data, isLoading } = useClientDataSWR('rank-models', async () =>
@@ -74,4 +74,4 @@ export const TopicsRank = memo(() => {
   );
 });
 
-export default TopicsRank;
+export default ModelsRank;

@@ -5,7 +5,6 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
-import { socialService } from '@/services/social';
 import { useDiscoverStore } from '@/store/discover';
 
 interface FollowButtonProps {
@@ -14,7 +13,7 @@ interface FollowButtonProps {
 
 const FollowButton = memo<FollowButtonProps>(({ userId }) => {
   const { t } = useTranslation('discover');
-  const { isAuthenticated, signIn, session } = useMarketAuth();
+  const { isAuthenticated, signIn } = useMarketAuth();
   const [loading, setLoading] = useState(false);
 
   const useFollowStatus = useDiscoverStore((s) => s.useFollowStatus);

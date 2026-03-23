@@ -287,7 +287,7 @@ export class ResourceActionImpl {
     this.#set({ isLoadingMore: true }, false, 'loadMoreResources/start');
 
     try {
-      const { items } = await resourceService.queryResources({
+      const { hasMore: nextHasMore, items } = await resourceService.queryResources({
         ...queryParams,
         limit: 50,
         offset,
@@ -299,7 +299,7 @@ export class ResourceActionImpl {
 
       this.#set(
         {
-          hasMore: items.length === 50,
+          hasMore: nextHasMore,
           isLoadingMore: false,
           offset: offset + items.length,
           resourceList: [...resourceList, ...items],

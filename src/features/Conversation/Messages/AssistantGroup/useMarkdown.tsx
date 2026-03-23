@@ -1,12 +1,16 @@
+'use client';
+
 import { type MarkdownProps } from '@lobehub/ui';
+import isEqual from 'fast-deep-equal';
 import { useMemo } from 'react';
 
+import { HtmlPreviewAction } from '@/components/HtmlPreview';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
 import { type MarkdownElement } from '../../Markdown/plugins';
 import { markdownElements } from '../../Markdown/plugins';
-import { messageStateSelectors, useConversationStore } from '../../store';
+import { dataSelectors, messageStateSelectors, useConversationStore } from '../../store';
 
 const rehypePlugins = markdownElements
   .map((element: MarkdownElement) => element.rehypePlugin)
@@ -15,7 +19,17 @@ const remarkPlugins = markdownElements
   .map((element: MarkdownElement) => element.remarkPlugin)
   .filter(Boolean);
 
+const isHtmlCode = (content: string, language: string) => {
+  return (
+    language === 'html' ||
+    (language === '' && content.includes('<html>')) ||
+    (language === '' && content.includes('<!DOCTYPE html>'))
+  );
+};
+
 export const useMarkdown = (id: string): Partial<MarkdownProps> => {
+  const item = useConversationStore(dataSelectors.getDbMessageById(id), isEqual)!;
+  const { search } = item || {};
   const { transitionMode } = useUserStore(userGeneralSettingsSelectors.config);
   const generating = useConversationStore(messageStateSelectors.isMessageGenerating(id));
 
@@ -36,12 +50,30 @@ export const useMarkdown = (id: string): Partial<MarkdownProps> => {
     () =>
       ({
         animated,
+        citations: search?.citations,
+        componentProps: {
+          highlight: {
+            actionsRender: ({ content, actionIconSize, language, originalNode }: any) => {
+              const showHtmlPreview = isHtmlCode(content, language);
+              return (
+                <>
+                  {showHtmlPreview && <HtmlPreviewAction content={content} size={actionIconSize} />}
+                  {originalNode}
+                </>
+              );
+            },
+          },
+        },
         components,
         enableCustomFootnotes: true,
         enableStream: true,
         rehypePlugins,
         remarkPlugins,
+        showFootnotes:
+          search?.citations &&
+          search.citations.length > 0 &&
+          search.citations.every((item) => item.title !== item.url),
       }) satisfies Partial<MarkdownProps>,
-    [animated, components],
+    [animated, components, search],
   );
 };

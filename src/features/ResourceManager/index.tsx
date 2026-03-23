@@ -1,6 +1,7 @@
 'use client';
 
 import { BRANDING_NAME } from '@lobechat/business-const';
+import { type DocumentItem } from '@lobechat/database/schemas';
 import { Flexbox } from '@lobehub/ui';
 import { createStaticStyles, useTheme } from 'antd-style';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -11,14 +12,45 @@ import { PageEditor } from '@/features/PageEditor';
 import dynamic from '@/libs/next/dynamic';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { documentService } from '@/services/document';
+import { abortableRequest } from '@/services/utils/abortableRequest';
 import { useFileStore } from '@/store/file';
 import { documentSelectors } from '@/store/file/slices/document/selectors';
+import { DocumentSourceType, type LobeDocument } from '@/types/document';
 
 import FileEditor from './components/Editor';
 import Explorer from './components/Explorer';
 import UploadDock from './components/UploadDock';
 
 const ChunkDrawer = dynamic(() => import('./components/ChunkDrawer'), { ssr: false });
+
+const PAGE_EDITOR_FETCH_KEY = 'resource-manager-page-editor';
+
+const mapDocumentItemToLobeDocument = (document: DocumentItem): LobeDocument => {
+  let editorData: Record<string, any> | null = document.editorData ?? null;
+  if (typeof editorData === 'string') {
+    try {
+      editorData = JSON.parse(editorData) as Record<string, any>;
+    } catch {
+      editorData = null;
+    }
+  }
+
+  return {
+    content: document.content || null,
+    createdAt: document.createdAt ? new Date(document.createdAt) : new Date(),
+    editorData,
+    fileType: document.fileType,
+    filename: document.title || document.filename || 'Untitled',
+    id: document.id,
+    metadata: document.metadata || {},
+    source: 'document',
+    sourceType: DocumentSourceType.EDITOR,
+    title: document.title || '',
+    totalCharCount: document.content?.length || 0,
+    totalLineCount: 0,
+    updatedAt: document.updatedAt ? new Date(document.updatedAt) : new Date(),
+  };
+};
 
 const styles = createStaticStyles(({ css, cssVar }) => {
   return {
@@ -95,17 +127,36 @@ const ResourceManager = memo(() => {
 
   // Fetch specific document when switching to page mode if not already loaded
   useEffect(() => {
-    if (mode === 'page' && currentViewItemId && !currentDocument) {
-      // Document not in store, fetch it individually
-      documentService.getDocumentById(currentViewItemId).then((doc) => {
-        if (doc) {
-          // Add the document to the store's documents array
-          useFileStore.setState((state) => ({
-            documents: [...state.documents, doc as any],
-          }));
-        }
-      });
+    if (mode !== 'page' || !currentViewItemId || currentDocument) {
+      return undefined;
     }
+
+    const requestedId = currentViewItemId;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const raw = await documentService.getDocumentById(requestedId, PAGE_EDITOR_FETCH_KEY);
+        if (cancelled || !raw || raw.id !== requestedId) return;
+
+        const rm = useResourceManagerStore.getState();
+        if (rm.mode !== 'page' || rm.currentViewItemId !== requestedId) return;
+
+        const page = mapDocumentItemToLobeDocument(raw);
+
+        useFileStore.setState((state) => {
+          if (state.documents.some((d) => d.id === page.id)) return state;
+          return { documents: [...state.documents, page] };
+        });
+      } catch {
+        // Aborted (new navigation) or request failure — avoid unhandled rejection
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      abortableRequest.cancel(PAGE_EDITOR_FETCH_KEY);
+    };
   }, [mode, currentViewItemId, currentDocument]);
 
   const handleBack = () => {
@@ -164,6 +215,7 @@ const ResourceManager = memo(() => {
                 pageId={currentViewItemId}
                 title={currentDocument?.title}
                 onBack={handleBack}
+                onDelete={handleBack}
                 onEmojiChange={handleEmojiChange}
                 onTitleChange={handleTitleChange}
               />

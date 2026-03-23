@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Sync with src/theme/colors.ts + palettes.ts — single source of truth for theming */
+/* Sync with src/theme/colors.ts + palettes.ts — Tailwind/CSS vars cover surface + primary only; other tokens (e.g. media chrome, info, inline code) live in colors.ts */
 @layer base {
   :root {
     color-scheme: light;

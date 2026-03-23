@@ -385,12 +385,17 @@ function VideoPreviewCard({
                 <View
                   className="items-center justify-center rounded-full"
                   style={{
-                    backgroundColor: 'rgba(0,0,0,0.45)',
+                    backgroundColor: colors.mediaScrim,
                     height: 52,
                     width: 52,
                   }}
                 >
-                  <Play color="#fff" fill="#fff" size={22} strokeWidth={2.2} />
+                  <Play
+                    color={colors.mediaOnBackdrop}
+                    fill={colors.mediaOnBackdrop}
+                    size={22}
+                    strokeWidth={2.2}
+                  />
                 </View>
               </View>
             ) : null}
@@ -1020,7 +1025,7 @@ export default function VideoScreen({
               multiline
               className="min-h-[36px] flex-1"
               placeholder={t.videoPromptPlaceholder}
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={colors.secondaryText}
               underlineColorAndroid="transparent"
               value={prompt}
               style={{
@@ -1417,7 +1422,7 @@ export default function VideoScreen({
                   </Text>
                 </View>
                 <Switch
-                  thumbColor={generateAudio ? colors.iconOnPrimary : '#ffffff'}
+                  thumbColor={generateAudio ? colors.iconOnPrimary : colors.controlKnob}
                   trackColor={{ false: colors.switchTrackOff, true: colors.primary }}
                   value={generateAudio}
                   onValueChange={setGenerateAudio}
@@ -1434,19 +1439,22 @@ export default function VideoScreen({
         visible={previewVisible}
         onRequestClose={() => setPreviewVisible(false)}
       >
-        <View className="flex-1 bg-black">
+        <View className="flex-1" style={{ backgroundColor: colors.mediaBackdrop }}>
           <Pressable
-            className="absolute right-5 top-14 z-10 rounded-full bg-black/40 px-4 py-2"
+            className="absolute right-5 top-14 z-10 rounded-full px-4 py-2"
+            style={{ backgroundColor: colors.mediaScrim }}
             onPress={() => setPreviewVisible(false)}
           >
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{t.cancel}</Text>
+            <Text style={{ color: colors.mediaOnBackdrop, fontSize: 14, fontWeight: '600' }}>
+              {t.cancel}
+            </Text>
           </Pressable>
           {previewUrl ? (
             <WebView
               allowsFullscreenVideo
               mediaPlaybackRequiresUserAction={false}
               source={{
-                html: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" /><style>html,body{margin:0;background:#000;height:100%;overflow:hidden}body{display:flex;align-items:center;justify-content:center}video{width:100%;height:100%;object-fit:contain;background:#000}</style></head><body><video controls playsinline src="${previewUrl}"></video></body></html>`,
+                html: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" /><style>html,body{margin:0;background:${colors.mediaBackdrop};height:100%;overflow:hidden}body{display:flex;align-items:center;justify-content:center}video{width:100%;height:100%;object-fit:contain;background:${colors.mediaBackdrop}}</style></head><body><video controls playsinline src="${previewUrl}"></video></body></html>`,
               }}
             />
           ) : null}

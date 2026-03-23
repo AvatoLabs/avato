@@ -47,6 +47,7 @@ import type {
   MemoryPreferenceItem,
   MessageContentPart,
   MobileMemoryEffort,
+  MobileSSOProvider,
   MobileUserState,
   ModelRankItem,
   RecentTopic,
@@ -65,6 +66,12 @@ import {
   setApiUrl,
   testConnection,
 } from './server';
+import {
+  isChatToolPayloadArray,
+  mergeToolCallChunks,
+  type MobileToolCallChunk,
+  transformToolCalls,
+} from './toolCallUtils';
 
 export { clearStoredAuthSession as clearAuth, getApiUrl, hasConfiguredUrl, setApiUrl, testConnection };
 
@@ -515,11 +522,6 @@ const normalizeMessages = (
     ? messages.map((message) => normalizeMessage(message, parentSessionId))
     : [];
 
-interface MobileToolFunction {
-  arguments?: string;
-  name?: string;
-}
-
 export interface MobileMessageToolCall {
   function: {
     arguments: string;
@@ -529,131 +531,6 @@ export interface MobileMessageToolCall {
   thoughtSignature?: string;
   type: string;
 }
-
-interface MobileToolCallChunk {
-  function?: MobileToolFunction;
-  id?: string;
-  index?: number;
-  thoughtSignature?: string;
-  type?: string;
-}
-
-/** Detect if payload is ChatToolPayload[] (server format) vs MobileToolCallChunk[] (LLM stream format) */
-const isChatToolPayloadArray = (payload: unknown[]): payload is ChatToolPayload[] =>
-  payload.length > 0 &&
-  payload.every(
-    (item): item is ChatToolPayload =>
-      typeof item === 'object' &&
-      item !== null &&
-      'apiName' in item &&
-      'identifier' in item &&
-      'arguments' in item &&
-      !('function' in item),
-  );
-
-const mergeToolCallChunks = (origin: MobileToolCallChunk[], value: MobileToolCallChunk[]) => {
-  const next = [...origin];
-
-  if (next.length === 0) {
-    return value.map((item) => ({
-      ...item,
-      function: {
-        arguments: item.function?.arguments || '',
-        name: item.function?.name || '',
-      },
-      id: item.id || `${item.index || 0}`,
-      type: item.type || 'function',
-    }));
-  }
-
-  for (const incoming of value) {
-    const index = incoming.index ?? 0;
-    const incomingId = incoming.id;
-    const existingByIdIndex = incomingId ? next.findIndex((item) => item.id === incomingId) : -1;
-
-    if (existingByIdIndex !== -1) {
-      const existing = next[existingByIdIndex];
-      next[existingByIdIndex] = {
-        ...existing,
-        ...incoming,
-        function: {
-          arguments:
-            (existing.function?.arguments || '') + (incoming.function?.arguments || ''),
-          name: incoming.function?.name || existing.function?.name || '',
-        },
-      };
-      continue;
-    }
-
-    if (!next[index]) {
-      next.splice(index, 0, {
-        ...incoming,
-        function: {
-          arguments: incoming.function?.arguments || '',
-          name: incoming.function?.name || '',
-        },
-        id: incomingId || `${index}`,
-        type: incoming.type || 'function',
-      });
-      continue;
-    }
-
-    const existingAtIndex = next[index];
-    if (incomingId && existingAtIndex?.id !== incomingId) {
-      next.push({
-        ...incoming,
-        function: {
-          arguments: incoming.function?.arguments || '',
-          name: incoming.function?.name || '',
-        },
-        id: incomingId,
-        type: incoming.type || 'function',
-      });
-      continue;
-    }
-
-    next[index] = {
-      ...existingAtIndex,
-      ...incoming,
-      function: {
-        arguments:
-          (existingAtIndex.function?.arguments || '') + (incoming.function?.arguments || ''),
-        name: incoming.function?.name || existingAtIndex.function?.name || '',
-      },
-    };
-  }
-
-  return next;
-};
-
-interface MobileToolCallChunkWithIntervention extends MobileToolCallChunk {
-  intervention?: ToolInterventionPayload;
-}
-
-const transformToolCalls = (toolCalls: MobileToolCallChunk[]): ChatToolPayload[] =>
-  toolCalls.map((toolCall, index) => {
-    const fullName = toolCall.function?.name || `tool_${index + 1}`;
-    const slashSegments = fullName.split('/');
-    const slashApiName = slashSegments.pop() || fullName;
-    const slashIdentifier = slashSegments.join('/');
-    const [underscoreIdentifier, underscoreApiName] = fullName.split('____');
-    const identifier = underscoreApiName
-      ? underscoreIdentifier
-      : slashIdentifier || fullName;
-    const apiName = underscoreApiName || slashApiName;
-    const withIntervention = toolCall as MobileToolCallChunkWithIntervention;
-
-    return {
-      apiName,
-      arguments: toolCall.function?.arguments || '{}',
-      id: toolCall.id || `${index}`,
-      identifier,
-      intervention: withIntervention.intervention,
-      source: identifier.startsWith('lobe-') ? 'builtin' : undefined,
-      thoughtSignature: toolCall.thoughtSignature,
-      type: 'default',
-    };
-  });
 
 async function getBaseUrl(): Promise<string> {
   return getApiUrl();
@@ -705,6 +582,29 @@ const createTrpcHttpError = (
 
   return error;
 };
+
+/** Parse tRPC `message` from a failed mobile fetch (see `createTrpcHttpError`). */
+export function getTrpcErrorMessageFromClientError(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const body = (error as { body?: string }).body;
+  if (typeof body !== 'string') return undefined;
+  try {
+    const payload = JSON.parse(body);
+    const first = Array.isArray(payload) ? payload[0] : payload;
+    return (
+      first?.error?.json?.message ??
+      first?.error?.message ??
+      extractTrpcErrorMessage(payload) ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+export function isSharePasswordRequiredError(error: unknown): boolean {
+  return getTrpcErrorMessageFromClientError(error) === 'SHARE_PASSWORD_REQUIRED';
+}
 
 const unwrapTrpcPayload = <T>(payload: any) => {
   const data = payload?.result?.data;
@@ -878,7 +778,7 @@ export const sessionApi = {
   /**
    * Create a new session (simple chat).
    * Always creates an Agent-bound session (no session-only virtual session).
-   * This keeps App/Web session semantics aligned.
+   * Pass a stable `slug` (e.g. personal notebook) to dedupe and hide from the session list client-side.
    */
   create: (config?: CreateSessionConfig) =>
     trpcMutate<string>('session.createSession', {
@@ -911,6 +811,7 @@ export const sessionApi = {
     return (result ?? []).map((s) => ({
       ...s,
       agentId: s.config?.id ?? undefined,
+      slug: s.slug ?? undefined,
       title: resolveDisplaySessionTitle(s.meta?.title, s.config?.title, s.title),
       description:
         pickFirstNonEmptyString(
@@ -1240,6 +1141,7 @@ export interface ToolExecutionItem {
   id: string;
   identifier: string;
   intervention?: ToolInterventionPayload;
+  pluginError?: { message: string };
   result: string;
   state?: Record<string, unknown>;
 }
@@ -1757,6 +1659,9 @@ export const aiChatApi = {
                 }
                 break;
               }
+              case 'intervention_required': {
+                break;
+              }
               case 'reasoning': {
                 if (typeof chunk.data === 'string') {
                   accReasoning += chunk.data;
@@ -1991,6 +1896,104 @@ export const aiChatApi = {
 
     return run();
   },
+
+  /**
+   * Continue after approve (execute tool) or reject-and-continue (inject user rejection, resume loop).
+   * POSTs to /webapi/chat/:provider/continue.
+   */
+  continueToolIntervention: (
+    provider: string,
+    params:
+      | { approvedToolCall: ChatToolPayload; sessionId: string; topicId?: string }
+      | { rejectedToolCall: { id: string; reason?: string }; sessionId: string; topicId?: string },
+    callbacks: StreamCallbacks,
+    signal?: AbortSignal,
+  ): Promise<StreamResult> => {
+    return (async () => {
+      const [base, headers] = await Promise.all([getBaseUrl(), getHeaders()]);
+      if (!headers['X-lobe-chat-auth'] && !headers['Oidc-Auth']) {
+        throw new Error('Auth session expired — please sign in again');
+      }
+
+      const url = `${base}/webapi/chat/${provider}/continue`;
+
+      return new Promise<StreamResult>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.responseType = 'text';
+        xhr.timeout = 120_000;
+
+        for (const [key, value] of Object.entries(headers)) {
+          xhr.setRequestHeader(key, value);
+        }
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('X-Avato-Mobile-Client', '1');
+
+        let accText = '';
+        let accTools: ChatToolPayload[] | undefined;
+        let accToolExecutions: ToolExecutionItem[] | undefined;
+        const parseSSE = createSSEChunkParser();
+
+        const handleParsedChunk = (parsed: ReturnType<typeof parseSSE>) => {
+          for (const p of parsed) {
+            if (p.event === 'tool_calls' && Array.isArray(p.data)) {
+              accTools = p.data as ChatToolPayload[];
+              callbacks.onTools?.(accTools);
+            } else if (p.event === 'tool_executions' && Array.isArray(p.data)) {
+              accToolExecutions = p.data as ToolExecutionItem[];
+              callbacks.onToolExecutions?.(accToolExecutions);
+            } else if (p.event === 'text' && typeof p.data === 'string') {
+              accText += p.data;
+              callbacks.onContent?.({ content: accText });
+            } else if (p.event === 'error' && p.data) {
+              reject(new Error(`Continue failed: ${JSON.stringify(p.data)}`));
+            }
+          }
+        };
+
+        xhr.onprogress = () => {
+          const chunk = xhr.responseText;
+          if (!chunk) return;
+          handleParsedChunk(parseSSE(chunk));
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 400) {
+            reject(new Error(`Continue failed: ${xhr.status}`));
+            return;
+          }
+          const chunk = xhr.responseText;
+          if (chunk) {
+            handleParsedChunk(parseSSE(chunk, { flush: true }));
+          }
+          resolve({
+            text: accText,
+            tools: accTools,
+            toolExecutions: accToolExecutions,
+          });
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.ontimeout = () => reject(new Error('Continue timed out'));
+        if (signal) signal.addEventListener('abort', () => xhr.abort());
+
+        const body =
+          'approvedToolCall' in params
+            ? {
+                approvedToolCall: params.approvedToolCall,
+                sessionId: params.sessionId,
+                topicId: params.topicId,
+              }
+            : {
+                rejectedToolCall: params.rejectedToolCall,
+                sessionId: params.sessionId,
+                topicId: params.topicId,
+              };
+
+        xhr.send(JSON.stringify(body));
+      });
+    })();
+  },
 };
 
 // ── Topic API ───────────────────────────────────────────────────────
@@ -2094,7 +2097,25 @@ export const aiProviderApi = {
 // ── Knowledge Base API ──────────────────────────────────────────────
 
 export const knowledgeBaseApi = {
-  list: () => trpcQuery<KnowledgeBaseItem[]>('knowledgeBase.getKnowledgeBases'),
+  list: (params?: { spaceId?: string }) =>
+    trpcQuery<KnowledgeBaseItem[]>('knowledgeBase.getKnowledgeBases', params),
+
+  getById: (id: string) => trpcQuery<KnowledgeBaseItem | undefined>('knowledgeBase.getKnowledgeBaseById', { id }),
+
+  create: (params: { avatar?: string; description?: string; name: string; spaceId?: string }) =>
+    trpcMutate<string | undefined>('knowledgeBase.createKnowledgeBase', params),
+
+  update: (id: string, value: Record<string, unknown>) =>
+    trpcMutate('knowledgeBase.updateKnowledgeBase', { id, value }),
+
+  addFiles: (knowledgeBaseId: string, ids: string[]) =>
+    trpcMutate('knowledgeBase.addFilesToKnowledgeBase', { ids, knowledgeBaseId }),
+
+  removeFiles: (knowledgeBaseId: string, ids: string[]) =>
+    trpcMutate('knowledgeBase.removeFilesFromKnowledgeBase', { ids, knowledgeBaseId }),
+
+  remove: (id: string, removeFiles?: boolean) =>
+    trpcMutate('knowledgeBase.removeKnowledgeBase', { id, removeFiles }),
 };
 
 // ── Resource API (unified files + documents with folder support) ─────
@@ -2109,6 +2130,8 @@ export interface ResourceQueryParams {
   showFilesInKnowledgeBase?: boolean;
   sorter?: 'createdAt' | 'size' | 'name';
   sortType?: 'asc' | 'desc';
+  /** When set with a library context, matches server `getKnowledgeItems` space scoping. */
+  spaceId?: string;
 }
 
 export interface ResourceListResponse {
@@ -2202,6 +2225,119 @@ export const resourceApi = {
     }),
 
   restoreDocument: (id: string) => trpcMutate('document.restoreDocument', { id }),
+};
+
+export type ResourceShareKind = 'document' | 'file' | 'knowledge_base';
+
+export interface ExplainAccessResult {
+  authzEpoch: number;
+  canAccess: boolean;
+  matchedBy?: string;
+  reason?: string;
+  resourceUid: string;
+  spaceId: string;
+}
+
+export interface ResourcePermissionListItem {
+  canReshare?: boolean;
+  createdAt?: string | Date | null;
+  expiresAt?: string | Date | null;
+  id: string;
+  inheritsToChildren?: boolean;
+  resourceUid?: string;
+  role: 'owner' | 'editor' | 'viewer';
+  spaceId?: string;
+  subjectId?: string;
+  subjectName?: string | null;
+  subjectType?: string;
+  subjectUsername?: string | null;
+}
+
+export interface ResourceShareLinkListItem {
+  createdAt?: string | Date | null;
+  disabledAt?: string | Date | null;
+  expiresAt?: string | Date | null;
+  id: string;
+  resourceUid?: string;
+  spaceId?: string;
+}
+
+export interface SharedWithMeListItem {
+  kind: 'document' | 'file' | 'knowledge_base';
+  localId: string;
+  name: string;
+  parentId?: string | null;
+  resourceUid: string;
+  sharedExpiresAt?: string | Date | null;
+  sharedInheritsToChildren?: boolean;
+  sharedRole?: 'owner' | 'editor' | 'viewer';
+  spaceId: string | null;
+}
+
+/** Payload from `getSharedResourceByToken` (shape varies by `kind`). */
+export interface PublicSharedResourcePayload {
+  avatar?: string | null;
+  content?: string;
+  /** Knowledge base summary text when `kind === 'knowledge_base'`. */
+  description?: string | null;
+  expiresAt: string | Date;
+  fileType?: string;
+  kind: 'document' | 'file' | 'knowledge_base';
+  localId: string;
+  metadata?: unknown;
+  name: string;
+  resourceUid: string;
+  role: 'viewer';
+  spaceId: string | null;
+  /** Present for shared documents. */
+  title?: string;
+}
+
+export const resourceShareApi = {
+  createResourceShareLink: (params: {
+    expiresInDays?: 1 | 7 | 30;
+    id?: string;
+    kind?: ResourceShareKind;
+    password?: string;
+    resourceUid?: string;
+  }) =>
+    trpcMutate<{
+      expiresAt: string;
+      fileShareDownloadUrl?: string;
+      id: string;
+      shareUrl: string;
+    }>('resourceShare.createResourceShareLink', params),
+
+  disableResourceShareLink: (shareLinkId: string) =>
+    trpcMutate<{ success: boolean }>('resourceShare.disableResourceShareLink', { shareLinkId }),
+
+  explainAccess: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
+    trpcQuery<ExplainAccessResult>('resourceShare.explainAccess', params),
+
+  getSharedResourceByToken: (params: { password?: string; token: string }) =>
+    trpcQuery<PublicSharedResourcePayload>('resourceShare.getSharedResourceByToken', params),
+
+  grantResourcePermission: (params: {
+    canReshare?: boolean;
+    expiresAt?: Date | string;
+    id?: string;
+    inheritsToChildren?: boolean;
+    kind?: ResourceShareKind;
+    resourceUid?: string;
+    role: 'owner' | 'editor' | 'viewer';
+    username: string;
+  }) => trpcMutate<ResourcePermissionListItem>('resourceShare.grantResourcePermission', params),
+
+  listResourcePermissions: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
+    trpcQuery<ResourcePermissionListItem[]>('resourceShare.listResourcePermissions', params),
+
+  listResourceShareLinks: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
+    trpcQuery<ResourceShareLinkListItem[]>('resourceShare.listResourceShareLinks', params),
+
+  listSharedWithMe: () => trpcQuery<SharedWithMeListItem[]>('resourceShare.listSharedWithMe'),
+
+  revokeResourcePermission: (permissionId: string) =>
+    trpcMutate<{ success: boolean }>('resourceShare.revokeResourcePermission', { permissionId }),
 };
 
 // ── File / Upload API ──────────────────────────────────────────────
@@ -2344,9 +2480,41 @@ export const configApi = {
   getGlobalConfig: () => trpcQuery('config.getGlobalConfig'),
 };
 
+async function postBetterAuthJson(
+  path: string,
+  jsonBody: Record<string, unknown>,
+  errorLabel: string,
+): Promise<unknown> {
+  const base = await getBaseUrl();
+  const res = await fetch(`${base}${path}`, {
+    body: JSON.stringify(jsonBody),
+    headers: await getHeaders(),
+    method: 'POST',
+  });
+  const rawText = await res.text();
+  let parsed: Record<string, unknown> = {};
+  if (rawText) {
+    try {
+      parsed = JSON.parse(rawText) as Record<string, unknown>;
+    } catch {
+      /* HTML or plain-text error body */
+    }
+  }
+  if (!res.ok) {
+    const detail =
+      (typeof parsed.message === 'string' && parsed.message) ||
+      (typeof parsed.error === 'string' && parsed.error) ||
+      rawText.trim().slice(0, 240);
+    throw new Error(detail.trim() || `${errorLabel} (${res.status})`);
+  }
+  return parsed;
+}
+
 export const userApi = {
   getState: () => trpcQuery<MobileUserState>('user.getUserState'),
   getUser: () => trpcQuery<MobileUserState>('user.getUserState'),
+  /** Linked OAuth / SSO accounts (same as web profile). */
+  getSSOProviders: () => trpcQuery<MobileSSOProvider[]>('user.getUserSSOProviders'),
   /**
    * Server has NO single `updateUser` procedure.
    * Must call separate procedures per field:
@@ -2379,26 +2547,14 @@ export const userApi = {
     if (data.username !== undefined) promises.push(trpcMutate('user.updateUsername', data.username));
     await Promise.all(promises);
   },
-  requestPasswordReset: async (email: string) => {
-    const base = await getBaseUrl();
-    const res = await fetch(`${base}/api/auth/forget-password`, {
-      method: 'POST',
-      headers: await getHeaders(),
-      body: JSON.stringify({ email, redirectTo: '/reset-password' }),
-    });
-    if (!res.ok) throw new Error(`Password reset request failed: ${res.status}`);
-    return res.json();
-  },
-  changeEmail: async (newEmail: string) => {
-    const base = await getBaseUrl();
-    const res = await fetch(`${base}/api/auth/change-email`, {
-      method: 'POST',
-      headers: await getHeaders(),
-      body: JSON.stringify({ newEmail, callbackURL: '/' }),
-    });
-    if (!res.ok) throw new Error(`Email change request failed: ${res.status}`);
-    return res.json();
-  },
+  requestPasswordReset: (email: string) =>
+    postBetterAuthJson(
+      '/api/auth/forget-password',
+      { email, redirectTo: '/reset-password' },
+      'Password reset request failed',
+    ),
+  changeEmail: (newEmail: string) =>
+    postBetterAuthJson('/api/auth/change-email', { callbackURL: '/', newEmail }, 'Email change request failed'),
 };
 
 // ── Plugin (Installed Plugins) API ──────────────────────────────────
@@ -2965,8 +3121,8 @@ export const memoryApi = {
       params,
     ),
 
-  /** Get memory tags */
-  queryTags: (params?: { layer?: string; page?: number; pageSize?: number }) =>
+  /** Get memory tags (params match tRPC: `layers`, `size`) */
+  queryTags: (params?: { layers?: string[]; page?: number; size?: number }) =>
     trpcQuery<{ items: Array<{ count: number; tag: string }>; total: number }>(
       'userMemories.queryTags',
       params,

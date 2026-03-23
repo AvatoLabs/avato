@@ -22,6 +22,8 @@
   "workspace.resume.empty": "还没有最近工作，先开始一个任务。",
   "workspace.resume.title": "继续最近工作",
   "workspace.resume.untitled": "未命名话题",
+  "workspace.secondary.collapse": "收起",
+  "workspace.secondary.expand": "显示最近工作与文稿",
   "workspace.status.mcp": "MCP",
   "workspace.status.model": "模型",
   "workspace.status.off": "关闭",

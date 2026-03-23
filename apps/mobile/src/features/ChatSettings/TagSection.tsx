@@ -29,6 +29,8 @@ export function TagSection({ currentTag, delay = 90, onPress }: TagSectionProps)
           {t.chatSettingsTag}
         </Text>
         <TouchableOpacity
+          accessibilityLabel={`${t.chatSettingsTag}: ${currentTag?.name ?? t.tagNone}`}
+          accessibilityRole="button"
           activeOpacity={0.8}
           className="flex-row items-center rounded-2xl bg-foreground/[0.02] px-4 py-3"
           onPress={onPress}

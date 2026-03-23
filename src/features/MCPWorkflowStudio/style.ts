@@ -160,11 +160,11 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   edgeActionButton: css`
     cursor: pointer;
 
+    filter: drop-shadow(0 8px 18px ${cssVar.colorFillSecondary});
+
     fill: ${cssVar.colorBgElevated};
     stroke: ${cssVar.colorErrorBorder};
     stroke-width: 1.5;
-
-    filter: drop-shadow(0 8px 18px ${cssVar.colorFillSecondary});
 
     transition:
       fill 0.2s ease,
@@ -172,9 +172,9 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       transform 0.2s ease;
 
     &:hover {
+      transform: scale(1.06);
       fill: ${cssVar.colorErrorBg};
       stroke: ${cssVar.colorError};
-      transform: scale(1.06);
     }
   `,
   edgeActionIcon: css`
@@ -493,8 +493,8 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     min-width: 0;
 
     @media (width <= 900px) {
-      align-items: flex-start;
       flex-direction: column;
+      align-items: flex-start;
     }
   `,
   stageHintDock: css`
@@ -518,8 +518,8 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     box-shadow: 0 8px 20px ${cssVar.colorFillTertiary};
 
     @media (width <= 900px) {
-      align-items: stretch;
       flex-direction: column;
+      align-items: stretch;
     }
   `,
   stageHintMeta: css`
@@ -661,7 +661,9 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       padding-block: 0;
       padding-inline: 0;
       border-radius: ${cssVar.borderRadius}px;
+
       background: transparent;
+
       transition:
         background 0.2s ease,
         color 0.2s ease;
@@ -694,9 +696,11 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   workflowTabLabel: css`
     overflow: hidden;
     display: block;
+
     max-width: 112px;
     padding-block: 5px;
     padding-inline: 10px;
+
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
@@ -715,12 +719,14 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     align-items: flex-start;
 
     width: 100%;
-    padding: 10px 12px;
+    padding-block: 10px;
+    padding-inline: 12px;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${cssVar.borderRadiusLG};
 
+    text-align: start;
+
     background: ${cssVar.colorBgElevated};
-    text-align: left;
 
     transition:
       border-color 0.2s ease,
@@ -728,18 +734,20 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       transform 0.2s ease;
 
     &:hover {
+      transform: translateY(-1px);
       border-color: ${cssVar.colorBorder};
       background: ${cssVar.colorBgContainer};
-      transform: translateY(-1px);
     }
   `,
   commandPaletteItemIcon: css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
     width: 32px;
     height: 32px;
     border-radius: ${cssVar.borderRadius}px;
+
     background: ${cssVar.colorFillQuaternary};
   `,
   commandPaletteItemBody: css`

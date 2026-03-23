@@ -318,6 +318,39 @@ function ProviderBadge({ logo, providerId }: { logo?: string; providerId?: strin
   );
 }
 
+function ConfigFetchErrorPanel({
+  colors,
+  onRetry,
+  t,
+}: {
+  colors: ReturnType<typeof useThemeColors>;
+  onRetry: () => void;
+  t: { errorNetwork: string; errorRetry: string };
+}) {
+  return (
+    <View className="flex-1 justify-center px-8">
+      <Text className="text-center text-[15px] font-medium" style={{ color: colors.foreground }}>
+        {t.errorNetwork}
+      </Text>
+      <TouchableOpacity
+        accessibilityLabel={t.errorRetry}
+        accessibilityRole="button"
+        activeOpacity={0.85}
+        className="mt-5 self-center rounded-xl px-6 py-3"
+        style={{ backgroundColor: colors.primary }}
+        onPress={() => {
+          haptics.light();
+          onRetry();
+        }}
+      >
+        <Text className="text-[15px] font-semibold" style={{ color: colors.iconOnPrimary }}>
+          {t.errorRetry}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function CreateNewAgentConfigScreen({ navigation }: { navigation: any }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -606,6 +639,7 @@ function SessionAgentConfigScreen({
     config: agentConfig,
     error: agentConfigError,
     loading: configLoading,
+    refetch,
     setConfig,
   } = useAgentConfig(sessionId, true);
 
@@ -616,8 +650,7 @@ function SessionAgentConfigScreen({
 
   useEffect(() => {
     if (agentConfigError) {
-      toast.show('error', t.errorNetwork);
-      navigation.goBack();
+      setLoading(false);
       return;
     }
 
@@ -636,15 +669,7 @@ function SessionAgentConfigScreen({
     setConversationExpanded(true);
     setAdvancedExpanded(!!agentConfig.systemRole);
     setLoading(false);
-  }, [
-    agentConfig,
-    agentConfigError,
-    configLoading,
-    navigation,
-    t.errorNetwork,
-    t.settingsNotConfigured,
-    toast,
-  ]);
+  }, [agentConfig, agentConfigError, configLoading, navigation, t.settingsNotConfigured, toast]);
 
   const toggleSkill = useCallback((identifier: string) => {
     haptics.light();
@@ -722,6 +747,21 @@ function SessionAgentConfigScreen({
     t.errorSaveFailed,
     toast,
   ]);
+
+  if (agentConfigError && !draft) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t.agentConfigTitle}
+          leftElement={
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          }
+          onPressLeft={() => navigation.goBack()}
+        />
+        <ConfigFetchErrorPanel colors={colors} t={t} onRetry={() => void refetch()} />
+      </View>
+    );
+  }
 
   if (loading || !draft) {
     return (
@@ -1171,6 +1211,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
     config: agentConfig,
     error: agentConfigError,
     loading: configLoading,
+    refetch,
     setConfig,
   } = useAgentConfigByAgentId(agentId, true);
 
@@ -1180,8 +1221,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
 
   useEffect(() => {
     if (agentConfigError) {
-      toast.show('error', t.errorNetwork);
-      navigation.goBack();
+      setLoading(false);
       return;
     }
 
@@ -1200,15 +1240,7 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
     setConversationExpanded(true);
     setAdvancedExpanded(!!agentConfig.systemRole);
     setLoading(false);
-  }, [
-    agentConfig,
-    agentConfigError,
-    configLoading,
-    navigation,
-    t.errorNetwork,
-    t.settingsNotConfigured,
-    toast,
-  ]);
+  }, [agentConfig, agentConfigError, configLoading, navigation, t.settingsNotConfigured, toast]);
 
   const toggleSkill = useCallback((identifier: string) => {
     haptics.light();
@@ -1276,6 +1308,21 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
       setSaving(false);
     }
   }, [draft, selectedSkills, setConfig, t.agentConfigSaved, t.errorSaveFailed, toast]);
+
+  if (agentConfigError && !draft) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t.agentConfigTitle}
+          leftElement={
+            <ArrowLeft color={colors.primary} size={22} strokeWidth={tokens.icon.strokeWidth} />
+          }
+          onPressLeft={() => navigation.goBack()}
+        />
+        <ConfigFetchErrorPanel colors={colors} t={t} onRetry={() => void refetch()} />
+      </View>
+    );
+  }
 
   if (loading || !draft) {
     return (
@@ -1430,28 +1477,37 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
               />
             </View>
           </View>
-          <View className="mb-3">
-            <Text className="mb-2 px-1 text-[12px] font-medium text-secondary/65">
-              {t.memoryToolTitle}
-            </Text>
-            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-              <ChoicePill
-                active={!draft.memoryEnabled}
-                label={t.memoryToolOffTitle}
-                onPress={() => updateDraft('memoryEnabled', false)}
-              />
-              <ChoicePill
-                active={draft.memoryEnabled}
-                label={t.memoryToolOnTitle}
-                onPress={() => updateDraft('memoryEnabled', true)}
-              />
-            </View>
-          </View>
           <ToggleRow
-            label={t.agentConfigMemoryEffort}
-            value={draft.memoryEffort}
-            onValueChange={(v) => updateDraft('memoryEffort', v)}
+            description={draft.memoryEnabled ? t.memoryToolOnDesc : t.memoryToolOffDesc}
+            label={t.memoryTitle}
+            value={draft.memoryEnabled}
+            onValueChange={(value) => updateDraft('memoryEnabled', value)}
           />
+
+          {draft.memoryEnabled ? (
+            <View className="mb-3">
+              <Text className="mb-2 px-1 text-[12px] font-medium text-secondary/65">
+                {t.memoryToolEffortTitle}
+              </Text>
+              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                <ChoicePill
+                  active={draft.memoryEffort === 'low'}
+                  label={t.memoryToolEffortLow}
+                  onPress={() => updateDraft('memoryEffort', 'low')}
+                />
+                <ChoicePill
+                  active={draft.memoryEffort === 'medium'}
+                  label={t.memoryToolEffortMedium}
+                  onPress={() => updateDraft('memoryEffort', 'medium')}
+                />
+                <ChoicePill
+                  active={draft.memoryEffort === 'high'}
+                  label={t.memoryToolEffortHigh}
+                  onPress={() => updateDraft('memoryEffort', 'high')}
+                />
+              </View>
+            </View>
+          ) : null}
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -1464,13 +1520,12 @@ function AgentConfigByAgentIdScreen({ agentId, navigation }: { agentId: string; 
           <Field
             multiline
             label={t.agentConfigInstruction}
-            placeholder={t.agentConfigInstructionPlaceholder}
+            placeholder={t.chatSettingsSystemPromptPlaceholder}
             value={draft.systemRole}
             onChangeText={(value) => updateDraft('systemRole', value)}
           />
           <Field
             label={t.agentConfigOpeningMessage}
-            placeholder={t.agentConfigOpeningPlaceholder}
             value={draft.openingMessage}
             onChangeText={(value) => updateDraft('openingMessage', value)}
           />

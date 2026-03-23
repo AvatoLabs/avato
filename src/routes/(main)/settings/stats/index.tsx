@@ -6,7 +6,7 @@ import { type DatePickerProps } from 'antd';
 import { DatePicker, Divider } from 'antd';
 import dayjs from 'dayjs';
 import { Brain } from 'lucide-react';
-import { memo, useEffect, useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useClientDataSWR } from '@/libs/swr';
@@ -31,18 +31,12 @@ const StatsSetting = memo<{ mobile?: boolean }>(({ mobile }) => {
   dayjs.locale(i18n.language);
 
   const [groupBy, setGroupBy] = useState<GroupBy>(GroupBy.Model);
-  const [dateRange, setDateRange] = useState<dayjs.Dayjs>(dayjs(new Date()));
-  const [dateStrings, setDateStrings] = useState<string>();
+  const [dateRange, setDateRange] = useState<dayjs.Dayjs>(() => dayjs());
+  const [dateStrings, setDateStrings] = useState<string>(() => dayjs().format('YYYY-MM'));
 
-  const { data, isLoading, mutate } = useClientDataSWR('usage-stat', async () =>
+  const { data, isLoading } = useClientDataSWR(['usage-stat', dateStrings], async () =>
     usageService.findAndGroupByDay(dateStrings),
   );
-
-  useEffect(() => {
-    if (dateStrings) {
-      mutate();
-    }
-  }, [dateStrings]);
 
   const handleDateChange: DatePickerProps['onChange'] = (dates, dateStrings) => {
     // Handle both single date and array
@@ -67,9 +61,9 @@ const StatsSetting = memo<{ mobile?: boolean }>(({ mobile }) => {
         variant={'filled'}
       >
         <Grid gap={8} maxItemWidth={150} rows={4}>
-          <TotalAssistants mobile={mobile} />
-          <TotalTopics mobile={mobile} />
-          <TotalMessages mobile={mobile} />
+          <TotalAssistants />
+          <TotalTopics />
+          <TotalMessages />
           <TotalWords />
         </Grid>
         <Divider dashed />

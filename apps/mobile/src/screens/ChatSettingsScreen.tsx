@@ -46,7 +46,7 @@ import { isGroupSessionLike } from '../lib/session';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useChatStore } from '../store/chat';
 import { useSessionStore } from '../store/session';
-import { useTopicStore } from '../store/topic';
+import { EMPTY_TOPICS, useTopicStore } from '../store/topic';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
 import type { ChatMessage, Tag as TagItem } from '../types';
@@ -100,6 +100,7 @@ export default function ChatSettingsScreen({
 }: RootStackScreenProps<'ChatSettings'>) {
   const colors = useThemeColors();
   const sessionId = route.params.sessionId;
+  const sessionKey = sessionId ?? '__invalid_session__';
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const toast = useToast();
@@ -115,8 +116,8 @@ export default function ChatSettingsScreen({
   const fetchTopics = useTopicStore((s) => s.fetchTopics);
   const createTopic = useTopicStore((s) => s.createTopic);
   const updateTopicTag = useTopicStore((s) => s.updateTopicTag);
-  const topicsBySession = useTopicStore((s) => s.topicsBySession);
-  const activeTopicBySession = useTopicStore((s) => s.activeTopicBySession);
+  const topics = useTopicStore((s) => s.topicsBySession[sessionKey] ?? EMPTY_TOPICS);
+  const activeTopicId = useTopicStore((s) => s.activeTopicBySession[sessionKey] ?? null);
 
   const { config: agentConfig, invalidate } = useAgentConfig(
     sessionId,
@@ -244,17 +245,15 @@ export default function ChatSettingsScreen({
   const currentTopic = useMemo(() => {
     if (!sessionId) return null;
 
-    const sessionTopics = topicsBySession[sessionId] ?? [];
-    if (sessionTopics.length === 0) return null;
+    if (topics.length === 0) return null;
 
-    const activeTopicId = activeTopicBySession[sessionId];
     if (activeTopicId) {
-      const matched = sessionTopics.find((topic) => topic.id === activeTopicId);
+      const matched = topics.find((topic) => topic.id === activeTopicId);
       if (matched) return matched;
     }
 
-    return sessionTopics[0];
-  }, [activeTopicBySession, sessionId, topicsBySession]);
+    return topics[0];
+  }, [activeTopicId, sessionId, topics]);
 
   const currentTag = useMemo(
     () => tags.find((tag) => tag.id === currentTopic?.tagId),
@@ -529,8 +528,12 @@ export default function ChatSettingsScreen({
           )
         }
         onPressLeft={() => {
-          void saveSettings();
-          navigation.goBack();
+          void (async () => {
+            const saved = await saveSettings();
+            if (!saved) return;
+
+            navigation.goBack();
+          })();
         }}
         onPressRight={async () => {
           const saved = await saveSettings();

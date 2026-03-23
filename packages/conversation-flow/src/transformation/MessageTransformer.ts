@@ -17,7 +17,7 @@ export class MessageTransformer {
   messageToContentBlock(message: Message): AssistantContentBlock {
     const { usage, performance } = this.splitMetadata(message.metadata);
 
-    return {
+    const block: AssistantContentBlock = {
       content: message.content || '',
       error: message.error,
       fileList: message.fileList,
@@ -28,6 +28,16 @@ export class MessageTransformer {
       tools: message.tools as any,
       usage,
     };
+
+    if (message.search) {
+      block.search = message.search;
+    }
+
+    if (message.chunksList && message.chunksList.length > 0) {
+      block.chunksList = message.chunksList;
+    }
+
+    return block;
   }
 
   /**

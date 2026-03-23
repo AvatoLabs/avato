@@ -80,7 +80,7 @@ const ApprovalActions = memo<ApprovalActionsProps>(
     };
 
     return (
-      <Flexbox horizontal gap={8}>
+      <Flexbox direction={isMobile ? 'vertical' : 'horizontal'} gap={8}>
         <Popover
           open={rejectPopoverOpen}
           placement={isMobile ? 'top' : 'bottomRight'}

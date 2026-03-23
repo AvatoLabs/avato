@@ -1,7 +1,6 @@
-import debug from 'debug';
-
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type FileItem } from '@lobechat/database/schemas';
+import debug from 'debug';
 
 import { ResourceModel } from '@/database/models/resource';
 import { getRedisConfig } from '@/envs/redis';

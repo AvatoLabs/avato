@@ -12,7 +12,7 @@ export type Locale = 'en-US' | 'zh-CN' | 'zh-TW';
 const STORAGE_KEY = 'avato_locale';
 
 // ── Translation keys ────────────────────────────────────────────────
-type TranslationKeys = {
+export type TranslationKeys = {
   // Common
   cancel: string;
   confirm: string;
@@ -27,6 +27,8 @@ type TranslationKeys = {
   tabVideo: string;
   tabDiscover: string;
   tabMe: string;
+  /** Create tab — header action to open artwork/video options */
+  createOpenOptionsA11y: string;
 
   // Chat List
   chatListTitle: string;
@@ -67,6 +69,8 @@ type TranslationKeys = {
   accessibilityAddTopic: string;
   accessibilityChatDirectory: string;
   accessibilityOpenStore: string;
+  accessibilityStoreSearchClear: string;
+  accessibilityStoreSearchClose: string;
   accessibilityCreateMenu: string;
   accessibilityGoBack: string;
   accessibilitySave: string;
@@ -98,6 +102,7 @@ type TranslationKeys = {
   chatToolApprove: string;
   chatToolApproveNotSupported: string;
   chatToolReject: string;
+  chatToolRejectAndContinue: string;
   chatToolAbortedDesc: string;
   chatToolRejectedDesc: string;
   chatToolPendingDesc: string;
@@ -106,6 +111,10 @@ type TranslationKeys = {
   chatToolGtdPlanDescPlaceholder: string;
   chatToolGtdPlanContextPlaceholder: string;
   chatToolGtdAddTodoPlaceholder: string;
+  chatToolGtdClearHeader: string;
+  chatToolGtdClearLabel: string;
+  chatToolGtdClearCompleted: string;
+  chatToolGtdClearAll: string;
   chatToolNotebookCreateDocTitlePlaceholder: string;
   chatToolNotebookCreateDocDescPlaceholder: string;
   chatToolNotebookCreateDocContentPlaceholder: string;
@@ -118,6 +127,9 @@ type TranslationKeys = {
   chatToolStreamingWebSearch: string;
   chatToolStreamingKnowledgeBase: string;
   chatToolStreamingSearchSkill: string;
+  chatToolStreamingRunning: string;
+  chatToolTapToExpand: string;
+  chatToolTapToCollapse: string;
   chatShowMore: string;
   chatShowLess: string;
   chatAskAnything: string;
@@ -183,9 +195,11 @@ type TranslationKeys = {
   serverConnectStart: string;
   serverSaveConfig: string;
   serverTips: string;
+  serverFirstLaunchNextStep: string;
 
   // Chat Settings
   chatSettingsTitle: string;
+  chatSettingsSessionInfo: string;
   chatSettingsModel: string;
   chatSettingsModelHint: string;
   chatSettingsTemperature: string;
@@ -334,6 +348,13 @@ type TranslationKeys = {
   settingsGroupMemory: string;
   settingsGroupData: string;
   settingsGroupAccount: string;
+  /** Root settings screen — bridges tab label (Me) and page title (Settings) */
+  settingsHeaderSubtitle: string;
+  /** Shown under Connection & AI section to explain overlap with overview card */
+  settingsConnectionAlsoInOverview: string;
+  /** Collapsible header for planned (not yet available) features under Data & Voice */
+  settingsComingSoonSection: string;
+  settingsComingSoonHint: string;
 
   // AI Providers
   aiProvidersTitle: string;
@@ -382,6 +403,12 @@ type TranslationKeys = {
   homeStartChat: string;
   chatSidebarTags: string;
   chatSidebarTagEmpty: string;
+  chatSidebarEmptyTitle: string;
+  chatSidebarEmptyDesc: string;
+  chatSidebarSearchEmptyDesc: string;
+  chatSidebarRecentsShowAll: string;
+  chatSidebarRecentsShowLess: string;
+  chatSidebarTagsHint: string;
 
   // Studio / Capability Hub
   studioTitle: string;
@@ -491,7 +518,6 @@ type TranslationKeys = {
   profileAvatar: string;
   profileFullName: string;
   profileUsername: string;
-  profileBio: string;
   profileSaved: string;
   profileInterests: string;
   profileInterestsWriting: string;
@@ -509,6 +535,7 @@ type TranslationKeys = {
   profileUpdateEmail: string;
   profileEmailPlaceholder: string;
   profileEmailInvalid: string;
+  profileEmailMustDiffer: string;
   profileEmailChangeSent: string;
   profilePassword: string;
   profileSetPassword: string;
@@ -517,10 +544,20 @@ type TranslationKeys = {
   profilePasswordResetError: string;
   profileUsernameRule: string;
   profileUsernameDuplicate: string;
+  profileUsernameRequired: string;
+  profileLinkedSignIn: string;
+  profileLinkedSignInHint: string;
+  profileSecurity: string;
+  profileChangeEmailTitle: string;
+  profileChangeEmailAction: string;
+  profileSendPasswordReset: string;
+  profilePasswordResetConfirm: string;
+  profileEmailMissing: string;
 
   // Data Management
   dataManageTitle: string;
   dataManageClearCache: string;
+  dataManageClearCacheMessage: string;
   dataManageExport: string;
   dataManageResetApp: string;
   dataManageResetConfirm: string;
@@ -531,6 +568,8 @@ type TranslationKeys = {
   logsView: string;
   logsViewDesc: string;
   logsTitle: string;
+  logsActions: string;
+  logsRefresh: string;
   logsCopy: string;
   logsClear: string;
   logsEmpty: string;
@@ -573,6 +612,7 @@ type TranslationKeys = {
   errorSaveFailed: string;
   loginChangeServer: string;
   loginDesc: string;
+  loginLoadingAuthConfig: string;
   loginContinueWithEmail: string;
   loginContinueWithProvider: string;
   loginFeishuConfigMismatch: string;
@@ -755,6 +795,84 @@ type TranslationKeys = {
   resourceRenamePlaceholder: string;
   resourceRenamed: string;
   resourceShareFailed: string;
+  resourceShareLinkTitle: string;
+  resourceShareExpiresLabel: string;
+  resourceShareExpires1d: string;
+  resourceShareExpires7d: string;
+  resourceShareExpires30d: string;
+  resourceSharePasswordOptional: string;
+  resourceSharePasswordPlaceholder: string;
+  resourceShareConfirm: string;
+  resourceShareLibrary: string;
+  resourcePickerPickLocation: string;
+  resourceShareManage: string;
+  resourceShareManageLinks: string;
+  resourceShareManageMembers: string;
+  resourceShareAccessSummary: string;
+  resourceShareLinkActive: string;
+  resourceShareLinkDisabled: string;
+  resourceShareDisableLink: string;
+  resourceShareGrantHint: string;
+  resourceShareGrantButton: string;
+  resourceShareRevoke: string;
+  resourceShareNoLinks: string;
+  resourceShareNoMembers: string;
+  resourceShareMembersUnavailable: string;
+  resourceShareLinksUnavailable: string;
+  resourceShareManageLoadFailed: string;
+  resourceShareRoleViewer: string;
+  resourceShareRoleEditor: string;
+  resourceShareRoleOwner: string;
+  resourceShareCopyAccess: string;
+  resourceAccessCopied: string;
+  resourceSharedWithMe: string;
+  resourceSharedWithMeEmpty: string;
+  resourceSharedWithMeLoadFailed: string;
+  resourceSharedKindFile: string;
+  resourceSharedKindDocument: string;
+  resourceSharedKindLibrary: string;
+  resourceSharedFolderHint: string;
+  resourceShareGrantInheritChildren: string;
+  resourceShareGrantCanReshare: string;
+  resourceShareGrantExpiresPlaceholder: string;
+  resourceShareGrantInvalidExpiry: string;
+  resourceShareGrantExpirySection: string;
+  resourceShareGrantExpiryNone: string;
+  resourceShareGrantExpiryPreset7: string;
+  resourceShareGrantExpiryPreset30: string;
+  resourceShareGrantExpiryPreset90: string;
+  resourceShareGrantExpiryCustom: string;
+  resourceShareGrantExpirySelected: string;
+  resourceShareMemberCanReshare: string;
+  resourceShareMemberInheritOff: string;
+  resourcePublicShareTitle: string;
+  resourcePublicSharePasswordTitle: string;
+  resourcePublicSharePasswordSubtitle: string;
+  resourcePublicSharePasswordPlaceholder: string;
+  resourcePublicShareUnlock: string;
+  resourcePublicShareNotFound: string;
+  resourcePublicShareExpires: string;
+  resourcePublicShareDownload: string;
+  resourceSharedAccessNoExpiry: string;
+  resourceSharedPermissionValidUntil: string;
+  resourceShareAccessOk: string;
+  resourceShareAccessDenied: string;
+  resourceShareAccessUnknown: string;
+  resourceShareAccessViaSpace: string;
+  resourceShareAccessViaDirect: string;
+  resourceShareAccessViaInherited: string;
+  resourceShareAccessViaShareLink: string;
+  resourceShareConfirmDisableLinkTitle: string;
+  resourceShareConfirmDisableLinkMessage: string;
+  resourceShareConfirmRevokeTitle: string;
+  resourceShareConfirmRevokeMessage: string;
+  resourceShareRetry: string;
+  resourceShareGrantUsernamePlaceholder: string;
+  resourceUntitled: string;
+  resourcePublicShareDocEmpty: string;
+  resourcePublicShareNotFoundHint: string;
+  resourcePublicShareDownloadFailed: string;
+  resourcePublicShareKbHint: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
@@ -803,8 +921,6 @@ type TranslationKeys = {
   storeEmpty: string;
   storeLoadFailed: string;
   storeInstall: string;
-  storeManage: string;
-  storeFeatured: string;
   storeCustom: string;
   storeBuiltIn: string;
   storeFromStore: string;
@@ -826,6 +942,11 @@ type TranslationKeys = {
   storeInstallFailed: string;
   storeAddCustomMcp: string;
   storeCustomMcpSaved: string;
+  storeSearchNoResults: string;
+  storeLoadMore: string;
+  storeCategoriesLoadHint: string;
+  storeInstalledFilterAll: string;
+  storeInstalledKindEmpty: string;
 
   // Skills
   skillsTitle: string;
@@ -950,6 +1071,15 @@ type TranslationKeys = {
   statsEmpty: string;
   statsEmptyDesc: string;
   statsViewAll: string;
+  statsLoadFailed: string;
+  statsRetry: string;
+  statsVsNew: string;
+  statsWelcomeFallback: string;
+  statsRankUntitled: string;
+  statsHeatmapHint: string;
+  statsHeatmapDayTitle: string;
+  statsHeatmapDayMessage: string;
+  statsHeatmapCellA11y: string;
 
   // Memory
   memoryTitle: string;
@@ -1060,6 +1190,25 @@ type TranslationKeys = {
   artworkNoModelsDesc: string;
   artworkSelectModel: string;
   artworkImageCountCustom: string;
+  artworkImageCountCustomShort: string;
+  artworkReferenceImage: string;
+  artworkParamAuto: string;
+  artworkParamQuality: string;
+  artworkParamSize: string;
+  artworkParamWidth: string;
+  artworkParamHeight: string;
+  artworkParamSteps: string;
+  artworkParamCfg: string;
+  artworkParamSeed: string;
+  artworkNewTopicToast: string;
+  artworkShareImage: string;
+  artworkA11yReuseSettings: string;
+  artworkA11yCopyPrompt: string;
+  artworkA11yDeleteBatch: string;
+  artworkA11yGenerate: string;
+  artworkA11yOpenImagePreview: string;
+  artworkA11yCloseImagePreview: string;
+  artworkA11yShareImage: string;
 
   videoTitle: string;
   videoPromptPlaceholder: string;
@@ -1101,6 +1250,7 @@ const en: TranslationKeys = {
   tabVideo: 'Video',
   tabDiscover: 'Discover',
   tabMe: 'Me',
+  createOpenOptionsA11y: 'Open image and video creation settings',
 
   chatListTitle: 'Avato',
   chatListSearch: 'Search sessions and messages',
@@ -1140,6 +1290,8 @@ const en: TranslationKeys = {
   accessibilityAddTopic: 'Add topic',
   accessibilityChatDirectory: 'Open chat directory',
   accessibilityOpenStore: 'Open store',
+  accessibilityStoreSearchClear: 'Clear search text',
+  accessibilityStoreSearchClose: 'Close search',
   accessibilityCreateMenu: 'Create topic or group',
   accessibilityGoBack: 'Go back',
   accessibilitySave: 'Save',
@@ -1170,6 +1322,7 @@ const en: TranslationKeys = {
   chatToolApprove: 'Approve',
   chatToolApproveNotSupported: 'Tool approval is not yet supported for this flow.',
   chatToolReject: 'Reject',
+  chatToolRejectAndContinue: 'Reject & continue',
   chatToolAbortedDesc: 'This tool call was aborted.',
   chatToolRejectedDesc: 'This tool call was rejected.',
   chatToolPendingDesc: 'This tool needs your approval to run.',
@@ -1178,6 +1331,10 @@ const en: TranslationKeys = {
   chatToolGtdPlanDescPlaceholder: 'Brief summary',
   chatToolGtdPlanContextPlaceholder: 'Context and constraints',
   chatToolGtdAddTodoPlaceholder: 'Add todo item',
+  chatToolGtdClearHeader: 'Clear todo items',
+  chatToolGtdClearLabel: 'Choose what to clear:',
+  chatToolGtdClearCompleted: 'Clear completed items only',
+  chatToolGtdClearAll: 'Clear all items (including pending)',
   chatToolNotebookCreateDocTitlePlaceholder: 'Document title',
   chatToolNotebookCreateDocDescPlaceholder: 'Brief description',
   chatToolNotebookCreateDocContentPlaceholder: 'Content (Markdown)',
@@ -1190,6 +1347,9 @@ const en: TranslationKeys = {
   chatToolStreamingWebSearch: 'Searching…',
   chatToolStreamingKnowledgeBase: 'Searching knowledge base…',
   chatToolStreamingSearchSkill: 'Searching skills…',
+  chatToolStreamingRunning: 'Running…',
+  chatToolTapToExpand: 'Tap to expand',
+  chatToolTapToCollapse: 'Tap to collapse',
   chatShowMore: 'Show more',
   chatShowLess: 'Show less',
   chatAskAnything: 'Ask anything...',
@@ -1254,8 +1414,11 @@ const en: TranslationKeys = {
   serverSaveConfig: 'Save Configuration',
   serverTips:
     '💡 Make sure your phone and server are on the same network. Your Avato server should expose the tRPC mobile endpoint (/trpc/mobile).',
+  serverFirstLaunchNextStep:
+    'Next, sign in to connect this app to your workspace.',
 
   chatSettingsTitle: 'Session Settings',
+  chatSettingsSessionInfo: 'Session info',
   chatSettingsModel: 'Model',
   chatSettingsModelHint: 'Popular: gpt-4o, gpt-4o-mini, claude-3.5-sonnet, deepseek-chat',
   chatSettingsTemperature: 'Temperature',
@@ -1405,6 +1568,10 @@ const en: TranslationKeys = {
   settingsGroupMemory: 'Memory',
   settingsGroupData: 'Data & Voice',
   settingsGroupAccount: 'Account',
+  settingsHeaderSubtitle: 'Profile, workspace & preferences',
+  settingsConnectionAlsoInOverview: 'Full controls — same destinations as the overview shortcuts above',
+  settingsComingSoonSection: 'Coming soon',
+  settingsComingSoonHint: 'Sync, voice input, and text-to-speech',
 
   aiProvidersTitle: 'AI Providers',
   aiProvidersDesc: 'Configure your AI service providers and API keys.',
@@ -1448,6 +1615,13 @@ const en: TranslationKeys = {
   homeStartChat: 'Start Chat',
   chatSidebarTags: 'Tags',
   chatSidebarTagEmpty: 'No chats in this tag yet',
+  chatSidebarEmptyTitle: 'No conversations yet',
+  chatSidebarEmptyDesc:
+    'Use the shortcuts at the top to add an assistant, start a session, or create a group.',
+  chatSidebarSearchEmptyDesc: 'Try different keywords or check spelling.',
+  chatSidebarRecentsShowAll: 'Show all ({count})',
+  chatSidebarRecentsShowLess: 'Show less',
+  chatSidebarTagsHint: 'No custom tags yet — tap to create one and organize topics.',
 
   studioTitle: 'Studio',
   studioFeatured: 'Featured',
@@ -1548,7 +1722,6 @@ const en: TranslationKeys = {
   profileAvatar: 'Avatar',
   profileFullName: 'Full Name',
   profileUsername: 'Username',
-  profileBio: 'Bio',
   profileSaved: 'Profile saved',
   profileInterests: 'Interests',
   profileInterestsWriting: 'Content Creation',
@@ -1566,6 +1739,7 @@ const en: TranslationKeys = {
   profileUpdateEmail: 'Update',
   profileEmailPlaceholder: 'Enter new email address',
   profileEmailInvalid: 'Please enter a valid email address',
+  profileEmailMustDiffer: 'The new address must differ from your current email.',
   profileEmailChangeSent: 'Verification email sent to new address',
   profilePassword: 'Password',
   profileSetPassword: 'Set Password',
@@ -1574,9 +1748,19 @@ const en: TranslationKeys = {
   profilePasswordResetError: 'Failed to send password reset email',
   profileUsernameRule: 'Only letters, numbers, and underscores',
   profileUsernameDuplicate: 'Username is already taken',
+  profileUsernameRequired: 'Username is required',
+  profileLinkedSignIn: 'Linked sign-in',
+  profileLinkedSignInHint: 'Third-party accounts connected to this profile.',
+  profileSecurity: 'Sign-in & security',
+  profileChangeEmailTitle: 'Change email',
+  profileChangeEmailAction: 'Change email',
+  profileSendPasswordReset: 'Send password reset email',
+  profilePasswordResetConfirm: 'We will send a reset link to {email}.',
+  profileEmailMissing: 'No email address on this account.',
 
   dataManageTitle: 'Data Management',
   dataManageClearCache: 'Clear Cache',
+  dataManageClearCacheMessage: 'Clear all cached data on this device?',
   dataManageExport: 'Export Data',
   dataManageResetApp: 'Reset App',
   dataManageResetConfirm: 'Reset everything?',
@@ -1587,6 +1771,8 @@ const en: TranslationKeys = {
   logsView: 'View Logs',
   logsViewDesc: 'Review recent app errors and copy them for debugging.',
   logsTitle: 'App Logs',
+  logsActions: 'Actions',
+  logsRefresh: 'Refresh',
   logsCopy: 'Copy',
   logsClear: 'Clear',
   logsEmpty: 'No logs captured yet.',
@@ -1628,6 +1814,7 @@ const en: TranslationKeys = {
   errorSaveFailed: 'Failed to save',
   loginChangeServer: 'Server',
   loginDesc: 'Sign in to continue to your workspace.',
+  loginLoadingAuthConfig: 'Checking sign-in options…',
   loginContinueWithEmail: 'Continue with Email or Password',
   loginContinueWithProvider: 'Continue with {provider}',
   loginFeishuConfigMismatch:
@@ -1807,6 +1994,86 @@ const en: TranslationKeys = {
   resourceRenamePlaceholder: 'Enter new name',
   resourceRenamed: 'Renamed successfully',
   resourceShareFailed: 'Share failed',
+  resourceShareLinkTitle: 'Share link',
+  resourceShareExpiresLabel: 'Link expires after',
+  resourceShareExpires1d: '1 day',
+  resourceShareExpires7d: '7 days',
+  resourceShareExpires30d: '30 days',
+  resourceSharePasswordOptional: 'Password (optional)',
+  resourceSharePasswordPlaceholder: 'Leave empty for no password',
+  resourceShareConfirm: 'Create & share',
+  resourceShareLibrary: 'Share library',
+  resourcePickerPickLocation: 'Location',
+  resourceShareManage: 'Manage sharing',
+  resourceShareManageLinks: 'Share links',
+  resourceShareManageMembers: 'People',
+  resourceShareAccessSummary: 'Your access',
+  resourceShareLinkActive: 'Active',
+  resourceShareLinkDisabled: 'Disabled',
+  resourceShareDisableLink: 'Disable link',
+  resourceShareGrantHint: 'Grant by username',
+  resourceShareGrantButton: 'Grant',
+  resourceShareRevoke: 'Remove',
+  resourceShareNoLinks: 'No share links yet',
+  resourceShareNoMembers: 'No collaborators',
+  resourceShareMembersUnavailable: 'Member sharing is not available for your role',
+  resourceShareLinksUnavailable: 'Link sharing is not available for your role',
+  resourceShareManageLoadFailed: 'Failed to load sharing data',
+  resourceShareRoleViewer: 'Viewer',
+  resourceShareRoleEditor: 'Editor',
+  resourceShareRoleOwner: 'Owner',
+  resourceShareCopyAccess: 'Copy',
+  resourceAccessCopied: 'Copied',
+  resourceSharedWithMe: 'Shared with me',
+  resourceSharedWithMeEmpty: 'Nothing has been shared with you yet',
+  resourceSharedWithMeLoadFailed: 'Could not load shared items',
+  resourceSharedKindFile: 'File',
+  resourceSharedKindDocument: 'Document',
+  resourceSharedKindLibrary: 'Library',
+  resourceSharedFolderHint: 'Open folders from a library in Resources.',
+  resourceShareGrantInheritChildren: 'Apply to items inside (inherit)',
+  resourceShareGrantCanReshare: 'Allow this editor to manage sharing',
+  resourceShareGrantExpiresPlaceholder: 'Access expiry (optional, YYYY-MM-DD)',
+  resourceShareGrantInvalidExpiry: 'Invalid expiry date',
+  resourceShareGrantExpirySection: 'Access expiry (optional)',
+  resourceShareGrantExpiryNone: 'No expiry',
+  resourceShareGrantExpiryPreset7: '7 days',
+  resourceShareGrantExpiryPreset30: '30 days',
+  resourceShareGrantExpiryPreset90: '90 days',
+  resourceShareGrantExpiryCustom: 'Pick date',
+  resourceShareGrantExpirySelected: 'Ends:',
+  resourceShareMemberCanReshare: 'Can manage sharing',
+  resourceShareMemberInheritOff: 'Not inherited to sub-items',
+  resourcePublicShareTitle: 'Shared resource',
+  resourcePublicSharePasswordTitle: 'Password protected',
+  resourcePublicSharePasswordSubtitle: 'Enter the password to view this resource.',
+  resourcePublicSharePasswordPlaceholder: 'Password',
+  resourcePublicShareUnlock: 'Unlock',
+  resourcePublicShareNotFound: 'This share link is invalid or has expired.',
+  resourcePublicShareExpires: 'Expires',
+  resourcePublicShareDownload: 'Download file',
+  resourceSharedAccessNoExpiry: 'No expiry',
+  resourceSharedPermissionValidUntil: 'Access valid until',
+  resourceShareAccessOk: 'You can access this resource',
+  resourceShareAccessDenied: "You don't have access to this resource",
+  resourceShareAccessUnknown: 'Could not load access details',
+  resourceShareAccessViaSpace: 'Through your space membership',
+  resourceShareAccessViaDirect: 'Shared with you directly',
+  resourceShareAccessViaInherited: 'Through a parent folder or inherited permission',
+  resourceShareAccessViaShareLink: 'Through an active share link',
+  resourceShareConfirmDisableLinkTitle: 'Disable this share link?',
+  resourceShareConfirmDisableLinkMessage:
+    'Anyone with the link will lose access. You can create a new link later, but old links will stay broken.',
+  resourceShareConfirmRevokeTitle: 'Remove this person?',
+  resourceShareConfirmRevokeMessage: 'They will lose access to this resource.',
+  resourceShareRetry: 'Retry',
+  resourceShareGrantUsernamePlaceholder: 'Username',
+  resourceUntitled: 'Untitled',
+  resourcePublicShareDocEmpty: 'No content to preview for this document.',
+  resourcePublicShareNotFoundHint:
+    'Check the link and password. A wrong password looks the same as an expired or invalid link.',
+  resourcePublicShareDownloadFailed: 'Could not open the download link.',
+  resourcePublicShareKbHint: 'For the full library and file list, use LobeHub in a browser.',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -1854,8 +2121,6 @@ const en: TranslationKeys = {
   storeEmpty: 'No extensions found',
   storeLoadFailed: 'Failed to load. Check your connection.',
   storeInstall: 'Install',
-  storeManage: 'Manage',
-  storeFeatured: 'Featured',
   storeCustom: 'Custom',
   storeBuiltIn: 'Built-in',
   storeFromStore: 'Store',
@@ -1877,6 +2142,11 @@ const en: TranslationKeys = {
   storeInstallFailed: 'Failed to install extension',
   storeAddCustomMcp: 'Add Custom MCP',
   storeCustomMcpSaved: 'Custom MCP added',
+  storeSearchNoResults: 'No matching extensions',
+  storeLoadMore: 'Load more',
+  storeCategoriesLoadHint: 'Categories could not be refreshed. Filters may be incomplete.',
+  storeInstalledFilterAll: 'All',
+  storeInstalledKindEmpty: 'Nothing installed in this category',
 
   skillsTitle: 'Skills',
   skillsDesc: 'Manage installed skills and plugins',
@@ -2001,6 +2271,15 @@ const en: TranslationKeys = {
   statsEmpty: 'No data yet',
   statsEmptyDesc: 'Start chatting to see your statistics.',
   statsViewAll: 'View All',
+  statsLoadFailed: 'Could not load statistics. Check your connection.',
+  statsRetry: 'Retry',
+  statsVsNew: 'New',
+  statsWelcomeFallback: 'Your usage overview on Avato',
+  statsRankUntitled: 'Untitled',
+  statsHeatmapHint: 'About the last 20 weeks — simplified compared to the full chart on web.',
+  statsHeatmapDayTitle: 'Activity',
+  statsHeatmapDayMessage: 'Date: {date}\nMessages: {count}\nIntensity: {level} / 4',
+  statsHeatmapCellA11y: '{date}, intensity {level} of 4',
 
   memoryTitle: 'Memory',
   memoryDesc: 'AI remembers your preferences, identity, and experiences',
@@ -2084,7 +2363,7 @@ const en: TranslationKeys = {
   artworkEmptyDesc: 'Enter a prompt and generate stunning images with AI.',
   artworkModel: 'Model',
   artworkReferenceImages: 'Reference Images',
-  artworkReferenceImagesDesc: 'Click or drag to upload images\nSupports multiple image selection',
+  artworkReferenceImagesDesc: 'Tap to choose from your library\nMultiple images supported when the model allows',
   artworkResolution: 'Resolution',
   artworkAspectRatio: 'Aspect Ratio',
   artworkImageCount: 'Number of Images',
@@ -2109,6 +2388,25 @@ const en: TranslationKeys = {
   artworkNoModelsDesc: 'Enable an image generation provider in Settings.',
   artworkSelectModel: 'Select Model',
   artworkImageCountCustom: 'Custom',
+  artworkImageCountCustomShort: 'More',
+  artworkReferenceImage: 'Reference Image',
+  artworkParamAuto: 'Auto',
+  artworkParamQuality: 'Quality',
+  artworkParamSize: 'Size',
+  artworkParamWidth: 'Width',
+  artworkParamHeight: 'Height',
+  artworkParamSteps: 'Steps',
+  artworkParamCfg: 'CFG',
+  artworkParamSeed: 'Seed',
+  artworkNewTopicToast: 'Next generation will use a new cloud topic. Local history is unchanged.',
+  artworkShareImage: 'Share',
+  artworkA11yReuseSettings: 'Reuse model and settings from this batch',
+  artworkA11yCopyPrompt: 'Copy prompt',
+  artworkA11yDeleteBatch: 'Delete this batch',
+  artworkA11yGenerate: 'Generate image',
+  artworkA11yOpenImagePreview: 'Open image preview',
+  artworkA11yCloseImagePreview: 'Close preview',
+  artworkA11yShareImage: 'Share image',
   videoTitle: 'Video',
   videoPromptPlaceholder: 'Describe the video you want to generate...',
   videoGenerate: 'Generate Video',
@@ -2149,6 +2447,7 @@ const zh_tw: TranslationKeys = {
   tabVideo: '影片',
   tabDiscover: '發現',
   tabMe: '我的',
+  createOpenOptionsA11y: '開啟圖片與影片創作設定',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜尋會話與訊息',
@@ -2188,6 +2487,8 @@ const zh_tw: TranslationKeys = {
   accessibilityAddTopic: '新增話題',
   accessibilityChatDirectory: '打開聊天目錄',
   accessibilityOpenStore: '開啟商店',
+  accessibilityStoreSearchClear: '清空搜尋文字',
+  accessibilityStoreSearchClose: '關閉搜尋',
   accessibilityCreateMenu: '建立話題或群聊',
   accessibilityGoBack: '返回',
   accessibilitySave: '儲存',
@@ -2218,6 +2519,7 @@ const zh_tw: TranslationKeys = {
   chatToolApprove: '允許',
   chatToolApproveNotSupported: '此流程暫不支援工具批准。',
   chatToolReject: '拒絕',
+  chatToolRejectAndContinue: '拒絕並繼續',
   chatToolAbortedDesc: '此工具調用已中止。',
   chatToolRejectedDesc: '此工具調用已被拒絕。',
   chatToolPendingDesc: '此工具需要您的批准才能運行。',
@@ -2226,6 +2528,10 @@ const zh_tw: TranslationKeys = {
   chatToolGtdPlanDescPlaceholder: '簡要說明',
   chatToolGtdPlanContextPlaceholder: '背景與約束',
   chatToolGtdAddTodoPlaceholder: '添加待辦',
+  chatToolGtdClearHeader: '清除待辦',
+  chatToolGtdClearLabel: '選擇清除範圍：',
+  chatToolGtdClearCompleted: '僅清除已完成項',
+  chatToolGtdClearAll: '清除全部（含未完成）',
   chatToolNotebookCreateDocTitlePlaceholder: '文檔標題',
   chatToolNotebookCreateDocDescPlaceholder: '簡要說明',
   chatToolNotebookCreateDocContentPlaceholder: '內容（Markdown）',
@@ -2238,6 +2544,9 @@ const zh_tw: TranslationKeys = {
   chatToolStreamingWebSearch: '正在搜索…',
   chatToolStreamingKnowledgeBase: '正在檢索知識庫…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
+  chatToolStreamingRunning: '執行中…',
+  chatToolTapToExpand: '點擊展開',
+  chatToolTapToCollapse: '點擊收起',
   chatShowMore: '展開更多',
   chatShowLess: '收起',
   chatAskAnything: '有什麼可以幫助你的嗎？',
@@ -2300,8 +2609,10 @@ const zh_tw: TranslationKeys = {
   serverConnectStart: '連線並開始',
   serverSaveConfig: '儲存設定',
   serverTips: '💡 請確保手機和伺服器在同一網路中。你的 Avato 伺服器需要提供 tRPC 行動端點 (/trpc/mobile)。',
+  serverFirstLaunchNextStep: '接下來請登入，以將此 App 連線至你的工作區。',
 
   chatSettingsTitle: '會話設定',
+  chatSettingsSessionInfo: '會話資訊',
   chatSettingsModel: '模型',
   chatSettingsModelHint: '常用：gpt-4o、gpt-4o-mini、claude-3.5-sonnet、deepseek-chat',
   chatSettingsTemperature: '創意活躍度',
@@ -2449,6 +2760,10 @@ const zh_tw: TranslationKeys = {
   settingsGroupMemory: '記憶',
   settingsGroupData: '資料與語音',
   settingsGroupAccount: '帳戶',
+  settingsHeaderSubtitle: '個人資料、工作區與偏好',
+  settingsConnectionAlsoInOverview: '完整設定——與上方概覽捷徑相同目標',
+  settingsComingSoonSection: '即將推出',
+  settingsComingSoonHint: '同步、語音輸入與文字轉語音',
 
   aiProvidersTitle: 'AI 服務商',
   aiProvidersDesc: '設定你的 AI 服務商和 API 金鑰。',
@@ -2492,6 +2807,12 @@ const zh_tw: TranslationKeys = {
   homeStartChat: '開始聊天',
   chatSidebarTags: '標籤',
   chatSidebarTagEmpty: '這個標籤裡還沒有會話',
+  chatSidebarEmptyTitle: '還沒有對話',
+  chatSidebarEmptyDesc: '使用頂部捷徑新增助手、開始會話或建立群組。',
+  chatSidebarSearchEmptyDesc: '換個關鍵字試試，或檢查拼字。',
+  chatSidebarRecentsShowAll: '檢視全部（{count}）',
+  chatSidebarRecentsShowLess: '收起',
+  chatSidebarTagsHint: '尚無自訂標籤 — 點一下建立，方便整理話題。',
 
   studioTitle: '工作室',
   studioFeatured: '精選',
@@ -2592,7 +2913,6 @@ const zh_tw: TranslationKeys = {
   profileAvatar: '頭像',
   profileFullName: '全名',
   profileUsername: '使用者名稱',
-  profileBio: '簡介',
   profileSaved: '資料已儲存',
   profileInterests: '興趣領域',
   profileInterestsWriting: '內容創作',
@@ -2610,6 +2930,7 @@ const zh_tw: TranslationKeys = {
   profileUpdateEmail: '修改',
   profileEmailPlaceholder: '輸入新電子郵件地址',
   profileEmailInvalid: '請輸入有效的電子郵件地址',
+  profileEmailMustDiffer: '新地址必須與目前電子郵件不同。',
   profileEmailChangeSent: '驗證郵件已傳送至新地址',
   profilePassword: '密碼',
   profileSetPassword: '設定密碼',
@@ -2618,9 +2939,19 @@ const zh_tw: TranslationKeys = {
   profilePasswordResetError: '傳送密碼重設郵件失敗',
   profileUsernameRule: '僅支援英文字母、數字和底線',
   profileUsernameDuplicate: '使用者名稱已被使用',
+  profileUsernameRequired: '請填寫使用者名稱',
+  profileLinkedSignIn: '已連結登入方式',
+  profileLinkedSignInHint: '以下為與此個人資料連結的第三方帳號。',
+  profileSecurity: '登入與安全性',
+  profileChangeEmailTitle: '變更電子郵件',
+  profileChangeEmailAction: '變更電子郵件',
+  profileSendPasswordReset: '傳送密碼重設郵件',
+  profilePasswordResetConfirm: '我們將傳送重設連結至 {email}。',
+  profileEmailMissing: '此帳戶尚未綁定電子郵件。',
 
   dataManageTitle: '資料管理',
   dataManageClearCache: '清除快取',
+  dataManageClearCacheMessage: '清除此裝置上的所有快取資料？',
   dataManageExport: '匯出資料',
   dataManageResetApp: '重設應用程式',
   dataManageResetConfirm: '確定重設所有內容嗎？',
@@ -2631,6 +2962,8 @@ const zh_tw: TranslationKeys = {
   logsView: '查看日誌',
   logsViewDesc: '檢視最近的 App 錯誤，並可複製給開發者。',
   logsTitle: 'App 日誌',
+  logsActions: '操作',
+  logsRefresh: '重新整理',
   logsCopy: '複製',
   logsClear: '清除',
   logsEmpty: '目前尚未捕捉到日誌。',
@@ -2671,6 +3004,7 @@ const zh_tw: TranslationKeys = {
   errorSaveFailed: '儲存失敗',
   loginChangeServer: '伺服器',
   loginDesc: '登入以繼續使用你的工作區。',
+  loginLoadingAuthConfig: '正在取得登入方式…',
   loginContinueWithEmail: '使用郵箱或密碼繼續',
   loginContinueWithProvider: '使用 {provider} 繼續',
   loginFeishuConfigMismatch:
@@ -2849,6 +3183,86 @@ const zh_tw: TranslationKeys = {
   resourceRenamePlaceholder: '輸入新名稱',
   resourceRenamed: '重新命名成功',
   resourceShareFailed: '分享失敗',
+  resourceShareLinkTitle: '分享連結',
+  resourceShareExpiresLabel: '連結有效期限',
+  resourceShareExpires1d: '1 天',
+  resourceShareExpires7d: '7 天',
+  resourceShareExpires30d: '30 天',
+  resourceSharePasswordOptional: '密碼（選填）',
+  resourceSharePasswordPlaceholder: '留空則不需密碼',
+  resourceShareConfirm: '建立並分享',
+  resourceShareLibrary: '分享資源庫',
+  resourcePickerPickLocation: '位置',
+  resourceShareManage: '管理分享',
+  resourceShareManageLinks: '分享連結',
+  resourceShareManageMembers: '成員',
+  resourceShareAccessSummary: '你的存取權',
+  resourceShareLinkActive: '有效',
+  resourceShareLinkDisabled: '已停用',
+  resourceShareDisableLink: '停用連結',
+  resourceShareGrantHint: '以使用者名稱授權',
+  resourceShareGrantButton: '授權',
+  resourceShareRevoke: '移除',
+  resourceShareNoLinks: '尚無分享連結',
+  resourceShareNoMembers: '尚無協作者',
+  resourceShareMembersUnavailable: '你的角色無法管理成員分享',
+  resourceShareLinksUnavailable: '你的角色無法管理連結分享',
+  resourceShareManageLoadFailed: '無法載入分享資料',
+  resourceShareRoleViewer: '檢視',
+  resourceShareRoleEditor: '編輯',
+  resourceShareRoleOwner: '擁有者',
+  resourceShareCopyAccess: '複製',
+  resourceAccessCopied: '已複製',
+  resourceSharedWithMe: '與我分享',
+  resourceSharedWithMeEmpty: '目前沒有人與你分享資源',
+  resourceSharedWithMeLoadFailed: '無法載入分享列表',
+  resourceSharedKindFile: '檔案',
+  resourceSharedKindDocument: '文件',
+  resourceSharedKindLibrary: '資源庫',
+  resourceSharedFolderHint: '請在資源頁的資源庫中開啟此資料夾。',
+  resourceShareGrantInheritChildren: '對內部項目生效（繼承）',
+  resourceShareGrantCanReshare: '允許此編輯者管理分享',
+  resourceShareGrantExpiresPlaceholder: '存取過期（選填，YYYY-MM-DD）',
+  resourceShareGrantInvalidExpiry: '過期日期無效',
+  resourceShareGrantExpirySection: '存取過期（選填）',
+  resourceShareGrantExpiryNone: '無過期',
+  resourceShareGrantExpiryPreset7: '7 天',
+  resourceShareGrantExpiryPreset30: '30 天',
+  resourceShareGrantExpiryPreset90: '90 天',
+  resourceShareGrantExpiryCustom: '選擇日期',
+  resourceShareGrantExpirySelected: '到期：',
+  resourceShareMemberCanReshare: '可管理分享',
+  resourceShareMemberInheritOff: '不繼承至子項目',
+  resourcePublicShareTitle: '分享的資源',
+  resourcePublicSharePasswordTitle: '受密碼保護',
+  resourcePublicSharePasswordSubtitle: '輸入密碼以檢視此資源。',
+  resourcePublicSharePasswordPlaceholder: '密碼',
+  resourcePublicShareUnlock: '解鎖',
+  resourcePublicShareNotFound: '分享連結無效或已過期。',
+  resourcePublicShareExpires: '過期時間',
+  resourcePublicShareDownload: '下載檔案',
+  resourceSharedAccessNoExpiry: '無過期',
+  resourceSharedPermissionValidUntil: '存取有效至',
+  resourceShareAccessOk: '你可以存取此資源',
+  resourceShareAccessDenied: '你無法存取此資源',
+  resourceShareAccessUnknown: '無法載入存取詳情',
+  resourceShareAccessViaSpace: '透過空間成員身分',
+  resourceShareAccessViaDirect: '有人直接與你分享',
+  resourceShareAccessViaInherited: '透過上層資料夾或繼承權限',
+  resourceShareAccessViaShareLink: '透過有效的分享連結',
+  resourceShareConfirmDisableLinkTitle: '要停用此分享連結嗎？',
+  resourceShareConfirmDisableLinkMessage:
+    '擁有連結的人將無法再開啟。之後可以建立新連結，但舊連結會永久失效。',
+  resourceShareConfirmRevokeTitle: '要移除此人嗎？',
+  resourceShareConfirmRevokeMessage: '對方將失去此資源的存取權。',
+  resourceShareRetry: '重試',
+  resourceShareGrantUsernamePlaceholder: '使用者名稱',
+  resourceUntitled: '未命名',
+  resourcePublicShareDocEmpty: '此文件沒有可預覽的內容。',
+  resourcePublicShareNotFoundHint:
+    '請確認連結與密碼是否正確；密碼錯誤時顯示可能與連結過期相同。',
+  resourcePublicShareDownloadFailed: '無法開啟下載連結。',
+  resourcePublicShareKbHint: '若要瀏覽完整資源庫與檔案列表，請在瀏覽器使用 LobeHub。',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -2896,8 +3310,6 @@ const zh_tw: TranslationKeys = {
   storeEmpty: '未找到擴充項目',
   storeLoadFailed: '載入失敗，請檢查網路連線。',
   storeInstall: '安裝',
-  storeManage: '管理',
-  storeFeatured: '精選',
   storeCustom: '自訂',
   storeBuiltIn: '內建',
   storeFromStore: '商店',
@@ -2919,6 +3331,11 @@ const zh_tw: TranslationKeys = {
   storeInstallFailed: '安裝擴充項目失敗',
   storeAddCustomMcp: '新增自訂 MCP',
   storeCustomMcpSaved: '已新增自訂 MCP',
+  storeSearchNoResults: '沒有相符的擴充項目',
+  storeLoadMore: '載入更多',
+  storeCategoriesLoadHint: '分類列表暫無法更新，篩選可能不完整。',
+  storeInstalledFilterAll: '全部',
+  storeInstalledKindEmpty: '此分類尚無已安裝項目',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安裝的技能和外掛程式',
@@ -3041,6 +3458,15 @@ const zh_tw: TranslationKeys = {
   statsEmpty: '暫無資料',
   statsEmptyDesc: '開始聊天後即可檢視統計。',
   statsViewAll: '檢視全部',
+  statsLoadFailed: '無法載入統計，請檢查網路後再試。',
+  statsRetry: '重試',
+  statsVsNew: '新增',
+  statsWelcomeFallback: '你在 Avato 上的使用總覽',
+  statsRankUntitled: '未命名',
+  statsHeatmapHint: '約最近 20 週，為精簡版（網頁端為完整熱力圖）。',
+  statsHeatmapDayTitle: '活動',
+  statsHeatmapDayMessage: '日期：{date}\n訊息數：{count}\n強度：{level} / 4',
+  statsHeatmapCellA11y: '{date}，強度 {level} / 4',
 
   memoryTitle: '記憶',
   memoryDesc: 'AI 記住你的偏好、身分和經驗',
@@ -3124,7 +3550,7 @@ const zh_tw: TranslationKeys = {
   artworkEmptyDesc: '輸入提示詞，用 AI 產生精彩圖片。',
   artworkModel: '模型',
   artworkReferenceImages: '參考圖片',
-  artworkReferenceImagesDesc: '點擊或拖曳上傳圖片\n支援多張圖片選擇',
+  artworkReferenceImagesDesc: '點一下從相簿選擇\n模型支援時可選多張',
   artworkResolution: '解析度',
   artworkAspectRatio: '長寬比',
   artworkImageCount: '產生數量',
@@ -3149,6 +3575,25 @@ const zh_tw: TranslationKeys = {
   artworkNoModelsDesc: '請在設定中啟用圖片產生服務商。',
   artworkSelectModel: '選擇模型',
   artworkImageCountCustom: '自訂',
+  artworkImageCountCustomShort: '更多',
+  artworkReferenceImage: '參考圖',
+  artworkParamAuto: '自動',
+  artworkParamQuality: '畫質',
+  artworkParamSize: '尺寸',
+  artworkParamWidth: '寬度',
+  artworkParamHeight: '高度',
+  artworkParamSteps: '步數',
+  artworkParamCfg: 'CFG',
+  artworkParamSeed: '種子',
+  artworkNewTopicToast: '下次產生將使用新的雲端主題，本地歷史不受影響。',
+  artworkShareImage: '分享',
+  artworkA11yReuseSettings: '套用此批次的模型與設定',
+  artworkA11yCopyPrompt: '複製提示詞',
+  artworkA11yDeleteBatch: '刪除此批次',
+  artworkA11yGenerate: '產生圖片',
+  artworkA11yOpenImagePreview: '開啟圖片預覽',
+  artworkA11yCloseImagePreview: '關閉預覽',
+  artworkA11yShareImage: '分享圖片',
   videoTitle: '影片',
   videoPromptPlaceholder: '描述你想生成的影片內容...',
   videoGenerate: '生成影片',
@@ -3189,6 +3634,7 @@ const zh: TranslationKeys = {
   tabVideo: '视频',
   tabDiscover: '发现',
   tabMe: '我的',
+  createOpenOptionsA11y: '打开图片与视频创作设置',
 
   chatListTitle: 'Avato',
   chatListSearch: '搜索会话与消息',
@@ -3228,6 +3674,8 @@ const zh: TranslationKeys = {
   accessibilityAddTopic: '添加话题',
   accessibilityChatDirectory: '打开聊天目录',
   accessibilityOpenStore: '打开商店',
+  accessibilityStoreSearchClear: '清空搜索',
+  accessibilityStoreSearchClose: '关闭搜索',
   accessibilityCreateMenu: '创建话题或群聊',
   accessibilityGoBack: '返回',
   accessibilitySave: '保存',
@@ -3258,6 +3706,7 @@ const zh: TranslationKeys = {
   chatToolApprove: '允许',
   chatToolApproveNotSupported: '此流程暂不支持工具批准。',
   chatToolReject: '拒绝',
+  chatToolRejectAndContinue: '拒绝并继续',
   chatToolAbortedDesc: '此工具调用已中止。',
   chatToolRejectedDesc: '此工具调用已被拒绝。',
   chatToolPendingDesc: '此工具需要您的批准才能运行。',
@@ -3266,6 +3715,10 @@ const zh: TranslationKeys = {
   chatToolGtdPlanDescPlaceholder: '简要说明',
   chatToolGtdPlanContextPlaceholder: '背景与约束',
   chatToolGtdAddTodoPlaceholder: '添加待办',
+  chatToolGtdClearHeader: '清除待办',
+  chatToolGtdClearLabel: '选择清除范围：',
+  chatToolGtdClearCompleted: '仅清除已完成项',
+  chatToolGtdClearAll: '清除全部（含未完成）',
   chatToolNotebookCreateDocTitlePlaceholder: '文档标题',
   chatToolNotebookCreateDocDescPlaceholder: '简要说明',
   chatToolNotebookCreateDocContentPlaceholder: '内容（Markdown）',
@@ -3278,6 +3731,9 @@ const zh: TranslationKeys = {
   chatToolStreamingWebSearch: '正在搜索…',
   chatToolStreamingKnowledgeBase: '正在检索知识库…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
+  chatToolStreamingRunning: '执行中…',
+  chatToolTapToExpand: '点击展开',
+  chatToolTapToCollapse: '点击收起',
   chatShowMore: '展开更多',
   chatShowLess: '收起',
   chatAskAnything: '问我任何问题...',
@@ -3340,8 +3796,10 @@ const zh: TranslationKeys = {
   serverConnectStart: '连接并开始',
   serverSaveConfig: '保存配置',
   serverTips: '💡 请确保手机和服务器在同一网络中。你的 Avato 服务器需要提供 tRPC 移动端点 (/trpc/mobile)。',
+  serverFirstLaunchNextStep: '接下来请登录，以将本应用连接到你的工作区。',
 
   chatSettingsTitle: '会话设置',
+  chatSettingsSessionInfo: '会话信息',
   chatSettingsModel: '模型',
   chatSettingsModelHint: '常用：gpt-4o、gpt-4o-mini、claude-3.5-sonnet、deepseek-chat',
   chatSettingsTemperature: '创意活跃度',
@@ -3489,6 +3947,10 @@ const zh: TranslationKeys = {
   settingsGroupMemory: '记忆',
   settingsGroupData: '数据与语音',
   settingsGroupAccount: '账户',
+  settingsHeaderSubtitle: '个人资料、工作区与偏好',
+  settingsConnectionAlsoInOverview: '完整设置——与上方概览快捷相同入口',
+  settingsComingSoonSection: '即将推出',
+  settingsComingSoonHint: '同步、语音输入与文字转语音',
 
   aiProvidersTitle: 'AI 服务商',
   aiProvidersDesc: '配置你的 AI 服务商和 API 密钥。',
@@ -3532,6 +3994,12 @@ const zh: TranslationKeys = {
   homeStartChat: '开始聊天',
   chatSidebarTags: '标签',
   chatSidebarTagEmpty: '这个标签里还没有会话',
+  chatSidebarEmptyTitle: '还没有对话',
+  chatSidebarEmptyDesc: '使用顶部快捷按钮新建助手、开始会话或创建群组。',
+  chatSidebarSearchEmptyDesc: '换个关键词试试，或检查拼写。',
+  chatSidebarRecentsShowAll: '查看全部（{count}）',
+  chatSidebarRecentsShowLess: '收起',
+  chatSidebarTagsHint: '暂无自定义标签 — 点按创建一个，方便整理话题。',
 
   studioTitle: '工作室',
   studioFeatured: '精选',
@@ -3632,7 +4100,6 @@ const zh: TranslationKeys = {
   profileAvatar: '头像',
   profileFullName: '全名',
   profileUsername: '用户名',
-  profileBio: '简介',
   profileSaved: '资料已保存',
   profileInterests: '兴趣领域',
   profileInterestsWriting: '内容创作',
@@ -3650,6 +4117,7 @@ const zh: TranslationKeys = {
   profileUpdateEmail: '修改',
   profileEmailPlaceholder: '输入新邮箱地址',
   profileEmailInvalid: '请输入有效的邮箱地址',
+  profileEmailMustDiffer: '新邮箱不能与当前邮箱相同。',
   profileEmailChangeSent: '验证邮件已发送至新地址',
   profilePassword: '密码',
   profileSetPassword: '设置密码',
@@ -3658,9 +4126,19 @@ const zh: TranslationKeys = {
   profilePasswordResetError: '发送密码重置邮件失败',
   profileUsernameRule: '仅支持字母、数字和下划线',
   profileUsernameDuplicate: '用户名已被占用',
+  profileUsernameRequired: '请填写用户名',
+  profileLinkedSignIn: '已关联登录方式',
+  profileLinkedSignInHint: '以下第三方账号已关联到本账户。',
+  profileSecurity: '登录与安全',
+  profileChangeEmailTitle: '修改邮箱',
+  profileChangeEmailAction: '修改邮箱',
+  profileSendPasswordReset: '发送密码重置邮件',
+  profilePasswordResetConfirm: '我们将向 {email} 发送重置链接。',
+  profileEmailMissing: '当前账户未绑定邮箱。',
 
   dataManageTitle: '数据管理',
   dataManageClearCache: '清除缓存',
+  dataManageClearCacheMessage: '清除本机所有缓存数据？',
   dataManageExport: '导出数据',
   dataManageResetApp: '重置应用',
   dataManageResetConfirm: '确定重置所有内容吗？',
@@ -3671,6 +4149,8 @@ const zh: TranslationKeys = {
   logsView: '查看日志',
   logsViewDesc: '查看最近的 App 错误，并可复制给开发者。',
   logsTitle: 'App 日志',
+  logsActions: '操作',
+  logsRefresh: '刷新',
   logsCopy: '复制',
   logsClear: '清除',
   logsEmpty: '暂时还没有捕捉到日志。',
@@ -3711,6 +4191,7 @@ const zh: TranslationKeys = {
   errorSaveFailed: '保存失败',
   loginChangeServer: '服务器',
   loginDesc: '登录以继续使用你的工作区。',
+  loginLoadingAuthConfig: '正在获取登录方式…',
   loginContinueWithEmail: '使用邮箱或密码继续',
   loginContinueWithProvider: '使用 {provider} 继续',
   loginFeishuConfigMismatch:
@@ -3890,6 +4371,85 @@ const zh: TranslationKeys = {
   resourceRenamePlaceholder: '输入新名称',
   resourceRenamed: '重命名成功',
   resourceShareFailed: '分享失败',
+  resourceShareLinkTitle: '分享链接',
+  resourceShareExpiresLabel: '链接有效期',
+  resourceShareExpires1d: '1 天',
+  resourceShareExpires7d: '7 天',
+  resourceShareExpires30d: '30 天',
+  resourceSharePasswordOptional: '密码（可选）',
+  resourceSharePasswordPlaceholder: '留空则无需密码',
+  resourceShareConfirm: '创建并分享',
+  resourceShareLibrary: '分享资源库',
+  resourcePickerPickLocation: '位置',
+  resourceShareManage: '管理分享',
+  resourceShareManageLinks: '分享链接',
+  resourceShareManageMembers: '成员',
+  resourceShareAccessSummary: '你的访问权限',
+  resourceShareLinkActive: '有效',
+  resourceShareLinkDisabled: '已停用',
+  resourceShareDisableLink: '停用链接',
+  resourceShareGrantHint: '按用户名授权',
+  resourceShareGrantButton: '授权',
+  resourceShareRevoke: '移除',
+  resourceShareNoLinks: '暂无分享链接',
+  resourceShareNoMembers: '暂无协作者',
+  resourceShareMembersUnavailable: '当前角色无法管理成员分享',
+  resourceShareLinksUnavailable: '当前角色无法管理链接分享',
+  resourceShareManageLoadFailed: '无法加载分享数据',
+  resourceShareRoleViewer: '可查看',
+  resourceShareRoleEditor: '可编辑',
+  resourceShareRoleOwner: '所有者',
+  resourceShareCopyAccess: '复制',
+  resourceAccessCopied: '已复制',
+  resourceSharedWithMe: '与我分享',
+  resourceSharedWithMeEmpty: '暂时没有人与你分享资源',
+  resourceSharedWithMeLoadFailed: '无法加载分享列表',
+  resourceSharedKindFile: '文件',
+  resourceSharedKindDocument: '文档',
+  resourceSharedKindLibrary: '资源库',
+  resourceSharedFolderHint: '请在资源页的资源库中打开此文件夹。',
+  resourceShareGrantInheritChildren: '对内部项目生效（继承）',
+  resourceShareGrantCanReshare: '允许该编辑者管理分享',
+  resourceShareGrantExpiresPlaceholder: '访问过期（选填，YYYY-MM-DD）',
+  resourceShareGrantInvalidExpiry: '过期日期无效',
+  resourceShareGrantExpirySection: '访问过期（可选）',
+  resourceShareGrantExpiryNone: '无过期',
+  resourceShareGrantExpiryPreset7: '7 天',
+  resourceShareGrantExpiryPreset30: '30 天',
+  resourceShareGrantExpiryPreset90: '90 天',
+  resourceShareGrantExpiryCustom: '选择日期',
+  resourceShareGrantExpirySelected: '到期：',
+  resourceShareMemberCanReshare: '可管理分享',
+  resourceShareMemberInheritOff: '不继承到子项',
+  resourcePublicShareTitle: '分享的资源',
+  resourcePublicSharePasswordTitle: '受密码保护',
+  resourcePublicSharePasswordSubtitle: '输入密码以查看此资源。',
+  resourcePublicSharePasswordPlaceholder: '密码',
+  resourcePublicShareUnlock: '解锁',
+  resourcePublicShareNotFound: '分享链接无效或已过期。',
+  resourcePublicShareExpires: '过期时间',
+  resourcePublicShareDownload: '下载文件',
+  resourceSharedAccessNoExpiry: '无过期',
+  resourceSharedPermissionValidUntil: '访问有效期至',
+  resourceShareAccessOk: '你可以访问此资源',
+  resourceShareAccessDenied: '你无法访问此资源',
+  resourceShareAccessUnknown: '无法加载访问详情',
+  resourceShareAccessViaSpace: '通过空间成员身份',
+  resourceShareAccessViaDirect: '有人直接与你分享',
+  resourceShareAccessViaInherited: '通过上级文件夹或继承的权限',
+  resourceShareAccessViaShareLink: '通过有效的分享链接',
+  resourceShareConfirmDisableLinkTitle: '要停用此分享链接吗？',
+  resourceShareConfirmDisableLinkMessage:
+    '拥有链接的人将无法再打开。之后可以新建链接，但旧链接将永久失效。',
+  resourceShareConfirmRevokeTitle: '要移除此人吗？',
+  resourceShareConfirmRevokeMessage: '对方将失去对此资源的访问权限。',
+  resourceShareRetry: '重试',
+  resourceShareGrantUsernamePlaceholder: '用户名',
+  resourceUntitled: '未命名',
+  resourcePublicShareDocEmpty: '此文档没有可预览的内容。',
+  resourcePublicShareNotFoundHint: '请核对链接与密码；密码错误时提示可能与链接过期相同。',
+  resourcePublicShareDownloadFailed: '无法打开下载链接。',
+  resourcePublicShareKbHint: '若要查看完整资源库与文件列表，请在浏览器中使用 LobeHub。',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
@@ -3937,8 +4497,6 @@ const zh: TranslationKeys = {
   storeEmpty: '未找到扩展',
   storeLoadFailed: '加载失败，请检查网络连接。',
   storeInstall: '安装',
-  storeManage: '管理',
-  storeFeatured: '精选',
   storeCustom: '自定义',
   storeBuiltIn: '内置',
   storeFromStore: '商店',
@@ -3960,6 +4518,11 @@ const zh: TranslationKeys = {
   storeInstallFailed: '安装扩展失败',
   storeAddCustomMcp: '添加自定义 MCP',
   storeCustomMcpSaved: '已添加自定义 MCP',
+  storeSearchNoResults: '没有匹配的扩展',
+  storeLoadMore: '加载更多',
+  storeCategoriesLoadHint: '分类列表暂无法更新，筛选可能不完整。',
+  storeInstalledFilterAll: '全部',
+  storeInstalledKindEmpty: '该分类下暂无已安装项',
 
   skillsTitle: '技能',
   skillsDesc: '管理已安装的技能和插件',
@@ -4082,6 +4645,15 @@ const zh: TranslationKeys = {
   statsEmpty: '暂无数据',
   statsEmptyDesc: '开始聊天后即可查看统计。',
   statsViewAll: '查看全部',
+  statsLoadFailed: '统计加载失败，请检查网络后重试。',
+  statsRetry: '重试',
+  statsVsNew: '新增',
+  statsWelcomeFallback: '你在 Avato 上的使用概览',
+  statsRankUntitled: '未命名',
+  statsHeatmapHint: '约最近 20 周，为精简视图（网页端为完整热力图）。',
+  statsHeatmapDayTitle: '活动',
+  statsHeatmapDayMessage: '日期：{date}\n消息数：{count}\n强度：{level} / 4',
+  statsHeatmapCellA11y: '{date}，强度 {level} / 4',
 
   memoryTitle: '记忆',
   memoryDesc: 'AI 记住你的偏好、身份和经验',
@@ -4165,7 +4737,7 @@ const zh: TranslationKeys = {
   artworkEmptyDesc: '输入提示词，用 AI 生成精彩图片。',
   artworkModel: '模型',
   artworkReferenceImages: '参考图片',
-  artworkReferenceImagesDesc: '点击或拖拽上传图片\n支持多张图片选择',
+  artworkReferenceImagesDesc: '点按从相册选择\n模型支持时可选择多张',
   artworkResolution: '分辨率',
   artworkAspectRatio: '宽高比',
   artworkImageCount: '生成数量',
@@ -4190,6 +4762,25 @@ const zh: TranslationKeys = {
   artworkNoModelsDesc: '请在设置中启用图片生成服务商。',
   artworkSelectModel: '选择模型',
   artworkImageCountCustom: '自定义',
+  artworkImageCountCustomShort: '更多',
+  artworkReferenceImage: '参考图',
+  artworkParamAuto: '自动',
+  artworkParamQuality: '画质',
+  artworkParamSize: '尺寸',
+  artworkParamWidth: '宽度',
+  artworkParamHeight: '高度',
+  artworkParamSteps: '步数',
+  artworkParamCfg: 'CFG',
+  artworkParamSeed: '种子',
+  artworkNewTopicToast: '下次生成将使用新的云端主题，本地历史不受影响。',
+  artworkShareImage: '分享',
+  artworkA11yReuseSettings: '复用该批次的模型与设置',
+  artworkA11yCopyPrompt: '复制提示词',
+  artworkA11yDeleteBatch: '删除该批次',
+  artworkA11yGenerate: '生成图片',
+  artworkA11yOpenImagePreview: '打开图片预览',
+  artworkA11yCloseImagePreview: '关闭预览',
+  artworkA11yShareImage: '分享图片',
   videoTitle: '视频',
   videoPromptPlaceholder: '描述你想生成的视频内容...',
   videoGenerate: '生成视频',
