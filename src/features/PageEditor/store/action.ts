@@ -25,6 +25,7 @@ export interface Action {
   performMetaSave: () => Promise<void>;
   setEmoji: (emoji: string | undefined) => void;
   setTitle: (title: string) => void;
+  setViewMode: (viewMode: State['viewMode']) => void;
   triggerDebouncedMetaSave: () => void;
 }
 
@@ -179,6 +180,10 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         if (isDirty) {
           triggerDebouncedMetaSave();
         }
+      },
+
+      setViewMode: (viewMode) => {
+        set({ viewMode });
       },
 
       triggerDebouncedMetaSave: () => {

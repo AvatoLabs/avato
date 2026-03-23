@@ -97,6 +97,13 @@ export const mobileRoutes: RouteObject[] = [
                   },
                 ],
               },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/community/(list)/plugin'),
+                  'Mobile > Discover > List > Plugin Legacy Redirect',
+                ),
+                path: 'plugin',
+              },
             ],
             element: dynamicElement(
               () => import('@/routes/(mobile)/community/(list)/_layout'),
@@ -143,6 +150,13 @@ export const mobileRoutes: RouteObject[] = [
                   'Mobile > Discover > Detail > MCP',
                 ),
                 path: 'mcp/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/community/(detail)/plugin'),
+                  'Mobile > Discover > Detail > Plugin Legacy Redirect',
+                ),
+                path: 'plugin/:slug',
               },
               {
                 element: dynamicElement(

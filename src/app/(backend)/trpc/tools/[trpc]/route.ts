@@ -7,7 +7,7 @@ import { createResponseMeta } from '@/libs/trpc/utils/responseMeta';
 import { toolsRouter } from '@/server/routers/tools';
 
 // Keep the route budget above MCP_TOOL_TIMEOUT and below outer proxy timeouts.
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 const handler = (req: NextRequest) => {
   // Clone the request to avoid "Response body object should not be disturbed or locked" error

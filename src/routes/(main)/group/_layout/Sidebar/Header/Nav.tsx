@@ -1,13 +1,12 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { BotPromptIcon } from '@lobehub/ui/icons';
-import { MessageSquarePlusIcon, SearchIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import urlJoin from 'url-join';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useQueryRoute } from '@/hooks/useQueryRoute';
 import { usePathname } from '@/libs/router/navigation';
@@ -32,14 +31,14 @@ const Nav = memo(() => {
   return (
     <Flexbox gap={1} paddingInline={4}>
       <NavItem
-        icon={MessageSquarePlusIcon}
+        icon={ACTION_ENTRY_ICONS.newTopic}
         title={tTopic('actions.addNewTopic')}
         onClick={switchToNewTopic}
       />
       {isAgentEditable && (
         <NavItem
           active={isProfileActive}
-          icon={BotPromptIcon}
+          icon={ACTION_ENTRY_ICONS.profile}
           title={t('tab.groupProfile')}
           onClick={() => {
             switchTopic(null, { skipRefreshMessage: true });
@@ -48,7 +47,7 @@ const Nav = memo(() => {
         />
       )}
       <NavItem
-        icon={SearchIcon}
+        icon={APP_ENTRY_ICONS.search}
         title={t('tab.search')}
         onClick={() => {
           toggleCommandMenu(true);

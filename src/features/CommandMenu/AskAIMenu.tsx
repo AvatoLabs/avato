@@ -1,12 +1,11 @@
-import { DEFAULT_AVATAR, DEFAULT_INBOX_AVATAR } from '@lobechat/const';
+import { DEFAULT_AVATAR, DEFAULT_INBOX_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
 import { Avatar } from '@lobehub/ui';
-import { GroupBotSquareIcon } from '@lobehub/ui/icons';
 import { Command } from 'cmdk';
-import { Bot, Image } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
 
@@ -66,19 +65,19 @@ const AskAIMenu = memo(() => {
         </div>
       </Command.Item>
       <Command.Item value="agent-builder" onSelect={handleAgentBuilder}>
-        <Bot className={styles.icon} />
+        <ACTION_ENTRY_ICONS.createAgent className={styles.icon} />
         <div className={styles.itemContent}>
           <div className={styles.itemLabel}>{t('agentBuilder.title', { ns: 'chat' })}</div>
         </div>
       </Command.Item>
       <Command.Item value="group-builder" onSelect={handleGroupBuilder}>
-        <GroupBotSquareIcon className={styles.icon} />
+        <ACTION_ENTRY_ICONS.createGroup className={styles.icon} />
         <div className={styles.itemContent}>
           <div className={styles.itemLabel}>{t('starter.createGroup', { ns: 'home' })}</div>
         </div>
       </Command.Item>
       <Command.Item value="ai-painting" onSelect={handleAIPainting}>
-        <Image className={styles.icon} />
+        <APP_ENTRY_ICONS.image className={styles.icon} />
         <div className={styles.itemContent}>
           <div className={styles.itemLabel}>{t('cmdk.aiPainting')}</div>
         </div>
@@ -94,9 +93,13 @@ const AskAIMenu = memo(() => {
           icon={
             <Avatar
               emojiScaleWithBackground
-              avatar={typeof agent.avatar === 'string' ? agent.avatar : DEFAULT_AVATAR}
               shape="square"
               size={18}
+              avatar={
+                typeof agent.avatar === 'string'
+                  ? normalizeBuiltinAvatar(agent.avatar) || DEFAULT_AVATAR
+                  : DEFAULT_AVATAR
+              }
             />
           }
           onSelect={() => handleAgentSelect(agent.id)}

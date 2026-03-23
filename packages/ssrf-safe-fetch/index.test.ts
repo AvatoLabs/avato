@@ -186,6 +186,31 @@ describe('ssrfSafeFetch', () => {
       expect(console.error).toHaveBeenCalledWith('SSRF-safe fetch error:', originalError);
     });
 
+    it('should only append SSRF docs for SSRF-blocked errors', async () => {
+      mockFetch.mockRejectedValue(
+        new Error(
+          'DNS lookup 127.0.0.1(family:4, host:localhost) is not allowed. Because, It is private IP address.',
+        ),
+      );
+
+      await expect(ssrfSafeFetch('http://localhost:3000')).rejects.toThrow(
+        /See: https:\/\/lobehub\.com\/docs\/self-hosting\/environment-variables\/basic#ssrf-allow-private-ip-address/,
+      );
+    });
+
+    it('should not append SSRF docs for generic network failures', async () => {
+      expect.assertions(3);
+      mockFetch.mockRejectedValue(new Error('socket hang up'));
+
+      try {
+        await ssrfSafeFetch('https://example.com');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('SSRF-safe fetch failed: socket hang up');
+        expect((error as Error).message).not.toContain('ssrf-allow-private-ip-address');
+      }
+    });
+
     it('should handle non-Error thrown values', async () => {
       const nonErrorValue = 'String error';
       mockFetch.mockRejectedValue(nonErrorValue);

@@ -11,13 +11,13 @@ import { App, Input } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import dayjs from 'dayjs';
 import { isNull } from 'es-toolkit/compat';
-import { FileBoxIcon, FileText, FolderIcon } from 'lucide-react';
 import { type DragEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shallow } from 'zustand/shallow';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
 import {
@@ -442,13 +442,13 @@ const FileListItem = memo<FileListItemProps>(
                 style={{ fontSize: 24, marginInline: 8, width: 24 }}
               >
                 {isFolder ? (
-                  <Icon icon={FolderIcon} size={24} />
+                  <Icon icon={RESOURCE_ENTRY_ICONS.folder} size={24} />
                 ) : isPage ? (
                   emoji ? (
                     <span style={{ fontSize: 24 }}>{emoji}</span>
                   ) : (
                     <Center height={24} width={24}>
-                      <Icon icon={FileText} size={24} />
+                      <Icon icon={RESOURCE_ENTRY_ICONS.page} size={24} />
                     </Center>
                   )
                 ) : (
@@ -505,7 +505,7 @@ const FileListItem = memo<FileListItemProps>(
                   >
                     <Button
                       disabled={!isSupportedForChunking}
-                      icon={FileBoxIcon}
+                      icon={RESOURCE_ENTRY_ICONS.chunk}
                       loading={fileStoreState.isCreatingFileParseTask}
                       size={'small'}
                       type={'text'}

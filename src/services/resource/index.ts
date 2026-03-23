@@ -13,47 +13,31 @@ import { fileService } from '../file';
 /**
  * Map FileListItem to ResourceItem
  */
-const mapToResourceItem = (item: FileListItem): ResourceItem => {
+const mapToResourceItem = (
+  item: FileListItem & { knowledgeBaseId?: string | null },
+): ResourceItem => {
   return {
     chunkCount: item.chunkCount,
     chunkTaskId: item.chunkingStatus ? 'placeholder' : null,
     chunkingError: item.chunkingError,
     chunkingStatus: item.chunkingStatus,
-    // Document-specific fields
     content: item.content,
-
     createdAt: item.createdAt,
-
     editorData: item.editorData,
-
     embeddingError: item.embeddingError,
-
     embeddingStatus: item.embeddingStatus,
-
     embeddingTaskId: item.embeddingStatus ? 'placeholder' : null,
-
     fileType: item.fileType,
-
     finishEmbedding: item.finishEmbedding,
-
     id: item.id,
-
-    // Metadata
+    knowledgeBaseId: item.knowledgeBaseId ?? undefined,
     metadata: item.metadata || undefined,
-
     name: item.name,
-
     parentId: item.parentId,
-
     size: item.size,
-
     slug: item.slug,
-
     sourceType: item.sourceType as 'file' | 'document',
-
     updatedAt: item.updatedAt,
-
-    // File-specific fields
     url: item.url,
   };
 };
@@ -217,24 +201,18 @@ export class ResourceService {
    * Batch delete resources
    */
   async deleteResources(ids: string[]): Promise<void> {
-    // Separate files and documents
+    // Use ID prefix to separate files (file_*) and documents (docs_*) without N API calls
     const fileIds: string[] = [];
     const documentIds: string[] = [];
 
-    await Promise.all(
-      ids.map(async (id) => {
-        const item = await this.getResource(id);
-        if (item) {
-          if (item.sourceType === 'file') {
-            fileIds.push(id);
-          } else {
-            documentIds.push(id);
-          }
-        }
-      }),
-    );
+    for (const id of ids) {
+      if (id.startsWith('docs_')) {
+        documentIds.push(id);
+      } else {
+        fileIds.push(id);
+      }
+    }
 
-    // Batch delete
     await Promise.all([
       fileIds.length > 0 ? fileService.removeFiles(fileIds) : Promise.resolve(),
       documentIds.length > 0 ? documentService.deleteDocuments(documentIds) : Promise.resolve(),

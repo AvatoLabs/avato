@@ -40,7 +40,7 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
   const { message } = App.useApp();
   const data = useDetailContext();
   const { mobile = isMobile } = useResponsive();
-  const { isAuthenticated, signIn, session } = useMarketAuth();
+  const { isAuthenticated, signIn } = useMarketAuth();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const {
@@ -58,10 +58,9 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
   const displayAvatar = avatar || title?.[0] || '👥';
   const memberCount = memberAgents?.length || 0;
 
-  // TODO: Use 'group_agent' type when social service supports it
   // Fetch favorite status
   const { data: favoriteStatus, mutate: mutateFavorite } = useSWR(
-    identifier && isAuthenticated ? ['favorite-status', 'agent', identifier] : null,
+    identifier && isAuthenticated ? ['favorite-status', 'agent-group', identifier] : null,
     () => socialService.checkFavoriteStatus('agent-group', identifier!),
     { revalidateOnFocus: false },
   );
@@ -76,18 +75,23 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
 
     if (!identifier) return;
 
+    const nextFavorited = !isFavorited;
+
     setFavoriteLoading(true);
     try {
-      if (isFavorited) {
-        await socialService.removeFavorite('agent-group', identifier);
-        message.success(t('assistant.unfavoriteSuccess'));
-      } else {
+      if (nextFavorited) {
         await socialService.addFavorite('agent-group', identifier);
         message.success(t('assistant.favoriteSuccess'));
+      } else {
+        await socialService.removeFavorite('agent-group', identifier);
+        message.success(t('assistant.unfavoriteSuccess'));
       }
-      await mutateFavorite();
-    } catch {
-      message.error(t('assistant.favoriteFailed'));
+
+      await mutateFavorite({ isFavorited: nextFavorited }, { revalidate: false });
+      void mutateFavorite().catch(() => undefined);
+    } catch (error) {
+      console.error('Favorite action failed:', error);
+      message.error(t(nextFavorited ? 'assistant.favoriteFailed' : 'assistant.unfavoriteFailed'));
     } finally {
       setFavoriteLoading(false);
     }

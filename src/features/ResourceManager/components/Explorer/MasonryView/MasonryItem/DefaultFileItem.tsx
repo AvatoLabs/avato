@@ -1,11 +1,11 @@
 import { Button, Flexbox, stopPropagation, Tooltip } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
 import { isNull } from 'es-toolkit/compat';
-import { FileBoxIcon, Folder } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { type AsyncTaskStatus, type IAsyncTaskError } from '@/types/asyncTask';
 import { formatSize } from '@/utils/format';
@@ -88,7 +88,7 @@ const DefaultFileItem = memo<DefaultFileItemProps>(
           style={{ minHeight: 180 }}
         >
           {isFolder ? (
-            <Folder size={64} strokeWidth={1.5} />
+            <RESOURCE_ENTRY_ICONS.folder size={64} />
           ) : (
             <FileIcon fileName={name} fileType={fileType} size={64} />
           )}
@@ -138,7 +138,7 @@ const DefaultFileItem = memo<DefaultFileItemProps>(
                   }}
                 >
                   <Button
-                    icon={FileBoxIcon}
+                    icon={RESOURCE_ENTRY_ICONS.chunk}
                     loading={isCreatingFileParseTask}
                     size={'small'}
                     type={'text'}

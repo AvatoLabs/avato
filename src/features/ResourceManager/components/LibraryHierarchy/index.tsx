@@ -21,7 +21,7 @@ import {
 import { type TreeItem } from './types';
 
 // Export for external use
-export { clearTreeFolderCache } from './treeState';
+export { clearTreeFolderCache, clearTreeStateForLibrary } from './treeState';
 
 /**
  * As a sidebar along with the Explorer

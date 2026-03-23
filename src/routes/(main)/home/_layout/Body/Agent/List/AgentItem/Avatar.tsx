@@ -1,4 +1,4 @@
-import { DEFAULT_AVATAR } from '@lobechat/const';
+import { DEFAULT_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
 import { Avatar } from '@lobehub/ui';
 import { memo } from 'react';
 
@@ -11,7 +11,7 @@ const AgentAvatar = memo<AgentAvatarProps>(({ avatar, avatarBackground }) => {
   return (
     <Avatar
       emojiScaleWithBackground
-      avatar={avatar || DEFAULT_AVATAR}
+      avatar={normalizeBuiltinAvatar(avatar) || DEFAULT_AVATAR}
       background={avatarBackground}
       shape={'square'}
       size={22}

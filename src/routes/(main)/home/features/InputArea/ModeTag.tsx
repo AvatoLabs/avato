@@ -1,10 +1,10 @@
 import { ActionIcon, Block, Text } from '@lobehub/ui';
-import { GroupBotSquareIcon } from '@lobehub/ui/icons';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { BotIcon, FilePenIcon, ImageIcon, PenLineIcon, VideoIcon, X } from 'lucide-react';
+import { FilePenIcon, X } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { useHomeStore } from '@/store/home';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -20,12 +20,12 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 const modeConfig = {
-  agent: { icon: BotIcon, titleKey: 'starter.createAgent' },
-  group: { icon: GroupBotSquareIcon, titleKey: 'starter.createGroup' },
-  image: { icon: ImageIcon, titleKey: 'starter.image' },
+  agent: { icon: ACTION_ENTRY_ICONS.createAgent, titleKey: 'starter.createAgent' },
+  group: { icon: ACTION_ENTRY_ICONS.createGroup, titleKey: 'starter.createGroup' },
+  image: { icon: APP_ENTRY_ICONS.image, titleKey: 'starter.image' },
   research: { icon: FilePenIcon, titleKey: 'starter.deepResearch' },
-  video: { icon: VideoIcon, titleKey: 'starter.seedance' },
-  write: { icon: PenLineIcon, titleKey: 'starter.write' },
+  video: { icon: APP_ENTRY_ICONS.video, titleKey: 'starter.seedance' },
+  write: { icon: ACTION_ENTRY_ICONS.write, titleKey: 'starter.write' },
 } as const;
 
 const ModeHeader = memo(() => {
@@ -39,7 +39,7 @@ const ModeHeader = memo(() => {
   if (!inputActiveMode) return null;
 
   const config = modeConfig[inputActiveMode];
-  const Icon = config.icon;
+  const IconComponent = config.icon;
 
   return (
     <Block
@@ -50,7 +50,7 @@ const ModeHeader = memo(() => {
       padding={4}
       variant={'filled'}
     >
-      <Icon color={cssVar.colorTextDescription} size={16} />
+      <IconComponent color={cssVar.colorTextDescription} size={16} />
       <Text fontSize={12} type={'secondary'}>
         {t(config.titleKey)}
       </Text>

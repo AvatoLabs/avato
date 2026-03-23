@@ -3,10 +3,10 @@
 import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { App } from 'antd';
 import { cssVar } from 'antd-style';
-import { BookMinusIcon, FileBoxIcon, Trash2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavHeader from '@/features/NavHeader';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { FilesTabs } from '@/types/files';
@@ -40,7 +40,7 @@ const Header = memo(() => {
     <Flexbox horizontal align={'center'} gap={8} style={{ marginLeft: 0 }}>
       {libraryId ? (
         <ActionIcon
-          icon={BookMinusIcon}
+          icon={RESOURCE_ENTRY_ICONS.libraryRemove}
           title={t('FileManager.actions.removeFromLibrary')}
           onClick={() => {
             modal.confirm({
@@ -60,7 +60,7 @@ const Header = memo(() => {
       ) : null}
 
       <ActionIcon
-        icon={FileBoxIcon}
+        icon={RESOURCE_ENTRY_ICONS.chunk}
         title={t('FileManager.actions.batchChunking')}
         onClick={async () => {
           await onActionClick('batchChunking');
@@ -68,7 +68,7 @@ const Header = memo(() => {
       />
 
       <ActionIcon
-        icon={Trash2Icon}
+        icon={RESOURCE_ENTRY_ICONS.trash}
         title={t('delete', { ns: 'common' })}
         onClick={() => {
           modal.confirm({

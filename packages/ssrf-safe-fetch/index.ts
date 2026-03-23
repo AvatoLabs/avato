@@ -2,6 +2,13 @@ import fetch from 'node-fetch';
 import type { RequestFilteringAgentOptions } from 'request-filtering-agent';
 import { RequestFilteringHttpAgent, RequestFilteringHttpsAgent } from 'request-filtering-agent';
 
+const SSRF_DOC_LINK =
+  'https://lobehub.com/docs/self-hosting/environment-variables/basic#ssrf-allow-private-ip-address';
+
+const isSSRFBlockedMessage = (message: string) =>
+  message.includes('is not allowed. Because, It is private IP address.') ||
+  message.includes('is not allowed. Because, It is meta IP address.');
+
 /**
  * Options for per-call SSRF configuration overrides
  */
@@ -62,9 +69,13 @@ export const ssrfSafeFetch = async (
     });
   } catch (error) {
     console.error('SSRF-safe fetch error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+
     throw new Error(
-      `SSRF-safe fetch failed: ${error instanceof Error ? error.message : String(error)}. ` +
-        'See: https://lobehub.com/docs/self-hosting/environment-variables/basic#ssrf-allow-private-ip-address',
+      isSSRFBlockedMessage(message)
+        ? `SSRF-safe fetch failed: ${message}. See: ${SSRF_DOC_LINK}`
+        : `SSRF-safe fetch failed: ${message}`,
+      { cause: error },
     );
   }
 };

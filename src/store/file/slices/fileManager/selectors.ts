@@ -8,6 +8,27 @@ const dockRawFileList = (s: FilesStoreState) => s.dockUploadFileList.map((item) 
 const getFileById = (id?: string | null) => (s: FilesStoreState) => {
   if (!id) return;
 
+  // Prefer resourceMap (Explorer's data) when fileList may be empty or stale
+  const fromResourceMap = s.resourceMap?.get(id);
+  if (fromResourceMap) {
+    return {
+      chunkCount: fromResourceMap.chunkCount ?? null,
+      chunkingError: fromResourceMap.chunkingError ?? null,
+      chunkingStatus: fromResourceMap.chunkingStatus ?? null,
+      createdAt: fromResourceMap.createdAt,
+      embeddingError: fromResourceMap.embeddingError ?? null,
+      embeddingStatus: fromResourceMap.embeddingStatus ?? null,
+      fileType: fromResourceMap.fileType,
+      finishEmbedding: fromResourceMap.finishEmbedding ?? false,
+      id: fromResourceMap.id,
+      name: fromResourceMap.name,
+      size: fromResourceMap.size,
+      sourceType: fromResourceMap.sourceType,
+      updatedAt: fromResourceMap.updatedAt,
+      url: fromResourceMap.url ?? '',
+    };
+  }
+
   return s.fileList.find((item) => item.id === id);
 };
 

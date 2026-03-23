@@ -1,7 +1,8 @@
 import { type DropdownItem } from '@lobehub/ui';
 import { ActionIcon, DropdownMenu } from '@lobehub/ui';
-import { MoreHorizontalIcon } from 'lucide-react';
 import { memo } from 'react';
+
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 
 interface ActionProps {
   dropdownMenu: DropdownItem[] | (() => DropdownItem[]);
@@ -10,7 +11,7 @@ interface ActionProps {
 const Actions = memo<ActionProps>(({ dropdownMenu }) => {
   return (
     <DropdownMenu items={dropdownMenu}>
-      <ActionIcon icon={MoreHorizontalIcon} size={'small'} />
+      <ActionIcon icon={RESOURCE_ENTRY_ICONS.more} size={'small'} />
     </DropdownMenu>
   );
 });

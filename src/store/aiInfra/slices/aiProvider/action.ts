@@ -399,6 +399,10 @@ export class AiProviderActionImpl {
     await this.#get().refreshAiProviderList();
   };
 
+  setActiveAiProvider = (id: string): void => {
+    this.#set({ activeAiProvider: id }, false, 'setActiveAiProvider');
+  };
+
   useFetchAiProviderItem = (id: string): SWRResponse<AiProviderDetailItem | undefined> => {
     return useClientDataSWR<AiProviderDetailItem | undefined>(
       [AiProviderSwrKey.fetchAiProviderItem, id],

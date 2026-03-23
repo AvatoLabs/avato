@@ -7,7 +7,7 @@ import { useLocation, useParams } from 'react-router-dom';
  * Example URLs:
  * - /resource/library/kb_123 -> { knowledgeBaseId: 'kb_123', currentFolderSlug: null, isInKnowledgeBase: true }
  * - /resource/library/kb_123/folder-slug-1 -> { knowledgeBaseId: 'kb_123', currentFolderSlug: 'folder-slug-1', isInKnowledgeBase: true }
- * - /knowledge -> { knowledgeBaseId: null, currentFolderSlug: null, isInKnowledgeBase: false }
+ * - /resource -> { knowledgeBaseId: null, currentFolderSlug: null, isInKnowledgeBase: false }
  */
 export const useFolderPath = () => {
   const params = useParams<{ id: string; slug?: string }>();

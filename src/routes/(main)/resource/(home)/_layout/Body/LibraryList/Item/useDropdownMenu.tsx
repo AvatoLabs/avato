@@ -1,10 +1,10 @@
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
-import { FileText, Link2Icon, PencilLine, Trash } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useCreateNewModal } from '@/features/LibraryModal';
 import { useKnowledgeBaseStore } from '@/store/library';
 
@@ -55,7 +55,7 @@ export const useDropdownMenu = ({
     () =>
       [
         {
-          icon: <Icon icon={PencilLine} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
           key: 'rename',
           label: t('rename', { ns: 'common' }),
           onClick: (info: any) => {
@@ -64,7 +64,7 @@ export const useDropdownMenu = ({
           },
         },
         {
-          icon: <Icon icon={FileText} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.page} />,
           key: 'editDescription',
           label: t('edit', { ns: 'common' }),
           onClick: (info: any) => {
@@ -73,7 +73,7 @@ export const useDropdownMenu = ({
           },
         },
         {
-          icon: <Icon icon={Link2Icon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.share} />,
           key: 'share',
           label: t('share.title', { ns: 'file' }),
           onClick: (info: any) => {
@@ -84,7 +84,7 @@ export const useDropdownMenu = ({
         { type: 'divider' },
         {
           danger: true,
-          icon: <Icon icon={Trash} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.trash} />,
           key: 'delete',
           label: t('delete', { ns: 'common' }),
           onClick: handleDelete,

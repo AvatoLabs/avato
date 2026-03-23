@@ -1,13 +1,14 @@
 'use client';
 
+import { type ThemeMode } from '@lobechat/types';
 import { type FormGroupItemType } from '@lobehub/ui';
 import { Flexbox, Form, Icon, ImageSelect, Skeleton } from '@lobehub/ui';
 import { Select, Switch } from '@lobehub/ui/base-ui';
-import { Segmented } from 'antd';
+import { message, Segmented } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { Ban, Gauge, Loader2Icon, Monitor, Moon, Mouse, Sun, Waves } from 'lucide-react';
 import { useTheme as useNextThemesTheme } from 'next-themes';
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FORM_STYLE } from '@/const/layoutTokens';
@@ -30,8 +31,20 @@ const Common = memo(() => {
   const [switchLocale, isStatusInit] = useGlobalStore((s) => [s.switchLocale, s.isStatusInit]);
   const [loading, setLoading] = useState(false);
 
-  // Use the theme value from next-themes, default to 'system'
-  const currentTheme = theme || 'system';
+  const currentTheme: ThemeMode =
+    (general?.themeMode as ThemeMode) || (theme as ThemeMode) || 'system';
+
+  useEffect(() => {
+    if (general?.themeMode && theme !== general.themeMode) {
+      setTheme(general.themeMode);
+    }
+  }, [general?.themeMode, setTheme, theme]);
+
+  const handleThemeChange = (value: string) => {
+    const themeMode = (value === 'auto' ? 'system' : value) as ThemeMode;
+    setTheme(themeMode);
+    void setSettings({ general: { themeMode } });
+  };
 
   const handleLangChange = (value: LocaleMode) => {
     switchLocale(value);
@@ -69,9 +82,10 @@ const Common = memo(() => {
                 value: 'system',
               },
             ]}
-            onChange={(value) => setTheme(value === 'auto' ? 'system' : value)}
+            onChange={handleThemeChange}
           />
         ),
+        desc: t('settingCommon.themeMode.desc'),
         label: t('settingCommon.themeMode.title'),
         minWidth: undefined,
       },
@@ -79,7 +93,7 @@ const Common = memo(() => {
         children: (
           <Flexbox horizontal justify={'flex-end'}>
             <Select
-              defaultValue={language}
+              value={language}
               options={[
                 { label: t('settingCommon.lang.autoMode'), value: 'auto' },
                 ...localeOptions,
@@ -185,8 +199,13 @@ const Common = memo(() => {
       variant={'filled'}
       onValuesChange={async (v) => {
         setLoading(true);
-        await setSettings({ general: v });
-        setLoading(false);
+        try {
+          await setSettings({ general: v });
+        } catch {
+          message.error(t('settingCommon.saveFailed'));
+        } finally {
+          setLoading(false);
+        }
       }}
       {...FORM_STYLE}
     />

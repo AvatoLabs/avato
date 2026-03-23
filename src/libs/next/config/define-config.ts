@@ -300,9 +300,14 @@ export function defineConfig(config: CustomNextConfig) {
         source: '/community/assistants',
       },
       {
-        destination: '/community/plugin',
+        destination: '/community/mcp/:path*',
         permanent: true,
-        source: '/community/plugins',
+        source: '/community/plugins/:path*',
+      },
+      {
+        destination: '/community/mcp/:path*',
+        permanent: true,
+        source: '/community/plugin/:path*',
       },
       {
         destination: '/community/model',

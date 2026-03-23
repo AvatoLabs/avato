@@ -20,6 +20,7 @@ import CommunityDetailAgentPage from '@/routes/(main)/community/(detail)/agent';
 import CommunityDetailGroupAgentPage from '@/routes/(main)/community/(detail)/group_agent';
 import CommunityDetailMcpPage from '@/routes/(main)/community/(detail)/mcp';
 import CommunityDetailModelPage from '@/routes/(main)/community/(detail)/model';
+import CommunityDetailPluginRedirectPage from '@/routes/(main)/community/(detail)/plugin';
 import CommunityDetailProviderPage from '@/routes/(main)/community/(detail)/provider';
 import CommunityDetailUserPage from '@/routes/(main)/community/(detail)/user';
 import CommunityListLayout from '@/routes/(main)/community/(list)/_layout';
@@ -30,6 +31,7 @@ import CommunityListMcpPage from '@/routes/(main)/community/(list)/mcp';
 import CommunityListMcpLayout from '@/routes/(main)/community/(list)/mcp/_layout';
 import CommunityListModelPage from '@/routes/(main)/community/(list)/model';
 import CommunityListModelLayout from '@/routes/(main)/community/(list)/model/_layout';
+import CommunityListPluginRedirectPage from '@/routes/(main)/community/(list)/plugin';
 import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
@@ -167,6 +169,10 @@ export const desktopRoutes: RouteObject[] = [
                 path: 'mcp',
               },
               {
+                element: <CommunityListPluginRedirectPage />,
+                path: 'plugin',
+              },
+              {
                 element: <CommunityListHomePage />,
                 index: true,
               },
@@ -195,6 +201,10 @@ export const desktopRoutes: RouteObject[] = [
               {
                 element: <CommunityDetailMcpPage />,
                 path: 'mcp/:slug',
+              },
+              {
+                element: <CommunityDetailPluginRedirectPage />,
+                path: 'plugin/:slug',
               },
               {
                 element: <CommunityDetailUserPage />,

@@ -1,10 +1,10 @@
 'use client';
 
+import { DEFAULT_DOC_COPILOT_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
 import { Avatar, Flexbox, Markdown, Text } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { DEFAULT_INBOX_AVATAR } from '@/const/index';
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
 import SuggestQuestions from '@/features/SuggestQuestions';
 import { useAgentStore } from '@/store/agent';
@@ -25,7 +25,11 @@ const AgentBuilderWelcome = memo(() => {
           paddingBottom: 16,
         }}
       >
-        <Avatar avatar={agent?.avatar || DEFAULT_INBOX_AVATAR} shape={'square'} size={78} />
+        <Avatar
+          avatar={normalizeBuiltinAvatar(agent?.avatar) || DEFAULT_DOC_COPILOT_AVATAR}
+          shape={'square'}
+          size={78}
+        />
         <Text fontSize={24} weight={'bold'}>
           {t('pageCopilot.title')}
         </Text>

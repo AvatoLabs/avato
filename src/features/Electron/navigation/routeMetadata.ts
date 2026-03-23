@@ -2,13 +2,14 @@
  * Route metadata mapping for navigation history
  * Provides title and icon information based on route path
  */
-import { type LucideIcon } from 'lucide-react';
-import { Circle, Home, MessageSquare, Rocket, ShapesIcon, Users } from 'lucide-react';
+import { type IconProps } from '@lobehub/ui';
+import { Circle, MessageSquare, Rocket, Users } from 'lucide-react';
 
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { getRouteById } from '@/config/routes';
 
 export interface RouteMetadata {
-  icon?: LucideIcon;
+  icon?: IconProps['icon'];
   /** i18n key for the title (namespace: electron) */
   titleKey: string;
   /** Whether this route should use document.title for more specific title */
@@ -16,7 +17,7 @@ export interface RouteMetadata {
 }
 
 interface RoutePattern {
-  icon?: LucideIcon;
+  icon?: IconProps['icon'];
   test: (pathname: string) => boolean;
   /** i18n key for the title (namespace: electron) */
   titleKey: string;
@@ -77,7 +78,7 @@ const routePatterns: RoutePattern[] = [
 
   // Community/Discover routes
   {
-    icon: ShapesIcon,
+    icon: APP_ENTRY_ICONS.community,
     test: (p) => p.startsWith('/community/agent'),
     titleKey: 'navigation.discoverAssistants',
   },
@@ -177,7 +178,7 @@ const routePatterns: RoutePattern[] = [
 
   // Home (default)
   {
-    icon: Home,
+    icon: APP_ENTRY_ICONS.home,
     test: (p) => p === '/' || p === '',
     titleKey: 'navigation.home',
   },
@@ -210,9 +211,9 @@ export const getRouteMetadata = (pathname: string): RouteMetadata => {
 /**
  * Get route icon based on pathname or URL
  * @param url - The route URL (may include query string)
- * @returns LucideIcon component or undefined
+ * @returns route icon component or undefined
  */
-export const getRouteIcon = (url: string): LucideIcon | undefined => {
+export const getRouteIcon = (url: string): IconProps['icon'] | undefined => {
   // Extract pathname from URL
   const pathname = url.split('?')[0];
   const metadata = getRouteMetadata(pathname);

@@ -172,6 +172,13 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/community/(list)/plugin'),
+                  'Desktop > Discover > List > Plugin Legacy Redirect',
+                ),
+                path: 'plugin',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/community/(list)/aggregator'),
                   'Desktop > Discover > List > Aggregator',
                 ),
@@ -234,6 +241,13 @@ export const desktopRoutes: RouteObject[] = [
                   'Desktop > Discover > Detail > MCP',
                 ),
                 path: 'mcp/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/community/(detail)/plugin'),
+                  'Desktop > Discover > Detail > Plugin Legacy Redirect',
+                ),
+                path: 'plugin/:slug',
               },
               {
                 element: dynamicElement(

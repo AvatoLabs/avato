@@ -15,8 +15,10 @@ export interface KnowledgeItem {
   embeddingTaskId?: string | null;
   fileType: string;
   id: string;
+  knowledgeBaseId?: string | null;
   metadata?: Record<string, any> | null;
   name: string;
+  parentId?: string | null;
   size: number;
   slug?: string | null;
   /**
@@ -28,6 +30,10 @@ export interface KnowledgeItem {
   updatedAt: Date;
   url?: string;
 }
+
+/** Escape %, _, \ for PostgreSQL LIKE/ILIKE to prevent wildcard injection */
+const escapeLikeWildcards = (value: string): string =>
+  value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 
 /**
  * Resources Repository - combines files and documents into a unified interface
@@ -143,8 +149,10 @@ export class KnowledgeRepo {
         embeddingTaskId: row.embedding_task_id,
         fileType: row.file_type,
         id: row.id,
+        knowledgeBaseId: row.knowledge_base_id ?? null,
         metadata,
         name: row.name,
+        parentId: row.parent_id ?? null,
         size: Number(row.size),
         slug: row.slug,
         sourceType: row.source_type,
@@ -323,9 +331,10 @@ export class KnowledgeRepo {
       }
     }
 
-    // Search filter
+    // Search filter (escape %, _, \ to prevent wildcard injection)
     if (q) {
-      whereConditions.push(sql`f.name ILIKE ${`%${q}%`}`);
+      const pattern = `%${escapeLikeWildcards(q)}%`;
+      whereConditions.push(sql`f.name ILIKE ${pattern} ESCAPE '\'`);
     }
 
     // Category filter
@@ -356,9 +365,10 @@ export class KnowledgeRepo {
         }
       }
 
-      // Search filter
+      // Search filter (escape %, _, \ to prevent wildcard injection)
       if (q) {
-        kbWhereConditions.push(sql`f.name ILIKE ${`%${q}%`}`);
+        const pattern = `%${escapeLikeWildcards(q)}%`;
+        kbWhereConditions.push(sql`f.name ILIKE ${pattern} ESCAPE '\'`);
       }
 
       // Category filter
@@ -389,7 +399,9 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           COALESCE(d.metadata, f.metadata) as metadata,
-          'file' as source_type
+          'file' as source_type,
+          f.parent_id,
+          ${knowledgeBaseId}::text as knowledge_base_id
         FROM ${files} f
         INNER JOIN ${knowledgeBaseFiles} kbf
           ON f.id = kbf.file_id
@@ -427,7 +439,9 @@ export class KnowledgeRepo {
         d.content,
         d.slug,
         COALESCE(d.metadata, f.metadata) as metadata,
-        'file' as source_type
+        'file' as source_type,
+        f.parent_id,
+        NULL::text as knowledge_base_id
       FROM ${files} f
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
@@ -456,10 +470,11 @@ export class KnowledgeRepo {
       }
     }
 
-    // Search filter
+    // Search filter (escape %, _, \ to prevent wildcard injection)
     if (q) {
+      const pattern = `%${escapeLikeWildcards(q)}%`;
       whereConditions.push(
-        sql`(${documents.title} ILIKE ${`%${q}%`} OR ${documents.filename} ILIKE ${`%${q}%`})`,
+        sql`(${documents.title} ILIKE ${pattern} ESCAPE '\' OR ${documents.filename} ILIKE ${pattern} ESCAPE '\')`,
       );
     }
 
@@ -496,7 +511,9 @@ export class KnowledgeRepo {
             NULL::text as content,
             NULL::varchar(255) as slug,
             NULL::jsonb as metadata,
-            NULL::text as source_type
+            NULL::text as source_type,
+            NULL::varchar(255) as parent_id,
+            NULL::text as knowledge_base_id
           WHERE false
         `;
       }
@@ -519,9 +536,12 @@ export class KnowledgeRepo {
         }
       }
 
-      // Search filter
+      // Search filter (escape %, _, \ to prevent wildcard injection)
       if (q) {
-        kbWhereConditions.push(sql`(d.title ILIKE ${`%${q}%`} OR d.filename ILIKE ${`%${q}%`})`);
+        const pattern = `%${escapeLikeWildcards(q)}%`;
+        kbWhereConditions.push(
+          sql`(d.title ILIKE ${pattern} ESCAPE '\' OR d.filename ILIKE ${pattern} ESCAPE '\')`,
+        );
       }
 
       // Category filter
@@ -585,7 +605,9 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           d.metadata,
-          'document' as source_type
+          'document' as source_type,
+          d.parent_id,
+          d.knowledge_base_id
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
       `;
@@ -606,7 +628,9 @@ export class KnowledgeRepo {
         content,
         slug,
         metadata,
-        'document' as source_type
+        'document' as source_type,
+        parent_id,
+        knowledge_base_id
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     `;

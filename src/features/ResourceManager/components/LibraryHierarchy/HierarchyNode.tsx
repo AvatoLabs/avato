@@ -4,12 +4,12 @@ import { CaretDownFilled, LoadingOutlined } from '@ant-design/icons';
 import { ActionIcon, Block, Flexbox, Icon, showContextMenu, stopPropagation } from '@lobehub/ui';
 import { App, Input } from 'antd';
 import { cx } from 'antd-style';
-import { FileText, FolderIcon, FolderOpenIcon } from 'lucide-react';
 import * as motion from 'motion/react-m';
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
 import {
   getTransparentDragImage,
@@ -287,7 +287,10 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
               gap={8}
               style={{ minHeight: 28, minWidth: 0, overflow: 'hidden' }}
             >
-              <Icon icon={isExpanded ? FolderOpenIcon : FolderIcon} size={18} />
+              <Icon
+                icon={isExpanded ? RESOURCE_ENTRY_ICONS.folderOpen : RESOURCE_ENTRY_ICONS.folder}
+                size={18}
+              />
               {isRenaming ? (
                 <Input
                   ref={inputRef}
@@ -365,7 +368,7 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
               emoji ? (
                 <span style={{ fontSize: 18 }}>{emoji}</span>
               ) : (
-                <Icon icon={FileText} size={18} />
+                <Icon icon={RESOURCE_ENTRY_ICONS.page} size={18} />
               )
             ) : (
               <FileIcon fileName={item.name} fileType={item.fileType} size={18} />

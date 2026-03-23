@@ -1,11 +1,10 @@
 import { Icon } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { Loader2Icon } from 'lucide-react';
 import { type CSSProperties } from 'react';
 import React, { memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import RepoIcon from '@/components/LibIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useResourceShareModal } from '@/features/ResourceSharing';
 import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
@@ -67,9 +66,16 @@ const KnowledgeBaseItem = memo<KnowledgeBaseItemProps>(
     // Icon (show loader when updating)
     const icon = useMemo(() => {
       if (isLoading) {
-        return <Icon spin color={cssVar.colorTextDescription} icon={Loader2Icon} size={18} />;
+        return (
+          <Icon
+            spin
+            color={cssVar.colorTextDescription}
+            icon={RESOURCE_ENTRY_ICONS.loader}
+            size={18}
+          />
+        );
       }
-      return <RepoIcon size={18} />;
+      return <Icon icon={RESOURCE_ENTRY_ICONS.library} size={18} />;
     }, [isLoading]);
 
     const dropdownMenu = useDropdownMenu({

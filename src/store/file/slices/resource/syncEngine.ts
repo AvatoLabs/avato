@@ -50,30 +50,60 @@ export class ResourceSyncEngine {
   private debouncedSync: DebouncedFunc<() => Promise<void>>;
   private stateManager: StateManager;
 
+  private maxWaitTimer: ReturnType<typeof setTimeout> | null = null;
+  private firstCallTime = 0;
+
   constructor(getState: StateManager['getState'], setState: StateManager['setState']) {
     this.stateManager = { getState, setState };
 
-    this.debouncedSync = debounce(() => this.processQueue(), SYNC_CONFIG.DEBOUNCE_MS, {
+    const resetMaxWait = () => {
+      this.firstCallTime = 0;
+      if (this.maxWaitTimer) {
+        clearTimeout(this.maxWaitTimer);
+        this.maxWaitTimer = null;
+      }
+    };
+
+    const runProcessQueue = async () => {
+      resetMaxWait();
+      await this.processQueue();
+    };
+
+    this.debouncedSync = debounce(runProcessQueue, SYNC_CONFIG.DEBOUNCE_MS, {
       edges: ['trailing'],
     }) as DebouncedFunc<() => Promise<void>>;
 
-    // Add maxWait behavior manually since es-toolkit debounce doesn't support it
-    let lastExecution = 0;
+    // Wrap to add maxWait: force sync after MAX_WAIT_MS even if debounce keeps resetting
     const originalSync = this.debouncedSync;
-
     this.debouncedSync = (() => {
       const now = Date.now();
-      if (now - lastExecution >= SYNC_CONFIG.MAX_WAIT_MS) {
-        lastExecution = now;
-        originalSync.flush?.();
-        return originalSync();
-      } else {
-        return originalSync();
+      if (this.firstCallTime === 0) this.firstCallTime = now;
+
+      const elapsed = now - this.firstCallTime;
+      if (elapsed >= SYNC_CONFIG.MAX_WAIT_MS) {
+        resetMaxWait();
+        return originalSync.flush?.() ?? originalSync();
       }
+
+      if (!this.maxWaitTimer) {
+        this.maxWaitTimer = setTimeout(() => {
+          this.maxWaitTimer = null;
+          this.firstCallTime = 0;
+          originalSync.flush?.();
+        }, SYNC_CONFIG.MAX_WAIT_MS - elapsed);
+      }
+
+      return originalSync();
     }) as unknown as DebouncedFunc<() => Promise<void>>;
 
-    this.debouncedSync.flush = originalSync.flush;
-    this.debouncedSync.cancel = originalSync.cancel;
+    this.debouncedSync.flush = () => {
+      resetMaxWait();
+      return originalSync.flush?.();
+    };
+    this.debouncedSync.cancel = () => {
+      resetMaxWait();
+      return originalSync.cancel?.();
+    };
   }
 
   /**

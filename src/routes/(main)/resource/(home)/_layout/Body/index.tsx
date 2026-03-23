@@ -1,9 +1,9 @@
 import { AccordionItem, ActionIcon, Text } from '@lobehub/ui';
-import { PlusIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useCreateNewModal } from '@/features/LibraryModal';
 import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
@@ -33,7 +33,7 @@ const SidebarBody = memo<{ itemKey: string }>(({ itemKey }) => {
       paddingInline={'8px 4px'}
       action={
         <ActionIcon
-          icon={PlusIcon}
+          icon={RESOURCE_ENTRY_ICONS.plus}
           size={'small'}
           title={t('library.new')}
           onClick={handleCreate}

@@ -3,10 +3,10 @@
 import { ActionIcon } from '@lobehub/ui';
 import { useDebounce } from 'ahooks';
 import { Input } from 'antd';
-import { SearchIcon, XIcon } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
 const SearchInput = memo(() => {
@@ -70,14 +70,18 @@ const SearchInput = memo(() => {
       >
         <Input
           placeholder={t('FileManager.search.placeholder')}
-          prefix={<SearchIcon size={14} />}
+          prefix={<RESOURCE_ENTRY_ICONS.search size={14} />}
           ref={inputRef}
           size="small"
           style={{ width: 200 }}
           value={localQuery}
           suffix={
             localQuery ? (
-              <XIcon size={14} style={{ cursor: 'pointer' }} onClick={handleCollapse} />
+              <RESOURCE_ENTRY_ICONS.close
+                size={14}
+                style={{ cursor: 'pointer' }}
+                onClick={handleCollapse}
+              />
             ) : undefined
           }
           onBlur={handleBlur}
@@ -86,7 +90,11 @@ const SearchInput = memo(() => {
         />
       </div>
       {showIcon && (
-        <ActionIcon icon={SearchIcon} style={{ marginRight: 4 }} onClick={handleExpand} />
+        <ActionIcon
+          icon={RESOURCE_ENTRY_ICONS.search}
+          style={{ marginRight: 4 }}
+          onClick={handleExpand}
+        />
       )}
     </>
   );

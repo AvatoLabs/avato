@@ -32,11 +32,14 @@ services:
       - 'REDIS_URL=redis://redis:6379'
       - 'REDIS_PREFIX=lobechat_canary'
       - 'REDIS_TLS=0'
+      - 'VIRTUAL_HOST=${VIRTUAL_HOST:-canary.turingmesh.com}'
+      - 'VIRTUAL_PORT=3210'
     env_file:
       - .env
     restart: always
     networks:
       - canary-network
+      - stack-network
 
   postgresql:
     image: paradedb/paradedb:latest-pg17
@@ -126,6 +129,8 @@ services:
 networks:
   canary-network:
     driver: bridge
+  stack-network:
+    external: true
 
 volumes:
   redis_data:

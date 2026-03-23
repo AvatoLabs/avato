@@ -1,55 +1,58 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { FileText, ImageIcon, LayoutPanelTopIcon, Mic2, SquarePlay } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { buildResourceRootPath } from '@/features/ResourceSpaces';
 import { FilesTabs } from '@/types/files';
 
 import { useResourceManagerStore } from '../../../features/store';
 
 const CategoryMenu = memo(() => {
   const { t } = useTranslation('file');
+  const { spaceId } = useParams<{ spaceId?: string }>();
   const [activeKey, setMode] = useResourceManagerStore((s) => [s.category, s.setMode]);
   const navigate = useNavigate();
+  const basePath = buildResourceRootPath(spaceId);
 
   const items = useMemo(
     () => [
       {
-        icon: LayoutPanelTopIcon,
+        icon: RESOURCE_ENTRY_ICONS.all,
         key: FilesTabs.All,
         title: t('tab.all'),
-        url: '/resource',
+        url: basePath,
       },
       {
-        icon: FileText,
+        icon: RESOURCE_ENTRY_ICONS.documents,
         key: FilesTabs.Documents,
         title: t('tab.documents'),
-        url: '/resource?category=documents',
+        url: `${basePath}?category=documents`,
       },
       {
-        icon: ImageIcon,
+        icon: RESOURCE_ENTRY_ICONS.images,
         key: FilesTabs.Images,
         title: t('tab.images'),
-        url: '/resource?category=images',
+        url: `${basePath}?category=images`,
       },
       {
-        icon: Mic2,
+        icon: RESOURCE_ENTRY_ICONS.audios,
         key: FilesTabs.Audios,
         title: t('tab.audios'),
-        url: '/resource?category=audios',
+        url: `${basePath}?category=audios`,
       },
       {
-        icon: SquarePlay,
+        icon: RESOURCE_ENTRY_ICONS.videos,
         key: FilesTabs.Videos,
         title: t('tab.videos'),
-        url: '/resource?category=videos',
+        url: `${basePath}?category=videos`,
       },
     ],
-    [t],
+    [basePath, t],
   );
 
   return (

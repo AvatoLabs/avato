@@ -79,6 +79,18 @@ describe('settingsSelectors', () => {
 
       expect(result).toBe('#000000');
     });
+
+    it('should normalize empty neutralColor to undefined', () => {
+      const s: UserState = merge(initialState, {
+        settings: {
+          general: { neutralColor: '' },
+        },
+      });
+
+      const result = userGeneralSettingsSelectors.neutralColor(s as UserStore);
+
+      expect(result).toBeUndefined();
+    });
   });
 
   describe('primaryColor', () => {
@@ -116,6 +128,18 @@ describe('settingsSelectors', () => {
       const result = userGeneralSettingsSelectors.primaryColor(s as UserStore);
 
       expect(result).toBe('#ffffff');
+    });
+
+    it('should normalize empty primaryColor to undefined', () => {
+      const s: UserState = merge(initialState, {
+        settings: {
+          general: { primaryColor: '' },
+        },
+      });
+
+      const result = userGeneralSettingsSelectors.primaryColor(s as UserStore);
+
+      expect(result).toBeUndefined();
     });
   });
 

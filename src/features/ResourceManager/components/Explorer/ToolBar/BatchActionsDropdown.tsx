@@ -1,17 +1,10 @@
 import { type DropdownItem } from '@lobehub/ui';
 import { DropdownMenu, Icon } from '@lobehub/ui';
 import { App } from 'antd';
-import {
-  BookMinusIcon,
-  BookPlusIcon,
-  CircleEllipsisIcon,
-  FileBoxIcon,
-  Trash2Icon,
-} from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import RepoIcon from '@/components/LibIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useKnowledgeBaseStore } from '@/store/library';
 
@@ -51,7 +44,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
     if (libraryId && selectCount === 0) {
       items.push({
         danger: true,
-        icon: <Icon icon={Trash2Icon} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.trash} />,
         key: 'deleteLibrary',
         label: t('header.actions.deleteLibrary', { ns: 'file' }),
         onClick: async () => {
@@ -74,7 +67,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
 
     const addToKnowledgeBaseSubmenu: DropdownItem[] = availableKnowledgeBases.map((kb) => ({
       disabled: selectCount === 0,
-      icon: <RepoIcon />,
+      icon: <Icon icon={RESOURCE_ENTRY_ICONS.library} />,
       key: `add-to-kb-${kb.id}`,
       label: <span style={{ marginLeft: 8 }}>{kb.name}</span>,
       onClick: async () => {
@@ -96,7 +89,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
     if (libraryId) {
       items.push({
         disabled: selectCount === 0,
-        icon: <Icon icon={BookMinusIcon} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryRemove} />,
         key: 'removeFromKnowledgeBase',
         label: t('FileManager.actions.removeFromLibrary'),
         onClick: () => {
@@ -119,7 +112,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
         items.push({
           children: addToKnowledgeBaseSubmenu as any,
           disabled: selectCount === 0,
-          icon: <Icon icon={BookPlusIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />,
           key: 'moveToOtherKnowledgeBase',
           label: t('FileManager.actions.moveToOtherLibrary'),
         });
@@ -128,7 +121,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
       items.push({
         children: addToKnowledgeBaseSubmenu as any,
         disabled: selectCount === 0,
-        icon: <Icon icon={BookPlusIcon} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />,
         key: 'addToKnowledgeBase',
         label: t('FileManager.actions.addToLibrary'),
       });
@@ -137,7 +130,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
     items.push(
       {
         disabled: selectCount === 0,
-        icon: <Icon icon={FileBoxIcon} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.chunk} />,
         key: 'batchChunking',
         label: t('FileManager.actions.batchChunking'),
         onClick: async () => {
@@ -150,7 +143,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
       {
         danger: true,
         disabled: selectCount === 0,
-        icon: <Icon icon={Trash2Icon} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.trash} />,
         key: 'delete',
         label: t('delete', { ns: 'common' }),
         onClick: async () => {
@@ -184,7 +177,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
   return (
     <DropdownMenu items={menuItems} placement="bottomLeft">
       <ActionIconWithChevron
-        icon={CircleEllipsisIcon}
+        icon={RESOURCE_ENTRY_ICONS.more}
         title={t('FileManager.actions.batchActions', 'Batch actions')}
       />
     </DropdownMenu>

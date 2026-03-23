@@ -1,14 +1,6 @@
-import { type LucideIcon } from 'lucide-react';
-import {
-  BrainCircuit,
-  FilePenIcon,
-  Image,
-  LibraryBigIcon,
-  Settings,
-  ShapesIcon,
-  Video,
-  Workflow,
-} from 'lucide-react';
+import { type IconProps } from '@lobehub/ui';
+
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 
 export interface NavigationRoute {
   /** CMDK i18n key in common namespace */
@@ -16,7 +8,7 @@ export interface NavigationRoute {
   /** Electron i18n key in electron namespace */
   electronKey: string;
   /** Route icon component */
-  icon: LucideIcon;
+  icon: IconProps['icon'];
   /** Unique route identifier */
   id: string;
   /** Keywords for CMDK search (fallback) */
@@ -39,7 +31,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.community',
     electronKey: 'navigation.discover',
-    icon: ShapesIcon,
+    icon: APP_ENTRY_ICONS.community,
     id: 'community',
     keywords: ['discover', 'market', 'assistant', 'model', 'provider', 'mcp'],
     keywordsKey: 'cmdk.keywords.community',
@@ -49,7 +41,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.video',
     electronKey: 'navigation.video',
-    icon: Video,
+    icon: APP_ENTRY_ICONS.video,
     id: 'video',
     keywords: ['video', 'generate', 'seedance', 'kling'],
     keywordsKey: 'cmdk.keywords.video',
@@ -59,7 +51,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.painting',
     electronKey: 'navigation.image',
-    icon: Image,
+    icon: APP_ENTRY_ICONS.image,
     id: 'image',
     keywords: ['painting', 'art', 'generate', 'draw'],
     keywordsKey: 'cmdk.keywords.painting',
@@ -69,7 +61,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.avatoStudio',
     electronKey: 'navigation.avatoStudio',
-    icon: Workflow,
+    icon: APP_ENTRY_ICONS.studio,
     id: 'studio',
     keywords: ['workflow', 'mcp', 'automation', 'graph', 'studio'],
     keywordsKey: 'cmdk.keywords.avatoStudio',
@@ -79,7 +71,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.resource',
     electronKey: 'navigation.resources',
-    icon: LibraryBigIcon,
+    icon: APP_ENTRY_ICONS.resource,
     id: 'resource',
     keywords: ['knowledge', 'files', 'library', 'documents'],
     keywordsKey: 'cmdk.keywords.resources',
@@ -89,7 +81,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.pages',
     electronKey: 'navigation.pages',
-    icon: FilePenIcon,
+    icon: APP_ENTRY_ICONS.page,
     id: 'page',
     keywords: ['documents', 'write', 'notes'],
     keywordsKey: 'cmdk.keywords.pages',
@@ -100,7 +92,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.memory',
     electronKey: 'navigation.memory',
-    icon: BrainCircuit,
+    icon: APP_ENTRY_ICONS.memory,
     id: 'memory',
     keywords: ['identities', 'contexts', 'preferences', 'experiences'],
     keywordsKey: 'cmdk.keywords.memory',
@@ -110,7 +102,7 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
   {
     cmdkKey: 'cmdk.settings',
     electronKey: 'navigation.settings',
-    icon: Settings,
+    icon: APP_ENTRY_ICONS.settings,
     id: 'settings',
     keywords: ['settings', 'preferences', 'configuration', 'options'],
     keywordsKey: 'cmdk.keywords.settings',

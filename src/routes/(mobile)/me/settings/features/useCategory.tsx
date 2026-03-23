@@ -1,8 +1,8 @@
-import { Brain, BrainCircuit, Info, Mic2, Settings2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { type CellProps } from '@/components/Cell';
+import { SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { SettingsTabs } from '@/store/global/initialState';
 
 export const useCategory = () => {
@@ -11,28 +11,28 @@ export const useCategory = () => {
 
   const items: CellProps[] = [
     {
-      icon: Settings2,
+      icon: SETTINGS_ENTRY_ICONS.common,
       key: SettingsTabs.Common,
       label: t('tab.common'),
     },
     {
-      icon: Brain,
+      icon: SETTINGS_ENTRY_ICONS.provider,
       key: SettingsTabs.Provider,
       label: t('tab.provider'),
     },
     {
-      icon: Sparkles,
+      icon: SETTINGS_ENTRY_ICONS.agent,
       key: SettingsTabs.Agent,
       label: t('tab.agent'),
     },
     {
-      icon: BrainCircuit,
+      icon: SETTINGS_ENTRY_ICONS.memory,
       key: SettingsTabs.Memory,
       label: t('tab.memory'),
     },
-    { icon: Mic2, key: SettingsTabs.TTS, label: t('tab.tts') },
+    { icon: SETTINGS_ENTRY_ICONS.tts, key: SettingsTabs.TTS, label: t('tab.tts') },
     {
-      icon: Info,
+      icon: SETTINGS_ENTRY_ICONS.about,
       key: SettingsTabs.About,
       label: t('tab.about'),
     },

@@ -3,10 +3,10 @@
 import { ActionIcon, Flexbox, Icon, Tag } from '@lobehub/ui';
 import { Descriptions, Divider } from 'antd';
 import dayjs from 'dayjs';
-import { BoltIcon, DownloadIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { type FileListItem } from '@/types/files';
 import { downloadFile } from '@/utils/client/downloadFile';
 import { formatSize } from '@/utils/format';
@@ -56,7 +56,7 @@ const FileDetail = memo<FileDetailProps>((props) => {
   const dataItems = [
     {
       children: chunkCount ? (
-        <Tag icon={<Icon icon={BoltIcon} />} variant={'filled'}>
+        <Tag icon={<Icon icon={RESOURCE_ENTRY_ICONS.chunk} />} variant={'filled'}>
           {' '}
           {chunkCount}
         </Tag>
@@ -89,7 +89,7 @@ const FileDetail = memo<FileDetailProps>((props) => {
         extra={
           showDownloadButton && url ? (
             <ActionIcon
-              icon={DownloadIcon}
+              icon={RESOURCE_ENTRY_ICONS.download}
               title={t('download', { ns: 'common' })}
               onClick={() => {
                 downloadFile(url, name);

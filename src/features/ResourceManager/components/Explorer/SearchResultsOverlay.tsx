@@ -3,12 +3,12 @@
 import { Center, Checkbox, Flexbox } from '@lobehub/ui';
 import { VirtuosoMasonry } from '@virtuoso.dev/masonry';
 import { cssVar } from 'antd-style';
-import { SearchIcon } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useClientDataSWR } from '@/libs/swr';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { resourceService } from '@/services/resource';
@@ -25,10 +25,11 @@ const SWR_RESOURCE_SEARCH = 'SWR_RESOURCE_SEARCH';
 
 const SearchResultsOverlay = memo(() => {
   const { t } = useTranslation('components');
-  const [searchQuery, libraryId, category, viewMode] = useResourceManagerStore((s) => [
+  const [searchQuery, libraryId, category, spaceId, viewMode] = useResourceManagerStore((s) => [
     s.searchQuery,
     s.libraryId,
     s.category,
+    s.spaceId,
     s.viewMode,
   ]);
 
@@ -45,10 +46,13 @@ const SearchResultsOverlay = memo(() => {
     isActive
       ? [
           SWR_RESOURCE_SEARCH,
-          { category: libraryId ? undefined : category, libraryId, q: searchQuery },
+          { category: libraryId ? undefined : category, libraryId, q: searchQuery, spaceId },
         ]
       : null,
-    async ([, params]: [string, { category?: string; libraryId?: string; q: string }]) => {
+    async ([, params]: [
+      string,
+      { category?: string; libraryId?: string; q: string; spaceId?: string },
+    ]) => {
       const response = await resourceService.queryResources({
         ...params,
         limit: 50,
@@ -106,7 +110,10 @@ const SearchResultsOverlay = memo(() => {
       ) : !data || data.length === 0 ? (
         <Center height="100%">
           <Flexbox align="center" gap={8}>
-            <SearchIcon size={32} style={{ color: cssVar.colorTextQuaternary as string }} />
+            <RESOURCE_ENTRY_ICONS.search
+              size={32}
+              style={{ color: cssVar.colorTextQuaternary as string }}
+            />
             <span style={{ color: cssVar.colorTextDescription as string, fontSize: 14 }}>
               {t('FileManager.search.noResults')}
             </span>

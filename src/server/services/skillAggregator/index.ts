@@ -24,6 +24,8 @@ const DEFAULT_PAGE_SIZE = 21;
 const MAX_PAGE_SIZE = 60;
 const MAX_SKILL_PACKAGE_BYTES = 10 * 1024 * 1024;
 const VERIFICATION_CONCURRENCY = 4;
+const MAX_FETCH_ATTEMPTS = 3;
+const LIGHT_VERIFICATION_BYTES = 1024;
 
 interface LightmakeSkillItem {
   category?: string;
@@ -136,18 +138,61 @@ const toItem = (item: LightmakeSkillItem): SkillAggregatorItem => {
 export class SkillAggregatorService {
   private parser = new SkillParser();
 
-  private async fetchJson<T>(url: string) {
-    const response = await ssrfSafeFetch(url, {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+  private isRetryableFetchError(error: unknown): boolean {
+    const message = toErrorMessage(error).toLowerCase();
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+    const failedToFetchStatus = message.match(/failed to fetch .*: (\d{3})/);
+    if (failedToFetchStatus) {
+      const status = Number(failedToFetchStatus[1]);
+      return status >= 500 || status === 408 || status === 429;
     }
 
-    return (await response.json()) as T;
+    return [
+      'socket hang up',
+      'network error',
+      'fetch failed',
+      'econnreset',
+      'econnrefused',
+      'etimedout',
+      'timeout',
+      'temporary failure',
+      'temporarily unavailable',
+      'connection aborted',
+      'request aborted',
+    ].some((pattern) => message.includes(pattern));
+  }
+
+  private async retryFetch<T>(fetcher: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+      try {
+        return await fetcher();
+      } catch (error) {
+        lastError = error;
+        if (attempt >= MAX_FETCH_ATTEMPTS || !this.isRetryableFetchError(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  private async fetchJson<T>(url: string) {
+    return this.retryFetch(async () => {
+      const response = await ssrfSafeFetch(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+      }
+
+      return (await response.json()) as T;
+    });
   }
 
   private isZipResponse(url: string, contentType: string) {
@@ -161,6 +206,17 @@ export class SkillAggregatorService {
     );
   }
 
+  private isZipSignature(buffer: Buffer): boolean {
+    return buffer.length >= 2 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+  }
+
+  private getTotalSizeFromContentRange(header: string | null): number | null {
+    if (!header) return null;
+
+    const match = header.match(/bytes \d+-\d+\/(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
   private async verifyInstallability(
     item: SkillAggregatorItem,
   ): Promise<SkillAggregatorInstallability> {
@@ -172,41 +228,56 @@ export class SkillAggregatorService {
     }
 
     try {
-      const response = await ssrfSafeFetch(item.importUrl, {
-        headers: {
-          Accept:
-            'application/zip, application/octet-stream, text/markdown;q=0.9, text/plain;q=0.8',
-        },
-      });
+      const response = await this.retryFetch(async () =>
+        ssrfSafeFetch(item.importUrl!, {
+          headers: {
+            Accept:
+              'application/zip, application/octet-stream, text/markdown;q=0.9, text/plain;q=0.8',
+            Range: `bytes=0-${LIGHT_VERIFICATION_BYTES - 1}`,
+          },
+        }),
+      );
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 206) {
         return {
           level: SkillAggregatorInstallabilityLevel.Importable,
           reason: SkillAggregatorInstallabilityReason.FetchFailed,
         };
       }
 
+      const contentType = response.headers.get('content-type') || '';
       const contentLength = Number(response.headers.get('content-length') || 0);
-      if (
-        Number.isFinite(contentLength) &&
-        contentLength > 0 &&
-        contentLength > MAX_SKILL_PACKAGE_BYTES
-      ) {
+      const contentRange = response.headers.get('content-range');
+      const totalSize = this.getTotalSizeFromContentRange(contentRange) ?? contentLength;
+
+      if (Number.isFinite(totalSize) && totalSize > 0 && totalSize > MAX_SKILL_PACKAGE_BYTES) {
         return {
           level: SkillAggregatorInstallabilityLevel.Importable,
           reason: SkillAggregatorInstallabilityReason.PackageTooLarge,
         };
       }
 
-      const contentType = response.headers.get('content-type') || '';
-
       if (this.isZipResponse(item.importUrl, contentType)) {
         const buffer = Buffer.from(await response.arrayBuffer());
+
+        if (!this.isZipSignature(buffer)) {
+          return {
+            level: SkillAggregatorInstallabilityLevel.Importable,
+            reason: SkillAggregatorInstallabilityReason.InvalidPackage,
+          };
+        }
 
         if (buffer.length > MAX_SKILL_PACKAGE_BYTES) {
           return {
             level: SkillAggregatorInstallabilityLevel.Importable,
             reason: SkillAggregatorInstallabilityReason.PackageTooLarge,
+          };
+        }
+
+        if (buffer.length <= LIGHT_VERIFICATION_BYTES) {
+          return {
+            level: SkillAggregatorInstallabilityLevel.Verified,
+            validatedAt: new Date().toISOString(),
           };
         }
 

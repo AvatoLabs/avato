@@ -1,10 +1,10 @@
 import { Button, Checkbox, Flexbox, Icon, Skeleton } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { BookMinusIcon, BookPlusIcon, FileBoxIcon, Trash2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -80,7 +80,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
             {libraryId ? (
               <>
                 <Button
-                  icon={BookMinusIcon}
+                  icon={RESOURCE_ENTRY_ICONS.libraryRemove}
                   size={'small'}
                   onClick={() => {
                     modal.confirm({
@@ -101,7 +101,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                 </Button>
                 <Button
                   color={'default'}
-                  icon={<Icon icon={BookPlusIcon} />}
+                  icon={<Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />}
                   size={'small'}
                   variant={'filled'}
                   onClick={() => {
@@ -114,7 +114,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
             ) : (
               <Button
                 color={'default'}
-                icon={<Icon icon={BookPlusIcon} />}
+                icon={<Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />}
                 size={'small'}
                 variant={'filled'}
                 onClick={() => {
@@ -126,7 +126,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
             )}
             <Button
               color={'default'}
-              icon={<Icon icon={FileBoxIcon} />}
+              icon={<Icon icon={RESOURCE_ENTRY_ICONS.chunk} />}
               size={'small'}
               variant={'filled'}
               onClick={async () => {
@@ -138,7 +138,7 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
             <Button
               danger
               color={'danger'}
-              icon={<Icon icon={Trash2Icon} />}
+              icon={<Icon icon={RESOURCE_ENTRY_ICONS.trash} />}
               size={'small'}
               variant={'filled'}
               onClick={async () => {

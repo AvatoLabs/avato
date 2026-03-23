@@ -10,6 +10,8 @@ DEPLOY_USER="${DEPLOY_USER:-root}"
 DEPLOY_PASSWORD="${DEPLOY_PASSWORD:?DEPLOY_PASSWORD is required}"
 DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://avato.turingmesh.com}"
 DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-avato.turingmesh.com}"
+DEPLOY_VERIFY_PATH="${DEPLOY_VERIFY_PATH:-/signin}"
+DEPLOY_PUBLIC_VERIFY_MODE="${DEPLOY_PUBLIC_VERIFY_MODE:-resolve}"
 REMOTE_ARTIFACT_DIR="${REMOTE_ARTIFACT_DIR:-/data/avato}"
 REMOTE_DEPLOY_PATH="${REMOTE_DEPLOY_PATH:-/data/avato/deploy-image}"
 IMAGE_TAG="${IMAGE_TAG:-prod-$(date +%Y%m%d-%H%M%S)}"
@@ -35,6 +37,28 @@ Host avato-prod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 EOF
+
+run_with_expect() {
+  EXPECT_PASSWORD="${DEPLOY_PASSWORD}" expect -f - "$@" <<'EOF'
+log_user 1
+set timeout -1
+
+set password $env(EXPECT_PASSWORD)
+spawn {*}$argv
+expect {
+  -re ".*yes/no.*" { send "yes\r"; exp_continue }
+  -re ".*password:.*" { send "$password\r"; exp_continue }
+  eof
+}
+
+set wait_status [wait]
+set exit_code [lindex $wait_status 3]
+if {$exit_code eq ""} {
+  set exit_code 0
+}
+exit $exit_code
+EOF
+}
 
 cd "${ROOT_DIR}"
 
@@ -86,22 +110,15 @@ docker image prune -f >/dev/null 2>&1 || true
 ls -1t "${TMP_ARTIFACT_DIR}"/avato-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn scp -F ${SSH_CONFIG_FILE} ${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME} avato-prod:${REMOTE_ARTIFACT_DIR}/
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+run_with_expect \
+  scp -F "${SSH_CONFIG_FILE}" \
+  "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}" \
+  "avato-prod:${REMOTE_ARTIFACT_DIR}/"
 
 echo "==> Loading image and restarting ${REMOTE_RUNTIME_TAG} on remote"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn ssh -F ${SSH_CONFIG_FILE} avato-prod {bash -lc '
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" avato-prod \
+  "bash -lc '
 set -euo pipefail
 cd ${REMOTE_ARTIFACT_DIR}
 sha256sum ${ARTIFACT_NAME}
@@ -109,33 +126,35 @@ cd ${REMOTE_DEPLOY_PATH}
 docker load < ${REMOTE_ARTIFACT_DIR}/${ARTIFACT_NAME}
 docker tag ${IMAGE_NAME} ${REMOTE_RUNTIME_TAG}
 docker compose up -d lobe
-docker image ls avato-runtime --format "{{.Repository}}:{{.Tag}}" | tail -n +${REMOTE_IMAGE_PRUNE_FROM} | grep -v "^${IMAGE_NAME}$" | xargs -r docker image rm || true
+docker image ls avato-runtime --format \"{{.Repository}}:{{.Tag}}\" | tail -n +${REMOTE_IMAGE_PRUNE_FROM} | grep -v \"^${IMAGE_NAME}$\" | xargs -r docker image rm || true
 docker image prune -f >/dev/null 2>&1 || true
 ls -1t ${REMOTE_ARTIFACT_DIR}/avato-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +${REMOTE_ARTIFACT_PRUNE_FROM} | xargs -r rm -f
 docker compose ps
 docker logs --tail 50 avato-lobe
-'}
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+'"
 
-echo "==> Verifying remote service on 127.0.0.1:3210"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn ssh -F ${SSH_CONFIG_FILE} avato-prod {bash -lc '
+echo "==> Verifying remote service on 127.0.0.1:3210${DEPLOY_VERIFY_PATH}"
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" avato-prod \
+  "bash -lc '
 set -euo pipefail
-curl -I -L --max-time 30 http://127.0.0.1:3210/signin
-'}
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+curl -I -L --max-time 30 http://127.0.0.1:3210${DEPLOY_VERIFY_PATH}
+'"
 
-echo "==> Verifying ${DEPLOY_DOMAIN}/signin via explicit DNS resolve"
-curl -I -L --max-time 30 --resolve "${DEPLOY_VERIFY_HOST}:443:${DEPLOY_HOST}" "${DEPLOY_DOMAIN}/signin"
+case "${DEPLOY_PUBLIC_VERIFY_MODE}" in
+  skip)
+    echo "==> Skipping public verification (${DEPLOY_PUBLIC_VERIFY_MODE})"
+    ;;
+  resolve)
+    echo "==> Verifying ${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH} via explicit DNS resolve"
+    curl -I -L --max-time 30 --resolve "${DEPLOY_VERIFY_HOST}:443:${DEPLOY_HOST}" "${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH}"
+    ;;
+  direct)
+    echo "==> Verifying ${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH} via public DNS"
+    curl -I -L --max-time 30 "${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH}"
+    ;;
+  *)
+    echo "Unsupported DEPLOY_PUBLIC_VERIFY_MODE: ${DEPLOY_PUBLIC_VERIFY_MODE}" >&2
+    exit 1
+    ;;
+esac

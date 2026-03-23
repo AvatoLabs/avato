@@ -1,7 +1,7 @@
 'use client';
 
-import { ActionIcon, Avatar, DropdownMenu, Text } from '@lobehub/ui';
-import { ArrowLeftIcon, MoreHorizontal } from 'lucide-react';
+import { ActionIcon, Avatar, DropdownMenu, Icon, Segmented, Text } from '@lobehub/ui';
+import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,13 +16,9 @@ import { useMenu } from './useMenu';
 
 const Header = memo(() => {
   const { t } = useTranslation('file');
-  const [documentId, emoji, title, parentId, onBack] = usePageEditorStore((s) => [
-    s.documentId,
-    s.emoji,
-    s.title,
-    s.parentId,
-    s.onBack,
-  ]);
+  const [documentId, emoji, title, parentId, onBack, setViewMode, viewMode] = usePageEditorStore(
+    (s) => [s.documentId, s.emoji, s.title, s.parentId, s.onBack, s.setViewMode, s.viewMode],
+  );
   const { menuItems } = useMenu();
 
   return (
@@ -49,6 +45,28 @@ const Header = memo(() => {
       }
       right={
         <>
+          <Segmented
+            size={'small'}
+            value={viewMode}
+            options={[
+              {
+                icon: <Icon icon={SquarePen} />,
+                title: t('pageEditor.mode.rich'),
+                value: 'rich',
+              },
+              {
+                icon: <Icon icon={Code2} />,
+                title: t('pageEditor.mode.markdown'),
+                value: 'markdown',
+              },
+              {
+                icon: <Icon icon={Eye} />,
+                title: t('pageEditor.mode.preview'),
+                value: 'preview',
+              },
+            ]}
+            onChange={(value) => setViewMode(value as typeof viewMode)}
+          />
           {/* Three-dot menu */}
           <DropdownMenu
             iconSpaceMode="group"

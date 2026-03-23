@@ -6,6 +6,8 @@ export type AnimationMode = 'disabled' | 'agile' | 'elegant';
 
 export type ContextMenuMode = 'disabled' | 'default';
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export interface UserGeneralConfig {
   animationMode?: AnimationMode;
   contextMenuMode?: ContextMenuMode;
@@ -19,10 +21,11 @@ export interface UserGeneralConfig {
   isDevMode: boolean;
   isLiteMode: boolean;
   mermaidTheme?: MermaidProps['theme'];
-  neutralColor?: NeutralColors;
-  primaryColor?: PrimaryColors;
+  neutralColor?: NeutralColors | '';
+  primaryColor?: PrimaryColors | '';
   responseLanguage?: string;
   telemetry: boolean;
+  themeMode?: ThemeMode;
   timezone?: string;
   transitionMode?: ResponseAnimationStyle;
 }

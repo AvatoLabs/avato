@@ -1,20 +1,11 @@
 import { copyToClipboard, createRawModal, Icon } from '@lobehub/ui';
 import { App } from 'antd';
 import { type ItemType } from 'antd/es/menu/interface';
-import {
-  BookMinusIcon,
-  BookPlusIcon,
-  DownloadIcon,
-  FolderInputIcon,
-  LinkIcon,
-  PencilIcon,
-  Trash,
-} from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shallow } from 'zustand/shallow';
 
-import RepoIcon from '@/components/LibIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
 import { useResourceShareModal } from '@/features/ResourceSharing';
@@ -103,7 +94,7 @@ export const useFileItemDropdown = ({
 
     // Submenu for adding files to a library (used when NOT in a library)
     const addToKnowledgeBaseSubmenu: ItemType[] = availableKnowledgeBases.map((kb) => ({
-      icon: <RepoIcon />,
+      icon: <Icon icon={RESOURCE_ENTRY_ICONS.library} />,
       key: `add-to-library-${kb.id}`,
       label: <span style={{ marginLeft: 8 }}>{kb.name}</span>,
       onClick: async ({ domEvent }) => {
@@ -134,7 +125,7 @@ export const useFileItemDropdown = ({
     // Submenu for moving files to another library (used when IN a library)
     // Move = remove from current library + clear folder relationship + add to target library
     const moveToKnowledgeBaseSubmenu: ItemType[] = availableKnowledgeBases.map((kb) => ({
-      icon: <RepoIcon />,
+      icon: <Icon icon={RESOURCE_ENTRY_ICONS.library} />,
       key: `move-to-library-${kb.id}`,
       label: <span style={{ marginLeft: 8 }}>{kb.name}</span>,
       onClick: async ({ domEvent }) => {
@@ -167,12 +158,12 @@ export const useFileItemDropdown = ({
         ? [
             availableKnowledgeBases.length > 0 && {
               children: moveToKnowledgeBaseSubmenu,
-              icon: <Icon icon={BookPlusIcon} />,
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />,
               key: 'moveToOtherLibrary',
               label: t('FileManager.actions.moveToOtherLibrary'),
             },
             {
-              icon: <Icon icon={BookMinusIcon} />,
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryRemove} />,
               key: 'removeFromLibrary',
               label: t('FileManager.actions.removeFromLibrary'),
               onClick: async ({ domEvent }) => {
@@ -197,7 +188,7 @@ export const useFileItemDropdown = ({
         : [
             availableKnowledgeBases.length > 0 && {
               children: addToKnowledgeBaseSubmenu,
-              icon: <Icon icon={BookPlusIcon} />,
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.libraryAdd} />,
               key: 'addToLibrary',
               label: t('FileManager.actions.addToLibrary'),
             },
@@ -213,7 +204,7 @@ export const useFileItemDropdown = ({
           type: 'divider',
         },
         isInLibrary && {
-          icon: <Icon icon={FolderInputIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderMove} />,
           key: 'moveToFolder',
           label: t('FileManager.actions.moveToFolder'),
           onClick: async ({ domEvent }) => {
@@ -226,7 +217,7 @@ export const useFileItemDropdown = ({
           },
         },
         isFolder && {
-          icon: <Icon icon={PencilIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
           key: 'rename',
           label: t('FileManager.actions.rename'),
           onClick: async ({ domEvent }) => {
@@ -235,7 +226,7 @@ export const useFileItemDropdown = ({
           },
         },
         {
-          icon: <Icon icon={LinkIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.share} />,
           key: 'share',
           label: t('share.title', { ns: 'file' }),
           onClick: async ({ domEvent }) => {
@@ -248,7 +239,7 @@ export const useFileItemDropdown = ({
           },
         },
         {
-          icon: <Icon icon={LinkIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.link} />,
           key: 'copyUrl',
           label: t('FileManager.actions.copyUrl'),
           onClick: async ({ domEvent }) => {
@@ -265,7 +256,7 @@ export const useFileItemDropdown = ({
           },
         },
         !isFolder && {
-          icon: <Icon icon={DownloadIcon} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.download} />,
           key: 'download',
           label: t('download', { ns: 'common' }),
           onClick: async ({ domEvent }) => {
@@ -315,7 +306,7 @@ export const useFileItemDropdown = ({
         },
         {
           danger: true,
-          icon: <Icon icon={Trash} />,
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.trash} />,
           key: 'delete',
           label: t('delete', { ns: 'common' }),
           onClick: async ({ domEvent }) => {

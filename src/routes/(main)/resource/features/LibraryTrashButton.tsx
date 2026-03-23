@@ -1,10 +1,10 @@
 'use client';
 
 import { ActionIcon } from '@lobehub/ui';
-import { Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { DocumentTrashModal } from '@/routes/(main)/resource/features/modal/DocumentTrashModal';
 
 export const LibraryTrashButton = memo<{ knowledgeBaseId?: string }>(({ knowledgeBaseId }) => {
@@ -15,15 +15,15 @@ export const LibraryTrashButton = memo<{ knowledgeBaseId?: string }>(({ knowledg
     <>
       <ActionIcon
         aria-label={t('trash.open')}
-        icon={Trash2}
-        onClick={() => setOpen(true)}
+        icon={RESOURCE_ENTRY_ICONS.trash}
         size={{ blockSize: 32, size: 16 }}
         title={t('trash.open')}
+        onClick={() => setOpen(true)}
       />
       <DocumentTrashModal
         knowledgeBaseId={knowledgeBaseId}
-        onClose={() => setOpen(false)}
         open={open}
+        onClose={() => setOpen(false)}
       />
     </>
   );

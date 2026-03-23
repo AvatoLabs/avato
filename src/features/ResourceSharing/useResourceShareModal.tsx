@@ -24,7 +24,7 @@ export const useResourceShareModal = () => {
         focusTriggerAfterClose: true,
         footer: null,
         title: t('share.title'),
-        width: 720,
+        width: 820,
       });
     },
     [t],

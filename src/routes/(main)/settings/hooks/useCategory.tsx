@@ -1,33 +1,9 @@
 import { isDesktop } from '@lobechat/const';
 import { Avatar } from '@lobehub/ui';
-import {
-  Blocks,
-  Brain,
-  BrainCircuit,
-  ChartColumnBigIcon,
-  Coins,
-  CreditCard,
-  Database,
-  EllipsisIcon,
-  EthernetPort,
-  FlaskConical,
-  Gift,
-  Image as ImageIcon,
-  Info,
-  KeyboardIcon,
-  KeyIcon,
-  Map,
-  MessageSquareTextIcon,
-  Mic2,
-  PaletteIcon,
-  PieChart,
-  Sparkles,
-  TerminalSquare,
-  UserCircle,
-} from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { useElectronStore } from '@/store/electron';
 import { electronSyncSelectors } from '@/store/electron/selectors';
 import { SettingsTabs } from '@/store/global/initialState';
@@ -87,17 +63,21 @@ export const useCategory = () => {
     // Profile group - Profile-related settings
     const profileItems: CategoryItem[] = [
       {
-        icon: avatarUrl ? <Avatar avatar={avatarUrl} shape={'square'} size={26} /> : UserCircle,
+        icon: avatarUrl ? (
+          <Avatar avatar={avatarUrl} shape={'square'} size={26} />
+        ) : (
+          SETTINGS_ENTRY_ICONS.profile
+        ),
         key: SettingsTabs.Profile,
         label: username ? username : tAuth('tab.profile'),
       },
       {
-        icon: ChartColumnBigIcon,
+        icon: SETTINGS_ENTRY_ICONS.stats,
         key: SettingsTabs.Stats,
         label: tAuth('tab.stats'),
       },
       showApiKeyManage && {
-        icon: KeyIcon,
+        icon: SETTINGS_ENTRY_ICONS.apiKey,
         key: SettingsTabs.APIKey,
         label: tAuth('tab.apikey'),
       },
@@ -112,27 +92,27 @@ export const useCategory = () => {
     if (enableBusinessFeatures) {
       const subscriptionItems: CategoryItem[] = [
         {
-          icon: Map,
+          icon: SETTINGS_ENTRY_ICONS.plans,
           key: SettingsTabs.Plans,
           label: tSubscription('tab.plans'),
         },
         {
-          icon: Coins,
+          icon: SETTINGS_ENTRY_ICONS.funds,
           key: SettingsTabs.Funds,
           label: tSubscription('tab.funds'),
         },
         {
-          icon: PieChart,
+          icon: SETTINGS_ENTRY_ICONS.usage,
           key: SettingsTabs.Usage,
           label: tSubscription('tab.usage'),
         },
         {
-          icon: CreditCard,
+          icon: SETTINGS_ENTRY_ICONS.billing,
           key: SettingsTabs.Billing,
           label: tSubscription('tab.billing'),
         },
         {
-          icon: Gift,
+          icon: SETTINGS_ENTRY_ICONS.referral,
           key: SettingsTabs.Referral,
           label: tSubscription('tab.referral'),
         },
@@ -148,17 +128,17 @@ export const useCategory = () => {
     // Account group - personal settings
     const commonItems: CategoryItem[] = [
       {
-        icon: PaletteIcon,
+        icon: SETTINGS_ENTRY_ICONS.common,
         key: SettingsTabs.Common,
         label: t('tab.common'),
       },
       {
-        icon: MessageSquareTextIcon,
+        icon: SETTINGS_ENTRY_ICONS.chatAppearance,
         key: SettingsTabs.ChatAppearance,
         label: t('tab.chatAppearance'),
       },
       !mobile && {
-        icon: KeyboardIcon,
+        icon: SETTINGS_ENTRY_ICONS.hotkey,
         key: SettingsTabs.Hotkey,
         label: t('tab.hotkey'),
       },
@@ -173,32 +153,37 @@ export const useCategory = () => {
     // AI configuration group - AI-related settings
     const aiConfigItems: CategoryItem[] = [
       {
-        icon: Brain,
+        icon: SETTINGS_ENTRY_ICONS.provider,
         key: SettingsTabs.Provider,
         label: t('tab.provider'),
       },
       {
-        icon: Sparkles,
+        icon: SETTINGS_ENTRY_ICONS.agent,
         key: SettingsTabs.Agent,
         label: t('tab.agent'),
       },
       {
-        icon: Blocks,
+        icon: SETTINGS_ENTRY_ICONS.skill,
         key: SettingsTabs.Skill,
         label: t('tab.skill'),
       },
+      isDesktop && {
+        icon: SETTINGS_ENTRY_ICONS.mcpStudio,
+        key: SettingsTabs.MCPStudio,
+        label: t('tab.mcpStudio'),
+      },
       {
-        icon: BrainCircuit,
+        icon: SETTINGS_ENTRY_ICONS.memory,
         key: SettingsTabs.Memory,
         label: t('tab.memory'),
       },
       showAiImage && {
-        icon: ImageIcon,
+        icon: SETTINGS_ENTRY_ICONS.image,
         key: SettingsTabs.Image,
         label: t('tab.image'),
       },
       enableSTT && {
-        icon: Mic2,
+        icon: SETTINGS_ENTRY_ICONS.tts,
         key: SettingsTabs.TTS,
         label: t('tab.tts'),
       },
@@ -213,32 +198,32 @@ export const useCategory = () => {
     // System group - system-related settings
     const systemItems: CategoryItem[] = [
       isDesktop && {
-        icon: EthernetPort,
+        icon: SETTINGS_ENTRY_ICONS.proxy,
         key: SettingsTabs.Proxy,
         label: t('tab.proxy'),
       },
       isDesktop && {
-        icon: TerminalSquare,
+        icon: SETTINGS_ENTRY_ICONS.systemTools,
         key: SettingsTabs.SystemTools,
         label: t('tab.systemTools'),
       },
       isDesktop && {
-        icon: FlaskConical,
+        icon: SETTINGS_ENTRY_ICONS.beta,
         key: SettingsTabs.Beta,
         label: t('tab.beta'),
       },
       {
-        icon: Database,
+        icon: SETTINGS_ENTRY_ICONS.storage,
         key: SettingsTabs.Storage,
         label: t('tab.storage'),
       },
       {
-        icon: EllipsisIcon,
+        icon: SETTINGS_ENTRY_ICONS.advanced,
         key: SettingsTabs.Advanced,
         label: t('tab.advanced'),
       },
       !hideDocs && {
-        icon: Info,
+        icon: SETTINGS_ENTRY_ICONS.about,
         key: SettingsTabs.About,
         label: t('tab.about'),
       },
@@ -257,6 +242,7 @@ export const useCategory = () => {
     enableSTT,
     enableBusinessFeatures,
     hideDocs,
+    isDesktop,
     mobile,
     showAiImage,
     showApiKeyManage,

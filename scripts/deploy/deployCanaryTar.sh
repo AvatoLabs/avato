@@ -9,12 +9,15 @@ BUILD_ENV_FILE="${BUILD_ENV_FILE:-.env.canary}"
 DEPLOY_HOST="${DEPLOY_HOST:-8.217.101.26}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
 DEPLOY_PASSWORD="${DEPLOY_PASSWORD:?DEPLOY_PASSWORD is required}"
-DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://canary.avatoturingmesh.com}"
-DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-canary.avatoturingmesh.com}"
+DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://canary.turingmesh.com}"
+DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-canary.turingmesh.com}"
+DEPLOY_VERIFY_PATH="${DEPLOY_VERIFY_PATH:-/signin}"
+DEPLOY_PUBLIC_VERIFY_MODE="${DEPLOY_PUBLIC_VERIFY_MODE:-direct}"
 
 # Canary-specific paths (different from production)
 REMOTE_ARTIFACT_DIR="${REMOTE_ARTIFACT_DIR:-/data/canary}"
 REMOTE_DEPLOY_PATH="${REMOTE_DEPLOY_PATH:-/data/canary/deploy-image}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-${ROOT_DIR}/docker-compose/canary/.env}"
 IMAGE_TAG="${IMAGE_TAG:-canary-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_NAME="${IMAGE_NAME:-canary-runtime:${IMAGE_TAG}}"
 REMOTE_RUNTIME_TAG="${REMOTE_RUNTIME_TAG:-canary-lobe:deploy}"
@@ -39,14 +42,34 @@ Host canary-deploy
   UserKnownHostsFile /dev/null
 EOF
 
+run_with_expect() {
+  EXPECT_PASSWORD="${DEPLOY_PASSWORD}" expect -f - "$@" <<'EOF'
+log_user 1
+set timeout -1
+
+set password $env(EXPECT_PASSWORD)
+spawn {*}$argv
+expect {
+  -re ".*yes/no.*" { send "yes\r"; exp_continue }
+  -re ".*password:.*" { send "$password\r"; exp_continue }
+  eof
+}
+
+set wait_status [wait]
+set exit_code [lindex $wait_status 3]
+if {$exit_code eq ""} {
+  set exit_code 0
+}
+exit $exit_code
+EOF
+}
+
 cd "${ROOT_DIR}"
 
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
 cp "${BUILD_ENV_FILE}" .env.production
 trap 'rm -f "${ROOT_DIR}/.env.production"' EXIT
-# Only build Next.js server + sitemap; skip desktop/mobile SPA builds
-NODE_OPTIONS=--max-old-space-size=8192 DOCKER=true npx next build
-bun run build-sitemap
+bun run build:docker
 
 echo "==> Preparing runtime bundle"
 rm -rf "${TMP_BUILD_DIR}/app"
@@ -111,46 +134,40 @@ docker image prune -f >/dev/null 2>&1 || true
 ls -1t "${TMP_ARTIFACT_DIR}"/canary-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
 
 echo "==> Ensuring remote directory structure"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn ssh -F ${SSH_CONFIG_FILE} canary-deploy "mkdir -p ${REMOTE_ARTIFACT_DIR} ${REMOTE_DEPLOY_PATH}"
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+  "mkdir -p ${REMOTE_ARTIFACT_DIR} ${REMOTE_DEPLOY_PATH}"
 
 echo "==> Uploading docker-compose config"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn scp -F ${SSH_CONFIG_FILE} ${ROOT_DIR}/docker-compose/canary/docker-compose.yml ${ROOT_DIR}/docker-compose/canary/.env ${ROOT_DIR}/docker-compose/canary/bucket.config.json ${ROOT_DIR}/docker-compose/canary/searxng-settings.yml canary-deploy:${REMOTE_DEPLOY_PATH}/
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+config_files=(
+  "${ROOT_DIR}/docker-compose/canary/docker-compose.yml"
+  "${ROOT_DIR}/docker-compose/canary/bucket.config.json"
+  "${ROOT_DIR}/docker-compose/canary/searxng-settings.yml"
+)
+run_with_expect \
+  scp -F "${SSH_CONFIG_FILE}" \
+  "${config_files[@]}" \
+  "canary-deploy:${REMOTE_DEPLOY_PATH}/"
+if [ -f "${COMPOSE_ENV_FILE}" ]; then
+  echo "==> Uploading compose env from ${COMPOSE_ENV_FILE}"
+  run_with_expect \
+    scp -F "${SSH_CONFIG_FILE}" \
+    "${COMPOSE_ENV_FILE}" \
+    "canary-deploy:${REMOTE_DEPLOY_PATH}/.env"
+else
+  echo "==> Skipping compose env upload; local file not found: ${COMPOSE_ENV_FILE}"
+fi
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn scp -F ${SSH_CONFIG_FILE} ${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME} canary-deploy:${REMOTE_ARTIFACT_DIR}/
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+run_with_expect \
+  scp -F "${SSH_CONFIG_FILE}" \
+  "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}" \
+  "canary-deploy:${REMOTE_ARTIFACT_DIR}/"
 
 echo "==> Loading image and restarting ${REMOTE_RUNTIME_TAG} on remote"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn ssh -F ${SSH_CONFIG_FILE} canary-deploy {bash -lc '
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+  "bash -lc '
 set -euo pipefail
 cd ${REMOTE_ARTIFACT_DIR}
 sha256sum ${ARTIFACT_NAME}
@@ -158,33 +175,35 @@ cd ${REMOTE_DEPLOY_PATH}
 docker load < ${REMOTE_ARTIFACT_DIR}/${ARTIFACT_NAME}
 docker tag ${IMAGE_NAME} ${REMOTE_RUNTIME_TAG}
 docker compose up -d lobe
-docker image ls canary-runtime --format "{{.Repository}}:{{.Tag}}" | tail -n +${REMOTE_IMAGE_PRUNE_FROM} | grep -v "^${IMAGE_NAME}$" | xargs -r docker image rm || true
+docker image ls canary-runtime --format \"{{.Repository}}:{{.Tag}}\" | tail -n +${REMOTE_IMAGE_PRUNE_FROM} | grep -v \"^${IMAGE_NAME}$\" | xargs -r docker image rm || true
 docker image prune -f >/dev/null 2>&1 || true
 ls -1t ${REMOTE_ARTIFACT_DIR}/canary-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +${REMOTE_ARTIFACT_PRUNE_FROM} | xargs -r rm -f
 docker compose ps
 docker logs --tail 50 canary-lobe
-'}
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+'"
 
-echo "==> Verifying remote service on 127.0.0.1:3211"
-expect <<EOF
-log_user 1
-set timeout -1
-spawn ssh -F ${SSH_CONFIG_FILE} canary-deploy {bash -lc '
+echo "==> Verifying remote service on 127.0.0.1:3211${DEPLOY_VERIFY_PATH}"
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+  "bash -lc '
 set -euo pipefail
-curl -I -L --max-time 30 http://127.0.0.1:3211/signin
-'}
-expect {
-  -re ".*yes/no.*" { send "yes\r"; exp_continue }
-  -re ".*password:.*" { send "${DEPLOY_PASSWORD}\r"; exp_continue }
-  eof
-}
-EOF
+curl -I -L --max-time 30 http://127.0.0.1:3211${DEPLOY_VERIFY_PATH}
+'"
 
-echo "==> Verifying ${DEPLOY_DOMAIN}/signin via explicit DNS resolve"
-curl -I -L --max-time 30 --resolve "${DEPLOY_VERIFY_HOST}:443:${DEPLOY_HOST}" "${DEPLOY_DOMAIN}/signin"
+case "${DEPLOY_PUBLIC_VERIFY_MODE}" in
+  skip)
+    echo "==> Skipping public verification (${DEPLOY_PUBLIC_VERIFY_MODE})"
+    ;;
+  resolve)
+    echo "==> Verifying ${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH} via explicit DNS resolve"
+    curl -I -L --max-time 30 --resolve "${DEPLOY_VERIFY_HOST}:443:${DEPLOY_HOST}" "${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH}"
+    ;;
+  direct)
+    echo "==> Verifying ${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH} via public DNS"
+    curl -I -L --max-time 30 "${DEPLOY_DOMAIN}${DEPLOY_VERIFY_PATH}"
+    ;;
+  *)
+    echo "Unsupported DEPLOY_PUBLIC_VERIFY_MODE: ${DEPLOY_PUBLIC_VERIFY_MODE}" >&2
+    exit 1
+    ;;
+esac

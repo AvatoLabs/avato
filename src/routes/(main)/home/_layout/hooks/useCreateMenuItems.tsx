@@ -1,14 +1,13 @@
 import { Icon } from '@lobehub/ui';
-import { GroupBotSquareIcon } from '@lobehub/ui/icons';
 import { App } from 'antd';
 import { type ItemType } from 'antd/es/menu/interface';
-import { BotIcon, FileTextIcon, FolderCogIcon, FolderPlus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import useSWRMutation from 'swr/mutation';
 
 import { useGroupTemplates } from '@/components/ChatGroupWizard/templates';
+import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { DEFAULT_CHAT_GROUP_CHAT_CONFIG } from '@/const/settings';
 import { type CreateAgentParams } from '@/services/agent';
 import { type GroupMemberConfig } from '@/services/chatGroup';
@@ -185,7 +184,7 @@ export const useCreateMenuItems = () => {
    */
   const createAgentMenuItem = useCallback(
     (options?: CreateAgentOptions): ItemType => ({
-      icon: <Icon icon={BotIcon} />,
+      icon: <Icon icon={ACTION_ENTRY_ICONS.createAgent} />,
       key: 'newAgent',
       label: t('newAgent'),
       onClick: async (info) => {
@@ -212,7 +211,7 @@ export const useCreateMenuItems = () => {
    */
   const createGroupChatMenuItem = useCallback(
     (options?: CreateAgentOptions): ItemType => ({
-      icon: <Icon icon={GroupBotSquareIcon} />,
+      icon: <Icon icon={ACTION_ENTRY_ICONS.createGroup} />,
       key: 'newGroupChat',
       label: t('newGroupChat'),
       onClick: async (info) => {
@@ -228,7 +227,7 @@ export const useCreateMenuItems = () => {
    */
   const createSessionGroupMenuItem = useCallback(
     (): ItemType => ({
-      icon: <Icon icon={FolderPlus} />,
+      icon: <Icon icon={ACTION_ENTRY_ICONS.sessionGroup} />,
       key: 'addSessionGroup',
       label: t('sessionGroup.createGroup'),
       onClick: async (info) => {
@@ -246,7 +245,7 @@ export const useCreateMenuItems = () => {
    */
   const configMenuItem = useCallback(
     (onOpenConfig: () => void): ItemType => ({
-      icon: <Icon icon={FolderCogIcon} />,
+      icon: <Icon icon={ACTION_ENTRY_ICONS.sessionGroupConfig} />,
       key: 'config',
       label: t('sessionGroup.config'),
       onClick: (info) => {
@@ -276,7 +275,7 @@ export const useCreateMenuItems = () => {
    */
   const createPageMenuItem = useCallback(
     (): ItemType => ({
-      icon: <Icon icon={FileTextIcon} />,
+      icon: <Icon icon={ACTION_ENTRY_ICONS.createPage} />,
       key: 'newPage',
       label: t('newPage'),
       onClick: async (info) => {

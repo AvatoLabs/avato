@@ -1,10 +1,10 @@
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { ArrowUpIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useCreateNewModal } from '@/features/LibraryModal';
 import { buildResourceLibraryPath } from '@/features/ResourceSpaces';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
@@ -97,7 +97,7 @@ const EmptyPlaceholder = () => {
             <FileTypeIcon
               className={styles.icon}
               color={cssVar.purple}
-              icon={<Icon color={'#fff'} icon={PlusIcon} />}
+              icon={<Icon color={'#fff'} icon={RESOURCE_ENTRY_ICONS.plus} />}
               size={ICON_SIZE}
               type={'folder'}
             />
@@ -118,7 +118,7 @@ const EmptyPlaceholder = () => {
             <FileTypeIcon
               className={styles.icon}
               color={cssVar.gold}
-              icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
+              icon={<Icon color={'#fff'} icon={RESOURCE_ENTRY_ICONS.uploadArrow} />}
               size={ICON_SIZE}
             />
           </Flexbox>
@@ -141,7 +141,7 @@ const EmptyPlaceholder = () => {
             <FileTypeIcon
               className={styles.icon}
               color={cssVar.geekblue}
-              icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
+              icon={<Icon color={'#fff'} icon={RESOURCE_ENTRY_ICONS.uploadArrow} />}
               size={ICON_SIZE}
               type={'folder'}
             />

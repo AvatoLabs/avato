@@ -119,15 +119,15 @@ export class CommonActionImpl {
             const user =
               data.avatar || data.userId
                 ? merge(this.#get().user, {
-                  avatar: data.avatar,
-                  email: data.email,
-                  firstName: data.firstName,
-                  fullName: data.fullName,
-                  id: data.userId,
-                  interests: data.interests,
-                  latestName: data.lastName,
-                  username: data.username,
-                } as LobeUser)
+                    avatar: data.avatar,
+                    email: data.email,
+                    firstName: data.firstName,
+                    fullName: data.fullName,
+                    id: data.userId,
+                    interests: data.interests,
+                    latestName: data.lastName,
+                    username: data.username,
+                  } as LobeUser)
                 : this.#get().user;
 
             this.#set(
@@ -156,7 +156,9 @@ export class CommonActionImpl {
               if (detectedTimezone) {
                 this.#get()
                   .updateGeneralConfig({ timezone: detectedTimezone })
-                  .catch(() => { });
+                  .catch((err) => {
+                    console.error('[user] Failed to auto-sync timezone:', err);
+                  });
               }
             }
 

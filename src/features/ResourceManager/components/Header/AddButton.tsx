@@ -5,7 +5,6 @@ import { Notion } from '@lobehub/icons';
 import { type MenuProps } from '@lobehub/ui';
 import { Button, DropdownMenu, Icon } from '@lobehub/ui';
 import { Upload } from 'antd';
-import { FilePenLine, FileUp, FolderIcon, FolderUp, Link, Plus } from 'lucide-react';
 import { type ChangeEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { message } from '@/components/AntdStaticMethods';
 import GuideModal from '@/components/GuideModal';
 import GuideVideo from '@/components/GuideVideo';
+import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useFileStore } from '@/store/file';
 import { FilesTabs } from '@/types/files';
@@ -199,7 +200,7 @@ const AddButton = () => {
   const items = useMemo<MenuProps['items']>(
     () => [
       {
-        icon: <Icon icon={FilePenLine} />,
+        icon: <Icon icon={ACTION_ENTRY_ICONS.createPage} />,
         key: 'create-note',
         label: t('header.actions.newPage'),
         onClick: handleOpenPageEditor,
@@ -207,7 +208,7 @@ const AddButton = () => {
       ...(libraryId
         ? [
             {
-              icon: <Icon icon={FolderIcon} />,
+              icon: <Icon icon={RESOURCE_ENTRY_ICONS.folder} />,
               key: 'create-folder',
               label: t('header.actions.newFolder'),
               onClick: handleCreateFolder,
@@ -219,7 +220,7 @@ const AddButton = () => {
       },
       {
         closeOnClick: false,
-        icon: <Icon icon={FileUp} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
         key: 'upload-file',
         label: (
           <Upload
@@ -239,7 +240,7 @@ const AddButton = () => {
       },
       {
         closeOnClick: false,
-        icon: <Icon icon={FolderUp} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
         key: 'upload-folder',
         label: <label htmlFor="folder-upload-input">{t('header.actions.uploadFolder')}</label>,
       },
@@ -255,7 +256,7 @@ const AddButton = () => {
             onClick: handleOpenNotionGuide,
           },
         ],
-        icon: <Icon icon={Link} />,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.link} />,
         key: 'connect',
         label: t('header.actions.connect'),
       },
@@ -282,7 +283,7 @@ const AddButton = () => {
         trigger="both"
         onOpenChange={setMenuOpen}
       >
-        <Button data-no-highlight icon={Plus} type="primary">
+        <Button data-no-highlight icon={RESOURCE_ENTRY_ICONS.plus} type="primary">
           {t('addLibrary')}
         </Button>
       </DropdownMenu>

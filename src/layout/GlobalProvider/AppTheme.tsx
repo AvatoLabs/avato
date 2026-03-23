@@ -9,6 +9,7 @@ import { message as antdMessage } from 'antd';
 import { AppConfigContext } from 'antd/es/app/context';
 import { createStaticStyles, cx, useTheme } from 'antd-style';
 import * as motion from 'motion/react-m';
+import { useTheme as useNextThemesTheme } from 'next-themes';
 import { type ReactNode } from 'react';
 import { memo, useEffect, useMemo, useState } from 'react';
 
@@ -22,7 +23,7 @@ import Image from '@/libs/next/Image';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useUserStore } from '@/store/user';
-import { userGeneralSettingsSelectors } from '@/store/user/selectors';
+import { settingsSelectors, userGeneralSettingsSelectors } from '@/store/user/selectors';
 import { GlobalStyle } from '@/styles';
 import { setCookie } from '@/utils/client/cookie';
 
@@ -104,11 +105,16 @@ const AppTheme = memo<AppThemeProps>(
     const antdTheme = useTheme();
     const isDark = useIsDark();
 
-    const [primaryColor, neutralColor, animationMode] = useUserStore((s) => [
-      userGeneralSettingsSelectors.primaryColor(s),
-      userGeneralSettingsSelectors.neutralColor(s),
-      userGeneralSettingsSelectors.animationMode(s),
-    ]);
+    const { setTheme } = useNextThemesTheme();
+    const [primaryColor, neutralColor, animationMode, themeMode, isUserStateInit] = useUserStore(
+      (s) => [
+        userGeneralSettingsSelectors.primaryColor(s),
+        userGeneralSettingsSelectors.neutralColor(s),
+        userGeneralSettingsSelectors.animationMode(s),
+        settingsSelectors.currentSettings(s).general?.themeMode,
+        s.isUserStateInit,
+      ],
+    );
     const messageTop = isDesktop ? TITLE_BAR_HEIGHT + 8 : undefined;
     const appConfig = useMemo(
       () => (messageTop === undefined ? {} : { message: { top: messageTop } }),
@@ -146,6 +152,12 @@ const AppTheme = memo<AppThemeProps>(
       if (messageTop === undefined) return;
       antdMessage.config({ top: messageTop });
     }, [messageTop]);
+
+    useEffect(() => {
+      if (isUserStateInit && themeMode) {
+        setTheme(themeMode);
+      }
+    }, [isUserStateInit, themeMode, setTheme]);
 
     const currentAppearence = isDark ? 'dark' : 'light';
 

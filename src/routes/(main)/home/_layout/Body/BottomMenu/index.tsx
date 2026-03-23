@@ -3,7 +3,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { getRouteById } from '@/config/routes';
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { SidebarTabKey } from '@/store/global/initialState';
@@ -26,19 +26,19 @@ const BottomMenu = memo(() => {
     () =>
       [
         {
-          icon: getRouteById('settings')!.icon,
+          icon: APP_ENTRY_ICONS.settings,
           key: SidebarTabKey.Setting,
           title: t('tab.setting'),
           url: '/settings',
         },
         {
-          icon: getRouteById('resource')!.icon,
+          icon: APP_ENTRY_ICONS.resource,
           key: SidebarTabKey.Resource,
           title: t('tab.resource'),
           url: '/resource',
         },
         {
-          icon: getRouteById('memory')!.icon,
+          icon: APP_ENTRY_ICONS.memory,
           key: SidebarTabKey.Memory,
           title: t('tab.memory'),
           url: '/memory',

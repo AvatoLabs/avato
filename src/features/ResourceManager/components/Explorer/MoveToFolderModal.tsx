@@ -1,9 +1,9 @@
 import { Button, Flexbox, Icon, Modal } from '@lobehub/ui';
 import { App } from 'antd';
-import { FolderIcon } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { type FolderTreeItem } from '@/features/ResourceManager/components/FolderTree';
 import FolderTree from '@/features/ResourceManager/components/FolderTree';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
@@ -273,7 +273,7 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(
       >
         <Flexbox horizontal justify="flex-end" style={{ marginBottom: 12 }}>
           <Button
-            icon={<Icon icon={FolderIcon} />}
+            icon={<Icon icon={RESOURCE_ENTRY_ICONS.folder} />}
             loading={isCreatingFolder}
             size="small"
             type="default"

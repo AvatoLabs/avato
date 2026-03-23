@@ -89,7 +89,10 @@ export class UserSettingsActionImpl {
 
     const diffs = difference(nextSettings, defaultSettings);
     const isEmptyObjectDiff = (value: unknown): boolean =>
-      !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value as object).length === 0;
+      !!value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.keys(value as object).length === 0;
 
     // When user resets a field to default value, we need to explicitly include it in diffs
     // to override the previously saved non-default value in the backend
@@ -102,11 +105,17 @@ export class UserSettingsActionImpl {
       }
     }
 
+    const prevSettings = this.#get().settings;
     this.#set({ settings: diffs }, false, 'optimistic_updateSettings');
 
     const abortController = this.#get().internal_createSignal();
-    await userService.updateUserSettings(diffs, abortController.signal);
-    await this.#get().refreshUserState();
+    try {
+      await userService.updateUserSettings(diffs, abortController.signal);
+      await this.#get().refreshUserState();
+    } catch (e) {
+      this.#set({ settings: prevSettings }, false, 'setSettings/revert');
+      throw e;
+    }
   };
 
   updateDefaultAgent = async (defaultAgent: PartialDeep<LobeAgentSettings>): Promise<void> => {

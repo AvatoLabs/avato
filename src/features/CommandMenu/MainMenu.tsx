@@ -1,19 +1,12 @@
 import { SOCIAL_URL } from '@lobechat/business-const';
+import { Icon } from '@lobehub/ui';
 import { DiscordIcon } from '@lobehub/ui/icons';
 import { Command } from 'cmdk';
-import {
-  Bot,
-  FeatherIcon,
-  FilePen,
-  Github,
-  LibraryBig,
-  MessageSquarePlusIcon,
-  Monitor,
-  Star,
-} from 'lucide-react';
+import { FeatherIcon, Github, Star } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS, SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { getNavigableRoutes, getRouteById } from '@/config/routes';
 import { FEEDBACK } from '@/const/url';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
@@ -44,7 +37,7 @@ const MainMenu = memo(() => {
 
       <Command.Group>
         <CommandItem
-          icon={<Bot />}
+          icon={<ACTION_ENTRY_ICONS.createAgent />}
           unpinned={menuContext === 'agent' || menuContext === 'page'}
           value="create new agent assistant"
           onSelect={handleCreateSession}
@@ -53,7 +46,7 @@ const MainMenu = memo(() => {
         </CommandItem>
 
         <CommandItem
-          icon={<Bot />}
+          icon={<ACTION_ENTRY_ICONS.createGroup />}
           unpinned={menuContext === 'agent' || menuContext === 'page'}
           value="create new agent team"
           onSelect={handleCreateAgentTeam}
@@ -63,7 +56,7 @@ const MainMenu = memo(() => {
 
         {menuContext === 'agent' && (
           <CommandItem
-            icon={<MessageSquarePlusIcon />}
+            icon={<ACTION_ENTRY_ICONS.newTopic />}
             unpinned={menuContext !== 'agent'}
             value="create new topic"
             onSelect={handleCreateTopic}
@@ -72,12 +65,16 @@ const MainMenu = memo(() => {
           </CommandItem>
         )}
 
-        <CommandItem icon={<FilePen />} value="create new page" onSelect={handleCreatePage}>
+        <CommandItem
+          icon={<ACTION_ENTRY_ICONS.createPage />}
+          value="create new page"
+          onSelect={handleCreatePage}
+        >
           {t('cmdk.newPage')}
         </CommandItem>
 
         <CommandItem
-          icon={<LibraryBig />}
+          icon={<APP_ENTRY_ICONS.resource />}
           unpinned={menuContext !== 'resource'}
           value="create new library"
           onSelect={handleCreateLibrary}
@@ -94,7 +91,7 @@ const MainMenu = memo(() => {
               : settingsRoute?.keywords;
             return (
               <CommandItem
-                icon={SettingsIcon && <SettingsIcon />}
+                icon={SettingsIcon && <Icon icon={SettingsIcon} />}
                 keywords={keywords}
                 value="settings"
                 onSelect={() => handleNavigate(settingsRoute?.path || '/settings')}
@@ -105,7 +102,7 @@ const MainMenu = memo(() => {
           })()}
 
         <CommandItem
-          icon={<Monitor />}
+          icon={<SETTINGS_ENTRY_ICONS.common />}
           value="theme"
           onSelect={() => setPages([...pages, 'theme'])}
         >
@@ -122,7 +119,7 @@ const MainMenu = memo(() => {
           return (
             !pathname?.startsWith(route.pathPrefix) && (
               <CommandItem
-                icon={<RouteIcon />}
+                icon={<Icon icon={RouteIcon} />}
                 key={route.id}
                 keywords={keywords}
                 value={route.id}

@@ -62,7 +62,7 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
     forkCount,
   } = useDetailContext();
   const { mobile = isMobile } = useResponsive();
-  const { isAuthenticated, signIn, session } = useMarketAuth();
+  const { isAuthenticated, signIn } = useMarketAuth();
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   // Fetch favorite status
@@ -82,19 +82,23 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
 
     if (!identifier) return;
 
+    const nextFavorited = !isFavorited;
+
     setFavoriteLoading(true);
     try {
-      if (isFavorited) {
-        await socialService.removeFavorite('agent', identifier);
-        message.success(t('assistant.unfavoriteSuccess'));
-      } else {
+      if (nextFavorited) {
         await socialService.addFavorite('agent', identifier);
         message.success(t('assistant.favoriteSuccess'));
+      } else {
+        await socialService.removeFavorite('agent', identifier);
+        message.success(t('assistant.unfavoriteSuccess'));
       }
-      await mutateFavorite();
+
+      await mutateFavorite({ isFavorited: nextFavorited }, { revalidate: false });
+      void mutateFavorite().catch(() => undefined);
     } catch (error) {
       console.error('Favorite action failed:', error);
-      message.error(t('assistant.favoriteFailed'));
+      message.error(t(nextFavorited ? 'assistant.favoriteFailed' : 'assistant.unfavoriteFailed'));
     } finally {
       setFavoriteLoading(false);
     }

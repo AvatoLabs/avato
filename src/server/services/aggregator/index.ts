@@ -26,6 +26,7 @@ const DEFAULT_PAGE_SIZE = 21;
 const MAX_PAGE_SIZE = 60;
 const SOURCE_PAGE_SIZE = 100;
 const MAX_SOURCE_REQUESTS = 100;
+const MAX_FETCH_ATTEMPTS = 3;
 const INSTALL_VERIFICATION_CONCURRENCY = 4;
 const INSTALL_VERIFICATION_TIMEOUT = 8000;
 const SOURCE_PRIORITY = [
@@ -168,10 +169,13 @@ const uniq = (values: Array<string | undefined>) => [
   ...new Set(values.filter(Boolean).map((value) => value!.trim())),
 ];
 
+const MIN_QUERY_LENGTH = 2;
+
 const includesQuery = (item: AggregatorCandidate | AggregatorItem, query?: string) => {
   if (!query) return true;
 
   const searchValue = normalizeText(query);
+  if (searchValue.length < MIN_QUERY_LENGTH) return true;
   const haystack = [
     item.title,
     item.description,
@@ -431,6 +435,40 @@ const buildListResponse = (
 const toErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Unknown aggregator source error';
 
+const isRetryableFetchError = (error: unknown) => {
+  const message = toErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes('private ip address') ||
+    message.includes('meta ip address') ||
+    message.includes(' is not allowed. because')
+  ) {
+    return false;
+  }
+
+  const failedToFetchStatus = message.match(/failed to fetch .*: (\d{3})/);
+
+  if (failedToFetchStatus) {
+    const status = Number(failedToFetchStatus[1]);
+    return status >= 500 || status === 408 || status === 429;
+  }
+
+  return [
+    'socket hang up',
+    'network error',
+    'fetch failed',
+    'econnreset',
+    'econnrefused',
+    'etimedout',
+    'timeout',
+    'eai_again',
+    'temporary failure',
+    'temporarily unavailable',
+    'connection aborted',
+    'request aborted',
+  ].some((pattern) => message.includes(pattern));
+};
+
 const HIGRESS_PAGE_ID_PATTERN = /\/server\/(server\d+)/g;
 const HIGRESS_REPOSITORY_PATTERN =
   /https:\/\/github\.com\/alibaba\/higress\/tree\/main\/plugins\/wasm-go\/mcp-servers\/([^\\/"'<\s]+)/;
@@ -463,6 +501,24 @@ const normalizeHigressInstallUrl = (value?: string) =>
     .trim();
 
 export class AggregatorService {
+  private async retrySourceFetch<T>(fetcher: () => Promise<T>) {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+      try {
+        return await fetcher();
+      } catch (error) {
+        lastError = error;
+
+        if (attempt >= MAX_FETCH_ATTEMPTS || !isRetryableFetchError(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
   private async verifyInstallability(item: AggregatorItem): Promise<AggregatorInstallability> {
     const installSchema = item.installability.installSchema;
 
@@ -545,31 +601,35 @@ export class AggregatorService {
   }
 
   private async fetchJson<T>(url: string) {
-    const response = await ssrfSafeFetch(url, {
-      headers: {
-        Accept: 'application/json',
-      },
+    return this.retrySourceFetch(async () => {
+      const response = await ssrfSafeFetch(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+      }
+
+      return (await response.json()) as T;
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-    }
-
-    return (await response.json()) as T;
   }
 
   private async fetchText(url: string) {
-    const response = await ssrfSafeFetch(url, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      },
+    return this.retrySourceFetch(async () => {
+      const response = await ssrfSafeFetch(url, {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+      }
+
+      return response.text();
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-    }
-
-    return response.text();
   }
 
   private parseHigressEntry(pageId: string, html: string): HigressRegistryEntry | undefined {
@@ -959,21 +1019,29 @@ export class AggregatorService {
         if (params.q && !includesQuery(item, params.q)) return false;
         return isAggregatorInstallable(item.installability);
       });
-      const verifiedCandidates = (
-        await this.verifyItems(sortItems(candidates, params.sort))
-      ).filter(({ installability }) => isAggregatorInstallable(installability));
+      const sorted = sortItems(candidates, params.sort);
+      const paginated = paginateItems(sorted, params);
+
+      // Verify only the current page to avoid verifying hundreds of items
+      const verifiedItems = await this.verifyItems(paginated.items);
+      const verifiedPageItems = verifiedItems.filter(({ installability }) =>
+        isAggregatorInstallable(installability),
+      );
 
       return {
-        ...paginateItems(verifiedCandidates, params),
+        ...paginated,
         allCount: collection.allCount,
         fetchedAt: collection.fetchedAt,
+        items: verifiedPageItems,
         sourceCounts: collection.sourceCounts,
         stats: {
-          installableCount: verifiedCandidates.length,
-          officialCount: verifiedCandidates.filter((item) => item.isOfficial).length,
-          remoteCount: verifiedCandidates.filter((item) => item.isRemote).length,
-          verifiedCount: verifiedCandidates.filter((item) => item.isVerified).length,
+          installableCount: candidates.length,
+          officialCount: verifiedPageItems.filter((item) => item.isOfficial).length,
+          remoteCount: verifiedPageItems.filter((item) => item.isRemote).length,
+          verifiedCount: verifiedPageItems.filter((item) => item.isVerified).length,
         },
+        totalCount: candidates.length,
+        totalPages: paginated.totalPages,
         warnings: collection.warnings,
       };
     }

@@ -11,25 +11,23 @@ import { SortType } from '@/types/files';
 export const useResourceManagerUrlSync = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [sorter, sortType, viewMode, setSorter, setSortType] = useResourceManagerStore((s) => [
-    s.sorter,
-    s.sortType,
-    s.viewMode,
-    s.setSorter,
-    s.setSortType,
-  ]);
+  const [sorter, sortType, viewMode, setSorter, setSortType, setViewMode] = useResourceManagerStore(
+    (s) => [s.sorter, s.sortType, s.viewMode, s.setSorter, s.setSortType, s.setViewMode],
+  );
 
-  // Initialize store from URL on mount (URL → Store)
+  // Initialize store from URL when searchParams change (URL → Store, e.g. bookmark or back navigation)
   useEffect(() => {
     const sorterParam = (searchParams.get('sorter') || 'createdAt') as
       | 'name'
       | 'createdAt'
       | 'size';
     const sortTypeParam = (searchParams.get('sortType') || SortType.Desc) as SortType;
+    const viewParam = (searchParams.get('view') || 'list') as 'list' | 'masonry';
 
     setSorter(sorterParam);
     setSortType(sortTypeParam);
-  }, []); // Only on mount
+    setViewMode(viewParam);
+  }, [searchParams, setSorter, setSortType, setViewMode]);
 
   // Sync store changes to URL (Store → URL)
   useEffect(() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import { useClientDataSWR } from '@/libs/swr';
@@ -12,8 +12,16 @@ import ModelList from '../../features/ModelList';
 import ProviderConfig from '../../features/ProviderConfig';
 
 const ClientMode = memo<{ id: string }>(({ id }) => {
-  const useFetchAiProviderItem = useAiInfraStore((s) => s.useFetchAiProviderItem);
+  const [useFetchAiProviderItem, setActiveAiProvider] = useAiInfraStore((s) => [
+    s.useFetchAiProviderItem,
+    s.setActiveAiProvider,
+  ]);
   useFetchAiProviderItem(id);
+
+  // Sync activeAiProvider with route id on mount so refresh/toggle use correct provider before fetches complete
+  useEffect(() => {
+    setActiveAiProvider(id);
+  }, [id, setActiveAiProvider]);
 
   const { data, isLoading } = useClientDataSWR(`get-client-provider-${id}`, () =>
     aiProviderService.getAiProviderById(id),

@@ -156,6 +156,7 @@ export class ResourceAuthorizer {
   private resolveByKind = async (
     kind: ResourceKind,
     localId: string,
+    options?: { documentIncludeDeleted?: boolean },
   ): Promise<ResolvedResource | null> => {
     const [registryRow] = await this.db
       .select({
@@ -174,13 +175,16 @@ export class ResourceAuthorizer {
     if (!registryRow) return null;
 
     if (kind === 'document') {
+      const docWhere = options?.documentIncludeDeleted
+        ? eq(documents.id, localId)
+        : and(eq(documents.id, localId), isNull(documents.deletedAt));
       const [doc] = await this.db
         .select({
           inheritMode: documents.inheritMode,
           parentId: documents.parentId,
         })
         .from(documents)
-        .where(and(eq(documents.id, localId), isNull(documents.deletedAt)))
+        .where(docWhere)
         .limit(1);
 
       return {

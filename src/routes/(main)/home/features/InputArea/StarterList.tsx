@@ -1,13 +1,11 @@
 import { BUILTIN_AGENT_SLUGS } from '@lobechat/builtin-agents';
-import { NanoBanana } from '@lobehub/icons';
 import { type ButtonProps } from '@lobehub/ui';
 import { Button, Center, Tooltip } from '@lobehub/ui';
-import { GroupBotSquareIcon } from '@lobehub/ui/icons';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { BotIcon, PenLineIcon } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { useInitBuiltinAgent } from '@/hooks/useInitBuiltinAgent';
 import { type StarterMode } from '@/store/home';
 import { useHomeStore } from '@/store/home';
@@ -62,22 +60,22 @@ const StarterList = memo(() => {
   const items: StarterItem[] = useMemo(
     () => [
       {
-        icon: BotIcon,
+        icon: ACTION_ENTRY_ICONS.createAgent,
         key: 'agent',
         titleKey: 'starter.createAgent',
       },
       {
-        icon: GroupBotSquareIcon,
+        icon: ACTION_ENTRY_ICONS.createGroup,
         key: 'group',
         titleKey: 'starter.createGroup',
       },
       {
-        icon: PenLineIcon,
+        icon: ACTION_ENTRY_ICONS.write,
         key: 'write',
         titleKey: 'starter.write',
       },
       {
-        icon: NanoBanana.Color,
+        icon: APP_ENTRY_ICONS.image,
         key: 'image',
         titleKey: 'starter.nanoBanana2',
       },
@@ -132,7 +130,7 @@ const StarterList = memo(() => {
             variant={'outlined'}
             iconProps={{
               color: inputActiveMode === item.key ? cssVar.colorText : cssVar.colorTextSecondary,
-              size: 18,
+              size: { size: 18, strokeWidth: 2.2 },
             }}
             onClick={() => handleClick(item.key)}
           >

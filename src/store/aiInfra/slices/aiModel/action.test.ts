@@ -344,7 +344,32 @@ describe('AiModelAction', () => {
       });
 
       expect(mutate).toHaveBeenCalledWith(['FETCH_AI_PROVIDER_MODELS', 'test-provider']);
+      // Also invalidates DisabledModels SWR for the provider
+      expect(mutate).toHaveBeenCalledWith(expect.any(Function));
       expect(refreshRuntimeSpy).toHaveBeenCalled();
+    });
+
+    it('should use providerId when passed and skip when no provider', async () => {
+      const { result } = renderHook(() => useStore());
+
+      await act(async () => {
+        await result.current.refreshAiModelList('custom-provider');
+      });
+
+      expect(mutate).toHaveBeenCalledWith(['FETCH_AI_PROVIDER_MODELS', 'custom-provider']);
+    });
+
+    it('should not mutate when no active provider and no providerId passed', async () => {
+      act(() => {
+        useStore.setState({ activeAiProvider: undefined });
+      });
+      const { result } = renderHook(() => useStore());
+
+      await act(async () => {
+        await result.current.refreshAiModelList();
+      });
+
+      expect(mutate).not.toHaveBeenCalled();
     });
   });
 
@@ -363,7 +388,7 @@ describe('AiModelAction', () => {
       });
 
       expect(serviceSpy).toHaveBeenCalledWith({ id: 'model-1', providerId: 'test-provider' });
-      expect(refreshSpy).toHaveBeenCalled();
+      expect(refreshSpy).toHaveBeenCalledWith('test-provider');
     });
   });
 

@@ -163,6 +163,41 @@ describe('AggregatorService', () => {
     expect(mockGetStreamableMcpServerManifest).not.toHaveBeenCalled();
   });
 
+  it('retries transient source fetch failures before surfacing warnings', async () => {
+    let glamaRequestCount = 0;
+
+    mockSsrfSafeFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('https://registry.modelcontextprotocol.io/')) {
+        return createJsonResponse({ metadata: {}, servers: [] });
+      }
+
+      if (url === 'https://mcp.higress.ai/') {
+        return createTextResponse('<html><body>No hosted pages yet.</body></html>');
+      }
+
+      if (url.startsWith('https://api.smithery.ai/servers')) {
+        return createJsonResponse({ servers: [] });
+      }
+
+      if (url.startsWith('https://glama.ai/api/mcp/v1/servers')) {
+        glamaRequestCount += 1;
+
+        if (glamaRequestCount === 1) {
+          throw new Error('socket hang up');
+        }
+
+        return createJsonResponse({ pageInfo: { hasNextPage: false }, servers: [] });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const collection = await service.collectEntries();
+
+    expect(glamaRequestCount).toBe(2);
+    expect(collection.warnings).toEqual([]);
+  });
+
   it('hides install action again when manifest verification fails', async () => {
     mockGetStreamableMcpServerManifest.mockRejectedValue(new Error('Connection failed'));
 
@@ -348,10 +383,10 @@ describe('AggregatorService', () => {
       { installable: true, page: 1, pageSize: 10 },
     );
 
-    expect(response.totalCount).toBe(1);
+    expect(response.totalCount).toBe(2);
     expect(response.items).toHaveLength(1);
     expect(response.items[0].id).toBe('good-remote');
     expect(response.items[0].installability.level).toBe(AggregatorInstallabilityLevel.Verified);
-    expect(response.stats.installableCount).toBe(1);
+    expect(response.stats.installableCount).toBe(2);
   });
 });

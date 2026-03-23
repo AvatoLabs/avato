@@ -1,10 +1,10 @@
 import { Button, stopPropagation, Tooltip } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
 import { isNull } from 'es-toolkit/compat';
-import { FileBoxIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { type AsyncTaskStatus, type IAsyncTaskError } from '@/types/asyncTask';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
@@ -220,7 +220,7 @@ const NoteFileItem = memo<NoteFileItemProps>(
                 }}
               >
                 <Button
-                  icon={FileBoxIcon}
+                  icon={RESOURCE_ENTRY_ICONS.chunk}
                   loading={isCreatingFileParseTask}
                   size={'small'}
                   type={'text'}

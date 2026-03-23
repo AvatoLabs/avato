@@ -19,7 +19,6 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     container: css`
       overflow: hidden;
-      justify-self: flex-end;
 
       width: 332px;
       height: 200px;

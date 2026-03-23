@@ -1,10 +1,10 @@
 import { DropdownMenu, Icon } from '@lobehub/ui';
-import { type LucideIcon } from 'lucide-react';
-import { ArrowDownAZ, CalendarIcon, Check, HardDriveIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type MenuProps } from '@/components/Menu';
+import { type EntryIcon } from '@/config/entryIcons';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 
 import ActionIconWithChevron from './ActionIconWithChevron';
@@ -14,11 +14,11 @@ const SortDropdown = memo(() => {
   const sorter = useResourceManagerStore((s) => s.sorter);
   const setSorter = useResourceManagerStore((s) => s.setSorter);
 
-  const sortOptions: { icon: LucideIcon; key: string; label: string }[] = useMemo(
+  const sortOptions: { icon: EntryIcon; key: string; label: string }[] = useMemo(
     () => [
-      { icon: ArrowDownAZ, key: 'name', label: t('FileManager.sort.name') },
-      { icon: CalendarIcon, key: 'createdAt', label: t('FileManager.sort.dateAdded') },
-      { icon: HardDriveIcon, key: 'size', label: t('FileManager.sort.size') },
+      { icon: RESOURCE_ENTRY_ICONS.sort, key: 'name', label: t('FileManager.sort.name') },
+      { icon: RESOURCE_ENTRY_ICONS.date, key: 'createdAt', label: t('FileManager.sort.dateAdded') },
+      { icon: RESOURCE_ENTRY_ICONS.size, key: 'size', label: t('FileManager.sort.size') },
     ],
     [t],
   );
@@ -28,7 +28,7 @@ const SortDropdown = memo(() => {
   const menuItems: MenuProps['items'] = useMemo(
     () =>
       sortOptions.map((option) => ({
-        extra: option.key === selectedKey ? <Icon icon={Check} /> : undefined,
+        extra: option.key === selectedKey ? <Icon icon={RESOURCE_ENTRY_ICONS.check} /> : undefined,
         icon: <Icon icon={option.icon} />,
         key: option.key,
         label: option.label,
@@ -42,7 +42,7 @@ const SortDropdown = memo(() => {
 
   return (
     <DropdownMenu items={menuItems}>
-      <ActionIconWithChevron icon={ArrowDownAZ} title={currentSortLabel} />
+      <ActionIconWithChevron icon={RESOURCE_ENTRY_ICONS.sort} title={currentSortLabel} />
     </DropdownMenu>
   );
 });

@@ -1,7 +1,8 @@
 import { ActionIcon, DropdownMenu as DropdownMenuUI } from '@lobehub/ui';
 import { type ItemType } from 'antd/es/menu/interface';
-import { MoreHorizontalIcon } from 'lucide-react';
 import { memo } from 'react';
+
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 
 interface DropdownMenuProps {
   className?: string;
@@ -11,7 +12,7 @@ interface DropdownMenuProps {
 const DropdownMenu = memo<DropdownMenuProps>(({ items, className }) => {
   return (
     <DropdownMenuUI items={items}>
-      <ActionIcon className={className} icon={MoreHorizontalIcon} size={'small'} />
+      <ActionIcon className={className} icon={RESOURCE_ENTRY_ICONS.more} size={'small'} />
     </DropdownMenuUI>
   );
 });

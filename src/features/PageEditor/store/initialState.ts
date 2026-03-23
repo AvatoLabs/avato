@@ -1,6 +1,7 @@
 import { type IEditor } from '@lobehub/editor';
 
 export type MetaSaveStatus = 'idle' | 'saving' | 'saved';
+export type PageEditorViewMode = 'markdown' | 'preview' | 'rich';
 
 export interface PublicState {
   autoSave?: boolean;
@@ -23,6 +24,7 @@ export interface State extends PublicState {
   lastSavedEmoji?: string;
   lastSavedTitle?: string;
   metaSaveStatus?: MetaSaveStatus;
+  viewMode: PageEditorViewMode;
 }
 
 export const initialState: State = {
@@ -32,4 +34,5 @@ export const initialState: State = {
   isMetaDirty: false,
   metaSaveStatus: 'idle',
   title: undefined,
+  viewMode: 'rich',
 };

@@ -1,9 +1,9 @@
 import { DropdownMenu, Icon } from '@lobehub/ui';
-import { Check, Grid3x3Icon, ListIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type MenuProps } from '@/components/Menu';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 
 import { useViewMode } from '../hooks/useViewMode';
 import ActionIconWithChevron from './ActionIconWithChevron';
@@ -16,22 +16,23 @@ const ViewSwitcher = memo(() => {
 
   const [viewMode, setViewMode] = useViewMode();
 
-  const currentViewIcon = viewMode === 'list' ? ListIcon : Grid3x3Icon;
+  const currentViewIcon =
+    viewMode === 'list' ? RESOURCE_ENTRY_ICONS.list : RESOURCE_ENTRY_ICONS.grid;
   const currentViewLabel =
     viewMode === 'list' ? t('FileManager.view.list') : t('FileManager.view.masonry');
 
   const menuItems: MenuProps['items'] = useMemo(
     () => [
       {
-        extra: viewMode === 'list' ? <Icon icon={Check} /> : undefined,
-        icon: <Icon icon={ListIcon} />,
+        extra: viewMode === 'list' ? <Icon icon={RESOURCE_ENTRY_ICONS.check} /> : undefined,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.list} />,
         key: 'list',
         label: t('FileManager.view.list'),
         onClick: () => setViewMode('list'),
       },
       {
-        extra: viewMode === 'masonry' ? <Icon icon={Check} /> : undefined,
-        icon: <Icon icon={Grid3x3Icon} />,
+        extra: viewMode === 'masonry' ? <Icon icon={RESOURCE_ENTRY_ICONS.check} /> : undefined,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.grid} />,
         key: 'masonry',
         label: t('FileManager.view.masonry'),
         onClick: () => setViewMode('masonry'),

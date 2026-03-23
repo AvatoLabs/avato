@@ -1,10 +1,10 @@
 import { LOBE_CHAT_CLOUD, UTM_SOURCE } from '@lobechat/business-const';
 import { OFFICIAL_URL } from '@lobechat/const';
-import { Book, CircleUserRound, Cloudy, Feather, FileClockIcon, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { type CellProps } from '@/components/Cell';
+import { APP_ENTRY_ICONS, SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { DOCUMENTS, FEEDBACK } from '@/const/index';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useUserStore } from '@/store/user';
@@ -18,7 +18,7 @@ export const useCategory = (onOpenChangelogModal: () => void) => {
 
   const profile: CellProps[] = [
     {
-      icon: CircleUserRound,
+      icon: SETTINGS_ENTRY_ICONS.profile,
       key: 'profile',
       label: t('userPanel.profile'),
       onClick: () => navigate('/me/profile'),
@@ -27,7 +27,7 @@ export const useCategory = (onOpenChangelogModal: () => void) => {
 
   const settings: CellProps[] = [
     {
-      icon: Settings2,
+      icon: APP_ENTRY_ICONS.settings,
       key: 'setting',
       label: t('userPanel.setting'),
       onClick: () => navigate('/me/settings'),
@@ -40,25 +40,25 @@ export const useCategory = (onOpenChangelogModal: () => void) => {
   /* ↓ cloud slot ↓ */
   const helps: CellProps[] = [
     showCloudPromotion && {
-      icon: Cloudy,
+      icon: SETTINGS_ENTRY_ICONS.cloud,
       key: 'cloud',
       label: t('userPanel.cloud', { name: LOBE_CHAT_CLOUD }),
       onClick: () => window.open(`${OFFICIAL_URL}?utm_source=${UTM_SOURCE}`, '__blank'),
     },
     {
-      icon: Book,
+      icon: SETTINGS_ENTRY_ICONS.docs,
       key: 'docs',
       label: t('document'),
       onClick: () => window.open(DOCUMENTS, '__blank'),
     },
     {
-      icon: Feather,
+      icon: SETTINGS_ENTRY_ICONS.feedback,
       key: 'feedback',
       label: t('feedback'),
       onClick: () => window.open(FEEDBACK, '__blank'),
     },
     {
-      icon: FileClockIcon,
+      icon: SETTINGS_ENTRY_ICONS.changelog,
       key: 'changelog',
       label: t('changelog'),
       onClick: onOpenChangelogModal,

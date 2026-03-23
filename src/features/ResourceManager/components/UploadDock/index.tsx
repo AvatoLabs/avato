@@ -2,11 +2,11 @@ import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import { ActionIcon, Center, Flexbox, Icon, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
-import { UploadIcon, XIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { convertAlphaToSolid } from '@/utils/colorUtils';
 
@@ -76,7 +76,7 @@ const UploadDock = memo(() => {
       }
 
       default: {
-        return <Icon icon={UploadIcon} />;
+        return <Icon icon={RESOURCE_ENTRY_ICONS.upload} />;
       }
     }
   }, [overviewUploadingStatus]);
@@ -128,7 +128,7 @@ const UploadDock = memo(() => {
         </Flexbox>
         {!isUploading && (
           <ActionIcon
-            icon={XIcon}
+            icon={RESOURCE_ENTRY_ICONS.close}
             onClick={() => {
               setShow(false);
               dispatchDockFileList({ ids: fileList.map((item) => item.id), type: 'removeFiles' });

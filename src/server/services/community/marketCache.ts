@@ -6,6 +6,7 @@ import { initializeRedis, isRedisEnabled, type RedisClient } from '@/libs/redis'
 const COMMUNITY_CACHE_TTL_SECONDS = 60 * 60 * 6;
 const COMMUNITY_STALE_TTL_SECONDS = 60 * 60 * 24 * 7;
 const COMMUNITY_CACHE_PREFIX = 'community-market-cache';
+const MEMORY_CACHE_MAX_SIZE = 500;
 
 interface CacheEnvelope<T> {
   data: T;
@@ -18,6 +19,14 @@ interface MemoryEntry {
 }
 
 const memoryCache = new Map<string, MemoryEntry>();
+
+const evictOldestIfNeeded = () => {
+  while (memoryCache.size > MEMORY_CACHE_MAX_SIZE) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    memoryCache.delete(oldestKey);
+  }
+};
 
 const getCacheKey = (scope: string, params?: unknown) => {
   const normalizedParams = params
@@ -45,7 +54,10 @@ const getMemoryCache = <T>(key: string): CacheEnvelope<T> | null => {
   }
 
   try {
-    return JSON.parse(entry.value) as CacheEnvelope<T>;
+    const parsed = JSON.parse(entry.value) as CacheEnvelope<T>;
+    memoryCache.delete(key);
+    memoryCache.set(key, entry);
+    return parsed;
   } catch {
     memoryCache.delete(key);
     return null;
@@ -57,6 +69,7 @@ const setMemoryCache = <T>(key: string, value: CacheEnvelope<T>) => {
     expiresAt: Date.now() + COMMUNITY_STALE_TTL_SECONDS * 1000,
     value: JSON.stringify(value),
   });
+  evictOldestIfNeeded();
 };
 
 const getRedis = async (): Promise<RedisClient | null> => {
@@ -123,7 +136,11 @@ class CommunityMarketCacheService {
     return next;
   }
 
-  async getCached<T>(scope: string, params: Record<string, unknown> | undefined, fetcher: () => Promise<T>) {
+  async getCached<T>(
+    scope: string,
+    params: Record<string, unknown> | undefined,
+    fetcher: () => Promise<T>,
+  ) {
     const key = getCacheKey(scope, params);
     const cached = await this.readCache<T>(key);
 

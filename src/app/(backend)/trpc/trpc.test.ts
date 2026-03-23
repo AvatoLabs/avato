@@ -17,6 +17,6 @@ describe('Desktop TRPC Route', () => {
     const toolsRoutePath = path.join(__dirname, 'tools', '[trpc]', 'route.ts');
     const routeSource = readFileSync(toolsRoutePath, 'utf8');
 
-    expect(routeSource).toContain('export const maxDuration = 180;');
+    expect(routeSource).toContain('export const maxDuration = 300;');
   });
 });

@@ -1,4 +1,4 @@
-import { type LucideIcon } from 'lucide-react';
+import { type IconProps } from '@lobehub/ui';
 
 // ======== Page Types ======== //
 
@@ -160,7 +160,7 @@ export interface ResolvedPageData {
   /**
    * Icon to display
    */
-  icon?: LucideIcon;
+  icon?: IconProps['icon'];
   /**
    * Original reference for navigation and pin/unpin
    */

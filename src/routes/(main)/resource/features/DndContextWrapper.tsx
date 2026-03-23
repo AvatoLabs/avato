@@ -3,13 +3,13 @@
 import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
 import { cssVar } from 'antd-style';
-import { FileText, FolderIcon } from 'lucide-react';
 import { type PropsWithChildren } from 'react';
 import { createContext, memo, use, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { useFileStore } from '@/store/file';
 
@@ -275,9 +275,9 @@ export const DndContextWrapper = memo<PropsWithChildren>(({ children }) => {
                   }}
                 >
                   {currentDrag.data.fileType === 'custom/folder' ? (
-                    <Icon icon={FolderIcon} size={20} />
+                    <Icon icon={RESOURCE_ENTRY_ICONS.folder} size={20} />
                   ) : currentDrag.data.fileType === 'custom/document' ? (
-                    <Icon icon={FileText} size={20} />
+                    <Icon icon={RESOURCE_ENTRY_ICONS.page} size={20} />
                   ) : (
                     <FileIcon
                       fileName={currentDrag.data.name}

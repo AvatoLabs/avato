@@ -6,17 +6,17 @@ import {
   Block,
   Center,
   DropdownMenu,
+  Icon,
   Skeleton,
   stopPropagation,
   Text,
 } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
-import { ChevronsUpDownIcon } from 'lucide-react';
 import { type DragEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import RepoIcon from '@/components/LibIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useDragActive } from '@/routes/(main)/resource/features/DndContextWrapper';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { knowledgeBaseSelectors, useKnowledgeBaseStore } from '@/store/library';
@@ -90,7 +90,7 @@ const Head = memo<{ id: string }>(({ id }) => {
     return libraries.map((library) => ({
       icon: (
         <Center className={styles.menuIcon} style={{ minWidth: 16 }} width={16}>
-          <RepoIcon size={14} />
+          <Icon icon={RESOURCE_ENTRY_ICONS.library} size={14} />
         </Center>
       ),
       key: library.id,
@@ -119,7 +119,7 @@ const Head = memo<{ id: string }>(({ id }) => {
       onDrop={handleDrop}
     >
       <Center style={{ minWidth: 32 }} width={32}>
-        <RepoIcon size={18} />
+        <Icon icon={RESOURCE_ENTRY_ICONS.library} size={18} />
       </Center>
       {!name ? (
         <Skeleton active paragraph={false} title={{ style: { marginBottom: 0 }, width: 80 }} />
@@ -135,7 +135,7 @@ const Head = memo<{ id: string }>(({ id }) => {
               {name}
             </Text>
             <ActionIcon
-              icon={ChevronsUpDownIcon}
+              icon={RESOURCE_ENTRY_ICONS.selector}
               style={{ width: 24 }}
               size={{
                 blockSize: 28,

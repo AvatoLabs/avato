@@ -1,6 +1,6 @@
 'use client';
 
-import { DEFAULT_INBOX_AVATAR } from '@lobechat/const';
+import { DEFAULT_DOC_COPILOT_AVATAR } from '@lobechat/const';
 import { nanoid } from '@lobechat/utils';
 import { type IEditor } from '@lobehub/editor';
 import { HIDE_TOOLBAR_COMMAND } from '@lobehub/editor';
@@ -91,7 +91,7 @@ export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActions
               editor.blur();
             }}
           >
-            <Avatar avatar={DEFAULT_INBOX_AVATAR} shape="square" size={16} />
+            <Avatar avatar={DEFAULT_DOC_COPILOT_AVATAR} shape="square" size={16} />
             <span>{label}</span>
           </Block>
         ),

@@ -13,8 +13,8 @@ import { usePageStore } from '@/store/page';
 import { StyleSheet } from '@/utils/styles';
 
 import Copilot from './Copilot';
-import EditorCanvas from './EditorCanvas';
 import Header from './Header';
+import ModeContent from './ModeContent';
 import { PageAgentProvider } from './PageAgentProvider';
 import { PageEditorProvider } from './PageEditorProvider';
 import PageTitle from './PageTitle';
@@ -51,8 +51,11 @@ interface PageEditorProps {
 }
 
 const PageEditorCanvas = memo(() => {
-  const editor = usePageEditorStore((s) => s.editor);
-  const documentId = usePageEditorStore((s) => s.documentId);
+  const [documentId, editor, viewMode] = usePageEditorStore((s) => [
+    s.documentId,
+    s.editor,
+    s.viewMode,
+  ]);
 
   // Register Files scope and save document hotkey
   useRegisterFilesHotkeys();
@@ -69,14 +72,23 @@ const PageEditorCanvas = memo(() => {
         <Flexbox flex={1} height={'100%'} style={styles.editorContainer}>
           <Header />
           <Flexbox horizontal height={'100%'} style={styles.contentWrapper} width={'100%'}>
-            <WideScreenContainer wrapperStyle={{ cursor: 'text' }} onClick={() => editor?.focus()}>
+            <WideScreenContainer
+              wrapperStyle={{ cursor: viewMode === 'rich' ? 'text' : 'default' }}
+              onClick={() => {
+                if (viewMode === 'rich') {
+                  editor?.focus();
+                }
+              }}
+            >
               <Flexbox flex={1} style={styles.editorContent}>
                 <TitleSection />
-                <EditorCanvas />
+                <ModeContent documentId={documentId} editor={editor} viewMode={viewMode} />
               </Flexbox>
             </WideScreenContainer>
           </Flexbox>
-          {documentId && <DiffAllToolbar documentId={documentId} editor={editor!} />}
+          {documentId && editor && viewMode === 'rich' && (
+            <DiffAllToolbar documentId={documentId} editor={editor} />
+          )}
         </Flexbox>
         <Copilot />
       </Flexbox>

@@ -2,32 +2,27 @@
 
 import { Accordion, AccordionItem, Flexbox, Text } from '@lobehub/ui';
 import { memo, useMemo } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { SettingsTabs } from '@/store/global/initialState';
-import { isModifierClick } from '@/utils/navigation';
 
 import { SettingsGroupKey, useCategory } from '../../hooks/useCategory';
 
 const Body = memo(() => {
   const categoryGroups = useCategory();
-  const navigate = useNavigate();
   const location = useLocation();
 
-  // Extract current tab from pathname: /settings/profile -> profile
   const activeTab = useMemo(() => {
     const pathParts = location.pathname.split('/');
-    // pathname is like /settings/profile or /settings/provider/xxx
     if (pathParts.length >= 3) {
       return pathParts[2] as SettingsTabs;
     }
     return SettingsTabs.Profile;
   }, [location.pathname]);
 
-  const getTabUrl = (tab: SettingsTabs) => {
-    return tab === SettingsTabs.Provider ? '/settings/provider/all' : `/settings/${tab}`;
-  };
+  const getTabUrl = (tab: SettingsTabs) =>
+    tab === SettingsTabs.Provider ? '/settings/provider/all' : `/settings/${tab}`;
 
   return (
     <Flexbox paddingInline={4}>
@@ -57,15 +52,7 @@ const Body = memo(() => {
               {group.items.map((item) => {
                 const url = getTabUrl(item.key);
                 return (
-                  <Link
-                    key={item.key}
-                    to={url}
-                    onClick={(e) => {
-                      if (isModifierClick(e)) return;
-                      e.preventDefault();
-                      navigate(url);
-                    }}
-                  >
+                  <Link key={item.key} to={url}>
                     <NavItem active={activeTab === item.key} icon={item.icon} title={item.label} />
                   </Link>
                 );

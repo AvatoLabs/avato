@@ -23,6 +23,7 @@ const MasonryView = memo(function MasonryView() {
   const [
     libraryId,
     category,
+    spaceId,
     selectedFileIds,
     setSelectedFileIds,
     storeIsMasonryReady,
@@ -32,6 +33,7 @@ const MasonryView = memo(function MasonryView() {
   ] = useResourceManagerStore((s) => [
     s.libraryId,
     s.category,
+    s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
     s.isMasonryReady,
@@ -51,10 +53,11 @@ const MasonryView = memo(function MasonryView() {
       libraryId,
       parentId: currentFolderSlug || null,
       showFilesInKnowledgeBase: false,
+      spaceId,
       sortType,
       sorter,
     }),
-    [category, currentFolderSlug, libraryId, sorter, sortType],
+    [category, currentFolderSlug, libraryId, sorter, sortType, spaceId],
   );
 
   const { hasMore, isLoading, items: resourceList } = useVisibleResources(queryParams);

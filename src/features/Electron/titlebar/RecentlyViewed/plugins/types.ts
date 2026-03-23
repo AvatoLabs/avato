@@ -1,4 +1,4 @@
-import { type LucideIcon } from 'lucide-react';
+import { type IconProps } from '@lobehub/ui';
 
 import { type LobeDocument } from '@/types/document';
 import { type MetaData } from '@/types/meta';
@@ -65,7 +65,7 @@ export interface BaseRecentlyViewedPlugin {
   /**
    * Get default icon for this page type
    */
-  getDefaultIcon?: () => LucideIcon;
+  getDefaultIcon?: () => IconProps['icon'];
 
   /**
    * Check if URL matches this plugin
@@ -124,7 +124,7 @@ export interface RecentlyViewedPlugin<T extends PageType = PageType> {
   /**
    * Get default icon for this page type
    */
-  getDefaultIcon?: () => LucideIcon;
+  getDefaultIcon?: () => IconProps['icon'];
 
   /**
    * Check if URL matches this plugin

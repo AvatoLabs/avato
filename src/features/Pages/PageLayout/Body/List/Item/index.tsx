@@ -1,9 +1,9 @@
 import { Avatar, Icon } from '@lobehub/ui';
-import { FileTextIcon } from 'lucide-react';
 import { type MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -79,7 +79,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
     if (emoji) {
       return <Avatar avatar={emoji} size={28} />;
     }
-    return <Icon icon={FileTextIcon} size={{ size: 18, strokeWidth: 1.5 }} />;
+    return <Icon icon={APP_ENTRY_ICONS.page} size={{ size: 18, strokeWidth: 2.2 }} />;
   }, [emoji]);
 
   const dropdownMenu = useDropdownMenu({ pageId, toggleEditing });

@@ -2,12 +2,11 @@
 
 import { Flexbox, Tag } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { HomeIcon, SearchIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { getRouteById } from '@/config/routes';
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
@@ -42,7 +41,7 @@ const Nav = memo(() => {
   const items: Item[] = useMemo(
     () => [
       {
-        icon: SearchIcon,
+        icon: APP_ENTRY_ICONS.search,
         key: 'search',
         onClick: () => {
           toggleCommandMenu(true);
@@ -50,41 +49,41 @@ const Nav = memo(() => {
         title: t('tab.search'),
       },
       {
-        icon: HomeIcon,
+        icon: APP_ENTRY_ICONS.home,
         key: SidebarTabKey.Home,
         title: t('tab.home'),
         url: '/',
       },
       {
         badge: 'beta',
-        icon: getRouteById('studio')!.icon,
+        icon: APP_ENTRY_ICONS.studio,
         key: SidebarTabKey.Studio,
         title: t('tab.avatoStudio'),
         url: '/studio',
       },
       {
-        icon: getRouteById('page')!.icon,
+        icon: APP_ENTRY_ICONS.page,
         key: SidebarTabKey.Pages,
         title: t('tab.pages'),
         url: '/page',
       },
       {
         hidden: !enableBusinessFeatures,
-        icon: getRouteById('video')!.icon,
+        icon: APP_ENTRY_ICONS.video,
         key: SidebarTabKey.Video,
         title: t('tab.video'),
         url: '/video',
       },
       {
         hidden: !showAiImage,
-        icon: getRouteById('image')!.icon,
+        icon: APP_ENTRY_ICONS.image,
         key: SidebarTabKey.Image,
         title: t('tab.aiImage'),
         url: '/image',
       },
       {
         hidden: !showMarket,
-        icon: getRouteById('community')!.icon,
+        icon: APP_ENTRY_ICONS.community,
         key: SidebarTabKey.Community,
         title: t('tab.community'),
         url: '/community',

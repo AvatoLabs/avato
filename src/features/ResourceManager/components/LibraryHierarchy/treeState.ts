@@ -61,6 +61,11 @@ export const getTreeState = (knowledgeBaseId: string) => {
   return treeState.get(knowledgeBaseId)!;
 };
 
+/** Remove cached tree state for a library (call when switching away or after delete) */
+export const clearTreeStateForLibrary = (knowledgeBaseId: string) => {
+  treeState.delete(knowledgeBaseId);
+};
+
 /**
  * Clear and reload all expanded folders
  * This should be called along with file store's refreshFileList()

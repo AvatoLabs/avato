@@ -1,8 +1,8 @@
+import { DEFAULT_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
 import { Avatar, Block, Center, Flexbox, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 
-import { DEFAULT_AVATAR } from '@/const/meta';
 import GroupAvatar from '@/features/GroupAvatar';
 import Time from '@/routes/(main)/home/features/components/Time';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
@@ -18,7 +18,7 @@ const ReactTopicItem = memo<RecentTopic>(({ title, updatedAt, agent, group, type
   const groupAvatars = useMemo(() => {
     if (!isGroup || !group?.members) return [];
     return group.members.map((member) => ({
-      avatar: member.avatar || DEFAULT_AVATAR,
+      avatar: normalizeBuiltinAvatar(member.avatar) || DEFAULT_AVATAR,
       background: member.backgroundColor || undefined,
       style: { borderRadius: 3 },
     }));
@@ -54,8 +54,8 @@ const ReactTopicItem = memo<RecentTopic>(({ title, updatedAt, agent, group, type
           size={200}
           avatar={
             isGroup
-              ? group?.members?.[0]?.avatar || DEFAULT_AVATAR
-              : agent?.avatar || DEFAULT_AVATAR
+              ? normalizeBuiltinAvatar(group?.members?.[0]?.avatar) || DEFAULT_AVATAR
+              : normalizeBuiltinAvatar(agent?.avatar) || DEFAULT_AVATAR
           }
           style={{
             filter: 'blur(100px)',
@@ -80,7 +80,7 @@ const ReactTopicItem = memo<RecentTopic>(({ title, updatedAt, agent, group, type
           ) : (
             <Avatar
               emojiScaleWithBackground
-              avatar={agent?.avatar || DEFAULT_AVATAR}
+              avatar={normalizeBuiltinAvatar(agent?.avatar) || DEFAULT_AVATAR}
               background={agent?.backgroundColor || undefined}
               shape={'square'}
               size={30}

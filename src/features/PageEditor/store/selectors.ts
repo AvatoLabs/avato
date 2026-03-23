@@ -5,4 +5,5 @@ export const selectors = {
   editor: (s: Store) => s.editor,
   emoji: (s: Store) => s.emoji,
   title: (s: Store) => s.title,
+  viewMode: (s: Store) => s.viewMode,
 };

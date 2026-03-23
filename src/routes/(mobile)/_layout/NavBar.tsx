@@ -4,11 +4,11 @@ import { Icon } from '@lobehub/ui';
 import { type TabBarProps } from '@lobehub/ui/mobile';
 import { TabBar } from '@lobehub/ui/mobile';
 import { createStaticStyles } from 'antd-style';
-import { Compass, LibraryBigIcon, MessageSquare, User } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { MOBILE_TABBAR_HEIGHT } from '@/const/layoutTokens';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { SidebarTabKey } from '@/store/global/initialState';
@@ -16,9 +16,7 @@ import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfi
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   active: css`
-    svg {
-      fill: color-mix(in srgb, ${cssVar.colorPrimary} 33%, transparent);
-    }
+    color: ${cssVar.colorPrimary};
   `,
   container: css`
     position: fixed;
@@ -47,7 +45,7 @@ const NavBar = memo(() => {
       [
         {
           icon: (active: boolean) => (
-            <Icon className={active ? styles.active : undefined} icon={MessageSquare} />
+            <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.chat} />
           ),
           key: SidebarTabKey.Chat,
           onClick: () => {
@@ -57,7 +55,7 @@ const NavBar = memo(() => {
         },
         showMarket && {
           icon: (active: boolean) => (
-            <Icon className={active ? styles.active : undefined} icon={Compass} />
+            <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.community} />
           ),
           key: SidebarTabKey.Community,
           onClick: () => {
@@ -67,7 +65,7 @@ const NavBar = memo(() => {
         },
         {
           icon: (active: boolean) => (
-            <Icon className={active ? styles.active : undefined} icon={LibraryBigIcon} />
+            <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.resource} />
           ),
           key: SidebarTabKey.Resource,
           onClick: () => {
@@ -77,7 +75,7 @@ const NavBar = memo(() => {
         },
         {
           icon: (active: boolean) => (
-            <Icon className={active ? styles.active : undefined} icon={User} />
+            <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.me} />
           ),
           key: SidebarTabKey.Me,
           onClick: () => {

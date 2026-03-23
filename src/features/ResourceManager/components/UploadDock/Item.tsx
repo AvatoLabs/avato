@@ -1,11 +1,11 @@
 import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
-import { XIcon } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useFileStore } from '@/store/file';
 import { type UploadFileItem } from '@/types/files/upload';
 import { formatSize, formatSpeed, formatTime } from '@/utils/format';
@@ -133,7 +133,7 @@ const UploadItem = memo<UploadItemProps>(({ id, file, status, uploadState }) => 
       {(status === 'uploading' || status === 'pending') && (
         <ActionIcon
           className={`${styles.cancelButton} cancel-button`}
-          icon={XIcon}
+          icon={RESOURCE_ENTRY_ICONS.close}
           size="small"
           title={t('uploadDock.body.item.cancel')}
           onClick={() => {

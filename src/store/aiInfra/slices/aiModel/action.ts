@@ -13,6 +13,7 @@ import { type AiInfraStore } from '@/store/aiInfra/store';
 import { type StoreSetter } from '@/store/types';
 
 const FETCH_AI_PROVIDER_MODEL_LIST_KEY = 'FETCH_AI_PROVIDER_MODELS';
+const FETCH_DISABLED_MODELS_PAGE_KEY = 'FETCH_DISABLED_MODELS_PAGE';
 
 type Setter = StoreSetter<AiInfraStore>;
 export const createAiModelSlice = (set: Setter, get: () => AiInfraStore, _api?: unknown) =>
@@ -33,7 +34,7 @@ export class AiModelActionImpl {
     if (!activeAiProvider) return;
 
     await aiModelService.batchToggleAiModels(activeAiProvider, ids, enabled);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(activeAiProvider);
   };
 
   batchUpdateAiModels = async (models: AiProviderModelListItem[]): Promise<void> => {
@@ -41,22 +42,22 @@ export class AiModelActionImpl {
     if (!id) return;
 
     await aiModelService.batchUpdateAiModels(id, models);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(id);
   };
 
   clearModelsByProvider = async (provider: string): Promise<void> => {
     await aiModelService.clearModelsByProvider(provider);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(provider);
   };
 
   clearRemoteModels = async (provider: string): Promise<void> => {
     await aiModelService.clearRemoteModels(provider);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(provider);
   };
 
   createNewAiModel = async (data: CreateAiModelParams): Promise<void> => {
     await aiModelService.createAiModel(data);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(data.providerId);
   };
 
   fetchRemoteModelList = async (providerId: string): Promise<void> => {
@@ -82,7 +83,7 @@ export class AiModelActionImpl {
         })),
       );
 
-      await this.#get().refreshAiModelList();
+      await this.#get().refreshAiModelList(providerId);
     }
   };
 
@@ -98,15 +99,23 @@ export class AiModelActionImpl {
     );
   };
 
-  refreshAiModelList = async (): Promise<void> => {
-    await mutate([FETCH_AI_PROVIDER_MODEL_LIST_KEY, this.#get().activeAiProvider]);
+  refreshAiModelList = async (providerId?: string): Promise<void> => {
+    const targetId = providerId ?? this.#get().activeAiProvider;
+    if (!targetId) return;
+
+    await mutate([FETCH_AI_PROVIDER_MODEL_LIST_KEY, targetId]);
+    // Invalidate DisabledModels useSWRInfinite cache for this provider
+    await mutate(
+      (key: unknown) =>
+        Array.isArray(key) && key[0] === FETCH_DISABLED_MODELS_PAGE_KEY && key[1] === targetId,
+    );
     // make refresh provide runtime state async, not block
     this.#get().refreshAiProviderRuntimeState();
   };
 
   removeAiModel = async (id: string, providerId: string): Promise<void> => {
     await aiModelService.deleteAiModel({ id, providerId });
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(providerId);
   };
 
   toggleModelEnabled = async (
@@ -118,7 +127,7 @@ export class AiModelActionImpl {
     this.#get().internal_toggleAiModelLoading(params.id, true);
 
     await aiModelService.toggleModelEnabled({ ...params, providerId: activeAiProvider });
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(activeAiProvider);
 
     this.#get().internal_toggleAiModelLoading(params.id, false);
   };
@@ -129,12 +138,12 @@ export class AiModelActionImpl {
     data: Partial<AiProviderModelListItem>,
   ): Promise<void> => {
     await aiModelService.updateAiModel(id, providerId, data);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(providerId);
   };
 
   updateAiModelsSort = async (id: string, items: AiModelSortMap[]): Promise<void> => {
     await aiModelService.updateAiModelOrder(id, items);
-    await this.#get().refreshAiModelList();
+    await this.#get().refreshAiModelList(id);
   };
 
   useFetchAiProviderModels = (id: string): SWRResponse<AiProviderModelListItem[]> => {
@@ -143,6 +152,8 @@ export class AiModelActionImpl {
       ([, id]) => aiModelService.getAiProviderModelList(id as string),
       {
         onSuccess: (data) => {
+          // Skip update if user has switched to another provider (avoid race overwriting current list)
+          if (this.#get().activeAiProvider !== id) return;
           // no need to update list if the list have been init and data is the same
           if (this.#get().isAiModelListInit && isEqual(data, this.#get().aiProviderModelList))
             return;

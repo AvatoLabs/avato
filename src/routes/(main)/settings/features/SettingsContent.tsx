@@ -9,38 +9,43 @@ import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfi
 
 import { componentMap } from './componentMap';
 
+const TABS_WITH_MOBILE_PROP: readonly SettingsTabs[] = [
+  SettingsTabs.About,
+  SettingsTabs.Agent,
+  SettingsTabs.Provider,
+  SettingsTabs.Profile,
+  SettingsTabs.Stats,
+  SettingsTabs.Security,
+];
+
+const BUSINESS_TABS_WITH_MOBILE_PROP: readonly SettingsTabs[] = [
+  SettingsTabs.Plans,
+  SettingsTabs.Funds,
+  SettingsTabs.Usage,
+  SettingsTabs.Billing,
+  SettingsTabs.Referral,
+];
+
 interface SettingsContentProps {
-  activeTab?: string;
+  activeTab?: SettingsTabs | string;
   mobile?: boolean;
 }
 
 const SettingsContent = ({ mobile, activeTab }: SettingsContentProps) => {
   const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
 
-  const renderComponent = (tab: string) => {
-    const Component = componentMap[tab as keyof typeof componentMap] || componentMap.common;
+  const tabsWithMobile = [
+    ...TABS_WITH_MOBILE_PROP,
+    ...(enableBusinessFeatures ? BUSINESS_TABS_WITH_MOBILE_PROP : []),
+  ];
+
+  const renderComponent = (tab: SettingsTabs | string) => {
+    const Component =
+      componentMap[tab as keyof typeof componentMap] || componentMap[SettingsTabs.Common];
     if (!Component) return null;
 
     const componentProps: { mobile?: boolean } = {};
-    if (
-      [
-        SettingsTabs.About,
-        SettingsTabs.Agent,
-        SettingsTabs.Provider,
-        SettingsTabs.Profile,
-        SettingsTabs.Stats,
-        SettingsTabs.Security,
-        ...(enableBusinessFeatures
-          ? [
-              SettingsTabs.Plans,
-              SettingsTabs.Funds,
-              SettingsTabs.Usage,
-              SettingsTabs.Billing,
-              SettingsTabs.Referral,
-            ]
-          : []),
-      ].includes(tab as any)
-    ) {
+    if (tabsWithMobile.includes(tab as SettingsTabs)) {
       componentProps.mobile = mobile;
     }
 

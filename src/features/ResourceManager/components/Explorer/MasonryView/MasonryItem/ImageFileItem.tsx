@@ -2,11 +2,11 @@ import { Button, Flexbox, stopPropagation, Tooltip } from '@lobehub/ui';
 import { Image } from 'antd';
 import { createStaticStyles, cx } from 'antd-style';
 import { isNull } from 'es-toolkit/compat';
-import { FileBoxIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { type AsyncTaskStatus, type IAsyncTaskError } from '@/types/asyncTask';
 import { formatSize } from '@/utils/format';
@@ -229,7 +229,7 @@ const ImageFileItem = memo<ImageFileItemProps>(
                 }}
               >
                 <Button
-                  icon={FileBoxIcon}
+                  icon={RESOURCE_ENTRY_ICONS.chunk}
                   loading={isCreatingFileParseTask}
                   size={'small'}
                   type={'text'}

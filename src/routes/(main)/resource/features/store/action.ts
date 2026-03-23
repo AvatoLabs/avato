@@ -184,10 +184,13 @@ export const store: CreateStore = (publicState) => (set, get) => ({
       case 'deleteLibrary': {
         if (!libraryId) return;
         await kbStore.removeKnowledgeBase(libraryId);
-        // Navigate to knowledge base page using window.location
-        // (can't use useNavigate hook from store)
+        // Clear tree cache before navigation
+        const { clearTreeStateForLibrary } =
+          await import('@/features/ResourceManager/components/LibraryHierarchy');
+        clearTreeStateForLibrary(libraryId);
+        // Navigate to resource home (can't use useNavigate hook from store)
         if (typeof window !== 'undefined') {
-          window.location.href = '/knowledge';
+          window.location.href = '/resource';
         }
         return;
       }
@@ -223,6 +226,8 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setLibraryId: (libraryId) => {
+    const prevId = get().libraryId;
+
     set({ libraryId });
 
     // Reset pagination state when switching libraries to prevent showing stale data
@@ -230,6 +235,13 @@ export const store: CreateStore = (publicState) => (set, get) => ({
       fileListHasMore: false,
       fileListOffset: 0,
     });
+
+    // Clear tree cache when navigating to home (libraryId undefined) to prevent memory buildup
+    if (prevId && !libraryId) {
+      import('@/features/ResourceManager/components/LibraryHierarchy').then(
+        ({ clearTreeStateForLibrary }) => clearTreeStateForLibrary(prevId),
+      );
+    }
 
     // Note: No need to manually refresh - Explorer's useEffect will automatically
     // call fetchResources when libraryId changes

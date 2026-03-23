@@ -1,9 +1,9 @@
+import { DEFAULT_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
 import { ModelTag } from '@lobehub/icons';
 import { Flexbox } from '@lobehub/ui';
 import React, { memo, useMemo, useState } from 'react';
 import { shallow } from 'zustand/shallow';
 
-import { DEFAULT_AVATAR } from '@/const/meta';
 import { INBOX_SESSION_ID } from '@/const/session';
 import { isDesktop } from '@/const/version';
 import { useChatStore } from '@/store/chat';
@@ -106,15 +106,15 @@ const SessionItem = memo<SessionItemProps>(({ id }) => {
     sessionType === 'group'
       ? [
           {
-            avatar: currentUser.avatar || DEFAULT_AVATAR,
+            avatar: normalizeBuiltinAvatar(currentUser.avatar) || DEFAULT_AVATAR,
             background: undefined,
           },
           ...(members?.map((member) => ({
-            avatar: member.avatar || DEFAULT_AVATAR,
+            avatar: normalizeBuiltinAvatar(member.avatar) || DEFAULT_AVATAR,
             background: member.backgroundColor || undefined,
           })) || []),
         ]
-      : avatar;
+      : normalizeBuiltinAvatar(avatar) || DEFAULT_AVATAR;
 
   return (
     <>

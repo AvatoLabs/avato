@@ -3,9 +3,10 @@
 import { CaretDownFilled } from '@ant-design/icons';
 import { ActionIcon, Flexbox, Icon } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
-import { FolderIcon, FolderOpenIcon } from 'lucide-react';
 import * as motion from 'motion/react-m';
 import { memo, useCallback } from 'react';
+
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   folderHeader: css`
@@ -109,7 +110,10 @@ export const FolderTreeItemComponent = memo<FolderTreeItemProps>(
             gap={8}
             style={{ minHeight: 28, minWidth: 0 }}
           >
-            <Icon icon={isExpanded ? FolderOpenIcon : FolderIcon} size={16} />
+            <Icon
+              icon={isExpanded ? RESOURCE_ENTRY_ICONS.folderOpen : RESOURCE_ENTRY_ICONS.folder}
+              size={16}
+            />
             <span
               style={{
                 flex: 1,

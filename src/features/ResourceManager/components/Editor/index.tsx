@@ -3,10 +3,10 @@
 import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { Modal } from 'antd';
 import { cssVar, useTheme } from 'antd-style';
-import { ArrowLeftIcon, DownloadIcon, InfoIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavHeader from '@/features/NavHeader';
 import { PageAgentProvider } from '@/features/PageEditor/PageAgentProvider';
 import FileDetailComponent from '@/routes/(main)/resource/features/FileDetail';
@@ -41,7 +41,7 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                 gap={12}
                 style={{ minHeight: 32, minWidth: 0, overflow: 'hidden' }}
               >
-                <ActionIcon icon={ArrowLeftIcon} title={t('back')} onClick={onBack} />
+                <ActionIcon icon={RESOURCE_ENTRY_ICONS.back} title={t('back')} onClick={onBack} />
                 <span
                   title={fileDetail?.name}
                   style={{
@@ -62,7 +62,7 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                 {/* <ToggleRightPanelButton icon={BotMessageSquareIcon} showActive={true} size={20} /> */}
                 {fileDetail?.url && (
                   <ActionIcon
-                    icon={DownloadIcon}
+                    icon={RESOURCE_ENTRY_ICONS.download}
                     title={t('download', { ns: 'common' })}
                     onClick={() => {
                       if (fileDetail?.url && fileDetail?.name) {
@@ -71,7 +71,10 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                     }}
                   />
                 )}
-                <ActionIcon icon={InfoIcon} onClick={() => setIsDetailModalOpen(true)} />
+                <ActionIcon
+                  icon={RESOURCE_ENTRY_ICONS.info}
+                  onClick={() => setIsDetailModalOpen(true)}
+                />
               </Flexbox>
             }
             style={{
