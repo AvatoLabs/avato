@@ -18,7 +18,9 @@ services:
       - 'KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}'
       - 'AUTH_SECRET=${AUTH_SECRET}'
       - 'DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME}'
-      - 'INTERNAL_APP_URL=${INTERNAL_APP_URL:-http://127.0.0.1:3211}'
+      # In-container Next listens on 3210 (see ports LOBE_PORT:3210). Async image/chat uses this for /trpc/async — NOT host-mapped 3211.
+      - 'INTERNAL_APP_URL=${INTERNAL_APP_URL:-http://127.0.0.1:3210}'
+      # S3_ENDPOINT must be reachable from browsers/mobile (presigned PUT). Not http://localhost:9002.
       - 'S3_ENDPOINT=${S3_ENDPOINT}'
       - 'S3_BUCKET=${RUSTFS_LOBE_BUCKET}'
       - 'S3_ENABLE_PATH_STYLE=1'

@@ -13,6 +13,9 @@ DEPLOY_DOMAIN="${DEPLOY_DOMAIN:-https://canary.turingmesh.com}"
 DEPLOY_VERIFY_HOST="${DEPLOY_VERIFY_HOST:-canary.turingmesh.com}"
 DEPLOY_VERIFY_PATH="${DEPLOY_VERIFY_PATH:-/signin}"
 DEPLOY_PUBLIC_VERIFY_MODE="${DEPLOY_PUBLIC_VERIFY_MODE:-direct}"
+# Presigned S3 uploads: clients PUT to this URL (must not be localhost)
+DEPLOY_S3_PORT="${DEPLOY_S3_PORT:-9002}"
+PUBLIC_S3_ENDPOINT="${PUBLIC_S3_ENDPOINT:-http://${DEPLOY_HOST}:${DEPLOY_S3_PORT}}"
 
 # Canary-specific paths (different from production)
 REMOTE_ARTIFACT_DIR="${REMOTE_ARTIFACT_DIR:-/data/canary}"
@@ -157,6 +160,12 @@ if [ -f "${COMPOSE_ENV_FILE}" ]; then
 else
   echo "==> Skipping compose env upload; local file not found: ${COMPOSE_ENV_FILE}"
 fi
+
+echo "==> Patching remote .env: S3_ENDPOINT + INTERNAL_APP_URL (async /trpc/async must hit container :3210)"
+CANARY_INTERNAL_APP_URL="${CANARY_INTERNAL_APP_URL:-http://127.0.0.1:3210}"
+run_with_expect \
+  ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
+  "f=${REMOTE_DEPLOY_PATH}/.env; test -f \"\$f\" || touch \"\$f\"; if grep -q '^S3_ENDPOINT=' \"\$f\"; then sed -i.bak \"s|^S3_ENDPOINT=.*|S3_ENDPOINT=${PUBLIC_S3_ENDPOINT}|\" \"\$f\"; else printf '\\nS3_ENDPOINT=%s\\n' \"${PUBLIC_S3_ENDPOINT}\" >> \"\$f\"; fi; if grep -q '^INTERNAL_APP_URL=' \"\$f\"; then sed -i.bak \"s|^INTERNAL_APP_URL=.*|INTERNAL_APP_URL=${CANARY_INTERNAL_APP_URL}|\" \"\$f\"; else printf '\\nINTERNAL_APP_URL=%s\\n' \"${CANARY_INTERNAL_APP_URL}\" >> \"\$f\"; fi"
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
 run_with_expect \
