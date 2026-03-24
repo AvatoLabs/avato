@@ -60,11 +60,24 @@ exit $exit_code
 EOF
 }
 
+restore_build_env() {
+  if [ -n "${BUILD_ENV_BACKUP_FILE:-}" ] && [ -f "${BUILD_ENV_BACKUP_FILE}" ]; then
+    mv "${BUILD_ENV_BACKUP_FILE}" "${ROOT_DIR}/.env.production"
+  else
+    rm -f "${ROOT_DIR}/.env.production"
+  fi
+}
+
 cd "${ROOT_DIR}"
 
 echo "==> Building production assets with ${BUILD_ENV_FILE}"
+BUILD_ENV_BACKUP_FILE=""
+if [ -e "${ROOT_DIR}/.env.production" ]; then
+  BUILD_ENV_BACKUP_FILE="$(mktemp "${ROOT_DIR}/.env.production.backup.XXXXXX")"
+  cp -p "${ROOT_DIR}/.env.production" "${BUILD_ENV_BACKUP_FILE}"
+fi
 cp "${BUILD_ENV_FILE}" .env.production
-trap 'rm -f "${ROOT_DIR}/.env.production"' EXIT
+trap restore_build_env EXIT
 bun run build:docker
 
 echo "==> Preparing runtime bundle"

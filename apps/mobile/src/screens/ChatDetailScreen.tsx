@@ -204,6 +204,9 @@ export default function ChatDetailScreen({
   const autoScrollLocked = useRef(false);
   const lastAutoScrollAt = useRef(0);
   const hasObservedTopicChange = useRef(false);
+  /** Tracks generating across renders so we only refetch when a stream ends, not on every deps churn */
+  const prevGenForMessageSyncRef = useRef<boolean | null>(null);
+  const prevTopicForMessageSyncRef = useRef<string | null | undefined>(undefined);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const animatedKeyboard = useAnimatedKeyboard();
@@ -243,6 +246,8 @@ export default function ChatDetailScreen({
 
   useEffect(() => {
     hasObservedTopicChange.current = false;
+    prevGenForMessageSyncRef.current = null;
+    prevTopicForMessageSyncRef.current = undefined;
   }, [sessionId]);
 
   useEffect(() => {
@@ -305,32 +310,28 @@ export default function ChatDetailScreen({
     }, [loadGroupDetail]),
   );
 
-  // Refresh messages/topics when screen gains focus (align with Web revalidateOnFocus)
-  // Prefer initialTopicId from route over store — avoids fetching historical topic when navigating from home send
+  // Refresh messages/topics only when the screen actually gains focus (align with Web revalidateOnFocus).
+  // Read chat/topic state via getState() so we do NOT re-run this when generating/activeTopic/etc. change while focused —
+  // that was causing repeated full refetches during tool rounds and stream end.
   useFocusEffect(
     useCallback(() => {
       if (!sessionId) return;
-      if (generating && activeStreamingSessionId === sessionId) return;
-      const topicId = initialTopicId ?? activeTopic ?? undefined;
-      void fetchSessions();
-      fetchMessages(sessionId, topicId, { preferPopulatedTopic: true });
-      void fetchTopics(sessionId).then(() => {
-        // Re-assert initialTopicId after fetchTopics; it may have overwritten with nextTopics[0]
+
+      const chat = useChatStore.getState();
+      if (chat.generating && chat.activeStreamingSessionId === sessionId) return;
+
+      const topicState = useTopicStore.getState();
+      const activeTopicNow = topicState.activeTopicBySession[sessionId] ?? null;
+      const topicId = initialTopicId ?? activeTopicNow ?? undefined;
+
+      void useSessionStore.getState().fetchSessions();
+      void chat.fetchMessages(sessionId, topicId, { preferPopulatedTopic: true });
+      void topicState.fetchTopics(sessionId).then(() => {
         if (initialTopicId != null) {
-          switchTopic(sessionId, initialTopicId);
+          useTopicStore.getState().switchTopic(sessionId, initialTopicId);
         }
       });
-    }, [
-      activeStreamingSessionId,
-      activeTopic,
-      initialTopicId,
-      fetchMessages,
-      fetchSessions,
-      fetchTopics,
-      generating,
-      sessionId,
-      switchTopic,
-    ]),
+    }, [sessionId, initialTopicId]),
   );
 
   useFocusEffect(
@@ -415,16 +416,41 @@ export default function ChatDetailScreen({
     return () => clearInterval(timer);
   }, [hints.length]);
 
+  // Refetch when the user switches topic or when a generation stream ends — not on unrelated dep churn.
   useEffect(() => {
-    if (!sessionId || generating) return;
+    if (!sessionId) return;
 
-    if (!hasObservedTopicChange.current) {
-      hasObservedTopicChange.current = true;
+    if (prevGenForMessageSyncRef.current === null) {
+      prevGenForMessageSyncRef.current = generating;
+      if (!hasObservedTopicChange.current) {
+        hasObservedTopicChange.current = true;
+        prevTopicForMessageSyncRef.current = activeTopic;
+      }
       return;
     }
 
-    fetchMessages(sessionId, activeTopic ?? undefined);
-  }, [sessionId, fetchMessages, activeTopic, generating]);
+    const genWas = prevGenForMessageSyncRef.current;
+    prevGenForMessageSyncRef.current = generating;
+
+    if (generating) {
+      return;
+    }
+
+    if (!hasObservedTopicChange.current) {
+      hasObservedTopicChange.current = true;
+      prevTopicForMessageSyncRef.current = activeTopic;
+      return;
+    }
+
+    const streamJustEnded = genWas && !generating;
+    const topicChanged = prevTopicForMessageSyncRef.current !== activeTopic;
+    if (streamJustEnded || topicChanged) {
+      prevTopicForMessageSyncRef.current = activeTopic;
+      void fetchMessages(sessionId, activeTopic ?? undefined, {
+        preserveOnEmpty: streamJustEnded,
+      });
+    }
+  }, [sessionId, generating, activeTopic, fetchMessages]);
 
   useEffect(() => {
     if (sessionId) return;

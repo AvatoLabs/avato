@@ -25,6 +25,48 @@ const TOPIC_TITLE_SCHEMA = {
   strict: true,
 };
 
+const extractTitleValue = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const title = (value as Record<string, unknown>).title;
+  return typeof title === 'string' ? title : null;
+};
+
+const parseToolCallArguments = (value: unknown): Record<string, unknown> | null => {
+  if (!value) return null;
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+};
+
+const resolveGeneratedTopicTitle = (result: unknown): string | null => {
+  const directTitle = extractTitleValue(result);
+  if (directTitle) return directTitle;
+
+  if (!Array.isArray(result)) return null;
+
+  for (const item of result) {
+    if (!item || typeof item !== 'object') continue;
+
+    const args = parseToolCallArguments((item as { arguments?: unknown }).arguments);
+    const title = extractTitleValue(args);
+
+    if (title) return title;
+  }
+
+  return null;
+};
+
 /**
  * Server-side service for SystemAgent automated tasks.
  *
@@ -74,10 +116,10 @@ export class SystemAgentService {
         schema: TOPIC_TITLE_SCHEMA,
       });
 
-      const rawTitle = (result as { title?: string })?.title;
+      const rawTitle = resolveGeneratedTopicTitle(result);
       const title = sanitizeGeneratedTopicTitle(rawTitle);
       if (!title) {
-        log('generateTopicTitle: LLM returned invalid title: %O', rawTitle);
+        log('generateTopicTitle: LLM returned invalid title payload: %O', result);
         return null;
       }
 

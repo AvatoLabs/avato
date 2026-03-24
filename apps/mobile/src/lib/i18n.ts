@@ -796,6 +796,11 @@ export type TranslationKeys = {
   resourceRenamed: string;
   resourceShareFailed: string;
   resourceShareLinkTitle: string;
+  resourceShareLinkSheetSubtitle: string;
+  resourceShareCreateLinkAction: string;
+  resourceShareLibraryMenuTitle: string;
+  resourceFolderOpenNeedsLibrary: string;
+  resourceBatchShareLink: string;
   resourceShareExpiresLabel: string;
   resourceShareExpires1d: string;
   resourceShareExpires7d: string;
@@ -1995,6 +2000,12 @@ const en: TranslationKeys = {
   resourceRenamed: 'Renamed successfully',
   resourceShareFailed: 'Share failed',
   resourceShareLinkTitle: 'Share link',
+  resourceShareLinkSheetSubtitle:
+    'Creates a time-limited link others can open. This is not the same as sending the raw file.',
+  resourceShareCreateLinkAction: 'Create share link',
+  resourceShareLibraryMenuTitle: 'Library sharing',
+  resourceFolderOpenNeedsLibrary: 'Pick a library above to open folders.',
+  resourceBatchShareLink: 'Share link',
   resourceShareExpiresLabel: 'Link expires after',
   resourceShareExpires1d: '1 day',
   resourceShareExpires7d: '7 days',
@@ -3184,6 +3195,11 @@ const zh_tw: TranslationKeys = {
   resourceRenamed: '重新命名成功',
   resourceShareFailed: '分享失敗',
   resourceShareLinkTitle: '分享連結',
+  resourceShareLinkSheetSubtitle: '會建立有期限的連結供他人開啟，與直接傳送原始檔案不同。',
+  resourceShareCreateLinkAction: '建立分享連結',
+  resourceShareLibraryMenuTitle: '資源庫分享',
+  resourceFolderOpenNeedsLibrary: '請先在上方選擇資源庫，才能瀏覽資料夾。',
+  resourceBatchShareLink: '分享連結',
   resourceShareExpiresLabel: '連結有效期限',
   resourceShareExpires1d: '1 天',
   resourceShareExpires7d: '7 天',
@@ -4372,6 +4388,11 @@ const zh: TranslationKeys = {
   resourceRenamed: '重命名成功',
   resourceShareFailed: '分享失败',
   resourceShareLinkTitle: '分享链接',
+  resourceShareLinkSheetSubtitle: '将生成限时链接供他人打开，与直接发送原始文件不同。',
+  resourceShareCreateLinkAction: '创建分享链接',
+  resourceShareLibraryMenuTitle: '资源库分享',
+  resourceFolderOpenNeedsLibrary: '请先在上方选择资源库，才能浏览文件夹。',
+  resourceBatchShareLink: '分享链接',
   resourceShareExpiresLabel: '链接有效期',
   resourceShareExpires1d: '1 天',
   resourceShareExpires7d: '7 天',

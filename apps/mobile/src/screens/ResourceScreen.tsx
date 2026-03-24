@@ -34,6 +34,7 @@ import {
   Grid3X3,
   Link2,
   List,
+  MoreVertical,
   Pencil,
   Plus,
   Search,
@@ -1411,8 +1412,6 @@ const FilePreviewModal = memo(
           </Animated.View>
         </Modal>
         <ResourceShareOptionsSheet
-          apiBase={apiBaseUrl}
-          cachedLocalUri={cachedEntry?.localUri}
           visible={shareSheetOpen && !!item}
           target={
             item
@@ -1814,6 +1813,7 @@ export default function ResourceScreen() {
   const [restoringTrashId, setRestoringTrashId] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<ResourceShareSheetTarget | null>(null);
   const [manageShareTarget, setManageShareTarget] = useState<ResourceShareSheetTarget | null>(null);
+  const [librarySharingMenuVisible, setLibrarySharingMenuVisible] = useState(false);
   const [sharedWithMeVisible, setSharedWithMeVisible] = useState(false);
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 10, minimumViewTime: 100 }),
@@ -1850,6 +1850,18 @@ export default function ResourceScreen() {
       q: searchText.trim() || undefined,
       ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
     }),
+    [libraryId, currentFolderId, currentFolderSlug, librarySpaceId, searchText],
+  );
+
+  /** Stable identity for list reload — avoids re-running when only the loadFiles callback reference changes */
+  const resourceListQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        kb: libraryId ?? null,
+        parent: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
+        q: searchText.trim() || null,
+        space: librarySpaceId ?? null,
+      }),
     [libraryId, currentFolderId, currentFolderSlug, librarySpaceId, searchText],
   );
 
@@ -2067,7 +2079,7 @@ export default function ResourceScreen() {
 
       try {
         const base = await getApiUrl();
-        setApiBase(base);
+        setApiBase((prev) => (prev === base ? prev : base));
         const result = await resourceApi.getKnowledgeItems({
           ...resourceListQueryParams,
           limit: RESOURCE_LIST_PAGE_SIZE,
@@ -2351,21 +2363,14 @@ export default function ResourceScreen() {
     }
   }, [currentFolderSlug, loadFolderBreadcrumb]);
 
-  // 切换 library 时重置文件夹导航，避免跨库的 parentId 导致请求失败
-  useEffect(() => {
-    setCurrentFolderId(null);
-    setCurrentFolderSlug(null);
-    setTreeChildrenByParent({});
-    setTreeExpandedIds(new Set());
-  }, [libraryId]);
-
   useEffect(() => {
     nextOffsetRef.current = 0;
     void (async () => {
       await refreshCachedResources();
       await loadFiles();
     })();
-  }, [loadFiles, refreshCachedResources]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadFiles identity can churn without query changes; resourceListQueryKey matches list fetch semantics
+  }, [resourceListQueryKey, refreshCachedResources]);
 
   useEffect(() => {
     if (!libraryId) return;
@@ -2387,6 +2392,17 @@ export default function ResourceScreen() {
     setCurrentFolderId(item.id);
     setCurrentFolderSlug(item.slug ?? item.id);
   }, []);
+
+  const handleFolderPressResolved = useCallback(
+    (item: FileListItem) => {
+      if (!libraryId) {
+        toast.show('info', t.resourceFolderOpenNeedsLibrary);
+        return;
+      }
+      handleFolderPress(item);
+    },
+    [handleFolderPress, libraryId, t.resourceFolderOpenNeedsLibrary, toast],
+  );
 
   const handleBreadcrumbPress = useCallback(
     (item: FolderCrumb, index: number) => {
@@ -2646,6 +2662,15 @@ export default function ResourceScreen() {
     });
   }, []);
 
+  const handleBatchShareLink = useCallback(() => {
+    if (selectedIds.size !== 1) return;
+    const onlyId = Array.from(selectedIds)[0];
+    const item = files.find((f) => f.id === onlyId);
+    if (!item) return;
+    openItemShareSheet(item);
+    clearSelection();
+  }, [clearSelection, files, openItemShareSheet, selectedIds]);
+
   const handleShareFromActionSheet = useCallback(
     (item: FileListItem) => {
       closeActionSheet();
@@ -2684,6 +2709,8 @@ export default function ResourceScreen() {
     });
   }, [libraryId, libraries, t.resourceTitle]);
 
+  const canMoveAction = !!libraryId;
+
   const handleSharedWithMePick = useCallback(
     async (row: SharedWithMeRow) => {
       setSharedWithMeVisible(false);
@@ -2709,6 +2736,21 @@ export default function ResourceScreen() {
       const doc = await resourceApi.getDocument(row.localId).catch(() => null);
       const ft = doc?.fileType ?? 'text/plain';
       if (ft === 'custom/folder') {
+        const kbId = doc?.knowledgeBaseId;
+        if (typeof kbId === 'string' && kbId.length > 0) {
+          const slug = doc?.slug ?? row.localId;
+          setLibraryId(kbId);
+          setCurrentFolderId(row.localId);
+          setCurrentFolderSlug(slug);
+          setTreeChildrenByParent({});
+          setTreeExpandedIds(new Set());
+          setFolderBreadcrumb([]);
+          clearResourceListCache();
+          void loadLibraries();
+          void loadFolderBreadcrumb(slug);
+          haptics.success();
+          return;
+        }
         toast.show('info', t.resourceSharedFolderHint);
         return;
       }
@@ -2723,7 +2765,13 @@ export default function ResourceScreen() {
       setPreviewVisible(true);
       haptics.light();
     },
-    [toast, t.resourceSharedFolderHint],
+    [
+      clearResourceListCache,
+      loadFolderBreadcrumb,
+      loadLibraries,
+      toast,
+      t.resourceSharedFolderHint,
+    ],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
@@ -2786,15 +2834,11 @@ export default function ResourceScreen() {
     ],
   );
 
-  const handleTreeFolderToggle = useCallback(
+  /** Disclosure only: expand/collapse without changing the current-folder context. */
+  const handleTreeChevronPress = useCallback(
     async (item: FileListItem) => {
       if (!isFolder(item)) return;
-
       const isExpanded = treeExpandedIds.has(item.id);
-
-      setCurrentFolderId(item.id);
-      setCurrentFolderSlug(item.slug ?? item.id);
-
       if (isExpanded) {
         setTreeExpandedIds((prev) => {
           const next = new Set(prev);
@@ -2803,13 +2847,30 @@ export default function ResourceScreen() {
         });
         return;
       }
-
       setTreeExpandedIds((prev) => {
         const next = new Set(prev);
         next.add(item.id);
         return next;
       });
       await loadTreeChildren(item.id);
+    },
+    [loadTreeChildren, treeExpandedIds],
+  );
+
+  /** Row tap: move into folder for listing/upload; expand when collapsed. */
+  const handleTreeFolderRowPress = useCallback(
+    async (item: FileListItem) => {
+      if (!isFolder(item)) return;
+      setCurrentFolderId(item.id);
+      setCurrentFolderSlug(item.slug ?? item.id);
+      if (!treeExpandedIds.has(item.id)) {
+        setTreeExpandedIds((prev) => {
+          const next = new Set(prev);
+          next.add(item.id);
+          return next;
+        });
+        await loadTreeChildren(item.id);
+      }
     },
     [loadTreeChildren, treeExpandedIds],
   );
@@ -2928,18 +2989,14 @@ export default function ResourceScreen() {
               </HeaderIconButton>
               {libraryId ? (
                 <HeaderIconButton
-                  accessibilityLabel={t.resourceShareManage}
-                  onPress={openManageLibraryShare}
+                  accessibilityLabel={t.resourceShareLibraryMenuTitle}
+                  onPress={() => setLibrarySharingMenuVisible(true)}
                 >
-                  <Users color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
-                </HeaderIconButton>
-              ) : null}
-              {libraryId ? (
-                <HeaderIconButton
-                  accessibilityLabel={t.resourceShareLibrary}
-                  onPress={handleShareLibrary}
-                >
-                  <Share2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
+                  <MoreVertical
+                    color={colors.primary}
+                    size={20}
+                    strokeWidth={tokens.icon.strokeWidth}
+                  />
                 </HeaderIconButton>
               ) : null}
               <HeaderIconButton
@@ -3176,6 +3233,11 @@ export default function ResourceScreen() {
               <Text style={{ color: colors.primary }}>{t.resourceBatchMove}</Text>
             </TouchableOpacity>
           )}
+          {selectedIds.size === 1 && (
+            <TouchableOpacity className="flex-1 items-center" onPress={handleBatchShareLink}>
+              <Text style={{ color: colors.primary }}>{t.resourceBatchShareLink}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -3315,7 +3377,7 @@ export default function ResourceScreen() {
                       }
 
                       if (entryIsFolder) {
-                        void handleTreeFolderToggle(entry);
+                        void handleTreeFolderRowPress(entry);
                         return;
                       }
 
@@ -3338,7 +3400,7 @@ export default function ResourceScreen() {
                               activeOpacity={0.7}
                               className="h-6 w-6 items-center justify-center"
                               hitSlop={8}
-                              onPress={() => void handleTreeFolderToggle(entry)}
+                              onPress={() => void handleTreeChevronPress(entry)}
                             >
                               {isExpanded ? (
                                 <ChevronDown color={colors.primary} size={16} strokeWidth={2.2} />
@@ -3388,7 +3450,7 @@ export default function ResourceScreen() {
                             : `${formatBytes(entry.size)}  ·  ${formatDate(entry.createdAt)}`}
                         </Text>
                       </View>
-                      {libraryId && !selectMode ? (
+                      {!selectMode ? (
                         <TouchableOpacity
                           accessibilityRole="button"
                           className="h-8 w-8 items-center justify-center rounded-full"
@@ -3415,13 +3477,17 @@ export default function ResourceScreen() {
                 className="flex-1 m-1 items-center rounded-xl bg-foreground/5 p-3"
                 style={viewMode === 'grid' ? { minWidth: 0 } : undefined}
                 onLongPress={() => (selectMode ? toggleSelect(item) : handleEnterSelectMode(item))}
-                onPress={() =>
-                  selectMode
-                    ? toggleSelect(item)
-                    : isFolder(item) && libraryId
-                      ? handleFolderPress(item)
-                      : handlePreview(item)
-                }
+                onPress={() => {
+                  if (selectMode) {
+                    toggleSelect(item);
+                    return;
+                  }
+                  if (isFolder(item)) {
+                    handleFolderPressResolved(item);
+                    return;
+                  }
+                  handlePreview(item);
+                }}
               >
                 <View className="h-14 w-14 items-center justify-center">
                   <View className="h-14 w-14 items-center justify-center rounded-lg bg-foreground/5 overflow-hidden">
@@ -3450,7 +3516,7 @@ export default function ResourceScreen() {
                     ) : null}
                   </View>
                 </View>
-                {libraryId && !selectMode ? (
+                {!selectMode ? (
                   <TouchableOpacity
                     accessibilityRole="button"
                     className="absolute right-2 top-2 z-10 h-7 w-7 items-center justify-center rounded-full"
@@ -3490,10 +3556,10 @@ export default function ResourceScreen() {
                 selectMode={selectMode}
                 showFolderActions={!!libraryId}
                 onDelete={handleDelete}
-                onFolderPress={libraryId ? handleFolderPress : undefined}
+                onFolderPress={handleFolderPressResolved}
                 onInvalidateCache={invalidateCachedResource}
                 onLongPressItem={handleEnterSelectMode}
-                onOpenActions={libraryId ? setActionItem : undefined}
+                onOpenActions={setActionItem}
                 onPress={handlePreview}
                 onSelect={selectMode ? toggleSelect : undefined}
                 onMoveToFolder={
@@ -3580,8 +3646,6 @@ export default function ResourceScreen() {
       />
 
       <ResourceShareOptionsSheet
-        apiBase={apiBase}
-        cachedLocalUri={shareTarget ? cachedResourceMap[shareTarget.id]?.localUri : undefined}
         target={shareTarget}
         visible={!!shareTarget}
         onClose={() => setShareTarget(null)}
@@ -3707,6 +3771,62 @@ export default function ResourceScreen() {
         </Pressable>
       </Modal>
 
+      <Modal
+        accessibilityViewIsModal
+        transparent
+        animationType="slide"
+        visible={librarySharingMenuVisible}
+        onRequestClose={() => setLibrarySharingMenuVisible(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setLibrarySharingMenuVisible(false)}
+        >
+          <Pressable
+            className="bg-card rounded-t-2xl overflow-hidden"
+            style={{ paddingBottom: insets.bottom + 16 }}
+            onPress={(e: any) => e.stopPropagation?.()}
+          >
+            <View className="items-center pt-3 pb-2">
+              <View className="w-9 h-1 rounded-full bg-foreground/10" />
+            </View>
+            <Text className="px-5 text-[16px] font-semibold text-foreground mb-1">
+              {t.resourceShareLibraryMenuTitle}
+            </Text>
+            <Pressable
+              className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
+              onPress={() => {
+                setLibrarySharingMenuVisible(false);
+                handleShareLibrary();
+              }}
+            >
+              <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-base text-foreground">{t.resourceShareLibrary}</Text>
+            </Pressable>
+            <Pressable
+              className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
+              onPress={() => {
+                setLibrarySharingMenuVisible(false);
+                openManageLibraryShare();
+              }}
+            >
+              <Users color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+              <Text className="ml-3 text-base text-foreground">{t.resourceShareManage}</Text>
+            </Pressable>
+            <View className="px-5 mt-1">
+              <Pressable
+                className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
+                onPress={() => setLibrarySharingMenuVisible(false)}
+              >
+                <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
+                  {t.cancel}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Item Action Sheet */}
       <Modal
         accessibilityViewIsModal
@@ -3739,19 +3859,21 @@ export default function ResourceScreen() {
                     <Text className="ml-3 text-base text-foreground">{t.notebookPreview}</Text>
                   </Pressable>
                 ) : null}
-                <Pressable
-                  className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
-                  onPress={() => {
-                    haptics.light();
-                    setMoveToFolderItem(actionItem);
-                    setBatchMoveIds(new Set());
-                    setMoveFolderStack([null]);
-                    closeActionSheet();
-                  }}
-                >
-                  <Folder color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-3 text-base text-foreground">{t.resourceMoveToFolder}</Text>
-                </Pressable>
+                {canMoveAction ? (
+                  <Pressable
+                    className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
+                    onPress={() => {
+                      haptics.light();
+                      setMoveToFolderItem(actionItem);
+                      setBatchMoveIds(new Set());
+                      setMoveFolderStack([null]);
+                      closeActionSheet();
+                    }}
+                  >
+                    <Folder color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
+                    <Text className="ml-3 text-base text-foreground">{t.resourceMoveToFolder}</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
                   onPress={handleRenameStart}
@@ -3764,7 +3886,9 @@ export default function ResourceScreen() {
                   onPress={() => handleShareFromActionSheet(actionItem)}
                 >
                   <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-                  <Text className="ml-3 text-base text-foreground">{t.msgActionShare}</Text>
+                  <Text className="ml-3 text-base text-foreground">
+                    {t.resourceShareCreateLinkAction}
+                  </Text>
                 </Pressable>
                 <Pressable
                   className="flex-row items-center py-3.5 px-3 rounded-xl active:bg-foreground/5"
@@ -3843,6 +3967,8 @@ export default function ResourceScreen() {
                   setLibraryId(null);
                   setCurrentFolderId(null);
                   setCurrentFolderSlug(null);
+                  setTreeChildrenByParent({});
+                  setTreeExpandedIds(new Set());
                   setLibrarySelectVisible(false);
                 }}
               >
@@ -3871,6 +3997,8 @@ export default function ResourceScreen() {
                     setLibraryId(lib.id);
                     setCurrentFolderId(null);
                     setCurrentFolderSlug(null);
+                    setTreeChildrenByParent({});
+                    setTreeExpandedIds(new Set());
                     setLibrarySelectVisible(false);
                   }}
                 >

@@ -16,6 +16,8 @@ DEPLOY_PUBLIC_VERIFY_MODE="${DEPLOY_PUBLIC_VERIFY_MODE:-direct}"
 # Presigned S3 uploads: clients PUT to this URL (must not be localhost)
 DEPLOY_S3_PORT="${DEPLOY_S3_PORT:-9002}"
 PUBLIC_S3_ENDPOINT="${PUBLIC_S3_ENDPOINT:-http://${DEPLOY_HOST}:${DEPLOY_S3_PORT}}"
+# Runtime Dockerfile base (override when Docker registry-mirror DNS fails, e.g. docker.mirrors.ustc.edu.cn)
+CANARY_RUNTIME_NODE_IMAGE="${CANARY_RUNTIME_NODE_IMAGE:-node:24-slim}"
 
 # Canary-specific paths (different from production)
 REMOTE_ARTIFACT_DIR="${REMOTE_ARTIFACT_DIR:-/data/canary}"
@@ -67,25 +69,38 @@ exit $exit_code
 EOF
 }
 
+restore_build_env() {
+  if [ -n "${BUILD_ENV_BACKUP_FILE:-}" ] && [ -f "${BUILD_ENV_BACKUP_FILE}" ]; then
+    mv "${BUILD_ENV_BACKUP_FILE}" "${ROOT_DIR}/.env.production"
+  else
+    rm -f "${ROOT_DIR}/.env.production"
+  fi
+}
+
 cd "${ROOT_DIR}"
 
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
+BUILD_ENV_BACKUP_FILE=""
+if [ -e "${ROOT_DIR}/.env.production" ]; then
+  BUILD_ENV_BACKUP_FILE="$(mktemp "${ROOT_DIR}/.env.production.backup.XXXXXX")"
+  cp -p "${ROOT_DIR}/.env.production" "${BUILD_ENV_BACKUP_FILE}"
+fi
 cp "${BUILD_ENV_FILE}" .env.production
-trap 'rm -f "${ROOT_DIR}/.env.production"' EXIT
+trap restore_build_env EXIT
 bun run build:docker
 
 echo "==> Preparing runtime bundle"
 rm -rf "${TMP_BUILD_DIR}/app"
 mkdir -p "${TMP_BUILD_DIR}" "${TMP_ARTIFACT_DIR}"
 
-cat >"${TMP_BUILD_DIR}/Dockerfile" <<'EOF'
-FROM node:24-slim AS sharp-runtime
+cat >"${TMP_BUILD_DIR}/Dockerfile" <<EOF
+FROM ${CANARY_RUNTIME_NODE_IMAGE} AS sharp-runtime
 WORKDIR /sharp-runtime
-RUN printf '{"name":"sharp-runtime","private":true}' > package.json \
-  && npm install --legacy-peer-deps --no-save --include=optional --os=linux --cpu=x64 sharp@^0.34.4 \
+RUN printf '{"name":"sharp-runtime","private":true}' > package.json \\
+  && npm install --legacy-peer-deps --no-save --include=optional --os=linux --cpu=x64 sharp@^0.34.4 \\
   && npm cache clean --force
 
-FROM node:24-slim
+FROM ${CANARY_RUNTIME_NODE_IMAGE}
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3210
@@ -123,7 +138,7 @@ mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
 rsync -a public/ "${TMP_BUILD_DIR}/app/public/"
 
-echo "==> Building runtime image ${IMAGE_NAME}"
+echo "==> Building runtime image ${IMAGE_NAME} (base: ${CANARY_RUNTIME_NODE_IMAGE})"
 docker buildx build --platform linux/amd64 --load -t "${IMAGE_NAME}" "${TMP_BUILD_DIR}"
 
 echo "==> Packaging ${ARTIFACT_NAME}"

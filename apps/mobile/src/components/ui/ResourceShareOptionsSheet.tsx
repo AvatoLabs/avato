@@ -27,8 +27,6 @@ export interface ResourceShareSheetTarget {
 }
 
 interface ResourceShareOptionsSheetProps {
-  apiBase: string;
-  cachedLocalUri?: string | null;
   onClose: () => void;
   onFail: () => void;
   onSuccess: () => void;
@@ -39,8 +37,6 @@ interface ResourceShareOptionsSheetProps {
 export default function ResourceShareOptionsSheet({
   visible,
   target,
-  apiBase,
-  cachedLocalUri,
   onClose,
   onSuccess,
   onFail,
@@ -65,8 +61,6 @@ export default function ResourceShareOptionsSheet({
     setSubmitting(true);
     try {
       const result = await shareResourceWithLink({
-        apiBase,
-        cachedLocalUri,
         expiresInDays,
         id: target.id,
         kind: target.kind,
@@ -82,17 +76,7 @@ export default function ResourceShareOptionsSheet({
     } finally {
       setSubmitting(false);
     }
-  }, [
-    apiBase,
-    cachedLocalUri,
-    expiresInDays,
-    onClose,
-    onFail,
-    onSuccess,
-    password,
-    submitting,
-    target,
-  ]);
+  }, [expiresInDays, onClose, onFail, onSuccess, password, submitting, target]);
 
   if (!target) return null;
 
@@ -140,6 +124,9 @@ export default function ResourceShareOptionsSheet({
             </View>
             <Text className="text-foreground text-[17px] font-bold" numberOfLines={2}>
               {t.resourceShareLinkTitle}
+            </Text>
+            <Text className="text-[12px] mt-1.5 mb-1" style={{ color: colors.secondaryText }}>
+              {t.resourceShareLinkSheetSubtitle}
             </Text>
             <Text
               className="text-[13px] mt-1 mb-4"

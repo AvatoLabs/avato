@@ -547,6 +547,11 @@ export interface MobileMessageToolCall {
   type: string;
 }
 
+const readNextXHRResponseChunk = (responseText: string, processedLength: number) => ({
+  chunk: responseText.slice(processedLength),
+  processedLength: responseText.length,
+});
+
 async function getBaseUrl(): Promise<string> {
   return getApiUrl();
 }
@@ -1947,6 +1952,7 @@ export const aiChatApi = {
         let accText = '';
         let accTools: ChatToolPayload[] | undefined;
         let accToolExecutions: ToolExecutionItem[] | undefined;
+        let processedLength = 0;
         const parseSSE = createSSEChunkParser();
 
         const handleParsedChunk = (parsed: ReturnType<typeof parseSSE>) => {
@@ -1967,7 +1973,9 @@ export const aiChatApi = {
         };
 
         xhr.onprogress = () => {
-          const chunk = xhr.responseText;
+          const next = readNextXHRResponseChunk(xhr.responseText, processedLength);
+          processedLength = next.processedLength;
+          const chunk = next.chunk;
           if (!chunk) return;
           handleParsedChunk(parseSSE(chunk));
         };
@@ -1977,7 +1985,9 @@ export const aiChatApi = {
             reject(new Error(`Continue failed: ${xhr.status}`));
             return;
           }
-          const chunk = xhr.responseText;
+          const next = readNextXHRResponseChunk(xhr.responseText, processedLength);
+          processedLength = next.processedLength;
+          const chunk = next.chunk;
           if (chunk) {
             handleParsedChunk(parseSSE(chunk, { flush: true }));
           }
@@ -2187,6 +2197,9 @@ export const resourceApi = {
       editorData?: Record<string, any> | null;
       fileType?: string | null;
       id: string;
+      knowledgeBaseId?: string | null;
+      parentId?: string | null;
+      slug?: string | null;
       title?: string | null;
     }>('document.getDocumentById', { id }),
 

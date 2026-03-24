@@ -396,9 +396,7 @@ export default function ResourceShareManageSheet({
                       className="pt-0.5"
                       hitSlop={8}
                       onPress={async () => {
-                        const line = access.canAccess
-                          ? `allow · ${access.matchedBy ?? 'ok'} · authzEpoch=${access.authzEpoch} · resourceUid=${access.resourceUid} · spaceId=${access.spaceId}`
-                          : `deny · ${access.reason ?? 'unknown'} · resourceUid=${access.resourceUid} · spaceId=${access.spaceId}`;
+                        const line = humanAccessSummary(access, t);
                         await Clipboard.setStringAsync(line);
                         haptics.success();
                         toast.show('success', t.resourceAccessCopied);
