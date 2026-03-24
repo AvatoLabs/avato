@@ -214,7 +214,7 @@ const CronJobDetailPage = memo(() => {
       } catch (error) {
         console.error('Failed to update cron job:', error);
         setAutoSaveState({ status: 'idle' });
-        message.error('Failed to update scheduled task');
+        message.error(t('agentCronJobs.updateFailed', { ns: 'setting' }));
       }
     },
     { wait: EDITOR_DEBOUNCE_TIME },
@@ -283,12 +283,12 @@ const CronJobDetailPage = memo(() => {
       } catch (error) {
         console.error('Failed to update cron job status:', error);
         setAutoSaveState({ status: 'idle' });
-        message.error('Failed to update scheduled task');
+        message.error(t('agentCronJobs.updateFailed', { ns: 'setting' }));
       } finally {
         setIsTogglingEnabled(false);
       }
     },
-    [cronId, internal_refreshCronTopics],
+    [cronId, internal_refreshCronTopics, t],
   );
 
   const handleDeleteCronJob = useCallback(async () => {
@@ -329,27 +329,27 @@ const CronJobDetailPage = memo(() => {
           }
         } catch (error) {
           console.error('Failed to delete cron job:', error);
-          message.error('Failed to delete scheduled task');
+          message.error(t('agentCronJobs.deleteFailed', { ns: 'setting' }));
         }
       },
       title: t('agentCronJobs.deleteCronJob' as any),
     });
-  }, [activeTopicId, cronId, cronListAgentId, modal, refreshTopic, router, switchTopic, t]);
+  }, [activeTopicId, aid, cronId, cronListAgentId, modal, refreshTopic, router, switchTopic, t]);
 
   const handleSaveNewJob = useCallback(async () => {
     if (!aid) {
-      message.error('Agent ID is required');
+      message.error(t('agentCronJobs.form.validation.agentRequired', { ns: 'setting' }));
       return;
     }
 
     const payload = buildUpdateData(draftRef.current, contentRef.current);
     if (!payload) {
-      message.error('Please fill in all required fields');
+      message.error(t('agentCronJobs.form.validation.completeRequired', { ns: 'setting' }));
       return;
     }
 
     if (!payload.content || !payload.name || !payload.cronPattern) {
-      message.error('Name and content are required');
+      message.error(t('agentCronJobs.form.validation.nameAndContentRequired', { ns: 'setting' }));
       return;
     }
 
@@ -369,7 +369,7 @@ const CronJobDetailPage = memo(() => {
 
       if (result.success && result.data) {
         setAutoSaveState({ lastUpdatedTime: new Date(), status: 'saved' });
-        message.success('Scheduled task created successfully');
+        message.success(t('agentCronJobs.createSuccess', { ns: 'setting' }));
         refreshCronList();
         // Navigate to the newly created job
         router.push(`/agent/${aid}/cron/${result.data.id}`);
@@ -379,9 +379,9 @@ const CronJobDetailPage = memo(() => {
     } catch (error) {
       console.error('Failed to create cron job:', error);
       setAutoSaveState({ status: 'idle' });
-      message.error('Failed to create scheduled task');
+      message.error(t('agentCronJobs.createFailed', { ns: 'setting' }));
     }
-  }, [aid, buildUpdateData, refreshCronList, router]);
+  }, [aid, buildUpdateData, refreshCronList, router, t]);
 
   // Initialize draft for new jobs
   useEffect(() => {

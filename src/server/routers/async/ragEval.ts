@@ -17,6 +17,10 @@ import {
 import { asyncAuthedProcedure, asyncRouter as router } from '@/libs/trpc/async';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
+import {
+  assertRagEmbeddingDimensions,
+  RAG_EMBEDDING_DIMENSIONS,
+} from '@/server/services/rag/constants';
 import { AsyncTaskError } from '@/types/asyncTask';
 
 const ragEvalProcedure = asyncAuthedProcedure.use(async (opts) => {
@@ -66,10 +70,14 @@ export const ragEvalRouter = router({
         // If questionEmbeddingId does not exist, perform an embedding
         if (!questionEmbeddingId) {
           const embeddings = await modelRuntime.embeddings({
-            dimensions: 1024,
+            dimensions: RAG_EMBEDDING_DIMENSIONS,
             input: question,
             model: !!embeddingModel ? embeddingModel : DEFAULT_EMBEDDING_MODEL,
           });
+          assertRagEmbeddingDimensions(
+            embeddings,
+            `rag eval question embedding:${ModelProvider.OpenAI}/${embeddingModel ?? DEFAULT_EMBEDDING_MODEL}`,
+          );
 
           const embeddingId = await ctx.embeddingModel.create({
             embeddings: embeddings?.[0],
@@ -91,8 +99,8 @@ export const ragEvalRouter = router({
 
           const chunks = await ctx.chunkModel.semanticSearchForChat({
             embedding: embeddingItem!.embeddings!,
+            embeddingModel: embeddingItem?.model ?? undefined,
             fileIds: datasetRecord!.referenceFiles!,
-            query: evalRecord.question,
           });
 
           context = chunks.map((item) => item.text).filter(Boolean) as string[];

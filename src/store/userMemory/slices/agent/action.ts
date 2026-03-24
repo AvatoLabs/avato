@@ -34,12 +34,33 @@ export class AgentMemoryActionImpl {
   };
 
   useFetchMemoriesForTopic = (topicId?: string | null): SWRResponse<RetrieveMemoryResult> => {
+    return this.useFetchMemoriesForTopicWithOptions(topicId);
+  };
+
+  useFetchMemoriesForTopicWithOptions = (
+    topicId?: string | null,
+    options?: {
+      effort?: 'high' | 'low' | 'medium';
+      latestUserMessageId?: string;
+      userMessageCount?: number;
+    },
+  ): SWRResponse<RetrieveMemoryResult> => {
     return useClientDataSWRWithSync<RetrieveMemoryResult>(
-      topicId ? ['useFetchMemoriesForTopic', topicId] : null,
+      topicId
+        ? [
+            'useFetchMemoriesForTopic',
+            topicId,
+            options?.effort ?? 'medium',
+            options?.userMessageCount ?? 0,
+            options?.latestUserMessageId ?? null,
+          ]
+        : null,
       async () => {
         // Retrieve memories using topic's context
         // The backend will use topic info to build the query
-        return await userMemoryService.retrieveMemoryForTopic(topicId!);
+        return await userMemoryService.retrieveMemoryForTopic(topicId!, {
+          effort: options?.effort,
+        });
       },
       {
         onData: (data) => {

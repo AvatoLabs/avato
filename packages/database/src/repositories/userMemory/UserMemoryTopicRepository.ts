@@ -25,7 +25,7 @@ export class UserMemoryTopicRepository {
    * This is used for memory retrieval based on conversation context
    *
    * @param topicId - The topic ID to get messages from
-   * @returns Concatenated user message content (first 7000 chars) or null if no messages
+   * @returns Concatenated user message content (last 7000 chars) or null if no messages
    */
   async getUserMessagesQueryForTopic(topicId: string): Promise<string | null> {
     // Query user messages for this topic, ordered by creation time
@@ -57,7 +57,7 @@ export class UserMemoryTopicRepository {
       return null;
     }
 
-    // Truncate to max length
-    return concatenatedContent.slice(0, MAX_QUERY_LENGTH);
+    // Keep the most recent portion of the concatenated conversation
+    return concatenatedContent.slice(-MAX_QUERY_LENGTH);
   }
 }

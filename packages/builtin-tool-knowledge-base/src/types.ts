@@ -8,8 +8,9 @@ export const KnowledgeBaseApiName = {
 };
 
 export interface SearchKnowledgeBaseArgs {
+  chunkTopK?: number;
+  fileTopK?: number;
   query: string;
-  topK?: number;
 }
 export interface SearchKnowledgeBaseState {
   chunks: ChatSemanticSearchChunk[];

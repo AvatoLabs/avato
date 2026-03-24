@@ -40,6 +40,17 @@ const readUserMemoryEffortFromDb = async (
 };
 
 const searchResultToPromptMemories = (result: SearchMemoryResult): Partial<UserMemoryData> => ({
+  activities: result.activities.map((activity) => ({
+    endsAt: activity.endsAt,
+    feedback: activity.feedback,
+    id: activity.id,
+    narrative: activity.narrative,
+    notes: activity.notes,
+    startsAt: activity.startsAt,
+    status: activity.status,
+    timezone: activity.timezone,
+    type: activity.type,
+  })),
   contexts: result.contexts.map((c) => ({
     description: c.description,
     id: c.id,
@@ -112,6 +123,7 @@ export const buildMobileChatUserMemoryPrompt = async (params: {
   }
 
   const memories: UserMemoryData = {
+    activities: topicMemories.activities ?? [],
     contexts: topicMemories.contexts ?? [],
     experiences: topicMemories.experiences ?? [],
     identities: identities.length > 0 ? identities : undefined,

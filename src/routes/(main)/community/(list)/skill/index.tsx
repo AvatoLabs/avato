@@ -8,14 +8,16 @@ import { useDiscoverStore } from '@/store/discover';
 import { type SkillQueryParams } from '@/types/discover';
 import { DiscoverTab, SkillSorts } from '@/types/discover';
 
+import DiscoverRequestError from '../features/DiscoverRequestError';
 import Pagination from '../features/Pagination';
+import SkillEmpty from '../features/SkillEmpty';
 import List from './features/List';
 import Loading from './loading';
 
 const SkillPage = memo(() => {
   const { q, page, category, sort, order } = useQuery() as SkillQueryParams;
   const useSkillList = useDiscoverStore((s) => s.useFetchSkillList);
-  const { data, isLoading } = useSkillList({
+  const { data, error, isLoading, mutate } = useSkillList({
     category,
     order,
     page,
@@ -24,9 +26,12 @@ const SkillPage = memo(() => {
     sort: sort ?? SkillSorts.InstallCount,
   });
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
+  if (!data) return <Loading />;
 
   const { items, currentPage, pageSize, totalCount } = data;
+  if (items.length === 0) return <SkillEmpty search={Boolean(q || category)} />;
 
   return (
     <Flexbox gap={32} width={'100%'}>

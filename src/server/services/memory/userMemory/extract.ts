@@ -371,14 +371,21 @@ const debugRuntimeInit = (
   });
 };
 
-const isTopicExtracted = (metadata?: ChatTopicMetadata | null): boolean => {
-  const extractStatus = metadata?.userMemoryExtractStatus;
-  if (extractStatus) return extractStatus === 'completed';
+const isTopicExtracted = (
+  metadata?: ChatTopicMetadata | null,
+  updatedAt?: Date | null,
+): boolean => {
+  if (metadata?.userMemoryExtractStatus !== 'completed') return false;
 
-  return (
-    metadata?.userMemoryExtractStatus === 'completed' &&
-    !!metadata?.userMemoryExtractRunState?.lastRunAt
-  );
+  const lastRunAt = metadata.userMemoryExtractRunState?.lastRunAt;
+  if (!lastRunAt) return true;
+
+  if (!updatedAt) return true;
+
+  const lastRunDate = new Date(lastRunAt);
+  if (Number.isNaN(lastRunDate.getTime())) return false;
+
+  return updatedAt.getTime() <= lastRunDate.getTime();
 };
 
 type RuntimeBundle = {
@@ -1144,7 +1151,11 @@ export class MemoryExtractionExecutor {
               traceId: span.spanContext().traceId,
             };
           }
-          if (!job.forceAll && !job.forceTopics && isTopicExtracted(topic.metadata)) {
+          if (
+            !job.forceAll &&
+            !job.forceTopics &&
+            isTopicExtracted(topic.metadata, topic.updatedAt)
+          ) {
             span.setStatus({ code: SpanStatusCode.OK, message: 'already_extracted' });
             topicProcessed = true;
             return {

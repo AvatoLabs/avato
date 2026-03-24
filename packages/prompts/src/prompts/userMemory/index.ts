@@ -20,6 +20,18 @@ export interface UserMemoryPreferenceItem {
   id?: string;
 }
 
+export interface UserMemoryActivityItem {
+  endsAt?: string | Date | null;
+  feedback?: string | null;
+  id?: string;
+  narrative?: string | null;
+  notes?: string | null;
+  startsAt?: string | Date | null;
+  status?: string | null;
+  timezone?: string | null;
+  type?: string | null;
+}
+
 export type IdentityType = 'demographic' | 'personal' | 'professional';
 
 export interface UserMemoryIdentityItem {
@@ -36,6 +48,7 @@ export interface UserMemoryPersonaItem {
 }
 
 export interface UserMemoryData {
+  activities?: UserMemoryActivityItem[];
   contexts?: UserMemoryContextItem[];
   experiences?: UserMemoryExperienceItem[];
   identities?: UserMemoryIdentityItem[];
@@ -95,6 +108,52 @@ const formatPreferenceItem = (item: UserMemoryPreferenceItem): string => {
 };
 
 /**
+ * Check if an activity item has meaningful content
+ */
+const isValidActivityItem = (item: UserMemoryActivityItem): boolean => {
+  return !!(
+    item.id ||
+    item.type ||
+    item.status ||
+    item.timezone ||
+    item.startsAt ||
+    item.endsAt ||
+    item.narrative ||
+    item.notes ||
+    item.feedback
+  );
+};
+
+const formatDateTime = (value: string | Date): string => {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString();
+};
+
+/**
+ * Formats a single activity memory item
+ */
+const formatActivityItem = (item: UserMemoryActivityItem): string => {
+  const idAttr = item.id ? ` id="${item.id}"` : '';
+  const typeAttr = item.type ? ` type="${item.type}"` : '';
+  const statusAttr = item.status ? ` status="${item.status}"` : '';
+  const timezoneAttr = item.timezone ? ` timezone="${item.timezone}"` : '';
+  const startsAtAttr = item.startsAt ? ` startsAt="${formatDateTime(item.startsAt)}"` : '';
+  const endsAtAttr = item.endsAt ? ` endsAt="${formatDateTime(item.endsAt)}"` : '';
+  const content = [
+    item.narrative ? `    <narrative>${item.narrative}</narrative>` : undefined,
+    item.notes ? `    <notes>${item.notes}</notes>` : undefined,
+    item.feedback ? `    <feedback>${item.feedback}</feedback>` : undefined,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return `  <activity${idAttr}${typeAttr}${statusAttr}${timezoneAttr}${startsAtAttr}${endsAtAttr}>
+${content}
+  </activity>`;
+};
+
+/**
  * Check if an identity item has meaningful content
  */
 const isValidIdentityItem = (item: UserMemoryIdentityItem): boolean => {
@@ -145,19 +204,28 @@ const formatPersonaItem = (item: UserMemoryPersonaItem): string => {
  */
 export const promptUserMemory = ({ memories }: PromptUserMemoryOptions): string => {
   // Filter out empty/invalid items
+  const activities = (memories.activities || []).filter(isValidActivityItem);
   const hasPersona = isValidPersonaItem(memories.persona);
   const identities = (memories.identities || []).filter(isValidIdentityItem);
   const contexts = (memories.contexts || []).filter(isValidContextItem);
   const experiences = (memories.experiences || []).filter(isValidExperienceItem);
   const preferences = (memories.preferences || []).filter(isValidPreferenceItem);
 
+  const hasActivities = activities.length > 0;
   const hasIdentities = identities.length > 0;
   const hasContexts = contexts.length > 0;
   const hasExperiences = experiences.length > 0;
   const hasPreferences = preferences.length > 0;
 
   // If no memories at all, return empty
-  if (!hasPersona && !hasIdentities && !hasContexts && !hasExperiences && !hasPreferences) {
+  if (
+    !hasActivities &&
+    !hasPersona &&
+    !hasIdentities &&
+    !hasContexts &&
+    !hasExperiences &&
+    !hasPreferences
+  ) {
     return '';
   }
 
@@ -176,6 +244,14 @@ export const promptUserMemory = ({ memories }: PromptUserMemoryOptions): string 
     contentParts.push(`<identities count="${identities.length}">
 ${identitiesXml}
 </identities>`);
+  }
+
+  // Add activities section
+  if (hasActivities) {
+    const activitiesXml = activities.map((item) => formatActivityItem(item)).join('\n');
+    contentParts.push(`<activities count="${activities.length}">
+${activitiesXml}
+</activities>`);
   }
 
   // Add contexts section

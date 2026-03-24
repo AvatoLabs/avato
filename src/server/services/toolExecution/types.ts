@@ -7,6 +7,8 @@ import { type ProcessContentBlocksFn } from '@/server/services/mcp/contentProces
 export interface ToolExecutionContext {
   /** Target device ID for device proxy tool calls */
   activeDeviceId?: string;
+  /** Knowledge base IDs enabled for the current agent/session */
+  knowledgeBaseIds?: string[];
   /** Memory tool permission from agent chat config */
   memoryToolPermission?: 'read-only' | 'read-write';
   /** Optional MCP content block post-processor for multimodal tool results */

@@ -1,7 +1,7 @@
 import { Flexbox } from '@lobehub/ui';
 import { useTheme } from 'antd-style';
 import { type FC, type ReactNode } from 'react';
-import { Activity, useEffect, useMemo, useState } from 'react';
+import { Activity, useEffect, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useIsDark } from '@/hooks/useIsDark';
@@ -22,17 +22,12 @@ const Layout: FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isHomeRoute = pathname === '/';
-  const [hasActivated, setHasActivated] = useState(isHomeRoute);
   const setNavigate = useHomeStore((s) => s.setNavigate);
   const content = children ?? <Outlet />;
 
   useEffect(() => {
     setNavigate(navigate);
   }, [navigate, setNavigate]);
-
-  useEffect(() => {
-    if (isHomeRoute) setHasActivated(true);
-  }, [isHomeRoute]);
 
   // CSS 变量用于动态背景色（colorBgContainerSecondary 不在 cssVar 中）
   const cssVariables = useMemo<Record<string, string>>(
@@ -42,9 +37,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
     [theme.colorBgContainerSecondary],
   );
 
-  if (!hasActivated) return null;
-
-  // Keep the Home layout alive and render it offscreen when inactive.
+  // Keep the Home layout mounted so deep-link entries still hydrate the sidebar and home state.
   return (
     <Activity mode={isHomeRoute ? 'visible' : 'hidden'} name="DesktopHomeLayout">
       <Flexbox className={styles.absoluteContainer} height={'100%'} width={'100%'}>

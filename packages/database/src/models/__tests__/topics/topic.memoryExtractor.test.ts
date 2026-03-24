@@ -74,4 +74,39 @@ describe('TopicModel - countTopicsForMemoryExtractor', () => {
 
     expect(total).toBe(2);
   });
+
+  it('counts completed topics that changed after the last extraction run', async () => {
+    await serverDB.insert(topics).values([
+      {
+        id: 't1',
+        createdAt: new Date('2023-01-01'),
+        metadata: {
+          userMemoryExtractRunState: {
+            lastRunAt: '2023-01-01T00:00:00.000Z',
+          },
+          userMemoryExtractStatus: 'completed',
+        },
+        updatedAt: new Date('2023-01-02'),
+        userId,
+      },
+      {
+        id: 't2',
+        createdAt: new Date('2023-02-01'),
+        metadata: {
+          userMemoryExtractRunState: {
+            lastRunAt: '2023-02-02T00:00:00.000Z',
+          },
+          userMemoryExtractStatus: 'completed',
+        },
+        updatedAt: new Date('2023-02-01'),
+        userId,
+      },
+    ]);
+
+    const total = await topicModel.countTopicsForMemoryExtractor({
+      ignoreExtracted: false,
+    });
+
+    expect(total).toBe(1);
+  });
 });

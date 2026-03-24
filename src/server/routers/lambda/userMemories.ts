@@ -785,10 +785,10 @@ export const userMemoriesRouter = router({
 
   /**
    * Retrieve memories for a specific topic
-   * Uses concatenated user messages (first 7000 chars) as the search query
+   * Uses the most recent user-message context in the topic as the search query
    */
   retrieveMemoryForTopic: memoryProcedure
-    .input(z.object({ topicId: z.string() }))
+    .input(z.object({ effort: z.enum(['high', 'low', 'medium']).optional(), topicId: z.string() }))
     .query(async ({ ctx, input }) => {
       try {
         // Get concatenated user messages for this topic
@@ -802,6 +802,7 @@ export const userMemoriesRouter = router({
 
         // Search memories using concatenated user messages
         const searchParams = {
+          effort: input.effort,
           query,
           topK: DEFAULT_SEARCH_USER_MEMORY_TOP_K,
         };

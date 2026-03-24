@@ -195,7 +195,6 @@ describe('ChunkModel', () => {
       const result = await chunkModel.semanticSearch({
         embedding: designThinkingQuery2,
         fileIds: [fileId],
-        query: 'design thinking',
       });
 
       expect(result).toHaveLength(2);
@@ -204,7 +203,7 @@ describe('ChunkModel', () => {
       expect(result[0].similarity).toBeGreaterThan(result[1].similarity);
     });
     // 补充无文件 ID 的搜索场景
-    it('should perform semantic search without fileIds', async () => {
+    it('should return empty array without fileIds', async () => {
       const [chunk1, chunk2] = await serverDB
         .insert(chunks)
         .values([
@@ -220,12 +219,10 @@ describe('ChunkModel', () => {
 
       const result = await chunkModel.semanticSearch({
         embedding: designThinkingQuery2,
-        fileIds: undefined,
-        query: 'design thinking',
+        fileIds: [],
       });
 
-      expect(result).toBeDefined();
-      expect(result).toHaveLength(2);
+      expect(result).toEqual([]);
     });
 
     // 测试空结果场景
@@ -233,7 +230,6 @@ describe('ChunkModel', () => {
       const result = await chunkModel.semanticSearch({
         embedding: designThinkingQuery,
         fileIds: ['non-existent-file'],
-        query: 'no matches',
       });
 
       expect(result).toHaveLength(0);
@@ -436,7 +432,6 @@ describe('ChunkModel', () => {
       const result = await chunkModel.semanticSearchForChat({
         embedding: designThinkingQuery2,
         fileIds: [fileId],
-        query: 'design thinking',
       });
 
       expect(result).toHaveLength(2);
@@ -529,7 +524,6 @@ content in Table html is below:
       const result = await chunkModel.semanticSearchForChat({
         embedding: designThinkingQuery,
         fileIds: [],
-        query: 'test',
       });
 
       expect(result).toHaveLength(0);
@@ -566,8 +560,8 @@ content in Table html is below:
 
       const result = await chunkModel.semanticSearchForChat({
         embedding: designThinkingQuery2,
+        chunkTopK: 15,
         fileIds: [fileId],
-        query: 'test',
       });
 
       expect(result).toHaveLength(15);

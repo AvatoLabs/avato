@@ -289,11 +289,11 @@ export const useFileItemDropdown = ({
                   await downloadFile(blobUrl, mdFilename);
                   URL.revokeObjectURL(blobUrl);
                 } else {
-                  message.error('Failed to download page: no content available');
+                  message.error(t('pageList.downloadPageNoContent', { ns: 'file' }));
                 }
               } catch (error) {
                 console.error('Failed to download page:', error);
-                message.error('Failed to download page');
+                message.error(t('pageList.downloadPageFailed', { ns: 'file' }));
               }
             } else {
               // For regular files, download from URL

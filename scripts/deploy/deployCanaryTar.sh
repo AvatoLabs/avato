@@ -79,6 +79,12 @@ restore_build_env() {
 
 cd "${ROOT_DIR}"
 
+if [ ! -f "${COMPOSE_ENV_FILE}" ]; then
+  echo "Missing compose env file: ${COMPOSE_ENV_FILE}" >&2
+  echo "Create docker-compose/canary/.env or set COMPOSE_ENV_FILE to a valid runtime env file." >&2
+  exit 1
+fi
+
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
 BUILD_ENV_BACKUP_FILE=""
 if [ -e "${ROOT_DIR}/.env.production" ]; then
@@ -166,15 +172,11 @@ run_with_expect \
   scp -F "${SSH_CONFIG_FILE}" \
   "${config_files[@]}" \
   "canary-deploy:${REMOTE_DEPLOY_PATH}/"
-if [ -f "${COMPOSE_ENV_FILE}" ]; then
-  echo "==> Uploading compose env from ${COMPOSE_ENV_FILE}"
-  run_with_expect \
-    scp -F "${SSH_CONFIG_FILE}" \
-    "${COMPOSE_ENV_FILE}" \
-    "canary-deploy:${REMOTE_DEPLOY_PATH}/.env"
-else
-  echo "==> Skipping compose env upload; local file not found: ${COMPOSE_ENV_FILE}"
-fi
+echo "==> Uploading compose env from ${COMPOSE_ENV_FILE}"
+run_with_expect \
+  scp -F "${SSH_CONFIG_FILE}" \
+  "${COMPOSE_ENV_FILE}" \
+  "canary-deploy:${REMOTE_DEPLOY_PATH}/.env"
 
 echo "==> Patching remote .env: S3_ENDPOINT + INTERNAL_APP_URL (async /trpc/async must hit container :3210)"
 CANARY_INTERNAL_APP_URL="${CANARY_INTERNAL_APP_URL:-http://127.0.0.1:3210}"

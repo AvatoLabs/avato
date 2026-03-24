@@ -30,6 +30,17 @@ const BackLink = ({ children }: { children: ReactNode }) => {
     (e: MouseEvent) => {
       if (isModifierClick(e)) return;
       e.preventDefault();
+
+      const historyIndex =
+        typeof window !== 'undefined' && typeof window.history.state?.idx === 'number'
+          ? window.history.state.idx
+          : 0;
+
+      if (historyIndex > 0) {
+        navigate(-1);
+        return;
+      }
+
       navigate('/');
     },
     [navigate],

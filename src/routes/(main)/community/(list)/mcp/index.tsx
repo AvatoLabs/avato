@@ -8,6 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type McpQueryParams } from '@/types/discover';
 import { DiscoverTab, McpSorts } from '@/types/discover';
 
+import DiscoverRequestError from '../features/DiscoverRequestError';
+import McpEmpty from '../features/McpEmpty';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';
@@ -15,7 +17,7 @@ import Loading from './loading';
 const McpPage = memo(() => {
   const { q, page, category, sort, order } = useQuery() as McpQueryParams;
   const useMcpList = useDiscoverStore((s) => s.useFetchMcpList);
-  const { data, isLoading } = useMcpList({
+  const { data, error, isLoading, mutate } = useMcpList({
     category,
     order,
     page,
@@ -24,9 +26,12 @@ const McpPage = memo(() => {
     sort: sort ?? McpSorts.Recommended,
   });
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
+  if (!data) return <Loading />;
 
   const { items, currentPage, pageSize, totalCount } = data;
+  if (items.length === 0) return <McpEmpty search={Boolean(q || category)} />;
 
   return (
     <Flexbox gap={32} width={'100%'}>

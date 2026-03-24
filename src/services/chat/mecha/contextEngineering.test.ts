@@ -518,6 +518,69 @@ describe('contextEngineering', () => {
       expect(injection!.content).toContain('<context id="ctx-1" title="LobeHub">');
     });
 
+    it('should inject identities and activities into web memory context', async () => {
+      const messages: UIChatMessage[] = [
+        {
+          role: 'user',
+          content: 'Hello',
+          createdAt: Date.now(),
+          id: 'memory-user-1',
+          updatedAt: Date.now(),
+        },
+      ];
+
+      vi.spyOn(memoryManager, 'resolveTopicMemories').mockReturnValue({
+        activities: [
+          {
+            id: 'act-1',
+            narrative: 'User completed quarterly planning',
+            startsAt: new Date('2024-03-01T08:00:00.000Z'),
+            status: 'completed',
+            timezone: 'UTC',
+            type: 'planning',
+          } as any,
+        ],
+        contexts: [],
+        experiences: [],
+        preferences: [],
+      });
+      const resolveUserIdentitiesSpy = vi
+        .spyOn(memoryManager, 'resolveUserIdentities')
+        .mockReturnValue([
+          {
+            capturedAt: '2025-02-23T10:30:00.000Z',
+            description: 'User is a staff engineer',
+            id: 'id-1',
+            role: 'Engineer',
+            type: 'professional',
+          },
+        ]);
+      vi.spyOn(memoryManager, 'resolveUserPersona').mockReturnValue(undefined);
+
+      const result = await contextEngineering({
+        enableUserMemories: true,
+        memoryContext: { effort: 'high' },
+        messages,
+        model: 'gpt-4',
+        provider: 'openai',
+      });
+
+      const injection = result.find(
+        (m: any) => m.role === 'user' && String(m.content).includes('<user_memory>'),
+      );
+
+      expect(resolveUserIdentitiesSpy).toHaveBeenCalledWith('high');
+      expect(injection).toBeDefined();
+      expect(injection!.content).toContain('<identities count="1">');
+      expect(injection!.content).toContain(
+        '<identity type="professional" role="Engineer" id="id-1"',
+      );
+      expect(injection!.content).toContain('<activities count="1">');
+      expect(injection!.content).toContain(
+        '<activity id="act-1" type="planning" status="completed"',
+      );
+    });
+
     it('should handle missing placeholder variables gracefully', async () => {
       const messages: UIChatMessage[] = [
         {

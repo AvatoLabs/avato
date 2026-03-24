@@ -808,15 +808,20 @@ export class MobileChatService {
   };
 
   private streamToolLoopFallback = async (params: {
+    conversationConfig?: ConversationConfig;
     payload: MobileChatPayload;
     runtimeOptions: Record<string, any>;
     toolSet: MobileToolSet;
   }) => {
-    const { payload, runtimeOptions, toolSet } = params;
+    const { conversationConfig, payload, runtimeOptions, toolSet } = params;
     const encoder = new TextEncoder();
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
+    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+      ?.filter((kb) => kb.enabled === true)
+      .map((kb) => kb.id)
+      .filter(Boolean) as string[] | undefined;
 
     const writeEvent = async (event: string, data: unknown) => {
       await writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
@@ -929,6 +934,7 @@ export class MobileChatService {
 
             for (const toolCall of toolsToExecute) {
               const execution = await toolExecutionService.executeTool(toolCall, {
+                knowledgeBaseIds,
                 processContentBlocks:
                   toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
                 serverDB: this.serverDB,
@@ -1009,6 +1015,7 @@ export class MobileChatService {
 
           for (const toolCall of normalizedToolCalls) {
             const execution = await toolExecutionService.executeTool(toolCall, {
+              knowledgeBaseIds,
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
@@ -1109,6 +1116,10 @@ export class MobileChatService {
       messages,
       ...(toolSet?.tools ? { tools: toolSet.tools } : {}),
     };
+    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+      ?.filter((kb) => kb.enabled === true)
+      .map((kb) => kb.id)
+      .filter(Boolean) as string[] | undefined;
 
     delete (data as any).memory;
     delete (data as any).plugins;
@@ -1250,6 +1261,7 @@ export class MobileChatService {
                 `[webapi/chat] executing tool (auto): ${toolCall.identifier}:${toolCall.apiName}`,
               );
               const execution = await toolExecutionService.executeTool(toolCall, {
+                knowledgeBaseIds,
                 processContentBlocks:
                   toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
                 serverDB: this.serverDB,
@@ -1326,6 +1338,7 @@ export class MobileChatService {
             );
 
             const execution = await toolExecutionService.executeTool(toolCall, {
+              knowledgeBaseIds,
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
@@ -1412,6 +1425,7 @@ export class MobileChatService {
 
     if (!toolLoopSucceeded && toolSet?.tools?.length) {
       return this.streamToolLoopFallback({
+        conversationConfig,
         payload: data,
         runtimeOptions,
         toolSet,
@@ -1469,6 +1483,15 @@ export class MobileChatService {
 
     const { loopMessages, pendingToolCalls, round, toolSet } = resumeState;
     const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
+    const conversationConfig = await readSessionConversationConfig(
+      this.serverDB,
+      this.userId,
+      payload.sessionId,
+    );
+    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+      ?.filter((kb) => kb.enabled === true)
+      .map((kb) => kb.id)
+      .filter(Boolean) as string[] | undefined;
 
     let newLoopMessages: any[];
     let toolExecEvent: MobileToolExecutionEvent;
@@ -1476,6 +1499,7 @@ export class MobileChatService {
 
     if (approvedToolCall) {
       const execution = await toolExecutionService.executeTool(approvedToolCall, {
+        knowledgeBaseIds,
         processContentBlocks:
           approvedToolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
         serverDB: this.serverDB,
@@ -1646,6 +1670,7 @@ export class MobileChatService {
         const execEvents: MobileToolExecutionEvent[] = [];
         for (const tc of toExecute) {
           const ex = await toolExecutionService.executeTool(tc, {
+            knowledgeBaseIds,
             processContentBlocks: tc.source === 'mcp' ? boundProcessContentBlocks : undefined,
             serverDB: this.serverDB,
             spaceId: payload.spaceId,

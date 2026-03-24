@@ -124,7 +124,7 @@ describe('UserMemoryTopicRepository', () => {
       expect(result).toBe('A'.repeat(7000));
     });
 
-    it('should truncate concatenated content to 7000 characters', async () => {
+    it('should prioritize the most recent portion when concatenated content exceeds 7000 characters', async () => {
       // Create multiple messages that together exceed 7000 chars
       const content1 = 'B'.repeat(4000);
       const content2 = 'C'.repeat(4000);
@@ -149,8 +149,9 @@ describe('UserMemoryTopicRepository', () => {
 
       const result = await repo.getUserMessagesQueryForTopic(topicId);
       expect(result).toHaveLength(7000);
-      // Should be content1 + newline + first part of content2
-      expect(result!.startsWith('B'.repeat(4000))).toBe(true);
+      expect(result).toContain('C'.repeat(4000));
+      expect(result!.endsWith('C'.repeat(4000))).toBe(true);
+      expect(result!.startsWith('B'.repeat(4000))).toBe(false);
     });
 
     it('should filter messages by topic', async () => {

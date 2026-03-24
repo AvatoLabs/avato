@@ -51,6 +51,7 @@ const StoreInitialization = memo(() => {
   const useUserStoreUpdater = createStoreUpdater(useUserStore);
   const oAuthSSOProviders = useServerConfigStore(serverConfigSelectors.oAuthSSOProviders);
   useUserStoreUpdater('oAuthSSOProviders', oAuthSSOProviders);
+  const useServerConfigStoreUpdater = createStoreUpdater(useServerConfigStore);
 
   /**
    * The store function of `isLogin` will both consider the values of `enableAuth` and `isSignedIn`.
@@ -88,6 +89,7 @@ const StoreInitialization = memo(() => {
   const mobile = useIsMobile();
 
   useStoreUpdater('isMobile', mobile);
+  useServerConfigStoreUpdater('isMobile', mobile);
 
   return (
     <Suspense>

@@ -266,7 +266,7 @@ export const useCreateMenuItems = () => {
       navigate(`/page/${newPageId}`);
     } catch (error) {
       console.error('Failed to create page:', error);
-      message.error('Failed to create page');
+      message.error(tFile('pageList.createFailed'));
     }
   }, [createNewPage, tFile, navigate, message]);
 

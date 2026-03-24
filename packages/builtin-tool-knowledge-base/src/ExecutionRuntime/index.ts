@@ -1,5 +1,9 @@
 import { formatSearchResults, promptFileContents, promptNoSearchResults } from '@lobechat/prompts';
-import type { BuiltinServerRuntimeOutput } from '@lobechat/types';
+import {
+  type BuiltinServerRuntimeOutput,
+  resolveSemanticSearchLimits,
+  type SemanticSearchSchemaType,
+} from '@lobechat/types';
 
 import type {
   ReadKnowledgeArgs,
@@ -21,7 +25,7 @@ interface FileContentResult {
 interface RagService {
   getFileContents: (fileIds: string[], signal?: AbortSignal) => Promise<FileContentResult[]>;
   semanticSearchForChat: (
-    params: { knowledgeIds?: string[]; query: string; topK: number },
+    params: Pick<SemanticSearchSchemaType, 'chunkTopK' | 'fileTopK' | 'knowledgeIds' | 'query'>,
     signal?: AbortSignal,
   ) => Promise<{ chunks: any[]; fileResults: any[] }>;
 }
@@ -45,12 +49,13 @@ export class KnowledgeBaseExecutionRuntime {
     },
   ): Promise<BuiltinServerRuntimeOutput> {
     try {
-      const { query, topK = 20 } = args;
+      const { chunkTopK, fileTopK } = resolveSemanticSearchLimits(args);
+      const { query } = args;
 
       // Only search in knowledge bases, not agent files
       // Agent files will be injected as full content in context-engine
       const { chunks, fileResults } = await this.ragService.semanticSearchForChat(
-        { knowledgeIds: options?.knowledgeBaseIds, query, topK },
+        { chunkTopK, fileTopK, knowledgeIds: options?.knowledgeBaseIds, query },
         options?.signal,
       );
 

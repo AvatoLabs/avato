@@ -5,12 +5,10 @@ import { ChatInput, ChatInputActionBar } from '@lobehub/editor/react';
 import { Center, Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
 import { type ReactNode } from 'react';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useChatInputStore } from '@/features/ChatInput/store';
-import { useChatStore } from '@/store/chat';
-import { chatSelectors } from '@/store/chat/selectors';
 import { fileChatSelectors, useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
@@ -29,6 +27,18 @@ const styles = createStaticStyles(({ css }) => ({
     }
 
     &:hover {
+      .show-on-hover {
+        opacity: 1;
+      }
+    }
+
+    &:focus-within {
+      .show-on-hover {
+        opacity: 1;
+      }
+    }
+
+    @media (hover: none) {
       .show-on-hover {
         opacity: 1;
       }
@@ -87,12 +97,13 @@ const DesktopChatInput = memo<DesktopChatInputProps>(
       s.editor,
       s.leftActions,
     ]);
-
-    const chatKey = useChatStore(chatSelectors.currentChatKey);
+    const hasAutoFocusedRef = useRef(false);
 
     useEffect(() => {
-      if (editor) editor.focus();
-    }, [chatKey, editor]);
+      if (!editor || hasAutoFocusedRef.current) return;
+      editor.focus();
+      hasAutoFocusedRef.current = true;
+    }, [editor]);
 
     const shouldShowContextContainer =
       leftActions.flat().includes('fileUpload') || hasContextSelections || hasFiles;
@@ -152,7 +163,7 @@ const DesktopChatInput = memo<DesktopChatInputProps>(
           <InputEditor />
         </ChatInput>
         {showFootnote && !expand && (
-          <Center style={{ pointerEvents: 'none', zIndex: 100 }}>
+          <Center style={{ pointerEvents: 'none' }}>
             <Text className={styles.footnote} type={'secondary'}>
               {t('input.disclaimer')}
             </Text>

@@ -135,6 +135,11 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
       &::placeholder {
         color: ${cssVar.colorTextPlaceholder};
       }
+
+      &:focus-visible {
+        outline: 2px solid ${cssVar.colorPrimaryBorder};
+        outline-offset: 2px;
+      }
     }
 
     [cmdk-list] {

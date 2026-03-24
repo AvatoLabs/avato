@@ -1,5 +1,9 @@
 import { formatSearchResults, promptFileContents, promptNoSearchResults } from '@lobechat/prompts';
-import type { BuiltinToolContext, BuiltinToolResult } from '@lobechat/types';
+import {
+  type BuiltinToolContext,
+  type BuiltinToolResult,
+  resolveSemanticSearchLimits,
+} from '@lobechat/types';
 import { BaseExecutor } from '@lobechat/types';
 
 import { ragService } from '@/services/rag';
@@ -38,7 +42,8 @@ class KnowledgeBaseExecutor extends BaseExecutor<{
     ctx: BuiltinToolContext,
   ): Promise<BuiltinToolResult> => {
     try {
-      const { query, topK = 20 } = params;
+      const { chunkTopK, fileTopK } = resolveSemanticSearchLimits(params);
+      const { query } = params;
 
       // Get knowledge base IDs from agent store
       const agentState = getAgentStoreState();
@@ -49,7 +54,7 @@ class KnowledgeBaseExecutor extends BaseExecutor<{
       const knowledgeBaseIds = knowledgeIds.knowledgeBaseIds;
 
       const { chunks, fileResults } = await ragService.semanticSearchForChat(
-        { knowledgeIds: knowledgeBaseIds, query, topK },
+        { chunkTopK, fileTopK, knowledgeIds: knowledgeBaseIds, query },
         ctx.signal,
       );
 

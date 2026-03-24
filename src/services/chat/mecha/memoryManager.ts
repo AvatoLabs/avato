@@ -3,9 +3,17 @@ import { type RetrieveMemoryResult } from '@lobechat/types';
 
 import { getChatStoreState } from '@/store/chat';
 import { getUserMemoryStoreState } from '@/store/userMemory';
-import { agentMemorySelectors } from '@/store/userMemory/selectors';
+import { agentMemorySelectors, identitySelectors } from '@/store/userMemory/selectors';
+import { type IdentityForInjection } from '@/store/userMemory/types';
 
 type UserMemoryPersona = UserMemoryData['persona'];
+type UserMemoryIdentities = UserMemoryData['identities'];
+
+const IDENTITY_LIMIT_BY_EFFORT = {
+  high: 50,
+  low: 12,
+  medium: 30,
+} as const;
 
 const EMPTY_MEMORIES: RetrieveMemoryResult = {
   activities: [],
@@ -27,6 +35,29 @@ export const resolveUserPersona = (): UserMemoryPersona | undefined => {
     narrative: persona.content,
     tagline: persona.summary,
   };
+};
+
+const mapIdentityForPrompt = (
+  identity: IdentityForInjection,
+): NonNullable<UserMemoryIdentities>[number] => ({
+  capturedAt: identity.capturedAt,
+  description: identity.description,
+  id: identity.id,
+  role: identity.role,
+  type: identity.type,
+});
+
+export const resolveUserIdentities = (
+  effort: 'high' | 'low' | 'medium' = 'medium',
+): UserMemoryIdentities | undefined => {
+  const memoryState = getUserMemoryStoreState();
+  const identities = identitySelectors.globalIdentities(memoryState);
+
+  if (identities.length === 0) return undefined;
+
+  const selected = identities.slice(0, IDENTITY_LIMIT_BY_EFFORT[effort]).map(mapIdentityForPrompt);
+
+  return selected.length > 0 ? selected : undefined;
 };
 
 /**
@@ -69,10 +100,12 @@ export const resolveTopicMemories = (ctx?: TopicMemoryResolverContext): Retrieve
 export const combineUserMemoryData = (
   topicMemories: RetrieveMemoryResult,
   persona?: UserMemoryPersona,
+  identities?: UserMemoryIdentities,
 ): UserMemoryData => ({
   activities: topicMemories.activities,
   contexts: topicMemories.contexts,
   experiences: topicMemories.experiences,
+  identities,
   persona,
   preferences: topicMemories.preferences,
 });

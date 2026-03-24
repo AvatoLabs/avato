@@ -1,3 +1,7 @@
+import {
+  KnowledgeBaseApiName,
+  KnowledgeBaseIdentifier,
+} from '@lobechat/builtin-tool-knowledge-base';
 import { type ChatToolPayload } from '@lobechat/types';
 import { safeParseJSON } from '@lobechat/utils';
 import debug from 'debug';
@@ -21,6 +25,7 @@ import {
 
 const log = debug('lobe-server:tool-execution-service');
 const MAX_MCP_RETRIES = 3;
+const KNOWLEDGE_BASE_READ_TOOL_RESULT_MAX_LENGTH = 100_000;
 
 interface ToolExecutionServiceDeps {
   builtinToolsExecutor: BuiltinToolsExecutor;
@@ -74,14 +79,15 @@ export class ToolExecutionService {
       }
 
       const executionTime = Date.now() - startTime;
+      const toolResultMaxLength = this.getToolResultMaxLength(payload, context);
 
       // Truncate result content to prevent context overflow
       // Use agent-specific config if provided, otherwise use default
-      const truncatedContent = truncateToolResult(data.content, context.toolResultMaxLength);
+      const truncatedContent = truncateToolResult(data.content, toolResultMaxLength);
 
       // Log if content was truncated
       if (truncatedContent !== data.content) {
-        const maxLength = context.toolResultMaxLength ?? DEFAULT_TOOL_RESULT_MAX_LENGTH;
+        const maxLength = toolResultMaxLength ?? DEFAULT_TOOL_RESULT_MAX_LENGTH;
         log(
           'Tool result truncated for %s:%s - original: %d chars, truncated: %d chars (limit: %d)',
           identifier,
@@ -114,6 +120,19 @@ export class ToolExecutionService {
       };
     }
   }
+
+  private getToolResultMaxLength = (payload: ChatToolPayload, context: ToolExecutionContext) => {
+    if (context.toolResultMaxLength !== undefined) return context.toolResultMaxLength;
+
+    if (
+      payload.identifier === KnowledgeBaseIdentifier &&
+      payload.apiName === KnowledgeBaseApiName.readKnowledge
+    ) {
+      return KNOWLEDGE_BASE_READ_TOOL_RESULT_MAX_LENGTH;
+    }
+
+    return undefined;
+  };
 
   private async executeMCPTool(
     payload: ChatToolPayload,

@@ -15,6 +15,12 @@ const log = debug('lobe-image:lambda-client');
 // 401 error debouncing: prevent showing multiple login notifications in short time
 let last401Time = 0;
 const MIN_401_INTERVAL = 5000; // 5 seconds
+let lastInfraErrorAt = 0;
+let lastInfraErrorKey = '';
+const MIN_INFRA_ERROR_INTERVAL = 3000;
+
+const isInfrastructureStatus = (status?: number) =>
+  typeof status !== 'number' || status === 408 || status === 429 || status >= 500;
 
 // handle error
 const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
@@ -62,6 +68,28 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
               }
 
               default: {
+                if (isInfrastructureStatus(status)) {
+                  const normalizedStatus = typeof status === 'number' ? status : 0;
+                  const errorKey = `${normalizedStatus}:${err.message}`;
+                  const now = Date.now();
+
+                  if (
+                    errorKey !== lastInfraErrorKey ||
+                    now - lastInfraErrorAt > MIN_INFRA_ERROR_INTERVAL
+                  ) {
+                    lastInfraErrorAt = now;
+                    lastInfraErrorKey = errorKey;
+
+                    const { fetchErrorNotification } =
+                      await import('@/components/Error/fetchErrorNotification');
+
+                    fetchErrorNotification.error({
+                      errorMessage: err.message,
+                      status: normalizedStatus,
+                    });
+                  }
+                }
+
                 console.error(err);
               }
             }

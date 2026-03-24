@@ -9,7 +9,8 @@ import { css } from 'antd-style';
 export default ({ token }: { prefixCls: string; token: Theme }) => css`
   html,
   body,
-  #__next {
+  #__next,
+  #root {
     position: relative;
 
     overscroll-behavior: none;
@@ -18,7 +19,7 @@ export default ({ token }: { prefixCls: string; token: Theme }) => css`
     min-height: 100dvh;
     max-height: 100dvh;
 
-    @media (device-width >= 576px) {
+    @media (width >= 576px) {
       overflow: hidden;
     }
   }
@@ -57,6 +58,21 @@ export default ({ token }: { prefixCls: string; token: Theme }) => css`
     -webkit-app-region: no-drag;
   }
 
+  :where(
+    a[href],
+    button,
+    input,
+    select,
+    summary,
+    textarea,
+    [role='button'],
+    [role='link'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline: 2px solid ${token.colorPrimary};
+    outline-offset: 2px;
+  }
+
   .${CLASSNAMES.ContextTrigger}[data-popup-open]:not([data-no-highlight]),
   .${CLASSNAMES.DropdownMenuTrigger}[data-popup-open]:not([data-no-highlight]) {
     background: ${token.colorFillTertiary};
@@ -65,5 +81,20 @@ export default ({ token }: { prefixCls: string; token: Theme }) => css`
     .${CLASSNAMES.DropdownMenuTrigger}[data-popup-open]:not([data-no-highlight])
   ) {
     opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
   }
 `;

@@ -19,6 +19,10 @@ import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
 import { FileService } from '@/server/services/file';
+import {
+  assertRagEmbeddingDimensions,
+  RAG_EMBEDDING_DIMENSIONS,
+} from '@/server/services/rag/constants';
 import { ResourceAuthorizer } from '@/server/services/resource';
 import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
@@ -109,10 +113,14 @@ export const fileRouter = router({
                 );
 
                 const embeddings = await modelRuntime.embeddings({
-                  dimensions: 1024,
+                  dimensions: RAG_EMBEDDING_DIMENSIONS,
                   input: chunks.map((c) => c.text),
                   model,
                 });
+                assertRagEmbeddingDimensions(
+                  embeddings,
+                  `file chunk embedding:${provider}/${model}`,
+                );
 
                 const items: NewEmbeddingsItem[] =
                   embeddings?.map((e, idx) => ({

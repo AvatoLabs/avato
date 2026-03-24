@@ -105,10 +105,16 @@ class UserMemoryService {
 
   /**
    * Retrieve memories for a specific topic
-   * Uses the topic's historySummary as the search query
+   * Uses recent user messages in the topic as the search query
    */
-  retrieveMemoryForTopic = async (topicId: string): Promise<SearchMemoryResult> => {
-    return lambdaClient.userMemories.retrieveMemoryForTopic.query({ topicId });
+  retrieveMemoryForTopic = async (
+    topicId: string,
+    params?: { effort?: 'high' | 'low' | 'medium' },
+  ): Promise<SearchMemoryResult> => {
+    return lambdaClient.userMemories.retrieveMemoryForTopic.query({
+      effort: params?.effort,
+      topicId,
+    });
   };
 
   searchMemory = async (params: SearchMemoryParams): Promise<SearchMemoryResult> => {

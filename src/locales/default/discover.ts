@@ -251,6 +251,9 @@ export default {
   'fork.alreadyForked': 'You have already forked this agent. Navigating to your fork...',
 
   'fork.failed': 'Fork failed. Please try again.',
+  'list.error.description':
+    'The current list could not be loaded. Check your network or retry the request.',
+  'list.error.title': 'Failed to load list',
 
   // Fork related
   'fork.forkAndChat': 'Fork & Chat',

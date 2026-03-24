@@ -1,4 +1,8 @@
-import type { BuiltinToolManifest } from '@lobechat/types';
+import {
+  type BuiltinToolManifest,
+  DEFAULT_SEMANTIC_SEARCH_CHUNK_TOP_K,
+  DEFAULT_SEMANTIC_SEARCH_FILE_TOP_K,
+} from '@lobechat/types';
 
 import { systemPrompt } from './systemRole';
 import { KnowledgeBaseApiName, KnowledgeBaseIdentifier } from './types';
@@ -16,10 +20,17 @@ export const KnowledgeBaseManifest: BuiltinToolManifest = {
               'The search query to find relevant information. Be specific and use concrete entities. IMPORTANT: Resolve all pronouns and references (like "it", "that", "this") to actual entity names before searching, as this uses semantic vector search which works best with concrete terms.',
             type: 'string',
           },
-          topK: {
-            default: 15,
+          chunkTopK: {
+            default: DEFAULT_SEMANTIC_SEARCH_CHUNK_TOP_K,
             description:
-              'Number of top relevant chunks to return (default: 15). Each file will include the most relevant chunks.',
+              'Number of top relevant chunks to retrieve before grouping results by file (default: 15).',
+            maximum: 100,
+            minimum: 5,
+            type: 'number',
+          },
+          fileTopK: {
+            default: DEFAULT_SEMANTIC_SEARCH_FILE_TOP_K,
+            description: 'Number of files to summarize from the retrieved chunks (default: 15).',
             maximum: 100,
             minimum: 5,
             type: 'number',
@@ -31,7 +42,7 @@ export const KnowledgeBaseManifest: BuiltinToolManifest = {
     },
     {
       description:
-        'Read the full content of specific files from the knowledge base. Use this after searchKnowledgeBase to get complete information from relevant files. You can read multiple files at once.',
+        'Read the content of specific files from the knowledge base. Use this after searchKnowledgeBase to inspect the most relevant files. You can read multiple files at once.',
       name: KnowledgeBaseApiName.readKnowledge,
       parameters: {
         properties: {

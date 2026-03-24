@@ -6,6 +6,7 @@ import { App, Input } from 'antd';
 import { cx } from 'antd-style';
 import * as motion from 'motion/react-m';
 import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import FileIcon from '@/components/FileIcon';
@@ -51,6 +52,7 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
   }) => {
     const navigate = useNavigate();
     const { message } = App.useApp();
+    const { t } = useTranslation('file');
 
     const [setMode, libraryId] = useResourceManagerStore((s) => [s.setMode, s.libraryId]);
 
@@ -97,7 +99,7 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
 
     const handleRenameConfirm = useCallback(async () => {
       if (!renamingValue.trim()) {
-        message.error('Folder name cannot be empty');
+        message.error(t('library.renameFolderEmpty'));
         return;
       }
 
@@ -111,13 +113,13 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
         if (libraryId) {
           await clearTreeFolderCache(libraryId);
         }
-        message.success('Renamed successfully');
+        message.success(t('library.renameFolderSuccess'));
         setIsRenaming(false);
       } catch (error) {
         console.error('Rename error:', error);
-        message.error('Rename failed');
+        message.error(t('library.renameFolderFailed'));
       }
-    }, [item.id, item.name, libraryId, renamingValue, renameFolder, message]);
+    }, [item.id, item.name, libraryId, message, renameFolder, renamingValue, t]);
 
     const handleRenameCancel = useCallback(() => {
       setIsRenaming(false);
@@ -211,7 +213,7 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
 
         setMode('explorer');
       },
-      [libraryId, navigate],
+      [libraryId, navigate, setMode],
     );
 
     if (item.isFolder) {

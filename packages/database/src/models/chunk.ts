@@ -137,12 +137,13 @@ export class ChunkModel {
   };
 
   semanticSearch = async ({
+    embeddingModel,
     embedding,
     fileIds,
   }: {
     embedding: number[];
-    fileIds: string[] | undefined;
-    query: string;
+    embeddingModel?: string;
+    fileIds?: string[];
   }) => {
     const similarity = sql<number>`1 - (${cosineDistance(embeddings.embeddings, embedding)})`;
 
@@ -158,10 +159,16 @@ export class ChunkModel {
         type: chunks.type,
       })
       .from(chunks)
-      .leftJoin(embeddings, eq(chunks.id, embeddings.chunkId))
-      .leftJoin(fileChunks, eq(chunks.id, fileChunks.chunkId))
-      .leftJoin(files, eq(fileChunks.fileId, files.id))
-      .where(fileIds ? inArray(fileChunks.fileId, fileIds) : undefined)
+      .innerJoin(embeddings, eq(chunks.id, embeddings.chunkId))
+      .innerJoin(fileChunks, eq(chunks.id, fileChunks.chunkId))
+      .innerJoin(files, eq(fileChunks.fileId, files.id))
+      .where(
+        and(
+          eq(fileChunks.userId, this.userId),
+          fileIds ? inArray(fileChunks.fileId, fileIds) : undefined,
+          embeddingModel ? eq(embeddings.model, embeddingModel) : undefined,
+        ),
+      )
       .orderBy((t) => desc(t.similarity))
       .limit(30);
 
@@ -172,14 +179,15 @@ export class ChunkModel {
   };
 
   semanticSearchForChat = async ({
+    chunkTopK = 15,
+    embeddingModel,
     embedding,
     fileIds,
-    topK = 15,
   }: {
+    chunkTopK?: number;
     embedding: number[];
+    embeddingModel?: string;
     fileIds: string[] | undefined;
-    query: string;
-    topK?: number;
   }) => {
     const similarity = sql<number>`1 - (${cosineDistance(embeddings.embeddings, embedding)})`;
 
@@ -199,13 +207,18 @@ export class ChunkModel {
         type: chunks.type,
       })
       .from(chunks)
-      .leftJoin(embeddings, eq(chunks.id, embeddings.chunkId))
-      .leftJoin(fileChunks, eq(chunks.id, fileChunks.chunkId))
-      .leftJoin(files, eq(files.id, fileChunks.fileId))
-      .where(inArray(fileChunks.fileId, fileIds))
+      .innerJoin(embeddings, eq(chunks.id, embeddings.chunkId))
+      .innerJoin(fileChunks, eq(chunks.id, fileChunks.chunkId))
+      .innerJoin(files, eq(files.id, fileChunks.fileId))
+      .where(
+        and(
+          eq(fileChunks.userId, this.userId),
+          inArray(fileChunks.fileId, fileIds),
+          embeddingModel ? eq(embeddings.model, embeddingModel) : undefined,
+        ),
+      )
       .orderBy((t) => desc(t.similarity))
-      // Relaxed to 15 for now
-      .limit(topK);
+      .limit(chunkTopK);
 
     return result.map((item) => {
       return {

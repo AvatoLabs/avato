@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, sql } from 'drizzle-orm';
 
 import type { NewEmbeddingsItem } from '../schemas';
 import { embeddings } from '../schemas';
@@ -26,8 +26,12 @@ export class EmbeddingModel {
     return this.db
       .insert(embeddings)
       .values(values.map((item) => ({ ...item, userId: this.userId })))
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [embeddings.chunkId],
+        set: {
+          embeddings: sql.raw(`excluded.${embeddings.embeddings.name}`),
+          model: sql.raw(`excluded.${embeddings.model.name}`),
+        },
       });
   };
 

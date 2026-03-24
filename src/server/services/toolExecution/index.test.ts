@@ -1,3 +1,7 @@
+import {
+  KnowledgeBaseApiName,
+  KnowledgeBaseIdentifier,
+} from '@lobechat/builtin-tool-knowledge-base';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToolExecutionService } from './index';
@@ -64,5 +68,43 @@ describe('ToolExecutionService', () => {
         toolName: 'calculate',
       }),
     );
+  });
+
+  it('should allow larger default output for knowledge base read tool results', async () => {
+    const content = 'a'.repeat(30_000);
+    const builtinToolsExecutor = {
+      execute: vi.fn().mockResolvedValue({
+        content,
+        success: true,
+      }),
+    } as any;
+    const mcpService = {
+      callTool: vi.fn(),
+    } as any;
+    const pluginGatewayService = {
+      execute: vi.fn(),
+    } as any;
+
+    const service = new ToolExecutionService({
+      builtinToolsExecutor,
+      mcpService,
+      pluginGatewayService,
+    });
+
+    const result = await service.executeTool(
+      {
+        apiName: KnowledgeBaseApiName.readKnowledge,
+        arguments: '{"fileIds":["file-1"]}',
+        id: 'tool-call-2',
+        identifier: KnowledgeBaseIdentifier,
+        type: 'builtin',
+      } as any,
+      {
+        toolManifestMap: {},
+      },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.content).toBe(content);
   });
 });

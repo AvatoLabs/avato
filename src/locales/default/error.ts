@@ -19,6 +19,8 @@ export default {
   'notFound.title': 'Entered Unknown Territory?',
   'pluginSettings.desc': 'Complete the following configuration to start using this skill',
   'pluginSettings.title': '{{name}} Skill Settings',
+  'response.0':
+    'Sorry, the request could not reach the server. Please check your network connection and try again.',
   'response.400':
     'Sorry, the server does not understand your request. Please make sure your request parameters are correct.',
   'response.401':

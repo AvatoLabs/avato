@@ -5,6 +5,8 @@ import { memo, useCallback } from 'react';
 
 import { useFetchTopicMemories } from '@/hooks/useFetchMemoryForTopic';
 import { useFetchNotebookDocuments } from '@/hooks/useFetchNotebookDocuments';
+import { useAgentStore } from '@/store/agent';
+import { chatConfigByIdSelectors } from '@/store/agent/selectors';
 import { useUserStore } from '@/store/user';
 import { settingsSelectors } from '@/store/user/selectors';
 
@@ -38,6 +40,10 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
   // Fetch messages (SWR key is null when skipFetch is true)
   const context = useConversationStore((s) => s.context);
   const enableUserMemories = useUserStore(settingsSelectors.memoryEnabled);
+  const currentMemorySettings = useUserStore(settingsSelectors.currentMemorySettings);
+  const agentChatConfig = useAgentStore(
+    chatConfigByIdSelectors.getChatConfigById(context.agentId || ''),
+  );
   const [skipFetch, useFetchMessages] = useConversationStore((s) => [
     dataSelectors.skipFetch(s),
     s.useFetchMessages,
@@ -49,7 +55,18 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
 
   // Fetch notebook documents when topic is selected (skip for share pages)
   useFetchNotebookDocuments(isSharePage ? undefined : context.topicId!);
-  useFetchTopicMemories(enableUserMemories && !isSharePage ? context.topicId : undefined);
+  const dbMessages = useConversationStore(dataSelectors.dbMessages);
+  const userMessages = dbMessages.filter((message) => message.role === 'user');
+  const latestUserMessageId = userMessages.at(-1)?.id;
+  const effectiveMemoryEffort =
+    agentChatConfig.memory?.effort ?? currentMemorySettings.effort ?? 'medium';
+
+  useFetchTopicMemories({
+    effort: effectiveMemoryEffort,
+    latestUserMessageId,
+    topicId: enableUserMemories && !isSharePage ? context.topicId : undefined,
+    userMessageCount: userMessages.length,
+  });
 
   // Use selectors for data
 

@@ -9,22 +9,20 @@ import {
   memoryExtractionPayloadSchema,
   normalizeMemoryExtractionPayload,
 } from '@/server/services/memory/userMemory/extract';
+import { validateWebhookRequestAuth } from '@/server/services/memory/userMemory/webhookAuth';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 
 export const POST = async (req: Request) => {
   const { webhook } = parseMemoryExtractionConfig();
   let params: MemoryExtractionNormalizedPayload | undefined;
 
-  if (webhook.headers && Object.keys(webhook.headers).length > 0) {
-    for (const [key, value] of Object.entries(webhook.headers)) {
-      const headerValue = req.headers.get(key);
-      if (headerValue !== value) {
-        return NextResponse.json(
-          { error: `Unauthorized: Missing or invalid header '${key}'` },
-          { status: 403 },
-        );
-      }
-    }
+  const authFailure = validateWebhookRequestAuth({
+    expectedHeaders: webhook.headers,
+    requestHeaders: req.headers,
+  });
+
+  if (authFailure) {
+    return NextResponse.json({ error: authFailure.error }, { status: authFailure.status });
   }
 
   try {

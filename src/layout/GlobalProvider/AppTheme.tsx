@@ -40,7 +40,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     min-height: 100dvh;
     max-height: 100dvh;
 
-    @media (device-width >= 576px) {
+    @media (width >= 576px) {
       overflow: hidden;
     }
   `,

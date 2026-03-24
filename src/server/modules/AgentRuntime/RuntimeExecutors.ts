@@ -623,8 +623,14 @@ export const createRuntimeExecutors = (
 
       // Execute tool using ToolExecutionService
       log(`[${operationLogId}] Executing tool ${toolName} ...`);
+      const knowledgeBaseIds = agentConfig?.knowledgeBases
+        ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
+        .map((kb: { id?: string }) => kb.id)
+        .filter(Boolean) as string[] | undefined;
+
       const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
         activeDeviceId: state.metadata?.activeDeviceId,
+        knowledgeBaseIds,
         memoryToolPermission: agentConfig?.chatConfig?.memory?.toolPermission,
         serverDB: ctx.serverDB,
         spaceId: ctx.spaceId,
@@ -841,9 +847,14 @@ export const createRuntimeExecutors = (
           };
 
           const batchAgentConfig = state.metadata?.agentConfig;
+          const knowledgeBaseIds = batchAgentConfig?.knowledgeBases
+            ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
+            .map((kb: { id?: string }) => kb.id)
+            .filter(Boolean) as string[] | undefined;
 
           const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
             activeDeviceId: state.metadata?.activeDeviceId,
+            knowledgeBaseIds,
             memoryToolPermission: batchAgentConfig?.chatConfig?.memory?.toolPermission,
             serverDB: ctx.serverDB,
             spaceId: ctx.spaceId,

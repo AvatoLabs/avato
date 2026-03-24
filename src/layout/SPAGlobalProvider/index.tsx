@@ -1,7 +1,7 @@
 'use client';
 
 import { TooltipGroup } from '@lobehub/ui';
-import { StyleProvider } from 'antd-style';
+import { StyleProvider, useResponsive } from 'antd-style';
 import { domMax, LazyMotion } from 'motion/react';
 import { lazy, memo, type PropsWithChildren, Suspense, useLayoutEffect } from 'react';
 
@@ -33,11 +33,13 @@ const SPAGlobalProvider = memo<PropsWithChildren>(({ children }) => {
     document.getElementById('loading-screen')?.remove();
   }, []);
 
+  const { mobile } = useResponsive();
   const serverConfig: SPAServerConfig | undefined = window.__SERVER_CONFIG__;
 
   const locale = document.documentElement.lang || 'en-US';
-  const isMobile =
-    (serverConfig?.isMobile ?? typeof __MOBILE__ !== 'undefined') ? __MOBILE__ : false;
+  const buildVariantIsMobile =
+    serverConfig?.isMobile ?? (typeof __MOBILE__ !== 'undefined' ? __MOBILE__ : false);
+  const isMobile = typeof mobile === 'boolean' ? mobile : buildVariantIsMobile;
 
   return (
     <Locale defaultLang={locale}>

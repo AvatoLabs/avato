@@ -8,14 +8,16 @@ import { useDiscoverStore } from '@/store/discover';
 import { type ProviderQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
+import DiscoverRequestError from '../features/DiscoverRequestError';
 import Pagination from '../features/Pagination';
+import ProviderEmpty from '../features/ProviderEmpty';
 import List from './features/List';
 import Loading from './loading';
 
 const ProviderPage = memo(() => {
   const { q, page, sort, order } = useQuery() as ProviderQueryParams;
   const useProviderList = useDiscoverStore((s) => s.useProviderList);
-  const { data, isLoading } = useProviderList({
+  const { data, error, isLoading, mutate } = useProviderList({
     order,
     page,
     pageSize: 21,
@@ -23,9 +25,12 @@ const ProviderPage = memo(() => {
     sort,
   });
 
-  if (isLoading || !data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
+  if (!data) return <Loading />;
 
   const { items, currentPage, pageSize, totalCount } = data;
+  if (items.length === 0) return <ProviderEmpty search={Boolean(q)} />;
 
   return (
     <Flexbox gap={32} width={'100%'}>

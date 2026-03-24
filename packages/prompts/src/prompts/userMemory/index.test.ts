@@ -146,6 +146,34 @@ describe('promptUserMemory', () => {
     });
   });
 
+  describe('activities only', () => {
+    it('should format activity memories', () => {
+      const result = promptUserMemory({
+        memories: {
+          activities: [
+            {
+              endsAt: '2025-03-01T10:00:00.000Z',
+              feedback: 'The workshop was productive',
+              id: 'act-1',
+              narrative: 'Attended a product workshop',
+              notes: 'Follow up on roadmap decisions',
+              startsAt: '2025-03-01T08:00:00.000Z',
+              status: 'completed',
+              timezone: 'UTC',
+              type: 'workshop',
+            },
+          ],
+        },
+      });
+
+      expect(result).toContain('<activities count="1">');
+      expect(result).toContain('<activity id="act-1" type="workshop" status="completed"');
+      expect(result).toContain('<narrative>Attended a product workshop</narrative>');
+      expect(result).toContain('<notes>Follow up on roadmap decisions</notes>');
+      expect(result).toContain('<feedback>The workshop was productive</feedback>');
+    });
+  });
+
   describe('preferences only', () => {
     it('should format single preference', () => {
       const result = promptUserMemory({

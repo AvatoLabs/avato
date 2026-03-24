@@ -20,15 +20,15 @@ export const systemPrompt = `You have access to a Knowledge Base tool with power
   - Uses semantic vector search to find relevant content
   - Returns file names, relevance scores, and brief excerpts
   - Helps you decide which files to read in full
-  - You can adjust topK parameter (5-100, default: 15) based on how many results you need
+  - You can adjust "chunkTopK" and "fileTopK" (5-100, defaults: 15) based on how many chunks to retrieve and how many files to summarize
   - **IMPORTANT**: Since this uses vector-based semantic search, always resolve references and use concrete entities in your query
     - BAD: "What does it do?" or "Tell me about that feature"
     - GOOD: "What does the authentication system do?" or "Tell me about the JWT authentication feature"
 
-- **readKnowledge**: Use this after searching to get complete file content
+- **readKnowledge**: Use this after searching to inspect file content
   - Can read multiple files at once by providing their file IDs
   - Get file IDs from searchKnowledgeBase results
-  - Provides complete context from the selected files
+  - Provides the selected file content for follow-up reasoning
 </tool_selection_guidelines>
 
 <search_strategy_guidelines>
@@ -45,7 +45,7 @@ export const systemPrompt = `You have access to a Knowledge Base tool with power
 - For broad topics, start with a general query then refine if needed
 - For specific questions, use precise terminology
 - You can perform multiple searches with different queries or perspectives if needed
-- Adjust topK based on result quality - increase if you need more context, decrease for focused searches
+- Adjust "chunkTopK" and "fileTopK" based on result quality - increase if you need more coverage, decrease for focused searches
 - Review the relevance scores and excerpts to select the most pertinent files
 </search_strategy_guidelines>
 

@@ -728,6 +728,16 @@ export class TopicModel {
     return and(isNull(topics.sessionId), isNull(topics.groupId));
   };
 
+  private pendingMemoryExtractionCondition = (ignoreExtracted?: boolean) => {
+    if (ignoreExtracted) return undefined;
+
+    return or(
+      isNull(topics.metadata),
+      sql`(${topics.metadata}->>'userMemoryExtractStatus') IS DISTINCT FROM 'completed'`,
+      sql`${topics.updatedAt} > ((${topics.metadata}->'userMemoryExtractRunState'->>'lastRunAt')::timestamptz)`,
+    );
+  };
+
   listTopicsForMemoryExtractor = async (
     options: {
       cursor?: ListTopicsForMemoryExtractorCursor;
@@ -760,12 +770,7 @@ export class TopicModel {
         eq(topics.userId, this.userId),
         options.startDate ? gte(topics.createdAt, options.startDate) : undefined,
         options.endDate ? lte(topics.createdAt, options.endDate) : undefined,
-        options.ignoreExtracted
-          ? undefined
-          : or(
-              isNull(topics.metadata),
-              sql`(${topics.metadata}->>'userMemoryExtractStatus') IS DISTINCT FROM 'completed'`,
-            ),
+        this.pendingMemoryExtractionCondition(options.ignoreExtracted),
         cursorCondition,
       ),
     });
@@ -786,12 +791,7 @@ export class TopicModel {
           eq(topics.userId, this.userId),
           options.startDate ? gte(topics.createdAt, options.startDate) : undefined,
           options.endDate ? lte(topics.createdAt, options.endDate) : undefined,
-          options.ignoreExtracted
-            ? undefined
-            : or(
-                isNull(topics.metadata),
-                sql`(${topics.metadata}->>'userMemoryExtractStatus') IS DISTINCT FROM 'completed'`,
-              ),
+          this.pendingMemoryExtractionCondition(options.ignoreExtracted),
         ),
       );
 

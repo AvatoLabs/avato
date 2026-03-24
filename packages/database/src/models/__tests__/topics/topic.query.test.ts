@@ -1355,6 +1355,39 @@ describe('TopicModel - Query', () => {
       expect(rows.map((t) => t.id)).toEqual(['et1', 'et2']);
     });
 
+    it('should re-include completed topics when they were updated after the last extraction run', async () => {
+      await serverDB.insert(topics).values([
+        {
+          createdAt: new Date('2024-03-01T00:00:00Z'),
+          id: 'fresh-completed',
+          metadata: {
+            userMemoryExtractRunState: {
+              lastRunAt: '2024-03-01T00:00:00.000Z',
+            },
+            userMemoryExtractStatus: 'completed',
+          },
+          updatedAt: new Date('2024-03-02T00:00:00Z'),
+          userId,
+        },
+        {
+          createdAt: new Date('2024-03-01T00:00:00Z'),
+          id: 'stale-completed',
+          metadata: {
+            userMemoryExtractRunState: {
+              lastRunAt: '2024-03-02T00:00:00.000Z',
+            },
+            userMemoryExtractStatus: 'completed',
+          },
+          updatedAt: new Date('2024-03-01T12:00:00Z'),
+          userId,
+        },
+      ] satisfies Array<typeof topics.$inferInsert>);
+
+      const rows = await topicModel.listTopicsForMemoryExtractor({ limit: 10 });
+
+      expect(rows.map((t) => t.id)).toEqual(['fresh-completed']);
+    });
+
     it('should paginate forward from the cursor, excluding items at or before it and including later ones', async () => {
       const createdAt = new Date('2025-01-20T18:43:33.603Z');
 
