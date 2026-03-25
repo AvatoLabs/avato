@@ -2,10 +2,10 @@
 
 import { Block, Flexbox, Icon, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar } from 'antd-style';
-import { ChevronDownIcon } from 'lucide-react';
 import { memo } from 'react';
 
 import { ProductLogo } from '@/components/Branding';
+import { ENTRY_ICON_STROKE, SIDEBAR_HEADER_ICONS } from '@/config/entryIcons';
 import UserAvatar from '@/features/User/UserAvatar';
 import UserPanel from '@/features/User/UserPanel';
 import { useUserStore } from '@/store/user';
@@ -67,8 +67,9 @@ const User = memo<{ lite?: boolean }>(({ lite }) => {
             )}
             <Icon
               color={cssVar.colorTextDescription}
-              icon={ChevronDownIcon}
+              icon={SIDEBAR_HEADER_ICONS.chevronDown}
               id={USER_DROPDOWN_ICON_ID}
+              size={{ size: 14, strokeWidth: ENTRY_ICON_STROKE }}
             />
           </Flexbox>
         )}

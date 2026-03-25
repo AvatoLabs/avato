@@ -5,6 +5,7 @@ import { cssVar, cx } from 'antd-style';
 import { PlusIcon } from 'lucide-react';
 import { memo } from 'react';
 
+import { ENTRY_ICON_STROKE } from '@/config/entryIcons';
 import { WORKSPACE_NAV_ROW_HEIGHT_PX } from '@/const/workspaceVisualTokens';
 
 import { useGlassNavVisual } from '../GlassNavVisualContext';
@@ -33,7 +34,11 @@ const EmptyNavItem = memo<EmptyStatusProps>(({ title, onClick, className }) => {
         onClick={onClick}
       >
         <div className={glassSidebarStyles.emptyNavIconWell}>
-          <Icon color={cssVar.colorTextDescription} icon={PlusIcon} size={20} />
+          <Icon
+            color={cssVar.colorTextDescription}
+            icon={PlusIcon}
+            size={{ size: 20, strokeWidth: ENTRY_ICON_STROKE }}
+          />
         </div>
         <Text
           ellipsis

@@ -5,6 +5,7 @@ import {
   IconBrain,
   IconChartHistogram,
   IconChartPie,
+  IconChevronDown,
   IconCloud,
   IconCloudNetwork,
   IconCoins,
@@ -24,6 +25,8 @@ import {
   IconInfoCircle,
   IconKey,
   IconKeyboard,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
   IconMap2,
   IconMessage2,
   IconMessage2Plus,
@@ -45,9 +48,12 @@ import {
 } from '@tabler/icons-react';
 import { createElement, type FC } from 'react';
 
+import { WORKSPACE_ICON_STROKE_WIDTH } from '@/const/workspaceVisualTokens';
+
 export type EntryIcon = FC<any>;
 
-export const ENTRY_ICON_STROKE = 2.2;
+/** Tabler stroke prop + lobehub Icon `size.strokeWidth` (see WORKSPACE_ICON_STROKE_WIDTH). */
+export const ENTRY_ICON_STROKE = WORKSPACE_ICON_STROKE_WIDTH;
 
 export const createEntryIcon = (IconComponent: EntryIcon): EntryIcon => {
   const WrappedIcon: EntryIcon = (props) =>
@@ -105,6 +111,13 @@ export const SETTINGS_ENTRY_ICONS = {
   systemTools: createEntryIcon(IconTools),
   tts: createEntryIcon(IconMicrophone2),
   usage: createEntryIcon(IconChartPie),
+} as const;
+
+/** Left rail header: same Tabler family + stroke as APP_ENTRY_ICONS / ACTION_ENTRY_ICONS. */
+export const SIDEBAR_HEADER_ICONS = {
+  chevronDown: createEntryIcon(IconChevronDown),
+  toggleCollapse: createEntryIcon(IconLayoutSidebarLeftCollapse),
+  toggleExpand: createEntryIcon(IconLayoutSidebarLeftExpand),
 } as const;
 
 export const ACTION_ENTRY_ICONS = {

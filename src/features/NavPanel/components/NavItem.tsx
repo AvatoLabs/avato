@@ -7,6 +7,7 @@ import { type ReactNode } from 'react';
 import { memo } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { ENTRY_ICON_STROKE } from '@/config/entryIcons';
 import { WORKSPACE_NAV_ROW_HEIGHT_PX } from '@/const/workspaceVisualTokens';
 import { isModifierClick } from '@/utils/navigation';
 
@@ -130,6 +131,7 @@ const NavItem = memo<NavItemProps>(
   }) => {
     const glass = useGlassNavVisual();
     const iconSize = iconSizeProp ?? (glass ? 20 : 18);
+    const iconSizeForLobeIcon = { size: iconSize, strokeWidth: ENTRY_ICON_STROKE };
     const iconColor = glass
       ? active
         ? cssVar.colorPrimary
@@ -190,7 +192,7 @@ const NavItem = memo<NavItemProps>(
               {loading ? (
                 <NeuralNetworkLoading size={iconSize} />
               ) : (
-                <Icon color={iconColor} icon={icon} size={iconSize} />
+                <Icon color={iconColor} icon={icon} size={iconSizeForLobeIcon} />
               )}
             </div>
           ) : (
@@ -198,7 +200,7 @@ const NavItem = memo<NavItemProps>(
               {loading ? (
                 <NeuralNetworkLoading size={iconSize} />
               ) : (
-                <Icon color={iconColor} icon={icon} size={iconSize} />
+                <Icon color={iconColor} icon={icon} size={iconSizeForLobeIcon} />
               )}
             </Center>
           ))}

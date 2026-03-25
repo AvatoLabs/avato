@@ -75,7 +75,12 @@ const RecentTopicsList = memo(() => {
 
   if (recentTopics.length === 0) {
     return (
-      <Text fontSize={12} lineHeight={1.5} paddingBlock={4} paddingInline={8} type={'secondary'}>
+      <Text
+        fontSize={12}
+        lineHeight={1.5}
+        style={{ paddingBlock: 4, paddingInline: 8 }}
+        type={'secondary'}
+      >
         {t('workspace.sidebar.recentTopicsEmpty')}
       </Text>
     );

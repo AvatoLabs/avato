@@ -2,11 +2,11 @@
 
 import { type ActionIconProps } from '@lobehub/ui';
 import { ActionIcon } from '@lobehub/ui';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SIDEBAR_HEADER_ICONS } from '@/config/entryIcons';
 import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
@@ -36,7 +36,9 @@ const ToggleLeftPanelButton = memo<ToggleLeftPanelButtonProps>(
     return (
       <ActionIcon
         active={showActive ? expand : undefined}
-        icon={icon || (expand ? PanelLeftClose : PanelLeftOpen)}
+        icon={
+          icon || (expand ? SIDEBAR_HEADER_ICONS.toggleCollapse : SIDEBAR_HEADER_ICONS.toggleExpand)
+        }
         id={TOGGLE_BUTTON_ID}
         size={size || DESKTOP_HEADER_ICON_SIZE}
         title={title || t('toggleLeftPanel.title', { ns: 'hotkey' })}

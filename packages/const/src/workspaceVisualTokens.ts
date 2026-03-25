@@ -3,6 +3,12 @@
  * Semantic colors still come from antd-style / ThemeProvider (cssVar).
  */
 
+/**
+ * Tabler outline icons via @lobehub/ui `Icon`: pass as `size.strokeWidth` (calcSize merges onto SVG).
+ * Must match `ENTRY_ICON_STROKE` in app `config/entryIcons.ts`.
+ */
+export const WORKSPACE_ICON_STROKE_WIDTH = 2.3;
+
 /** Draggable nav rail — slightly wider minimum for breathing room */
 export const WORKSPACE_SHELL_RAIL_MIN_WIDTH = 252;
 
