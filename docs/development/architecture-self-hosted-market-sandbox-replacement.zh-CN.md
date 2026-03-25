@@ -1,7 +1,10 @@
 # 主程序内完整替代 Market + 云沙盒 — 架构说明
 
-本文档面向 **完全离线 / 仅内网**、需在 **LobeHub 主程序内** 替代官方 `market.lobehub.com` 与云端 Code Interpreter（云沙盒）的架构设计，用于技术评审与分阶段实施。\
+本文档面向 **完全离线 / 仅内网**、需在 **LobeHub 主程序内** 替代官方 `market.lobehub.com` 与云端 Code Interpreter（云沙盒）的架构设计，用于技术评审与分阶段实施。
+
 **说明**：官方 Market 服务端未随主仓库开源；下文「兼容」指 **行为上满足主程序已通过 `@lobehub/market-sdk` 发起的调用**，而非声称与公网服务逐字节一致。
+
+**技术栈提案**：自建 **Market 兼容网关** 推荐使用 **Rust**（见 §4.1）；与实现语言无关，关键是 HTTP/JSON 契约一致。
 
 ---
 
@@ -64,7 +67,7 @@ flowchart TB
   end
 
   subgraph Replacement["自建替代集群（内网）"]
-    GW[Market 兼容网关 / Private Market API]
+    GW["Market 兼容网关（建议 Rust：Axum/Actix 等）"]
     SB[Sandbox 执行平面]
     ST[(元数据与索引存储)]
     OBJ[(对象存储 S3/MinIO)]
@@ -98,6 +101,13 @@ flowchart TB
 
 - 对外保持与 **`@lobehub/market-sdk` 期望的 REST 路径与 JSON 形态** 一致（至少覆盖主程序实际调用的子集）。
 - 对内可拆多个微服务；对 LobeHub 仅暴露 **单一 `MARKET_BASE_URL`**。
+
+**实现语言：推荐 Rust**
+
+- **主程序只通过 HTTPS 调用**，与网关实现语言解耦；自建 Market 本质是 **REST + JSON + 鉴权头** 的兼容服务。
+- **Rust 适合作为网关**：单二进制部署、延迟与内存占用可控、TLS/mTLS 与并发模型成熟（常用 **Axum**、**Actix Web** 等）。
+- **鉴权**：在 Rust 侧校验 `Authorization` Bearer、`trustedClientToken` 或自建 JWT（如 `jose` / `jsonwebtoken` 等 crate），与 Node 无差异。
+- **与沙盒解耦**：网关 **不执行用户代码**，仅将 `runBuildInTool` 等请求 **转发** 至沙盒执行平面（gRPC/HTTP）；沙盒 Worker 可用 **Rust / Go / Python** 等单独选型，不必与网关同栈。
 
 **实现策略（二选一或混合）**：
 
@@ -166,7 +176,7 @@ flowchart TB
 flowchart LR
   Client[浏览器/桌面端]
   LB[LobeHub 入口]
-  MM[Market 兼容网关]
+  MM["Market 网关（Rust 推荐）"]
   SBX[沙盒 Worker 池]
   S3[MinIO / 自建 S3]
   DB[(PostgreSQL)]
@@ -185,13 +195,13 @@ flowchart LR
 
 ## 7. 分阶段实施路线（建议）
 
-| 阶段        | 交付物                                                      | 验收                                |
-| ----------- | ----------------------------------------------------------- | ----------------------------------- |
-| **Phase 0** | 梳理 `market-sdk` 实际命中端点（自动化集成测试或抓包）      | 清单与优先级确认                    |
-| **Phase 1** | 自建 `MARKET_BASE_URL` + P0：`runBuildInTool` + 沙盒 Worker | 内置 Cloud Sandbox 端到端可用       |
-| **Phase 2** | `exportFile` + 与现有 S3 / 文件记录联调                     | 导出链接与知识库 `spaceId` 策略不变 |
-| **Phase 3** | 技能商店 / Discover 所需 API 或 **UI 降级**                 | 社区页可用或明确隐藏                |
-| **Phase 4** | Connect / OIDC 替换或禁用                                   | 无公网依赖、符合等保 / 内网规范     |
+| 阶段        | 交付物                                                                                 | 验收                                |
+| ----------- | -------------------------------------------------------------------------------------- | ----------------------------------- |
+| **Phase 0** | 梳理 `market-sdk` 实际命中端点（自动化集成测试或抓包）                                 | 清单与优先级确认                    |
+| **Phase 1** | 自建 `MARKET_BASE_URL`（**Rust 网关** 或等价实现）+ P0：`runBuildInTool` + 沙盒 Worker | 内置 Cloud Sandbox 端到端可用       |
+| **Phase 2** | `exportFile` + 与现有 S3 / 文件记录联调                                                | 导出链接与知识库 `spaceId` 策略不变 |
+| **Phase 3** | 技能商店 / Discover 所需 API 或 **UI 降级**                                            | 社区页可用或明确隐藏                |
+| **Phase 4** | Connect / OIDC 替换或禁用                                                              | 无公网依赖、符合等保 / 内网规范     |
 
 ---
 
@@ -203,6 +213,7 @@ flowchart LR
 | `execScript` + Skill zip   | 主程序在服务端解析 `zipUrl`（`market.ts`）；自建 Market 或 Worker 需支持 **从可访问 URL 拉取技能包** |
 | 运维成本                   | 数十人规模可采用 **单集群多副本**，仍建议监控与会话 GC                                               |
 | 法律与合规                 | 用户代码执行属高风险能力，需安全评审与应急预案                                                       |
+| Rust 网关与 SDK 契约漂移   | 网关层只做路由与鉴权，业务与 Discover 等可拆独立服务；对 P0 路径做 **契约测试** 锁定 JSON 形态       |
 
 ---
 
@@ -213,4 +224,4 @@ flowchart LR
 
 ---
 
-**版本**：1.0（架构草案，随实现修订）
+**版本**：1.1（架构草案：补充 Market 网关 Rust 实现提案，随实现修订）

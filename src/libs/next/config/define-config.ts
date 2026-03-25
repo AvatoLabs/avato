@@ -35,10 +35,9 @@ export function defineConfig(config: CustomNextConfig) {
         // On Vercel (serverless), including native bindings can easily exceed function size limits.
         ...(buildWithDocker
           ? [
-              // Exclude SPA/desktop/mobile build artifacts from serverless functions
+              // SPA assets are copied to public/spa by build:spa:copy; do not include dist/desktop|mobile
+              // (avoids redundant copies and ENOENT when nft resolves HTML asset paths to dist/).
               'public/spa/**',
-              'dist/desktop/**',
-              'dist/mobile/**',
 
               'packages/database/migrations/**',
 

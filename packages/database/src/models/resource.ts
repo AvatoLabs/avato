@@ -27,6 +27,7 @@ import {
   users,
 } from '../schemas';
 import type { LobeChatDatabase, Transaction } from '../type';
+import { UserModel } from './user';
 
 export class ResourceModel {
   private readonly db: LobeChatDatabase;
@@ -596,6 +597,7 @@ export class ResourceModel {
   createUploadSession = async (
     params: Omit<NewUploadSession, 'id' | 'createdBy' | 'status'> & { id?: string },
   ): Promise<UploadSessionItem> => {
+    await UserModel.makeSureUserExist(this.db, this.userId);
     const { id: explicitId, ...rest } = params;
     const [session] = await this.db
       .insert(uploadSessions)

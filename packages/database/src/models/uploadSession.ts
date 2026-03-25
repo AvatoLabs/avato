@@ -3,6 +3,7 @@ import { and, eq, gt, lt, or } from 'drizzle-orm';
 import type { NewUploadSession, UploadSessionItem } from '../schemas';
 import { uploadSessions } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { UserModel } from './user';
 
 export class UploadSessionModel {
   private readonly db: LobeChatDatabase;
@@ -19,6 +20,7 @@ export class UploadSessionModel {
   create = async (
     params: Omit<NewUploadSession, 'id' | 'createdBy' | 'status'>,
   ): Promise<UploadSessionItem> => {
+    await UserModel.makeSureUserExist(this.db, this.userId);
     const [session] = await this.db
       .insert(uploadSessions)
       .values({

@@ -15,8 +15,9 @@ export default {
   'starter.seedance': 'Seedance 2.0',
   'starter.write': 'Write',
   'workspace.assistants.empty': 'No assistants yet. Create one to get started.',
-  'workspace.hero.subtitle': 'Chat, write, search docs, or launch an assistant from one workspace.',
-  'workspace.hero.title': 'What do you want to finish today?',
+  'workspace.hero.subtitle':
+    'Bring messaging, drafting, and document search together—then hand off to the right assistant when the work calls for depth.',
+  'workspace.hero.title': 'One workspace. Full context. No switching.',
   'workspace.quickActions.newDoc': 'Open Documents',
   'workspace.quickActions.openCommunity': 'Browse Community',
   'workspace.quickActions.title': 'Quick Actions',

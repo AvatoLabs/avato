@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import * as dotenv from 'dotenv';
@@ -17,6 +18,12 @@ const env = process.env.NODE_ENV || 'development';
 dotenvExpand.expand(dotenv.config()); // Load .env
 dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}` })); // Load .env.[env] and override
 dotenvExpand.expand(dotenv.config({ override: true, path: `.env.${env}.local` })); // Load .env.[env].local and override
+
+// 若仍未设置 DATABASE_URL，回退加载 .env.dev（迁移脚本不默认读该文件）
+const envDevPath = join(process.cwd(), '.env.dev');
+if (!process.env.DATABASE_URL && existsSync(envDevPath)) {
+  dotenvExpand.expand(dotenv.config({ override: true, path: envDevPath }));
+}
 
 const migrationsFolder = join(__dirname, '../../packages/database/migrations');
 
@@ -52,6 +59,15 @@ if (connectionString) {
       console.info(DUPLICATE_EMAIL_HINT);
     } else if (errMsg.includes(`Cannot read properties of undefined (reading 'migrate')`)) {
       console.info(DB_FAIL_INIT_HINT);
+    }
+
+    const cause = (err as { cause?: { code?: string } })?.cause;
+    if (cause?.code === '28P01') {
+      console.info(`
+💡 PostgreSQL 密码认证失败（28P01）。常见原因：
+  • 已改根目录 .env 的 DATABASE_URL，但 Docker Postgres 仍用旧密码：首次启动时密码写入数据卷，需同步 docker-compose/dev/.env 的 POSTGRES_PASSWORD 后删除数据卷再重建（无重要数据时）：cd docker-compose/dev && docker compose down && rm -rf data && docker compose up -d
+  • 或在本机 psql 执行：ALTER USER postgres WITH PASSWORD '与 DATABASE_URL 中一致';
+`);
     }
 
     process.exit(1);
