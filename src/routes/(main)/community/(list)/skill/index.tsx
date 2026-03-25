@@ -8,9 +8,9 @@ import { useDiscoverStore } from '@/store/discover';
 import { type SkillQueryParams } from '@/types/discover';
 import { DiscoverTab, SkillSorts } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import SkillEmpty from '../../features/SkillEmpty';
 import Pagination from '../features/Pagination';
-import SkillEmpty from '../features/SkillEmpty';
 import List from './features/List';
 import Loading from './loading';
 

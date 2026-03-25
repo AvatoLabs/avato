@@ -26,7 +26,12 @@ COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-${ROOT_DIR}/docker-compose/canary/.env}"
 IMAGE_TAG="${IMAGE_TAG:-canary-$(date +%Y%m%d-%H%M%S)}"
 IMAGE_NAME="${IMAGE_NAME:-canary-runtime:${IMAGE_TAG}}"
 REMOTE_RUNTIME_TAG="${REMOTE_RUNTIME_TAG:-canary-lobe:deploy}"
-TMP_BUILD_DIR="${TMP_BUILD_DIR:-/tmp/canary-runtime-build}"
+TMP_BUILD_ROOT="${TMP_BUILD_ROOT:-/tmp/canary-runtime-build}"
+AUTO_TMP_BUILD_DIR=0
+if [ -z "${TMP_BUILD_DIR:-}" ]; then
+  TMP_BUILD_DIR="$(mktemp -d "${TMP_BUILD_ROOT}.XXXXXX")"
+  AUTO_TMP_BUILD_DIR=1
+fi
 TMP_ARTIFACT_DIR="${TMP_ARTIFACT_DIR:-/tmp/canary-artifacts}"
 ARTIFACT_NAME="${ARTIFACT_NAME:-canary-runtime-${IMAGE_TAG}-amd64.tar.gz}"
 KEEP_LOCAL_ARTIFACTS="${KEEP_LOCAL_ARTIFACTS:-3}"
@@ -77,6 +82,48 @@ restore_build_env() {
   fi
 }
 
+cleanup_tmp_build_dir() {
+  if [ "${AUTO_TMP_BUILD_DIR}" = "1" ] && [ -d "${TMP_BUILD_DIR}" ]; then
+    rm -rf "${TMP_BUILD_DIR}"
+  fi
+}
+
+cleanup_on_exit() {
+  restore_build_env
+  cleanup_tmp_build_dir
+}
+
+get_env_value() {
+  local env_file="$1"
+  local env_key="$2"
+
+  [ -f "${env_file}" ] || return 1
+
+  awk -F= -v key="${env_key}" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "${env_file}"
+}
+
+validate_server_actions_key() {
+  local build_key compose_key
+
+  build_key="$(get_env_value "${BUILD_ENV_FILE}" "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" || true)"
+  compose_key="$(get_env_value "${COMPOSE_ENV_FILE}" "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" || true)"
+
+  if [ -z "${build_key}" ]; then
+    echo "Missing NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in build env: ${BUILD_ENV_FILE}" >&2
+    exit 1
+  fi
+
+  if [ -z "${compose_key}" ]; then
+    echo "Missing NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in compose env: ${COMPOSE_ENV_FILE}" >&2
+    exit 1
+  fi
+
+  if [ "${build_key}" != "${compose_key}" ]; then
+    echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY mismatch between ${BUILD_ENV_FILE} and ${COMPOSE_ENV_FILE}" >&2
+    exit 1
+  fi
+}
+
 cd "${ROOT_DIR}"
 
 if [ ! -f "${COMPOSE_ENV_FILE}" ]; then
@@ -85,6 +132,8 @@ if [ ! -f "${COMPOSE_ENV_FILE}" ]; then
   exit 1
 fi
 
+validate_server_actions_key
+
 echo "==> Building canary assets with ${BUILD_ENV_FILE}"
 BUILD_ENV_BACKUP_FILE=""
 if [ -e "${ROOT_DIR}/.env.production" ]; then
@@ -92,11 +141,11 @@ if [ -e "${ROOT_DIR}/.env.production" ]; then
   cp -p "${ROOT_DIR}/.env.production" "${BUILD_ENV_BACKUP_FILE}"
 fi
 cp "${BUILD_ENV_FILE}" .env.production
-trap restore_build_env EXIT
+trap cleanup_on_exit EXIT
 bun run build:docker
 
 echo "==> Preparing runtime bundle"
-rm -rf "${TMP_BUILD_DIR}/app"
+rm -rf "${TMP_BUILD_DIR}"
 mkdir -p "${TMP_BUILD_DIR}" "${TMP_ARTIFACT_DIR}"
 
 cat >"${TMP_BUILD_DIR}/Dockerfile" <<EOF

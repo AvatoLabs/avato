@@ -11,14 +11,9 @@ const MarketList = memo<{ id: string }>(({ id }) => {
   const [toggleAgentPlugin, hasPlugin] = useStore((s) => [s.toggleAgentPlugin, !!s.config.plugins]);
   const plugins = useStore((s) => s.config.plugins || []);
 
-  const [useFetchPluginList, fetchPluginManifest] = useToolStore((s) => [
-    s.useFetchPluginStore,
-    s.installPlugin,
-  ]);
+  const fetchPluginManifest = useToolStore((s) => s.installPlugin);
 
   const pluginManifestLoading = useToolStore((s) => s.pluginInstallLoading, isEqual);
-
-  useFetchPluginList();
 
   return (
     <Flexbox horizontal align={'center'} gap={8}>

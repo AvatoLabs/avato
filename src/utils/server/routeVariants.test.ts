@@ -121,6 +121,19 @@ describe('RouteVariants', () => {
     });
   });
 
+  describe('isSerializedVariants', () => {
+    it('should accept canonical serialized variants', () => {
+      expect(RouteVariants.isSerializedVariants('en-US__0')).toBe(true);
+      expect(RouteVariants.isSerializedVariants('zh-CN__1')).toBe(true);
+    });
+
+    it('should reject malformed or non-canonical variants', () => {
+      expect(RouteVariants.isSerializedVariants('assets')).toBe(false);
+      expect(RouteVariants.isSerializedVariants('en-US')).toBe(false);
+      expect(RouteVariants.isSerializedVariants('en-US__2')).toBe(false);
+    });
+  });
+
   describe('getVariantsFromProps', () => {
     it('should extract and deserialize variants from props', async () => {
       const props: DynamicLayoutProps = {

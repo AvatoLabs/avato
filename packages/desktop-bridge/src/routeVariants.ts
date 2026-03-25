@@ -44,6 +44,14 @@ export class RouteVariants {
   static serializeVariants = (variants: IRouteVariants): string =>
     [variants.locale, Number(variants.isMobile)].join(SPLITTER);
 
+  static isSerializedVariants = (serialized: string): boolean => {
+    if (!serialized.includes(SPLITTER)) return false;
+
+    return (
+      RouteVariants.serializeVariants(RouteVariants.deserializeVariants(serialized)) === serialized
+    );
+  };
+
   static deserializeVariants = (serialized: string): IRouteVariants => {
     try {
       const [locale, isMobile] = serialized.split(SPLITTER);

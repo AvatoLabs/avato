@@ -193,6 +193,11 @@ export async function GET(
   { params }: { params: Promise<{ path?: string[]; variants: string }> },
 ) {
   const { variants } = await params;
+
+  if (!RouteVariants.isSerializedVariants(variants)) {
+    return new Response('Not Found', { status: 404 });
+  }
+
   const { locale, isMobile } = RouteVariants.deserializeVariants(variants);
   const canonicalUrl = new URL(request.url).origin;
 

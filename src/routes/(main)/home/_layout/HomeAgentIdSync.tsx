@@ -1,21 +1,24 @@
-import { useUnmount } from 'ahooks';
-import { createStoreUpdater } from 'zustand-utils';
+import { useEffect } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 const HomeAgentIdSync = () => {
-  const useAgentStoreUpdater = createStoreUpdater(useAgentStore);
-
   const inboxAgentId = useAgentStore(builtinAgentSelectors.inboxAgentId);
 
-  // Sync inbox agent id to activeAgentId when on home page
-  useAgentStoreUpdater('activeAgentId', inboxAgentId);
+  useEffect(() => {
+    if (typeof inboxAgentId === 'undefined') return;
 
-  // Clear activeAgentId when unmounting (leaving home page)
-  useUnmount(() => {
-    useAgentStore.setState({ activeAgentId: undefined });
-  });
+    const currentAgentId = useAgentStore.getState().activeAgentId;
+
+    if (currentAgentId !== inboxAgentId) {
+      useAgentStore.setState({ activeAgentId: inboxAgentId });
+    }
+
+    return () => {
+      useAgentStore.setState({ activeAgentId: undefined });
+    };
+  }, [inboxAgentId]);
 
   return null;
 };

@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type AssistantQueryParams } from '@/types/discover';
 import { AssistantSorts, DiscoverTab } from '@/types/discover';
 
-import AssistantEmpty from '../features/AssistantEmpty';
-import DiscoverRequestError from '../features/DiscoverRequestError';
+import AssistantEmpty from '../../features/AssistantEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';

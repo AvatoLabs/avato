@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type ModelQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
-import ModelEmpty from '../features/ModelEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import ModelEmpty from '../../features/ModelEmpty';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';

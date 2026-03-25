@@ -78,5 +78,8 @@ export const createServerConfigStore = (initState?: Partial<ServerConfigStore>) 
   return store;
 };
 
-export const { useStore: useServerConfigStore, Provider } =
-  createContext<StoreApiWithSelector<ServerConfigStore>>();
+export const {
+  useStore: useServerConfigStore,
+  useStoreApi: useServerConfigStoreApi,
+  Provider,
+} = createContext<StoreApiWithSelector<ServerConfigStore>>();

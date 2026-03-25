@@ -3,14 +3,13 @@
 import { INBOX_SESSION_ID } from '@lobechat/const';
 import { lazy, memo, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createStoreUpdater } from 'zustand-utils';
 
 import { isDesktop } from '@/const/version';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { getDesktopOnboardingCompleted } from '@/routes/(desktop)/desktop-onboarding/storage';
 import { useAgentStore } from '@/store/agent';
 import { useGlobalStore } from '@/store/global';
-import { useServerConfigStore } from '@/store/serverConfig';
+import { useServerConfigStore, useServerConfigStoreApi } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';
 import { useUserStore } from '@/store/user';
 import { authSelectors } from '@/store/user/selectors';
@@ -28,7 +27,8 @@ const StoreInitialization = memo(() => {
     s.useInitUserState,
   ]);
 
-  const { serverConfig } = useServerConfigStore();
+  const serverConfig = useServerConfigStore((s) => s.serverConfig);
+  const serverConfigStoreApi = useServerConfigStoreApi();
 
   const [useInitSystemStatus, useCheckServerVersion] = useGlobalStore((s) => [
     s.useInitSystemStatus,
@@ -47,11 +47,7 @@ const StoreInitialization = memo(() => {
   const useFetchServerConfig = useServerConfigStore((s) => s.useInitServerConfig);
   useFetchServerConfig();
 
-  // Update NextAuth status
-  const useUserStoreUpdater = createStoreUpdater(useUserStore);
   const oAuthSSOProviders = useServerConfigStore(serverConfigSelectors.oAuthSSOProviders);
-  useUserStoreUpdater('oAuthSSOProviders', oAuthSSOProviders);
-  const useServerConfigStoreUpdater = createStoreUpdater(useServerConfigStore);
 
   /**
    * The store function of `isLogin` will both consider the values of `enableAuth` and `isSignedIn`.
@@ -84,12 +80,18 @@ const StoreInitialization = memo(() => {
     onSuccess: onUserStateSuccess,
   });
 
-  const useStoreUpdater = createStoreUpdater(useGlobalStore);
-
   const mobile = useIsMobile();
 
-  useStoreUpdater('isMobile', mobile);
-  useServerConfigStoreUpdater('isMobile', mobile);
+  useEffect(() => {
+    if (typeof oAuthSSOProviders === 'undefined') return;
+
+    useUserStore.setState({ oAuthSSOProviders });
+  }, [oAuthSSOProviders]);
+
+  useEffect(() => {
+    useGlobalStore.setState({ isMobile: mobile });
+    serverConfigStoreApi.setState({ isMobile: mobile });
+  }, [mobile, serverConfigStoreApi]);
 
   return (
     <Suspense>

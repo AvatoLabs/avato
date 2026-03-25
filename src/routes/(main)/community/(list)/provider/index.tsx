@@ -8,9 +8,9 @@ import { useDiscoverStore } from '@/store/discover';
 import { type ProviderQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import ProviderEmpty from '../../features/ProviderEmpty';
 import Pagination from '../features/Pagination';
-import ProviderEmpty from '../features/ProviderEmpty';
 import List from './features/List';
 import Loading from './loading';
 

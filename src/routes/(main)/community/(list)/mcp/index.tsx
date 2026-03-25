@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type McpQueryParams } from '@/types/discover';
 import { DiscoverTab, McpSorts } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
-import McpEmpty from '../features/McpEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import McpEmpty from '../../features/McpEmpty';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';

@@ -9,9 +9,9 @@ import { LOBE_LOCALE_COOKIE } from '@/const/locale';
 import { appEnv } from '@/envs/app';
 import { authEnv } from '@/envs/auth';
 import { type Locales } from '@/locales/resources';
-import { parseBrowserLanguage } from '@/utils/locale';
-import { RouteVariants } from '@/utils/server/routeVariants';
 
+import { parseBrowserLanguage } from '../../../utils/locale';
+import { RouteVariants } from '../../../utils/server/routeVariants';
 import { nextjsOnlyRoutes } from '../nextjsOnlyRoutes';
 import { createRouteMatcher } from './createRouteMatcher';
 
@@ -200,6 +200,9 @@ export function defineConfig() {
     '/share(.*)',
   ]);
 
+  const isServerActionRequest = (req: NextRequest) =>
+    req.method === 'POST' && req.headers.has('next-action');
+
   const betterAuthMiddleware = async (req: NextRequest) => {
     logBetterAuth('BetterAuth middleware processing request: %s %s', req.method, req.url);
 
@@ -231,6 +234,15 @@ export function defineConfig() {
     });
 
     if (!isLoggedIn) {
+      if (isServerActionRequest(req)) {
+        logBetterAuth(
+          'Protected server action request has no session, skipping middleware redirect: %s',
+          req.url,
+        );
+
+        return response;
+      }
+
       // If request a protected route, redirect to sign-in page
       if (isProtected) {
         logBetterAuth('Request a protected route, redirecting to sign-in page');

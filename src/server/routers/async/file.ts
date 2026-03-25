@@ -23,6 +23,7 @@ import {
   assertRagEmbeddingDimensions,
   RAG_EMBEDDING_DIMENSIONS,
 } from '@/server/services/rag/constants';
+import { getEffectiveEmbeddingBatchSize } from '@/server/services/rag/embeddingLimits';
 import { ResourceAuthorizer } from '@/server/services/resource';
 import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
@@ -96,7 +97,11 @@ export const fileRouter = router({
 
           const startAt = Date.now();
 
-          const CHUNK_SIZE = fileEnv.EMBEDDING_BATCH_SIZE;
+          const CHUNK_SIZE = getEffectiveEmbeddingBatchSize({
+            configuredBatchSize: fileEnv.EMBEDDING_BATCH_SIZE,
+            model,
+            provider,
+          });
           const CONCURRENCY = fileEnv.EMBEDDING_CONCURRENCY;
 
           const chunks = await ctx.chunkModel.getChunksTextByFileId(input.fileId);

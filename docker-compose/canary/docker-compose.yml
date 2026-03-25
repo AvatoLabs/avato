@@ -17,6 +17,7 @@ services:
     environment:
       - 'KEY_VAULTS_SECRET=${KEY_VAULTS_SECRET}'
       - 'AUTH_SECRET=${AUTH_SECRET}'
+      - 'NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}'
       - 'DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgresql:5432/${LOBE_DB_NAME}'
       # In-container Next listens on 3210 (see ports LOBE_PORT:3210). Async image/chat uses this for /trpc/async — NOT host-mapped 3211.
       - 'INTERNAL_APP_URL=${INTERNAL_APP_URL:-http://127.0.0.1:3210}'

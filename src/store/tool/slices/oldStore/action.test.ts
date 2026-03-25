@@ -106,7 +106,11 @@ describe('useToolStore:pluginStore', () => {
       });
 
       // Then
-      expect(toolService.getDiscoverPluginList).toHaveBeenCalled();
+      expect(toolService.getDiscoverPluginList).toHaveBeenCalledWith({
+        locale: expect.any(String),
+        page: 1,
+        pageSize: 40,
+      });
       expect(pluginList).toEqual(pluginListMock);
       expect(useToolStore.getState().oldPluginItems).toEqual(pluginListMock);
     });
@@ -118,21 +122,25 @@ describe('useToolStore:pluginStore', () => {
 
       // When
       let pluginList;
-      let errorOccurred = false;
-      try {
-        await act(async () => {
-          pluginList = await useToolStore.getState().loadPluginStore();
-        });
-      } catch (e) {
-        errorOccurred = true;
-      }
+      await act(async () => {
+        pluginList = await useToolStore.getState().loadPluginStore();
+      });
 
       // Then
-      expect(toolService.getDiscoverPluginList).toHaveBeenCalled();
-      expect(errorOccurred).toBe(true);
-      expect(pluginList).toBeUndefined();
-      // Ensure the state is not updated with an undefined value
-      expect(useToolStore.getState().oldPluginItems).not.toBeUndefined();
+      expect(toolService.getDiscoverPluginList).toHaveBeenCalledWith({
+        locale: expect.any(String),
+        page: 1,
+        pageSize: 40,
+      });
+      expect(pluginList).toEqual(useToolStore.getState().oldPluginItems);
+      expect(useToolStore.getState().oldPluginItems).toEqual([
+        {
+          avatar: '🍏',
+          identifier: 'plugin1',
+          manifest: 'https://abc.com/manifest.json',
+          title: 'plugin1',
+        },
+      ]);
     });
   });
 

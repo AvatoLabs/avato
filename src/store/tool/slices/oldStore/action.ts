@@ -22,6 +22,7 @@ import { type PluginInstallProgress, type PluginStoreState } from './initialStat
 const n = setNamespace('pluginStore');
 
 const INSTALLED_PLUGINS = 'loadInstalledPlugins';
+const DISCOVER_PLUGIN_PAGE_SIZE = 40;
 
 type Setter = StoreSetter<ToolStore>;
 export const createPluginStoreSlice = (set: Setter, get: () => ToolStore, _api?: unknown) =>
@@ -73,15 +74,21 @@ export class PluginStoreActionImpl {
   loadPluginStore = async (): Promise<DiscoverPluginItem[]> => {
     const locale = globalHelpers.getCurrentLanguage();
 
-    const data = await toolService.getDiscoverPluginList({
-      locale,
-      page: 1,
-      pageSize: 50,
-    });
+    try {
+      const data = await toolService.getDiscoverPluginList({
+        locale,
+        page: 1,
+        pageSize: DISCOVER_PLUGIN_PAGE_SIZE,
+      });
 
-    this.#set({ oldPluginItems: data.items }, false, n('loadPluginList'));
+      this.#set({ oldPluginItems: data.items }, false, n('loadPluginList'));
 
-    return data.items;
+      return data.items;
+    } catch {
+      // Old plugin discovery is deprecated. Keep existing state instead of surfacing
+      // a boot-time error for a non-critical request.
+      return this.#get().oldPluginItems;
+    }
   };
 
   refreshPlugins = async (): Promise<void> => {
@@ -190,6 +197,7 @@ export class PluginStoreActionImpl {
   useFetchPluginStore = (): SWRResponse<DiscoverPluginItem[]> => {
     return useSWR<DiscoverPluginItem[]>('loadPluginStore', this.#get().loadPluginStore, {
       revalidateOnFocus: false,
+      shouldRetryOnError: false,
     });
   };
 }
