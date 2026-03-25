@@ -3,7 +3,7 @@
 import { type PropsWithChildren, type ReactNode } from 'react';
 import { memo, useLayoutEffect, useSyncExternalStore } from 'react';
 
-import Sidebar from '@/routes/(main)/home/_layout/Sidebar';
+import SidebarContent from '@/routes/(main)/home/_layout/SidebarContent';
 
 import { NavPanelDraggable } from './components/NavPanelDraggable';
 
@@ -13,12 +13,6 @@ type NavPanelSnapshot = {
   key: string;
   node: ReactNode;
 } | null;
-
-/** Stable ref so `memo(NavPanelDraggable)` skips re-renders when no route owns `NavPanelPortal` */
-const FALLBACK_HOME_SIDEBAR: NavPanelSnapshot = {
-  key: 'home',
-  node: <Sidebar />,
-};
 
 let currentSnapshot: NavPanelSnapshot = null;
 const listeners = new Set<() => void>();
@@ -32,6 +26,38 @@ const getNavPanelSnapshot = () => currentSnapshot;
 const setNavPanelSnapshot = (snapshot: NavPanelSnapshot) => {
   currentSnapshot = snapshot;
   listeners.forEach((listener) => listener());
+};
+
+interface NavPanelPortalProps extends PropsWithChildren {
+  /**
+   * Unique key to trigger transition animation when content changes
+   * @example <NavPanelPortal navKey="chat">...</NavPanelPortal>
+   */
+  navKey?: string;
+}
+
+export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'default' }) => {
+  useLayoutEffect(() => {
+    if (!children) return;
+
+    setNavPanelSnapshot({
+      key: navKey,
+      node: children,
+    });
+    // Intentionally keep previous content until new one mounts.
+  }, [children, navKey]);
+
+  return null;
+});
+
+/** Stable ref so `memo(NavPanelDraggable)` skips re-renders when no route owns `NavPanelPortal` */
+const FALLBACK_HOME_SIDEBAR: NavPanelSnapshot = {
+  key: 'home',
+  node: (
+    <NavPanelPortal navKey="home">
+      <SidebarContent />
+    </NavPanelPortal>
+  ),
 };
 
 const NavPanel = memo(() => {
@@ -63,25 +89,3 @@ const NavPanel = memo(() => {
 });
 
 export default NavPanel;
-
-interface NavPanelPortalProps extends PropsWithChildren {
-  /**
-   * Unique key to trigger transition animation when content changes
-   * @example <NavPanelPortal navKey="chat">...</NavPanelPortal>
-   */
-  navKey?: string;
-}
-
-export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'default' }) => {
-  useLayoutEffect(() => {
-    if (!children) return;
-
-    setNavPanelSnapshot({
-      key: navKey,
-      node: children,
-    });
-    // Intentionally keep previous content until new one mounts.
-  }, [children, navKey]);
-
-  return null;
-});

@@ -66,7 +66,7 @@ const User = memo<{ lite?: boolean }>(({ lite }) => {
         ) : (
           <Flexbox horizontal align={'center'} flex={1} gap={10} style={{ minWidth: 0 }}>
             <UserAvatar shape={'circle'} size={24} />
-            <Flexbox vertical flex={1} gap={2} style={{ minWidth: 0 }}>
+            <Flexbox direction={'vertical'} flex={1} gap={2} style={{ minWidth: 0 }}>
               {!isSignedIn && (nickname || username) ? (
                 <ProductLogo color={cssVar.colorText} size={26} type={'text'} />
               ) : (

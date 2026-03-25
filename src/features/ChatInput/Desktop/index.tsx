@@ -47,6 +47,12 @@ const styles = createStaticStyles(({ css }) => ({
   footnote: css`
     font-size: 10px;
   `,
+  /** Avoid Chrome warning: contenteditable inside display:flex focus quirks */
+  chatInputHost: css`
+    display: block;
+    width: 100%;
+    min-width: 0;
+  `,
   fullscreen: css`
     position: absolute;
     z-index: 100;
@@ -115,53 +121,55 @@ const DesktopChatInput = memo<DesktopChatInputProps>(
         gap={8}
         paddingBlock={expand ? 0 : showFootnote ? '0 12px' : '0 16px'}
       >
-        <ChatInput
-          data-testid="chat-input"
-          defaultHeight={chatInputHeight || 32}
-          fullscreen={expand}
-          maxHeight={320}
-          minHeight={36}
-          resize={true}
-          slashMenuRef={slashMenuRef}
-          footer={
-            <ChatInputActionBar
-              style={actionBarStyle ?? { paddingRight: 8 }}
-              left={
-                leftContent ?? (
-                  <ActionBar
-                    borderRadius={borderRadius}
-                    dropdownPlacement={dropdownPlacement}
-                    extraActionItems={extraActionItems}
-                  />
-                )
-              }
-              right={
-                sendAreaPrefix ? (
-                  <Flexbox horizontal align={'center'} gap={6}>
-                    {sendAreaPrefix}
+        <div className={styles.chatInputHost}>
+          <ChatInput
+            data-testid="chat-input"
+            defaultHeight={chatInputHeight || 32}
+            fullscreen={expand}
+            maxHeight={320}
+            minHeight={36}
+            resize={true}
+            slashMenuRef={slashMenuRef}
+            footer={
+              <ChatInputActionBar
+                style={actionBarStyle ?? { paddingRight: 8 }}
+                left={
+                  leftContent ?? (
+                    <ActionBar
+                      borderRadius={borderRadius}
+                      dropdownPlacement={dropdownPlacement}
+                      extraActionItems={extraActionItems}
+                    />
+                  )
+                }
+                right={
+                  sendAreaPrefix ? (
+                    <Flexbox horizontal align={'center'} gap={6}>
+                      {sendAreaPrefix}
+                      <SendArea />
+                    </Flexbox>
+                  ) : (
                     <SendArea />
-                  </Flexbox>
-                ) : (
-                  <SendArea />
-                )
-              }
-            />
-          }
-          header={
-            <Flexbox gap={0}>
-              {extentHeaderContent}
-              {showTypoBar && <TypoBar />}
-              {contextContainerNode}
-            </Flexbox>
-          }
-          onSizeChange={(height) => {
-            updateSystemStatus({ chatInputHeight: height });
-          }}
-          {...inputContainerProps}
-          className={cx(expand && styles.inputFullscreen, inputContainerProps?.className)}
-        >
-          <InputEditor />
-        </ChatInput>
+                  )
+                }
+              />
+            }
+            header={
+              <Flexbox gap={0}>
+                {extentHeaderContent}
+                {showTypoBar && <TypoBar />}
+                {contextContainerNode}
+              </Flexbox>
+            }
+            onSizeChange={(height) => {
+              updateSystemStatus({ chatInputHeight: height });
+            }}
+            {...inputContainerProps}
+            className={cx(expand && styles.inputFullscreen, inputContainerProps?.className)}
+          >
+            <InputEditor />
+          </ChatInput>
+        </div>
         {showFootnote && !expand && (
           <Center style={{ pointerEvents: 'none' }}>
             <Text className={styles.footnote} type={'secondary'}>
