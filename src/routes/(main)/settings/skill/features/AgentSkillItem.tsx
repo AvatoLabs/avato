@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next';
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createBuiltinAgentSkillDetailModal } from '@/features/SkillStore/SkillDetail';
 import { agentSkillService } from '@/services/skill';
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { downloadFile } from '@/utils/client/downloadFile';
 
 import { styles } from './style';

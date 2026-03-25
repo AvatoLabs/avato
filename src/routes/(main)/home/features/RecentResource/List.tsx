@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 
 import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleton';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
-import { useHomeStore } from '@/store/home';
 import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 import RecentResourceItem from './Item';
 

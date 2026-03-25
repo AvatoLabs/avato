@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 
 import GuideModal from '@/components/GuideModal';
 import GuideVideo from '@/components/GuideVideo';
-import NavHeader from '@/features/NavHeader';
 import useNotionImport from '@/features/ResourceManager/components/Header/hooks/useNotionImport';
 import { useFileStore } from '@/store/file';
 import { usePageStore } from '@/store/page';
@@ -254,7 +253,6 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
     return (
       <>
-        <NavHeader />
         <Center gap={24} height={'100%'} style={{ paddingBottom: 100 }} width={'100%'}>
           {hasPages && (
             <Flexbox justify={'center'} style={{ textAlign: 'center' }}>

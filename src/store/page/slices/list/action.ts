@@ -1,6 +1,6 @@
 import { type SWRResponse } from 'swr';
 
-import { useClientDataSWRWithSync } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { documentService } from '@/services/document';
 import { useGlobalStore } from '@/store/global';
 import { type StoreSetter } from '@/store/types';

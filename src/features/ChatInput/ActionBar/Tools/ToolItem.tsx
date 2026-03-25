@@ -3,8 +3,8 @@ import { memo, Suspense } from 'react';
 
 import DebugNode from '@/components/DebugNode';
 import PluginTag from '@/components/Plugins/PluginTag';
-import { useToolStore } from '@/store/tool';
 import { customPluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import type { CheckboxItemProps } from '../components/CheckboxWithLoading';
 import CheckboxItem from '../components/CheckboxWithLoading';

@@ -41,9 +41,11 @@ const Common = memo(() => {
   }, [general?.themeMode, setTheme, theme]);
 
   const handleThemeChange = (value: string) => {
-    const themeMode = (value === 'auto' ? 'system' : value) as ThemeMode;
-    setTheme(themeMode);
-    void setSettings({ general: { themeMode } });
+    const nextMode = (value === 'auto' ? 'system' : value) as ThemeMode;
+    setTheme(nextMode);
+    queueMicrotask(() => {
+      void setSettings({ general: { themeMode: nextMode } });
+    });
   };
 
   const handleLangChange = (value: LocaleMode) => {

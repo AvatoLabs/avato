@@ -6,7 +6,7 @@ import * as motion from 'motion/react-m';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { type SystemDependencyCheckResult } from '@/types/plugins';
 
 interface MCPDependenciesGuideProps {

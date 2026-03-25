@@ -2,8 +2,8 @@ import {
   type CachedPageData,
   type PageReference,
 } from '@/features/Electron/titlebar/RecentlyViewed/types';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { usePageStore } from '@/store/page';
 import { listSelectors } from '@/store/page/slices/list/selectors';

@@ -11,8 +11,8 @@ import urlJoin from 'url-join';
 
 import ModelSelect from '@/features/ModelSelect';
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 

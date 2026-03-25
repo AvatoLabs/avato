@@ -4,7 +4,7 @@ import debug from 'debug';
 import { type SWRResponse } from 'swr';
 import { type StateCreator } from 'zustand/vanilla';
 
-import { useClientDataSWRWithSync } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { messageService } from '@/services/message';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 

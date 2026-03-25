@@ -13,9 +13,9 @@ const StyleRegistry = ({ children }: PropsWithChildren) => {
         dangerouslySetInnerHTML={{
           __html: `
               html body {background: var(--ant-color-bg-layout, #f8f8f8);}
-              html[data-theme="dark"] body { background-color: var(--ant-color-bg-layout, #000); }
+              html[data-theme="dark"] body { background-color: var(--ant-color-bg-layout, #171717); }
               ${isDesktop ? 'html body, html { background: none; }' : ''}
-              ${isDesktop ? 'html[data-theme="dark"] body { background: color-mix(in srgb, var(--ant-color-bg-layout, #000) 90%, transparent); }' : ''}
+              ${isDesktop ? 'html[data-theme="dark"] body { background: color-mix(in srgb, var(--ant-color-bg-layout, #171717) 90%, transparent); }' : ''}
               ${isDesktop ? 'html[data-theme="light"] body { background: color-mix(in srgb, var(--ant-color-bg-layout, #f8f8f8) 70%, transparent); }' : ''}
             `,
         }}

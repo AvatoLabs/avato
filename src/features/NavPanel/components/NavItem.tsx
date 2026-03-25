@@ -38,6 +38,16 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       outline-offset: 2px;
     }
 
+    /** 未选中：hover 次级高亮（同色带，亮度低于选中底） */
+    &:not([data-selected='true'], [data-disabled='true']):hover:not(:active) {
+      background: color-mix(in srgb, ${cssVar.colorText} 12%, transparent) !important;
+
+      [data-glass-icon-well] {
+        transform: scale(1.04);
+        background: color-mix(in srgb, ${cssVar.colorText} 17%, transparent) !important;
+      }
+    }
+
     .${ACTION_CLASS_NAME} {
       transform: translateX(2px);
       margin-inline-end: 2px;
@@ -60,8 +70,25 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       }
     }
   `,
-  activeRail: css`
-    box-shadow: inset 2px 0 0 ${cssVar.colorPrimary};
+  /**
+   * Selected row: neutral pill — 正式、克制，避免主题色描边/侧条带来的「霓虹」感。
+   */
+  chatgptSelected: css`
+    margin-inline: 8px;
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: color-mix(in srgb, ${cssVar.colorText} 14%, transparent) !important;
+    box-shadow: inset 0 0 0 1px ${cssVar.colorBorderSecondary};
+
+    transition:
+      background-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+
+    &:hover {
+      background: color-mix(in srgb, ${cssVar.colorText} 18%, transparent) !important;
+      box-shadow: inset 0 0 0 1px ${cssVar.colorBorder};
+    }
   `,
   glassIconWell: css`
     display: flex;
@@ -74,19 +101,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     border-radius: ${cssVar.borderRadiusLG};
 
     background: ${cssVar.colorFillQuaternary};
-  `,
-  glassRow: css`
-    &:hover:not(:active) {
-      background: ${cssVar.colorFillQuaternary} !important;
-    }
-  `,
-  glassRowActive: css`
-    background: ${cssVar.colorPrimaryBg} !important;
-    box-shadow: inset 0 0 0 1px ${cssVar.colorPrimaryBorder};
 
-    &:hover {
-      background: ${cssVar.colorPrimaryBgHover} !important;
-    }
+    transition:
+      background-color ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      box-shadow ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+  `,
+  /** 选中时去掉 icon 井字底，避免「大灰底套小灰底」 */
+  glassIconWellSelected: css`
+    background: transparent !important;
   `,
 }));
 
@@ -132,21 +155,8 @@ const NavItem = memo<NavItemProps>(
     const glass = useGlassNavVisual();
     const iconSize = iconSizeProp ?? (glass ? 20 : 18);
     const iconSizeForLobeIcon = { size: iconSize, strokeWidth: ENTRY_ICON_STROKE };
-    const iconColor = glass
-      ? active
-        ? cssVar.colorPrimary
-        : cssVar.colorTextDescription
-      : active
-        ? cssVar.colorText
-        : cssVar.colorTextSecondary;
-    const textColor = glass
-      ? active
-        ? cssVar.colorPrimary
-        : cssVar.colorTextDescription
-      : active
-        ? cssVar.colorText
-        : cssVar.colorTextSecondary;
-    const variant = glass ? 'borderless' : active ? 'filled' : 'borderless';
+    const labelColor = cssVar.colorText;
+    const variant = 'borderless';
 
     const { titlePrefix, iconPostfix } = slots || {};
     // Link props for cmd+click support
@@ -163,6 +173,8 @@ const NavItem = memo<NavItemProps>(
         horizontal
         align={'center'}
         clickable={!disabled}
+        data-disabled={disabled || loading ? 'true' : undefined}
+        data-selected={active ? 'true' : undefined}
         gap={10}
         height={WORKSPACE_NAV_ROW_HEIGHT_PX}
         paddingInline={8}
@@ -178,21 +190,18 @@ const NavItem = memo<NavItemProps>(
         }}
         {...linkProps}
         {...rest}
-        className={cx(
-          styles.container,
-          !glass && active && styles.activeRail,
-          glass && styles.glassRow,
-          glass && active && styles.glassRowActive,
-          className,
-        )}
+        className={cx(styles.container, active && styles.chatgptSelected, className)}
       >
         {icon &&
           (glass ? (
-            <div className={styles.glassIconWell}>
+            <div
+              className={cx(styles.glassIconWell, active && styles.glassIconWellSelected)}
+              data-glass-icon-well=""
+            >
               {loading ? (
                 <NeuralNetworkLoading size={iconSize} />
               ) : (
-                <Icon color={iconColor} icon={icon} size={iconSizeForLobeIcon} />
+                <Icon color={labelColor} icon={icon} size={iconSizeForLobeIcon} />
               )}
             </div>
           ) : (
@@ -200,7 +209,7 @@ const NavItem = memo<NavItemProps>(
               {loading ? (
                 <NeuralNetworkLoading size={iconSize} />
               ) : (
-                <Icon color={iconColor} icon={icon} size={iconSizeForLobeIcon} />
+                <Icon color={labelColor} icon={icon} size={iconSizeForLobeIcon} />
               )}
             </Center>
           ))}
@@ -209,10 +218,15 @@ const NavItem = memo<NavItemProps>(
         <Flexbox horizontal align={'center'} flex={1} gap={8} style={{ overflow: 'hidden' }}>
           {titlePrefix}
           <Text
-            color={textColor}
-            style={{ flex: 1, ...(glass ? { fontSize: cssVar.fontSizeSM } : undefined) }}
+            color={labelColor}
             ellipsis={{
               tooltipWhenOverflow: true,
+            }}
+            style={{
+              flex: 1,
+              fontSize: cssVar.fontSize,
+              fontWeight: active ? 450 : 400,
+              lineHeight: 1.3,
             }}
           >
             {title}

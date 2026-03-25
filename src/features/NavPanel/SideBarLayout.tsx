@@ -15,7 +15,7 @@ interface SidebarLayoutProps {
   body?: ReactNode;
   footer?: ReactNode;
   header?: ReactNode;
-  /** System tray (e.g. settings / resource / memory) — pinned above the changelog footer. */
+  /** Optional block between scroll body and footer (e.g. pinned shortcuts). */
   middleFooter?: ReactNode;
 }
 
@@ -29,12 +29,16 @@ const SideBarLayout = memo<SidebarLayoutProps>(({ header, body, footer, middleFo
       gap={gap}
       style={{ height: '100%', minHeight: 0, overflow: 'hidden' }}
     >
-      <Flexbox className={glass ? glassSidebarStyles.headerZone : undefined} flex={'none'}>
-        <Suspense fallback={<SkeletonItem height={44} style={{ marginTop: 8 }} />}>
-          {header}
-        </Suspense>
-      </Flexbox>
-      {glass && <div aria-hidden className={glassSidebarStyles.hairlineDivider} />}
+      {header ? (
+        <>
+          <Flexbox className={glass ? glassSidebarStyles.headerZone : undefined} flex={'none'}>
+            <Suspense fallback={<SkeletonItem height={44} style={{ marginTop: 8 }} />}>
+              {header}
+            </Suspense>
+          </Flexbox>
+          {glass && <div aria-hidden className={glassSidebarStyles.hairlineDivider} />}
+        </>
+      ) : null}
       <Flexbox flex={1} style={{ minHeight: 0, overflow: 'hidden' }}>
         <ScrollShadow size={2} style={{ height: '100%', maxHeight: '100%' }}>
           <TooltipGroup>

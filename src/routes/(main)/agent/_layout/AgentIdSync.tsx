@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { createStoreUpdater } from 'zustand-utils';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 
 const AgentIdSync = () => {

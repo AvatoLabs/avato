@@ -15,11 +15,11 @@ import {
 } from '@/features/SkillStore/SkillDetail';
 import { useMarketLobehubSkills } from '@/hooks/useMarketLobehubSkills';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { useToolStore } from '@/store/tool';
 import { type ToolStoreState } from '@/store/tool/initialState';
 import { klavisStoreSelectors, lobehubSkillStoreSelectors } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 
 import BuiltinItem from '../Builtin/Item';
 import Empty from '../Empty';

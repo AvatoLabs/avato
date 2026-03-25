@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { createSkillStoreModal } from '@/features/SkillStore';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 const ICON_SIZE = 16;
 const AVATAR_SIZE = 24;

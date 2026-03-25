@@ -1,5 +1,6 @@
 import { isDesktop } from '@/const/version';
 import { MARKET_OIDC_ENDPOINTS } from '@/services/_url';
+import { remoteServerService } from '@/services/electron/remoteServer';
 
 import { MarketAuthError } from './errors';
 import {
@@ -202,7 +203,6 @@ export class MarketOIDC {
     if (isDesktop) {
       // Electron desktop: use IPC to call the main process to open the system browser
       console.info('[MarketOIDC] Desktop app detected, opening system browser via IPC');
-      const { remoteServerService } = await import('@/services/electron/remoteServer');
 
       try {
         const result = await remoteServerService.requestMarketAuthorization({ authUrl });

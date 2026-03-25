@@ -11,12 +11,13 @@ import { useGroupWizard } from '@/layout/GlobalProvider/GroupWizardProvider';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks';
 import { electronSystemService } from '@/services/electron/system';
-import { useAgentStore } from '@/store/agent';
 import { builtinAgentSelectors } from '@/store/agent/selectors/builtinAgentSelectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
 import { globalHelpers } from '@/store/global/helpers';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
+import { useUserStore } from '@/store/user';
 
 import { useCommandMenuContext } from './CommandMenuContext';
 import { type ThemeMode } from './types';
@@ -121,12 +122,17 @@ export const useCommandMenu = () => {
     [onClose],
   );
 
+  const setSettings = useUserStore((s) => s.setSettings);
+
   const handleThemeChange = useCallback(
-    (theme: ThemeMode) => {
-      setTheme(theme);
+    (next: ThemeMode) => {
+      setTheme(next);
+      queueMicrotask(() => {
+        void setSettings({ general: { themeMode: next } });
+      });
       onClose();
     },
-    [setTheme, onClose],
+    [onClose, setSettings, setTheme],
   );
 
   const handleAskLobeAI = useCallback(() => {

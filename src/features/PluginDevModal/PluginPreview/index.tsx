@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import ManifestPreviewer from '@/components/ManifestPreviewer';
 import PluginAvatar from '@/components/Plugins/PluginAvatar';
 import PluginTag from '@/components/Plugins/PluginTag';
-import { pluginHelpers } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 
 import ApiVisualizer from './ApiVisualizer';
 import PluginEmptyState from './EmptyState';

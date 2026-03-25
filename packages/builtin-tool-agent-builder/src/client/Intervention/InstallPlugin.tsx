@@ -7,7 +7,6 @@ import { CheckCircle } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import {
   klavisStoreSelectors,
   lobehubSkillStoreSelectors,
@@ -16,6 +15,7 @@ import {
 } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore/types';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 
 import type { InstallPluginParams } from '../../types';
 

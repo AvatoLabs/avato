@@ -1,10 +1,11 @@
 import { type SidebarGroup } from '@lobechat/types';
 import { AccordionItem, ContextMenuTrigger, Flexbox, Icon, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
-import { HashIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 
-import { useHomeStore } from '@/store/home';
+import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
+import { useHomeStore } from '@/store/home/store';
 
 import { useCreateMenuItems } from '../../../../hooks';
 import { useAgentModal } from '../../ModalProvider';
@@ -44,7 +45,9 @@ const GroupItem = memo<SidebarGroup>(({ items, id, name }) => {
     if (isUpdating) {
       return <Icon spin icon={Loader2} style={{ opacity: 0.5 }} />;
     }
-    return <Icon icon={HashIcon} style={{ opacity: 0.5 }} />;
+    return (
+      <Icon color={'var(--ant-color-text-secondary)'} icon={ACTION_ENTRY_ICONS.sessionGroup} />
+    );
   }, [isUpdating]);
 
   return (
@@ -63,7 +66,12 @@ const GroupItem = memo<SidebarGroup>(({ items, id, name }) => {
       title={
         <Flexbox horizontal align="center" gap={6} style={{ overflow: 'hidden' }}>
           {groupIcon}
-          <Text ellipsis fontSize={12} style={{ flex: 1 }} type={'secondary'} weight={500}>
+          <Text
+            ellipsis
+            fontSize={14}
+            style={{ color: 'var(--ant-color-text)', flex: 1 }}
+            weight={400}
+          >
             {name}
           </Text>
         </Flexbox>

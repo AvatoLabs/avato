@@ -3,9 +3,7 @@ import { type FC } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import PageTitle from '@/components/PageTitle';
-import NavHeader from '@/features/NavHeader';
 import WideScreenContainer from '@/features/WideScreenContainer';
-import WideScreenButton from '@/features/WideScreenContainer/WideScreenButton';
 
 import HomeContent from './features';
 
@@ -14,9 +12,8 @@ const Home: FC = () => {
   const isHomeRoute = pathname === '/';
 
   return (
-    <Flexbox flex={1} height={'100%'} style={{ minHeight: 0 }} width={'100%'}>
+    <Flexbox flex={1} height={'100%'} style={{ minHeight: 0, position: 'relative' }} width={'100%'}>
       {isHomeRoute && <PageTitle title="" />}
-      <NavHeader right={<WideScreenButton />} />
       <Flexbox
         align={'center'}
         flex={1}

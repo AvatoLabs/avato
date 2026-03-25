@@ -1,7 +1,7 @@
 import { type ThreadItem, type UIChatMessage } from '@lobechat/types';
 
-import { useAgentStore } from '@/store/agent';
 import { agentChatConfigSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { type ChatStoreState } from '@/store/chat';
 import { chatHelpers } from '@/store/chat/helpers';
 
@@ -64,10 +64,10 @@ const getThreadParentMessages = (s: ChatStoreState, data: UIChatMessage[]) => {
  */
 const getThreadChildMessages =
   (id?: string) =>
-    (s: ChatStoreState): UIChatMessage[] => {
-      const data = displayMessageSelectors.activeDisplayMessages(s);
-      return data.filter((m) => !!id && m.threadId === id);
-    };
+  (s: ChatStoreState): UIChatMessage[] => {
+    const data = displayMessageSelectors.activeDisplayMessages(s);
+    return data.filter((m) => !!id && m.threadId === id);
+  };
 
 /**
  * Portal AI chats - used for AI title summarization

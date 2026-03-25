@@ -7,8 +7,8 @@ import { createStaticStyles, cx, useTheme } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { highlightTextStyles, shinyTextStyles } from '@/styles';
 
 import type { CallAgentParams } from '../../../types';

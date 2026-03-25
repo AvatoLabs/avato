@@ -5,8 +5,8 @@ import { type ReactNode } from 'react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { type DetailContextValue } from './DetailContext';
 import { DetailContext } from './DetailContext';

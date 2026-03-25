@@ -1,9 +1,9 @@
 import { Skeleton } from '@lobehub/ui';
-import { memo,Suspense } from 'react';
+import { memo, Suspense } from 'react';
 
 import dynamic from '@/libs/next/dynamic';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import Loading from '../Loading';
 import { useParseContent } from '../useParseContent';

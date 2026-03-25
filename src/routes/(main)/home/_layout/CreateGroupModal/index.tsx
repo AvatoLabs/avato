@@ -9,7 +9,7 @@ import useSWR from 'swr';
 
 import { agentService } from '@/services/agent';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 import { type AgentItemData } from './AgentItem';
 import AvailableAgentList from './AvailableAgentList';

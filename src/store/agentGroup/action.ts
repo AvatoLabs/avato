@@ -4,9 +4,10 @@ import { produce } from 'immer';
 import { type StateCreator } from 'zustand/vanilla';
 
 import { type ChatGroupItem } from '@/database/schemas/chatGroup';
-import { mutate, useClientDataSWRWithSync } from '@/libs/swr';
+import { mutate } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { chatGroupService } from '@/services/chatGroup';
-import { getAgentStoreState } from '@/store/agent';
+import { getAgentStoreState } from '@/store/agent/store';
 import { type ChatGroupStore } from '@/store/agentGroup/store';
 import { useChatStore } from '@/store/chat';
 import { type StoreSetter } from '@/store/types';

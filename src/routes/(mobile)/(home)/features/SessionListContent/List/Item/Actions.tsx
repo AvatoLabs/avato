@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 
 import { isDesktop } from '@/const/index';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 import { useSessionStore } from '@/store/session';
 import { sessionHelpers } from '@/store/session/helpers';
 import { sessionGroupSelectors, sessionSelectors } from '@/store/session/selectors';

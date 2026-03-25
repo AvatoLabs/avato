@@ -7,8 +7,9 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import PluginSettingsConfig from '@/features/PluginSettings';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { ErrorActionContainer, styles as errorStyles } from '../../../../Error/style';
 import { useConversationStore } from '../../../../store';

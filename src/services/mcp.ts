@@ -11,6 +11,7 @@ import superjson from 'superjson';
 
 import { type MCPToolCallResult } from '@/libs/mcp';
 import { toolsClient } from '@/libs/trpc/client';
+import { getToolStoreState } from '@/store/tool/store';
 import { ensureElectronIpc } from '@/utils/electron/ipc';
 
 import { discoverService } from './discover';
@@ -54,7 +55,6 @@ class MCPService {
     await discoverService.safeInjectMPToken();
 
     const { pluginSelectors } = await import('@/store/tool/selectors');
-    const { getToolStoreState } = await import('@/store/tool/store');
 
     const s = getToolStoreState();
     const { identifier, arguments: args, apiName } = payload;

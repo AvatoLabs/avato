@@ -4,8 +4,8 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { modal } from '@/components/AntdStaticMethods';
-import { useToolStore } from '@/store/tool';
 import { type KlavisServer } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 
 interface KlavisAuthItemProps {
   server: KlavisServer;

@@ -2,7 +2,7 @@ import { type UIChatMessage } from '@lobechat/types';
 import { act, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { useClientDataSWRWithSync } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { messageService } from '@/services/message';
 
 import { createStore } from '../../index';

@@ -14,7 +14,8 @@ export enum SidebarTabKey {
   Knowledge = 'knowledge',
   Me = 'me',
   Memory = 'memory',
-  Pages = 'pages',
+  /** Route segment is `/page` */
+  Pages = 'page',
   Resource = 'resource',
   Setting = 'settings',
   Studio = 'studio',
@@ -114,6 +115,8 @@ export interface SystemStatus {
   lastSelectedVideoModel?: string;
   lastSelectedVideoProvider?: string;
   latestChangelogId?: string;
+  /** true：Qwen 式窄条侧栏（固定迷你宽度）；false：完整可拖拽宽度。仅当 showLeftPanel 为 true 时有效。 */
+  leftPanelCollapsed?: boolean;
   leftPanelWidth: number;
   mobileShowPortal?: boolean;
   mobileShowTopic?: boolean;
@@ -214,6 +217,7 @@ export const INITIAL_STATUS = {
   imagePanelWidth: 320,
   imageTopicPanelWidth: 80,
   knowledgeBaseModalViewMode: 'list' as const,
+  leftPanelCollapsed: false,
   leftPanelWidth: 320,
   mobileShowTopic: false,
   modelSwitchPanelGroupMode: 'byProvider',

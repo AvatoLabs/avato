@@ -6,8 +6,9 @@ import { ChevronRight } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { shinyTextStyles } from '@/styles';
 
 export const styles = createStaticStyles(({ css, cssVar }) => ({

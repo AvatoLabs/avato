@@ -12,7 +12,7 @@ import NavItem from '@/features/NavPanel/components/NavItem';
 import { useChatStore } from '@/store/chat';
 import { operationSelectors } from '@/store/chat/selectors';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 import { useAgentModal } from '../../ModalProvider';
 import Actions from '../Item/Actions';
@@ -26,7 +26,9 @@ interface AgentItemProps {
 }
 
 const AgentItem = memo<AgentItemProps>(({ item, style, className }) => {
-  const { id, avatar, backgroundColor, title, pinned } = item;
+  const { id, avatar, title, pinned } = item;
+  const activeAgentId = useChatStore((s) => s.activeAgentId);
+  const isActive = activeAgentId === id;
   const { t } = useTranslation('chat');
   const { openCreateGroupModal } = useAgentModal();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -83,13 +85,8 @@ const AgentItem = memo<AgentItemProps>(({ item, style, className }) => {
       return <Icon spin color={cssVar.colorTextDescription} icon={Loader2} size={18} />;
     }
 
-    return (
-      <Avatar
-        avatar={typeof avatar === 'string' ? avatar : undefined}
-        avatarBackground={backgroundColor || undefined}
-      />
-    );
-  }, [isUpdating, avatar, backgroundColor]);
+    return <Avatar avatar={typeof avatar === 'string' ? avatar : undefined} />;
+  }, [isUpdating, avatar]);
 
   const dropdownMenu = useAgentDropdownMenu({
     anchor,
@@ -105,6 +102,7 @@ const AgentItem = memo<AgentItemProps>(({ item, style, className }) => {
     <Link aria-label={displayTitle} ref={setAnchor} to={agentUrl}>
       <NavItem
         actions={<Actions dropdownMenu={dropdownMenu} />}
+        active={isActive}
         className={className}
         contextMenuItems={dropdownMenu}
         disabled={isUpdating}

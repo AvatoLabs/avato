@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 import SettingHeader from '@/routes/(main)/settings/features/SettingHeader';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';
-import { useToolStore } from '@/store/tool';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { authSelectors, userProfileSelectors } from '@/store/user/selectors';
 
@@ -36,7 +36,11 @@ const SkeletonRow = ({ mobile }: { mobile?: boolean }) => {
   return (
     <Flexbox horizontal align="center" gap={24} style={rowStyle}>
       <Skeleton.Button active size="small" style={{ ...labelStyle, height: 22 }} />
-      <Skeleton.Button active size="small" style={{ height: 22, marginInlineStart: 'auto', width: 120 }} />
+      <Skeleton.Button
+        active
+        size="small"
+        style={{ height: 22, marginInlineStart: 'auto', width: 120 }}
+      />
     </Flexbox>
   );
 };

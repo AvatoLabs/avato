@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 
 import { useIsMobile } from '@/hooks/useIsMobile';
 import SupervisorAvatar from '@/routes/(main)/group/features/GroupAvatar';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { agentGroupSelectors, useAgentGroupStore } from '@/store/agentGroup';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';

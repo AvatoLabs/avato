@@ -9,8 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { useInitRecentPage } from '@/hooks/useInitRecentPage';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
-import { useHomeStore } from '@/store/home';
 import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 import { FilesTabs } from '@/types/files';
 
 import GroupBlock from '../components/GroupBlock';

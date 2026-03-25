@@ -5,8 +5,8 @@ import { memo } from 'react';
 
 import { ProductLogo } from '@/components/Branding';
 import PluginTag from '@/features/PluginTag';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import pkg from '../../../../package.json';
 import { containerStyles } from '../style';

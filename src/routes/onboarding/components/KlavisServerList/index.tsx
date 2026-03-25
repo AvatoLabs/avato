@@ -5,8 +5,8 @@ import isEqual from 'fast-deep-equal';
 import { memo } from 'react';
 
 import { KLAVIS_SERVER_TYPES } from '@/const/index';
-import { useToolStore } from '@/store/tool';
 import { klavisStoreSelectors } from '@/store/tool/slices/klavisStore';
+import { useToolStore } from '@/store/tool/store';
 
 import KlavisServerItem from './components/KlavisServerItem';
 

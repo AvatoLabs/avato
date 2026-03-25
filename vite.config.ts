@@ -24,6 +24,7 @@ const platform = isMobile ? 'mobile' : 'web';
 export default defineConfig({
   base: isDev ? '/' : process.env.VITE_CDN_BASE || '/spa/',
   build: {
+    chunkSizeWarningLimit: 2500,
     outDir: isMobile ? 'dist/mobile' : 'dist/desktop',
     rollupOptions: {
       input: path.resolve(__dirname, isMobile ? 'index.mobile.html' : 'index.html'),
@@ -36,6 +37,14 @@ export default defineConfig({
     vercelSkewProtection(),
     viteEnvRestartKeys(['APP_URL']),
     ...sharedRendererPlugins({ platform }),
+
+    /** Debug Proxy loads the doc on app.lobehub.com while assets are localhost — manifest would be cross-origin and Chrome ignores start_url. */
+    isDev && {
+      name: 'spa-dev-strip-web-manifest-link',
+      transformIndexHtml(html) {
+        return html.replace(/\s*<link[^>]*rel=["']manifest["'][^>]*>\s*/i, '\n');
+      },
+    },
 
     isDev && {
       name: 'lobe-dev-proxy-print',
@@ -114,8 +123,7 @@ export default defineConfig({
       '/share/f': { changeOrigin: true, target: 'http://localhost:3010' },
       '/trpc': 'http://localhost:3010',
       '/webapi': 'http://localhost:3010',
-      // Next App Router serves this; without proxy Vite returns index.html → manifest JSON parse error
-      '/manifest.webmanifest': { changeOrigin: true, target: 'http://localhost:3010' },
+      // Served from `public/manifest.webmanifest` so `start_url` stays same-origin (Next metadataBase would absolutize)
     },
     warmup: {
       clientFiles: [

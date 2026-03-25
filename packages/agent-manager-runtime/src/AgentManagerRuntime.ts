@@ -18,10 +18,9 @@ import { KLAVIS_SERVER_TYPES, LOBEHUB_SKILL_PROVIDERS } from '@lobechat/const';
 import { marketToolsResultsPrompt, modelsResultsPrompt } from '@lobechat/prompts';
 import type { BuiltinToolResult } from '@lobechat/types';
 
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { getAiInfraStoreState } from '@/store/aiInfra';
-import { getToolStoreState } from '@/store/tool';
 import {
   builtinToolSelectors,
   klavisStoreSelectors,
@@ -30,6 +29,7 @@ import {
 } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore/types';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { getToolStoreState } from '@/store/tool/store';
 import { getUserStoreState } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 
@@ -427,7 +427,6 @@ export class AgentManagerRuntime {
       getAgentStoreState().appendStreamingSystemRole(chunk);
 
       if (i + chunkSize < prompt.length) {
-        // eslint-disable-next-line no-promise-executor-return
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }

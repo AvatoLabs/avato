@@ -23,6 +23,8 @@ import {
 import type { BuiltinToolContext, BuiltinToolResult } from '@lobechat/types';
 import { BaseExecutor } from '@lobechat/types';
 
+import { aiAgentService } from '@/services/aiAgent';
+
 class GroupManagementExecutor extends BaseExecutor<typeof GroupManagementApiName> {
   readonly identifier = GroupManagementIdentifier;
   protected readonly apiEnum = GroupManagementApiName;
@@ -199,7 +201,6 @@ class GroupManagementExecutor extends BaseExecutor<typeof GroupManagementApiName
     const { taskId } = params;
 
     try {
-      const { aiAgentService } = await import('@/services/aiAgent');
       const result = await aiAgentService.interruptTask({
         threadId: taskId,
       });

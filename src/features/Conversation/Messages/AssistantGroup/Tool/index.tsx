@@ -9,8 +9,8 @@ import { memo, useEffect, useState } from 'react';
 import dynamic from '@/libs/next/dynamic';
 import { useChatStore } from '@/store/chat';
 import { operationSelectors } from '@/store/chat/slices/operation/selectors';
-import { useToolStore } from '@/store/tool';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { ToolErrorBoundary } from '../../Tool/ErrorBoundary';
 import Actions from './Actions';

@@ -12,8 +12,8 @@ import { BaseExecutor } from '@lobechat/types';
 import type { z } from 'zod';
 
 import { userMemoryService } from '@/services/userMemory';
-import { getAgentStoreState } from '@/store/agent';
 import { agentChatConfigSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 
 import { MemoryExecutionRuntime } from '../ExecutionRuntime';
 import { MemoryIdentifier } from '../manifest';

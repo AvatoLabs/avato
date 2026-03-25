@@ -12,8 +12,8 @@ import {
   useConversationStore,
 } from '@/features/Conversation';
 import RightPanel from '@/features/RightPanel';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 
 const actions: ActionKeys[] = ['model', 'search'];

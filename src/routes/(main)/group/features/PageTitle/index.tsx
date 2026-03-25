@@ -3,8 +3,8 @@
 import { memo } from 'react';
 
 import PageTitle from '@/components/PageTitle';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { topicSelectors } from '@/store/chat/selectors';
 

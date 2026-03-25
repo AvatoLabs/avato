@@ -8,8 +8,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import LevelSlider from '@/features/ModelSwitchPanel/components/ControlsForm/LevelSlider';
-import { useAgentStore } from '@/store/agent';
 import { chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { useAgentId } from '../../hooks/useAgentId';
 import { useUpdateAgentConfig } from '../../hooks/useUpdateAgentConfig';

@@ -6,7 +6,12 @@ import { getThemePresetPreview, resolveThemePreset } from './themePresets';
 describe('themePresets', () => {
   it('resolves matching preset colors to the preset id', () => {
     expect(resolveThemePreset(undefined, undefined)).toBe('classic');
+    expect(resolveThemePreset('green', 'slate')).toBe('classic');
     expect(resolveThemePreset('cyan', 'slate')).toBe('tide');
+    expect(resolveThemePreset('lime', 'slate')).toBe('canopy');
+    expect(resolveThemePreset('volcano', 'slate')).toBe('ember');
+    expect(resolveThemePreset('magenta', 'slate')).toBe('velvet');
+    expect(resolveThemePreset('geekblue', 'slate')).toBe('midnight');
   });
 
   it('falls back to custom when colors do not match a preset', () => {

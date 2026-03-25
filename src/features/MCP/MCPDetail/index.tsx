@@ -13,7 +13,7 @@ import Overview from '@/features/MCPPluginDetail/Overview';
 import Schema from '@/features/MCPPluginDetail/Schema';
 import Score from '@/features/MCPPluginDetail/Score';
 import { useDiscoverStore } from '@/store/discover';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 import { McpNavKey } from '@/types/discover';
 
 import Settings from '../MCPSettings';

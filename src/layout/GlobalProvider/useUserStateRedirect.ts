@@ -5,6 +5,8 @@ import { useCallback } from 'react';
 
 import { isDesktop } from '@/const/version';
 import { getDesktopOnboardingCompleted } from '@/routes/(desktop)/desktop-onboarding/storage';
+import { remoteServerService } from '@/services/electron/remoteServer';
+import { electronSystemService } from '@/services/electron/system';
 import { useElectronStore } from '@/store/electron';
 import { useUserStore } from '@/store/user';
 import { onboardingSelectors } from '@/store/user/selectors';
@@ -31,14 +33,12 @@ export const useDesktopUserStateRedirect = () => {
       }
 
       try {
-        const { electronSystemService } = await import('@/services/electron/system');
         await electronSystemService.openExternalLink(targetUrl);
       } catch {
         // Ignore: fallback to logout flow even if IPC is unavailable.
       }
 
       try {
-        const { remoteServerService } = await import('@/services/electron/remoteServer');
         await remoteServerService.clearRemoteServerConfig();
       } catch {
         // Ignore: fallback to logout flow even if IPC is unavailable.

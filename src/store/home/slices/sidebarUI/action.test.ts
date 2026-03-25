@@ -6,8 +6,8 @@ import { agentService } from '@/services/agent';
 import { chatGroupService } from '@/services/chatGroup';
 import { homeService } from '@/services/home';
 import { sessionService } from '@/services/session';
-import { getAgentStoreState } from '@/store/agent';
-import { useHomeStore } from '@/store/home';
+import { getAgentStoreState } from '@/store/agent/store';
+import { useHomeStore } from '@/store/home/store';
 import { getSessionStoreState } from '@/store/session';
 
 // Mock dependencies

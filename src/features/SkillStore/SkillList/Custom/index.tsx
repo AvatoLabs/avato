@@ -3,8 +3,8 @@
 import isEqual from 'fast-deep-equal';
 import { memo, useMemo } from 'react';
 
-import { useToolStore } from '@/store/tool';
 import { agentSkillsSelectors, pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import AgentSkillItem from '../AgentSkillItem';
 import Empty from '../Empty';

@@ -8,8 +8,8 @@ import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSkillConnect } from '@/features/SkillStore/SkillList/LobeHub/useSkillConnect';
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { useDetailContext } from './DetailContext';
 import { ICON_SIZE, styles } from './styles';

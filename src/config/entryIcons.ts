@@ -1,16 +1,21 @@
 import {
+  IconAdjustmentsHorizontal,
   IconAiAgent,
   IconAiGateway,
   IconBook2,
   IconBrain,
+  IconBulb,
   IconChartHistogram,
   IconChartPie,
   IconChevronDown,
   IconCloud,
   IconCloudNetwork,
   IconCoins,
+  IconCompass,
+  IconCornerUpRight,
   IconCreditCard,
   IconDatabase,
+  IconDeviceDesktop,
   IconDots,
   IconFeather,
   IconFilePencil,
@@ -25,26 +30,32 @@ import {
   IconInfoCircle,
   IconKey,
   IconKeyboard,
+  IconLayoutGrid,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconMap2,
   IconMessage2,
   IconMessage2Plus,
   IconMicrophone2,
+  IconMoon,
   IconPalette,
+  IconPaperclip,
   IconPencil,
   IconPhotoAi,
   IconPlugConnected,
   IconPuzzle2,
+  IconRefresh,
   IconRobot,
   IconSearch,
   IconSettings,
   IconSettings2,
+  IconSun,
   IconTools,
   IconTopologyStar3,
   IconUserCircle,
-  IconUsersGroup,
   IconVideo,
+  IconWorld,
+  IconWorldOff,
 } from '@tabler/icons-react';
 import { createElement, type FC } from 'react';
 
@@ -69,7 +80,7 @@ export const createEntryIcon = (IconComponent: EntryIcon): EntryIcon => {
 
 export const APP_ENTRY_ICONS = {
   chat: createEntryIcon(IconMessage2),
-  community: createEntryIcon(IconUsersGroup),
+  community: createEntryIcon(IconCompass),
   home: createEntryIcon(IconHome2),
   image: createEntryIcon(IconPhotoAi),
   me: createEntryIcon(IconUserCircle),
@@ -113,9 +124,17 @@ export const SETTINGS_ENTRY_ICONS = {
   usage: createEntryIcon(IconChartPie),
 } as const;
 
+export const THEME_MODE_ICONS = {
+  dark: createEntryIcon(IconMoon),
+  light: createEntryIcon(IconSun),
+  system: createEntryIcon(IconDeviceDesktop),
+} as const;
+
 /** Left rail header: same Tabler family + stroke as APP_ENTRY_ICONS / ACTION_ENTRY_ICONS. */
 export const SIDEBAR_HEADER_ICONS = {
   chevronDown: createEntryIcon(IconChevronDown),
+  /** ChatGPT-style account row — menu trigger */
+  more: createEntryIcon(IconDots),
   toggleCollapse: createEntryIcon(IconLayoutSidebarLeftCollapse),
   toggleExpand: createEntryIcon(IconLayoutSidebarLeftExpand),
 } as const;
@@ -130,4 +149,22 @@ export const ACTION_ENTRY_ICONS = {
   sessionGroup: createEntryIcon(IconFolderPlus),
   sessionGroupConfig: createEntryIcon(IconFolderCog),
   write: createEntryIcon(IconPencil),
+} as const;
+
+/** Home / AgentBuilder suggest starter cards — same Tabler + stroke as APP_ENTRY_ICONS. */
+export const SUGGEST_QUESTIONS_ICONS = {
+  bulb: createEntryIcon(IconBulb),
+  cornerUpRight: createEntryIcon(IconCornerUpRight),
+  refresh: createEntryIcon(IconRefresh),
+} as const;
+
+/** Chat input action bar — same Tabler + stroke as APP_ENTRY_ICONS (replaces Lucide on the toolbar). */
+export const CHAT_INPUT_ACTION_ICONS = {
+  memory: createEntryIcon(IconBrain),
+  modelExtendParams: createEntryIcon(IconSettings2),
+  paperclip: createEntryIcon(IconPaperclip),
+  params: createEntryIcon(IconAdjustmentsHorizontal),
+  tools: createEntryIcon(IconLayoutGrid),
+  world: createEntryIcon(IconWorld),
+  worldOff: createEntryIcon(IconWorldOff),
 } as const;

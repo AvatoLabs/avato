@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { isDesktop } from '@/const/version';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { getDesktopOnboardingCompleted } from '@/routes/(desktop)/desktop-onboarding/storage';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useGlobalStore } from '@/store/global';
 import { useServerConfigStore, useServerConfigStoreApi } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';

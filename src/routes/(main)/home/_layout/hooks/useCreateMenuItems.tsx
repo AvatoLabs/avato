@@ -12,9 +12,9 @@ import { DEFAULT_CHAT_GROUP_CHAT_CONFIG } from '@/const/settings';
 import { type CreateAgentParams } from '@/services/agent';
 import { type GroupMemberConfig } from '@/services/chatGroup';
 import { chatGroupService } from '@/services/chatGroup';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 import { usePageStore } from '@/store/page';
 
 interface CreateAgentOptions {
@@ -25,7 +25,7 @@ interface CreateAgentOptions {
 
 /**
  * Hook for generating menu items for top-level create actions
- * Used in Body/Agent/Actions.tsx and Header/AddButton.tsx
+ * Used in Body/Agent (actions, lists, dropdowns), CommandMenu, DesktopFileMenuBridge, etc.
  */
 export const useCreateMenuItems = () => {
   const { t } = useTranslation('chat');

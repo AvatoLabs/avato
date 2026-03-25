@@ -21,8 +21,8 @@ import { useTranslation } from 'react-i18next';
 
 import OfficialIcon from '@/components/OfficialIcon';
 import PublishedTime from '@/components/PublishedTime';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import {
   AggregatorInstallabilityLevel,
   type AggregatorItem,

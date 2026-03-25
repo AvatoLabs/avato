@@ -7,8 +7,9 @@ import { useTranslation } from 'react-i18next';
 import PluginAvatar from '@/features/PluginAvatar';
 import { useChatStore } from '@/store/chat';
 import { chatPortalSelectors } from '@/store/chat/selectors';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 const Title = () => {
   const [closeToolUI, toolUIIdentifier = ''] = useChatStore((s) => [

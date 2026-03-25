@@ -19,6 +19,8 @@ import isEqual from 'fast-deep-equal';
 import { memo, type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ensureElectronIpc } from '@/utils/electron/ipc';
+
 import { type EditorCanvasProps } from './EditorCanvas';
 import InlineToolbar from './InlineToolbar';
 import { useImageUpload } from './useImageUpload';
@@ -76,7 +78,6 @@ const InternalEditor = memo<InternalEditorProps>(
 
     const handlePickFile = useCallback(async (): Promise<File | null> => {
       if (!isDesktop) return null;
-      const { ensureElectronIpc } = await import('@/utils/electron/ipc');
       const ipc = ensureElectronIpc();
       const result = await (ipc as any).localSystem.handlePickFile({
         filters: IMAGE_FILTERS,

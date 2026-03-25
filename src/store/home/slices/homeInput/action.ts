@@ -2,9 +2,8 @@ import { type NavigateFunction } from 'react-router-dom';
 
 import { chatGroupService } from '@/services/chatGroup';
 import { documentService } from '@/services/document';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
-import { getChatGroupStoreState } from '@/store/agentGroup';
+import { getAgentStoreState } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
@@ -113,6 +112,7 @@ export class HomeInputActionImpl {
       });
 
       // 3. Load groups and refresh
+      const { getChatGroupStoreState } = await import('@/store/agentGroup/store');
       const groupStore = getChatGroupStoreState();
       await groupStore.loadGroups();
 

@@ -5,8 +5,8 @@ import i18n from 'i18next';
 
 import { type StreamEvent } from '@/services/agentRuntime';
 import { agentRuntimeService } from '@/services/agentRuntime';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { type ChatStore } from '@/store/chat/store';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
 import { type StoreSetter } from '@/store/types';

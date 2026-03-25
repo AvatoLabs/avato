@@ -86,7 +86,7 @@ const SideBarHeaderLayout = memo<SideBarHeaderLayoutProps>(
           />
         )}
         {left && typeof left === 'string' ? (
-          <Text ellipsis fontSize={16} weight={500}>
+          <Text ellipsis fontSize={16} weight={400}>
             {left}
           </Text>
         ) : (

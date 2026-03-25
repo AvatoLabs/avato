@@ -1,9 +1,9 @@
-import { Flexbox, Icon, Skeleton, Tag } from '@lobehub/ui';
+import { Flexbox, Skeleton, Tag } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { HashIcon, MessageSquareDashed } from 'lucide-react';
 import { memo, Suspense, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -25,7 +25,7 @@ interface TopicItemProps {
   title: string;
 }
 
-const TopicItem = memo<TopicItemProps>(({ id, title, fav, active, threadId }) => {
+const TopicItem = memo<TopicItemProps>(({ id, title, fav: _fav, active, threadId }) => {
   const { t } = useTranslation('topic');
   const toggleMobileTopic = useGlobalStore((s) => s.toggleMobileTopic);
   const [activeGroupId, switchTopic] = useAgentGroupStore((s) => [s.activeGroupId, s.switchTopic]);
@@ -89,10 +89,8 @@ const TopicItem = memo<TopicItemProps>(({ id, title, fav, active, threadId }) =>
     return (
       <NavItem
         active={active}
+        icon={ACTION_ENTRY_ICONS.newTopic}
         loading={isLoading}
-        icon={
-          <Icon color={cssVar.colorTextDescription} icon={MessageSquareDashed} size={'small'} />
-        }
         title={
           <Flexbox horizontal align={'center'} flex={1} gap={6}>
             {t('defaultTitle')}
@@ -120,11 +118,9 @@ const TopicItem = memo<TopicItemProps>(({ id, title, fav, active, threadId }) =>
         contextMenuItems={dropdownMenu}
         disabled={editing}
         href={!editing ? href : undefined}
+        icon={APP_ENTRY_ICONS.chat}
         loading={isLoading}
         title={title}
-        icon={
-          <Icon icon={HashIcon} size={'small'} style={{ color: cssVar.colorTextDescription }} />
-        }
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />

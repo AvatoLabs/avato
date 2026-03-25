@@ -96,6 +96,7 @@ export default defineConfig({
   renderer: {
     root: ROOT_DIR,
     build: {
+      chunkSizeWarningLimit: 2500,
       outDir: resolve(__dirname, 'dist/renderer'),
       rollupOptions: {
         input: resolve(__dirname, 'index.html'),

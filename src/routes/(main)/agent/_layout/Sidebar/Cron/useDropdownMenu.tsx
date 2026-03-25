@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { agentCronJobService } from '@/services/agentCronJob';
 import { topicService } from '@/services/topic';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 export const useCronJobDropdownMenu = (
   cronJobId: string,

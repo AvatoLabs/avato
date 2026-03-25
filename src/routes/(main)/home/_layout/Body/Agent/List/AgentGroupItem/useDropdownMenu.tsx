@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { openEditingPopover } from '@/features/EditingPopover/store';
 import { useGlobalStore } from '@/store/global';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 interface UseGroupDropdownMenuParams {
   anchor: HTMLElement | null;

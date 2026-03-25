@@ -1,6 +1,6 @@
 'use client';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 import { useChatInputStore } from '../store';
 

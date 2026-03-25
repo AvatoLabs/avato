@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 
 import { lambdaClient } from '@/libs/trpc/client/lambda';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 
 /**
  * Fetch cron topics grouped by cronJob for the current agent

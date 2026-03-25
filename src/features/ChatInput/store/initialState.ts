@@ -16,6 +16,8 @@ export interface SendButtonProps {
   onStop: (params: { editor: IEditor }) => void;
   shape?: 'round' | 'default';
   size?: number;
+  /** Home starter: green circle + white up-arrow (ChatGPT-like); default keeps editor paper-plane */
+  variant?: 'default' | 'chatgpt';
 }
 
 export const initialSendButtonState: SendButtonProps = {

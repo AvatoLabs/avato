@@ -9,8 +9,8 @@ import EmptyNavItem from '@/features/NavPanel/components/EmptyNavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 import { SessionDefaultGroup } from '@/types/session';
 
 import { useCreateMenuItems } from '../../../hooks';
@@ -35,7 +35,7 @@ const List = memo<SessionListProps>(
 
     // Check if this is defaultList and if there are more agents
     const isDefaultList = groupId === SessionDefaultGroup.Default;
-    const ungroupedAgentsCount = useHomeStore(homeAgentListSelectors.ungroupedAgentsCount);
+    const ungroupedAgentsCount = useHomeStore(homeAgentListSelectors.ungroupedAgentsOnlyCount);
     const agentPageSize = useGlobalStore(systemStatusSelectors.agentPageSize);
     const openAllAgentsDrawer = useHomeStore((s) => s.openAllAgentsDrawer);
 

@@ -21,7 +21,6 @@ import {
   type ThemePresetId,
 } from './themePresets';
 import ThemePresetSelect from './ThemePresetSelect';
-import { ThemeSwatchesNeutral, ThemeSwatchesPrimary } from './ThemeSwatches';
 
 const Appearance = memo(() => {
   const { t } = useTranslation('setting');
@@ -36,7 +35,6 @@ const Appearance = memo(() => {
   const currentNeutralColor = normalizeThemeColor(general.neutralColor);
   const resolvedPreset = resolveThemePreset(currentPrimaryColor, currentNeutralColor);
   const currentPreset = presetOverride ?? resolvedPreset;
-  const isCustomPreset = currentPreset === 'custom';
 
   const updateTheme = async (value: Pick<UserGeneralConfig, 'neutralColor' | 'primaryColor'>) => {
     setLoading(true);
@@ -79,48 +77,18 @@ const Appearance = memo(() => {
               primaryColor: currentPrimaryColor,
             }}
             onChange={(value) => void handlePresetChange(value)}
-          />
-        ),
-        desc: t('settingAppearance.themePreset.desc'),
-        label: t('settingAppearance.themePreset.title'),
-        minWidth: undefined,
-      },
-      {
-        children: (
-          <ThemeSwatchesPrimary
-            disabled={!isCustomPreset}
-            value={currentPrimaryColor}
-            onChange={(value) => {
+            onNeutralChange={(value) => {
+              setPresetOverride('custom');
+              void updateTheme({ neutralColor: serializeThemeColor(value) });
+            }}
+            onPrimaryChange={(value) => {
               setPresetOverride('custom');
               void updateTheme({ primaryColor: serializeThemeColor(value) });
             }}
           />
         ),
-        desc: t(
-          isCustomPreset
-            ? 'settingAppearance.primaryColor.desc'
-            : 'settingAppearance.primaryColor.lockedDesc',
-        ),
-        label: t('settingAppearance.primaryColor.title'),
-        minWidth: undefined,
-      },
-      {
-        children: (
-          <ThemeSwatchesNeutral
-            disabled={!isCustomPreset}
-            value={currentNeutralColor}
-            onChange={(value) => {
-              setPresetOverride('custom');
-              void updateTheme({ neutralColor: serializeThemeColor(value) });
-            }}
-          />
-        ),
-        desc: t(
-          isCustomPreset
-            ? 'settingAppearance.neutralColor.desc'
-            : 'settingAppearance.neutralColor.lockedDesc',
-        ),
-        label: t('settingAppearance.neutralColor.title'),
+        desc: t('settingAppearance.themePreset.desc'),
+        label: t('settingAppearance.themePreset.title'),
         minWidth: undefined,
       },
     ],

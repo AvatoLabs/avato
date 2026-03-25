@@ -3,7 +3,7 @@ import type { BuiltinToolContext, BuiltinToolResult } from '@lobechat/types';
 import { BaseExecutor } from '@lobechat/types';
 
 import { notebookService } from '@/services/notebook';
-import { useNotebookStore } from '@/store/notebook';
+import { useNotebookStore } from '@/store/notebook/store';
 
 import { GTDIdentifier } from '../manifest';
 import type {

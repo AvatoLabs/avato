@@ -6,7 +6,7 @@ import { ArrowLeftRight, Github, Sparkles } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface ImportFromGithubModalProps {
   onOpenChange: (open: boolean) => void;

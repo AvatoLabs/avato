@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 interface UseDropdownMenuProps {
   agentId: string;

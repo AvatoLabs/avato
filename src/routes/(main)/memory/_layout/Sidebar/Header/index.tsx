@@ -1,27 +1,20 @@
 'use client';
 
-import { type PropsWithChildren } from 'react';
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
+import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 
 import Nav from './Nav';
 
-const Header = memo<PropsWithChildren>(() => {
+const Header = memo(() => {
   const { t } = useTranslation('common');
+
   return (
-    <>
-      <SideBarHeaderLayout
-        breadcrumb={[
-          {
-            href: '/memory',
-            title: t('tab.memory'),
-          },
-        ]}
-      />
+    <Fragment>
+      <SubSidebarTitleBar title={t('tab.memory')} titleTo="/memory" />
       <Nav />
-    </>
+    </Fragment>
   );
 });
 

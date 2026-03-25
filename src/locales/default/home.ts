@@ -10,7 +10,7 @@ export default {
   'starter.createGroup': 'Create Group',
   'starter.deepResearch': 'Deep Research',
   'starter.developing': 'Coming soon',
-  'starter.image': 'Image',
+  'starter.image': 'Artwork',
   'starter.nanoBanana2': 'Nano Banana 2',
   'starter.seedance': 'Seedance 2.0',
   'starter.write': 'Write',

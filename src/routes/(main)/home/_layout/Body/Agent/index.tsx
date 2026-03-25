@@ -50,7 +50,7 @@ const Agent = memo<AgentProps>(({ itemKey }) => {
           <Text ellipsis className={glassSidebarStyles.groupHeader}>
             {t('navPanel.agent')}
           </Text>
-          {isRevalidating && <NeuralNetworkLoading size={14} />}
+          {isRevalidating ? <NeuralNetworkLoading size={14} /> : null}
         </Flexbox>
       }
     >

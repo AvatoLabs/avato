@@ -10,8 +10,8 @@ import {
 } from '@/const/workspaceVisualTokens';
 import { type ActionKeys } from '@/features/ChatInput';
 import { ChatInputProvider, DesktopChatInput } from '@/features/ChatInput';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
@@ -86,6 +86,7 @@ const InputArea = () => {
               onStop: () => {},
               shape: 'round',
               size: 36,
+              variant: 'chatgpt',
             }}
             onSend={send}
             onMarkdownContentChange={(content) => {

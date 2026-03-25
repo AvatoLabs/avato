@@ -5,8 +5,8 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DevModal from '@/features/PluginDevModal';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/slices/plugin/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 const EditCustomPlugin = memo<{ identifier: string }>(({ identifier }) => {
   const { t } = useTranslation('plugin');

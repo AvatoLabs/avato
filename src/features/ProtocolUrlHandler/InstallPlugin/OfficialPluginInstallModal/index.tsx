@@ -6,10 +6,10 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DetailLoading from '@/features/MCP/MCPDetail/Loading';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { useDiscoverStore } from '@/store/discover';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/slices/plugin/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { type McpInstallRequest } from '../types';
 import OfficialDetail from './Detail';

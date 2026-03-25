@@ -12,6 +12,7 @@ const copyDirs = [
   'icons',
   'images',
   'og',
+  'provider',
   'screenshots',
   'vendor',
   'videos',

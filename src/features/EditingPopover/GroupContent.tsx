@@ -20,7 +20,7 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 
 const MAX_AVATAR_SIZE = 1024 * 1024;
 

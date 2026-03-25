@@ -1,8 +1,8 @@
 import { type MetaData } from '@lobechat/types';
 import { useMemo } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { contextSelectors, useConversationStore } from '../store';
 

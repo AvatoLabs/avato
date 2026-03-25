@@ -460,7 +460,6 @@ const LoginStep = memo<LoginStepProps>(({ onBack, onNext }) => {
           onContextMenu={async (e) => {
             if (!isDesktop) return;
             e.preventDefault();
-            const { electronSystemService } = await import('@/services/electron/system');
             const input = e.target as HTMLInputElement;
             const selectionText = input.value.slice(
               input.selectionStart || 0,

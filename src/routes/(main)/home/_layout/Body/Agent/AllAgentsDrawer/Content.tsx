@@ -7,8 +7,8 @@ import { VList } from 'virtua';
 
 import AgentSelectionEmpty from '@/features/AgentSelectionEmpty';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 import GroupItem from '../List/AgentGroupItem';
 import AgentItem from '../List/AgentItem';
@@ -30,7 +30,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
   );
 
   // Get all agents from homeStore (ungrouped agents for default view)
-  const allUngroupedAgents = useHomeStore(homeAgentListSelectors.ungroupedAgents, isEqual);
+  const allUngroupedAgents = useHomeStore(homeAgentListSelectors.ungroupedAgentsOnly, isEqual);
 
   // Filter and display - searchResults already returns SidebarAgentItem[]
   const displayItems = isSearching ? searchResults || [] : allUngroupedAgents;

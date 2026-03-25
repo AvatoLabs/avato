@@ -5,8 +5,6 @@ import { createStaticStyles } from 'antd-style';
 import { type PropsWithChildren } from 'react';
 import { memo, Suspense, useState } from 'react';
 
-import { isDesktop } from '@/const/version';
-
 import PanelContent from './PanelContent';
 import PanelContentSkeleton from './PanelContentSkeleton';
 import UpgradeBadge from './UpgradeBadge';
@@ -14,9 +12,8 @@ import { useNewVersion } from './useNewVersion';
 
 const styles = createStaticStyles(({ css }) => {
   return {
+    /** Do not override inset — User lives in sidebar footer; fixed insets break Base UI positioner */
     popover: css`
-      inset-block-start: ${isDesktop ? 32 : 8}px !important;
-      inset-inline-start: 8px !important;
       border-radius: 10px;
     `,
     popoverContent: css`

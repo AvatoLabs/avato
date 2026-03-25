@@ -9,6 +9,7 @@ import { SkillStoreExecutor } from '@lobechat/builtin-tool-skill-store/executor'
 
 import { marketApiService } from '@/services/marketApi';
 import { agentSkillService } from '@/services/skill';
+import { getToolStoreState } from '@/store/tool/store';
 
 // Create runtime with client-side service
 const runtime = new SkillStoreExecutionRuntime({
@@ -34,8 +35,6 @@ const runtime = new SkillStoreExecutionRuntime({
       return { skill: { id: result.skill.id, name: result.skill.name }, status: result.status };
     },
     onSkillImported: async () => {
-      // Dynamic import to avoid circular dependency (this file is inside the tool store)
-      const { getToolStoreState } = await import('@/store/tool/store');
       await getToolStoreState().refreshAgentSkills();
     },
     searchSkill: async (params) => {

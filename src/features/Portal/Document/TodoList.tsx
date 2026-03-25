@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 
 import { useChatStore } from '@/store/chat';
 import { chatPortalSelectors } from '@/store/chat/selectors';
-import { useNotebookStore } from '@/store/notebook';
 import { notebookSelectors } from '@/store/notebook/selectors';
+import { useNotebookStore } from '@/store/notebook/store';
 
 interface TodoItem {
   completed: boolean;

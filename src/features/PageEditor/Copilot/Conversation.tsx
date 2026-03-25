@@ -11,8 +11,8 @@ import {
   conversationSelectors,
   useConversationStore,
 } from '@/features/Conversation';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 
 import AgentSelectorAction from './AgentSelector/AgentSelectorAction';

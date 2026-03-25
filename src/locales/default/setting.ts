@@ -753,8 +753,8 @@ export default {
   'settingAppearance.primaryColor.lockedDesc': 'Select Custom Theme before editing the theme color',
   'settingAppearance.primaryColor.title': 'Theme Color',
   'settingAppearance.themePreset.desc':
-    'Choose a color scheme. Every scheme works in both light and dark mode.',
-  'settingAppearance.themePreset.options.canopy.desc': 'Calm and organic',
+    'Choose a saturated accent palette on neutral slate. Works in light and dark mode.',
+  'settingAppearance.themePreset.options.canopy.desc': 'Bright lime accent',
   'settingAppearance.themePreset.options.canopy.title': 'Canopy',
   'settingAppearance.themePreset.options.classic.desc': 'Balanced default',
   'settingAppearance.themePreset.options.classic.title': 'Classic',

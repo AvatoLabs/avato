@@ -10,7 +10,7 @@ import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import EmptyNavItem from '@/features/NavPanel/components/EmptyNavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import CronTopicGroup from './CronTopicGroup';

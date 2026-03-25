@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createBuiltinSkillDetailModal } from '@/features/SkillStore/SkillDetail';
-import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { styles } from './style';
 

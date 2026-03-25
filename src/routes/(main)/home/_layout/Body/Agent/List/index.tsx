@@ -4,8 +4,8 @@ import { memo, useMemo } from 'react';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { useFetchAgentList } from '@/hooks/useFetchAgentList';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 import { SessionDefaultGroup } from '@/types/index';
 
 import AllAgentsDrawer from '../AllAgentsDrawer';
@@ -25,7 +25,7 @@ const AgentList = memo<{ onMoreClick?: () => void }>(({ onMoreClick }) => {
   useFetchAgentList();
 
   // Memoize computed visibility flags to prevent unnecessary recalculations
-  // customList (session groups) is rendered under Body/Groups, not here
+  // customList (folders) + 群组会话 rows are rendered under Body/Groups, not here
   const { showPinned, showDefault } = useMemo(() => {
     const hasPinned = Boolean(pinnedList?.length);
     const hasDefault = Boolean(defaultList?.length);

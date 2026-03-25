@@ -15,9 +15,9 @@ import { t } from 'i18next';
 
 import { markUserValidAction } from '@/business/client/markUserValidAction';
 import { aiChatService } from '@/services/aiChat';
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
-import { agentGroupByIdSelectors, getChatGroupStoreState } from '@/store/agentGroup';
+import { getAgentStoreState } from '@/store/agent/store';
+import { agentGroupByIdSelectors } from '@/store/agentGroup/selectors';
 import { type ChatStore } from '@/store/chat/store';
 import { getFileStoreState } from '@/store/file/store';
 import { useGlobalStore } from '@/store/global';
@@ -89,9 +89,9 @@ export class ConversationLifecycleActionImpl {
     const newThread =
       isCreatingNewThread && context.sourceMessageId && context.threadType
         ? {
-          sourceMessageId: context.sourceMessageId,
-          type: context.threadType as ChatThreadType,
-        }
+            sourceMessageId: context.sourceMessageId,
+            type: context.threadType as ChatThreadType,
+          }
         : undefined;
 
     if (!agentId) return;
@@ -100,6 +100,7 @@ export class ConversationLifecycleActionImpl {
     // Check if current agentId is the supervisor agent of the group
     let isGroupSupervisor = false;
     if (context.groupId) {
+      const { getChatGroupStoreState } = await import('@/store/agentGroup/store');
       const group = agentGroupByIdSelectors.groupById(context.groupId)(getChatGroupStoreState());
       isGroupSupervisor = group?.supervisorAgentId === agentId;
     }
@@ -229,15 +230,15 @@ export class ConversationLifecycleActionImpl {
           // Support creating new thread along with message
           newThread: newThread
             ? {
-              sourceMessageId: newThread.sourceMessageId,
-              type: newThread.type,
-            }
+                sourceMessageId: newThread.sourceMessageId,
+                type: newThread.type,
+              }
             : undefined,
           newTopic: !topicId
             ? {
-              topicMessageIds: messages.map((m) => m.id),
-              title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
-            }
+                topicMessageIds: messages.map((m) => m.id),
+                title: message.slice(0, 20) || t('defaultTitle', { ns: 'topic' }),
+              }
             : undefined,
           agentId: operationContext.agentId,
           // Pass groupId for group chat scenarios

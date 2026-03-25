@@ -4,8 +4,6 @@ import { BrainIcon, LucideRefreshCcwDot, PlusIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAiInfraStore } from '@/store/aiInfra';
-
 import CreateNewModelModal from './CreateNewModelModal';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -44,55 +42,65 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
-const EmptyState = memo<{ provider: string }>(({ provider }) => {
-  const { t } = useTranslation('modelProvider');
+interface EmptyStateProps {
+  fetchRemoteModelsLoading?: boolean;
+  onFetchRemoteModels?: () => Promise<void>;
+  showAddNewModel?: boolean;
+  showModelFetcher?: boolean;
+}
 
-  const [fetchRemoteModelList] = useAiInfraStore((s) => [s.fetchRemoteModelList]);
+const EmptyState = memo<EmptyStateProps>(
+  ({
+    fetchRemoteModelsLoading = false,
+    onFetchRemoteModels,
+    showAddNewModel = true,
+    showModelFetcher = true,
+  }) => {
+    const { t } = useTranslation('modelProvider');
 
-  const [fetchRemoteModelsLoading, setFetchRemoteModelsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+    const [showModal, setShowModal] = useState(false);
 
-  return (
-    <Center className={styles.container} gap={24} paddingBlock={40}>
-      <Center className={styles.circle}>
-        <Icon className={styles.sparklesIcon} icon={BrainIcon} />
+    return (
+      <Center className={styles.container} gap={24} paddingBlock={40}>
+        <Center className={styles.circle}>
+          <Icon className={styles.sparklesIcon} icon={BrainIcon} />
+        </Center>
+        <Flexbox align={'center'} gap={8}>
+          <div className={styles.title}>{t('providerModels.list.empty.title')}</div>
+          <div className={styles.description}>{t('providerModels.list.empty.desc')}</div>
+        </Flexbox>
+
+        <Flexbox horizontal gap={8} justify={'center'} wrap={'wrap'}>
+          {showAddNewModel && (
+            <>
+              <Button
+                icon={PlusIcon}
+                onClick={() => {
+                  setShowModal(true);
+                }}
+              >
+                {t('providerModels.list.addNew')}
+              </Button>
+              <CreateNewModelModal open={showModal} setOpen={setShowModal} />
+            </>
+          )}
+          {showModelFetcher && (
+            <Button
+              icon={<Icon icon={LucideRefreshCcwDot} />}
+              loading={fetchRemoteModelsLoading}
+              onClick={async () => {
+                await onFetchRemoteModels?.();
+              }}
+            >
+              {fetchRemoteModelsLoading
+                ? t('providerModels.list.fetcher.fetching')
+                : t('providerModels.list.fetcher.fetch')}
+            </Button>
+          )}
+        </Flexbox>
       </Center>
-      <Flexbox align={'center'} gap={8}>
-        <div className={styles.title}>{t('providerModels.list.empty.title')}</div>
-        <div className={styles.description}>{t('providerModels.list.empty.desc')}</div>
-      </Flexbox>
-
-      <Flexbox horizontal gap={8}>
-        <Button
-          icon={PlusIcon}
-          onClick={() => {
-            setShowModal(true);
-          }}
-        >
-          {t('providerModels.list.addNew')}
-        </Button>
-        <CreateNewModelModal open={showModal} setOpen={setShowModal} />
-        <Button
-          icon={<Icon icon={LucideRefreshCcwDot} />}
-          loading={fetchRemoteModelsLoading}
-          type={'primary'}
-          onClick={async () => {
-            setFetchRemoteModelsLoading(true);
-            try {
-              await fetchRemoteModelList(provider);
-            } catch (e) {
-              console.error(e);
-            }
-            setFetchRemoteModelsLoading(false);
-          }}
-        >
-          {fetchRemoteModelsLoading
-            ? t('providerModels.list.fetcher.fetching')
-            : t('providerModels.list.fetcher.fetch')}
-        </Button>
-      </Flexbox>
-    </Center>
-  );
-});
+    );
+  },
+);
 
 export default EmptyState;

@@ -11,11 +11,12 @@ const DEFAULT_PREVIEW_PRIMARY = primaryColors.blue;
 const DEFAULT_PREVIEW_NEUTRAL = neutralColors.slate;
 
 export const THEME_PRESETS = [
-  { id: 'classic', neutralColor: undefined, primaryColor: undefined },
+  /** 高饱和度重点色 + slate 中性底（取消 sage/mauve/sand 等莫兰迪灰） */
+  { id: 'classic', neutralColor: 'slate', primaryColor: 'green' },
   { id: 'tide', neutralColor: 'slate', primaryColor: 'cyan' },
-  { id: 'canopy', neutralColor: 'sage', primaryColor: 'green' },
-  { id: 'ember', neutralColor: 'sand', primaryColor: 'volcano' },
-  { id: 'velvet', neutralColor: 'mauve', primaryColor: 'magenta' },
+  { id: 'canopy', neutralColor: 'slate', primaryColor: 'lime' },
+  { id: 'ember', neutralColor: 'slate', primaryColor: 'volcano' },
+  { id: 'velvet', neutralColor: 'slate', primaryColor: 'magenta' },
   { id: 'midnight', neutralColor: 'slate', primaryColor: 'geekblue' },
   { id: 'custom', isCustom: true, neutralColor: undefined, primaryColor: undefined },
 ] as const satisfies readonly ThemePresetDefinition[];
@@ -33,10 +34,11 @@ export const getThemePresetPreview = (
   },
 ) => {
   const preset = getThemePreset(id);
-  const primaryColor = preset?.isCustom
+  const isCustomPreset = preset?.id === 'custom';
+  const primaryColor = isCustomPreset
     ? customPreview?.primaryColor
     : normalizeThemeColor(preset?.primaryColor);
-  const neutralColor = preset?.isCustom
+  const neutralColor = isCustomPreset
     ? customPreview?.neutralColor
     : normalizeThemeColor(preset?.neutralColor);
 
@@ -55,10 +57,25 @@ export const resolveThemePreset = (
   const normalizedPrimary = normalizeThemeColor(primaryColor);
   const normalizedNeutral = normalizeThemeColor(neutralColor);
 
+  const classic = getThemePreset('classic');
+  const classicPrimary = normalizeThemeColor(classic?.primaryColor);
+  const classicNeutral = normalizeThemeColor(classic?.neutralColor);
+
+  const unset = normalizedPrimary === undefined && normalizedNeutral === undefined;
+  const matchesClassic =
+    (classicPrimary !== undefined &&
+      classicNeutral !== undefined &&
+      normalizedPrimary === classicPrimary &&
+      normalizedNeutral === classicNeutral) ||
+    unset;
+
+  if (matchesClassic) return 'classic';
+
   return (
     THEME_PRESETS.find(
       (preset) =>
-        !preset.isCustom &&
+        preset.id !== 'custom' &&
+        preset.id !== 'classic' &&
         normalizeThemeColor(preset.primaryColor) === normalizedPrimary &&
         normalizeThemeColor(preset.neutralColor) === normalizedNeutral,
     )?.id || 'custom'

@@ -6,7 +6,7 @@ import { ArrowLeftRight, Link, Sparkles } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface ImportFromUrlModalProps {
   onOpenChange: (open: boolean) => void;

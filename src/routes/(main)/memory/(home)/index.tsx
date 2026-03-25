@@ -3,7 +3,6 @@ import { Flexbox } from '@lobehub/ui';
 import { type FC } from 'react';
 
 import Loading from '@/components/Loading/BrandTextLoading';
-import NavHeader from '@/features/NavHeader';
 import WideScreenContainer from '@/features/WideScreenContainer';
 import WideScreenButton from '@/features/WideScreenContainer/WideScreenButton';
 import MemoryAnalysis from '@/routes/(main)/memory/features/MemoryAnalysis';
@@ -28,19 +27,15 @@ const Home: FC = () => {
   if (isTagsLoading || isPersonaLoading) return <Loading debugId={'Home'} />;
 
   return (
-    <Flexbox flex={1} height={'100%'}>
-      <NavHeader
-        right={
-          <Flexbox horizontal gap={8}>
-            {/* <ActionIcon icon={PencilLineIcon} onClick={openEditor} /> */}
-            <MemoryAnalysis iconOnly />
-            <WideScreenButton />
-          </Flexbox>
-        }
-        style={{
-          zIndex: 1,
-        }}
-      />
+    <Flexbox flex={1} height={'100%'} style={{ position: 'relative' }}>
+      <Flexbox
+        horizontal
+        gap={8}
+        style={{ position: 'absolute', insetInlineEnd: 12, insetBlockStart: 12, zIndex: 2 }}
+      >
+        <MemoryAnalysis iconOnly />
+        <WideScreenButton />
+      </Flexbox>
       <Flexbox
         height={'100%'}
         id={SCROLL_PARENT_ID}

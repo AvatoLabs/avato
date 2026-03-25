@@ -7,8 +7,8 @@ import ActionPopover from '@/features/ChatInput/ActionBar/components/ActionPopov
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
 import ModelSwitchPanel from '@/features/ModelSwitchPanel';
 import ControlsForm from '@/features/ModelSwitchPanel/components/ControlsForm';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { aiModelSelectors, useAiInfraStore } from '@/store/aiInfra';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({

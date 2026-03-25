@@ -5,8 +5,8 @@ import { type Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useModelSupportVision } from '@/hooks/useModelSupportVision';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { getContainer, useDragUpload } from './useDragUpload';
 

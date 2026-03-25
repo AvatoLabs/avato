@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import useMergeState from 'use-merge-value';
 
 import PluginSettingsConfig from '@/features/PluginSettings';
-import { pluginHelpers } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 
 import APIs from './APIs';
 import Meta from './Meta';

@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import DataStyleModal from '@/components/DataStyleModal';
 import { importService } from '@/services/import';
 import { useChatStore } from '@/store/chat';
-import { useHomeStore } from '@/store/home';
+import { useHomeStore } from '@/store/home/store';
 import { type ImportPgDataStructure } from '@/types/export';
 
 import { parseConfigFile } from './config';

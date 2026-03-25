@@ -14,6 +14,12 @@ type NavPanelSnapshot = {
   node: ReactNode;
 } | null;
 
+/** Stable ref so `memo(NavPanelDraggable)` skips re-renders when no route owns `NavPanelPortal` */
+const FALLBACK_HOME_SIDEBAR: NavPanelSnapshot = {
+  key: 'home',
+  node: <Sidebar />,
+};
+
 let currentSnapshot: NavPanelSnapshot = null;
 const listeners = new Set<() => void>();
 
@@ -35,8 +41,7 @@ const NavPanel = memo(() => {
     getNavPanelSnapshot,
   );
 
-  // Use home Content as fallback when no portal content is provided
-  const activeContent = panelContent || { key: 'home', node: <Sidebar /> };
+  const activeContent = panelContent ?? FALLBACK_HOME_SIDEBAR;
 
   return (
     <>
@@ -44,7 +49,10 @@ const NavPanel = memo(() => {
       <div
         id={NAV_PANEL_RIGHT_DRAWER_ID}
         style={{
+          alignSelf: 'stretch',
+          flexShrink: 0,
           height: '100%',
+          minHeight: 0,
           position: 'relative',
           width: 0,
           zIndex: 10,

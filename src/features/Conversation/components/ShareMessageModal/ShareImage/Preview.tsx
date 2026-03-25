@@ -10,8 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { ProductLogo } from '@/components/Branding';
 import { ChatItem } from '@/features/Conversation/ChatItem';
 import PluginTag from '@/features/PluginTag';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import { useAgentMeta, useIsBuiltinAgent } from '../../../hooks';
 import { normalizeThinkTags, processWithArtifact } from '../../../utils/markdown';

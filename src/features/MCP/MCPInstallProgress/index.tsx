@@ -6,8 +6,8 @@ import * as motion from 'motion/react-m';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useToolStore } from '@/store/tool';
 import { mcpStoreSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { MCPInstallStep } from '@/types/plugins';
 
 import InstallError from './InstallError';

@@ -6,8 +6,8 @@ import { useMemo } from 'react';
 import { useFetchAgentList } from '@/hooks/useFetchAgentList';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { useHomeStore } from '@/store/home';
 import { homeAgentListSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 export const useAgentList = (limitDefault = true) => {
   useFetchAgentList();
@@ -15,12 +15,12 @@ export const useAgentList = (limitDefault = true) => {
   const agentPageSize = useGlobalStore(systemStatusSelectors.agentPageSize);
   const ungroupedAgents = useHomeStore(
     limitDefault
-      ? homeAgentListSelectors.ungroupedAgentsLimited(agentPageSize)
-      : homeAgentListSelectors.ungroupedAgents,
+      ? homeAgentListSelectors.ungroupedAgentsOnlyLimited(agentPageSize)
+      : homeAgentListSelectors.ungroupedAgentsOnly,
     isEqual,
   );
   const agentGroups = useHomeStore(homeAgentListSelectors.agentGroups, isEqual);
-  const pinnedAgents = useHomeStore(homeAgentListSelectors.pinnedAgents, isEqual);
+  const pinnedAgents = useHomeStore(homeAgentListSelectors.pinnedAgentsOnly, isEqual);
 
   return useMemo(() => {
     return {

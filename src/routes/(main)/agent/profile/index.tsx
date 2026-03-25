@@ -7,8 +7,8 @@ import { memo, Suspense } from 'react';
 import Loading from '@/components/Loading/BrandTextLoading';
 import AgentBuilder from '@/features/AgentBuilder';
 import WideScreenContainer from '@/features/WideScreenContainer';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { StyleSheet } from '@/utils/styles';
 
 import Header from './features/Header';

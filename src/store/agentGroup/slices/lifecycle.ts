@@ -3,7 +3,7 @@ import urlJoin from 'url-join';
 
 import { chatGroupService } from '@/services/chatGroup';
 import { useChatStore } from '@/store/chat';
-import { getHomeStoreState } from '@/store/home';
+import { getHomeStoreState } from '@/store/home/store';
 
 import { type ChatGroupStore } from '../store';
 

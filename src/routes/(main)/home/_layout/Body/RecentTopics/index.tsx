@@ -2,9 +2,10 @@
 
 import { type RecentTopic } from '@lobechat/types';
 import { AccordionItem, Avatar, Flexbox, Text } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import GroupAvatar from '@/features/GroupAvatar';
@@ -12,7 +13,8 @@ import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { useInitRecentTopic } from '@/hooks/useInitRecentTopic';
-import { homeRecentSelectors, useHomeStore } from '@/store/home';
+import { homeRecentSelectors } from '@/store/home/selectors';
+import { useHomeStore } from '@/store/home/store';
 
 import Time from '../../../features/components/Time';
 
@@ -28,26 +30,40 @@ const getRecentTopicUrl = (topic: RecentTopic): string | null => {
 
 const RecentTopicRow = memo<{ topic: RecentTopic }>(({ topic }) => {
   const { t } = useTranslation('home');
+  const location = useLocation();
   const url = useMemo(() => getRecentTopicUrl(topic), [topic]);
   const title = topic.title || t('workspace.sidebar.recentTopicUntitled');
+
+  const isActive = useMemo(() => {
+    if (!url) return false;
+    const topicParam = new URLSearchParams(location.search).get('topic');
+    if (topicParam !== topic.id) return false;
+    if (topic.type === 'group' && topic.group) {
+      return location.pathname === `/group/${topic.group.id}`;
+    }
+    if (topic.agent?.id) {
+      return location.pathname === `/agent/${topic.agent.id}`;
+    }
+    return false;
+  }, [location.pathname, location.search, topic, url]);
 
   const icon =
     topic.type === 'group' && topic.group ? (
       topic.group.members?.length ? (
         <GroupAvatar
+          background={cssVar.colorFillQuaternary}
           size={24}
           avatars={topic.group.members.map((member) => ({
             avatar: member.avatar || '🤖',
-            backgroundColor: member.backgroundColor || undefined,
           }))}
         />
       ) : (
-        <Avatar avatar={'👥'} shape={'square'} size={24} />
+        <Avatar avatar={'👥'} background={cssVar.colorFillQuaternary} shape={'square'} size={24} />
       )
     ) : (
       <Avatar
         avatar={topic.agent?.avatar || '🤖'}
-        background={topic.agent?.backgroundColor || undefined}
+        background={cssVar.colorFillQuaternary}
         shape={'square'}
         size={24}
       />
@@ -57,7 +73,12 @@ const RecentTopicRow = memo<{ topic: RecentTopic }>(({ topic }) => {
 
   return (
     <Link style={{ color: 'inherit', textDecoration: 'none' }} to={url}>
-      <NavItem extra={<Time date={topic.updatedAt} />} icon={icon} title={title} />
+      <NavItem
+        active={isActive}
+        extra={<Time date={topic.updatedAt} />}
+        icon={icon}
+        title={title}
+      />
     </Link>
   );
 });

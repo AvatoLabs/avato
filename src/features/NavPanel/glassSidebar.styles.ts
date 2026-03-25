@@ -19,7 +19,6 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
       transparent
     ) !important;
     backdrop-filter: blur(${blur}) saturate(${sat});
-    backdrop-filter: blur(${blur}) saturate(${sat});
   `;
 
   return {
@@ -40,7 +39,9 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
     `,
     draggablePanelGlass: css`
       ${glassElevatedSurface}
-      box-shadow: inset -1px 0 0 ${cssVar.colorBorderSecondary};
+      box-shadow:
+        inset -1px 0 0 ${cssVar.colorBorderSecondary},
+        inset 0 1px 0 color-mix(in srgb, ${cssVar.colorText} 6%, transparent);
     `,
     emptyNavIconWell: css`
       display: flex;
@@ -67,19 +68,30 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
     `,
     groupHeader: css`
       font-size: ${cssVar.fontSizeSM} !important;
-      font-weight: 600 !important;
+      font-weight: 300 !important;
       color: ${cssVar.colorTextDescription} !important;
       text-transform: uppercase !important;
       letter-spacing: 0.08em !important;
+
+      html[data-theme='dark'] & {
+        color: ${cssVar.colorTextSecondary} !important;
+      }
     `,
     hairlineDivider: css`
       flex: none;
 
       height: 1px;
-      margin-block: 0;
+      margin-block: 4px 0;
       margin-inline: 10px;
 
-      background: ${cssVar.colorSplit};
+      opacity: 0.92;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        ${cssVar.colorSplit} 14%,
+        ${cssVar.colorSplit} 86%,
+        transparent 100%
+      );
     `,
     headerZone: css`
       flex: none;
@@ -107,16 +119,26 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
       padding-inline: 10px;
 
       font-size: ${cssVar.fontSizeSM};
-      font-weight: 600;
+      font-weight: 300;
       line-height: 1.2;
       color: ${cssVar.colorTextDescription};
       text-transform: uppercase;
       letter-spacing: 0.08em;
+
+      html[data-theme='dark'] & {
+        color: ${cssVar.colorTextSecondary};
+      }
     `,
     shell: css`
       display: flex;
       flex-direction: column;
       min-height: 0;
+    `,
+    /** Home sidebar accordion body — breathing room at scroll bottom */
+    scrollAccordionBody: css`
+      flex: 1;
+      min-height: 0;
+      padding-block-end: 6px;
     `,
   };
 });

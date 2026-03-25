@@ -15,8 +15,9 @@ import { FORM_STYLE } from '@/const/layoutTokens';
 import { createSkillStoreModal } from '@/features/SkillStore';
 import { useFetchInstalledPlugins } from '@/hooks/useFetchInstalledPlugins';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { toolSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { useStore } from '../store';
 import AddPluginButton from './AddPluginButton';

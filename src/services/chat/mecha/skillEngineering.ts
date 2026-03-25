@@ -1,7 +1,7 @@
 import { SkillEngine } from '@lobechat/context-engine';
 
 import { shouldEnableBuiltinSkill } from '@/helpers/skillFilters';
-import { getToolStoreState } from '@/store/tool';
+import { getToolStoreState } from '@/store/tool/store';
 
 /**
  * Create a SkillEngine by merging all skill sources from toolStore

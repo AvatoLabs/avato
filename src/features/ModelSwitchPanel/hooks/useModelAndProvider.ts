@@ -1,5 +1,5 @@
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 export const useModelAndProvider = (modelProp?: string, providerProp?: string) => {
   const [storeModel, storeProvider] = useAgentStore((s) => [

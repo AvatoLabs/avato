@@ -35,14 +35,14 @@ const EmptyNavItem = memo<EmptyStatusProps>(({ title, onClick, className }) => {
       >
         <div className={glassSidebarStyles.emptyNavIconWell}>
           <Icon
-            color={cssVar.colorTextDescription}
+            color={cssVar.colorText}
             icon={PlusIcon}
             size={{ size: 20, strokeWidth: ENTRY_ICON_STROKE }}
           />
         </div>
         <Text
           ellipsis
-          style={{ color: cssVar.colorTextDescription, flex: 1, fontSize: cssVar.fontSizeSM }}
+          style={{ color: cssVar.colorText, flex: 1, fontSize: cssVar.fontSize, fontWeight: 400 }}
         >
           {title}
         </Text>
@@ -63,9 +63,9 @@ const EmptyNavItem = memo<EmptyStatusProps>(({ title, onClick, className }) => {
       onClick={onClick}
     >
       <Center flex={'none'} height={28} width={28}>
-        <Icon icon={PlusIcon} size={'small'} />
+        <Icon color={cssVar.colorText} icon={PlusIcon} size={'small'} />
       </Center>
-      <Text align={'center'} type={'secondary'}>
+      <Text align={'center'} style={{ color: cssVar.colorText, fontWeight: 400 }}>
         {title}
       </Text>
     </Block>

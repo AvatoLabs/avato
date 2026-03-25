@@ -191,6 +191,10 @@ if [ -d "${TMP_BUILD_DIR}/app/.next/node_modules" ]; then
 fi
 mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
+# Next 16 Turbopack standalone can miss runtime chunk files that server routes still require
+# from .next/server/chunks and .next/server/chunks/ssr at runtime.
+mkdir -p "${TMP_BUILD_DIR}/app/.next/server/chunks"
+rsync -a .next/server/chunks/ "${TMP_BUILD_DIR}/app/.next/server/chunks/"
 rsync -a public/ "${TMP_BUILD_DIR}/app/public/"
 
 echo "==> Building runtime image ${IMAGE_NAME} (base: ${CANARY_RUNTIME_NODE_IMAGE})"

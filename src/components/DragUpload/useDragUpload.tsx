@@ -1,11 +1,10 @@
- 
 import { App } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModelSupportVision } from '@/hooks/useModelSupportVision';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 const DRAGGING_ROOT_ID = 'dragging-root';
 export const getContainer = () => document.querySelector(`#${DRAGGING_ROOT_ID}`);

@@ -4,10 +4,10 @@ import { getLobehubSkillProviderById } from '@lobechat/const';
 import { type Klavis } from 'klavis';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useToolStore } from '@/store/tool';
 import { klavisStoreSelectors, lobehubSkillStoreSelectors } from '@/store/tool/selectors';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { useToolStore } from '@/store/tool/store';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 

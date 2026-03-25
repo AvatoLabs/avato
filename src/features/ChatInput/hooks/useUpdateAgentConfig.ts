@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { type PartialDeep } from 'type-fest';
 
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { type LobeAgentChatConfig, type LobeAgentConfig } from '@/types/agent';
 
 import { useAgentId } from './useAgentId';

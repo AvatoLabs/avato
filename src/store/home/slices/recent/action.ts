@@ -1,7 +1,7 @@
 import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
 
-import { useClientDataSWRWithSync } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { fileService } from '@/services/file';
 import { topicService } from '@/services/topic';
 import { type HomeStore } from '@/store/home/store';

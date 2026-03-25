@@ -11,8 +11,8 @@ import { useNavigate } from 'react-router-dom';
 import { SESSION_CHAT_URL } from '@/const/url';
 import { agentService } from '@/services/agent';
 import { discoverService } from '@/services/discover';
-import { useAgentStore } from '@/store/agent';
-import { useHomeStore } from '@/store/home';
+import { useAgentStore } from '@/store/agent/store';
+import { useHomeStore } from '@/store/home/store';
 
 import { useDetailContext } from '../../DetailProvider';
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { Flexbox, Tag } from '@lobehub/ui';
-import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -13,11 +12,7 @@ import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
 import { SidebarTabKey } from '@/store/global/initialState';
-import {
-  featureFlagsSelectors,
-  serverConfigSelectors,
-  useServerConfigStore,
-} from '@/store/serverConfig';
+import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { isModifierClick } from '@/utils/navigation';
 
 interface Item {
@@ -39,7 +34,6 @@ const Nav = memo(() => {
   const { t: tSetting } = useTranslation('setting');
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
-  const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
 
   const globalActions: Item[] = useMemo(
     () => [
@@ -78,7 +72,19 @@ const Nav = memo(() => {
         url: '/page',
       },
       {
-        hidden: !enableBusinessFeatures,
+        icon: APP_ENTRY_ICONS.resource,
+        key: SidebarTabKey.Resource,
+        title: t('tab.resource'),
+        url: '/resource',
+      },
+      {
+        icon: APP_ENTRY_ICONS.memory,
+        key: SidebarTabKey.Memory,
+        title: t('tab.memory'),
+        url: '/memory',
+      },
+      {
+        /** 服务端已有视频生成能力（lambda/video）；入口常驻侧栏，不依赖 enableBusinessFeatures */
         icon: APP_ENTRY_ICONS.video,
         key: SidebarTabKey.Video,
         title: t('tab.video'),
@@ -100,7 +106,7 @@ const Nav = memo(() => {
         url: '/community',
       },
     ],
-    [enableBusinessFeatures, showAiImage, showMarket, t],
+    [showAiImage, showMarket, t],
   );
 
   const newBadge = (
@@ -109,16 +115,7 @@ const Nav = memo(() => {
     </Tag>
   );
   const betaBadge = (
-    <Tag
-      size="small"
-      variant={'filled'}
-      style={{
-        background: cssVar.colorFillSecondary,
-        border: `1px solid ${cssVar.colorFillTertiary}`,
-        color: cssVar.colorTextDescription,
-        marginInlineStart: 4,
-      }}
-    >
+    <Tag color="cyan" size="small" style={{ marginInlineStart: 4 }} variant="outlined">
       {tSetting('tab.beta')}
     </Tag>
   );

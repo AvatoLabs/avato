@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { useAgentStore } from '@/store/agent';
+import { useAgentStore } from '@/store/agent/store';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import CronJobCards from './CronJobCards';

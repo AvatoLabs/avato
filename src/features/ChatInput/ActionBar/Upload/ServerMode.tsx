@@ -3,7 +3,7 @@ import { type ItemType } from '@lobehub/ui';
 import { Icon, Tooltip } from '@lobehub/ui';
 import { Upload } from 'antd';
 import isEqual from 'fast-deep-equal';
-import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig, Paperclip } from 'lucide-react';
+import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig } from 'lucide-react';
 import { memo, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,10 +11,11 @@ import { message } from '@/components/AntdStaticMethods';
 import FileIcon from '@/components/FileIcon';
 import RepoIcon from '@/components/LibIcon';
 import TipGuide from '@/components/TipGuide';
+import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
 import { AttachKnowledgeModal } from '@/features/LibraryModal';
 import { useModelSupportVision } from '@/hooks/useModelSupportVision';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { useFileStore } from '@/store/file';
 import { useUserStore } from '@/store/user';
 import { preferenceSelectors } from '@/store/user/selectors';
@@ -220,7 +221,7 @@ const FileUpload = memo(() => {
 
   const content = (
     <Action
-      icon={Paperclip}
+      icon={CHAT_INPUT_ACTION_ICONS.paperclip}
       loading={updating}
       open={dropdownOpen}
       showTooltip={false}
@@ -237,7 +238,15 @@ const FileUpload = memo(() => {
   );
 
   return (
-    <Suspense fallback={<Action disabled icon={Paperclip} title={t('upload.action.tooltip')} />}>
+    <Suspense
+      fallback={
+        <Action
+          disabled
+          icon={CHAT_INPUT_ACTION_ICONS.paperclip}
+          title={t('upload.action.tooltip')}
+        />
+      }
+    >
       {showTip ? (
         <TipGuide
           open={showTip}

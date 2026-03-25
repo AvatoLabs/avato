@@ -4,8 +4,8 @@ import { memo, useRef, useState } from 'react';
 
 import { useChatStore } from '@/store/chat';
 import { dbMessageSelectors } from '@/store/chat/selectors';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 import { useOnPluginReadyForInteraction } from '../utils/iframeOnReady';
 import {

@@ -1,5 +1,5 @@
-import { useNotebookStore } from '@/store/notebook';
 import { notebookSelectors } from '@/store/notebook/selectors';
+import { useNotebookStore } from '@/store/notebook/store';
 
 /**
  * Fetch notebook documents for the current topic

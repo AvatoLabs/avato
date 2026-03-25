@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { mutate } from '@/libs/swr';
 import { remoteServerService } from '@/services/electron/remoteServer';
 import { type StoreSetter } from '@/store/types';
+import { getUserStoreState } from '@/store/user/store';
 
 import { initialState } from '../initialState';
 import { type ElectronStore } from '../store';
@@ -96,7 +97,6 @@ export class ElectronRemoteServerActionImpl {
   refreshUserData = async (): Promise<void> => {
     const { getSessionStoreState } = await import('@/store/session');
     const { getChatStoreState } = await import('@/store/chat');
-    const { getUserStoreState } = await import('@/store/user');
 
     await getSessionStoreState().refreshSessions();
     await getChatStoreState().refreshMessages();

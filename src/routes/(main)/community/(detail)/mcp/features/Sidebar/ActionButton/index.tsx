@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 import MCPInstallProgress from '@/features/MCP/MCPInstallProgress';
 import { useDetailContext } from '@/features/MCPPluginDetail/DetailProvider';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/slices/plugin/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 const styles = createStaticStyles(({ css }) => ({
   button: css`

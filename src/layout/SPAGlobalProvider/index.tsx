@@ -1,6 +1,6 @@
 'use client';
 
-import { TooltipGroup } from '@lobehub/ui';
+import { type NeutralColors, type PrimaryColors, TooltipGroup } from '@lobehub/ui';
 import { StyleProvider, useResponsive } from 'antd-style';
 import { domMax, LazyMotion } from 'motion/react';
 import { lazy, memo, type PropsWithChildren, Suspense, useLayoutEffect } from 'react';
@@ -21,6 +21,10 @@ import { ServerConfigStoreProvider } from '@/store/serverConfig/Provider';
 import type { SPAServerConfig } from '@/types/spaServerConfig';
 
 import Locale from './Locale';
+
+/** Default accent: saturated green (ChatGPT-like), neutral slate — not Morandi primary scale. */
+const DEFAULT_THEME_PRIMARY: PrimaryColors = 'green';
+const DEFAULT_THEME_NEUTRAL: NeutralColors = 'slate';
 
 const ModalHost = lazy(() => import('@lobehub/ui').then((m) => ({ default: m.ModalHost })));
 const ToastHost = lazy(() => import('@lobehub/ui').then((m) => ({ default: m.ToastHost })));
@@ -44,7 +48,10 @@ const SPAGlobalProvider = memo<PropsWithChildren>(({ children }) => {
   return (
     <Locale defaultLang={locale}>
       <NextThemeProvider>
-        <AppTheme>
+        <AppTheme
+          defaultNeutralColor={DEFAULT_THEME_NEUTRAL}
+          defaultPrimaryColor={DEFAULT_THEME_PRIMARY}
+        >
           <ServerConfigStoreProvider
             featureFlags={serverConfig?.featureFlags}
             isMobile={isMobile}

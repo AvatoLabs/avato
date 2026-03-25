@@ -11,8 +11,8 @@ import SkillSourceTag from '@/components/SkillSourceTag';
 import McpDetail from '@/features/MCP/MCPDetail';
 import McpDetailLoading from '@/features/MCP/MCPDetail/Loading';
 import PluginDetailModal from '@/features/PluginDetailModal';
-import { useToolStore } from '@/store/tool';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type LobeToolType } from '@/types/tool/tool';
 
 import Actions from './Actions';

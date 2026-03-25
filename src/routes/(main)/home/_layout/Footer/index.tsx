@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import ChangelogModal from '@/components/ChangelogModal';
 import HighlightNotification from '@/components/HighlightNotification';
 import LabsModal from '@/components/LabsModal';
-import ThemeButton from '@/features/User/UserPanel/ThemeButton';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
+import User from '@/routes/(main)/home/_layout/Header/components/User';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors/systemStatus';
 
@@ -63,7 +63,7 @@ const Footer = memo(() => {
 
   const { open: openFeedbackModal } = useFeedbackModal();
 
-  const handleOpenLabsModal = () => {
+  const _handleOpenLabsModal = () => {
     setIsLabsModalOpen(true);
   };
 
@@ -71,7 +71,7 @@ const Footer = memo(() => {
     setIsLabsModalOpen(false);
   };
 
-  const handleOpenChangelogModal = () => {
+  const _handleOpenChangelogModal = () => {
     setShouldLoadChangelog(true);
     setIsChangelogModalOpen(true);
   };
@@ -80,11 +80,11 @@ const Footer = memo(() => {
     setIsChangelogModalOpen(false);
   };
 
-  const handleOpenFeedbackModal = () => {
+  const _handleOpenFeedbackModal = () => {
     openFeedbackModal();
   };
 
-  const handleOpenProductHuntCard = () => {
+  const _handleOpenProductHuntCard = () => {
     setIsProductHuntCardOpen(true);
     trackProductHuntEvent('product_hunt_card_viewed', {
       spm: 'homepage.product_hunt.viewed',
@@ -113,9 +113,8 @@ const Footer = memo(() => {
 
   return (
     <>
-      <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={'10px 12px'}>
-        <Flexbox horizontal align={'center'} flex={1} gap={2} />
-        <ThemeButton placement={'topCenter'} size={16} />
+      <Flexbox flex={'none'} padding={'6px 6px 8px'}>
+        <User />
       </Flexbox>
       <LabsModal open={isLabsModalOpen} onClose={handleCloseLabsModal} />
       <ChangelogModal

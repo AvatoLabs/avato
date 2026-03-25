@@ -42,6 +42,7 @@ const SideBarDrawer = memo<SideBarDrawerProps>(
         }}
         rootStyle={{
           bottom: 0,
+          left: 0,
           overflow: 'hidden',
           position: 'absolute',
           top: 0,
@@ -59,11 +60,10 @@ const SideBarDrawer = memo<SideBarDrawerProps>(
                 typeof title === 'string' ? (
                   <Text
                     ellipsis
-                    weight={400}
                     style={{
                       color: cssVar.colorText,
                       fontSize: cssVar.fontSize,
-                      fontWeight: 600,
+                      fontWeight: 400,
                       paddingLeft: 8,
                     }}
                   >

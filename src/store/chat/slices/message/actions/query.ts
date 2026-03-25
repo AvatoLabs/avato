@@ -3,7 +3,8 @@ import { type ConversationContext, type UIChatMessage } from '@lobechat/types';
 import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
 
-import { mutate, useClientDataSWRWithSync } from '@/libs/swr';
+import { mutate } from '@/libs/swr';
+import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { messageService } from '@/services/message';
 import { type ChatStore } from '@/store/chat/store';
 import { type StoreSetter } from '@/store/types';

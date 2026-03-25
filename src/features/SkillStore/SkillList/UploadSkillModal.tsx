@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import { lambdaClient } from '@/libs/trpc/client/lambda';
 import { uploadService } from '@/services/upload';
-import { useToolStore } from '@/store/tool';
+import { useToolStore } from '@/store/tool/store';
 
 interface UploadSkillModalProps {
   onOpenChange: (open: boolean) => void;
@@ -65,7 +65,7 @@ const UploadSkillModal = memo<UploadSkillModalProps>(({ open, onOpenChange }) =>
       destroyOnClose
       closable={!loading}
       footer={null}
-      maskClosable={!loading}
+      mask={{ closable: !loading }}
       open={open}
       title={null}
       width={480}

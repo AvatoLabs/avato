@@ -8,8 +8,8 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { VirtuosoGrid } from 'react-virtuoso';
 
-import { useToolStore } from '@/store/tool';
 import { agentSkillsSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 import { type DiscoverMcpItem } from '@/types/discover';
 
 import AgentSkillItem from '../AgentSkillItem';

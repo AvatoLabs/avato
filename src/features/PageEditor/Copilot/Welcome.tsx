@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
 import SuggestQuestions from '@/features/SuggestQuestions';
-import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 const AgentBuilderWelcome = memo(() => {
   const { t } = useTranslation('chat');

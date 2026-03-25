@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 import { memo } from 'react';
 
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 import { ChatSettingsTabs } from '@/store/global/initialState';
 
 import AgentChat from './AgentChat';

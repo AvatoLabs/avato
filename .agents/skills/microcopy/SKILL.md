@@ -12,13 +12,13 @@ Brand: **Where Agents Collaborate** - Focus on collaborative agent system, not j
 | Chinese    | English       |
 | ---------- | ------------- |
 | 空间       | Workspace     |
-| 助理       | Agent         |
+| 智能体     | Agent         |
 | 群组       | Group         |
 | 上下文     | Context       |
 | 记忆       | Memory        |
 | 连接器     | Integration   |
 | 技能       | Skill         |
-| 助理档案   | Agent Profile |
+| 智能体档案 | Agent Profile |
 | 话题       | Topic         |
 | 文稿       | Page          |
 | 社区       | Community     |

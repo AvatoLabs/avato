@@ -1,9 +1,41 @@
 'use client';
 
 import { BRANDING_NAME } from '@lobechat/business-const';
+import { createStyles } from 'antd-style';
 import { motion } from 'motion/react';
 
 import styles from './index.module.css';
+
+const useLaunchStyles = createStyles(({ css, token }) => ({
+  startButton: css`
+    cursor: pointer;
+
+    min-width: 172px;
+    margin-block-start: 14px;
+    padding-block: 11px;
+    padding-inline: 20px;
+    border: 0;
+    border-radius: 999px;
+
+    font-size: 16px;
+    font-weight: 600;
+    color: ${token.colorTextLightSolid} !important;
+    letter-spacing: 0.02em;
+
+    background: ${token.colorPrimary};
+    box-shadow: 0 10px 22px rgb(0 0 0 / 12%);
+
+    &:hover {
+      color: ${token.colorTextLightSolid} !important;
+      background: ${token.colorPrimaryHover};
+      filter: none;
+    }
+
+    &:active {
+      transform: translateY(1px);
+    }
+  `,
+}));
 
 const DEFAULT_START_TEXT = 'Get Started';
 const DEFAULT_LAUNCH_SLOGAN = 'Your AI workspace, engineered for the future by Avato.';
@@ -27,6 +59,7 @@ const BrandTextLoading = ({
   startButtonText = DEFAULT_START_TEXT,
   onStart,
 }: BrandTextLoadingProps) => {
+  const { styles: launchStyles } = useLaunchStyles();
   const isLaunchMode = mode === 'launch';
   const showDebug = process.env.NODE_ENV === 'development' && debugId && isLaunchMode;
   const resolvedBrandName = brandName ?? BRANDING_NAME;
@@ -121,7 +154,7 @@ const BrandTextLoading = ({
 
         <motion.button
           animate={{ opacity: 1, y: 0 }}
-          className={styles.startButton}
+          className={launchStyles.startButton}
           initial={{ opacity: 0, y: 20 }}
           transition={{ delay: 1.5, duration: 0.4 }}
           type="button"

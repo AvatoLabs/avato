@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
-import SideBarHeaderLayout from '@/features/NavPanel/SideBarHeaderLayout';
+import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 import { buildResourceRootPath } from '@/features/ResourceSpaces';
 import { LibraryTrashButton } from '@/routes/(main)/resource/features/LibraryTrashButton';
 
@@ -13,17 +13,14 @@ import CategoryMenu from './CategoryMenu';
 const Header = memo(() => {
   const { t } = useTranslation('common');
   const { spaceId } = useParams<{ spaceId?: string }>();
+  const resourceRoot = buildResourceRootPath(spaceId);
 
   return (
     <>
-      <SideBarHeaderLayout
+      <SubSidebarTitleBar
         right={<LibraryTrashButton />}
-        breadcrumb={[
-          {
-            href: buildResourceRootPath(spaceId),
-            title: t('tab.resource'),
-          },
-        ]}
+        title={t('tab.resource')}
+        titleTo={resourceRoot}
       />
       <CategoryMenu />
     </>

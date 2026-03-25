@@ -2,10 +2,10 @@
 
 import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import { Lightbulb, RefreshCw } from 'lucide-react';
 import { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SUGGEST_QUESTIONS_ICONS } from '@/config/entryIcons';
 import { type StarterMode } from '@/store/home';
 
 import GroupBlock from '../components/GroupBlock';
@@ -28,7 +28,7 @@ const SuggestQuestions = memo<SuggestQuestionsProps>(({ mode }) => {
   return (
     <GroupBlock
       actionAlwaysVisible
-      icon={Lightbulb}
+      icon={SUGGEST_QUESTIONS_ICONS.bulb}
       title={t('home.suggestQuestions')}
       action={
         <Flexbox
@@ -38,7 +38,7 @@ const SuggestQuestions = memo<SuggestQuestionsProps>(({ mode }) => {
           style={{ cursor: 'pointer' }}
           onClick={refresh}
         >
-          <ActionIcon icon={RefreshCw} size={'small'} />
+          <ActionIcon icon={SUGGEST_QUESTIONS_ICONS.refresh} size={'small'} />
           <Text color={cssVar.colorTextSecondary} fontSize={12}>
             {t('switch')}
           </Text>

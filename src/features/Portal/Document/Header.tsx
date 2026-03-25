@@ -10,8 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { documentService } from '@/services/document';
 import { useChatStore } from '@/store/chat';
 import { chatPortalSelectors } from '@/store/chat/selectors';
-import { useNotebookStore } from '@/store/notebook';
 import { notebookSelectors } from '@/store/notebook/selectors';
+import { useNotebookStore } from '@/store/notebook/store';
 import { oneLineEllipsis } from '@/styles';
 import { standardizeIdentifier } from '@/utils/identifier';
 

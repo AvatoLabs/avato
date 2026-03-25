@@ -9,6 +9,7 @@ import superjson from 'superjson';
 import { withElectronProtocolIfElectron } from '@/const/protocol';
 import { isDesktop } from '@/const/version';
 import { type LambdaRouter } from '@/server/routers/lambda';
+import { getUserStoreState } from '@/store/user/store';
 
 const log = debug('lobe-image:lambda-client');
 
@@ -50,7 +51,6 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
                   // Desktop app doesn't have the web auth routes like `/signin`,
                   // so skip the login redirect/notification there.
                   if (!isDesktop) {
-                    const { getUserStoreState } = await import('@/store/user/store');
                     const { isSignedIn, logout } = getUserStoreState();
                     // If user is still marked as signed in but got 401,
                     // session is invalid - clear client state first

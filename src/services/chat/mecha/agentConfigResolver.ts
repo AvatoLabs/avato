@@ -11,8 +11,8 @@ import {
 import debug from 'debug';
 import { produce } from 'immer';
 
-import { getAgentStoreState } from '@/store/agent';
 import { agentSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { getAgentStoreState } from '@/store/agent/store';
 import { getChatGroupStoreState } from '@/store/agentGroup';
 import { agentGroupByIdSelectors, agentGroupSelectors } from '@/store/agentGroup/selectors';
 
@@ -186,10 +186,10 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
       ctx.groupId,
       group
         ? {
-          groupId: group.id,
-          supervisorAgentId: group.supervisorAgentId,
-          title: group.title,
-        }
+            groupId: group.id,
+            supervisorAgentId: group.supervisorAgentId,
+            title: group.title,
+          }
         : null,
       agentId,
     );
@@ -292,11 +292,11 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
       ctx.groupId,
       group
         ? {
-          agentsCount: group.agents?.length,
-          groupId: group.id,
-          supervisorAgentId: group.supervisorAgentId,
-          title: group.title,
-        }
+            agentsCount: group.agents?.length,
+            groupId: group.id,
+            supervisorAgentId: group.supervisorAgentId,
+            title: group.title,
+          }
         : null,
     );
 

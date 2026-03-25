@@ -5,8 +5,8 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAgentOwnershipCheck } from '@/hooks/useAgentOwnershipCheck';
-import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
+import { useAgentStore } from '@/store/agent/store';
 
 import PublishButton from './PublishButton';
 import PublishResultModal from './PublishResultModal';

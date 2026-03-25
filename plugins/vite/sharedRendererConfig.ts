@@ -12,7 +12,17 @@ import { vitePlatformResolve } from './platformResolve';
  * Only targets pure data modules (no downstream dependents) to avoid facade chunk issues.
  */
 /** Large i18n namespaces that get their own per-locale chunk instead of merging into the locale bundle */
-const HEAVY_NS = new Set(['models', 'modelProvider']);
+const HEAVY_NS = new Set([
+  'chat',
+  'common',
+  'discover',
+  'modelProvider',
+  'models',
+  'plugin',
+  'setting',
+  'subscription',
+  'suggestQuestions',
+]);
 
 /** antd locale filename → app locale */
 const ANTD_LOCALE: Record<string, string> = {
@@ -69,7 +79,9 @@ function sharedManualChunks(id: string): string | undefined {
   }
 
   // model-bank (monorepo package — split before node_modules guard)
-  if (id.includes('model-bank')) return 'providerConfig';
+  if (id.includes('/packages/model-bank/src/aiModels/')) return 'providerConfig-models';
+  if (id.includes('/packages/model-bank/src/modelProviders/')) return 'providerConfig-providers';
+  if (id.includes('model-bank')) return 'providerConfig-models';
 
   if (!id.includes('node_modules')) return;
 
@@ -104,6 +116,7 @@ export const sharedRollupOutput = {
   chunkFileNames: (chunkInfo: { name: string }) => {
     const { name } = chunkInfo;
     if (name.startsWith('i18n-')) return 'i18n/[name]-[hash].js';
+    if (name.startsWith('providerConfig-')) return 'provider/[name]-[hash].js';
     if (name.startsWith('vendor-')) return 'vendor/[name]-[hash].js';
     return 'assets/[name]-[hash].js';
   },

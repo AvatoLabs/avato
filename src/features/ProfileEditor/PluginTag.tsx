@@ -13,7 +13,6 @@ import PluginAvatar from '@/components/Plugins/PluginAvatar';
 import { useIsDark } from '@/hooks/useIsDark';
 import { useDiscoverStore } from '@/store/discover';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-import { useToolStore } from '@/store/tool';
 import {
   builtinToolSelectors,
   klavisStoreSelectors,
@@ -21,6 +20,7 @@ import {
   pluginSelectors,
 } from '@/store/tool/selectors';
 import { type LobeToolMetaWithAvailability } from '@/store/tool/slices/builtin/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 /**
  * Klavis 服务器图标组件

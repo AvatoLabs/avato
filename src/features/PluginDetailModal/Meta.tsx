@@ -3,8 +3,9 @@ import isEqual from 'fast-deep-equal';
 import { memo } from 'react';
 
 import PluginAvatar from '@/features/PluginAvatar';
-import { pluginHelpers, useToolStore } from '@/store/tool';
+import { pluginHelpers } from '@/store/tool/helpers';
 import { pluginSelectors } from '@/store/tool/selectors';
+import { useToolStore } from '@/store/tool/store';
 
 const Meta = memo<{
   id: string;
