@@ -1,3 +1,5 @@
+'use client';
+
 import { Flexbox } from '@lobehub/ui';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -5,12 +7,13 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { SidebarTabKey } from '@/store/global/initialState';
 import { isModifierClick } from '@/utils/navigation';
 
 interface Item {
-  icon: any;
+  icon: typeof APP_ENTRY_ICONS.settings;
   key: SidebarTabKey;
   title: string;
   url: string;
@@ -21,6 +24,7 @@ const BottomMenu = memo(() => {
 
   const navigate = useNavigate();
   const { t } = useTranslation('common');
+  const { t: tHome } = useTranslation('home');
 
   const items = useMemo(
     () =>
@@ -48,13 +52,10 @@ const BottomMenu = memo(() => {
   );
 
   return (
-    <Flexbox
-      gap={1}
-      paddingBlock={4}
-      style={{
-        overflow: 'hidden',
-      }}
-    >
+    <Flexbox gap={2} style={{ overflow: 'hidden' }}>
+      <span className={glassSidebarStyles.sectionLabel}>
+        {tHome('workspace.sidebar.section.system')}
+      </span>
       {items.map((item) => (
         <Link
           key={item.key}

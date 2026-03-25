@@ -114,6 +114,8 @@ export default defineConfig({
       '/share/f': { changeOrigin: true, target: 'http://localhost:3010' },
       '/trpc': 'http://localhost:3010',
       '/webapi': 'http://localhost:3010',
+      // Next App Router serves this; without proxy Vite returns index.html → manifest JSON parse error
+      '/manifest.webmanifest': { changeOrigin: true, target: 'http://localhost:3010' },
     },
     warmup: {
       clientFiles: [

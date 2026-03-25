@@ -15,7 +15,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   button: css`
     height: 32px;
     padding-inline-start: 4px;
-    font-size: 13px;
+    font-size: ${cssVar.fontSizeSM};
     color: ${cssVar.colorTextSecondary};
 
     &:hover {

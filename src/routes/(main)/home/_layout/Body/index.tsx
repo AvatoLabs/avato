@@ -4,19 +4,31 @@ import { Accordion, Flexbox } from '@lobehub/ui';
 import { memo } from 'react';
 
 import Agent from './Agent';
-import BottomMenu from './BottomMenu';
+import GroupsPanel from './Groups';
+import RecentTopics from './RecentTopics';
 
 export enum GroupKey {
   Agent = 'agent',
+  Groups = 'groups',
   Project = 'project',
+  RecentTopics = 'recentTopics',
 }
 
 const Body = memo(() => {
   return (
-    <Flexbox paddingInline={4}>
-      <Accordion defaultExpandedKeys={[GroupKey.Project, GroupKey.Agent]} gap={8}>
+    <Flexbox flex={1} paddingInline={8} style={{ minHeight: 0 }}>
+      <Accordion
+        gap={10}
+        defaultExpandedKeys={[
+          GroupKey.RecentTopics,
+          GroupKey.Groups,
+          GroupKey.Project,
+          GroupKey.Agent,
+        ]}
+      >
+        <RecentTopics itemKey={GroupKey.RecentTopics} />
+        <GroupsPanel itemKey={GroupKey.Groups} />
         <Agent itemKey={GroupKey.Agent} />
-        <BottomMenu />
       </Accordion>
     </Flexbox>
   );

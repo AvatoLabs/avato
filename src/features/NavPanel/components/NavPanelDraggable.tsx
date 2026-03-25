@@ -1,12 +1,13 @@
 'use client';
 
 import { DraggablePanel, Freeze } from '@lobehub/ui';
-import { createStaticStyles, cssVar } from 'antd-style';
+import { createStaticStyles, cx } from 'antd-style';
 import { AnimatePresence, motion, useIsPresent } from 'motion/react';
 import { type ReactNode } from 'react';
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { isDesktop } from '@/const/version';
+import { WORKSPACE_SHELL_RAIL_MIN_WIDTH } from '@/const/workspaceVisualTokens';
 import { TOGGLE_BUTTON_ID } from '@/features/NavPanel/ToggleLeftPanelButton';
 import { USER_DROPDOWN_ICON_ID } from '@/routes/(main)/home/_layout/Header/components/User';
 import { useGlobalStore } from '@/store/global';
@@ -15,6 +16,8 @@ import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 import { isMacOS } from '@/utils/platform';
 
+import { GlassNavVisualProvider } from '../GlassNavVisualContext';
+import { glassSidebarStyles } from '../glassSidebar.styles';
 import { useNavPanelSizeChangeHandler } from '../hooks/useNavPanel';
 import { BACK_BUTTON_ID } from './BackButton';
 
@@ -42,7 +45,7 @@ const motionVariants = {
     x: direction * MOTION_OFFSET,
   }),
   transition: {
-    duration: 0.28,
+    duration: 0.22,
     ease: [0.4, 0, 0.2, 1],
   },
 } as const;
@@ -64,7 +67,7 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     overflow: hidden;
     flex: 1;
 
-    min-width: 240px;
+    min-width: ${WORKSPACE_SHELL_RAIL_MIN_WIDTH}px;
     max-width: 100%;
     min-height: 100%;
     max-height: 100%;
@@ -79,16 +82,20 @@ const draggableStyles = createStaticStyles(({ css, cssVar }) => ({
     display: flex;
     flex-direction: column;
 
-    min-width: 240px;
+    min-width: ${WORKSPACE_SHELL_RAIL_MIN_WIDTH}px;
     max-width: 100%;
     min-height: 100%;
     max-height: 100%;
   `,
   panel: css`
     user-select: none;
+
     height: 100%;
+
     color: ${cssVar.colorTextSecondary};
+
     background: ${isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout};
+    box-shadow: inset -1px 0 0 ${cssVar.colorBorderSecondary};
 
     * {
       user-select: none;
@@ -171,13 +178,7 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
     }),
     [],
   );
-  const styles = useMemo(
-    () => ({
-      background: isDesktop && isMacOS() ? 'transparent' : cssVar.colorBgLayout,
-      zIndex: 11,
-    }),
-    [],
-  );
+  const styles = useMemo(() => ({ zIndex: 11 }), []);
 
   const historyRef = useRef([activeContent.key]);
   const directionRef = useRef<MotionDirection>(0);
@@ -210,13 +211,13 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
 
   return (
     <DraggablePanel
-      className={draggableStyles.panel}
+      className={cx(draggableStyles.panel, glassSidebarStyles.draggablePanelGlass)}
       classNames={classNames}
       defaultSize={defaultSize}
       expand={expand}
       expandable={false}
       maxWidth={400}
-      minWidth={240}
+      minWidth={WORKSPACE_SHELL_RAIL_MIN_WIDTH}
       placement="left"
       showBorder={false}
       style={styles}
@@ -236,12 +237,14 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
               transition={motionVariants.transition}
               variants={motionVariants}
             >
-              <ExitingFrozenContent>{activeContent.node}</ExitingFrozenContent>
+              <ExitingFrozenContent>
+                <GlassNavVisualProvider>{activeContent.node}</GlassNavVisualProvider>
+              </ExitingFrozenContent>
             </motion.div>
           </AnimatePresence>
         ) : (
           <div className={draggableStyles.layer} key={activeContent.key}>
-            {activeContent.node}
+            <GlassNavVisualProvider>{activeContent.node}</GlassNavVisualProvider>
           </div>
         )}
       </div>

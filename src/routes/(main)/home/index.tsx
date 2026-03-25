@@ -14,15 +14,21 @@ const Home: FC = () => {
   const isHomeRoute = pathname === '/';
 
   return (
-    <>
+    <Flexbox flex={1} height={'100%'} style={{ minHeight: 0 }} width={'100%'}>
       {isHomeRoute && <PageTitle title="" />}
       <NavHeader right={<WideScreenButton />} />
-      <Flexbox height={'100%'} style={{ overflowY: 'auto', paddingBottom: '16vh' }} width={'100%'}>
-        <WideScreenContainer minWidth={1280}>
+      <Flexbox
+        align={'center'}
+        flex={1}
+        justify={'center'}
+        style={{ minHeight: 0, overflowY: 'auto', paddingBlock: 32 }}
+        width={'100%'}
+      >
+        <WideScreenContainer minWidth={1280} paddingInline={20}>
           <HomeContent />
         </WideScreenContainer>
       </Flexbox>
-    </>
+    </Flexbox>
   );
 };
 

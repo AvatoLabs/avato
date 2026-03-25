@@ -11,6 +11,7 @@ import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 
 import { NAV_PANEL_RIGHT_DRAWER_ID } from './';
 import SkeletonList from './components/SkeletonList';
+import { glassSidebarStyles } from './glassSidebar.styles';
 import SideBarHeaderLayout from './SideBarHeaderLayout';
 
 interface SideBarDrawerProps {
@@ -34,6 +35,11 @@ const SideBarDrawer = memo<SideBarDrawerProps>(
         open={open}
         placement="left"
         size={size}
+        classNames={{
+          body: glassSidebarStyles.drawerGlassBody,
+          header: glassSidebarStyles.drawerGlassHeader,
+          wrapper: glassSidebarStyles.drawerGlassWrapper,
+        }}
         rootStyle={{
           bottom: 0,
           overflow: 'hidden',
@@ -42,21 +48,7 @@ const SideBarDrawer = memo<SideBarDrawerProps>(
           width: `${size}px`,
         }}
         styles={{
-          body: {
-            background: cssVar.colorBgLayout,
-            padding: 0,
-          },
-          header: {
-            background: cssVar.colorBgLayout,
-            borderBottom: 'none',
-            padding: 0,
-          },
-          wrapper: {
-            borderLeft: `1px solid ${cssVar.colorBorderSecondary}`,
-            borderRight: `1px solid ${cssVar.colorBorderSecondary}`,
-            boxShadow: `4px 0 8px -2px rgba(0,0,0,.04)`,
-            zIndex: 0,
-          },
+          wrapper: { zIndex: 0 },
         }}
         title={
           <>
@@ -67,9 +59,13 @@ const SideBarDrawer = memo<SideBarDrawerProps>(
                 typeof title === 'string' ? (
                   <Text
                     ellipsis
-                    fontSize={14}
-                    style={{ fontWeight: 600, paddingLeft: 8 }}
                     weight={400}
+                    style={{
+                      color: cssVar.colorText,
+                      fontSize: cssVar.fontSize,
+                      fontWeight: 600,
+                      paddingLeft: 8,
+                    }}
                   >
                     {title}
                   </Text>

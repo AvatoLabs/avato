@@ -8,7 +8,6 @@ import { useIsDark } from '@/hooks/useIsDark';
 import { useHomeStore } from '@/store/home';
 
 import HomeAgentIdSync from './HomeAgentIdSync';
-import RecentHydration from './RecentHydration';
 import Sidebar from './Sidebar';
 import { styles } from './style';
 
@@ -64,7 +63,6 @@ const Layout: FC<LayoutProps> = ({ children }) => {
       </Flexbox>
 
       {isHomeRoute && <HomeAgentIdSync />}
-      <RecentHydration />
     </Flexbox>
   );
 };

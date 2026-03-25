@@ -11,9 +11,10 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   contentDark: css`
     overflow: hidden;
     background: linear-gradient(
-      to bottom,
-      ${cssVar.colorBgContainer},
-      var(--content-bg-secondary, ${cssVar.colorBgContainer})
+      165deg,
+      ${cssVar.colorBgContainer} 0%,
+      var(--content-bg-secondary, ${cssVar.colorBgContainer}) 72%,
+      var(--content-bg-secondary, ${cssVar.colorBgContainer}) 100%
     );
   `,
 

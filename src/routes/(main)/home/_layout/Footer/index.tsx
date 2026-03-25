@@ -113,7 +113,7 @@ const Footer = memo(() => {
 
   return (
     <>
-      <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={8}>
+      <Flexbox horizontal align={'center'} gap={2} justify={'space-between'} padding={'10px 12px'}>
         <Flexbox horizontal align={'center'} flex={1} gap={2} />
         <ThemeButton placement={'topCenter'} size={16} />
       </Flexbox>

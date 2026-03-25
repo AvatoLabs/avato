@@ -9,14 +9,13 @@ import { homeAgentListSelectors } from '@/store/home/selectors';
 import { SessionDefaultGroup } from '@/types/index';
 
 import AllAgentsDrawer from '../AllAgentsDrawer';
-import Group from './Group';
 import InboxItem from './InboxItem';
 import SessionList from './List';
 import { useAgentList } from './useAgentList';
 
 const AgentList = memo<{ onMoreClick?: () => void }>(({ onMoreClick }) => {
   const isInit = useHomeStore(homeAgentListSelectors.isAgentListInit);
-  const { customList, pinnedList, defaultList } = useAgentList();
+  const { pinnedList, defaultList } = useAgentList();
 
   const [allAgentsDrawerOpen, closeAllAgentsDrawer] = useHomeStore((s) => [
     s.allAgentsDrawerOpen,
@@ -26,17 +25,16 @@ const AgentList = memo<{ onMoreClick?: () => void }>(({ onMoreClick }) => {
   useFetchAgentList();
 
   // Memoize computed visibility flags to prevent unnecessary recalculations
-  const { showPinned, showCustom, showDefault } = useMemo(() => {
+  // customList (session groups) is rendered under Body/Groups, not here
+  const { showPinned, showDefault } = useMemo(() => {
     const hasPinned = Boolean(pinnedList?.length);
-    const hasCustom = Boolean(customList?.length);
     const hasDefault = Boolean(defaultList?.length);
 
     return {
-      showCustom: hasCustom,
       showDefault: hasDefault,
       showPinned: hasPinned,
     };
-  }, [pinnedList?.length, customList?.length, defaultList?.length]);
+  }, [pinnedList?.length, defaultList?.length]);
 
   if (!isInit) return <SkeletonList rows={6} />;
 
@@ -44,7 +42,6 @@ const AgentList = memo<{ onMoreClick?: () => void }>(({ onMoreClick }) => {
     <>
       <InboxItem style={{ minHeight: 36 }} />
       {showPinned && <SessionList dataSource={pinnedList!} />}
-      {showCustom && <Group dataSource={customList!} />}
       {showDefault && (
         <SessionList
           dataSource={defaultList!}

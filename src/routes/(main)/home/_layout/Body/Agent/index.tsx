@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { useFetchAgentList } from '@/hooks/useFetchAgentList';
 
 import { useCreateMenuItems } from '../../hooks';
@@ -45,8 +46,8 @@ const Agent = memo<AgentProps>(({ itemKey }) => {
         <ContextMenuTrigger items={dropdownMenu}>{header}</ContextMenuTrigger>
       )}
       title={
-        <Flexbox horizontal align="center" gap={4}>
-          <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
+        <Flexbox horizontal align={'center'} gap={4}>
+          <Text ellipsis className={glassSidebarStyles.groupHeader}>
             {t('navPanel.agent')}
           </Text>
           {isRevalidating && <NeuralNetworkLoading size={14} />}

@@ -14,7 +14,7 @@ interface GroupBlockProps extends Omit<FlexboxProps, 'title'> {
 const styles = createStaticStyles(({ css, cssVar }) => ({
   action: css`
     opacity: 0;
-    transition: opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseInOut};
+    transition: opacity ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
   `,
   actionVisible: css`
     opacity: 1;
@@ -27,7 +27,7 @@ const GroupBlock = memo<GroupBlockProps>(
 
     return (
       <Flexbox
-        gap={16}
+        gap={14}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         {...rest}
@@ -37,12 +37,12 @@ const GroupBlock = memo<GroupBlockProps>(
             horizontal
             align={'center'}
             flex={1}
-            gap={8}
+            gap={10}
             justify={'flex-start'}
             style={{ overflow: 'hidden' }}
           >
-            <Icon color={cssVar.colorTextDescription} icon={icon} size={18} />
-            <Text ellipsis color={cssVar.colorTextSecondary}>
+            <Icon color={cssVar.colorTextDescription} icon={icon} size={16} />
+            <Text ellipsis fontSize={13} style={{ letterSpacing: '0.02em' }} weight={600}>
               {title}
             </Text>
           </Flexbox>

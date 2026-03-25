@@ -509,6 +509,10 @@
       "better-auth": "1.4.6",
       "better-call": "1.1.8",
       "drizzle-orm": "^0.45.1"
+    },
+    "patchedDependencies": {
+      "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch",
+      "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
     }
   }
 }

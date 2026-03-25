@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
 import { SidebarTabKey } from '@/store/global/initialState';
@@ -25,6 +26,7 @@ interface Item {
   icon: NavItemProps['icon'];
   key: string;
   onClick?: () => void;
+  sectionBreak?: boolean;
   title: NavItemProps['title'];
   url?: string;
 }
@@ -33,12 +35,13 @@ const Nav = memo(() => {
   const tab = useActiveTabKey();
   const navigate = useNavigate();
   const { t } = useTranslation('common');
+  const { t: tHome } = useTranslation('home');
   const { t: tSetting } = useTranslation('setting');
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
   const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
 
-  const items: Item[] = useMemo(
+  const globalActions: Item[] = useMemo(
     () => [
       {
         icon: APP_ENTRY_ICONS.search,
@@ -48,6 +51,12 @@ const Nav = memo(() => {
         },
         title: t('tab.search'),
       },
+    ],
+    [t, toggleCommandMenu],
+  );
+
+  const mainNav: Item[] = useMemo(
+    () => [
       {
         icon: APP_ENTRY_ICONS.home,
         key: SidebarTabKey.Home,
@@ -58,6 +67,7 @@ const Nav = memo(() => {
         badge: 'beta',
         icon: APP_ENTRY_ICONS.studio,
         key: SidebarTabKey.Studio,
+        sectionBreak: true,
         title: t('tab.avatoStudio'),
         url: '/studio',
       },
@@ -85,11 +95,12 @@ const Nav = memo(() => {
         hidden: !showMarket,
         icon: APP_ENTRY_ICONS.community,
         key: SidebarTabKey.Community,
+        sectionBreak: true,
         title: t('tab.community'),
         url: '/community',
       },
     ],
-    [enableBusinessFeatures, showAiImage, showMarket, t, toggleCommandMenu],
+    [enableBusinessFeatures, showAiImage, showMarket, t],
   );
 
   const newBadge = (
@@ -112,47 +123,55 @@ const Nav = memo(() => {
     </Tag>
   );
 
-  return (
-    <Flexbox gap={1} paddingInline={4}>
-      {items.map((item) => {
-        const extra =
-          item.badge === 'new' ? newBadge : item.badge === 'beta' ? betaBadge : undefined;
-        const content = (
-          <NavItem
-            active={tab === item.key}
-            extra={extra}
-            hidden={item.hidden}
-            icon={item.icon}
-            key={item.key}
-            title={item.title}
-            onClick={item.onClick}
-          />
-        );
-        if (!item.url) return content;
+  const renderItem = (item: Item) => {
+    const extra = item.badge === 'new' ? newBadge : item.badge === 'beta' ? betaBadge : undefined;
+    const mt = item.sectionBreak ? 10 : undefined;
+    const content = (
+      <NavItem
+        active={tab === item.key}
+        extra={extra}
+        hidden={item.hidden}
+        icon={item.icon}
+        key={item.key}
+        style={{ marginTop: mt }}
+        title={item.title}
+        onClick={item.onClick}
+      />
+    );
+    if (!item.url) return content;
 
-        return (
-          <Link
-            key={item.key}
-            to={item.url}
-            onClick={(e) => {
-              if (isModifierClick(e)) return;
-              e.preventDefault();
-              item?.onClick?.();
-              if (item.url) {
-                navigate(item.url);
-              }
-            }}
-          >
-            <NavItem
-              active={tab === item.key}
-              extra={extra}
-              hidden={item.hidden}
-              icon={item.icon}
-              title={item.title}
-            />
-          </Link>
-        );
-      })}
+    return (
+      <Link
+        key={item.key}
+        to={item.url}
+        onClick={(e) => {
+          if (isModifierClick(e)) return;
+          e.preventDefault();
+          item?.onClick?.();
+          if (item.url) {
+            navigate(item.url);
+          }
+        }}
+      >
+        <NavItem
+          active={tab === item.key}
+          extra={extra}
+          hidden={item.hidden}
+          icon={item.icon}
+          style={{ marginTop: mt }}
+          title={item.title}
+        />
+      </Link>
+    );
+  };
+
+  return (
+    <Flexbox gap={2} paddingBlock={'4px 0'} paddingInline={6}>
+      {globalActions.map(renderItem)}
+      <span className={glassSidebarStyles.sectionLabel}>
+        {tHome('workspace.sidebar.section.navigation')}
+      </span>
+      {mainNav.map(renderItem)}
     </Flexbox>
   );
 });
