@@ -15,7 +15,7 @@ const AiHeatmaps = memo<
   Omit<HeatmapsProps, 'data' | 'ref'> & { inShare?: boolean; mobile?: boolean }
 >(({ inShare, mobile, ...rest }) => {
   const { t } = useTranslation('auth');
-  const { data, isLoading } = useClientDataSWR('stats-heatmaps', async () =>
+  const { data, error, isLoading } = useClientDataSWR('stats-heatmaps', async () =>
     messageService.getHeatmaps(),
   );
 
@@ -28,7 +28,7 @@ const AiHeatmaps = memo<
       blockRadius={mobile ? 2 : undefined}
       blockSize={mobile ? 6 : 14}
       data={data || []}
-      loading={isLoading || !data}
+      loading={isLoading || (!data && !error)}
       maxLevel={4}
       labels={{
         legend: {

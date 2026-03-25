@@ -14,7 +14,7 @@ import TotalCard from './ShareButton/TotalCard';
 const TotalWords = memo<{ inShare?: boolean }>(({ inShare }) => {
   const { t } = useTranslation('auth');
 
-  const { data, isLoading } = useClientDataSWR('stats-words', async () => ({
+  const { data, error, isLoading } = useClientDataSWR('stats-words', async () => ({
     count: await messageService.countWords(),
     prevCount: await messageService.countWords({ endDate: lastMonth().format('YYYY-MM-DD') }),
   }));
@@ -26,7 +26,7 @@ const TotalWords = memo<{ inShare?: boolean }>(({ inShare }) => {
 
   return (
     <StatisticCard
-      loading={isLoading || !data}
+      loading={isLoading || (!data && !error)}
       statistic={{
         description: (
           <Statistic

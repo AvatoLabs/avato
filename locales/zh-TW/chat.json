@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "即將刪除該分組，刪除後該分組的助手將移動到預設清單，請確認你的操作",
   "sessionGroup.createAgentSuccess": "助手建立成功",
   "sessionGroup.createGroup": "新增新分組",
+  "sessionGroup.templateNotFound": "找不到模板「{{id}}」。",
   "sessionGroup.createGroupFailed": "群聊建立失敗",
   "sessionGroup.createGroupSuccess": "群聊建立成功",
   "sessionGroup.createSuccess": "創建成功",

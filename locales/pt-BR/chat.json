@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Este grupo será excluído. Após a exclusão, os agentes serão movidos para a lista padrão. Confirme sua ação.",
   "sessionGroup.createAgentSuccess": "Agente criado com sucesso",
   "sessionGroup.createGroup": "Adicionar Novo Grupo",
+  "sessionGroup.templateNotFound": "Modelo \"{{id}}\" não encontrado.",
   "sessionGroup.createGroupFailed": "Falha ao criar grupo",
   "sessionGroup.createGroupSuccess": "Grupo criado com sucesso",
   "sessionGroup.createSuccess": "Criado com sucesso",

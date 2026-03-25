@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Эта группа будет удалена. После удаления агенты будут перемещены в список по умолчанию. Подтвердите действие.",
   "sessionGroup.createAgentSuccess": "Агент успешно создан",
   "sessionGroup.createGroup": "Добавить новую группу",
+  "sessionGroup.templateNotFound": "Шаблон «{{id}}» не найден.",
   "sessionGroup.createGroupFailed": "Не удалось создать групповую беседу",
   "sessionGroup.createGroupSuccess": "Групповая беседа успешно создана",
   "sessionGroup.createSuccess": "Успешно создано",

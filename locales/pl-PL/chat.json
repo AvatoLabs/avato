@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Ta grupa zostanie usunięta. Po usunięciu agenci z tej grupy zostaną przeniesieni do listy domyślnej. Potwierdź operację.",
   "sessionGroup.createAgentSuccess": "Agent utworzony pomyślnie",
   "sessionGroup.createGroup": "Dodaj nową grupę",
+  "sessionGroup.templateNotFound": "Nie znaleziono szablonu „{{id}}”.",
   "sessionGroup.createGroupFailed": "Nie udało się utworzyć czatu grupowego",
   "sessionGroup.createGroupSuccess": "Czat grupowy utworzony pomyślnie",
   "sessionGroup.createSuccess": "Utworzono pomyślnie",

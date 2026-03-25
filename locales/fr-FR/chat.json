@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Ce groupe va être supprimé. Après suppression, les agents seront déplacés vers la liste par défaut. Veuillez confirmer votre action.",
   "sessionGroup.createAgentSuccess": "Agent créé avec succès",
   "sessionGroup.createGroup": "Ajouter un nouveau groupe",
+  "sessionGroup.templateNotFound": "Modèle « {{id}} » introuvable.",
   "sessionGroup.createGroupFailed": "Échec de la création du groupe",
   "sessionGroup.createGroupSuccess": "Groupe créé avec succès",
   "sessionGroup.createSuccess": "Créé avec succès",

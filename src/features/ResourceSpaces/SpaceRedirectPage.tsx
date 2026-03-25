@@ -1,7 +1,8 @@
 'use client';
 
-import { Center } from '@lobehub/ui';
+import { Button, Center, Empty } from '@lobehub/ui';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import useSWR from 'swr';
 
@@ -11,12 +12,30 @@ import { lambdaClient } from '@/libs/trpc/client';
 import { buildResourceRootPath } from './paths';
 
 const SpaceRedirectPage = memo(() => {
+  const { t } = useTranslation(['common', 'discover']);
   const location = useLocation();
-  const { data, isLoading } = useSWR(
+  const { data, error, isLoading, mutate } = useSWR(
     'resource-space-list',
     () => lambdaClient.space.listSpaces.query(),
     { revalidateOnFocus: false },
   );
+
+  if (error) {
+    return (
+      <Center height={'100%'} width={'100%'}>
+        <Empty
+          description={t('list.error.description', { ns: 'discover' })}
+          extra={
+            <Button type={'primary'} onClick={() => void mutate()}>
+              {t('retry', { ns: 'common' })}
+            </Button>
+          }
+          title={t('list.error.title', { ns: 'discover' })}
+          type={'page'}
+        />
+      </Center>
+    );
+  }
 
   if (isLoading || !data) {
     return (

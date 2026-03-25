@@ -6,6 +6,7 @@ import { memo, useEffect } from 'react';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { useClientDataSWR } from '@/libs/swr';
 import { aiProviderService } from '@/services/aiProvider';
+import DiscoverRequestError from '@/routes/(main)/community/features/DiscoverRequestError';
 import { useAiInfraStore } from '@/store/aiInfra';
 
 import ModelList from '../../features/ModelList';
@@ -23,11 +24,13 @@ const ClientMode = memo<{ id: string }>(({ id }) => {
     setActiveAiProvider(id);
   }, [id, setActiveAiProvider]);
 
-  const { data, isLoading } = useClientDataSWR(`get-client-provider-${id}`, () =>
+  const { data, error, isLoading, mutate } = useClientDataSWR(`get-client-provider-${id}`, () =>
     aiProviderService.getAiProviderById(id),
   );
 
-  if (isLoading || !data || !data.id) return <Loading debugId="Provider > ClientMode" />;
+  if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
+  if (isLoading) return <Loading debugId="Provider > ClientMode" />;
+  if (!data?.id) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   return (
     <Flexbox gap={24} paddingBlock={8}>

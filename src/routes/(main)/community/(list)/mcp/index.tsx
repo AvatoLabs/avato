@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type McpQueryParams } from '@/types/discover';
 import { DiscoverTab, McpSorts } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
-import McpEmpty from '../features/McpEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import McpEmpty from '../../features/McpEmpty';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';
@@ -26,9 +26,9 @@ const McpPage = memo(() => {
     sort: sort ?? McpSorts.Recommended,
   });
 
-  if (isLoading) return <Loading />;
   if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
-  if (!data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   const { items, currentPage, pageSize, totalCount } = data;
   if (items.length === 0) return <McpEmpty search={Boolean(q || category)} />;

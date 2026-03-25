@@ -106,7 +106,8 @@ export const useCreateMenuItems = () => {
       try {
         const template = groupTemplates.find((t) => t.id === templateId);
         if (!template) {
-          throw new Error(`Template ${templateId} not found`);
+          message.error(t('sessionGroup.templateNotFound', { id: templateId }));
+          return false;
         }
 
         const membersToCreate =

@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Bu grup silinmek üzere. Silindikten sonra, bu gruptaki ajanlar varsayılan listeye taşınacaktır. Lütfen işlemi onaylayın.",
   "sessionGroup.createAgentSuccess": "Ajan başarıyla oluşturuldu",
   "sessionGroup.createGroup": "Yeni Grup Ekle",
+  "sessionGroup.templateNotFound": "Şablon \"{{id}}\" bulunamadı.",
   "sessionGroup.createGroupFailed": "Grup sohbeti oluşturulamadı",
   "sessionGroup.createGroupSuccess": "Grup sohbeti başarıyla oluşturuldu",
   "sessionGroup.createSuccess": "Başarıyla oluşturuldu",

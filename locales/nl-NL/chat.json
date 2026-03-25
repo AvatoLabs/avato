@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Deze groep wordt verwijderd. Na verwijdering worden de agenten in deze groep verplaatst naar de standaardlijst. Bevestig je actie.",
   "sessionGroup.createAgentSuccess": "Agent succesvol aangemaakt",
   "sessionGroup.createGroup": "Nieuwe groep toevoegen",
+  "sessionGroup.templateNotFound": "Sjabloon \"{{id}}\" niet gevonden.",
   "sessionGroup.createGroupFailed": "Aanmaken groepsgesprek mislukt",
   "sessionGroup.createGroupSuccess": "Groepsgesprek succesvol aangemaakt",
   "sessionGroup.createSuccess": "Succesvol aangemaakt",

@@ -41,6 +41,10 @@ const SPAGlobalProvider = memo<PropsWithChildren>(({ children }) => {
     serverConfig?.isMobile ?? (typeof __MOBILE__ !== 'undefined' ? __MOBILE__ : false);
   const isMobile = typeof mobile === 'boolean' ? mobile : buildVariantIsMobile;
 
+  useLayoutEffect(() => {
+    window.global_serverConfigStore?.setState({ isMobile });
+  }, [isMobile]);
+
   return (
     <Locale defaultLang={locale}>
       <NextThemeProvider>

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@/hooks/useQuery';
 import { useClientDataSWR } from '@/libs/swr';
 import Pagination from '@/routes/(main)/community/(list)/features/Pagination';
+import DiscoverRequestError from '@/routes/(main)/community/features/DiscoverRequestError';
 import SearchResultCount from '@/routes/(main)/community/components/SearchResultCount';
 import Statistic from '@/routes/(main)/community/components/Statistic';
 import Title from '@/routes/(main)/community/components/Title';
@@ -96,11 +97,13 @@ const McpAggregatorPage = memo(() => {
     };
   }, [installable, page, q, sort, source]);
 
-  const { data, isLoading } = useClientDataSWR(['community-aggregator', params], () =>
+  const { data, error, isLoading, mutate } = useClientDataSWR(['community-aggregator', params], () =>
     aggregatorClientService.getRegistryEntries(params),
   );
 
-  if (isLoading || !data) {
+  if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
+
+  if (isLoading) {
     return (
       <Flexbox gap={24} width={'100%'}>
         <Flexbox gap={8}>
@@ -136,6 +139,8 @@ const McpAggregatorPage = memo(() => {
       </Flexbox>
     );
   }
+
+  if (!data) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   const countBySource = (target: AggregatorSource) =>
     data.sourceCounts.find(({ source }) => source === target)?.count || 0;

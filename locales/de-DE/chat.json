@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Diese Gruppe wird gelöscht. Die Agenten werden danach in die Standardliste verschoben. Bitte bestätigen Sie den Vorgang.",
   "sessionGroup.createAgentSuccess": "Agent erfolgreich erstellt",
   "sessionGroup.createGroup": "Neue Gruppe hinzufügen",
+  "sessionGroup.templateNotFound": "Vorlage „{{id}}“ wurde nicht gefunden.",
   "sessionGroup.createGroupFailed": "Gruppenerstellung fehlgeschlagen",
   "sessionGroup.createGroupSuccess": "Gruppenerstellung erfolgreich",
   "sessionGroup.createSuccess": "Erfolgreich erstellt",

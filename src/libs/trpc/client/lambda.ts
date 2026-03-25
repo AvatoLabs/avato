@@ -22,6 +22,17 @@ const MIN_INFRA_ERROR_INTERVAL = 3000;
 const isInfrastructureStatus = (status?: number) =>
   typeof status !== 'number' || status === 408 || status === 429 || status >= 500;
 
+const isLikelyNetworkFailure = (err: { cause?: { message?: string }; message?: string; name?: string }) => {
+  const msg = `${err.message ?? ''} ${err.cause && 'message' in err.cause ? String((err.cause as Error).message) : ''}`;
+  return (
+    err.name === 'TypeError' ||
+    /failed to fetch/i.test(msg) ||
+    /networkerror/i.test(msg) ||
+    /load failed/i.test(msg) ||
+    /network request failed/i.test(msg)
+  );
+};
+
 // handle error
 const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
   return ({ op, next }) =>
@@ -68,7 +79,11 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
               }
 
               default: {
-                if (isInfrastructureStatus(status)) {
+                const treatAsInfra =
+                  isInfrastructureStatus(status) ||
+                  (typeof status !== 'number' && isLikelyNetworkFailure(err));
+
+                if (treatAsInfra) {
                   const normalizedStatus = typeof status === 'number' ? status : 0;
                   const errorKey = `${normalizedStatus}:${err.message}`;
                   const now = Date.now();

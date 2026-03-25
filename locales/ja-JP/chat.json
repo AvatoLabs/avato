@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "このグループを削除してもよろしいですか？グループ内のアシスタントはデフォルトリストに移動します",
   "sessionGroup.createAgentSuccess": "アシスタントの作成に成功しました",
   "sessionGroup.createGroup": "新しいグループを追加",
+  "sessionGroup.templateNotFound": "テンプレート「{{id}}」が見つかりません。",
   "sessionGroup.createGroupFailed": "グループの作成に失敗しました",
   "sessionGroup.createGroupSuccess": "グループの作成に成功しました",
   "sessionGroup.createSuccess": "グループの作成に成功しました",

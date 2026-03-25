@@ -26,7 +26,7 @@ const Welcome = memo<{ mobile?: boolean }>(({ mobile }) => {
     userProfileSelectors.username(s),
   ]);
 
-  const { data, isLoading } = useClientDataSWR('welcome', async () =>
+  const { data, error, isLoading } = useClientDataSWR('welcome', async () =>
     userService.getUserRegistrationDuration(),
   );
 
@@ -46,7 +46,7 @@ const Welcome = memo<{ mobile?: boolean }>(({ mobile }) => {
           ns={'auth'}
           components={{
             span:
-              isLoading || !data ? (
+              isLoading || (!data && !error) ? (
                 <Skeleton.Button active style={{ height: 24, minWidth: 40, width: 40 }} />
               ) : (
                 <span style={{ fontWeight: 'bold' }} />

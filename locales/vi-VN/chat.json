@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Nhóm này sắp bị xóa. Sau khi xóa, các tác nhân trong nhóm sẽ được chuyển về danh sách mặc định. Vui lòng xác nhận thao tác.",
   "sessionGroup.createAgentSuccess": "Tạo tác nhân thành công",
   "sessionGroup.createGroup": "Thêm nhóm mới",
+  "sessionGroup.templateNotFound": "Không tìm thấy mẫu \"{{id}}\".",
   "sessionGroup.createGroupFailed": "Tạo nhóm trò chuyện thất bại",
   "sessionGroup.createGroupSuccess": "Tạo nhóm trò chuyện thành công",
   "sessionGroup.createSuccess": "Tạo thành công",

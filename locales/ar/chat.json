@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "سيتم حذف هذه المجموعة. بعد الحذف، سيتم نقل الوكلاء إلى القائمة الافتراضية. يرجى تأكيد العملية.",
   "sessionGroup.createAgentSuccess": "تم إنشاء الوكيل بنجاح",
   "sessionGroup.createGroup": "إضافة مجموعة جديدة",
+  "sessionGroup.templateNotFound": "لم يتم العثور على القالب \"{{id}}\".",
   "sessionGroup.createGroupFailed": "فشل في إنشاء محادثة جماعية",
   "sessionGroup.createGroupSuccess": "تم إنشاء المحادثة الجماعية بنجاح",
   "sessionGroup.createSuccess": "تم الإنشاء بنجاح",

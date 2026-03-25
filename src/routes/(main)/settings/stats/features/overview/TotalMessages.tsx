@@ -13,7 +13,7 @@ import TotalCard from './ShareButton/TotalCard';
 
 const TotalMessages = memo<{ inShare?: boolean }>(({ inShare }) => {
   const { t } = useTranslation('auth');
-  const { data, isLoading } = useClientDataSWR('stats-messages', async () => ({
+  const { data, error, isLoading } = useClientDataSWR('stats-messages', async () => ({
     count: await messageService.countMessages(),
     prevCount: await messageService.countMessages({ endDate: lastMonth().format('YYYY-MM-DD') }),
   }));
@@ -28,7 +28,7 @@ const TotalMessages = memo<{ inShare?: boolean }>(({ inShare }) => {
 
   return (
     <StatisticCard
-      loading={isLoading || !data}
+      loading={isLoading || (!data && !error)}
       statistic={{
         description: (
           <Statistic

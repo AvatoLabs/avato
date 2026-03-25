@@ -8,9 +8,9 @@ import { useDiscoverStore } from '@/store/discover';
 import { type ProviderQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
 import Pagination from '../features/Pagination';
-import ProviderEmpty from '../features/ProviderEmpty';
+import ProviderEmpty from '../../features/ProviderEmpty';
 import List from './features/List';
 import Loading from './loading';
 
@@ -25,9 +25,9 @@ const ProviderPage = memo(() => {
     sort,
   });
 
-  if (isLoading) return <Loading />;
   if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
-  if (!data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   const { items, currentPage, pageSize, totalCount } = data;
   if (items.length === 0) return <ProviderEmpty search={Boolean(q)} />;

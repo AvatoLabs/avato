@@ -19,7 +19,7 @@ export const TopicsRank = memo<{ mobile?: boolean }>(({ mobile }) => {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('auth');
   const navigate = useNavigate();
-  const { data, isLoading } = useClientDataSWR('rank-topics', async () =>
+  const { data, error, isLoading } = useClientDataSWR('rank-topics', async () =>
     topicService.rankTopics(),
   );
 
@@ -61,7 +61,7 @@ export const TopicsRank = memo<{ mobile?: boolean }>(({ mobile }) => {
           data={data?.slice(0, 5).map((item) => mapData(item)) || []}
           height={220}
           leftLabel={t('stats.topicsRank.left')}
-          loading={isLoading || !data}
+          loading={isLoading || (!data && !error)}
           rightLabel={t('stats.topicsRank.right')}
           noDataText={{
             desc: t('stats.empty.desc'),
@@ -73,7 +73,7 @@ export const TopicsRank = memo<{ mobile?: boolean }>(({ mobile }) => {
       {showExtra && (
         <Modal
           footer={null}
-          loading={isLoading || !data}
+          loading={isLoading || (!data && !error)}
           open={open}
           title={t('stats.topicsRank.title')}
           onCancel={() => setOpen(false)}
@@ -82,7 +82,7 @@ export const TopicsRank = memo<{ mobile?: boolean }>(({ mobile }) => {
             data={data?.map((item) => mapData(item)) || []}
             height={340}
             leftLabel={t('stats.topicsRank.left')}
-            loading={isLoading || !data}
+            loading={isLoading || (!data && !error)}
             rightLabel={t('stats.topicsRank.right')}
             onValueChange={(item) => navigate(item.link)}
           />

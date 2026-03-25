@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "این گروه در حال حذف است. پس از حذف، نماینده‌های این گروه به فهرست پیش‌فرض منتقل می‌شوند. لطفاً عملیات خود را تأیید کنید.",
   "sessionGroup.createAgentSuccess": "نماینده با موفقیت ایجاد شد",
   "sessionGroup.createGroup": "افزودن گروه جدید",
+  "sessionGroup.templateNotFound": "قالب «{{id}}» یافت نشد.",
   "sessionGroup.createGroupFailed": "ایجاد گفتگوی گروهی ناموفق بود",
   "sessionGroup.createGroupSuccess": "گفتگوی گروهی با موفقیت ایجاد شد",
   "sessionGroup.createSuccess": "با موفقیت ایجاد شد",

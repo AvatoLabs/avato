@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type AssistantQueryParams } from '@/types/discover';
 import { AssistantSorts, DiscoverTab } from '@/types/discover';
 
-import AssistantEmpty from '../features/AssistantEmpty';
-import DiscoverRequestError from '../features/DiscoverRequestError';
+import AssistantEmpty from '../../features/AssistantEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';
@@ -27,9 +27,9 @@ const AssistantPage = memo(() => {
     sort: sort ?? AssistantSorts.Recommended,
   });
 
-  if (isLoading) return <Loading />;
   if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
-  if (!data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   const { items, currentPage, pageSize, totalCount } = data;
   if (items.length === 0) return <AssistantEmpty search={Boolean(q || category)} />;

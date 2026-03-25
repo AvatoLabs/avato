@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "This category is about to be deleted. After deletion, the agents in this category will be moved to the default list. Please confirm your operation.",
   "sessionGroup.createAgentSuccess": "Agent created successfully",
   "sessionGroup.createGroup": "Add New Category",
+  "sessionGroup.templateNotFound": "Template \"{{id}}\" was not found.",
   "sessionGroup.createGroupFailed": "Failed to create category",
   "sessionGroup.createGroupSuccess": "Category created successfully",
   "sessionGroup.createSuccess": "Created successfully",

@@ -263,6 +263,7 @@
   "sessionGroup.confirmRemoveGroupAlert": "Este grupo está a punto de eliminarse. Después de la eliminación, los agentes de este grupo se moverán a la lista predeterminada. Por favor, confirma tu acción.",
   "sessionGroup.createAgentSuccess": "Agente creado con éxito",
   "sessionGroup.createGroup": "Agregar nuevo grupo",
+  "sessionGroup.templateNotFound": "No se encontró la plantilla \"{{id}}\".",
   "sessionGroup.createGroupFailed": "Error al crear el grupo",
   "sessionGroup.createGroupSuccess": "Grupo creado con éxito",
   "sessionGroup.createSuccess": "Creado con éxito",

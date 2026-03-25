@@ -14,7 +14,7 @@ import StatsFormGroup from '../components/StatsFormGroup';
 export const ModelsRank = memo(() => {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation('auth');
-  const { data, isLoading } = useClientDataSWR('rank-models', async () =>
+  const { data, error, isLoading } = useClientDataSWR('rank-models', async () =>
     messageService.rankModels(),
   );
 
@@ -45,7 +45,7 @@ export const ModelsRank = memo(() => {
           data={data?.slice(0, 5).map((item) => mapData(item)) || []}
           height={220}
           leftLabel={t('stats.modelsRank.left')}
-          loading={isLoading || !data}
+          loading={isLoading || (!data && !error)}
           rightLabel={t('stats.modelsRank.right')}
           noDataText={{
             desc: t('stats.empty.desc'),
@@ -56,7 +56,7 @@ export const ModelsRank = memo(() => {
       {showExtra && (
         <Modal
           footer={null}
-          loading={isLoading || !data}
+          loading={isLoading || (!data && !error)}
           open={open}
           title={t('stats.modelsRank.title')}
           onCancel={() => setOpen(false)}
@@ -65,7 +65,7 @@ export const ModelsRank = memo(() => {
             data={data?.map((item) => mapData(item)) || []}
             height={340}
             leftLabel={t('stats.modelsRank.left')}
-            loading={isLoading || !data}
+            loading={isLoading || (!data && !error)}
             rightLabel={t('stats.modelsRank.right')}
           />
         </Modal>

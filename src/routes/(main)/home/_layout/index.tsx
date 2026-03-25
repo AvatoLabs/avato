@@ -37,7 +37,7 @@ const Layout: FC<LayoutProps> = ({ children }) => {
     [theme.colorBgContainerSecondary],
   );
 
-  // Keep the Home layout mounted so deep-link entries still hydrate the sidebar and home state.
+  // Keep the Home layout alive and render it offscreen when inactive (always mounted so deep links still hydrate HomeAgentIdSync / RecentHydration).
   return (
     <Activity mode={isHomeRoute ? 'visible' : 'hidden'} name="DesktopHomeLayout">
       <Flexbox className={styles.absoluteContainer} height={'100%'} width={'100%'}>

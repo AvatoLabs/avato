@@ -8,8 +8,8 @@ import { useDiscoverStore } from '@/store/discover';
 import { type ModelQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
-import DiscoverRequestError from '../features/DiscoverRequestError';
-import ModelEmpty from '../features/ModelEmpty';
+import DiscoverRequestError from '../../features/DiscoverRequestError';
+import ModelEmpty from '../../features/ModelEmpty';
 import Pagination from '../features/Pagination';
 import List from './features/List';
 import Loading from './loading';
@@ -26,9 +26,9 @@ const ModelPage = memo<{ mobile?: boolean }>(() => {
     sort,
   });
 
-  if (isLoading) return <Loading />;
   if (error) return <DiscoverRequestError onRetry={() => void mutate()} />;
-  if (!data) return <Loading />;
+  if (isLoading) return <Loading />;
+  if (!data) return <DiscoverRequestError onRetry={() => void mutate()} />;
 
   const { items, currentPage, pageSize, totalCount } = data;
   if (items.length === 0) return <ModelEmpty search={Boolean(q || category)} />;
