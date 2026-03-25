@@ -1,7 +1,7 @@
 import { Flexbox } from '@lobehub/ui';
 import { useTheme } from 'antd-style';
 import { type FC, type ReactNode } from 'react';
-import { Activity, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useIsDark } from '@/hooks/useIsDark';
@@ -22,12 +22,17 @@ const Layout: FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isHomeRoute = pathname === '/';
+  const [hasActivated, setHasActivated] = useState(isHomeRoute);
   const setNavigate = useHomeStore((s) => s.setNavigate);
   const content = children ?? <Outlet />;
 
   useEffect(() => {
     setNavigate(navigate);
   }, [navigate, setNavigate]);
+
+  useEffect(() => {
+    if (isHomeRoute) setHasActivated(true);
+  }, [isHomeRoute]);
 
   // CSS 变量用于动态背景色（colorBgContainerSecondary 不在 cssVar 中）
   const cssVariables = useMemo<Record<string, string>>(
@@ -37,24 +42,30 @@ const Layout: FC<LayoutProps> = ({ children }) => {
     [theme.colorBgContainerSecondary],
   );
 
-  // Keep the Home layout mounted so deep-link entries still hydrate the sidebar and home state.
-  return (
-    <Activity mode={isHomeRoute ? 'visible' : 'hidden'} name="DesktopHomeLayout">
-      <Flexbox className={styles.absoluteContainer} height={'100%'} width={'100%'}>
-        <Sidebar />
-        <Flexbox
-          className={isDarkMode ? styles.contentDark : styles.contentLight}
-          flex={1}
-          height={'100%'}
-          style={cssVariables}
-        >
-          {content}
-        </Flexbox>
+  if (!hasActivated) return null;
 
-        <HomeAgentIdSync />
-        <RecentHydration />
+  return (
+    <Flexbox
+      aria-hidden={!isHomeRoute}
+      className={styles.absoluteContainer}
+      height={'100%'}
+      style={{ display: isHomeRoute ? 'flex' : 'none' }}
+      width={'100%'}
+    >
+      {/* 仅首页挂载 NavPanelPortal；否则隐藏时仍挂载会与 /community 等侧栏抢占同一份 snapshot，导致侧栏导航失效 */}
+      {isHomeRoute && <Sidebar />}
+      <Flexbox
+        className={isDarkMode ? styles.contentDark : styles.contentLight}
+        flex={1}
+        height={'100%'}
+        style={cssVariables}
+      >
+        {content}
       </Flexbox>
-    </Activity>
+
+      {isHomeRoute && <HomeAgentIdSync />}
+      <RecentHydration />
+    </Flexbox>
   );
 };
 
