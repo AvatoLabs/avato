@@ -3,7 +3,6 @@ import { inferContentTypeFromImageUrl, nanoid, uuid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { sha256 } from 'js-sha256';
 
-import { serverDBEnv } from '@/config/db';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
@@ -13,6 +12,7 @@ import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { createFileServiceModule } from './impls';
 import { type FileServiceImpl } from './impls/type';
+import { isStorageObjectMissingError, STORAGE_OBJECT_MISSING_MESSAGE } from './storageErrors';
 
 /**
  * File service class
@@ -375,13 +375,12 @@ export class FileService {
       content = await this.getFileByteArray(file.url);
     } catch (e) {
       console.error(e);
-      // if file not found, delete it from db
-      if ((e as any).Code === 'NoSuchKey') {
-        await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
-        await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
-          { resourceUid: file.resourceUid, spaceId: file.spaceId },
-        ]);
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
+
+      if (isStorageObjectMissingError(e)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: STORAGE_OBJECT_MISSING_MESSAGE,
+        });
       }
     }
 

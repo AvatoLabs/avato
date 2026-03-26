@@ -15,6 +15,7 @@ import { KnowledgeRepo } from '@/database/repositories/knowledge';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
+import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import {
   AuthorizedResourceResolver,
   ResourceAuthorizer,
@@ -113,6 +114,13 @@ export const fileRouter = router({
       const blob = await ctx.resourceModel.findSpaceBlobByHash(spaceId, input.hash);
 
       if (!blob) return { isExist: false };
+
+      try {
+        await ctx.fileService.getFileMetadata(blob.storageKey);
+      } catch (error) {
+        if (isStorageObjectMissingError(error)) return { isExist: false };
+        throw error;
+      }
 
       return {
         fileType: blob.fileType,

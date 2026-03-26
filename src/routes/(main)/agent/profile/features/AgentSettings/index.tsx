@@ -25,7 +25,9 @@ const AgentSettings = memo(() => {
           position: 'relative',
         },
       }}
-      onCancel={() => useAgentStore.setState({ showAgentSetting: false })}
+      onCancel={() =>
+        useAgentStore.setState({ activeAgentSettingTab: undefined, showAgentSetting: false })
+      }
     >
       <Content />
     </Modal>

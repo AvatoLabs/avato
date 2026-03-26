@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAgentStore } from '@/store/agent/store';
@@ -10,14 +10,13 @@ export const useOpenChatSettings = (tab: ChatSettingsTabs = ChatSettingsTabs.Met
 
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const location = useLocation();
 
   return useMemo(() => {
     if (isMobile)
       return () => navigate(`/chat/settings?session=${activeAgentId}&showMobileWorkspace=true`);
 
     return () => {
-      useAgentStore.setState({ showAgentSetting: true });
+      useAgentStore.setState({ activeAgentSettingTab: tab, showAgentSetting: true });
     };
-  }, [activeAgentId, navigate, location.pathname, tab, isMobile]);
+  }, [activeAgentId, navigate, tab, isMobile]);
 };

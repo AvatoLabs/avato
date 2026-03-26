@@ -4,8 +4,14 @@ import { Avatar, Block, Flexbox, Icon, Text } from '@lobehub/ui';
 import { type ItemType } from 'antd/es/menu/interface';
 import { useTheme } from 'antd-style';
 import isEqual from 'fast-deep-equal';
-import { BrainIcon, MessageSquareHeartIcon, MessagesSquareIcon, UserIcon } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+import {
+  BrainIcon,
+  LibraryBig,
+  MessageSquareHeartIcon,
+  MessagesSquareIcon,
+  UserIcon,
+} from 'lucide-react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Menu from '@/components/Menu';
@@ -18,13 +24,19 @@ import { ChatSettingsTabs } from '@/store/global/initialState';
 const Content = memo(() => {
   const { t } = useTranslation('setting');
   const theme = useTheme();
-  const [agentId, isInbox] = useAgentStore((s) => [
+  const [agentId, isInbox, activeAgentSettingTab] = useAgentStore((s) => [
     s.activeAgentId,
     builtinAgentSelectors.isInboxAgent(s),
+    s.activeAgentSettingTab,
   ]);
   const config = useAgentStore(agentSelectors.currentAgentConfig, isEqual);
   const meta = useAgentStore(agentSelectors.currentAgentMeta, isEqual);
-  const [tab, setTab] = useState(isInbox ? ChatSettingsTabs.Modal : ChatSettingsTabs.Meta);
+  const defaultTab = isInbox ? ChatSettingsTabs.Modal : ChatSettingsTabs.Meta;
+  const [tab, setTab] = useState(activeAgentSettingTab || defaultTab);
+
+  useEffect(() => {
+    setTab(activeAgentSettingTab || defaultTab);
+  }, [activeAgentSettingTab, defaultTab]);
 
   const updateAgentConfig = async (config: any) => {
     if (!agentId) return;
@@ -51,6 +63,13 @@ const Content = memo(() => {
               icon: <Icon icon={MessageSquareHeartIcon} />,
               key: ChatSettingsTabs.Opening,
               label: t('agentTab.opening'),
+            }
+          : null,
+        !isInbox
+          ? {
+              icon: <Icon icon={LibraryBig} />,
+              key: ChatSettingsTabs.Knowledge,
+              label: t('agentTab.knowledge'),
             }
           : null,
         {

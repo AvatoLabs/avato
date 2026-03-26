@@ -1,11 +1,11 @@
 import { ASYNC_TASK_TIMEOUT } from '@lobechat/business-config/server';
+import { AgentRuntimeErrorType } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { chunk } from 'es-toolkit/compat';
 import pMap from 'p-map';
 import { z } from 'zod';
 
 import { checkBudgetsUsage, checkEmbeddingUsage } from '@/business/server/trpc-middlewares/async';
-import { serverDBEnv } from '@/config/db';
 import { DEFAULT_FILE_EMBEDDING_MODEL_ITEM } from '@/const/settings/knowledge';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
@@ -20,6 +20,10 @@ import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
 import { FileService } from '@/server/services/file';
 import {
+  isStorageObjectMissingError,
+  STORAGE_OBJECT_MISSING_MESSAGE,
+} from '@/server/services/file/storageErrors';
+import {
   assertRagEmbeddingDimensions,
   RAG_EMBEDDING_DIMENSIONS,
 } from '@/server/services/rag/constants';
@@ -29,6 +33,38 @@ import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { safeParseJSON } from '@/utils/safeParseJSON';
 import { sanitizeUTF8 } from '@/utils/sanitizeUTF8';
+
+const getEmbeddingErrorMessage = (error: any) => {
+  const bodyMessage =
+    typeof error?.body === 'string'
+      ? error.body
+      : error?.body?.message || error?.body?.detail || error?.error?.message;
+
+  return bodyMessage || error?.message || error?.errorType || JSON.stringify(error);
+};
+
+const formatEmbeddingErrorMessage = (provider: string, model: string, error: any) =>
+  `${provider}/${model}: ${getEmbeddingErrorMessage(error)}`;
+
+const categorizeEmbeddingError = (provider: string, model: string, error: any): AsyncTaskError => {
+  if (error instanceof AsyncTaskError) return error;
+
+  const message = formatEmbeddingErrorMessage(provider, model, error);
+
+  if (error?.errorType === AgentRuntimeErrorType.InvalidProviderAPIKey || error?.status === 401) {
+    return new AsyncTaskError(AsyncTaskErrorType.InvalidProviderAPIKey, message);
+  }
+
+  if (error?.errorType === AgentRuntimeErrorType.ModelNotFound) {
+    return new AsyncTaskError(AsyncTaskErrorType.ModelNotFound, message);
+  }
+
+  if (error?.errorType === AgentRuntimeErrorType.ProviderBizError) {
+    return new AsyncTaskError(AsyncTaskErrorType.ServerError, message);
+  }
+
+  return new AsyncTaskError(AsyncTaskErrorType.EmbeddingError, message);
+};
 
 const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
   const { ctx } = opts;
@@ -139,11 +175,8 @@ export const fileRouter = router({
               },
               { concurrency: CONCURRENCY },
             );
-          } catch (e: any) {
-            throw {
-              message: e.errorType ?? e.message ?? JSON.stringify(e),
-              name: AsyncTaskErrorType.EmbeddingError,
-            };
+          } catch (error) {
+            throw categorizeEmbeddingError(provider, model, error);
           }
 
           const duration = Date.now() - startAt;
@@ -162,7 +195,7 @@ export const fileRouter = router({
         console.error('embeddingChunks error', e);
 
         await ctx.asyncTaskModel.update(input.taskId, {
-          error: new AsyncTaskError((e as Error).name, (e as Error).message),
+          error: categorizeEmbeddingError(provider, model, e),
           status: AsyncTaskStatus.Error,
         });
 
@@ -192,28 +225,28 @@ export const fileRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
       }
 
-      let content: Uint8Array | undefined;
-      try {
-        content = await ctx.fileService.getFileByteArray(file.url);
-      } catch (e) {
-        console.error(e);
-        // if file not found, delete it from db
-        if ((e as any).Code === 'NoSuchKey') {
-          await ctx.fileModel.deleteAny(input.fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
-          await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-            { resourceUid: file.resourceUid, spaceId: file.spaceId },
-          ]);
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
-        }
-      }
-
-      if (!content) return;
-
       const asyncTask = await ctx.asyncTaskModel.findById(input.taskId);
-
       if (!asyncTask) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Async Task not found' });
 
       try {
+        let content: Uint8Array;
+        try {
+          content = await ctx.fileService.getFileByteArray(file.url);
+        } catch (error) {
+          if (isStorageObjectMissingError(error)) {
+            throw new AsyncTaskError(
+              AsyncTaskErrorType.ServerError,
+              STORAGE_OBJECT_MISSING_MESSAGE,
+            );
+          }
+
+          throw error;
+        }
+
+        if (!content) {
+          throw new AsyncTaskError(AsyncTaskErrorType.ServerError, 'File content is empty');
+        }
+
         const startAt = Date.now();
 
         const timeoutPromise = new Promise((_, reject) => {

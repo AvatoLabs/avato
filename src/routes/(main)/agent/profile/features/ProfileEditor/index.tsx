@@ -4,16 +4,18 @@ import { Button, Flexbox } from '@lobehub/ui';
 import { Divider } from 'antd';
 import { useTheme } from 'antd-style';
 import isEqual from 'fast-deep-equal';
-import { Clock, PlayIcon, Settings2Icon } from 'lucide-react';
+import { Clock, LibraryBig, PlayIcon, Settings2Icon } from 'lucide-react';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
 
 import ModelSelect from '@/features/ModelSelect';
+import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
 import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { agentSelectors } from '@/store/agent/selectors';
+import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
+import { ChatSettingsTabs } from '@/store/global/initialState';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 
 import AgentCronJobs from '../AgentCronJobs';
@@ -26,12 +28,24 @@ import AgentTool from './AgentTool';
 const ProfileEditor = memo(() => {
   const { t } = useTranslation('setting');
   const theme = useTheme();
-  const config = useAgentStore(agentSelectors.currentAgentConfig, isEqual);
+  const [config, knowledgeCount, isInbox] = useAgentStore(
+    (s) => [
+      agentSelectors.currentAgentConfig(s),
+      agentSelectors.currentAgentFiles(s).length +
+        agentSelectors.currentAgentKnowledgeBases(s).length,
+      builtinAgentSelectors.isInboxAgent(s),
+    ],
+    isEqual,
+  );
   const updateConfig = useAgentStore((s) => s.updateAgentConfig);
   const agentId = useAgentStore((s) => s.activeAgentId);
   const switchTopic = useChatStore((s) => s.switchTopic);
   const router = useQueryRoute();
   const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
+  const openAdvancedSettings = useOpenChatSettings(
+    isInbox ? ChatSettingsTabs.Modal : ChatSettingsTabs.Meta,
+  );
+  const openKnowledgeSettings = useOpenChatSettings(ChatSettingsTabs.Knowledge);
 
   const handleCreateCronJob = useCallback(() => {
     if (!agentId) return;
@@ -65,12 +79,28 @@ const ProfileEditor = memo(() => {
             }}
             onChange={updateConfig}
           />
+          {!isInbox && (
+            <Button
+              icon={LibraryBig}
+              size={'small'}
+              style={{ color: theme.colorTextSecondary }}
+              type={'text'}
+              onClick={openKnowledgeSettings}
+            >
+              {t(
+                knowledgeCount > 0
+                  ? 'settingKnowledge.profileButtonCount'
+                  : 'settingKnowledge.profileButton',
+                { count: knowledgeCount },
+              )}
+            </Button>
+          )}
           <Button
             icon={Settings2Icon}
             size={'small'}
             style={{ color: theme.colorTextSecondary }}
             type={'text'}
-            onClick={() => useAgentStore.setState({ showAgentSetting: true })}
+            onClick={openAdvancedSettings}
           >
             {t('advancedSettings')}
           </Button>

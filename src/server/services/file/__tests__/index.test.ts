@@ -5,6 +5,7 @@ import { FileModel } from '@/database/models/file';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { FileService } from '../index';
+import { STORAGE_OBJECT_MISSING_MESSAGE } from '../storageErrors';
 
 const { mockGetOrCreatePersonalSpace, mockRequireFile, mockUpsertSpaceBlob } = vi.hoisted(() => ({
   mockGetOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_personal_default' }),
@@ -124,15 +125,15 @@ describe('FileService', () => {
       );
     });
 
-    it('should delete file from db and throw error if file not found in storage', async () => {
+    it('should keep file record and throw error if file is missing in storage', async () => {
       mockRequireFile.mockResolvedValue(mockFile);
       vi.mocked(service['impl'].getFileByteArray).mockRejectedValue({ Code: 'NoSuchKey' });
 
       await expect(service.downloadFileToLocal('test-file-id')).rejects.toThrow(
-        new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' }),
+        new TRPCError({ code: 'BAD_REQUEST', message: STORAGE_OBJECT_MISSING_MESSAGE }),
       );
 
-      expect(mockFileModel.deleteAny).toHaveBeenCalledWith('test-file-id', false);
+      expect(mockFileModel.deleteAny).not.toHaveBeenCalled();
     });
 
     it('should log error and rethrow for non-NoSuchKey errors', async () => {

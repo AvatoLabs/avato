@@ -302,6 +302,22 @@ describe('fileRouter', () => {
         isExist: false,
       });
     });
+
+    it('should return not found when blob exists in db but storage object is missing', async () => {
+      mockResourceModelFindSpaceBlobByHash.mockResolvedValue({
+        fileType: 'text/plain',
+        metadata: { filename: 'test.txt' },
+        size: 100,
+        storageKey: 'files/test.txt',
+      });
+      mockFileServiceGetFileMetadata.mockRejectedValue({ name: 'NoSuchKey' });
+
+      await expect(caller.checkFileHash({ hash: 'test-hash' })).resolves.toEqual({
+        isExist: false,
+      });
+
+      expect(mockFileServiceGetFileMetadata).toHaveBeenCalledWith('files/test.txt');
+    });
   });
 
   describe('createFile', () => {

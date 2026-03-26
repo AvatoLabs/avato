@@ -441,7 +441,7 @@ export class ResourceModel {
     const rows = await Promise.all(
       shared.map(async (permission) => {
         const summary = await this.getResourceSummary(permission.resourceUid);
-        if (!summary) return null;
+        if (!summary || summary.createdBy === this.userId) return null;
         return {
           ...summary,
           sharedExpiresAt: permission.expiresAt,
