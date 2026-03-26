@@ -13,7 +13,6 @@ const DEFAULT_PREVIEW_NEUTRAL = neutralColors.slate;
 export const THEME_PRESETS = [
   /** 高饱和度重点色 + slate 中性底（取消 sage/mauve/sand 等莫兰迪灰） */
   { id: 'classic', neutralColor: 'slate', primaryColor: 'green' },
-  { id: 'tide', neutralColor: 'slate', primaryColor: 'cyan' },
   { id: 'canopy', neutralColor: 'slate', primaryColor: 'lime' },
   { id: 'ember', neutralColor: 'slate', primaryColor: 'volcano' },
   { id: 'velvet', neutralColor: 'slate', primaryColor: 'magenta' },

@@ -65,13 +65,11 @@ const Content = memo(() => {
               label: t('agentTab.opening'),
             }
           : null,
-        !isInbox
-          ? {
-              icon: <Icon icon={LibraryBig} />,
-              key: ChatSettingsTabs.Knowledge,
-              label: t('agentTab.knowledge'),
-            }
-          : null,
+        {
+          icon: <Icon icon={LibraryBig} />,
+          key: ChatSettingsTabs.Knowledge,
+          label: t('agentTab.knowledge'),
+        },
         {
           icon: <Icon icon={MessagesSquareIcon} />,
           key: ChatSettingsTabs.Chat,

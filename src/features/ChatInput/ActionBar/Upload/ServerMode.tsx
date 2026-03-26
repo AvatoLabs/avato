@@ -2,14 +2,12 @@ import { validateVideoFileSize } from '@lobechat/utils/client';
 import { type ItemType } from '@lobehub/ui';
 import { Icon, Tooltip } from '@lobehub/ui';
 import { Upload } from 'antd';
-import isEqual from 'fast-deep-equal';
 import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig } from 'lucide-react';
 import { memo, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { message } from '@/components/AntdStaticMethods';
 import FileIcon from '@/components/FileIcon';
-import RepoIcon from '@/components/LibIcon';
 import TipGuide from '@/components/TipGuide';
 import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
 import { AttachKnowledgeModal } from '@/features/LibraryModal';
@@ -38,7 +36,8 @@ const FileUpload = memo(() => {
   const provider = useAgentStore((s) => agentByIdSelectors.getAgentModelProviderById(agentId)(s));
 
   const canUploadImage = useModelSupportVision(model, provider);
-  const libraryScope = activeGroupId ? 'agent' : 'conversation';
+  const conversationFileContext = activeGroupId ? { groupId: activeGroupId } : { agentId };
+  const libraryScope = 'conversation';
 
   const [showTip, updateGuideState] = useUserStore((s) => [
     preferenceSelectors.showUploadFileInKnowledgeBaseTip(s),
@@ -48,21 +47,9 @@ const FileUpload = memo(() => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const files = useAgentStore((s) => agentByIdSelectors.getAgentFilesById(agentId)(s), isEqual);
-  const knowledgeBases = useAgentStore(
-    (s) => agentByIdSelectors.getAgentKnowledgeBasesById(agentId)(s),
-    isEqual,
-  );
-
-  const [toggleFile, toggleKnowledgeBase] = useAgentStore((s) => [
-    s.toggleFile,
-    s.toggleKnowledgeBase,
-  ]);
   const useFetchConversationFiles = useSessionStore((s) => s.useFetchConversationFiles);
   const toggleConversationFile = useSessionStore((s) => s.toggleConversationFile);
-  const { data: conversationFiles = [] } = useFetchConversationFiles(
-    libraryScope === 'conversation' ? { agentId } : undefined,
-  );
+  const { data: conversationFiles = [] } = useFetchConversationFiles(conversationFileContext);
 
   const uploadItems: ActionDropdownMenuItems = [
     {
@@ -161,53 +148,7 @@ const FileUpload = memo(() => {
 
   const knowledgeItems: ItemType[] = [];
 
-  // Group chat still falls back to agent-scope library behavior.
-  if (libraryScope === 'agent' && (files.length > 0 || knowledgeBases.length > 0)) {
-    knowledgeItems.push({
-      children: [
-        // first the files
-        ...files.map((item) => ({
-          icon: <FileIcon fileName={item.name} fileType={item.type} size={20} />,
-          key: item.id,
-          label: (
-            <CheckboxItem
-              checked={item.enabled}
-              id={item.id}
-              label={item.name}
-              onUpdate={async (id, enabled) => {
-                setUpdating(true);
-                await toggleFile(id, enabled);
-                setUpdating(false);
-              }}
-            />
-          ),
-        })),
-
-        // then the knowledge bases
-        ...knowledgeBases.map((item) => ({
-          icon: <RepoIcon />,
-          key: item.id,
-          label: (
-            <CheckboxItem
-              checked={item.enabled}
-              id={item.id}
-              label={item.name}
-              onUpdate={async (id, enabled) => {
-                setUpdating(true);
-                await toggleKnowledgeBase(id, enabled);
-                setUpdating(false);
-              }}
-            />
-          ),
-        })),
-      ],
-      key: 'relativeFilesOrLibraries',
-      label: t('knowledgeBase.relativeFilesOrLibraries'),
-      type: 'group',
-    });
-  }
-
-  if (libraryScope === 'conversation' && conversationFiles.length > 0) {
+  if (conversationFiles.length > 0) {
     knowledgeItems.push({
       children: conversationFiles.map((item) => ({
         icon: <FileIcon fileName={item.name} fileType={item.fileType} size={20} />,
@@ -219,7 +160,7 @@ const FileUpload = memo(() => {
             label={item.name}
             onUpdate={async (id, enabled) => {
               setUpdating(true);
-              await toggleConversationFile(id, enabled, { agentId });
+              await toggleConversationFile(id, enabled, conversationFileContext);
               setUpdating(false);
             }}
           />
@@ -240,10 +181,7 @@ const FileUpload = memo(() => {
       extra: <Icon icon={ArrowRight} />,
       icon: LibraryBig,
       key: 'knowledge-base-store',
-      label:
-        libraryScope === 'conversation'
-          ? t('conversationFiles.viewMore')
-          : t('knowledgeBase.viewMore'),
+      label: t('conversationFiles.viewMore'),
       onClick: () => {
         setModalOpen(true);
       },

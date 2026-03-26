@@ -1,7 +1,7 @@
 'use client';
 
 import { Block, Flexbox, Icon, type IconProps, Text } from '@lobehub/ui';
-import { createStaticStyles, cssVar, cx } from 'antd-style';
+import { createStaticStyles, cx } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
@@ -44,35 +44,46 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     height: 30px;
     border-radius: ${cssVar.borderRadius}px;
 
-    color: ${cssVar.colorTextSecondary};
+    color: var(--item-color);
 
-    background: ${cssVar.colorFillQuaternary};
+    background: var(--item-icon-bg);
   `,
   actionItem: css`
-    --item-hover-color: ${cssVar.colorTextSecondary};
-    --item-hover-bg: ${cssVar.colorBgContainer};
+    --item-border-color: transparent;
+    --item-color: ${cssVar.colorTextSecondary};
+    --item-icon-bg: ${cssVar.colorFillQuaternary};
+    --item-surface: ${cssVar.colorBgContainer};
 
     min-width: 0;
     min-height: 70px;
-    border: 1px solid transparent;
+    border: 1px solid var(--item-border-color);
     border-radius: ${cssVar.borderRadiusLG};
 
-    color: ${cssVar.colorTextSecondary};
+    color: var(--item-color);
 
-    background: ${cssVar.colorBgContainer};
+    background: var(--item-surface);
 
     transition:
       background-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
+      color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
       border-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
-      box-shadow ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
       transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
 
     &:hover {
-      --item-hover-color: ${cssVar.colorPrimary};
+      --item-border-color: color-mix(
+        in srgb,
+        ${cssVar.colorPrimary} 14%,
+        ${cssVar.colorBorderSecondary}
+      );
+      --item-color: ${cssVar.colorText};
+      --item-icon-bg: color-mix(in srgb, ${cssVar.colorPrimaryBg} 70%, ${cssVar.colorFillTertiary});
+      --item-surface: color-mix(
+        in srgb,
+        ${cssVar.colorFillSecondary} 82%,
+        ${cssVar.colorBgContainer}
+      );
 
       transform: translateY(-1px);
-      border-color: ${cssVar.colorPrimary};
-      background: ${cssVar.colorPrimaryBg};
     }
 
     &:active {
@@ -85,16 +96,21 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
 
     &[data-active='true'] {
-      border-color: ${cssVar.colorBorder};
-      background: color-mix(in srgb, ${cssVar.colorFillSecondary} 72%, ${cssVar.colorBgContainer});
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorText} 8%, transparent);
+      --item-border-color: color-mix(
+        in srgb,
+        ${cssVar.colorPrimary} 18%,
+        ${cssVar.colorBorderSecondary}
+      );
+      --item-color: ${cssVar.colorText};
+      --item-icon-bg: color-mix(in srgb, ${cssVar.colorPrimaryBg} 74%, ${cssVar.colorFillTertiary});
+      --item-surface: color-mix(in srgb, ${cssVar.colorPrimaryBg} 38%, ${cssVar.colorBgContainer});
     }
   `,
   actionLabel: css`
     font-size: ${cssVar.fontSizeSM};
     font-weight: 500;
     line-height: 1.25;
-    color: var(--item-hover-color);
+    color: var(--item-color);
     white-space: normal;
   `,
 }));
@@ -189,7 +205,7 @@ const Nav = memo(() => {
           >
             <Flexbox gap={10} justify={'space-between'} style={{ height: '100%' }}>
               <div className={styles.actionIcon}>
-                <Icon color={cssVar.colorTextSecondary} icon={item.icon} size={18} />
+                <Icon color={'currentColor'} icon={item.icon} size={18} />
               </div>
               <Text className={styles.actionLabel}>{item.title}</Text>
             </Flexbox>

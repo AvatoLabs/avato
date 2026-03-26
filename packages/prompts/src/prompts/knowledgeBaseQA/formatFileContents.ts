@@ -1,3 +1,5 @@
+import { escapeXmlAttr, escapeXmlContent } from '../search/xmlEscape';
+
 export interface FileContent {
   content: string;
   error?: string;
@@ -10,11 +12,11 @@ export interface FileContent {
  */
 const formatFileContent = (file: FileContent): string => {
   if (file.error) {
-    return `<file id="${file.fileId}" name="${file.filename}" error="${file.error}" />`;
+    return `<file id="${escapeXmlAttr(file.fileId)}" name="${escapeXmlAttr(file.filename)}" error="${escapeXmlAttr(file.error)}" />`;
   }
 
-  return `<file id="${file.fileId}" name="${file.filename}">
-${file.content}
+  return `<file id="${escapeXmlAttr(file.fileId)}" name="${escapeXmlAttr(file.filename)}">
+${escapeXmlContent(file.content)}
 </file>`;
 };
 

@@ -1,3 +1,5 @@
+import { escapeXmlAttr, escapeXmlContent } from '../search/xmlEscape';
+
 export interface FileSearchResultChunk {
   similarity: number;
   text: string;
@@ -14,7 +16,7 @@ export interface FileSearchResult {
  * Formats a single chunk with XML tags
  */
 const formatChunk = (chunk: FileSearchResultChunk, fileId: string, fileName: string): string => {
-  return `<chunk fileId="${fileId}" fileName="${fileName}" similarity="${chunk.similarity}">${chunk.text}</chunk>`;
+  return `<chunk fileId="${escapeXmlAttr(fileId)}" fileName="${escapeXmlAttr(fileName)}" similarity="${escapeXmlAttr(String(chunk.similarity))}">${escapeXmlContent(chunk.text)}</chunk>`;
 };
 
 /**
@@ -23,7 +25,7 @@ const formatChunk = (chunk: FileSearchResultChunk, fileId: string, fileName: str
 const formatFile = (file: FileSearchResult): string => {
   const chunks = file.topChunks.map((chunk) => formatChunk(chunk, file.fileId, file.fileName));
 
-  return `<file id="${file.fileId}" name="${file.fileName}" relevanceScore="${file.relevanceScore}">
+  return `<file id="${escapeXmlAttr(file.fileId)}" name="${escapeXmlAttr(file.fileName)}" relevanceScore="${escapeXmlAttr(String(file.relevanceScore))}">
 ${chunks.join('\n')}
 </file>`;
 };
@@ -36,14 +38,14 @@ ${chunks.join('\n')}
  */
 export const formatSearchResults = (fileResults: FileSearchResult[], query: string): string => {
   if (fileResults.length === 0) {
-    return `<knowledge_base_search_results query="${query}" totalCount="0">
+    return `<knowledge_base_search_results query="${escapeXmlAttr(query)}" totalCount="0">
 <instruction>No relevant files found in the knowledge base for this query.</instruction>
 </knowledge_base_search_results>`;
   }
 
   const filesXml = fileResults.map((file) => formatFile(file)).join('\n');
 
-  return `<knowledge_base_search_results query="${query}" totalCount="${fileResults.length}">
+  return `<knowledge_base_search_results query="${escapeXmlAttr(query)}" totalCount="${fileResults.length}">
 <instruction>Here are the search results from the knowledge base. Use the readKnowledge tool with file IDs to get complete content.</instruction>
 ${filesXml}
 </knowledge_base_search_results>`;

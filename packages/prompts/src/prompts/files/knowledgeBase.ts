@@ -1,4 +1,5 @@
 import type { FileContent } from '../knowledgeBaseQA';
+import { escapeXmlAttr, escapeXmlContent } from '../search/xmlEscape';
 
 export interface KnowledgeBaseInfo {
   description?: string | null;
@@ -18,11 +19,11 @@ export interface PromptKnowledgeOptions {
  */
 const formatFileContent = (file: FileContent): string => {
   if (file.error) {
-    return `<file id="${file.fileId}" name="${file.filename}" error="${file.error}" />`;
+    return `<file id="${escapeXmlAttr(file.fileId)}" name="${escapeXmlAttr(file.filename)}" error="${escapeXmlAttr(file.error)}" />`;
   }
 
-  return `<file id="${file.fileId}" name="${file.filename}">
-${file.content}
+  return `<file id="${escapeXmlAttr(file.fileId)}" name="${escapeXmlAttr(file.filename)}">
+${escapeXmlContent(file.content)}
 </file>`;
 };
 
@@ -71,7 +72,7 @@ ${filesXml}
     const kbItems = knowledgeBases
       .map(
         (kb) =>
-          `<knowledge_base id="${kb.id}" name="${kb.name}"${kb.description ? ` description="${kb.description}"` : ''} />`,
+          `<knowledge_base id="${escapeXmlAttr(kb.id)}" name="${escapeXmlAttr(kb.name)}"${kb.description ? ` description="${escapeXmlAttr(kb.description)}"` : ''} />`,
       )
       .join('\n');
     contentParts.push(`<knowledge_bases totalCount="${knowledgeBases.length}">

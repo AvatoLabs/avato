@@ -44,20 +44,32 @@ export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'd
       key: navKey,
       node: children,
     });
-    // Intentionally keep previous content until new one mounts.
+
+    return () => {
+      // Only clear the snapshot if it still belongs to this portal instance.
+      // This prevents a race condition where the old portal's cleanup runs *after*
+      // the new portal has already written its snapshot (e.g. during Suspense delay
+      // or React concurrent-mode batching), which would wipe the new snapshot and
+      // leave the sidebar stuck showing stale content.
+      if (currentSnapshot?.key === navKey) {
+        setNavPanelSnapshot(null);
+      }
+    };
   }, [children, navKey]);
 
   return null;
 });
 
-/** Stable ref so `memo(NavPanelDraggable)` skips re-renders when no route owns `NavPanelPortal` */
+/**
+ * Stable fallback shown when no route portal is active (e.g. during Suspense loading).
+ * Renders the Home sidebar content directly – intentionally does NOT wrap in another
+ * NavPanelPortal to avoid an infinite loop:
+ *   snapshot=null → FALLBACK renders Portal → Portal writes snapshot → snapshot≠null
+ *   → FALLBACK unmounts Portal → cleanup: snapshot.key==='home' → clears snapshot → loop.
+ */
 const FALLBACK_HOME_SIDEBAR: NavPanelSnapshot = {
   key: 'home',
-  node: (
-    <NavPanelPortal navKey="home">
-      <SidebarContent />
-    </NavPanelPortal>
-  ),
+  node: <SidebarContent />,
 };
 
 const NavPanel = memo(() => {

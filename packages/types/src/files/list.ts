@@ -4,6 +4,7 @@ import type { AsyncTaskStatus } from '../asyncTask';
 import type { InheritMode, ResourceRole } from '../resource';
 
 export interface FileListItem {
+  attachable?: boolean;
   chunkCount: number | null;
   chunkingError: any | null;
   chunkingStatus?: AsyncTaskStatus | null;
@@ -15,6 +16,7 @@ export interface FileListItem {
   editorData?: Record<string, any> | null;
   embeddingError: any | null;
   embeddingStatus?: AsyncTaskStatus | null;
+  fileId?: string | null;
   fileType: string;
   finishEmbedding: boolean;
   id: string;
@@ -44,6 +46,7 @@ export enum SortType {
 }
 
 export const QueryFileListSchema = z.object({
+  attachableOnly: z.boolean().default(false),
   category: z.string().optional(),
   knowledgeBaseId: z.string().optional(),
   limit: z.number().int().positive().default(50),
@@ -59,6 +62,7 @@ export const QueryFileListSchema = z.object({
 export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
 
 export interface QueryFileListParams {
+  attachableOnly?: boolean;
   category?: string;
   knowledgeBaseId?: string;
   limit?: number;

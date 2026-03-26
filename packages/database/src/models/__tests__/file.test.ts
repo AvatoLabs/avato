@@ -4,24 +4,29 @@ import { eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { agentSkills } from '../../schemas/agentSkill';
 import {
   chunks,
+  documents,
   embeddings,
   fileChunks,
   files,
+  filesToSessions,
   globalFiles,
   knowledgeBaseFiles,
   knowledgeBases,
+  sessions,
   users,
 } from '../../schemas';
+import { agentSkills } from '../../schemas/agentSkill';
 import type { LobeChatDatabase } from '../../type';
+import { DocumentModel } from '../document';
 import { FileModel } from '../file';
 
 const serverDB: LobeChatDatabase = await getTestDB();
 
 const userId = 'file-model-test-user-id';
 const fileModel = new FileModel(serverDB, userId);
+const documentModel = new DocumentModel(serverDB, userId);
 
 const knowledgeBase = { id: 'kb1', userId, name: 'knowledgeBase' };
 beforeEach(async () => {
@@ -33,6 +38,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await serverDB.delete(agentSkills);
+  await serverDB.delete(filesToSessions);
+  await serverDB.delete(documents);
   await serverDB.delete(users);
   await serverDB.delete(files);
   await serverDB.delete(globalFiles);
@@ -264,6 +271,86 @@ describe('FileModel', () => {
 
       expect(file).toBeUndefined();
       expect(globalFile).toBeDefined();
+    });
+  });
+
+  describe('conversation-scope files', () => {
+    it('should only list files with parsed text content for conversation selection', async () => {
+      const { id: validFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'notes.txt',
+        size: 100,
+        url: 'https://example.com/notes.txt',
+      });
+      const { id: emptyFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'empty.txt',
+        size: 100,
+        url: 'https://example.com/empty.txt',
+      });
+      await fileModel.create({
+        fileType: 'image/png',
+        name: 'diagram.png',
+        size: 100,
+        url: 'https://example.com/diagram.png',
+      });
+
+      await documentModel.create({
+        content: 'meeting notes',
+        fileId: validFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/notes.txt',
+        sourceType: 'file',
+        totalCharCount: 13,
+        totalLineCount: 1,
+      });
+      await documentModel.create({
+        content: '',
+        fileId: emptyFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/empty.txt',
+        sourceType: 'file',
+        totalCharCount: 0,
+        totalLineCount: 0,
+      });
+
+      const result = await fileModel.getConversationAvailableFiles();
+
+      expect(result.map((file) => file.id)).toEqual([validFileId]);
+    });
+
+    it('should only attach files with parsed text content to a conversation', async () => {
+      const { id: validFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'guide.txt',
+        size: 100,
+        url: 'https://example.com/guide.txt',
+      });
+      const { id: invalidFileId } = await fileModel.create({
+        fileType: 'text/plain',
+        name: 'pending.txt',
+        size: 100,
+        url: 'https://example.com/pending.txt',
+      });
+
+      await documentModel.create({
+        content: 'guide content',
+        fileId: validFileId,
+        fileType: 'text/plain',
+        source: 'https://example.com/guide.txt',
+        sourceType: 'file',
+        totalCharCount: 13,
+        totalLineCount: 1,
+      });
+      await serverDB.insert(sessions).values({ id: 'session-1', userId });
+
+      await fileModel.createSessionFiles('session-1', [validFileId, invalidFileId]);
+
+      const attachedRows = await serverDB.query.filesToSessions.findMany({
+        where: eq(filesToSessions.sessionId, 'session-1'),
+      });
+
+      expect(attachedRows.map((row) => row.fileId)).toEqual([validFileId]);
     });
   });
 

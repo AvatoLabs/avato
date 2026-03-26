@@ -8,9 +8,9 @@ import { mix } from 'polished';
  * - elevated: inputs, pills, raised controls
  */
 export const CHATGPT_DARK_SURFACE = {
-  container: '#212121',
-  elevated: '#2f2f2f',
-  layout: '#171717',
+  container: '#282828',
+  elevated: '#363636',
+  layout: '#2d2c2cff',
 } as const;
 
 /** Maps ChatGPT-like neutrals onto antd semantic tokens (dark mode only). */
@@ -35,6 +35,7 @@ export function getChatgptDarkSurfaceTokenOverrides(
     // Put #fff first so small w lifts the dark base instead of washing it out.
     colorFillQuaternary: mix(0.1, '#ffffff', layout),
     colorFillSecondary: mix(0.12, '#ffffff', elevated),
-    colorFillTertiary: elevated,
+    // Brighter fill for chat starter cards and similar filled blocks in dark mode
+    colorFillTertiary: mix(0.16, '#ffffff', elevated),
   };
 }

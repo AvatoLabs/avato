@@ -8,11 +8,13 @@ import { documents, files, knowledgeBaseFiles } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
 export interface KnowledgeItem {
+  attachable?: boolean;
   chunkTaskId?: string | null;
   content?: string | null;
   createdAt: Date;
   editorData?: Record<string, any> | null;
   embeddingTaskId?: string | null;
+  fileId?: string | null;
   fileType: string;
   id: string;
   knowledgeBaseId?: string | null;
@@ -142,11 +144,13 @@ export class KnowledgeRepo {
       }
 
       return {
+        attachable: undefined,
         chunkTaskId: row.chunk_task_id,
         content: row.content,
         createdAt: new Date(row.created_at),
         editorData,
         embeddingTaskId: row.embedding_task_id,
+        fileId: row.file_id ?? null,
         fileType: row.file_type,
         id: row.id,
         knowledgeBaseId: row.knowledge_base_id ?? null,
@@ -387,6 +391,7 @@ export class KnowledgeRepo {
       return sql`
         SELECT
           COALESCE(d.id, f.id) as id,
+          f.id as file_id,
           f.name,
           f.file_type,
           f.size,
@@ -427,6 +432,7 @@ export class KnowledgeRepo {
     return sql`
       SELECT
         COALESCE(d.id, f.id) as id,
+        f.id as file_id,
         f.name,
         f.file_type,
         f.size,
@@ -567,6 +573,7 @@ export class KnowledgeRepo {
           return sql`
             SELECT
               NULL::varchar(30) as id,
+              NULL::varchar(30) as file_id,
               NULL::text as name,
               NULL::varchar(255) as file_type,
               NULL::integer as size,
@@ -593,6 +600,7 @@ export class KnowledgeRepo {
       return sql`
         SELECT
           d.id,
+          NULL::varchar(30) as file_id,
           COALESCE(d.title, d.filename, 'Untitled') as name,
           d.file_type,
           d.total_char_count as size,
@@ -616,6 +624,7 @@ export class KnowledgeRepo {
     return sql`
       SELECT
         id,
+        NULL::varchar(30) as file_id,
         COALESCE(title, filename, 'Untitled') as name,
         file_type,
         total_char_count as size,

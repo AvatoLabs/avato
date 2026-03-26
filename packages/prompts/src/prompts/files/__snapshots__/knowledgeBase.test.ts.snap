@@ -66,7 +66,7 @@ exports[`promptAgentKnowledge > should handle file with special characters in fi
 "<agent_knowledge>
 <instruction>The following files are available. Refer to their content directly to answer questions. No knowledge bases are associated.</instruction>
 <files totalCount="1">
-<file id="file1" name="file with spaces & special-chars.txt">
+<file id="file1" name="file with spaces &amp; special-chars.txt">
 Special content
 </file>
 </files>

@@ -23,13 +23,9 @@ export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
         allowFullscreen
         footer={null}
         open={open}
-        styles={{ body: { overflow: 'hidden' } }}
-        width={600}
-        title={
-          scope === 'conversation'
-            ? t('conversationFiles.library.title')
-            : t('knowledgeBase.library.title')
-        }
+        styles={{ body: { overflow: 'hidden', padding: 0 } }}
+        title={t('knowledgeBase.library.title')}
+        width={'min(88vw, 980px)'}
         onCancel={() => {
           setOpen(false);
         }}

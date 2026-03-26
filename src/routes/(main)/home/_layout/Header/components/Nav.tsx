@@ -1,6 +1,7 @@
 'use client';
 
 import { Flexbox, Tag } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -115,7 +116,12 @@ const Nav = memo(() => {
     </Tag>
   );
   const betaBadge = (
-    <Tag color="cyan" size="small" style={{ marginInlineStart: 4 }} variant="outlined">
+    <Tag
+      color={cssVar.colorPrimary}
+      size="small"
+      style={{ marginInlineStart: 4 }}
+      variant="outlined"
+    >
       {tSetting('tab.beta')}
     </Tag>
   );

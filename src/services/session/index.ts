@@ -22,6 +22,7 @@ interface ConversationFileContent {
 
 interface ConversationFileContext {
   agentId?: string;
+  groupId?: string | null;
   sessionId?: string | null;
 }
 

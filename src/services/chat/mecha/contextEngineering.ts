@@ -303,10 +303,11 @@ export const contextEngineering = async ({
       }>
     | undefined;
 
-  if (!groupId && (agentId || sessionId)) {
+  if (groupId || agentId || sessionId) {
     try {
       conversationFileContents = await sessionService.getConversationFileContents({
         agentId,
+        groupId,
         sessionId,
       });
     } catch (error) {

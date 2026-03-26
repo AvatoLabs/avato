@@ -441,7 +441,7 @@ export const fileRouter = router({
 
     const fileIdsInList = filteredItems
       .filter((item) => item.sourceType === 'file')
-      .map((item) => item.id);
+      .map((item: any) => item.fileId || item.id);
     const docIdsInList = filteredItems
       .filter((item) => item.sourceType === 'document')
       .map((item) => item.id);
@@ -452,15 +452,34 @@ export const fileRouter = router({
     const visibleFiles = new Set(visibleFileIdList);
     const visibleDocs = new Set(visibleDocIdList);
     const aclFiltered = filteredItems.filter((item) => {
-      if (item.sourceType === 'file') return visibleFiles.has(item.id);
+      if (item.sourceType === 'file') return visibleFiles.has((item as any).fileId || item.id);
       if (item.sourceType === 'document') return visibleDocs.has(item.id);
 
       return true;
     });
 
+    const attachableFileIds = input.attachableOnly
+      ? new Set(
+          await ctx.fileModel.getConversationAttachableFileIds(
+            aclFiltered
+              .filter((item) => item.sourceType === 'file')
+              .map((item: any) => item.fileId || item.id),
+          ),
+        )
+      : null;
+
+    const scopedItems = aclFiltered.filter((item) => {
+      if (!input.attachableOnly) return true;
+      if (item.sourceType === 'document') return item.fileType === 'custom/folder';
+      if (item.sourceType === 'file')
+        return attachableFileIds?.has((item as any).fileId || item.id) ?? false;
+
+      return false;
+    });
+
     // Process files (add chunk info and async task status)
-    const fileItems = aclFiltered.filter((item) => item.sourceType === 'file');
-    const fileIds = fileItems.map((item) => item.id);
+    const fileItems = scopedItems.filter((item) => item.sourceType === 'file');
+    const fileIds = fileItems.map((item: any) => item.fileId || item.id);
     const chunks = await ctx.chunkModel.countByFileIds(fileIds);
 
     const chunkTaskIds = fileItems.map((item) => item.chunkTaskId).filter(Boolean) as string[];
@@ -476,7 +495,7 @@ export const fileRouter = router({
 
     // Combine all items with their metadata
     const resultItems = [] as any[];
-    for (const item of aclFiltered) {
+    for (const item of scopedItems) {
       if (item.sourceType === 'file') {
         const chunkTask = item.chunkTaskId
           ? chunkTasks.find((task) => task.id === item.chunkTaskId)
@@ -487,25 +506,32 @@ export const fileRouter = router({
 
         resultItems.push({
           ...item,
-          chunkCount: chunks.find((chunk) => chunk.id === item.id)?.count ?? null,
+          attachable: input.attachableOnly
+            ? Boolean(attachableFileIds?.has((item as any).fileId || item.id))
+            : undefined,
+          chunkCount:
+            chunks.find((chunk) => chunk.id === ((item as any).fileId || item.id))?.count ?? null,
           chunkingError: chunkTask?.error ?? null,
           chunkingStatus: chunkTask?.status as AsyncTaskStatus,
           editorData: null,
           embeddingError: embeddingTask?.error ?? null,
           embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+          fileId: (item as any).fileId ?? null,
           fileType: normalizeFileType(item.fileType, item.name),
           finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
-          url: getFileProxyUrl(item.id),
+          url: getFileProxyUrl((item as any).fileId || item.id),
         } as FileListItem);
       } else {
         // Document item - no chunk processing needed, includes editorData
         const documentItem = {
           ...item,
+          attachable: item.fileType !== 'custom/folder',
           chunkCount: null,
           chunkingError: null,
           chunkingStatus: null,
           embeddingError: null,
           embeddingStatus: null,
+          fileId: (item as any).fileId ?? null,
           finishEmbedding: false,
         } as FileListItem;
         resultItems.push(documentItem);

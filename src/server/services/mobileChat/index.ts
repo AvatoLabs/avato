@@ -5,6 +5,7 @@ import { WebBrowsingExecutionRuntime } from '@lobechat/builtin-tool-web-browsing
 import { builtinTools } from '@lobechat/builtin-tools';
 import { type TracePayload } from '@lobechat/const';
 import {
+  type FileContent,
   type LobeToolManifest,
   type SkillMeta,
   ToolArgumentsRepairer,
@@ -22,6 +23,7 @@ import { LOBE_DEFAULT_MODEL_LIST } from 'model-bank';
 
 import { AgentModel } from '@/database/models/agent';
 import { AgentSkillModel } from '@/database/models/agentSkill';
+import { FileModel } from '@/database/models/file';
 import { PluginModel } from '@/database/models/plugin';
 import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
@@ -248,6 +250,21 @@ const readSessionConversationConfig = async (
     return (session as { config?: ConversationConfig })?.config;
   } catch (error) {
     console.error('[webapi/chat] failed to read session conversation config:', error);
+    return undefined;
+  }
+};
+
+const readConversationFileContents = async (
+  serverDB: LobeChatDatabase,
+  userId: string,
+  sessionId?: string,
+): Promise<FileContent[] | undefined> => {
+  if (!sessionId) return undefined;
+
+  try {
+    return await new FileModel(serverDB, userId).getSessionAssignedFileContents(sessionId);
+  } catch (error) {
+    console.error('[webapi/chat] failed to read conversation-scoped files:', error);
     return undefined;
   }
 };
@@ -726,12 +743,20 @@ export class MobileChatService {
 
   private buildMessages = async (params: {
     conversationConfig?: ConversationConfig;
+    conversationFileContents?: FileContent[];
     memoryContext?: string;
     payload: MobileChatPayload;
     skillMetas: SkillMeta[];
     toolSet?: MobileToolSet;
   }) => {
-    const { conversationConfig, memoryContext, payload, skillMetas, toolSet } = params;
+    const {
+      conversationConfig,
+      conversationFileContents,
+      memoryContext,
+      payload,
+      skillMetas,
+      toolSet,
+    } = params;
 
     const skillContext =
       skillMetas.length > 0
@@ -749,6 +774,7 @@ export class MobileChatService {
     }
 
     const shouldUseServerMessagesEngine =
+      (conversationFileContents?.length ?? 0) > 0 ||
       !!conversationConfig ||
       !!memoryContext ||
       !!skillContext ||
@@ -760,23 +786,25 @@ export class MobileChatService {
           enableHistoryCount: conversationConfig?.chatConfig?.enableHistoryCount,
           historyCount: conversationConfig?.chatConfig?.historyCount,
           inputTemplate: conversationConfig?.chatConfig?.inputTemplate,
-          knowledge: conversationConfig
-            ? {
-                fileContents: conversationConfig.files
-                  ?.filter((file) => file.enabled === true)
-                  .map((file) => ({
-                    content: file.content ?? '',
-                    fileId: file.id ?? '',
-                    filename: file.name ?? '',
-                  })),
-                knowledgeBases: conversationConfig.knowledgeBases
-                  ?.filter((kb) => kb.enabled === true)
-                  .map((kb) => ({
-                    id: kb.id ?? '',
-                    name: kb.name ?? '',
-                  })),
-              }
-            : undefined,
+          knowledge:
+            conversationConfig || conversationFileContents
+              ? {
+                  conversationFileContents,
+                  fileContents: conversationConfig?.files
+                    ?.filter((file) => file.enabled === true)
+                    .map((file) => ({
+                      content: file.content ?? '',
+                      fileId: file.id ?? '',
+                      filename: file.name ?? '',
+                    })),
+                  knowledgeBases: conversationConfig?.knowledgeBases
+                    ?.filter((kb) => kb.enabled === true)
+                    .map((kb) => ({
+                      id: kb.id ?? '',
+                      name: kb.name ?? '',
+                    })),
+                }
+              : undefined,
           messages: payload.messages as any,
           model: payload.model,
           provider: this.provider,
@@ -1085,7 +1113,8 @@ export class MobileChatService {
       );
     }
 
-    const [memoryContext, skillMetas] = await Promise.all([
+    const [conversationFileContents, memoryContext, skillMetas] = await Promise.all([
+      readConversationFileContents(this.serverDB, this.userId, payload.sessionId),
       readMemoryContext({
         conversationConfig,
         explicitMemory: payload.memory,
@@ -1105,6 +1134,7 @@ export class MobileChatService {
 
     const messages = await this.buildMessages({
       conversationConfig,
+      conversationFileContents,
       memoryContext,
       payload,
       skillMetas,

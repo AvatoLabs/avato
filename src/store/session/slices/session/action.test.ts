@@ -22,10 +22,13 @@ vi.mock('@/utils/localStorage', () => ({
 // Mock sessionService 和其他依赖项
 vi.mock('@/services/session', () => ({
   sessionService: {
+    createConversationFiles: vi.fn(),
     removeAllSessions: vi.fn(),
     createSession: vi.fn(),
     cloneSession: vi.fn(),
-    updateSessionGroup: vi.fn(),
+    deleteConversationFile: vi.fn(),
+    getConversationFiles: vi.fn(),
+    toggleConversationFile: vi.fn(),
     removeSession: vi.fn(),
     getAllSessions: vi.fn(),
     updateSession: vi.fn(),
@@ -51,9 +54,13 @@ vi.mock('@/components/AntdStaticMethods', () => ({
 }));
 
 const mockRefresh = vi.fn();
+const mockRefreshConversationFiles = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
-  useSessionStore.setState({ refreshSessions: mockRefresh });
+  useSessionStore.setState({
+    refreshConversationFiles: mockRefreshConversationFiles as any,
+    refreshSessions: mockRefresh,
+  });
 });
 
 afterEach(() => {
@@ -269,6 +276,51 @@ describe('SessionAction', () => {
 
       expect(chatGroupService.updateGroup).toHaveBeenCalledWith(sessionId, { groupId: null });
       expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  describe('conversation files', () => {
+    it('should add conversation files with group scope', async () => {
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.addFilesToConversation(['file-1'], { groupId: 'group-1' });
+      });
+
+      expect(sessionService.createConversationFiles).toHaveBeenCalledWith({
+        fileIds: ['file-1'],
+        groupId: 'group-1',
+      });
+      expect(mockRefreshConversationFiles).toHaveBeenCalledWith({ groupId: 'group-1' });
+    });
+
+    it('should toggle conversation files with group scope', async () => {
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.toggleConversationFile('file-1', true, { groupId: 'group-1' });
+      });
+
+      expect(sessionService.toggleConversationFile).toHaveBeenCalledWith({
+        enabled: true,
+        fileId: 'file-1',
+        groupId: 'group-1',
+      });
+      expect(mockRefreshConversationFiles).toHaveBeenCalledWith({ groupId: 'group-1' });
+    });
+
+    it('should delete conversation files with group scope', async () => {
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.deleteConversationFile('file-1', { groupId: 'group-1' });
+      });
+
+      expect(sessionService.deleteConversationFile).toHaveBeenCalledWith({
+        fileId: 'file-1',
+        groupId: 'group-1',
+      });
+      expect(mockRefreshConversationFiles).toHaveBeenCalledWith({ groupId: 'group-1' });
     });
   });
 });

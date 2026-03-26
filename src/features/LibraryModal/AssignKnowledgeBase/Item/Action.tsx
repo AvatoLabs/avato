@@ -1,10 +1,10 @@
 import { ActionIcon, Button, DropdownMenu, Flexbox, Icon } from '@lobehub/ui';
-import { InfoIcon, MoreVerticalIcon, Trash2 } from 'lucide-react';
+import { CheckIcon, InfoIcon, MoreVerticalIcon, Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useAgentId } from '@/features/ChatInput/hooks/useAgentId';
 import { useAgentStore } from '@/store/agent/store';
+import { useChatStore } from '@/store/chat';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { useSessionStore } from '@/store/session/store';
 import { KnowledgeType } from '@/types/knowledgeBase';
@@ -20,7 +20,11 @@ interface ActionsProps {
 
 const Actions = memo<ActionsProps>(({ id, type, enabled, scope }) => {
   const { t } = useTranslation('chat');
-  const agentId = useAgentId();
+  const activeGroupId = useChatStore((s) => s.activeGroupId);
+  const activeAgentId = useAgentStore((s) => s.activeAgentId);
+  const conversationFileContext = activeGroupId
+    ? { groupId: activeGroupId }
+    : { agentId: activeAgentId };
 
   const mobile = useServerConfigStore((s) => s.isMobile);
   const [
@@ -44,7 +48,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope }) => {
   const assignKnowledge = async () => {
     setLoading(true);
     if (scope === 'conversation') {
-      await addFilesToConversation([id], { agentId });
+      await addFilesToConversation([id], conversationFileContext);
     } else if (type === KnowledgeType.KnowledgeBase) {
       await addKnowledgeBasesToAgent(id);
     } else {
@@ -56,7 +60,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope }) => {
   const removeKnowledge = async () => {
     setLoading(true);
     if (scope === 'conversation') {
-      await deleteConversationFile(id, { agentId });
+      await deleteConversationFile(id, conversationFileContext);
     } else if (type === KnowledgeType.KnowledgeBase) {
       await removeKnowledgeBasesFromAgent(id);
     } else {
@@ -64,6 +68,24 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope }) => {
     }
     setLoading(false);
   };
+
+  if (scope === 'conversation') {
+    return (
+      <Flexbox horizontal align={'center'}>
+        <Button
+          icon={enabled ? <Icon icon={CheckIcon} /> : undefined}
+          loading={loading}
+          size={mobile ? 'small' : undefined}
+          type={enabled ? 'default' : 'primary'}
+          onClick={enabled ? removeKnowledge : assignKnowledge}
+        >
+          {enabled
+            ? t('conversationFiles.library.action.added')
+            : t('conversationFiles.library.action.add')}
+        </Button>
+      </Flexbox>
+    );
+  }
 
   return (
     <Flexbox horizontal align={'center'}>

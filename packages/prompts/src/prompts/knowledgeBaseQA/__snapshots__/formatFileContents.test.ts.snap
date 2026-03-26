@@ -55,7 +55,7 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
 exports[`promptFileContents > should handle file with special characters in name 1`] = `
 "<knowledge_base_files totalCount="1">
 <instruction>Use the information from these files to answer the user's question. Always cite the source files.</instruction>
-<file id="file-special" name="FAQ: Q&A (2024).md">
+<file id="file-special" name="FAQ: Q&amp;A (2024).md">
 Content from a file with special characters in the name.
 </file>
 </knowledge_base_files>"

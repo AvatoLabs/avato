@@ -203,6 +203,7 @@ export default {
   'settingKnowledge.empty': 'No long-term knowledge yet',
   'settingKnowledge.emptyDesc':
     'Attach files or libraries from the resource center for long-term reuse across conversations.',
+  'settingKnowledge.inlineAdd': 'Add Knowledge',
   'settingKnowledge.item.fileDesc': 'Long-term file knowledge',
   'settingKnowledge.item.libraryDesc': 'Long-term library knowledge',
   'settingKnowledge.profileButton': 'Knowledge',
@@ -773,8 +774,9 @@ export default {
   'settingAppearance.noAnimation.title': 'No Animation Mode',
   'settingAppearance.preview.title': 'Live Preview',
   'settingAppearance.primaryColor.desc': 'Fine-tune the accent color on top of the selected scheme',
-  'settingAppearance.primaryColor.lockedDesc': 'Select Custom Theme before editing the theme color',
-  'settingAppearance.primaryColor.title': 'Theme Color',
+  'settingAppearance.primaryColor.lockedDesc':
+    'Select Custom Theme before editing the accent color',
+  'settingAppearance.primaryColor.title': 'Accent Color',
   'settingAppearance.themePreset.desc':
     'Choose a saturated accent palette on neutral slate. Works in light and dark mode.',
   'settingAppearance.themePreset.options.canopy.desc': 'Bright lime accent',
@@ -791,7 +793,7 @@ export default {
   'settingAppearance.themePreset.options.tide.title': 'Tide',
   'settingAppearance.themePreset.options.velvet.desc': 'Rich and expressive',
   'settingAppearance.themePreset.options.velvet.title': 'Velvet',
-  'settingAppearance.themePreset.title': 'Theme Scheme',
+  'settingAppearance.themePreset.title': 'Color Scheme',
   'settingAppearance.title': 'Application Appearance',
   'settingChat.autoCreateTopicThreshold.desc':
     'Automatically create a topic when the current message count exceeds this value',
@@ -856,7 +858,7 @@ export default {
   'settingCommon.themeMode.auto': 'Automatic',
   'settingCommon.themeMode.dark': 'Dark',
   'settingCommon.themeMode.light': 'Light',
-  'settingCommon.themeMode.title': 'Theme',
+  'settingCommon.themeMode.title': 'Appearance Mode',
   'settingCommon.title': 'General Settings',
   'settingGroup.description.placeholder': 'Enter Group description',
   'settingGroup.description.title': 'Group description',

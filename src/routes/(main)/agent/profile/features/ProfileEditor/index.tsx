@@ -4,7 +4,7 @@ import { Button, Flexbox } from '@lobehub/ui';
 import { Divider } from 'antd';
 import { useTheme } from 'antd-style';
 import isEqual from 'fast-deep-equal';
-import { Clock, LibraryBig, PlayIcon, Settings2Icon } from 'lucide-react';
+import { Clock, PlayIcon, Settings2Icon } from 'lucide-react';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import urlJoin from 'url-join';
@@ -23,18 +23,14 @@ import AgentSettings from '../AgentSettings';
 import EditorCanvas from '../EditorCanvas';
 import AgentPublishButton from '../Header/AgentPublishButton';
 import AgentHeader from './AgentHeader';
+import AgentKnowledgeInline from './AgentKnowledgeInline';
 import AgentTool from './AgentTool';
 
 const ProfileEditor = memo(() => {
   const { t } = useTranslation('setting');
   const theme = useTheme();
-  const [config, knowledgeCount, isInbox] = useAgentStore(
-    (s) => [
-      agentSelectors.currentAgentConfig(s),
-      agentSelectors.currentAgentFiles(s).length +
-        agentSelectors.currentAgentKnowledgeBases(s).length,
-      builtinAgentSelectors.isInboxAgent(s),
-    ],
+  const [config, isInbox] = useAgentStore(
+    (s) => [agentSelectors.currentAgentConfig(s), builtinAgentSelectors.isInboxAgent(s)],
     isEqual,
   );
   const updateConfig = useAgentStore((s) => s.updateAgentConfig);
@@ -45,7 +41,6 @@ const ProfileEditor = memo(() => {
   const openAdvancedSettings = useOpenChatSettings(
     isInbox ? ChatSettingsTabs.Modal : ChatSettingsTabs.Meta,
   );
-  const openKnowledgeSettings = useOpenChatSettings(ChatSettingsTabs.Knowledge);
 
   const handleCreateCronJob = useCallback(() => {
     if (!agentId) return;
@@ -79,22 +74,6 @@ const ProfileEditor = memo(() => {
             }}
             onChange={updateConfig}
           />
-          {!isInbox && (
-            <Button
-              icon={LibraryBig}
-              size={'small'}
-              style={{ color: theme.colorTextSecondary }}
-              type={'text'}
-              onClick={openKnowledgeSettings}
-            >
-              {t(
-                knowledgeCount > 0
-                  ? 'settingKnowledge.profileButtonCount'
-                  : 'settingKnowledge.profileButton',
-                { count: knowledgeCount },
-              )}
-            </Button>
-          )}
           <Button
             icon={Settings2Icon}
             size={'small'}
@@ -106,6 +85,7 @@ const ProfileEditor = memo(() => {
           </Button>
         </Flexbox>
         <AgentTool />
+        <AgentKnowledgeInline />
         <Flexbox
           horizontal
           align={'center'}

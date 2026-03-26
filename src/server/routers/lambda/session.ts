@@ -9,6 +9,7 @@ import { SessionModel } from '@/database/models/session';
 import { SessionGroupModel } from '@/database/models/sessionGroup';
 import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
 import { insertAgentSchema, insertSessionSchema } from '@/database/schemas';
+import { type LobeChatDatabase } from '@/database/type';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { SystemAgentService } from '@/server/services/systemAgent';
@@ -37,6 +38,17 @@ function isDefaultSessionTitle(title: string | null | undefined) {
 
   return !trimmedTitle || DEFAULT_SESSION_TITLES.includes(trimmedTitle);
 }
+
+const resolveConversationFileSessionId = async (
+  input: z.infer<typeof conversationContextSchema>,
+  serverDB: LobeChatDatabase,
+  userId: string,
+) => {
+  if (input.groupId) return input.groupId;
+
+  const { sessionId } = await resolveContext(input, serverDB, userId);
+  return sessionId;
+};
 
 const sessionProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -176,7 +188,7 @@ export const sessionRouter = router({
   getConversationFileContents: sessionProcedure
     .input(conversationContextSchema)
     .query(async ({ ctx, input }) => {
-      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+      const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return [];
 
@@ -186,12 +198,12 @@ export const sessionRouter = router({
   getConversationFiles: sessionProcedure
     .input(conversationContextSchema)
     .query(async ({ ctx, input }): Promise<KnowledgeItem[]> => {
-      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+      const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return [];
 
       const [allFiles, assignedFiles] = await Promise.all([
-        ctx.fileModel.query({ showFilesInKnowledgeBase: false }),
+        ctx.fileModel.getConversationAvailableFiles(),
         ctx.fileModel.getSessionAssignedFiles(sessionId),
       ]);
 
@@ -311,7 +323,7 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+      const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return;
 
@@ -325,7 +337,7 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+      const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return;
 
@@ -340,7 +352,7 @@ export const sessionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+      const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return;
 

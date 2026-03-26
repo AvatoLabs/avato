@@ -36,6 +36,7 @@ const n = setNamespace('session');
 
 interface ConversationFileContext {
   agentId?: string;
+  groupId?: string | null;
   sessionId?: string | null;
 }
 
@@ -44,9 +45,14 @@ const FETCH_CONVERSATION_FILES_KEY = 'fetchConversationFiles';
 const SEARCH_SESSIONS_KEY = 'searchSessions';
 
 const getConversationFilesKey = (context?: ConversationFileContext) => {
-  if (!context?.agentId && !context?.sessionId) return null;
+  if (!context?.agentId && !context?.groupId && !context?.sessionId) return null;
 
-  return [FETCH_CONVERSATION_FILES_KEY, context?.agentId ?? null, context?.sessionId ?? null];
+  return [
+    FETCH_CONVERSATION_FILES_KEY,
+    context?.agentId ?? null,
+    context?.groupId ?? null,
+    context?.sessionId ?? null,
+  ];
 };
 
 type Setter = StoreSetter<SessionStore>;
@@ -333,9 +339,10 @@ export class SessionActionImpl {
   useFetchConversationFiles = (context?: ConversationFileContext): SWRResponse<KnowledgeItem[]> => {
     return useClientDataSWR<KnowledgeItem[]>(
       getConversationFilesKey(context),
-      ([, agentId, sessionId]) =>
+      ([, agentId, groupId, sessionId]) =>
         sessionService.getConversationFiles({
           agentId: agentId ?? undefined,
+          groupId: groupId ?? undefined,
           sessionId: sessionId ?? undefined,
         }),
       {

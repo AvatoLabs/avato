@@ -500,11 +500,51 @@ export class FileModel {
     });
   };
 
+  getConversationAttachableFileIds = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return [];
+
+    const validFiles = await this.findByIds(fileIds);
+    const candidateFileIds = validFiles
+      .filter((file) => !file.fileType.startsWith('image'))
+      .map((file) => file.id);
+
+    if (candidateFileIds.length === 0) return [];
+
+    const rows = await this.db
+      .select({ fileId: documents.fileId })
+      .from(documents)
+      .where(
+        and(
+          eq(documents.userId, this.userId),
+          inArray(documents.fileId, candidateFileIds),
+          isNull(documents.deletedAt),
+          sql`${documents.content} is not null`,
+          sql`${documents.content} <> ''`,
+        ),
+      );
+
+    return Array.from(
+      new Set(rows.map((row) => row.fileId).filter((id): id is string => Boolean(id))),
+    );
+  };
+
+  getConversationAvailableFiles = async () => {
+    const allFiles = await this.query({ showFilesInKnowledgeBase: true });
+    const candidateFiles = allFiles.filter((file) => !file.fileType.startsWith('image'));
+
+    if (candidateFiles.length === 0) return [];
+
+    const attachableIds = new Set(
+      await this.getConversationAttachableFileIds(candidateFiles.map((file) => file.id)),
+    );
+
+    return candidateFiles.filter((file) => attachableIds.has(file.id));
+  };
+
   createSessionFiles = async (sessionId: string, fileIds: string[]) => {
     if (fileIds.length === 0) return;
 
-    const validFiles = await this.findByIds(fileIds);
-    const validFileIds = validFiles.map((file) => file.id);
+    const validFileIds = await this.getConversationAttachableFileIds(fileIds);
 
     if (validFileIds.length === 0) return;
 

@@ -1365,11 +1365,11 @@ export class AgentRuntimeService {
    * Create Agent Runtime instance
    */
   private async loadConversationFileContents(metadata?: any) {
-    if (metadata?.groupId || !metadata?.userId) return undefined;
+    if (!metadata?.userId) return undefined;
 
-    let sessionId = metadata?.sessionId as string | undefined;
+    let sessionId = (metadata?.groupId || metadata?.sessionId) as string | undefined;
 
-    if (!sessionId && metadata?.agentId) {
+    if (!metadata?.groupId && !sessionId && metadata?.agentId) {
       const [relation] = await this.serverDB
         .select({ sessionId: agentsToSessions.sessionId })
         .from(agentsToSessions)
