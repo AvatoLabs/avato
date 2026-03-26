@@ -21,10 +21,31 @@ import {
 const ICON_SIZE = 80;
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
+  actionDescription: css`
+    margin-block-start: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: ${cssVar.colorTextTertiary};
+  `,
   actionTitle: css`
-    margin-block-start: 12px;
+    margin-block-start: 14px;
     font-size: 16px;
-    color: ${cssVar.colorTextSecondary};
+    color: ${cssVar.colorText};
+  `,
+  accentCard: css`
+    position: relative;
+
+    overflow: hidden;
+
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 28px;
+
+    background: ${cssVar.colorBgContainer};
+  `,
+  accentLine: css`
+    block-size: 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, ${cssVar.colorPrimaryBg} 64%, ${cssVar.colorFillTertiary} 36%);
   `,
   card: css`
     cursor: pointer;
@@ -33,20 +54,38 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     overflow: hidden;
 
-    width: 200px;
-    height: 140px;
-    border-radius: ${cssVar.borderRadiusLG};
+    min-width: 0;
+    min-height: 172px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 24px;
 
     font-weight: 500;
-    text-align: center;
 
-    background: ${cssVar.colorFillTertiary};
-    box-shadow: 0 0 0 1px ${cssVar.colorFillTertiary} inset;
+    background: ${cssVar.colorBgContainer};
 
-    transition: background 0.3s ease-in-out;
+    transition:
+      transform 0.25s ease,
+      border-color 0.25s ease,
+      background 0.25s ease;
 
     &:hover {
-      background: ${cssVar.colorFillSecondary};
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, ${cssVar.colorPrimaryBorder} 60%, ${cssVar.colorBorder} 40%);
+      background: color-mix(
+        in srgb,
+        ${cssVar.colorPrimaryBg} 14%,
+        ${cssVar.colorFillSecondary} 86%
+      );
+    }
+  `,
+  grid: css`
+    display: grid;
+    grid-template-columns: minmax(320px, 1.1fr) minmax(260px, 0.9fr);
+    gap: 20px;
+    width: min(1080px, 100%);
+
+    @media (width <= 900px) {
+      grid-template-columns: 1fr;
     }
   `,
   glow: css`
@@ -67,6 +106,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     inset-inline-end: 8px;
 
     flex: none;
+  `,
+  previewPanel: css`
+    gap: 14px;
+    inline-size: min(460px, 100%);
   `,
 }));
 
@@ -241,74 +284,99 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
     return (
       <>
-        <Center gap={24} height={'100%'} style={{ paddingBottom: 100 }} width={'100%'}>
-          {hasPages && (
-            <Flexbox justify={'center'} style={{ textAlign: 'center' }}>
-              <Text as={'h4'}>{t('pageEditor.empty.title')}</Text>
-              <Text type={'secondary'}>{t('or', { ns: 'common' })}</Text>
-            </Flexbox>
-          )}
-          <Flexbox horizontal gap={12}>
-            <Flexbox
-              className={styles.card}
-              padding={16}
-              onClick={() =>
-                handleCreateDocument(
-                  '',
-                  isTablePage ? t('pageList.tableUntitled') : t('pageList.untitled'),
-                )
-              }
-            >
-              <span className={styles.actionTitle}>
-                {t(
-                  isTablePage
-                    ? 'pageEditor.empty.createNewTable'
-                    : 'pageEditor.empty.createNewDocument',
+        <Center height={'100%'} style={{ paddingBottom: 100, paddingInline: 24 }} width={'100%'}>
+          <div className={styles.grid}>
+            <Flexbox className={styles.accentCard} gap={18} justify={'center'} padding={28}>
+              <Flexbox className={styles.previewPanel}>
+                <Text as={'h2'} style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1 }}>
+                  {t(isTablePage ? 'pageEditor.empty.tableTitle' : 'pageEditor.empty.title')}
+                </Text>
+                <Text style={{ color: cssVar.colorTextSecondary, fontSize: 15, lineHeight: 1.7 }}>
+                  {t(
+                    isTablePage
+                      ? 'pageEditor.empty.tableAutoSaveMessage'
+                      : 'pageEditor.autoSaveMessage',
+                  )}
+                </Text>
+                <Flexbox gap={10} style={{ marginTop: 8 }}>
+                  <div className={styles.accentLine} style={{ width: '38%' }} />
+                  <div className={styles.accentLine} style={{ width: '100%' }} />
+                  <div className={styles.accentLine} style={{ width: '84%' }} />
+                  <div className={styles.accentLine} style={{ width: '72%' }} />
+                </Flexbox>
+                {hasPages && (
+                  <Text style={{ color: cssVar.colorTextTertiary, fontSize: 13 }}>
+                    {t('or', { ns: 'common' })}
+                  </Text>
                 )}
-              </span>
-              <div
-                className={styles.glow}
-                style={{ background: isTablePage ? cssVar.geekblue : cssVar.purple }}
-              />
-              <FileTypeIcon
-                className={styles.icon}
-                color={isTablePage ? cssVar.geekblue : cssVar.purple}
-                icon={<Icon color={'#fff'} icon={PlusIcon} />}
-                size={ICON_SIZE}
-                type={'file'}
-              />
+              </Flexbox>
             </Flexbox>
 
-            {!isTablePage && (
-              <Upload
-                accept=".md,.markdown,.pdf,.docx"
-                beforeUpload={handleUploadFile}
-                disabled={isUploading}
-                multiple={false}
-                showUploadList={false}
+            <Flexbox gap={12}>
+              <Flexbox
+                className={styles.card}
+                gap={4}
+                padding={20}
+                onClick={() =>
+                  handleCreateDocument(
+                    '',
+                    isTablePage ? t('pageList.tableUntitled') : t('pageList.untitled'),
+                  )
+                }
               >
-                <Flexbox
-                  className={styles.card}
-                  padding={16}
-                  style={{ opacity: isUploading ? 0.5 : 1 }}
+                <span className={styles.actionTitle}>
+                  {t(
+                    isTablePage
+                      ? 'pageEditor.empty.createNewTable'
+                      : 'pageEditor.empty.createNewDocument',
+                  )}
+                </span>
+                <span className={styles.actionDescription}>
+                  {t('pageEditor.editorPlaceholder')}
+                </span>
+                <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
+                <FileTypeIcon
+                  className={styles.icon}
+                  color={cssVar.colorPrimary}
+                  icon={<Icon color={'#fff'} icon={PlusIcon} />}
+                  size={ICON_SIZE}
+                  type={'file'}
+                />
+              </Flexbox>
+
+              {!isTablePage && (
+                <Upload
+                  accept=".md,.markdown,.pdf,.docx"
+                  beforeUpload={handleUploadFile}
+                  disabled={isUploading}
+                  multiple={false}
+                  showUploadList={false}
                 >
-                  <span className={styles.actionTitle}>
-                    {isUploading
-                      ? t('uploadDock.uploadStatus.uploading')
-                      : t('pageEditor.empty.uploadFiles')}
-                  </span>
-                  <div className={styles.glow} style={{ background: cssVar.gold }} />
-                  <FileTypeIcon
-                    className={styles.icon}
-                    color={cssVar.gold}
-                    icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
-                    size={ICON_SIZE}
-                    type={'file'}
-                  />
-                </Flexbox>
-              </Upload>
-            )}
-          </Flexbox>
+                  <Flexbox
+                    className={styles.card}
+                    gap={4}
+                    padding={20}
+                    style={{ opacity: isUploading ? 0.65 : 1 }}
+                  >
+                    <span className={styles.actionTitle}>
+                      {isUploading
+                        ? t('uploadDock.uploadStatus.uploading')
+                        : t('pageEditor.empty.uploadFiles')}
+                    </span>
+                    <span className={styles.actionDescription}>{t('empty')}</span>
+                    <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
+                    <FileTypeIcon
+                      className={styles.icon}
+                      color={cssVar.colorPrimary}
+                      icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
+                      size={ICON_SIZE}
+                      type={'file'}
+                    />
+                  </Flexbox>
+                </Upload>
+              )}
+            </Flexbox>
+          </div>
         </Center>
       </>
     );

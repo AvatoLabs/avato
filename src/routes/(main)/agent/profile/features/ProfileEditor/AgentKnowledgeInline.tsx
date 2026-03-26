@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import KnowledgeIcon from '@/components/KnowledgeIcon';
 import { AttachKnowledgeModal } from '@/features/LibraryModal';
 import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
+import { useIsDark } from '@/hooks/useIsDark';
 import { agentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { ChatSettingsTabs } from '@/store/global/initialState';
@@ -23,16 +24,25 @@ interface AgentKnowledgeInlineItem {
 }
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
+  addButton: css`
+    color: ${cssVar.colorTextSecondary} !important;
+  `,
   tag: css`
     cursor: pointer;
     height: 28px !important;
     border-radius: ${cssVar.borderRadiusSM} !important;
+    color: ${cssVar.colorTextSecondary} !important;
+
+    :where(.ant-tag-close-icon) {
+      color: ${cssVar.colorTextSecondary} !important;
+    }
   `,
 }));
 
 const AgentKnowledgeInline = memo(() => {
   const { t } = useTranslation('setting');
   const [modalOpen, setModalOpen] = useState(false);
+  const isDarkMode = useIsDark();
   const openKnowledgeSettings = useOpenChatSettings(ChatSettingsTabs.Knowledge);
 
   const [files, knowledgeBases] = useAgentStore(
@@ -80,7 +90,13 @@ const AgentKnowledgeInline = memo(() => {
   return (
     <>
       <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-        <Button icon={PlusIcon} size={'small'} type={'text'} onClick={() => setModalOpen(true)}>
+        <Button
+          className={styles.addButton}
+          icon={PlusIcon}
+          size={'small'}
+          type={'text'}
+          onClick={() => setModalOpen(true)}
+        >
           {t('settingKnowledge.inlineAdd')}
         </Button>
         {items.map((item) => (
@@ -89,6 +105,7 @@ const AgentKnowledgeInline = memo(() => {
             className={styles.tag}
             closeIcon={<X size={12} />}
             key={item.id}
+            variant={isDarkMode ? 'filled' : 'outlined'}
             icon={
               <KnowledgeIcon
                 fileType={item.fileType}

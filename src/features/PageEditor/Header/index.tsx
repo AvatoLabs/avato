@@ -1,6 +1,7 @@
 'use client';
 
 import { ActionIcon, Avatar, DropdownMenu, Icon, Segmented, Text } from '@lobehub/ui';
+import { cssVar } from 'antd-style';
 import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen, Table2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,20 +37,20 @@ const Header = memo(() => {
       left={
         <>
           {onBack && <ActionIcon icon={ArrowLeftIcon} onClick={onBack} />}
-          {/* Breadcrumb - show when page has a parent folder */}
           {parentId && <Breadcrumb />}
-          {/* Show icon and title only when there's no parent folder */}
           {!parentId && (
             <>
-              {/* Icon */}
               {emoji && <Avatar avatar={emoji} shape={'square'} size={28} />}
-              {/* Title */}
-              <Text ellipsis style={{ marginLeft: 4 }} weight={500}>
+              <Text
+                ellipsis
+                style={{ marginLeft: 4, maxWidth: 240 }}
+                type={'secondary'}
+                weight={600}
+              >
                 {title || t('pageEditor.titlePlaceholder')}
               </Text>
             </>
           )}
-          {/* Auto Save Status */}
           {documentId && <AutoSaveHint documentId={documentId} style={{ marginLeft: 6 }} />}
         </>
       }
@@ -93,6 +94,18 @@ const Header = memo(() => {
           <ToggleRightPanelButton hideWhenExpanded showActive={false} />
         </>
       }
+      style={{
+        background: cssVar.colorBgContainer,
+        borderBottom: `1px solid ${cssVar.colorBorderSecondary}`,
+        paddingInline: 12,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}
+      styles={{
+        left: { flex: 1, minWidth: 0 },
+        right: { flex: 'none' },
+      }}
     />
   );
 });

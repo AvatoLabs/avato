@@ -67,6 +67,10 @@ export class DocumentService {
     await lambdaClient.document.deleteDocuments.mutate({ ids });
   }
 
+  async ensureFileDocument(id: string): Promise<DocumentItem> {
+    return lambdaClient.document.ensureFileDocument.mutate({ id });
+  }
+
   async restoreDocument(id: string): Promise<DocumentItem | undefined> {
     return lambdaClient.document.restoreDocument.mutate({ id });
   }

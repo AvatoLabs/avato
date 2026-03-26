@@ -290,9 +290,24 @@ export default {
   'owner': 'Group owner',
   'pageCopilot.title': 'Page Agent',
   'pageCopilot.welcome': `**Clearer, sharper writing**\n\nDraft, rewrite, or polish—tell me your intent and I'll refine the rest.`,
-  'pageCopilot.table.title': 'Table Agent',
+  'pageCopilot.table.cards.audit.prompt':
+    'Scan for duplicates, inconsistent values, and obvious gaps, then tell me what to fix first.',
+  'pageCopilot.table.cards.audit.title': 'Find issues first',
+  'pageCopilot.table.cards.fillMissing.prompt':
+    'Fill the cells that can be inferred safely. Keep the current structure and flag anything uncertain.',
+  'pageCopilot.table.cards.fillMissing.title': 'Fill obvious blanks',
+  'pageCopilot.table.cards.normalize.prompt':
+    'Standardize column names, dates, and status values without changing the meaning.',
+  'pageCopilot.table.cards.normalize.title': 'Standardize values',
+  'pageCopilot.table.cards.reshape.prompt':
+    'Review this table structure, split overloaded columns, merge duplicate fields, and suggest a cleaner schema.',
+  'pageCopilot.table.cards.reshape.title': 'Reshape the schema',
+  'pageCopilot.table.cards.summary.prompt':
+    'Summarize this table for me: row count, missing data, inconsistent values, and the next cleanup actions.',
+  'pageCopilot.table.cards.summary.title': 'Summarize the table',
+  'pageCopilot.table.title': 'Table Assistant',
   'pageCopilot.table.welcome':
-    '**Shape the table, not the fuss**\n\nAsk me to fill blanks, normalize columns, clean values, or reshape the table without leaving this page.',
+    '**Keep the table usable**\n\nFill blanks, standardize values, spot anomalies, or reshape columns without leaving this page.',
   'pageSelection.lines': 'Lines {{start}}-{{end}}',
   'pageSelection.reference': 'Selected Text',
   'pin': 'Pin',

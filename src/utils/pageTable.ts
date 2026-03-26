@@ -1,3 +1,4 @@
+import i18n from 'i18next';
 import { utils, write } from 'xlsx';
 
 const DEFAULT_FIRST_COLUMN_NAME = 'Name';
@@ -24,13 +25,36 @@ export interface TableSheetData {
   rows: TableSheetRow[];
 }
 
+const translateTableCopy = (key: string, defaultValue: string, options?: Record<string, unknown>) =>
+  i18n.t(key, { defaultValue, ns: 'file', ...options });
+
 const createColumnKey = (index: number) => `column_${index + 1}`;
 
 const createRowId = () =>
   `${DEFAULT_ROW_KEY_PREFIX}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 export const getDefaultTableColumnName = (index: number) =>
-  index === 0 ? DEFAULT_FIRST_COLUMN_NAME : `${DEFAULT_COLUMN_PREFIX} ${index + 1}`;
+  index === 0
+    ? translateTableCopy('pageEditor.table.primaryColumnName', DEFAULT_FIRST_COLUMN_NAME)
+    : translateTableCopy(
+        'pageEditor.table.defaultColumnName',
+        `${DEFAULT_COLUMN_PREFIX} ${index + 1}`,
+        { index: index + 1 },
+      );
+
+const localizeLegacyColumnName = (name: string | undefined, index: number) => {
+  const trimmed = name?.trim();
+
+  if (!trimmed) return getDefaultTableColumnName(index);
+  if (index === 0 && trimmed === DEFAULT_FIRST_COLUMN_NAME) return getDefaultTableColumnName(index);
+
+  const legacyMatch = trimmed.match(/^Column (\d+)$/);
+  if (legacyMatch && Number(legacyMatch[1]) === index + 1) {
+    return getDefaultTableColumnName(index);
+  }
+
+  return trimmed;
+};
 
 const normalizeCellValue = (value?: string) => (value ?? '').replaceAll(/\r?\n/g, ' ').trim();
 
@@ -72,10 +96,19 @@ const splitMarkdownRow = (line: string) => {
   return cells;
 };
 
-const isTableLine = (line: string) => /^\s*\|.*\|\s*$/.test(line);
+const isTableLine = (line: string) => {
+  const trimmed = line.trim();
 
-const isDividerRow = (line: string) =>
-  splitMarkdownRow(line).every((cell) => /^:?-{3,}:?$/.test(cell.replaceAll(' ', '')));
+  if (!trimmed.includes('|')) return false;
+
+  return splitMarkdownRow(trimmed).length > 1;
+};
+
+const isDividerRow = (line: string) => {
+  const cells = splitMarkdownRow(line);
+
+  return cells.length > 1 && cells.every((cell) => /^:?-+:?$/.test(cell.replaceAll(' ', '')));
+};
 
 const createRows = (columns: TableSheetColumn[], rowCount: number) =>
   Array.from({ length: rowCount }, () => {
@@ -93,7 +126,7 @@ const normalizeColumns = (headers: string[], fallbackCount = DEFAULT_TABLE_COLUM
 
   return Array.from({ length: count }, (_, index) => ({
     key: createColumnKey(index),
-    name: headers[index]?.trim() || getDefaultTableColumnName(index),
+    name: localizeLegacyColumnName(headers[index], index),
   }));
 };
 
@@ -159,7 +192,7 @@ export const parseMarkdownTable = (markdown?: string | null): TableSheetData => 
   const firstTableLineIndex = lines.findIndex(isTableLine);
 
   if (firstTableLineIndex === -1) {
-    const fallbackColumns = normalizeColumns([DEFAULT_FIRST_COLUMN_NAME], 1);
+    const fallbackColumns = normalizeColumns([getDefaultTableColumnName(0)], 1);
 
     return {
       columns: fallbackColumns,
@@ -177,7 +210,7 @@ export const parseMarkdownTable = (markdown?: string | null): TableSheetData => 
   }
 
   if (tableLines.length < 2 || !isDividerRow(tableLines[1])) {
-    const fallbackColumns = normalizeColumns([DEFAULT_FIRST_COLUMN_NAME], 1);
+    const fallbackColumns = normalizeColumns([getDefaultTableColumnName(0)], 1);
 
     return {
       columns: fallbackColumns,

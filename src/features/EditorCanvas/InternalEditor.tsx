@@ -15,6 +15,7 @@ import {
   ReactToolbarPlugin,
 } from '@lobehub/editor';
 import { Editor, useEditorState } from '@lobehub/editor/react';
+import { createStyles, cssVar } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { memo, type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +29,31 @@ import { useImageUpload } from './useImageUpload';
 const IMAGE_FILTERS = [
   { extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'], name: 'Images' },
 ];
+
+const useStyles = createStyles(({ css }) => ({
+  host: css`
+    inline-size: 100%;
+    min-block-size: 100%;
+
+    *::selection {
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 28%, transparent);
+    }
+
+    *::selection {
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 28%, transparent);
+    }
+
+    html[data-theme='dark'] & *::selection {
+      color: ${cssVar.colorTextLightSolid};
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 48%, ${cssVar.colorBgContainer} 52%);
+    }
+
+    html[data-theme='dark'] & *::selection {
+      color: ${cssVar.colorTextLightSolid};
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 48%, ${cssVar.colorBgContainer} 52%);
+    }
+  `,
+}));
 
 /**
  * Base plugins for the editor (without image and toolbar, which need dynamic config)
@@ -73,6 +99,7 @@ const InternalEditor = memo<InternalEditorProps>(
     toolbarExtraItems,
   }) => {
     const { t } = useTranslation('file');
+    const { styles } = useStyles();
     const editorState = useEditorState(editor);
     const handleImageUpload = useImageUpload();
 
@@ -183,6 +210,7 @@ const InternalEditor = memo<InternalEditorProps>(
 
     return (
       <div
+        className={styles.host}
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -197,6 +225,8 @@ const InternalEditor = memo<InternalEditorProps>(
           slashOption={slashItems ? { items: slashItems } : undefined}
           type={'text'}
           style={{
+            display: 'block',
+            minHeight: '100%',
             paddingBottom: 64,
             ...style,
           }}

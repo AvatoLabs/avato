@@ -5,19 +5,27 @@ import { createStaticStyles } from 'antd-style';
 import { memo } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { useUserStore } from '@/store/user';
+import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
 import { usePageAgentContextFallback } from '../../hooks/usePageAgentContextFallback';
 import { useTextFileLoader } from '../../hooks/useTextFileLoader';
+import { MermaidDiagramPanel } from '../Markdown/components';
+import { resolveCodeBlockLanguage } from '../Markdown/utils';
 
 const styles = createStaticStyles(({ css }) => ({
   page: css`
+    overflow-x: hidden;
+
+    box-sizing: border-box;
     width: 100%;
+    min-width: 0;
     height: 100%;
     padding-inline: 24px 4px;
   `,
 }));
 
-const getLanguage = (fileName?: string): string => {
+export const getLanguage = (fileName?: string): string => {
   if (!fileName) return 'txt';
 
   const ext = fileName.toLowerCase().split('.').pop();
@@ -147,6 +155,10 @@ const getLanguage = (fileName?: string): string => {
     case 'mdx': {
       return 'markdown';
     }
+    case 'mmd':
+    case 'mermaid': {
+      return 'mermaid';
+    }
 
     // SQL
     case 'sql': {
@@ -208,7 +220,8 @@ interface CodeViewerProps {
 const CodeViewer = memo<CodeViewerProps>(
   ({ enablePageAgentContext, fileId, url, fileName, pageAgentContextKey }) => {
     const { fileData, loading } = useTextFileLoader(url);
-    const language = getLanguage(fileName);
+    const { mermaidTheme } = useUserStore(userGeneralSettingsSelectors.config);
+    const language = resolveCodeBlockLanguage(getLanguage(fileName), fileData || '');
 
     usePageAgentContextFallback({
       contextKey: pageAgentContextKey,
@@ -221,9 +234,13 @@ const CodeViewer = memo<CodeViewerProps>(
     return (
       <Flexbox className={styles.page}>
         {!loading && fileData !== null ? (
-          <Highlighter language={language} showLanguage={false} variant={'borderless'}>
-            {fileData}
-          </Highlighter>
+          language === 'mermaid' ? (
+            <MermaidDiagramPanel content={fileData} mermaidTheme={mermaidTheme} />
+          ) : (
+            <Highlighter language={language} showLanguage={false} variant={'borderless'}>
+              {fileData}
+            </Highlighter>
+          )
         ) : (
           <Center height={'100%'}>
             <NeuralNetworkLoading size={36} />

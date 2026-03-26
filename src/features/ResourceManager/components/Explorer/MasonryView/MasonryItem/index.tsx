@@ -2,6 +2,7 @@ import { Checkbox, showContextMenu, stopPropagation } from '@lobehub/ui';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { isMarkdownResource } from '@/features/ResourceManager/utils/isMarkdownResource';
 import {
   getTransparentDragImage,
   useDragActive,
@@ -28,21 +29,9 @@ const IMAGE_TYPES = new Set([
   'image/svg+xml',
 ]);
 
-// Markdown file types
-const MARKDOWN_TYPES = new Set(['text/markdown', 'text/x-markdown']);
-
 // Custom note file type
 const CUSTOM_NOTE_TYPE = 'custom/document';
 const MARKDOWN_PREVIEW_MAX_LENGTH = 4000;
-
-// Helper to check if filename ends with .md or is a custom note
-const isMarkdownFile = (name: string, fileType?: string) => {
-  return (
-    name.toLowerCase().endsWith('.md') ||
-    name.toLowerCase().endsWith('.markdown') ||
-    (fileType && MARKDOWN_TYPES.has(fileType))
-  );
-};
 
 // Helper to check if it's a custom page that should be rendered
 // PDF and Office files should not be treated as pages even if they have fileType='custom/document'
@@ -209,6 +198,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     metadata,
     sourceType,
     slug,
+    fileId,
   }) => {
     const [markdownContent, setMarkdownContent] = useState<string>('');
     const [isLoadingMarkdown, setIsLoadingMarkdown] = useState(false);
@@ -223,7 +213,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
       () => ({
         isFolder: fileType === 'custom/folder',
         isImage: fileType && IMAGE_TYPES.has(fileType),
-        isMarkdown: isMarkdownFile(name, fileType),
+        isMarkdown: isMarkdownResource(name, fileType),
         isPage: isCustomPage(fileType, name),
       }),
       [fileType, name],
@@ -233,11 +223,13 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
 
     // Use shared click handler hook
     const handleItemClick = useFileItemClick({
+      fileId,
       id,
       isFolder,
       isPage,
       libraryId: knowledgeBaseId,
       onOpen,
+      preferPageEditor: isMarkdown,
       slug,
     });
 

@@ -104,6 +104,8 @@ const CODE_EXTENSIONS = [
   '.graphql',
   '.gql',
   '.txt',
+  '.mmd',
+  '.mermaid',
 ];
 
 const CODE_MIME_TYPES = new Set([
@@ -170,8 +172,12 @@ const CODE_MIME_TYPES = new Set([
   'mdx',
   // Other
   'graphql',
+  'mermaid',
+  'mmd',
   'txt',
   'text/plain',
+  'text/vnd.mermaid',
+  'application/vnd.mermaid',
 ]);
 
 const EXCEL_EXTENSIONS = ['.xls', '.xlsx'];

@@ -6,13 +6,16 @@ import { cssVar } from 'antd-style';
 import type { FC } from 'react';
 import { memo } from 'react';
 
+import { CONVERSATION_MIN_WIDTH } from '@/const/layoutTokens';
 import DiffAllToolbar from '@/features/EditorCanvas/DiffAllToolbar';
-import WideScreenContainer from '@/features/WideScreenContainer';
 import { useRegisterFilesHotkeys } from '@/hooks/useHotkeys';
+import { useGlobalStore } from '@/store/global';
+import { systemStatusSelectors } from '@/store/global/selectors';
 import { usePageStore } from '@/store/page';
 import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/page';
 import { StyleSheet } from '@/utils/styles';
 
+import { PAGE_EDITOR_SCROLL_ROOT_ID } from './constants';
 import Copilot from './Copilot';
 import Header from './Header';
 import ModeContent from './ModeContent';
@@ -23,18 +26,43 @@ import { usePageEditorStore } from './store';
 import TitleSection from './TitleSection';
 
 const styles = StyleSheet.create({
+  canvasFrame: {
+    boxSizing: 'border-box',
+    minHeight: '100%',
+    width: '100%',
+  },
+  canvasInner: {
+    boxSizing: 'border-box',
+    marginInline: 'auto',
+    minHeight: '100%',
+    paddingInline: 16,
+    width: '100%',
+  },
   contentWrapper: {
     display: 'flex',
     overflowY: 'auto',
     position: 'relative',
+  },
+  documentSurface: {
+    boxSizing: 'border-box',
+    minHeight: '100%',
+    paddingBottom: 24,
+    paddingInline: 20,
+    position: 'relative',
+    width: '100%',
   },
   editorContainer: {
     minWidth: 0,
     position: 'relative',
   },
   editorContent: {
-    overflowY: 'auto',
+    boxSizing: 'border-box',
+    minHeight: '100%',
+    minWidth: 0,
     position: 'relative',
+  },
+  workspaceBackground: {
+    background: cssVar.colorBgContainer,
   },
 });
 
@@ -67,52 +95,71 @@ const PageEditorCanvas = memo<PageEditorCanvasProps>(
       s.pageKind,
       s.viewMode,
     ]);
+    const wideScreen = useGlobalStore(systemStatusSelectors.wideScreen);
     const isTablePage = pageKind === TABLE_PAGE_KIND;
+    const canvasWidth = wideScreen
+      ? '100%'
+      : `min(${contentMinWidth || CONVERSATION_MIN_WIDTH}px, 100%)`;
 
     // Register Files scope and save document hotkey
     useRegisterFilesHotkeys();
 
+    const content = (
+      <div style={styles.editorContent}>
+        <TitleSection />
+        <ModeContent
+          documentId={documentId}
+          editor={editor}
+          pageKind={pageKind || DEFAULT_PAGE_KIND}
+          viewMode={viewMode}
+        />
+      </div>
+    );
+
     return (
       <>
         <PageTitle />
-        <Flexbox
-          horizontal
-          height={'100%'}
-          style={{ backgroundColor: cssVar.colorBgContainer }}
-          width={'100%'}
-        >
+        <Flexbox horizontal height={'100%'} style={styles.workspaceBackground} width={'100%'}>
           <Flexbox flex={1} height={'100%'} style={styles.editorContainer}>
             <Header />
             <Flexbox
               horizontal
               height={'100%'}
+              id={PAGE_EDITOR_SCROLL_ROOT_ID}
               width={'100%'}
               style={{
                 ...styles.contentWrapper,
                 overflowX: allowHorizontalScroll ? 'auto' : undefined,
               }}
             >
-              <div style={{ minWidth: contentMinWidth, width: '100%' }}>
-                <WideScreenContainer
-                  wrapperStyle={{
-                    cursor: viewMode === 'rich' && !isTablePage ? 'text' : 'default',
-                  }}
-                  onClick={() => {
-                    if (viewMode === 'rich' && !isTablePage) {
-                      editor?.focus();
-                    }
-                  }}
-                >
-                  <Flexbox flex={1} style={styles.editorContent}>
-                    <TitleSection />
-                    <ModeContent
-                      documentId={documentId}
-                      editor={editor}
-                      pageKind={pageKind || DEFAULT_PAGE_KIND}
-                      viewMode={viewMode}
-                    />
+              <div
+                style={{
+                  minHeight: isTablePage ? undefined : '100%',
+                  minWidth: contentMinWidth,
+                  width: '100%',
+                }}
+              >
+                {isTablePage ? (
+                  <Flexbox paddingInline={20} width={'100%'}>
+                    {content}
                   </Flexbox>
-                </WideScreenContainer>
+                ) : (
+                  <div
+                    style={{
+                      ...styles.canvasFrame,
+                      cursor: viewMode === 'rich' && !isTablePage ? 'text' : 'default',
+                    }}
+                    onClick={() => {
+                      if (viewMode === 'rich' && !isTablePage) {
+                        editor?.focus();
+                      }
+                    }}
+                  >
+                    <div style={{ ...styles.canvasInner, width: canvasWidth }}>
+                      <div style={styles.documentSurface}>{content}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Flexbox>
             {documentId && editor && viewMode === 'rich' && !isTablePage && (
@@ -154,27 +201,27 @@ export const PageEditor: FC<PageEditorProps> = ({
   };
 
   return (
-    <PageAgentProvider>
-      <EditorProvider>
-        <PageEditorProvider
-          emoji={emoji}
-          knowledgeBaseId={knowledgeBaseId}
-          pageId={pageId}
-          pageKind={pageKind}
-          title={title}
-          onBack={onBack}
-          onDelete={handleDeleteNavigate}
-          onDocumentIdChange={onDocumentIdChange}
-          onEmojiChange={onEmojiChange}
-          onSave={onSave}
-          onTitleChange={onTitleChange}
-        >
+    <EditorProvider>
+      <PageEditorProvider
+        emoji={emoji}
+        knowledgeBaseId={knowledgeBaseId}
+        pageId={pageId}
+        pageKind={pageKind}
+        title={title}
+        onBack={onBack}
+        onDelete={handleDeleteNavigate}
+        onDocumentIdChange={onDocumentIdChange}
+        onEmojiChange={onEmojiChange}
+        onSave={onSave}
+        onTitleChange={onTitleChange}
+      >
+        <PageAgentProvider>
           <PageEditorCanvas
             allowHorizontalScroll={allowHorizontalScroll}
             contentMinWidth={contentMinWidth}
           />
-        </PageEditorProvider>
-      </EditorProvider>
-    </PageAgentProvider>
+        </PageAgentProvider>
+      </PageEditorProvider>
+    </EditorProvider>
   );
 };

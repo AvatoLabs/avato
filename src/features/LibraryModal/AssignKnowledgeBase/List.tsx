@@ -54,7 +54,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   content: css`
     min-width: 0;
-    padding: 16px;
+    padding-block: 18px 20px;
+    padding-inline: 20px;
   `,
   countText: css`
     font-size: 12px;
@@ -69,19 +70,17 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   itemRow: css`
     cursor: pointer;
-
-    padding: 12px;
-    border: 1px solid ${cssVar.colorBorderSecondary};
-    border-radius: ${cssVar.borderRadiusLG}px;
-
-    background: ${cssVar.colorBgContainer};
-
+    padding-block: 12px;
+    padding-inline: 16px;
     transition:
       border-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
       background-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
 
+    &:not(:last-child) {
+      border-block-end: 1px solid ${cssVar.colorBorderSecondary};
+    }
+
     &:hover {
-      border-color: ${cssVar.colorPrimaryBorder};
       background: ${cssVar.colorFillTertiary};
     }
   `,
@@ -92,23 +91,37 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   itemTitle: css`
     font-size: 14px;
     font-weight: 500;
+    line-height: 1.5;
+  `,
+  listBody: css`
+    overflow-y: auto;
+    min-height: 0;
+  `,
+  listSurface: css`
+    overflow: hidden;
+
+    min-height: 0;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadiusLG}px;
+
+    background: ${cssVar.colorBgContainer};
   `,
   locationBar: css`
     min-height: 32px;
   `,
   panelTitle: css`
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    color: ${cssVar.colorTextTertiary};
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    color: ${cssVar.colorTextSecondary};
+  `,
+  searchBar: css`
+    width: 100%;
   `,
   sourceItem: css`
     cursor: pointer;
 
     padding-block: 10px;
     padding-inline: 12px;
-    border: 1px solid transparent;
     border-radius: ${cssVar.borderRadiusLG}px;
 
     transition:
@@ -116,12 +129,12 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       background-color ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
 
     &:hover {
-      background: ${cssVar.colorFillTertiary};
+      background: ${cssVar.colorFillSecondary};
     }
   `,
   sourceItemActive: css`
-    border-color: ${cssVar.colorBorderSecondary};
-    background: ${cssVar.colorBgElevated};
+    background: ${cssVar.colorFillSecondary};
+    box-shadow: inset 0 0 0 1px ${cssVar.colorBorderSecondary};
   `,
   sourceSecondary: css`
     font-size: 12px;
@@ -131,9 +144,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   sourceSidebar: css`
     overflow-y: auto;
 
-    width: 260px;
-    min-width: 260px;
-    padding: 16px;
+    width: 252px;
+    min-width: 252px;
+    padding-block: 18px 20px;
+    padding-inline: 16px 12px;
     border-inline-end: 1px solid ${cssVar.colorBorderSecondary};
 
     background: ${cssVar.colorFillQuaternary};
@@ -141,12 +155,18 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   sourceTitle: css`
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.4;
   `,
   emptyActions: css`
     margin-block-start: 4px;
   `,
+  toolbar: css`
+    gap: 12px;
+    padding-block-end: 12px;
+    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
+  `,
   titleRow: css`
-    min-height: 32px;
+    min-height: 36px;
   `,
 }));
 
@@ -236,10 +256,11 @@ const FileEntryRow = memo<FileEntryRowProps>(
           </Button>
         ) : (
           <Button
-            className={styles.actionButton}
+            className={cx(styles.actionButton)}
             icon={attached ? <Icon icon={CheckIcon} /> : undefined}
             loading={loading}
             size={'small'}
+            style={{ flexShrink: 0 }}
             type={attached ? 'default' : 'primary'}
             onClick={(e) => {
               e.stopPropagation();
@@ -655,14 +676,14 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
         })}
       </Flexbox>
 
-      <Flexbox className={styles.content} flex={1} gap={12}>
-        <Flexbox gap={8}>
+      <Flexbox className={styles.content} flex={1} gap={16}>
+        <Flexbox className={styles.toolbar}>
           <Flexbox
             horizontal
             align={'center'}
             className={styles.titleRow}
             gap={12}
-            justify={'space-between'}
+            justify={folderStack.length > 0 ? 'space-between' : 'flex-end'}
           >
             <Flexbox horizontal align={'center'} className={styles.locationBar} gap={6}>
               {folderStack.length > 0 && (
@@ -743,6 +764,7 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
 
           <SearchBar
             allowClear
+            className={styles.searchBar}
             value={searchQuery}
             variant={'filled'}
             placeholder={t(
@@ -754,19 +776,19 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
           />
         </Flexbox>
 
-        <Flexbox flex={1} gap={10} style={{ minHeight: 0, overflowY: 'auto' }}>
+        <Flexbox className={styles.listSurface} flex={1}>
           <input hidden multiple ref={fileInputRef} type={'file'} onChange={handleUploadFiles} />
           {isLoading ? (
-            <Center flex={1}>
+            <Center flex={1} style={{ minHeight: 280 }}>
               <Text className={styles.countText}>{t('loading', 'Loading...', { ns: 'file' })}</Text>
             </Center>
           ) : error ? (
-            <Center flex={1} gap={12}>
+            <Center flex={1} gap={12} style={{ minHeight: 280 }}>
               <Icon icon={ServerCrash} size={64} />
               <Text className={styles.emptyHint}>{t('networkError', { ns: 'file' })}</Text>
             </Center>
           ) : items.length === 0 ? (
-            <Center flex={1} gap={12}>
+            <Center flex={1} gap={12} style={{ minHeight: 280 }}>
               <Empty
                 icon={selectedKnowledgeBase ? LibraryBig : FileStack}
                 style={{ maxWidth: 420 }}
@@ -798,17 +820,19 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
               )}
             </Center>
           ) : (
-            items.map((item) => (
-              <FileEntryRow
-                attached={attachedFileIds.has(item.fileId || item.id)}
-                item={item}
-                key={`${item.sourceType}:${item.id}`}
-                loading={mutatingKey === `file:${item.fileId || item.id}`}
-                scope={scope}
-                onOpenFolder={handleOpenFolder}
-                onToggleFile={toggleFile}
-              />
-            ))
+            <Flexbox className={styles.listBody} flex={1}>
+              {items.map((item) => (
+                <FileEntryRow
+                  attached={attachedFileIds.has(item.fileId || item.id)}
+                  item={item}
+                  key={`${item.sourceType}:${item.id}`}
+                  loading={mutatingKey === `file:${item.fileId || item.id}`}
+                  scope={scope}
+                  onOpenFolder={handleOpenFolder}
+                  onToggleFile={toggleFile}
+                />
+              ))}
+            </Flexbox>
           )}
         </Flexbox>
       </Flexbox>

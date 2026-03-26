@@ -115,6 +115,18 @@ export const documentRouter = router({
       return ctx.documentService.deleteDocuments(input.ids);
     }),
 
+  ensureFileDocument: documentProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.id,
+        kind: 'file',
+      });
+
+      return ctx.documentService.ensureFileDocument(input.id);
+    }),
+
   restoreDocument: documentProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

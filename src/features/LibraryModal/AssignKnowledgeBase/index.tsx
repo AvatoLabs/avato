@@ -1,4 +1,5 @@
 import { Flexbox, Modal, Text } from '@lobehub/ui';
+import { createStaticStyles } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,6 +7,25 @@ import { useServerConfigStore } from '@/store/serverConfig';
 
 import List from './List';
 import { type LibraryModalScope } from './types';
+
+const styles = createStaticStyles(({ css, cssVar }) => ({
+  header: css`
+    gap: 2px;
+    padding-block: 20px 16px;
+    padding-inline: 24px 72px;
+    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
+  `,
+  subtitle: css`
+    font-size: 13px;
+    color: ${cssVar.colorTextDescription};
+  `,
+  title: css`
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: ${cssVar.colorText};
+  `,
+}));
 
 interface AttachKnowledgeModalProps {
   open?: boolean;
@@ -26,14 +46,12 @@ export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
         allowFullscreen
         footer={null}
         open={open}
-        styles={{ body: { overflow: 'hidden', padding: 0 } }}
+        title={null}
         width={'min(88vw, 980px)'}
-        title={
-          <Flexbox gap={2}>
-            <Text strong>{t('knowledgeBase.library.title')}</Text>
-            <Text type={'secondary'}>{subtitle}</Text>
-          </Flexbox>
-        }
+        styles={{
+          body: { overflow: 'hidden', padding: 0 },
+          header: { display: 'none' },
+        }}
         onCancel={() => {
           setOpen(false);
         }}
@@ -43,6 +61,10 @@ export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
           style={{ maxHeight: mobile ? '-webkit-fill-available' : 'inherit' }}
           width={'100%'}
         >
+          <Flexbox className={styles.header}>
+            <Text className={styles.title}>{t('knowledgeBase.library.title')}</Text>
+            <Text className={styles.subtitle}>{subtitle}</Text>
+          </Flexbox>
           <List scope={scope} />
         </Flexbox>
       </Modal>

@@ -80,6 +80,21 @@ describe('FileViewer', () => {
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
   });
 
+  it('routes mermaid files to the code viewer path so they can be upgraded there', () => {
+    render(
+      <FileViewer
+        {...createFile({
+          fileType: 'application/octet-stream',
+          id: 'file-3b',
+          name: 'diagram.mmd',
+          url: '/diagram.mmd',
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+  });
+
   it('renders xlsx files with the local excel viewer', () => {
     render(
       <FileViewer

@@ -19,6 +19,7 @@ const n = setNamespace('document/editor');
  */
 export interface SaveMetadata {
   emoji?: string;
+  metadata?: Record<string, any>;
   title?: string;
 }
 
@@ -151,8 +152,10 @@ export class EditorActionImpl {
     const doc = documents[id];
     if (!doc || !editor) return;
 
+    const hasExtraSavePayload = metadata?.metadata !== undefined || metadata?.title !== undefined;
+
     // Skip save if no changes
-    if (!doc.isDirty) return;
+    if (!doc.isDirty && !hasExtraSavePayload) return;
 
     // Update save status
     internal_dispatchDocument({ id, type: 'updateDocument', value: { saveStatus: 'saving' } });
@@ -166,7 +169,7 @@ export class EditorActionImpl {
         content: currentContent,
         editorData: JSON.stringify(currentEditorData),
         id,
-        metadata: metadata?.emoji ? { emoji: metadata.emoji } : undefined,
+        metadata: metadata?.metadata,
         title: metadata?.title,
       });
 

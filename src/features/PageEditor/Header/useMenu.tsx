@@ -13,6 +13,7 @@ import { editorSelectors } from '@/store/document/slices/editor';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
+import { usePageStore } from '@/store/page';
 import { TABLE_PAGE_KIND } from '@/utils/page';
 
 import { usePageEditorStore, useStoreApi } from '../store';
@@ -96,6 +97,16 @@ export const useMenu = (): { menuItems: any[] } => {
 
     try {
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
+      let content = markdown;
+
+      if (isTablePage && documentId) {
+        const document = usePageStore.getState().documents?.find((item) => item.id === documentId);
+        const { normalizeTableDocument, tableDocumentToMarkdown } =
+          await import('@/utils/tableDocument');
+        const table = normalizeTableDocument(markdown, document?.metadata?.table);
+        content = tableDocumentToMarkdown(table, { activeViewOnly: true });
+      }
+
       const fileName = normalizeExportFileName(
         title || t(isTablePage ? 'pageList.tableUntitled' : 'pageList.untitled'),
         'md',
@@ -104,11 +115,11 @@ export const useMenu = (): { menuItems: any[] } => {
       if (isDesktop) {
         const { desktopExportService } = await import('@/services/electron/desktopExportService');
         await desktopExportService.exportMarkdown({
-          content: markdown,
+          content,
           fileName,
         });
       } else {
-        const blob = new Blob([markdown], { type: 'text/markdown' });
+        const blob = new Blob([content], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -123,7 +134,7 @@ export const useMenu = (): { menuItems: any[] } => {
       console.error('Failed to export markdown:', error);
       message.error(t('pageEditor.exportError'));
     }
-  }, [isTablePage, message, storeApi, t]);
+  }, [documentId, isTablePage, message, storeApi, t]);
 
   const handleExportCsv = useCallback(async () => {
     const state = storeApi.getState();
@@ -133,8 +144,12 @@ export const useMenu = (): { menuItems: any[] } => {
 
     try {
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
-      const { parseMarkdownTable, tableSheetToCsv } = await import('@/utils/pageTable');
-      const csv = `\uFEFF${tableSheetToCsv(parseMarkdownTable(markdown))}`;
+      const document = documentId
+        ? usePageStore.getState().documents?.find((item) => item.id === documentId)
+        : undefined;
+      const { normalizeTableDocument, tableDocumentToCsv } = await import('@/utils/tableDocument');
+      const table = normalizeTableDocument(markdown, document?.metadata?.table);
+      const csv = `\uFEFF${tableDocumentToCsv(table, { activeViewOnly: true })}`;
       const fileName = normalizeExportFileName(title || t('pageList.tableUntitled'), 'csv');
 
       if (isDesktop) {
@@ -151,7 +166,7 @@ export const useMenu = (): { menuItems: any[] } => {
       console.error('Failed to export csv:', error);
       message.error(t('pageEditor.exportError'));
     }
-  }, [message, storeApi, t]);
+  }, [documentId, message, storeApi, t]);
 
   const handleExportXlsx = useCallback(async () => {
     const state = storeApi.getState();
@@ -161,8 +176,13 @@ export const useMenu = (): { menuItems: any[] } => {
 
     try {
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
-      const { parseMarkdownTable, tableSheetToXlsxBase64 } = await import('@/utils/pageTable');
-      const base64Content = tableSheetToXlsxBase64(parseMarkdownTable(markdown), title);
+      const document = documentId
+        ? usePageStore.getState().documents?.find((item) => item.id === documentId)
+        : undefined;
+      const { normalizeTableDocument, tableDocumentToXlsxBase64 } =
+        await import('@/utils/tableDocument');
+      const table = normalizeTableDocument(markdown, document?.metadata?.table);
+      const base64Content = tableDocumentToXlsxBase64(table, title, { activeViewOnly: true });
       const fileName = normalizeExportFileName(title || t('pageList.tableUntitled'), 'xlsx');
 
       if (isDesktop) {
@@ -179,7 +199,7 @@ export const useMenu = (): { menuItems: any[] } => {
       console.error('Failed to export xlsx:', error);
       message.error(t('pageEditor.exportError'));
     }
-  }, [message, storeApi, t]);
+  }, [documentId, message, storeApi, t]);
 
   const menuItems = useMemo<DropdownItem[]>(() => {
     const exportItems: DropdownItem[] = isTablePage

@@ -39,6 +39,17 @@ describe('pageTable', () => {
     expect(sheet.rows.map((row) => row.column_1)).toEqual(['Alpha', 'Beta']);
   });
 
+  it('should parse markdown tables with short alignment markers and optional trailing pipes', () => {
+    const sheet = parseMarkdownTable(`| 名称 | 状态
+| :- | :-:
+| 启动 | 进行中
+| 发布 | 已完成`);
+
+    expect(sheet.columns.map((column) => column.name)).toEqual(['名称', '状态']);
+    expect(sheet.rows.map((row) => row.column_1)).toEqual(['启动', '发布']);
+    expect(sheet.rows.map((row) => row.column_2)).toEqual(['进行中', '已完成']);
+  });
+
   it('should export csv and xlsx from sheet data', () => {
     const sheet = parseMarkdownTable(`| Name | Owner |
 | --- | --- |

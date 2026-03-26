@@ -1,3 +1,4 @@
+import i18n from 'i18next';
 import { type SWRResponse } from 'swr';
 
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
@@ -6,7 +7,6 @@ import { type StoreSetter } from '@/store/types';
 import { type LobeDocument } from '@/types/document';
 import { DocumentSourceType } from '@/types/document';
 import {
-  createStarterTableMarkdown,
   DEFAULT_PAGE_KIND,
   getPageDetailPath,
   getPageKindFromDocument,
@@ -15,6 +15,7 @@ import {
   TABLE_PAGE_KIND,
 } from '@/utils/page';
 import { setNamespace } from '@/utils/storeDebug';
+import { createDefaultTableDocument, tableDocumentToMarkdown } from '@/utils/tableDocument';
 
 import { type PageStore } from '../../store';
 
@@ -23,6 +24,8 @@ const n = setNamespace('page/crud');
 const EDITOR_PAGE_FILE_TYPE = 'custom/document';
 const DEFAULT_TABLE_COLUMNS = 5;
 const DEFAULT_TABLE_ROWS = 8;
+const getDefaultTableSheetName = () =>
+  i18n.t('pageEditor.table.sheetDefaultName', { index: 1, ns: 'file' });
 
 /**
  * Page update parameters - flattened for easier use
@@ -58,13 +61,23 @@ export class CrudActionImpl {
     );
 
     try {
-      const content =
+      const defaultTable =
         pageKind === TABLE_PAGE_KIND
-          ? createStarterTableMarkdown(DEFAULT_TABLE_COLUMNS, DEFAULT_TABLE_ROWS)
-          : '';
+          ? createDefaultTableDocument(
+              DEFAULT_TABLE_COLUMNS,
+              DEFAULT_TABLE_ROWS,
+              getDefaultTableSheetName(),
+            )
+          : undefined;
+      const content = defaultTable ? tableDocumentToMarkdown(defaultTable) : '';
 
       // Create real page
-      const newPage = await createPage({ content, pageKind, title });
+      const newPage = await createPage({
+        content,
+        pageKind,
+        table: defaultTable,
+        title,
+      });
 
       // Convert to LobeDocument
       const realPage: LobeDocument = {
@@ -131,7 +144,13 @@ export class CrudActionImpl {
     const newPage: LobeDocument = {
       content:
         pageKind === TABLE_PAGE_KIND
-          ? createStarterTableMarkdown(DEFAULT_TABLE_COLUMNS, DEFAULT_TABLE_ROWS)
+          ? tableDocumentToMarkdown(
+              createDefaultTableDocument(
+                DEFAULT_TABLE_COLUMNS,
+                DEFAULT_TABLE_ROWS,
+                getDefaultTableSheetName(),
+              ),
+            )
           : null,
       createdAt: now,
       editorData: null,
@@ -139,6 +158,15 @@ export class CrudActionImpl {
       filename: title,
       id: tempId,
       metadata: {
+        ...(pageKind === TABLE_PAGE_KIND
+          ? {
+              table: createDefaultTableDocument(
+                DEFAULT_TABLE_COLUMNS,
+                DEFAULT_TABLE_ROWS,
+                getDefaultTableSheetName(),
+              ),
+            }
+          : {}),
         pageKind,
       },
       source: 'document',
@@ -161,11 +189,13 @@ export class CrudActionImpl {
     knowledgeBaseId,
     parentId,
     pageKind = DEFAULT_PAGE_KIND,
+    table,
   }: {
     content?: string;
     knowledgeBaseId?: string;
     parentId?: string;
     pageKind?: PageKind;
+    table?: ReturnType<typeof createDefaultTableDocument>;
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
@@ -178,6 +208,7 @@ export class CrudActionImpl {
       metadata: {
         createdAt: now,
         pageKind,
+        ...(table ? { table } : {}),
       },
       parentId,
       title,

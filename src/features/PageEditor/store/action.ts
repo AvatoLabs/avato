@@ -145,9 +145,18 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         set({ metaSaveStatus: 'saving' });
 
         try {
+          const currentDocument = usePageStore
+            .getState()
+            .documents?.find((document) => document.id === documentId);
+          const nextMetadata = {
+            ...currentDocument?.metadata,
+            ...(emoji !== undefined ? { emoji } : {}),
+          };
+
           // Trigger save via DocumentStore with metadata
           await useDocumentStore.getState().performSave(documentId, {
             emoji,
+            metadata: nextMetadata,
             title,
           });
 

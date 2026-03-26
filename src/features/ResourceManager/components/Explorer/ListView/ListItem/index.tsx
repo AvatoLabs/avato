@@ -20,6 +20,7 @@ import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { clearTreeFolderCache } from '@/features/ResourceManager/components/LibraryHierarchy';
 import { PAGE_FILE_TYPE } from '@/features/ResourceManager/constants';
+import { isMarkdownResource } from '@/features/ResourceManager/utils/isMarkdownResource';
 import {
   getTransparentDragImage,
   useDragActive,
@@ -150,6 +151,7 @@ const FileListItem = memo<FileListItemProps>(
     url,
     name,
     fileType,
+    fileId,
     id,
     createdAt,
     selected,
@@ -209,6 +211,7 @@ const FileListItem = memo<FileListItemProps>(
       return {
         emoji: sourceType === 'document' || fileType === PAGE_FILE_TYPE ? metadata?.emoji : null,
         isFolder: fileType === 'custom/folder',
+        isMarkdown: isMarkdownResource(name, fileType),
         // PDF and Office files should not be treated as pages, even if they have sourceType='document'
         isPage:
           !isPDF && !isOfficeFile && (sourceType === 'document' || fileType === PAGE_FILE_TYPE),
@@ -216,7 +219,7 @@ const FileListItem = memo<FileListItemProps>(
       };
     }, [fileType, sourceType, metadata?.emoji, name]);
 
-    const { isSupportedForChunking, isPage, isFolder, emoji } = computedValues;
+    const { isSupportedForChunking, isPage, isFolder, isMarkdown, emoji } = computedValues;
 
     const dragData = useMemo(
       () => ({
@@ -347,10 +350,12 @@ const FileListItem = memo<FileListItemProps>(
 
     // Use shared click handler hook
     const handleItemClick = useFileItemClick({
+      fileId,
       id,
       isFolder,
       isPage,
       libraryId: resourceManagerState.libraryId,
+      preferPageEditor: isMarkdown,
       slug,
     });
 

@@ -1,4 +1,5 @@
-import { Avatar, Icon } from '@lobehub/ui';
+import { Avatar, Icon, Text } from '@lobehub/ui';
+import dayjs from 'dayjs';
 import { type MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,6 +39,13 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
     document?.title ||
     t(pageKind === TABLE_PAGE_KIND ? 'pageList.tableUntitled' : 'pageList.untitled');
   const emoji = document?.metadata?.emoji;
+  const updatedLabel = useMemo(() => {
+    if (!document?.updatedAt) return undefined;
+
+    return dayjs().diff(dayjs(document.updatedAt), 'd') < 7
+      ? dayjs(document.updatedAt).fromNow()
+      : dayjs(document.updatedAt).format('YYYY-MM-DD');
+  }, [document?.updatedAt]);
 
   const toggleEditing = useCallback(
     (visible?: boolean) => {
@@ -101,6 +109,13 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
         icon={icon}
         key={pageId}
         title={title}
+        extra={
+          updatedLabel ? (
+            <Text fontSize={11} style={{ color: 'inherit', opacity: active ? 0.7 : 0.5 }}>
+              {updatedLabel}
+            </Text>
+          ) : undefined
+        }
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />

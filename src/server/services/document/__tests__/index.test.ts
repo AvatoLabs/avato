@@ -7,8 +7,9 @@ import { FileModel } from '@/database/models/file';
 import { FileService } from '../../file';
 import { DocumentService } from '../index';
 
-const { mockRequireDocument } = vi.hoisted(() => ({
+const { mockRequireDocument, mockRequireFile } = vi.hoisted(() => ({
   mockRequireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
+  mockRequireFile: vi.fn().mockResolvedValue({ id: 'file-1' }),
 }));
 
 vi.mock('@/database/models/document');
@@ -31,6 +32,7 @@ vi.mock('../../file');
 vi.mock('../../resource', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
     requireDocument: mockRequireDocument,
+    requireFile: mockRequireFile,
     requireKnowledgeBase: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
   })),
   ResourceAuthorizer: vi.fn(() => ({
@@ -80,6 +82,7 @@ describe('DocumentService', () => {
       create: vi.fn(),
       delete: vi.fn(),
       deleteManyAny: vi.fn(),
+      findByFileId: vi.fn(),
       findById: vi.fn(),
       findByIdAny: vi.fn(),
       query: vi.fn(),
@@ -396,9 +399,7 @@ describe('DocumentService', () => {
         .mockResolvedValueOnce([{ id: 'child-doc-1' }, { id: 'child-folder-2' }])
         .mockResolvedValueOnce([]);
 
-      (mockDb.query as any).files.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      (mockDb.query as any).files.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       await service.deleteDocument('folder-1');
 
@@ -672,6 +673,50 @@ describe('DocumentService', () => {
       await expect(service.parseDocument('file-1')).rejects.toThrow('Parse error');
 
       expect(mockCleanup).toHaveBeenCalled();
+    });
+  });
+
+  describe('ensureFileDocument', () => {
+    it('should reuse an existing parsed document for the file', async () => {
+      const existingDocument = { fileId: 'file-1', id: 'docs_1', sourceType: 'file' };
+      mockDocumentModel.findByFileId.mockResolvedValue(existingDocument);
+
+      const result = await service.ensureFileDocument('file-1');
+
+      expect(mockRequireFile).toHaveBeenCalledWith('file-1', 'preview_content');
+      expect(mockDocumentModel.findByFileId).toHaveBeenCalledWith('file-1');
+      expect(mockFileService.downloadFileToLocal).not.toHaveBeenCalled();
+      expect(result).toBe(existingDocument);
+    });
+
+    it('should parse the file when no derived document exists yet', async () => {
+      mockDocumentModel.findByFileId.mockResolvedValue(undefined);
+      mockFileService.downloadFileToLocal.mockResolvedValue({
+        cleanup: vi.fn(),
+        file: { name: 'readme.md', parentId: null, url: 's3://bucket/readme.md' },
+        filePath: '/tmp/readme.md',
+      });
+      vi.mocked(loadFile).mockResolvedValue({
+        content: '# Hello',
+        fileType: 'markdown',
+        metadata: { title: 'Readme' },
+        pages: undefined,
+        totalCharCount: 7,
+        totalLineCount: 1,
+      } as any);
+      mockDocumentModel.create.mockResolvedValue({ id: 'docs_2', title: 'Readme' });
+
+      const result = await service.ensureFileDocument('file-1');
+
+      expect(mockDocumentModel.findByFileId).toHaveBeenCalledWith('file-1');
+      expect(mockDocumentModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'file-1',
+          sourceType: 'file',
+          title: 'Readme',
+        }),
+      );
+      expect(result).toEqual({ id: 'docs_2', title: 'Readme' });
     });
   });
 

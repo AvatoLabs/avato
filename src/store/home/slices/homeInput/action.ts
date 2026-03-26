@@ -7,6 +7,9 @@ import { getAgentStoreState } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
+import { settingsSelectors } from '@/store/user/selectors';
+import { useUserStore } from '@/store/user/store';
+import { resolveModelProviderWithFallback } from '@/utils/pageAgentModel';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type StarterMode } from './initialState';
@@ -36,14 +39,14 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Agent with inherited model/provider
       const result = await agentState.createAgent({
@@ -94,14 +97,14 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Group with inherited model/provider for orchestrator
       const { group } = await chatGroupService.createGroup({
@@ -163,14 +166,14 @@ export class HomeInputActionImpl {
 
     try {
       const agentState = getAgentStoreState();
+      const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
       const inboxConfig = inboxAgentId
         ? agentSelectors.getAgentConfigById(inboxAgentId)(agentState)
         : null;
-      const model = inboxConfig?.model;
-      const provider = inboxConfig?.provider;
+      const { model, provider } = resolveModelProviderWithFallback(inboxConfig, defaultAgentConfig);
 
       // 2. Create new Document
       const newDoc = await documentService.createDocument({

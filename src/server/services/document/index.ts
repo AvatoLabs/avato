@@ -519,6 +519,15 @@ export class DocumentService {
     return result;
   }
 
+  async ensureFileDocument(fileId: string): Promise<DocumentItem> {
+    await this.resolver.requireFile(fileId, 'preview_content');
+
+    const existingDocument = await this.documentModel.findByFileId(fileId);
+    if (existingDocument) return existingDocument;
+
+    return this.parseDocument(fileId) as Promise<DocumentItem>;
+  }
+
   /**
    * Parse file and create a document for page editor (without page tags)
    */

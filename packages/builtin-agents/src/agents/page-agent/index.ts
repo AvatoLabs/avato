@@ -1,6 +1,3 @@
-import { DEFAULT_PROVIDER } from '@lobechat/business-const';
-import { DEFAULT_MODEL } from '@lobechat/const';
-
 import type { BuiltinAgentDefinition } from '../../types';
 import { BUILTIN_AGENT_SLUGS } from '../../types';
 import { systemRoleTemplate } from './systemRole';
@@ -10,11 +7,9 @@ import { systemRoleTemplate } from './systemRole';
  */
 export const PAGE_AGENT: BuiltinAgentDefinition = {
   avatar: '/avatars/doc-copilot.svg',
-  // Persist config - stored in database
-  persist: {
-    model: DEFAULT_MODEL,
-    provider: DEFAULT_PROVIDER,
-  },
+  // Persist config intentionally leaves model/provider empty.
+  // The page copilot should inherit the user's default model unless explicitly changed.
+  persist: {},
 
   // Runtime function - generates dynamic config
   runtime: (ctx) => ({
