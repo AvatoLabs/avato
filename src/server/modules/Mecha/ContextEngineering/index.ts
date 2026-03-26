@@ -97,6 +97,7 @@ export const serverMessagesEngine = async ({
 
     // Knowledge injection
     knowledge: {
+      conversationFileContents: knowledge?.conversationFileContents,
       fileContents: knowledge?.fileContents,
       knowledgeBases: knowledge?.knowledgeBases,
     },

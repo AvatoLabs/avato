@@ -1,0 +1,24 @@
+import { describe, expect, it } from 'vitest';
+
+import { promptConversationFiles } from './conversationFiles';
+
+describe('promptConversationFiles', () => {
+  it('should return empty string when there are no files', () => {
+    expect(promptConversationFiles()).toBe('');
+  });
+
+  it('should format conversation-scoped files with explicit wrapper', () => {
+    const result = promptConversationFiles([
+      {
+        content: 'Session scoped content',
+        fileId: 'file-1',
+        filename: 'notes.md',
+      },
+    ]);
+
+    expect(result).toContain('<conversation_files totalCount="1">');
+    expect(result).toContain('current conversation only');
+    expect(result).toContain('<file id="file-1" name="notes.md">');
+    expect(result).toContain('Session scoped content');
+  });
+});

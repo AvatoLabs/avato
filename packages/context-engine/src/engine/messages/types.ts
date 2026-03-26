@@ -34,6 +34,8 @@ export interface ModelCapabilityChecker {
  * Knowledge configuration
  */
 export interface KnowledgeConfig {
+  /** Conversation-scoped file contents to inject */
+  conversationFileContents?: FileContent[];
   /** File contents to inject */
   fileContents?: FileContent[];
   /** Knowledge base metadata to inject */

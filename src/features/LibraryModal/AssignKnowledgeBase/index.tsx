@@ -5,35 +5,43 @@ import { useTranslation } from 'react-i18next';
 import { useServerConfigStore } from '@/store/serverConfig';
 
 import List from './List';
+import { type LibraryModalScope } from './types';
 
 interface AttachKnowledgeModalProps {
   open?: boolean;
+  scope?: LibraryModalScope;
   setOpen: (open: boolean) => void;
 }
 
-export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(({ setOpen, open }) => {
-  const { t } = useTranslation('chat');
-  const mobile = useServerConfigStore((s) => s.isMobile);
+export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
+  ({ setOpen, open, scope = 'agent' }) => {
+    const { t } = useTranslation('chat');
+    const mobile = useServerConfigStore((s) => s.isMobile);
 
-  return (
-    <Modal
-      allowFullscreen
-      footer={null}
-      open={open}
-      styles={{ body: { overflow: 'hidden' } }}
-      title={t('knowledgeBase.library.title')}
-      width={600}
-      onCancel={() => {
-        setOpen(false);
-      }}
-    >
-      <Flexbox
-        gap={mobile ? 8 : 16}
-        style={{ maxHeight: mobile ? '-webkit-fill-available' : 'inherit' }}
-        width={'100%'}
+    return (
+      <Modal
+        allowFullscreen
+        footer={null}
+        open={open}
+        styles={{ body: { overflow: 'hidden' } }}
+        width={600}
+        title={
+          scope === 'conversation'
+            ? t('conversationFiles.library.title')
+            : t('knowledgeBase.library.title')
+        }
+        onCancel={() => {
+          setOpen(false);
+        }}
       >
-        <List />
-      </Flexbox>
-    </Modal>
-  );
-});
+        <Flexbox
+          gap={mobile ? 8 : 16}
+          style={{ maxHeight: mobile ? '-webkit-fill-available' : 'inherit' }}
+          width={'100%'}
+        >
+          <List scope={scope} />
+        </Flexbox>
+      </Modal>
+    );
+  },
+);

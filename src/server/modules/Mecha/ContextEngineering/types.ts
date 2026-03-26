@@ -28,6 +28,8 @@ export interface ServerModelCapabilities {
  * Knowledge configuration for server context engineering
  */
 export interface ServerKnowledgeConfig {
+  /** Conversation-scoped file contents to inject */
+  conversationFileContents?: FileContent[];
   /** File contents to inject */
   fileContents?: FileContent[];
   /** Knowledge base metadata to inject */

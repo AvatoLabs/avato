@@ -5,6 +5,7 @@ import { memo } from 'react';
 import KnowledgeIcon from '@/components/KnowledgeIcon';
 import { type KnowledgeItem } from '@/types/knowledgeBase';
 
+import { type LibraryModalScope } from '../types';
 import Actions from './Action';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -25,41 +26,52 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
-const PluginItem = memo<KnowledgeItem>(({ id, fileType, name, type, description, enabled }) => {
-  return (
-    <Flexbox
-      horizontal
-      align={'center'}
-      gap={8}
-      justify={'space-between'}
-      paddingBlock={12}
-      paddingInline={16}
-      style={{ position: 'relative' }}
-    >
+interface PluginItemProps extends KnowledgeItem {
+  scope: LibraryModalScope;
+}
+
+const PluginItem = memo<PluginItemProps>(
+  ({ id, fileType, name, type, description, enabled, scope }) => {
+    return (
       <Flexbox
         horizontal
         align={'center'}
-        flex={1}
         gap={8}
-        style={{ overflow: 'hidden', position: 'relative' }}
+        justify={'space-between'}
+        paddingBlock={12}
+        paddingInline={16}
+        style={{ position: 'relative' }}
       >
-        <KnowledgeIcon fileType={fileType} name={name} size={{ file: 40, repo: 40 }} type={type} />
-        <Flexbox flex={1} gap={4} style={{ overflow: 'hidden', position: 'relative' }}>
-          <Flexbox horizontal align={'center'} gap={8}>
-            <Text ellipsis className={styles.title}>
-              {name}
-            </Text>
+        <Flexbox
+          horizontal
+          align={'center'}
+          flex={1}
+          gap={8}
+          style={{ overflow: 'hidden', position: 'relative' }}
+        >
+          <KnowledgeIcon
+            fileType={fileType}
+            name={name}
+            size={{ file: 40, repo: 40 }}
+            type={type}
+          />
+          <Flexbox flex={1} gap={4} style={{ overflow: 'hidden', position: 'relative' }}>
+            <Flexbox horizontal align={'center'} gap={8}>
+              <Text ellipsis className={styles.title}>
+                {name}
+              </Text>
+            </Flexbox>
+            {description && (
+              <Text ellipsis className={styles.desc}>
+                {description}
+              </Text>
+            )}
           </Flexbox>
-          {description && (
-            <Text ellipsis className={styles.desc}>
-              {description}
-            </Text>
-          )}
         </Flexbox>
+        <Actions enabled={enabled} id={id} scope={scope} type={type} />
       </Flexbox>
-      <Actions enabled={enabled} id={id} type={type} />
-    </Flexbox>
-  );
-});
+    );
+  },
+);
 
 export default PluginItem;

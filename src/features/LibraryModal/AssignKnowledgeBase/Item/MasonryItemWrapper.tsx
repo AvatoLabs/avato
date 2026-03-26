@@ -2,14 +2,18 @@ import { memo } from 'react';
 
 import { type KnowledgeItem } from '@/types/knowledgeBase';
 
+import { type LibraryModalScope } from '../types';
 import MasonryItem from './MasonryItem';
 
 interface MasonryItemWrapperProps {
+  context?: {
+    scope: LibraryModalScope;
+  };
   data: KnowledgeItem;
   index: number;
 }
 
-const MasonryItemWrapper = memo<MasonryItemWrapperProps>(({ data: item }) => {
+const MasonryItemWrapper = memo<MasonryItemWrapperProps>(({ data: item, context }) => {
   // Safety check: return null if item is undefined
   if (!item || !item.id) {
     return null;
@@ -17,7 +21,7 @@ const MasonryItemWrapper = memo<MasonryItemWrapperProps>(({ data: item }) => {
 
   return (
     <div style={{ padding: '8px 4px' }}>
-      <MasonryItem {...item} />
+      <MasonryItem {...item} scope={context?.scope ?? 'agent'} />
     </div>
   );
 });

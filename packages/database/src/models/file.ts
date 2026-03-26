@@ -7,6 +7,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNull,
   like,
   notExists,
   or,
@@ -18,10 +19,12 @@ import type { PgTransaction } from 'drizzle-orm/pg-core';
 import {
   chunks,
   documentChunks,
+  documents,
   embeddings,
   fileChunks,
   type FileItem,
   files,
+  filesToSessions,
   globalFiles,
   knowledgeBaseFiles,
   type NewFile,
@@ -495,6 +498,105 @@ export class FileModel {
     return this.db.query.files.findMany({
       where: and(inArray(files.id, ids), eq(files.userId, this.userId)),
     });
+  };
+
+  createSessionFiles = async (sessionId: string, fileIds: string[]) => {
+    if (fileIds.length === 0) return;
+
+    const validFiles = await this.findByIds(fileIds);
+    const validFileIds = validFiles.map((file) => file.id);
+
+    if (validFileIds.length === 0) return;
+
+    const existingFiles = await this.db
+      .select({ id: filesToSessions.fileId })
+      .from(filesToSessions)
+      .where(
+        and(
+          eq(filesToSessions.sessionId, sessionId),
+          eq(filesToSessions.userId, this.userId),
+          inArray(filesToSessions.fileId, validFileIds),
+        ),
+      );
+
+    const existingFileIds = new Set(existingFiles.map((item) => item.id));
+    const needToInsertFileIds = validFileIds.filter((fileId) => !existingFileIds.has(fileId));
+
+    if (needToInsertFileIds.length === 0) return;
+
+    return this.db.insert(filesToSessions).values(
+      needToInsertFileIds.map((fileId) => ({
+        fileId,
+        sessionId,
+        userId: this.userId,
+      })),
+    );
+  };
+
+  deleteSessionFile = async (sessionId: string, fileId: string) => {
+    return this.db
+      .delete(filesToSessions)
+      .where(
+        and(
+          eq(filesToSessions.sessionId, sessionId),
+          eq(filesToSessions.fileId, fileId),
+          eq(filesToSessions.userId, this.userId),
+        ),
+      );
+  };
+
+  getSessionAssignedFiles = async (sessionId: string) => {
+    const result = await this.db
+      .select({ file: files })
+      .from(filesToSessions)
+      .leftJoin(files, eq(files.id, filesToSessions.fileId))
+      .where(and(eq(filesToSessions.sessionId, sessionId), eq(filesToSessions.userId, this.userId)))
+      .orderBy(desc(files.updatedAt));
+
+    return result.map((item) => item.file).filter((item): item is FileItem => Boolean(item));
+  };
+
+  getSessionAssignedFileContents = async (sessionId: string) => {
+    const assignedFiles = await this.getSessionAssignedFiles(sessionId);
+
+    const validFiles = assignedFiles.filter((file) => !file.fileType.startsWith('image'));
+    if (validFiles.length === 0) return [];
+
+    const fileIds = validFiles.map((file) => file.id);
+    const documentsData = await this.db.query.documents.findMany({
+      where: and(
+        eq(documents.userId, this.userId),
+        inArray(documents.fileId, fileIds),
+        isNull(documents.deletedAt),
+      ),
+    });
+
+    const documentMap = new Map(documentsData.map((doc) => [doc.fileId, doc.content]));
+
+    return validFiles
+      .map((file) => ({
+        content: documentMap.get(file.id),
+        fileId: file.id,
+        filename: file.name,
+      }))
+      .filter(
+        (
+          item,
+        ): item is {
+          content: string;
+          fileId: string;
+          filename: string;
+        } => Boolean(item.content),
+      );
+  };
+
+  toggleSessionFile = async (sessionId: string, fileId: string, enabled: boolean = true) => {
+    if (!enabled) {
+      await this.deleteSessionFile(sessionId, fileId);
+      return;
+    }
+
+    await this.createSessionFiles(sessionId, [fileId]);
   };
 
   findById = async (id: string, trx?: Transaction) => {

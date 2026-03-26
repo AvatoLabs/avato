@@ -1,3 +1,4 @@
+import { type KnowledgeItem } from '@lobechat/types';
 import { getSingletonAnalyticsOptional } from '@lobehub/analytics';
 import isEqual from 'fast-deep-equal';
 import { t } from 'i18next';
@@ -33,8 +34,20 @@ import { sessionMetaSelectors } from './selectors/meta';
 
 const n = setNamespace('session');
 
+interface ConversationFileContext {
+  agentId?: string;
+  sessionId?: string | null;
+}
+
 const FETCH_SESSIONS_KEY = 'fetchSessions';
+const FETCH_CONVERSATION_FILES_KEY = 'fetchConversationFiles';
 const SEARCH_SESSIONS_KEY = 'searchSessions';
+
+const getConversationFilesKey = (context?: ConversationFileContext) => {
+  if (!context?.agentId && !context?.sessionId) return null;
+
+  return [FETCH_CONVERSATION_FILES_KEY, context?.agentId ?? null, context?.sessionId ?? null];
+};
 
 type Setter = StoreSetter<SessionStore>;
 export const createSessionSlice = (set: Setter, get: () => SessionStore, _api?: unknown) =>
@@ -99,6 +112,20 @@ export class SessionActionImpl {
     return id;
   };
 
+  addFilesToConversation = async (
+    fileIds: string[],
+    context: ConversationFileContext,
+  ): Promise<void> => {
+    if (fileIds.length === 0) return;
+
+    await sessionService.createConversationFiles({
+      ...context,
+      fileIds,
+    });
+
+    await this.#get().refreshConversationFiles(context);
+  };
+
   duplicateSession = async (id: string): Promise<void> => {
     const { switchSession, refreshSessions } = this.#get();
     const session = sessionSelectors.getSessionById(id)(this.#get());
@@ -132,12 +159,31 @@ export class SessionActionImpl {
     switchSession(newId);
   };
 
+  deleteConversationFile = async (
+    fileId: string,
+    context: ConversationFileContext,
+  ): Promise<void> => {
+    await sessionService.deleteConversationFile({
+      ...context,
+      fileId,
+    });
+
+    await this.#get().refreshConversationFiles(context);
+  };
+
   openAllAgentsDrawer = (): void => {
     this.#set({ allAgentsDrawerOpen: true }, false, n('openAllAgentsDrawer'));
   };
 
   pinSession = async (id: string, pinned: boolean): Promise<void> => {
     await this.#get().internal_updateSession(id, { pinned });
+  };
+
+  refreshConversationFiles = async (context: ConversationFileContext): Promise<void> => {
+    const key = getConversationFilesKey(context);
+    if (!key) return;
+
+    await mutate(key);
   };
 
   removeSession = async (sessionId: string): Promise<void> => {
@@ -199,6 +245,20 @@ export class SessionActionImpl {
       // For regular agent sessions, use the existing session service
       await this.#get().internal_updateSession(sessionId, { group });
     }
+  };
+
+  toggleConversationFile = async (
+    fileId: string,
+    enabled: boolean,
+    context: ConversationFileContext,
+  ): Promise<void> => {
+    await sessionService.toggleConversationFile({
+      ...context,
+      enabled,
+      fileId,
+    });
+
+    await this.#get().refreshConversationFiles(context);
   };
 
   useFetchSessions = (
@@ -266,6 +326,20 @@ export class SessionActionImpl {
           );
         },
         suspense: true,
+      },
+    );
+  };
+
+  useFetchConversationFiles = (context?: ConversationFileContext): SWRResponse<KnowledgeItem[]> => {
+    return useClientDataSWR<KnowledgeItem[]>(
+      getConversationFilesKey(context),
+      ([, agentId, sessionId]) =>
+        sessionService.getConversationFiles({
+          agentId: agentId ?? undefined,
+          sessionId: sessionId ?? undefined,
+        }),
+      {
+        fallbackData: [],
       },
     );
   };

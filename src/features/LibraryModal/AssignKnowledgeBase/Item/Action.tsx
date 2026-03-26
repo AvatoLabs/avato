@@ -3,18 +3,24 @@ import { InfoIcon, MoreVerticalIcon, Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useAgentId } from '@/features/ChatInput/hooks/useAgentId';
 import { useAgentStore } from '@/store/agent/store';
 import { useServerConfigStore } from '@/store/serverConfig';
+import { useSessionStore } from '@/store/session/store';
 import { KnowledgeType } from '@/types/knowledgeBase';
+
+import { type LibraryModalScope } from '../types';
 
 interface ActionsProps {
   enabled?: boolean;
   id: string;
+  scope: LibraryModalScope;
   type: KnowledgeType;
 }
 
-const Actions = memo<ActionsProps>(({ id, type, enabled }) => {
+const Actions = memo<ActionsProps>(({ id, type, enabled, scope }) => {
   const { t } = useTranslation('chat');
+  const agentId = useAgentId();
 
   const mobile = useServerConfigStore((s) => s.isMobile);
   const [
@@ -28,12 +34,18 @@ const Actions = memo<ActionsProps>(({ id, type, enabled }) => {
     s.removeFileFromAgent,
     s.removeKnowledgeBaseFromAgent,
   ]);
+  const [addFilesToConversation, deleteConversationFile] = useSessionStore((s) => [
+    s.addFilesToConversation,
+    s.deleteConversationFile,
+  ]);
 
   const [loading, setLoading] = useState(false);
 
   const assignKnowledge = async () => {
     setLoading(true);
-    if (type === KnowledgeType.KnowledgeBase) {
+    if (scope === 'conversation') {
+      await addFilesToConversation([id], { agentId });
+    } else if (type === KnowledgeType.KnowledgeBase) {
       await addKnowledgeBasesToAgent(id);
     } else {
       await addFilesToAgent([id], true);
@@ -43,7 +55,9 @@ const Actions = memo<ActionsProps>(({ id, type, enabled }) => {
 
   const removeKnowledge = async () => {
     setLoading(true);
-    if (type === KnowledgeType.KnowledgeBase) {
+    if (scope === 'conversation') {
+      await deleteConversationFile(id, { agentId });
+    } else if (type === KnowledgeType.KnowledgeBase) {
       await removeKnowledgeBasesFromAgent(id);
     } else {
       await removeFilesFromAgent(id);

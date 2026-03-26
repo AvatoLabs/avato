@@ -16,7 +16,9 @@ import { AttachKnowledgeModal } from '@/features/LibraryModal';
 import { useModelSupportVision } from '@/hooks/useModelSupportVision';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
+import { useChatStore } from '@/store/chat';
 import { useFileStore } from '@/store/file';
+import { useSessionStore } from '@/store/session/store';
 import { useUserStore } from '@/store/user';
 import { preferenceSelectors } from '@/store/user/selectors';
 
@@ -31,10 +33,12 @@ const FileUpload = memo(() => {
   const upload = useFileStore((s) => s.uploadChatFiles);
 
   const agentId = useAgentId();
+  const activeGroupId = useChatStore((s) => s.activeGroupId);
   const model = useAgentStore((s) => agentByIdSelectors.getAgentModelById(agentId)(s));
   const provider = useAgentStore((s) => agentByIdSelectors.getAgentModelProviderById(agentId)(s));
 
   const canUploadImage = useModelSupportVision(model, provider);
+  const libraryScope = activeGroupId ? 'agent' : 'conversation';
 
   const [showTip, updateGuideState] = useUserStore((s) => [
     preferenceSelectors.showUploadFileInKnowledgeBaseTip(s),
@@ -54,6 +58,11 @@ const FileUpload = memo(() => {
     s.toggleFile,
     s.toggleKnowledgeBase,
   ]);
+  const useFetchConversationFiles = useSessionStore((s) => s.useFetchConversationFiles);
+  const toggleConversationFile = useSessionStore((s) => s.toggleConversationFile);
+  const { data: conversationFiles = [] } = useFetchConversationFiles(
+    libraryScope === 'conversation' ? { agentId } : undefined,
+  );
 
   const uploadItems: ActionDropdownMenuItems = [
     {
@@ -152,8 +161,8 @@ const FileUpload = memo(() => {
 
   const knowledgeItems: ItemType[] = [];
 
-  // Only add knowledge base items if there are files or knowledge bases
-  if (files.length > 0 || knowledgeBases.length > 0) {
+  // Group chat still falls back to agent-scope library behavior.
+  if (libraryScope === 'agent' && (files.length > 0 || knowledgeBases.length > 0)) {
     knowledgeItems.push({
       children: [
         // first the files
@@ -198,6 +207,30 @@ const FileUpload = memo(() => {
     });
   }
 
+  if (libraryScope === 'conversation' && conversationFiles.length > 0) {
+    knowledgeItems.push({
+      children: conversationFiles.map((item) => ({
+        icon: <FileIcon fileName={item.name} fileType={item.fileType} size={20} />,
+        key: item.id,
+        label: (
+          <CheckboxItem
+            checked={item.enabled}
+            id={item.id}
+            label={item.name}
+            onUpdate={async (id, enabled) => {
+              setUpdating(true);
+              await toggleConversationFile(id, enabled, { agentId });
+              setUpdating(false);
+            }}
+          />
+        ),
+      })),
+      key: 'conversationFiles',
+      label: t('conversationFiles.relatedFiles'),
+      type: 'group',
+    });
+  }
+
   // Always add the "View More" option
   knowledgeItems.push(
     {
@@ -207,7 +240,10 @@ const FileUpload = memo(() => {
       extra: <Icon icon={ArrowRight} />,
       icon: LibraryBig,
       key: 'knowledge-base-store',
-      label: t('knowledgeBase.viewMore'),
+      label:
+        libraryScope === 'conversation'
+          ? t('conversationFiles.viewMore')
+          : t('knowledgeBase.viewMore'),
       onClick: () => {
         setModalOpen(true);
       },
@@ -261,7 +297,7 @@ const FileUpload = memo(() => {
       ) : (
         content
       )}
-      <AttachKnowledgeModal open={modalOpen} setOpen={setModalOpen} />
+      <AttachKnowledgeModal open={modalOpen} scope={libraryScope} setOpen={setModalOpen} />
     </Suspense>
   );
 });

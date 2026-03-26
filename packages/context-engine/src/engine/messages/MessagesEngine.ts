@@ -23,6 +23,7 @@ import {
 import {
   AgentBuilderContextInjector,
   AgentManagementContextInjector,
+  ConversationFilesInjector,
   DiscordContextProvider,
   EvalContextSystemInjector,
   ForceFinishSummaryInjector,
@@ -209,13 +210,18 @@ export class MessagesEngine {
       // 6. GTD Plan injection (conditionally added, after user memory, before knowledge)
       ...(isGTDPlanEnabled ? [new GTDPlanInjector({ enabled: true, plan: gtd.plan })] : []),
 
-      // 7. Knowledge injection (full content for agent files + metadata for knowledge bases)
+      // 7. Conversation-scoped files injection (shared only within the current conversation)
+      new ConversationFilesInjector({
+        fileContents: knowledge?.conversationFileContents,
+      }),
+
+      // 8. Knowledge injection (full content for agent files + metadata for knowledge bases)
       new KnowledgeInjector({
         fileContents: knowledge?.fileContents,
         knowledgeBases: knowledge?.knowledgeBases,
       }),
 
-      // 8. Tool Discovery context injection (available tools for dynamic activation)
+      // 9. Tool Discovery context injection (available tools for dynamic activation)
       ...(toolDiscoveryConfig?.availableTools && toolDiscoveryConfig.availableTools.length > 0
         ? [new ToolDiscoveryProvider({ availableTools: toolDiscoveryConfig.availableTools })]
         : []),

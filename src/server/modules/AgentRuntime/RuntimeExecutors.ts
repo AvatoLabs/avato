@@ -42,6 +42,11 @@ const TOOL_PRICING: Record<string, number> = {
 
 export interface RuntimeExecutorContext {
   agentConfig?: any;
+  conversationFileContents?: Array<{
+    content: string;
+    fileId: string;
+    filename: string;
+  }>;
   discordContext?: any;
   evalContext?: EvalContext;
   fileService?: any;
@@ -206,6 +211,7 @@ export const createRuntimeExecutors = (
           forceFinish: state.forceFinish,
           historyCount: agentConfig.chatConfig?.historyCount ?? undefined,
           knowledge: {
+            conversationFileContents: ctx.conversationFileContents,
             fileContents: agentConfig.files
               ?.filter((f: { enabled?: boolean | null }) => f.enabled === true)
               .map((f: { content?: string | null; id?: string; name?: string }) => ({

@@ -372,15 +372,6 @@ export class ConversationLifecycleActionImpl {
         inPortalThread: !!data.createdThreadId,
         skipCreateFirstMessage: true,
       });
-
-      const userFiles = dbMessageSelectors
-        .dbUserFiles(this.#get())
-        .map((f) => f?.id)
-        .filter(Boolean) as string[];
-
-      if (userFiles.length > 0) {
-        await getAgentStoreState().addFilesToAgent(userFiles, false);
-      }
     } catch (e) {
       console.error(e);
     } finally {

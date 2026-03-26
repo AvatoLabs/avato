@@ -1,3 +1,4 @@
+import { type KnowledgeItem } from '@lobechat/types';
 import { type PartialDeep } from 'type-fest';
 
 import { lambdaClient } from '@/libs/trpc/client';
@@ -12,6 +13,17 @@ import {
   type SessionRankItem,
   type UpdateSessionParams,
 } from '@/types/session';
+
+interface ConversationFileContent {
+  content: string;
+  fileId: string;
+  filename: string;
+}
+
+interface ConversationFileContext {
+  agentId?: string;
+  sessionId?: string | null;
+}
 
 export class SessionService {
   hasSessions = async (): Promise<boolean> => {
@@ -39,6 +51,41 @@ export class SessionService {
 
   getGroupedSessions = (): Promise<ChatSessionList> => {
     return lambdaClient.session.getGroupedSessions.query();
+  };
+
+  getConversationFileContents = (
+    context: ConversationFileContext,
+  ): Promise<ConversationFileContent[]> => {
+    return lambdaClient.session.getConversationFileContents.query(context);
+  };
+
+  getConversationFiles = (context: ConversationFileContext): Promise<KnowledgeItem[]> => {
+    return lambdaClient.session.getConversationFiles.query(context);
+  };
+
+  createConversationFiles = (
+    params: ConversationFileContext & {
+      fileIds: string[];
+    },
+  ) => {
+    return lambdaClient.session.createConversationFiles.mutate(params);
+  };
+
+  deleteConversationFile = (
+    params: ConversationFileContext & {
+      fileId: string;
+    },
+  ) => {
+    return lambdaClient.session.deleteConversationFile.mutate(params);
+  };
+
+  toggleConversationFile = (
+    params: ConversationFileContext & {
+      enabled?: boolean;
+      fileId: string;
+    },
+  ) => {
+    return lambdaClient.session.toggleConversationFile.mutate(params);
   };
 
   countSessions = async (params?: {

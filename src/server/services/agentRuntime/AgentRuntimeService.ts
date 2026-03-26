@@ -4,9 +4,12 @@ import { dynamicInterventionAudits } from '@lobechat/builtin-tools/dynamicInterv
 import { LOADING_FLAT } from '@lobechat/const';
 import { AgentRuntimeErrorType, ChatErrorType, type ChatMessageError } from '@lobechat/types';
 import debug from 'debug';
+import { and, eq } from 'drizzle-orm';
 import urlJoin from 'url-join';
 
+import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
+import { agentsToSessions } from '@/database/schemas';
 import { type LobeChatDatabase } from '@/database/type';
 import { appEnv } from '@/envs/app';
 import { type AgentRuntimeCoordinatorOptions } from '@/server/modules/AgentRuntime';
@@ -1361,6 +1364,31 @@ export class AgentRuntimeService {
   /**
    * Create Agent Runtime instance
    */
+  private async loadConversationFileContents(metadata?: any) {
+    if (metadata?.groupId || !metadata?.userId) return undefined;
+
+    let sessionId = metadata?.sessionId as string | undefined;
+
+    if (!sessionId && metadata?.agentId) {
+      const [relation] = await this.serverDB
+        .select({ sessionId: agentsToSessions.sessionId })
+        .from(agentsToSessions)
+        .where(
+          and(
+            eq(agentsToSessions.agentId, metadata.agentId),
+            eq(agentsToSessions.userId, metadata.userId),
+          ),
+        )
+        .limit(1);
+
+      sessionId = relation?.sessionId;
+    }
+
+    if (!sessionId) return undefined;
+
+    return new FileModel(this.serverDB, metadata.userId).getSessionAssignedFileContents(sessionId);
+  }
+
   private async createAgentRuntime({
     metadata,
     operationId,
@@ -1370,6 +1398,8 @@ export class AgentRuntimeService {
     operationId: string;
     stepIndex: number;
   }) {
+    const conversationFileContents = await this.loadConversationFileContents(metadata);
+
     // Create Durable Agent instance
     const agent = new GeneralChatAgent({
       agentConfig: metadata?.agentConfig,
@@ -1385,6 +1415,7 @@ export class AgentRuntimeService {
     // Create streaming executor context
     const executorContext: RuntimeExecutorContext = {
       agentConfig: metadata?.agentConfig,
+      conversationFileContents,
       discordContext: metadata?.discordContext,
       userTimezone: metadata?.userTimezone,
       evalContext: metadata?.evalContext,

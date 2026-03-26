@@ -29,6 +29,7 @@ import debug from 'debug';
 import { isCanUseFC } from '@/helpers/isCanUseFC';
 import { VARIABLE_GENERATORS } from '@/helpers/parserPlaceholder';
 import { notebookService } from '@/services/notebook';
+import { sessionService } from '@/services/session';
 import { agentSelectors } from '@/store/agent/selectors';
 import { getAgentStoreState } from '@/store/agent/store';
 import { getChatGroupStoreState } from '@/store/agentGroup';
@@ -110,6 +111,7 @@ export const contextEngineering = async ({
   groupId,
   initialContext,
   plugins,
+  sessionId,
   stepContext,
   topicId,
   memoryContext,
@@ -292,6 +294,25 @@ export const contextEngineering = async ({
   const fileContents = agentFiles
     .filter((file) => file.enabled && file.content)
     .map((file) => ({ content: file.content!, fileId: file.id, filename: file.name }));
+
+  let conversationFileContents:
+    | Array<{
+        content: string;
+        fileId: string;
+        filename: string;
+      }>
+    | undefined;
+
+  if (!groupId && (agentId || sessionId)) {
+    try {
+      conversationFileContents = await sessionService.getConversationFileContents({
+        agentId,
+        sessionId,
+      });
+    } catch (error) {
+      log('Failed to resolve conversation-scoped files: %O', error);
+    }
+  }
 
   const knowledgeBases = agentKnowledgeBases
     .filter((kb) => kb.enabled)
@@ -492,6 +513,7 @@ export const contextEngineering = async ({
 
     // Knowledge injection
     knowledge: {
+      conversationFileContents,
       fileContents,
       knowledgeBases,
     },

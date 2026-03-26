@@ -1,7 +1,9 @@
+import { type KnowledgeItem, KnowledgeType } from '@lobechat/types';
 import debug from 'debug';
 import { z } from 'zod';
 
 import { ChatGroupModel } from '@/database/models/chatGroup';
+import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
 import { SessionModel } from '@/database/models/session';
 import { SessionGroupModel } from '@/database/models/sessionGroup';
@@ -15,7 +17,9 @@ import { LobeMetaDataSchema } from '@/types/meta';
 import { type BatchTaskResult } from '@/types/service';
 import { type ChatSessionList, type LobeGroupSession } from '@/types/session';
 
+import { resolveContext } from './_helpers/resolveContext';
 import { pickLatestTitleContext } from './_helpers/titleContext';
+import { conversationContextSchema } from './_schema/context';
 
 const DEFAULT_SESSION_TITLES = [
   '',
@@ -39,6 +43,7 @@ const sessionProcedure = authedProcedure.use(serverDatabase).use(async (opts) =>
 
   return opts.next({
     ctx: {
+      fileModel: new FileModel(ctx.serverDB, ctx.userId),
       sessionGroupModel: new SessionGroupModel(ctx.serverDB, ctx.userId),
       sessionModel: new SessionModel(ctx.serverDB, ctx.userId),
     },
@@ -168,6 +173,45 @@ export const sessionRouter = router({
       return { sessionGroups, sessions: allSessions };
     }),
 
+  getConversationFileContents: sessionProcedure
+    .input(conversationContextSchema)
+    .query(async ({ ctx, input }) => {
+      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+
+      if (!sessionId) return [];
+
+      return ctx.fileModel.getSessionAssignedFileContents(sessionId);
+    }),
+
+  getConversationFiles: sessionProcedure
+    .input(conversationContextSchema)
+    .query(async ({ ctx, input }): Promise<KnowledgeItem[]> => {
+      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+
+      if (!sessionId) return [];
+
+      const [allFiles, assignedFiles] = await Promise.all([
+        ctx.fileModel.query({ showFilesInKnowledgeBase: false }),
+        ctx.fileModel.getSessionAssignedFiles(sessionId),
+      ]);
+
+      const attachedFileIds = new Set(assignedFiles.map((file) => file.id));
+
+      return allFiles
+        .filter((file) => !file.fileType.startsWith('image'))
+        .map((file) => ({
+          enabled: attachedFileIds.has(file.id),
+          fileType: file.fileType,
+          id: file.id,
+          name: file.name,
+          type: KnowledgeType.File,
+        }))
+        .sort(
+          (a, b) =>
+            Number(Boolean(b.enabled)) - Number(Boolean(a.enabled)) || a.name.localeCompare(b.name),
+        );
+    }),
+
   generateSessionTitle: sessionProcedure
     .input(z.object({ sessionId: z.string() }))
     .mutation(async ({ input, ctx }) => {
@@ -258,6 +302,49 @@ export const sessionRouter = router({
       const { current, pageSize } = input;
 
       return ctx.sessionModel.query({ current, pageSize });
+    }),
+
+  createConversationFiles: sessionProcedure
+    .input(
+      conversationContextSchema.extend({
+        fileIds: z.array(z.string()),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+
+      if (!sessionId) return;
+
+      return ctx.fileModel.createSessionFiles(sessionId, input.fileIds);
+    }),
+
+  deleteConversationFile: sessionProcedure
+    .input(
+      conversationContextSchema.extend({
+        fileId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+
+      if (!sessionId) return;
+
+      return ctx.fileModel.deleteSessionFile(sessionId, input.fileId);
+    }),
+
+  toggleConversationFile: sessionProcedure
+    .input(
+      conversationContextSchema.extend({
+        enabled: z.boolean().optional(),
+        fileId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { sessionId } = await resolveContext(input, ctx.serverDB, ctx.userId);
+
+      if (!sessionId) return;
+
+      return ctx.fileModel.toggleSessionFile(sessionId, input.fileId, input.enabled);
     }),
 
   rankSessions: sessionProcedure.input(z.number().optional()).query(async ({ ctx, input }) => {

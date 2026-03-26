@@ -5,25 +5,39 @@ import React, { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 
+import { useAgentId } from '@/features/ChatInput/hooks/useAgentId';
 import { useAgentStore } from '@/store/agent/store';
 import { useGlobalStore } from '@/store/global';
+import { useSessionStore } from '@/store/session/store';
 
 import Item from './Item';
 import MasonryItemWrapper from './Item/MasonryItemWrapper';
 import Loading from './Loading';
 import MasonrySkeleton from './MasonrySkeleton';
+import { type LibraryModalScope } from './types';
 import { type ViewMode } from './ViewSwitcher';
 import ViewSwitcher from './ViewSwitcher';
 
-export const List = memo(() => {
+interface ListProps {
+  scope: LibraryModalScope;
+}
+
+export const List = memo<ListProps>(({ scope }) => {
   const { t } = useTranslation('file');
+  const agentId = useAgentId();
 
   const [useFetchFilesAndKnowledgeBases, activeAgentId] = useAgentStore((s) => [
     s.useFetchFilesAndKnowledgeBases,
     s.activeAgentId,
   ]);
+  const useFetchConversationFiles = useSessionStore((s) => s.useFetchConversationFiles);
 
-  const { isLoading, error, data } = useFetchFilesAndKnowledgeBases(activeAgentId);
+  const agentResult = useFetchFilesAndKnowledgeBases(scope === 'agent' ? activeAgentId : undefined);
+  const conversationResult = useFetchConversationFiles(
+    scope === 'conversation' ? { agentId } : undefined,
+  );
+
+  const { isLoading, error, data } = scope === 'conversation' ? conversationResult : agentResult;
 
   const [columnCount, setColumnCount] = useState(2);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -72,7 +86,7 @@ export const List = memo(() => {
 
   const isEmpty = data && data.length === 0;
 
-  const masonryContext = useMemo(() => ({}), []);
+  const masonryContext = useMemo(() => ({ scope }), [scope]);
 
   return (
     <Flexbox height={500}>
@@ -111,7 +125,7 @@ export const List = memo(() => {
           totalCount={data!.length}
           itemContent={(index) => {
             const item = data![index];
-            return <Item key={item.id} {...item} />;
+            return <Item key={item.id} scope={scope} {...item} />;
           }}
         />
       ) : (

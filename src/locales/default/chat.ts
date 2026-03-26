@@ -46,6 +46,9 @@ export default {
     'Are you sure you want to uncompress? This will restore the original messages.',
   'compression.history': 'History',
   'compression.summary': 'Summary',
+  'conversationFiles.library.title': 'Conversation Files',
+  'conversationFiles.relatedFiles': 'Conversation Files',
+  'conversationFiles.viewMore': 'Browse Library Files',
   'confirmClearCurrentMessages':
     'You are about to clear the current session messages. Once cleared, they cannot be retrieved. Please confirm your action.',
   'confirmRemoveChatGroupItemAlert':
