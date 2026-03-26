@@ -18,6 +18,7 @@ import { type UploadFileListDispatch } from '@/store/file/reducers/uploadFileLis
 import { uploadFileListReducer } from '@/store/file/reducers/uploadFileList';
 import { type StoreSetter } from '@/store/types';
 import { type FileListItem, type QueryFileListParams } from '@/types/files';
+import { type UploadFileItem } from '@/types/files/upload';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 import { unzipFile } from '@/utils/unzipFile';
 
@@ -26,6 +27,14 @@ import { fileManagerSelectors } from './selectors';
 
 const serverFileService = new FileService();
 const FETCH_ALL_KNOWLEDGE_KEY = 'useFetchKnowledgeItems';
+const createUploadId = createNanoId(12);
+
+const createPendingUploadItem = (file: File): UploadFileItem => ({
+  abortController: new AbortController(),
+  file,
+  id: createUploadId(),
+  status: 'pending',
+});
 
 export interface FolderCrumb {
   id: string;
@@ -190,15 +199,7 @@ export class FileManageActionImpl {
     const files = filesToUpload.filter((file) => !FILE_UPLOAD_BLACKLIST.includes(file.name));
 
     // 2. Create upload items with abort controllers
-    const uploadFiles = files.map((file) => {
-      const abortController = new AbortController();
-      return {
-        abortController,
-        file,
-        id: file.name,
-        status: 'pending' as const,
-      };
-    });
+    const uploadFiles = files.map((file) => createPendingUploadItem(file));
 
     // 3. Add all files to dock
     dispatchDockFileList({
@@ -211,23 +212,40 @@ export class FileManageActionImpl {
     const uploadResults = await pMap(
       uploadFiles,
       async (uploadFileItem) => {
-        const result = await this.#get().uploadWithProgress({
-          abortController: uploadFileItem.abortController,
-          file: uploadFileItem.file,
-          knowledgeBaseId,
-          onStatusUpdate: dispatchDockFileList,
-          parentId,
-          spaceId,
-        });
+        try {
+          const result = await this.#get().uploadWithProgress({
+            abortController: uploadFileItem.abortController,
+            file: uploadFileItem.file,
+            knowledgeBaseId,
+            onStatusUpdate: dispatchDockFileList,
+            parentId,
+            spaceId,
+            uploadId: uploadFileItem.id,
+          });
 
-        // Note: Don't refresh after each file to avoid flickering
-        // We'll refresh once at the end
+          // Note: Don't refresh after each file to avoid flickering
+          // We'll refresh once at the end
 
-        return {
-          file: uploadFileItem.file,
-          fileId: result?.id,
-          fileType: uploadFileItem.file.type,
-        };
+          return {
+            file: uploadFileItem.file,
+            fileId: result?.id,
+            fileType: uploadFileItem.file.type,
+          };
+        } catch (error) {
+          dispatchDockFileList({
+            id: uploadFileItem.id,
+            type: 'updateFile',
+            value: {
+              status: uploadFileItem.abortController.signal.aborted ? 'cancelled' : 'error',
+            },
+          });
+          console.error('Failed to upload file:', error);
+          return {
+            file: uploadFileItem.file,
+            fileId: undefined,
+            fileType: uploadFileItem.file.type,
+          };
+        }
       },
       { concurrency: MAX_UPLOAD_FILE_COUNT },
     );
@@ -241,7 +259,7 @@ export class FileManageActionImpl {
       .map(({ fileId }) => fileId!);
 
     if (fileIdsToEmbed.length > 0) {
-      await this.#get().parseFilesToChunks(fileIdsToEmbed, { skipExist: false });
+      await this.#get().parseFilesToChunks(fileIdsToEmbed, { skipExist: true });
     }
   };
 
@@ -476,33 +494,48 @@ export class FileManageActionImpl {
       }
 
       // 6. Filter out blacklisted files
-      const validUploads = allUploads.filter(
-        ({ file }) => !FILE_UPLOAD_BLACKLIST.includes(file.name),
-      );
+      const validUploads = allUploads
+        .filter(({ file }) => !FILE_UPLOAD_BLACKLIST.includes(file.name))
+        .map(({ file, parentId }) => ({
+          ...createPendingUploadItem(file),
+          parentId,
+        }));
 
       // 7. Add all files to dock
       dispatchDockFileList({
         atStart: true,
-        files: validUploads.map(({ file }) => ({ file, id: file.name, status: 'pending' })),
+        files: validUploads,
         type: 'addFiles',
       });
 
       // 8. Upload files with concurrency limit
       const uploadResults = await pMap(
         validUploads,
-        async ({ file, parentId }) => {
-          const result = await this.#get().uploadWithProgress({
-            file,
-            knowledgeBaseId,
-            onStatusUpdate: dispatchDockFileList,
-            parentId,
-            spaceId,
-          });
+        async ({ abortController, file, id, parentId }) => {
+          try {
+            const result = await this.#get().uploadWithProgress({
+              abortController,
+              file,
+              knowledgeBaseId,
+              onStatusUpdate: dispatchDockFileList,
+              parentId,
+              spaceId,
+              uploadId: id,
+            });
 
-          // Note: Don't refresh after each file to avoid flickering
-          // We'll refresh once at the end
+            // Note: Don't refresh after each file to avoid flickering
+            // We'll refresh once at the end
 
-          return { file, fileId: result?.id, fileType: file.type };
+            return { file, fileId: result?.id, fileType: file.type };
+          } catch (error) {
+            dispatchDockFileList({
+              id,
+              type: 'updateFile',
+              value: { status: abortController.signal.aborted ? 'cancelled' : 'error' },
+            });
+            console.error('Failed to upload file:', error);
+            return { file, fileId: undefined, fileType: file.type };
+          }
         },
         { concurrency: MAX_UPLOAD_FILE_COUNT },
       );
@@ -516,7 +549,7 @@ export class FileManageActionImpl {
         .map(({ fileId }) => fileId!);
 
       if (fileIdsToEmbed.length > 0) {
-        await this.#get().parseFilesToChunks(fileIdsToEmbed, { skipExist: false });
+        await this.#get().parseFilesToChunks(fileIdsToEmbed, { skipExist: true });
       }
     } catch (error) {
       // Dismiss toast on error

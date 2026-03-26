@@ -29,11 +29,17 @@ const createMockState = (overrides: Partial<State> = {}): State => ({
     threadId: null,
   },
   dbMessages: [],
+  dbMessageByToolCallIdMap: {},
+  dbMessageMap: {},
   displayMessages: [],
+  displayMessageIds: [],
+  displayMessageMap: {},
   hooks: {},
+  latestUserMessageId: undefined,
   messagesInit: false,
   operationState: DEFAULT_OPERATION_STATE,
   skipFetch: false,
+  userMessageCount: 0,
   ...overrides,
 });
 

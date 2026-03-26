@@ -707,6 +707,13 @@
       "when": 1774181000000,
       "tag": "0100_documents_client_space_unique_active_only",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1774520134686,
+      "tag": "0101_upload_sessions_schema_fix",
+      "breakpoints": true
     }
   ],
   "version": "6"

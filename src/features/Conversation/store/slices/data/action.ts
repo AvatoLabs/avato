@@ -9,6 +9,7 @@ import { messageService } from '@/services/message';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 
 import { type Store as ConversationStore } from '../../action';
+import { buildDbState, buildDisplayState } from './helpers';
 import { type MessageDispatch } from './reducer';
 import { messagesReducer } from './reducer';
 import { dataSelectors } from './selectors';
@@ -84,7 +85,7 @@ export const dataSlice: StateCreator<
         metadata: { ...newDisplayMessages[index].metadata, ...payload.value },
       };
 
-      set({ displayMessages: newDisplayMessages }, false, {
+      set(buildDisplayState(newDisplayMessages), false, {
         payload,
         type: `dispatchMessage/${payload.type}`,
       });
@@ -113,7 +114,7 @@ export const dataSlice: StateCreator<
       flatList.length,
     );
 
-    set({ dbMessages: newDbMessages, displayMessages: flatList }, false, {
+    set({ ...buildDbState(newDbMessages), ...buildDisplayState(flatList) }, false, {
       payload,
       type: `dispatchMessage/${payload.type}`,
     });
@@ -138,7 +139,7 @@ export const dataSlice: StateCreator<
       messages.slice(0, 5).map((m) => m.id),
     );
 
-    set({ dbMessages: messages, displayMessages: flatList }, false, 'replaceMessages');
+    set({ ...buildDbState(messages), ...buildDisplayState(flatList) }, false, 'replaceMessages');
 
     // Sync changes to external store (ChatStore)
     get().onMessagesChange?.(messages, get().context);
@@ -200,8 +201,8 @@ export const dataSlice: StateCreator<
           );
 
           set({
-            dbMessages: data,
-            displayMessages: flatList,
+            ...buildDbState(data),
+            ...buildDisplayState(flatList),
             messagesInit: true,
           });
 

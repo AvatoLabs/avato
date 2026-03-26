@@ -284,13 +284,19 @@ export const agentRouter = router({
       });
 
       const knowledge = await ctx.agentModel.getAgentAssignedKnowledge(input.agentId);
+      const enabledFileIds = new Set(
+        knowledge.files.filter((item) => item.enabled).map((item) => item.id),
+      );
+      const enabledKnowledgeBaseIds = new Set(
+        knowledge.knowledgeBases.filter((item) => item.enabled).map((item) => item.id),
+      );
 
       return [
         ...files
           // Filter out all images
           .filter((file) => !file.fileType.startsWith('image'))
           .map((file) => ({
-            enabled: knowledge.files.some((item) => item.id === file.id),
+            enabled: enabledFileIds.has(file.id),
             fileType: file.fileType,
             id: file.id,
             name: file.name,
@@ -299,7 +305,7 @@ export const agentRouter = router({
         ...knowledgeBases.map((knowledgeBase) => ({
           avatar: knowledgeBase.avatar,
           description: knowledgeBase.description,
-          enabled: knowledge.knowledgeBases.some((item) => item.id === knowledgeBase.id),
+          enabled: enabledKnowledgeBaseIds.has(knowledgeBase.id),
           id: knowledgeBase.id,
           name: knowledgeBase.name,
           type: KnowledgeType.KnowledgeBase,

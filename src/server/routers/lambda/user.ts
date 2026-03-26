@@ -239,6 +239,17 @@ export const userRouter = router({
         username: user.username,
       };
     }),
+
+  searchUsers: userProcedure
+    .input(
+      z.object({
+        keyword: z.string().trim().min(1),
+        limit: z.number().int().min(1).max(10).default(8),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      return UserModel.searchByKeyword(ctx.serverDB, input.keyword, { limit: input.limit });
+    }),
 });
 
 export type UserRouter = typeof userRouter;

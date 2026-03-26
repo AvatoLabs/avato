@@ -6,18 +6,30 @@ import { topicSelectors } from '@/store/chat/selectors';
 import { type State } from '../../initialState';
 
 const displayMessages = (s: State) => s.displayMessages;
-const displayMessageIds = (s: State) => s.displayMessages.map((m) => m.id);
+const displayMessageIds = (s: State) =>
+  s.displayMessageIds.length > 0 ? s.displayMessageIds : s.displayMessages.map((m) => m.id);
+const dbMessageCount = (s: State) => s.dbMessages.length;
 const dbMessages = (s: State) => s.dbMessages;
+const lastDbMessageContentLength = (s: State) => {
+  const lastMessage = s.dbMessages.at(-1);
+  return typeof lastMessage?.content === 'string' ? lastMessage.content.length : 0;
+};
+const latestUserMessageId = (s: State) =>
+  s.latestUserMessageId ??
+  [...s.dbMessages].reverse().find((message) => message.role === 'user')?.id;
 const messagesInit = (s: State) => s.messagesInit;
+const secondLastDisplayMessageRole = (s: State) => s.displayMessages.at(-2)?.role;
 const skipFetch = (s: State) => s.skipFetch;
+const userMessageCount = (s: State) =>
+  s.userMessageCount > 0
+    ? s.userMessageCount
+    : s.dbMessages.filter((m) => m.role === 'user').length;
 
-const getDisplayMessageById = (id: string) => (s: State) => {
-  // First, try to find in top-level displayMessages
-  const topLevelMessage = s.displayMessages.find((m) => m.id === id);
+const findDisplayMessageById = (id: string, messages: UIChatMessage[]) => {
+  const topLevelMessage = messages.find((m) => m.id === id);
   if (topLevelMessage) return topLevelMessage;
 
-  // If not found, search in agentCouncil members
-  for (const message of s.displayMessages) {
+  for (const message of messages) {
     if (message.role === 'agentCouncil' && (message as any).members) {
       const member = (message as any).members.find((m: UIChatMessage) => m.id === id);
       if (member) return member;
@@ -26,9 +38,13 @@ const getDisplayMessageById = (id: string) => (s: State) => {
 
   return undefined;
 };
-const getDbMessageById = (id: string) => (s: State) => s.dbMessages.find((m) => m.id === id);
+
+const getDisplayMessageById = (id: string) => (s: State) =>
+  s.displayMessageMap[id] ?? findDisplayMessageById(id, s.displayMessages);
+const getDbMessageById = (id: string) => (s: State) =>
+  s.dbMessageMap[id] ?? s.dbMessages.find((m) => m.id === id);
 const getDbMessageByToolCallId = (id: string) => (s: State) =>
-  s.dbMessages.find((m) => m.tool_call_id === id);
+  s.dbMessageByToolCallIdMap[id] ?? s.dbMessages.find((m) => m.tool_call_id === id);
 
 /**
  * Helper to find last message ID in an AssistantContentBlock
@@ -83,7 +99,7 @@ const findLastMessageId = (id: string) => (s: State) => {
  * Returns undefined if the last block contains tools or if message is not a group message
  */
 const getGroupLatestMessageWithoutTools = (id: string) => (s: State) => {
-  const message = s.displayMessages.find((m) => m.id === id);
+  const message = s.displayMessageMap[id] ?? s.displayMessages.find((m) => m.id === id);
 
   if (
     !message ||
@@ -121,6 +137,7 @@ const currentTopicSummary = () => {
 
 export const dataSelectors = {
   currentTopicSummary,
+  dbMessageCount,
   dbMessages,
   displayMessageIds,
   displayMessages,
@@ -129,6 +146,10 @@ export const dataSelectors = {
   getDbMessageByToolCallId,
   getDisplayMessageById,
   getGroupLatestMessageWithoutTools,
+  lastDbMessageContentLength,
+  latestUserMessageId,
   messagesInit,
+  secondLastDisplayMessageRole,
   skipFetch,
+  userMessageCount,
 };

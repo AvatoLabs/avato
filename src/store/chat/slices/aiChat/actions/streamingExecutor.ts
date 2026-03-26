@@ -111,6 +111,15 @@ export class StreamingExecutorActionImpl {
     const operation = operationId ? this.#get().operations[operationId] : undefined;
     const scope = operation?.context.scope;
     const groupId = operation?.context.groupId;
+    const pageContextKey =
+      scope === 'page'
+        ? messageMapKey({
+            agentId: operation?.context.agentId || effectiveAgentId || '',
+            scope: 'page',
+            threadId: operation?.context.threadId,
+            topicId: operation?.context.topicId ?? topicId,
+          })
+        : undefined;
 
     // Resolve agent config with builtin agent runtime config merged
     // This ensures runtime plugins (e.g., 'lobe-agent-builder' for Agent Builder) are included
@@ -224,7 +233,10 @@ export class StreamingExecutorActionImpl {
     if (enabledToolIds.includes(PageAgentIdentifier)) {
       try {
         // Get page content context from page agent runtime
-        const pageContentContext = pageAgentRuntime.getPageContentContext('both');
+        const pageContentContext = pageAgentRuntime.getScopedPageContentContext(
+          'both',
+          pageContextKey,
+        );
 
         runtimeInitialContext = {
           pageEditor: {
@@ -238,8 +250,9 @@ export class StreamingExecutorActionImpl {
           },
         };
         log(
-          '[internal_createAgentState] Page Agent detected, injected initialContext.pageEditor with title: %s',
+          '[internal_createAgentState] Page Agent detected, injected initialContext.pageEditor with title: %s (contextKey=%s)',
           pageContentContext.metadata.title,
+          pageContextKey,
         );
       } catch (error) {
         // Page agent runtime may not be initialized (e.g., editor not set)

@@ -4,9 +4,8 @@ import { FILE_URL } from '@lobechat/business-const';
 import { Notion } from '@lobehub/icons';
 import { type MenuProps } from '@lobehub/ui';
 import { ActionIcon, Button, DropdownMenu, Icon } from '@lobehub/ui';
-import { Upload } from 'antd';
 import { type ChangeEvent } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { message } from '@/components/AntdStaticMethods';
@@ -55,6 +54,8 @@ const AddButton = ({ compact }: AddButtonProps) => {
   const uploadFolderWithStructure = useFileStore((s) => s.uploadFolderWithStructure);
   const createResourceAndSync = useFileStore((s) => s.createResourceAndSync);
   const [menuOpen, setMenuOpen] = useState(false);
+  const fileUploadInputRef = useRef<HTMLInputElement>(null);
+  const folderUploadInputRef = useRef<HTMLInputElement>(null);
 
   // TODO: Migrate Notion import to use createResource
   // Keep old functions temporarily for components not yet migrated
@@ -205,6 +206,27 @@ const AddButton = ({ compact }: AddButtonProps) => {
     [handleFolderUpload],
   );
 
+  const handleFileUpload = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+
+      await pushDockFileList(files, libraryId, currentFolderId ?? undefined, spaceId);
+      event.target.value = '';
+    },
+    [currentFolderId, libraryId, pushDockFileList, spaceId],
+  );
+
+  const openFileUploadDialog = useCallback(() => {
+    setMenuOpen(false);
+    fileUploadInputRef.current?.click();
+  }, []);
+
+  const openFolderUploadDialog = useCallback(() => {
+    setMenuOpen(false);
+    folderUploadInputRef.current?.click();
+  }, []);
+
   const items = useMemo<MenuProps['items']>(
     () => [
       {
@@ -227,30 +249,16 @@ const AddButton = ({ compact }: AddButtonProps) => {
         type: 'divider',
       },
       {
-        closeOnClick: false,
         icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
         key: 'upload-file',
-        label: (
-          <Upload
-            accept={getAcceptedFileTypes(category)}
-            multiple={true}
-            showUploadList={false}
-            beforeUpload={async (file) => {
-              setMenuOpen(false);
-              await pushDockFileList([file], libraryId, currentFolderId ?? undefined, spaceId);
-
-              return false;
-            }}
-          >
-            <div>{t('header.actions.uploadFile')}</div>
-          </Upload>
-        ),
+        label: t('header.actions.uploadFile'),
+        onClick: openFileUploadDialog,
       },
       {
-        closeOnClick: false,
         icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderUpload} />,
         key: 'upload-folder',
-        label: <label htmlFor="folder-upload-input">{t('header.actions.uploadFolder')}</label>,
+        label: t('header.actions.uploadFolder'),
+        onClick: openFolderUploadDialog,
       },
       {
         type: 'divider',
@@ -270,14 +278,12 @@ const AddButton = ({ compact }: AddButtonProps) => {
       },
     ],
     [
-      category,
-      currentFolderId,
       handleCreateFolder,
       handleOpenPageEditor,
       handleOpenNotionGuide,
       libraryId,
-      pushDockFileList,
-      spaceId,
+      openFileUploadDialog,
+      openFolderUploadDialog,
       t,
     ],
   );
@@ -318,7 +324,15 @@ const AddButton = ({ compact }: AddButtonProps) => {
       />
       <input
         multiple
-        id="folder-upload-input"
+        accept={getAcceptedFileTypes(category)}
+        ref={fileUploadInputRef}
+        style={{ display: 'none' }}
+        type="file"
+        onChange={handleFileUpload}
+      />
+      <input
+        multiple
+        ref={folderUploadInputRef}
         style={{ display: 'none' }}
         type="file"
         // @ts-expect-error - webkitdirectory is not in the React types

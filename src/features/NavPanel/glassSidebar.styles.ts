@@ -68,14 +68,11 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
     `,
     groupHeader: css`
       font-size: ${cssVar.fontSizeSM} !important;
-      font-weight: 300 !important;
-      color: ${cssVar.colorTextDescription} !important;
-      text-transform: uppercase !important;
-      letter-spacing: 0.08em !important;
-
-      html[data-theme='dark'] & {
-        color: ${cssVar.colorTextSecondary} !important;
-      }
+      font-weight: 500 !important;
+      line-height: 1.25 !important;
+      color: ${cssVar.colorTextSecondary} !important;
+      text-transform: none !important;
+      letter-spacing: 0.02em !important;
     `,
     hairlineDivider: css`
       flex: none;
@@ -119,15 +116,11 @@ export const glassSidebarStyles = createStaticStyles(({ css, cssVar }) => {
       padding-inline: 10px;
 
       font-size: ${cssVar.fontSizeSM};
-      font-weight: 300;
+      font-weight: 600;
       line-height: 1.2;
-      color: ${cssVar.colorTextDescription};
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-
-      html[data-theme='dark'] & {
-        color: ${cssVar.colorTextSecondary};
-      }
+      color: ${cssVar.colorTextSecondary};
+      text-transform: none;
+      letter-spacing: 0.02em;
     `,
     shell: css`
       display: flex;

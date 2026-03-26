@@ -33,6 +33,7 @@ const MARKDOWN_TYPES = new Set(['text/markdown', 'text/x-markdown']);
 
 // Custom note file type
 const CUSTOM_NOTE_TYPE = 'custom/document';
+const MARKDOWN_PREVIEW_MAX_LENGTH = 4000;
 
 // Helper to check if filename ends with .md or is a custom note
 const isMarkdownFile = (name: string, fileType?: string) => {
@@ -80,6 +81,15 @@ const extractTextFromEditorJSON = (editorData: any): string => {
   };
 
   return editorData.root.children.map((node: any) => extractFromNode(node)).join('\n');
+};
+
+const truncateMarkdownPreview = (content: string, maxLength = MARKDOWN_PREVIEW_MAX_LENGTH) => {
+  if (content.length <= maxLength) return content;
+
+  const lastLineBreak = content.lastIndexOf('\n', maxLength);
+  const sliceEnd = lastLineBreak > maxLength * 0.6 ? lastLineBreak : maxLength;
+
+  return `${content.slice(0, sliceEnd).trimEnd()}\n\n...`;
 };
 
 const styles = createStaticStyles(({ css }) => ({
@@ -346,8 +356,8 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
               text = '';
             }
 
-            // For custom pages, take more content for better preview; for regular markdown, take first 500 chars
-            const preview = isPage ? text.slice(0, 1000) : text.slice(0, 500);
+            // Preserve markdown block boundaries for file previews so tables/code blocks still render.
+            const preview = isPage ? text.slice(0, 1000) : truncateMarkdownPreview(text);
             setMarkdownContent(preview);
           } catch (error) {
             console.error('Failed to fetch markdown content:', error);

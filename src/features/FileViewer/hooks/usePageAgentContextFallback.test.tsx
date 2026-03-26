@@ -1,0 +1,53 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import { render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import { pageAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-page-agent';
+
+import { usePageAgentContextFallback } from './usePageAgentContextFallback';
+
+const TestComponent = (props: Parameters<typeof usePageAgentContextFallback>[0]) => {
+  usePageAgentContextFallback(props);
+  return null;
+};
+
+describe('usePageAgentContextFallback', () => {
+  it('syncs file content into page agent runtime and clears on unmount', () => {
+    const setScopedFallbackPageContentContext = vi.spyOn(
+      pageAgentRuntime,
+      'setScopedFallbackPageContentContext',
+    );
+
+    const { unmount } = render(
+      <TestComponent
+        enabled
+        contextKey="page_agent-1_topic-1"
+        fileId="file-1"
+        fileName="The Pragmatic Pivot.md"
+        text={'# Title\n\nBody copy'}
+      />,
+    );
+
+    expect(setScopedFallbackPageContentContext).toHaveBeenCalledWith({
+      context: {
+        markdown: '# Title\n\nBody copy',
+        metadata: {
+          charCount: 18,
+          lineCount: 3,
+          title: 'The Pragmatic Pivot.md',
+        },
+        xml: '',
+      },
+      contextKey: 'page_agent-1_topic-1',
+      docId: 'file-1',
+    });
+
+    unmount();
+
+    expect(setScopedFallbackPageContentContext).toHaveBeenLastCalledWith({
+      contextKey: 'page_agent-1_topic-1',
+    });
+  });
+});

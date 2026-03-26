@@ -1,7 +1,7 @@
 'use client';
 
 import { INBOX_SESSION_ID } from '@lobechat/const';
-import { lazy, memo, Suspense, useEffect } from 'react';
+import { lazy, memo, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isDesktop } from '@/const/version';
@@ -18,9 +18,29 @@ import { useUserStateRedirect } from './useUserStateRedirect';
 
 const DeferredStoreInitialization = lazy(() => import('./DeferredStoreInitialization'));
 
+const requestDeferredInitialization = (onReady: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+
+  const win = window as Window &
+    typeof globalThis & {
+      cancelIdleCallback?: (id: number) => void;
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+    };
+
+  if (typeof win.requestIdleCallback === 'function') {
+    const id = win.requestIdleCallback(() => onReady(), { timeout: 1500 });
+
+    return () => win.cancelIdleCallback?.(id);
+  }
+
+  const timeoutId = win.setTimeout(onReady, 300);
+  return () => win.clearTimeout(timeoutId);
+};
+
 const StoreInitialization = memo(() => {
   // prefetch error ns to avoid don't show error content correctly
   useTranslation('error');
+  const [shouldInitDeferred, setShouldInitDeferred] = useState(false);
 
   const [isLogin, useInitUserState] = useUserStore((s) => [
     authSelectors.isLogin(s),
@@ -93,9 +113,11 @@ const StoreInitialization = memo(() => {
     serverConfigStoreApi.setState({ isMobile: mobile });
   }, [mobile, serverConfigStoreApi]);
 
+  useEffect(() => requestDeferredInitialization(() => setShouldInitDeferred(true)), []);
+
   return (
     <Suspense>
-      <DeferredStoreInitialization isLogin={isLoginOnInit} />
+      {shouldInitDeferred && <DeferredStoreInitialization isLogin={isLoginOnInit} />}
     </Suspense>
   );
 });

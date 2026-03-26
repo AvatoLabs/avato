@@ -58,6 +58,7 @@ services:
     image: rustfs/rustfs:latest
     container_name: lobe-rustfs
     network_mode: 'service:network-service'
+    restart: always
     environment:
       - RUSTFS_CONSOLE_ENABLE=true
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY}

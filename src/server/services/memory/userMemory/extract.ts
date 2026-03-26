@@ -64,6 +64,7 @@ import { type MemoryAgentConfig } from '@/server/globalConfig/parseMemoryExtract
 import { parseMemoryExtractionConfig } from '@/server/globalConfig/parseMemoryExtractionConfig';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { S3 } from '@/server/modules/S3';
+import { buildInternalServiceAuthHeaders } from '@/server/utils/internalServiceAuth';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { type GlobalMemoryLayer } from '@/types/serverConfig';
 import { type ProviderConfig } from '@/types/user/settings';
@@ -2264,7 +2265,7 @@ const buildTriggerUrl = (path: string, baseUrl: string) => {
 const createTriggerHeaders = (extraHeaders?: Record<string, string>) => {
   const { webhook } = parseMemoryExtractionConfig();
 
-  return {
+  const headers = {
     'Content-Type': 'application/json',
     ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET && {
       'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
@@ -2272,6 +2273,16 @@ const createTriggerHeaders = (extraHeaders?: Record<string, string>) => {
     ...webhook.headers,
     ...extraHeaders,
   };
+
+  const hasAuthorizationHeader = Object.keys(headers).some(
+    (headerKey) => headerKey.toLowerCase() === 'authorization',
+  );
+
+  if (!hasAuthorizationHeader && process.env.KEY_VAULTS_SECRET) {
+    Object.assign(headers, buildInternalServiceAuthHeaders());
+  }
+
+  return headers;
 };
 
 const triggerInternalEndpoint = (

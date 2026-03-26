@@ -3,7 +3,6 @@
 import { memo, useMemo } from 'react';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
-import { useFetchAgentList } from '@/hooks/useFetchAgentList';
 import { homeAgentListSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
 import { SessionDefaultGroup } from '@/types/index';
@@ -21,8 +20,6 @@ const AgentList = memo<{ onMoreClick?: () => void }>(({ onMoreClick }) => {
     s.allAgentsDrawerOpen,
     s.closeAllAgentsDrawer,
   ]);
-
-  useFetchAgentList();
 
   // Memoize computed visibility flags to prevent unnecessary recalculations
   // customList (folders) + 群组会话 rows are rendered under Body/Groups, not here

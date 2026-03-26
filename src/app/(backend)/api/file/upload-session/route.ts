@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import debug from 'debug';
 import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -13,6 +15,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const log = debug('lobe-server:file-upload-session');
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,20 +40,77 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const uploadSessionId = formData.get('uploadSessionId');
-    const file = formData.get('file');
+    const uploadSessionIdFromHeader = request.headers.get(UPLOAD_SESSION_ID_HEADER);
+    const hasRawUploadHeader = !!uploadSessionIdFromHeader;
 
-    if (typeof uploadSessionId !== 'string' || !uploadSessionId) {
-      return NextResponse.json({ error: 'Invalid uploadSessionId.' }, { status: 400 });
-    }
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Invalid file payload.' }, { status: 400 });
-    }
+    let uploadSessionId = uploadSessionIdFromHeader;
+    let contentType = request.headers.get('content-type') || 'application/octet-stream';
+    let body: Buffer | Readable | null = null;
 
     const db = await getServerDB();
     const resourceModel = new ResourceModel(db, userId);
+
+    if (hasRawUploadHeader) {
+      if (!uploadSessionId) {
+        return NextResponse.json({ error: 'Invalid uploadSessionId.' }, { status: 400 });
+      }
+
+      const declaredContentLength = request.headers.get('content-length');
+      if (declaredContentLength) {
+        const actualSize = Number(declaredContentLength);
+
+        if (!Number.isFinite(actualSize)) {
+          return NextResponse.json({ error: 'Invalid Content-Length header.' }, { status: 400 });
+        }
+
+        const uploadSession = await resourceModel.findPendingUploadSessionById(uploadSessionId);
+
+        if (!uploadSession) {
+          return NextResponse.json(
+            { error: 'Upload session not found or expired.' },
+            { status: 400 },
+          );
+        }
+
+        if (uploadSession.createdBy !== userId) {
+          return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+        }
+
+        if (actualSize !== uploadSession.expectedSize) {
+          return NextResponse.json(
+            { error: 'File size does not match upload session.' },
+            { status: 400 },
+          );
+        }
+      }
+
+      if (!request.body) {
+        return NextResponse.json({ error: 'Invalid file payload.' }, { status: 400 });
+      }
+
+      body = Readable.fromWeb(request.body as any) as Readable;
+    } else {
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const formUploadSessionId = formData.get('uploadSessionId');
+
+      if (typeof formUploadSessionId !== 'string' || !formUploadSessionId) {
+        return NextResponse.json({ error: 'Invalid uploadSessionId.' }, { status: 400 });
+      }
+
+      if (!(file instanceof File)) {
+        return NextResponse.json({ error: 'Invalid file payload.' }, { status: 400 });
+      }
+
+      uploadSessionId = formUploadSessionId;
+      contentType = file.type || contentType;
+      body = Buffer.from(await file.arrayBuffer());
+    }
+
+    if (!uploadSessionId || !body) {
+      return NextResponse.json({ error: 'Invalid upload payload.' }, { status: 400 });
+    }
+
     const uploadSession = await resourceModel.findPendingUploadSessionById(uploadSessionId);
 
     if (!uploadSession) {
@@ -61,8 +121,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    if (buffer.length !== uploadSession.expectedSize) {
+    if (Buffer.isBuffer(body) && body.length !== uploadSession.expectedSize) {
       return NextResponse.json(
         { error: 'File size does not match upload session.' },
         { status: 400 },
@@ -70,11 +129,10 @@ export async function POST(request: NextRequest) {
     }
 
     const privateS3 = getPrivateBlobS3();
-    await privateS3.uploadBuffer(
-      uploadSession.storageKey,
-      buffer,
-      file.type || 'application/octet-stream',
-    );
+    await privateS3.uploadBody(uploadSession.storageKey, body, {
+      contentLength: Buffer.isBuffer(body) ? body.length : uploadSession.expectedSize,
+      contentType,
+    });
 
     log('Uploaded file via same-origin session fallback: %s', uploadSession.storageKey);
 

@@ -1,1 +1,1 @@
-export { default as useMentionOptions } from './useMentionItems';
+export { useMentionOptions } from '@/routes/(main)/agent/profile/features/ProfileEditor/MentionList';

@@ -16,16 +16,23 @@ import {
   type ReplaceTextArgs,
   type ReplaceTextRuntimeResult,
 } from '@lobechat/editor-runtime';
+import type { PageContentContext } from '@lobechat/prompts';
 import { type IEditor } from '@lobehub/editor';
 
 const EDITOR_READY_TIMEOUT_MS = 5000;
+const DEFAULT_FALLBACK_CONTEXT_KEY = '__default__';
 
-type PageContentContext = ReturnType<EditorRuntime['getPageContentContext']>;
+interface ScopedFallbackPageContext {
+  context: PageContentContext;
+  docId?: string;
+}
 
 export class ReadyPageAgentRuntime extends EditorRuntime {
   private currentEditor: IEditor | null = null;
   private editorReadyPromise: Promise<void> | null = null;
   private editorReadyTimeoutMs: number;
+  private activeFallbackContextKey?: string;
+  private fallbackPageContentContexts = new Map<string, ScopedFallbackPageContext>();
   private readyListener?: { editor: IEditor; handler: (editor: unknown) => void };
   private titleGetterRef: (() => string) | null = null;
 
@@ -68,17 +75,82 @@ export class ReadyPageAgentRuntime extends EditorRuntime {
     super.setTitleHandlers(setter, getter);
   }
 
+  setFallbackPageContentContext(context?: PageContentContext | null) {
+    this.setScopedFallbackPageContentContext({
+      context,
+      contextKey: DEFAULT_FALLBACK_CONTEXT_KEY,
+    });
+  }
+
+  setScopedFallbackPageContentContext({
+    context,
+    contextKey,
+    docId,
+  }: {
+    context?: PageContentContext | null;
+    contextKey: string;
+    docId?: string;
+  }) {
+    if (!context) {
+      this.fallbackPageContentContexts.delete(contextKey);
+
+      if (this.activeFallbackContextKey === contextKey) {
+        this.activeFallbackContextKey = Array.from(this.fallbackPageContentContexts.keys()).at(-1);
+      }
+
+      return;
+    }
+
+    this.fallbackPageContentContexts.set(contextKey, { context, docId });
+    this.activeFallbackContextKey = contextKey;
+  }
+
   override async initPage(args: InitDocumentArgs): Promise<InitPageRuntimeResult> {
     await this.waitForEditorReady();
     return super.initPage(args);
   }
 
   override async getPageContent(args: GetPageContentArgs): Promise<GetPageContentRuntimeResult> {
+    return this.getScopedPageContent(args);
+  }
+
+  async getScopedPageContent(
+    args: GetPageContentArgs,
+    contextKey?: string,
+  ): Promise<GetPageContentRuntimeResult> {
+    const fallback = this.getFallbackPageContentContext(contextKey);
+
+    if (fallback && !this.isEditorReady()) {
+      const context = this.pickFallbackContext(fallback.context, args.format);
+
+      return {
+        charCount: context.metadata.charCount,
+        documentId: fallback.docId || this.getCurrentDocId() || 'current',
+        lineCount: context.metadata.lineCount,
+        markdown: context.markdown,
+        title: context.metadata.title,
+        xml: context.xml,
+      };
+    }
+
     await this.waitForEditorReady();
     return super.getPageContent(args);
   }
 
   override getPageContentContext(format: 'xml' | 'markdown' | 'both' = 'both'): PageContentContext {
+    return this.getScopedPageContentContext(format);
+  }
+
+  getScopedPageContentContext(
+    format: 'xml' | 'markdown' | 'both' = 'both',
+    contextKey?: string,
+  ): PageContentContext {
+    const fallback = this.getFallbackPageContentContext(contextKey);
+
+    if (fallback && !this.isEditorReady()) {
+      return this.pickFallbackContext(fallback.context, format);
+    }
+
     if (!this.isEditorReady()) {
       return this.createPendingContext(format);
     }
@@ -101,6 +173,40 @@ export class ReadyPageAgentRuntime extends EditorRuntime {
 
     this.readyListener.editor.off('initialized', this.readyListener.handler);
     this.readyListener = undefined;
+  }
+
+  private getFallbackPageContentContext(contextKey?: string) {
+    if (contextKey) return this.fallbackPageContentContexts.get(contextKey);
+
+    if (this.activeFallbackContextKey) {
+      const activeFallback = this.fallbackPageContentContexts.get(this.activeFallbackContextKey);
+      if (activeFallback) return activeFallback;
+    }
+
+    return this.fallbackPageContentContexts.get(DEFAULT_FALLBACK_CONTEXT_KEY);
+  }
+
+  private pickFallbackContext(fallback: PageContentContext, format: 'xml' | 'markdown' | 'both') {
+    const markdown = fallback.markdown || '';
+    const xml = fallback.xml || '';
+
+    const context: PageContentContext = {
+      metadata: {
+        charCount: fallback.metadata?.charCount ?? markdown.length,
+        lineCount: fallback.metadata?.lineCount ?? (markdown ? markdown.split('\n').length : 0),
+        title: fallback.metadata?.title || this.titleGetterRef?.() || 'Untitled',
+      },
+    };
+
+    if (format === 'markdown' || format === 'both') {
+      context.markdown = markdown;
+    }
+
+    if (format === 'xml' || format === 'both') {
+      context.xml = xml;
+    }
+
+    return context;
   }
 
   private createPendingContext(format: 'xml' | 'markdown' | 'both'): PageContentContext {

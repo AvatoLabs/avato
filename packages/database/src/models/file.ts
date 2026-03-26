@@ -1,5 +1,4 @@
-import type { QueryFileListParams } from '@lobechat/types';
-import { FilesTabs, SortType } from '@lobechat/types';
+import { FilesTabs, type QueryFileListParams, SortType } from '@lobechat/types';
 import {
   and,
   asc,
@@ -16,17 +15,19 @@ import {
 } from 'drizzle-orm';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 
-import type { FileItem, NewFile, NewGlobalFile } from '../schemas';
-import { agentSkills } from '../schemas/agentSkill';
 import {
   chunks,
   documentChunks,
   embeddings,
   fileChunks,
+  type FileItem,
   files,
   globalFiles,
   knowledgeBaseFiles,
+  type NewFile,
+  type NewGlobalFile,
 } from '../schemas';
+import { agentSkills } from '../schemas/agentSkill';
 import type { LobeChatDatabase, Transaction } from '../type';
 
 export class FileModel {
@@ -339,6 +340,70 @@ export class FileModel {
 
   clear = async () => {
     return this.db.delete(files).where(eq(files.userId, this.userId));
+  };
+
+  findExistingByBlobAndContext = async ({
+    blobId,
+    fileType,
+    knowledgeBaseId,
+    name,
+    parentId,
+    source,
+    spaceId,
+  }: {
+    blobId: string;
+    fileType: string;
+    knowledgeBaseId?: string;
+    name: string;
+    parentId?: string | null;
+    source?: string | null;
+    spaceId?: string | null;
+  }) => {
+    const baseWhere = and(
+      eq(files.userId, this.userId),
+      eq(files.blobId, blobId),
+      eq(files.fileType, fileType),
+      eq(files.name, name),
+      sql`${files.parentId} is not distinct from ${parentId ?? null}`,
+      sql`${files.source} is not distinct from ${source ?? null}`,
+      sql`${files.spaceId} is not distinct from ${spaceId ?? null}`,
+      sql`${files.deletedAt} is null`,
+    );
+
+    if (knowledgeBaseId) {
+      const [result] = await this.db
+        .select({ file: files })
+        .from(files)
+        .innerJoin(
+          knowledgeBaseFiles,
+          and(
+            eq(files.id, knowledgeBaseFiles.fileId),
+            eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
+          ),
+        )
+        .where(baseWhere)
+        .limit(1);
+
+      return result?.file;
+    }
+
+    const [result] = await this.db
+      .select()
+      .from(files)
+      .where(
+        and(
+          baseWhere,
+          notExists(
+            this.db
+              .select({ fileId: knowledgeBaseFiles.fileId })
+              .from(knowledgeBaseFiles)
+              .where(eq(knowledgeBaseFiles.fileId, files.id)),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return result;
   };
 
   query = async ({

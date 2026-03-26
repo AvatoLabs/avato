@@ -55,9 +55,8 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
 
   // Fetch notebook documents when topic is selected (skip for share pages)
   useFetchNotebookDocuments(isSharePage ? undefined : context.topicId!);
-  const dbMessages = useConversationStore(dataSelectors.dbMessages);
-  const userMessages = dbMessages.filter((message) => message.role === 'user');
-  const latestUserMessageId = userMessages.at(-1)?.id;
+  const latestUserMessageId = useConversationStore(dataSelectors.latestUserMessageId);
+  const userMessageCount = useConversationStore(dataSelectors.userMessageCount);
   const effectiveMemoryEffort =
     agentChatConfig.memory?.effort ?? currentMemorySettings.effort ?? 'medium';
 
@@ -65,7 +64,7 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
     effort: effectiveMemoryEffort,
     latestUserMessageId,
     topicId: enableUserMemories && !isSharePage ? context.topicId : undefined,
-    userMessageCount: userMessages.length,
+    userMessageCount,
   });
 
   // Use selectors for data

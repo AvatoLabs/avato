@@ -45,7 +45,13 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       font-weight: 500 !important;
 
       &:hover {
+        margin-inline: -4px;
+        padding-inline: 4px;
+        border-radius: 4px;
+
         color: ${cssVar.colorLink};
+
+        background: ${cssVar.colorPrimaryBg};
       }
     `,
   };

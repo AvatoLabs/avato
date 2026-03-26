@@ -388,6 +388,35 @@ describe('AgentModel', () => {
         enabled: false,
       });
     });
+
+    it('should re-enable an existing disabled knowledge base association', async () => {
+      const agent = await serverDB
+        .insert(agents)
+        .values({ userId })
+        .returning()
+        .then((res) => res[0]);
+
+      await serverDB.insert(agentsKnowledgeBases).values({
+        agentId: agent.id,
+        enabled: false,
+        knowledgeBaseId: knowledgeBase.id,
+        userId,
+      });
+
+      await agentModel.createAgentKnowledgeBase(agent.id, knowledgeBase.id, true);
+
+      const results = await serverDB.query.agentsKnowledgeBases.findMany({
+        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        agentId: agent.id,
+        enabled: true,
+        knowledgeBaseId: knowledgeBase.id,
+        userId,
+      });
+    });
   });
 
   describe('deleteAgentKnowledgeBase', () => {
@@ -568,6 +597,35 @@ describe('AgentModel', () => {
 
       // Should still only have 2 files
       expect(results).toHaveLength(2);
+    });
+
+    it('should re-enable existing disabled files instead of leaving them unavailable', async () => {
+      const agent = await serverDB
+        .insert(agents)
+        .values({ userId })
+        .returning()
+        .then((res) => res[0]);
+
+      await serverDB.insert(agentsFiles).values({
+        agentId: agent.id,
+        enabled: false,
+        fileId: '1',
+        userId,
+      });
+
+      await agentModel.createAgentFiles(agent.id, ['1'], true);
+
+      const results = await serverDB.query.agentsFiles.findMany({
+        where: eq(agentsFiles.agentId, agent.id),
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        agentId: agent.id,
+        enabled: true,
+        fileId: '1',
+        userId,
+      });
     });
   });
 

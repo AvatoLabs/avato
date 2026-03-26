@@ -28,6 +28,7 @@ const mockFileModelCheckHash = vi.fn();
 const mockFileModelCreate = vi.fn();
 const mockFileModelDelete = vi.fn();
 const mockFileModelDeleteMany = vi.fn();
+const mockFileModelFindExistingByBlobAndContext = vi.fn();
 const mockFileModelFindById = vi.fn();
 const mockFileModelQuery = vi.fn();
 const mockFileModelClear = vi.fn();
@@ -42,6 +43,7 @@ function createCallerWithCtx(partialCtx: any = {}) {
     deleteAny: mockFileModelDelete,
     deleteMany: mockFileModelDeleteMany,
     deleteManyAny: mockFileModelDeleteMany,
+    findExistingByBlobAndContext: mockFileModelFindExistingByBlobAndContext,
     findById: mockFileModelFindById,
     findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
@@ -158,11 +160,16 @@ vi.mock('@/database/models/file', () => ({
     checkHash: mockFileModelCheckHash,
     create: mockFileModelCreate,
     delete: mockFileModelDelete,
+    deleteAny: mockFileModelDelete,
     deleteMany: mockFileModelDeleteMany,
+    deleteManyAny: mockFileModelDeleteMany,
+    findExistingByBlobAndContext: mockFileModelFindExistingByBlobAndContext,
     findById: mockFileModelFindById,
+    findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
     clear: mockFileModelClear,
     update: mockFileModelUpdate,
+    updateAny: mockFileModelUpdate,
   })),
 }));
 
@@ -172,6 +179,7 @@ vi.mock('@/database/models/resource', () => ({
     ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
     findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
     getSpaceMemberRole: mockResourceModelGetSpaceMemberRole,
+    invalidateAuthzEpochsAfterRemoval: mockResourceModelInvalidateAuthzEpochsAfterRemoval,
     upsertSpaceBlob: mockResourceModelUpsertSpaceBlob,
   })),
 }));
@@ -277,8 +285,10 @@ describe('fileRouter', () => {
     mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
     mockResourceModelGetSpaceMemberRole.mockResolvedValue('owner');
     mockResourceModelUpsertSpaceBlob.mockResolvedValue({ id: 'blob_test' });
+    mockFileModelFindExistingByBlobAndContext.mockResolvedValue(undefined);
     mockDocumentModelFindBySlug.mockResolvedValue(undefined);
     mockResolverRequireFile.mockResolvedValue(mockFile);
+    mockResolverRequireKnowledgeBase.mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' });
     mockSpaceModelFindAccessibleSpaceById.mockResolvedValue(undefined);
 
     // Use actual context with default mocks
@@ -312,6 +322,26 @@ describe('fileRouter', () => {
         id: 'new-file-id',
         url: '/f/new-file-id',
       });
+    });
+
+    it('should reuse existing file in the same knowledge context', async () => {
+      mockFileModelFindExistingByBlobAndContext.mockResolvedValue({ id: 'existing-file-id' });
+
+      const result = await caller.createFile({
+        hash: 'test-hash',
+        fileType: 'text/plain',
+        knowledgeBaseId: 'kb_test',
+        metadata: {},
+        name: 'test.txt',
+        size: 100,
+        url: 'files/test.txt',
+      });
+
+      expect(result).toEqual({
+        id: 'existing-file-id',
+        url: '/f/existing-file-id',
+      });
+      expect(mockFileModelCreate).not.toHaveBeenCalled();
     });
 
     it('should use actual file size from S3 instead of client-provided size (security fix)', async () => {

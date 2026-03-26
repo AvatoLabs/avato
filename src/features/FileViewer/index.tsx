@@ -8,6 +8,7 @@ import { type FileListItem } from '@/types/files';
 import NotSupport from './NotSupport';
 import CodeViewer from './Renderer/Code';
 import ImageViewer from './Renderer/Image';
+import MarkdownViewer from './Renderer/Markdown';
 import MSDocViewer from './Renderer/MSDoc';
 import PDFViewer from './Renderer/PDF';
 import VideoViewer from './Renderer/Video';
@@ -25,6 +26,15 @@ const IMAGE_MIME_TYPES = new Set([
 
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg'];
 const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'mp4', 'webm', 'ogg']);
+
+const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
+const MARKDOWN_MIME_TYPES = new Set([
+  'md',
+  'markdown',
+  'text/markdown',
+  'text/x-markdown',
+  'application/markdown',
+]);
 
 const CODE_EXTENSIONS = [
   // JavaScript/TypeScript
@@ -87,8 +97,7 @@ const CODE_EXTENSIONS = [
   '.clj',
   '.cljs',
   '.cljc',
-  // Markdown
-  '.md',
+  // Markdown-like code
   '.mdx',
   // Other
   '.vim',
@@ -157,11 +166,8 @@ const CODE_MIME_TYPES = new Set([
   'toml',
   'sql',
   'text/x-sql',
-  // Markdown
-  'md',
+  // Markdown-like code
   'mdx',
-  'text/markdown',
-  'text/x-markdown',
   // Other
   'graphql',
   'txt',
@@ -233,47 +239,72 @@ const matchesFileType = (
 
 interface FileViewerProps extends FileListItem {
   className?: string;
+  enablePageAgentContext?: boolean;
+  pageAgentContextKey?: string;
   style?: CSSProperties;
 }
 
 /**
  * Preview any file type.
  */
-const FileViewer = memo<FileViewerProps>(({ id, style, fileType, url, name }) => {
-  // PDF files
-  if (fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf')) {
-    return <PDFViewer fileId={id} url={url} />;
-  }
+const FileViewer = memo<FileViewerProps>(
+  ({ enablePageAgentContext, id, pageAgentContextKey, style, fileType, url, name }) => {
+    // PDF files
+    if (fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf')) {
+      return <PDFViewer fileId={id} url={url} />;
+    }
 
-  // Image files
-  if (matchesFileType(fileType, name, IMAGE_EXTENSIONS, IMAGE_MIME_TYPES)) {
-    return <ImageViewer fileId={id} url={url} />;
-  }
+    // Image files
+    if (matchesFileType(fileType, name, IMAGE_EXTENSIONS, IMAGE_MIME_TYPES)) {
+      return <ImageViewer fileId={id} url={url} />;
+    }
 
-  // Video files
-  if (matchesFileType(fileType, name, VIDEO_EXTENSIONS, VIDEO_MIME_TYPES)) {
-    return <VideoViewer fileId={id} url={url} />;
-  }
+    // Video files
+    if (matchesFileType(fileType, name, VIDEO_EXTENSIONS, VIDEO_MIME_TYPES)) {
+      return <VideoViewer fileId={id} url={url} />;
+    }
 
-  // Archive files (zip, rar, 7z, etc.) - not supported for preview
-  // Check before code files to avoid false matches
-  if (matchesFileType(fileType, name, ARCHIVE_EXTENSIONS, ARCHIVE_MIME_TYPES)) {
+    // Archive files (zip, rar, 7z, etc.) - not supported for preview
+    // Check before code files to avoid false matches
+    if (matchesFileType(fileType, name, ARCHIVE_EXTENSIONS, ARCHIVE_MIME_TYPES)) {
+      return <NotSupport fileName={name} style={style} url={url} />;
+    }
+
+    // Microsoft Office documents - check before code files to avoid false matches
+    // (e.g., 'doc' contains 'c' which would match CODE_EXTENSIONS)
+    if (matchesFileType(fileType, name, MSDOC_EXTENSIONS, MSDOC_MIME_TYPES)) {
+      return <MSDocViewer fileId={id} url={url} />;
+    }
+
+    // Markdown files
+    if (matchesFileType(fileType, name, MARKDOWN_EXTENSIONS, MARKDOWN_MIME_TYPES)) {
+      return (
+        <MarkdownViewer
+          enablePageAgentContext={enablePageAgentContext}
+          fileId={id}
+          fileName={name}
+          pageAgentContextKey={pageAgentContextKey}
+          url={url}
+        />
+      );
+    }
+
+    // Code files (JavaScript, TypeScript, Python, Java, C++, Go, Rust, Markdown, etc.)
+    if (matchesFileType(fileType, name, CODE_EXTENSIONS, CODE_MIME_TYPES)) {
+      return (
+        <CodeViewer
+          enablePageAgentContext={enablePageAgentContext}
+          fileId={id}
+          fileName={name}
+          pageAgentContextKey={pageAgentContextKey}
+          url={url}
+        />
+      );
+    }
+
+    // Unsupported file type
     return <NotSupport fileName={name} style={style} url={url} />;
-  }
-
-  // Microsoft Office documents - check before code files to avoid false matches
-  // (e.g., 'doc' contains 'c' which would match CODE_EXTENSIONS)
-  if (matchesFileType(fileType, name, MSDOC_EXTENSIONS, MSDOC_MIME_TYPES)) {
-    return <MSDocViewer fileId={id} url={url} />;
-  }
-
-  // Code files (JavaScript, TypeScript, Python, Java, C++, Go, Rust, Markdown, etc.)
-  if (matchesFileType(fileType, name, CODE_EXTENSIONS, CODE_MIME_TYPES)) {
-    return <CodeViewer fileId={id} fileName={name} url={url} />;
-  }
-
-  // Unsupported file type
-  return <NotSupport fileName={name} style={style} url={url} />;
-});
+  },
+);
 
 export default FileViewer;

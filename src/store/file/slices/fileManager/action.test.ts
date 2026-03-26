@@ -278,7 +278,7 @@ describe('FileManagerActions', () => {
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
         files: [
-          expect.objectContaining({ file: validFile, id: validFile.name, status: 'pending' }),
+          expect.objectContaining({ file: validFile, id: expect.any(String), status: 'pending' }),
         ],
         type: 'addFiles',
       });
@@ -288,10 +288,11 @@ describe('FileManagerActions', () => {
         file: validFile,
         knowledgeBaseId: undefined,
         onStatusUpdate: expect.any(Function),
+        uploadId: expect.any(String),
       });
       expect(refreshSpy).toHaveBeenCalled();
       // Should auto-parse text files
-      expect(parseSpy).toHaveBeenCalledWith(['file-1'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1'], { skipExist: true });
     });
 
     it('should upload files with knowledgeBaseId', async () => {
@@ -314,6 +315,7 @@ describe('FileManagerActions', () => {
         file,
         knowledgeBaseId: 'kb-123',
         onStatusUpdate: expect.any(Function),
+        uploadId: expect.any(String),
       });
     });
 
@@ -324,8 +326,12 @@ describe('FileManagerActions', () => {
 
       const uploadSpy = vi
         .spyOn(result.current, 'uploadWithProgress')
-        .mockImplementation(async ({ onStatusUpdate }) => {
-          onStatusUpdate?.({ id: file.name, type: 'updateFile', value: { status: 'uploading' } });
+        .mockImplementation(async ({ onStatusUpdate, uploadId }) => {
+          onStatusUpdate?.({
+            id: uploadId!,
+            type: 'updateFile',
+            value: { status: 'uploading' },
+          });
           return { id: 'file-1', url: 'http://example.com/file-1' };
         });
       vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
@@ -357,6 +363,38 @@ describe('FileManagerActions', () => {
       expect(parseSpy).not.toHaveBeenCalled();
     });
 
+    it('should assign different upload ids for files with the same name', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const firstFile = new File(['first'], 'duplicate.txt', { type: 'text/plain' });
+      const secondFile = new File(['second'], 'duplicate.txt', { type: 'text/plain' });
+
+      vi.spyOn(result.current, 'uploadWithProgress')
+        .mockResolvedValueOnce({ id: 'file-1', url: 'http://example.com/file-1' })
+        .mockResolvedValueOnce({ id: 'file-2', url: 'http://example.com/file-2' });
+      vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      vi.spyOn(result.current, 'parseFilesToChunks').mockResolvedValue();
+      const dispatchSpy = vi.spyOn(result.current, 'dispatchDockFileList');
+
+      await act(async () => {
+        await result.current.pushDockFileList([firstFile, secondFile]);
+      });
+
+      const addFilesCall = dispatchSpy.mock.calls.find((call) => call[0].type === 'addFiles');
+      expect(addFilesCall).toBeDefined();
+      if (!addFilesCall) return;
+
+      expect(addFilesCall[0]).toMatchObject({
+        atStart: true,
+        type: 'addFiles',
+      });
+      if (!('files' in addFilesCall[0])) return;
+
+      const uploadIds = addFilesCall[0].files.map((item) => item.id);
+      expect(uploadIds).toHaveLength(2);
+      expect(Array.from(new Set(uploadIds))).toHaveLength(2);
+    });
+
     it('should auto-embed files that support chunking', async () => {
       const { result } = renderHook(() => useStore());
 
@@ -374,7 +412,7 @@ describe('FileManagerActions', () => {
       });
 
       // Should auto-parse both files that support chunking
-      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-2'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-2'], { skipExist: true });
     });
 
     it('should skip auto-embed for unsupported file types (images/videos/audio)', async () => {
@@ -418,7 +456,7 @@ describe('FileManagerActions', () => {
       });
 
       // Should only auto-parse text and pdf files, skip image
-      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-3'], { skipExist: false });
+      expect(parseSpy).toHaveBeenCalledWith(['file-1', 'file-3'], { skipExist: true });
     });
 
     it('should skip auto-embed when upload fails', async () => {
@@ -436,6 +474,36 @@ describe('FileManagerActions', () => {
 
       // Should not auto-parse when upload returns undefined
       expect(parseSpy).not.toHaveBeenCalled();
+    });
+
+    it('should keep the batch moving when one upload throws', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const firstFile = new File(['text content'], 'first.txt', { type: 'text/plain' });
+      const secondFile = new File(['text content'], 'second.txt', { type: 'text/plain' });
+
+      const uploadSpy = vi
+        .spyOn(result.current, 'uploadWithProgress')
+        .mockRejectedValueOnce(new Error('Upload failed'))
+        .mockResolvedValueOnce({ id: 'file-2', url: 'http://example.com/file-2' });
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+      const parseSpy = vi.spyOn(result.current, 'parseFilesToChunks').mockResolvedValue();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const dispatchSpy = vi.spyOn(result.current, 'dispatchDockFileList');
+
+      await act(async () => {
+        await result.current.pushDockFileList([firstFile, secondFile]);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      const failedUploadId = vi.mocked(uploadSpy).mock.calls[0]?.[0]?.uploadId;
+      expect(dispatchSpy).toHaveBeenCalledWith({
+        id: failedUploadId,
+        type: 'updateFile',
+        value: { status: 'error' },
+      });
+      expect(refreshSpy).toHaveBeenCalled();
+      expect(parseSpy).toHaveBeenCalledWith(['file-2'], { skipExist: true });
     });
 
     it('should enforce file count limit and queue excess files', async () => {
@@ -506,7 +574,7 @@ describe('FileManagerActions', () => {
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
         files: extractedFiles.map((file) =>
-          expect.objectContaining({ file, id: file.name, status: 'pending' }),
+          expect.objectContaining({ file, id: expect.any(String), status: 'pending' }),
         ),
         type: 'addFiles',
       });
@@ -537,7 +605,9 @@ describe('FileManagerActions', () => {
       // Should fallback to uploading the ZIP file itself
       expect(dispatchSpy).toHaveBeenCalledWith({
         atStart: true,
-        files: [expect.objectContaining({ file: zipFile, id: zipFile.name, status: 'pending' })],
+        files: [
+          expect.objectContaining({ file: zipFile, id: expect.any(String), status: 'pending' }),
+        ],
         type: 'addFiles',
       });
     });

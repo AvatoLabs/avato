@@ -1,3 +1,5 @@
+import { isValidInternalServiceAuth } from '@/server/utils/internalServiceAuth';
+
 export interface ValidateWebhookRequestAuthParams {
   expectedHeaders?: Record<string, string>;
   nodeEnv?: string;
@@ -14,6 +16,10 @@ export const validateWebhookRequestAuth = ({
   nodeEnv = process.env.NODE_ENV,
   requestHeaders,
 }: ValidateWebhookRequestAuthParams): WebhookAuthFailure | undefined => {
+  if (isValidInternalServiceAuth(requestHeaders.get('authorization'))) {
+    return undefined;
+  }
+
   const hasConfiguredHeaders = !!expectedHeaders && Object.keys(expectedHeaders).length > 0;
 
   if (!hasConfiguredHeaders) {

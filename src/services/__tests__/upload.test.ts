@@ -37,6 +37,7 @@ vi.mock('js-sha256', () => ({
 const mockStorageKey = 'uploads/spc_test/sess_1/opq_upload_id';
 const mockSessionId = 'ups_sess_1';
 const mockPreSignUrl = 'https://example.com/presign';
+const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
 
 function mockXhrSuccess() {
   const xhrMock = {
@@ -256,6 +257,7 @@ describe('UploadService', () => {
         filename: 'test.png',
         path: mockStorageKey,
       });
+      expect(xhr.send).toHaveBeenCalledWith(mockFile);
     });
 
     it('should report progress during upload', async () => {
@@ -319,6 +321,46 @@ describe('UploadService', () => {
       });
 
       await expect(uploadService.uploadToServerS3(mockFile, {})).rejects.toBe('Bad Request');
+    });
+
+    it('should use same-origin raw upload fallback for mixed-content uploads', async () => {
+      const originalWindow = globalThis.window;
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: { location: { protocol: 'https:' } },
+      });
+
+      vi.mocked(lambdaClient.upload.prepareResourceUpload.mutate).mockResolvedValueOnce({
+        expiresAt: new Date().toISOString(),
+        presignedUrl: 'http://example.com/presign',
+        sessionId: mockSessionId,
+        storageKey: mockStorageKey,
+      });
+
+      const xhr = new XMLHttpRequest();
+
+      vi.spyOn(xhr, 'addEventListener').mockImplementation((event, handler) => {
+        if (event === 'load') {
+          // @ts-expect-error - mock implementation
+          handler({ target: { status: 200 } });
+        }
+      });
+
+      await uploadService.uploadToServerS3(mockFile, {});
+
+      expect(xhr.open).toHaveBeenCalledWith('POST', API_ENDPOINTS.fileUploadSession);
+      expect(xhr.setRequestHeader).toHaveBeenCalledWith(UPLOAD_SESSION_ID_HEADER, mockSessionId);
+      expect(xhr.setRequestHeader).toHaveBeenCalledWith('Content-Type', mockFile.type);
+      expect(xhr.send).toHaveBeenCalledWith(mockFile);
+
+      if (originalWindow === undefined) {
+        delete (globalThis as { window?: Window }).window;
+      } else {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: originalWindow,
+        });
+      }
     });
   });
 

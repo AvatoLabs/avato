@@ -1,7 +1,7 @@
-import { Button, stopPropagation, Tooltip } from '@lobehub/ui';
+import { Button, Markdown, stopPropagation, Tooltip } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
 import { isNull } from 'es-toolkit/compat';
-import { memo } from 'react';
+import { type FC, memo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
@@ -85,12 +85,6 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     padding: 16px;
     border-radius: ${cssVar.borderRadiusLG};
 
-    font-size: 13px;
-    line-height: 1.6;
-    color: ${cssVar.colorTextSecondary};
-    word-wrap: break-word;
-    white-space: pre-wrap;
-
     background: ${cssVar.colorFillQuaternary};
 
     &::after {
@@ -104,6 +98,36 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
       height: 60px;
 
       background: linear-gradient(to bottom, transparent, ${cssVar.colorFillQuaternary});
+    }
+
+    article {
+      padding-inline: 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      color: ${cssVar.colorText};
+    }
+
+    p,
+    li,
+    td,
+    th {
+      font-size: 13px;
+      color: ${cssVar.colorTextSecondary};
+    }
+
+    table {
+      font-size: 12px;
+    }
+
+    pre {
+      overflow: auto;
+      max-height: 160px;
     }
   `,
   overlaySize: css`
@@ -127,6 +151,12 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     word-break: break-word;
   `,
 }));
+
+const previewMarkdownComponents = {
+  a: ({ children }) => <>{children}</>,
+  img: () => null,
+  video: () => null,
+} as Record<string, FC<{ children?: ReactNode }>>;
 
 interface MarkdownFileItemProps {
   chunkCount?: number | null;
@@ -172,7 +202,23 @@ const MarkdownFileItem = memo<MarkdownFileItemProps>(
           {isLoadingMarkdown ? (
             <div className={styles.markdownLoading}>Loading preview...</div>
           ) : markdownContent ? (
-            <div className={styles.markdownPreview}>{markdownContent}</div>
+            <div className={styles.markdownPreview}>
+              <Markdown
+                components={previewMarkdownComponents}
+                enableImageGallery={false}
+                enableLatex={false}
+                enableMermaid={false}
+                enableStream={false}
+                fontSize={13}
+                fullFeaturedCodeBlock={false}
+                headerMultiple={0.25}
+                lineHeight={1.6}
+                marginMultiple={0.75}
+                variant={'chat'}
+              >
+                {markdownContent}
+              </Markdown>
+            </div>
           ) : (
             <div className={styles.iconWrapper}>
               <FileIcon fileName={name} fileType={fileType} size={64} />

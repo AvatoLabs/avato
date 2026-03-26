@@ -73,6 +73,20 @@ const getUserMemoryExtractionTimeoutMs = (metadata: UserMemoryExtractionMetadata
   return totalTopics * USER_MEMORY_EXTRACTION_TIMEOUT_PER_TOPIC_MS;
 };
 
+const getUserMemoryExtractionLastActiveAtMs = (task: {
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}) => {
+  const createdAtMs = task.createdAt ? new Date(task.createdAt).getTime() : Number.NaN;
+  const updatedAtMs = task.updatedAt ? new Date(task.updatedAt).getTime() : Number.NaN;
+
+  if (Number.isFinite(updatedAtMs)) {
+    return Number.isFinite(createdAtMs) ? Math.max(createdAtMs, updatedAtMs) : updatedAtMs;
+  }
+
+  return createdAtMs;
+};
+
 export const userMemoryRouter = router({
   // ============ Identity CRUD ============
   createIdentity: userMemoryProcedure
@@ -181,15 +195,15 @@ export const userMemoryRouter = router({
       );
 
       const timeoutMs = getUserMemoryExtractionTimeoutMs(metadata);
-      const taskCreatedAt = task.createdAt ? new Date(task.createdAt).getTime() : Number.NaN;
+      const taskLastActiveAt = getUserMemoryExtractionLastActiveAtMs(task);
       const isActiveTask =
         task.status === AsyncTaskStatus.Pending || task.status === AsyncTaskStatus.Processing;
 
       if (
         isActiveTask &&
         timeoutMs !== null &&
-        Number.isFinite(taskCreatedAt) &&
-        Date.now() - taskCreatedAt > timeoutMs
+        Number.isFinite(taskLastActiveAt) &&
+        Date.now() - taskLastActiveAt > timeoutMs
       ) {
         const timeoutMinutes = Math.ceil(timeoutMs / (60 * 1000));
         const timeoutError = new AsyncTaskError(

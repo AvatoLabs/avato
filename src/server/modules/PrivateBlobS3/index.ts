@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import {
   type BucketLocationConstraint,
   CreateBucketCommand,
@@ -5,6 +7,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
+  type PutObjectCommandInput,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -12,6 +15,12 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileEnv } from '@/envs/file';
 
 const DEFAULT_S3_REGION = 'us-east-1';
+
+interface UploadBodyOptions {
+  cacheControl?: string;
+  contentLength?: number;
+  contentType?: string;
+}
 
 /**
  * PrivateBlobS3 - S3 client for private blob storage
@@ -219,12 +228,29 @@ export class PrivateBlobS3 {
     contentType?: string,
     cacheControl?: string,
   ) {
+    return this.uploadBody(path, buffer, {
+      cacheControl,
+      contentLength: buffer.length,
+      contentType,
+    });
+  }
+
+  public async uploadBody(
+    path: string,
+    body: NonNullable<PutObjectCommandInput['Body']>,
+    { cacheControl, contentLength, contentType }: UploadBodyOptions = {},
+  ) {
+    if (body instanceof Readable && contentLength === undefined) {
+      throw new Error('ContentLength is required when uploading a stream body to S3.');
+    }
+
     return this.withBucketAutoCreateRetry(async () => {
       const command = new PutObjectCommand({
         // No ACL - always private
-        Body: buffer,
+        Body: body,
         Bucket: this.bucket,
         CacheControl: cacheControl,
+        ContentLength: contentLength,
         ContentType: contentType,
         Key: path,
       });

@@ -203,6 +203,23 @@ export const fileRouter = router({
         verifiedAt: new Date(),
       });
 
+      const existingFile =
+        input.knowledgeBaseId || input.spaceId || resolvedParentId
+          ? await ctx.fileModel.findExistingByBlobAndContext({
+              blobId: blob.id,
+              fileType: actualFileType,
+              knowledgeBaseId: input.knowledgeBaseId,
+              name: input.name,
+              parentId: resolvedParentId,
+              source: input.source,
+              spaceId,
+            })
+          : undefined;
+
+      if (existingFile) {
+        return { id: existingFile.id, url: getFileProxyUrl(existingFile.id) };
+      }
+
       // User uploads are space-scoped via space_blobs; do not insert into global_files or set
       // files.file_hash (FK to global_files) to avoid cross-user existence leaks.
       const { id } = await ctx.fileModel.create(

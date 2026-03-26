@@ -8,7 +8,7 @@ import { dataSelectors } from '../data/selectors';
  * Check if a message is currently collapsed (from message metadata)
  */
 const isMessageCollapsed = (id: string) => (s: State) => {
-  const message = s.dbMessages.find((m) => m.id === id);
+  const message = s.dbMessageMap[id] ?? s.dbMessages.find((m) => m.id === id);
   return message?.metadata?.collapsed ?? false;
 };
 

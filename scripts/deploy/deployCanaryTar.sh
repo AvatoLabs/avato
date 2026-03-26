@@ -43,6 +43,11 @@ REMOTE_ARTIFACT_PRUNE_FROM=$((KEEP_REMOTE_ARTIFACTS + 1))
 REMOTE_IMAGE_PRUNE_FROM=$((KEEP_REMOTE_RUNTIME_IMAGES + 1))
 
 SSH_CONFIG_FILE="${SSH_CONFIG_FILE:-/tmp/ssh_config_canary}"
+REMOTE_RETRY_ATTEMPTS="${REMOTE_RETRY_ATTEMPTS:-3}"
+REMOTE_RETRY_DELAY_SECONDS="${REMOTE_RETRY_DELAY_SECONDS:-5}"
+SSH_CONNECT_TIMEOUT="${SSH_CONNECT_TIMEOUT:-20}"
+SSH_SERVER_ALIVE_INTERVAL="${SSH_SERVER_ALIVE_INTERVAL:-15}"
+SSH_SERVER_ALIVE_COUNT_MAX="${SSH_SERVER_ALIVE_COUNT_MAX:-3}"
 
 cat >"${SSH_CONFIG_FILE}" <<EOF
 Host canary-deploy
@@ -50,6 +55,13 @@ Host canary-deploy
   User ${DEPLOY_USER}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
+  PreferredAuthentications password
+  PubkeyAuthentication no
+  NumberOfPasswordPrompts 1
+  ConnectTimeout ${SSH_CONNECT_TIMEOUT}
+  ConnectionAttempts 3
+  ServerAliveInterval ${SSH_SERVER_ALIVE_INTERVAL}
+  ServerAliveCountMax ${SSH_SERVER_ALIVE_COUNT_MAX}
 EOF
 
 run_with_expect() {
@@ -72,6 +84,29 @@ if {$exit_code eq ""} {
 }
 exit $exit_code
 EOF
+}
+
+run_remote_with_retry() {
+  local attempt=1
+  local exit_code=0
+
+  while [ "${attempt}" -le "${REMOTE_RETRY_ATTEMPTS}" ]; do
+    if run_with_expect "$@"; then
+      return 0
+    else
+      exit_code=$?
+    fi
+
+    if [ "${attempt}" -ge "${REMOTE_RETRY_ATTEMPTS}" ]; then
+      break
+    fi
+
+    echo "Remote step failed with exit code ${exit_code}; retrying in ${REMOTE_RETRY_DELAY_SECONDS}s (${attempt}/${REMOTE_RETRY_ATTEMPTS})..." >&2
+    sleep "${REMOTE_RETRY_DELAY_SECONDS}"
+    attempt=$((attempt + 1))
+  done
+
+  return "${exit_code}"
 }
 
 restore_build_env() {
@@ -211,7 +246,7 @@ docker image prune -f >/dev/null 2>&1 || true
 ls -1t "${TMP_ARTIFACT_DIR}"/canary-runtime-*-amd64.tar.gz 2>/dev/null | tail -n +"${LOCAL_ARTIFACT_PRUNE_FROM}" | xargs -r rm -f
 
 echo "==> Ensuring remote directory structure"
-run_with_expect \
+run_remote_with_retry \
   ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
   "mkdir -p ${REMOTE_ARTIFACT_DIR} ${REMOTE_DEPLOY_PATH}"
 
@@ -221,30 +256,30 @@ config_files=(
   "${ROOT_DIR}/docker-compose/canary/bucket.config.json"
   "${ROOT_DIR}/docker-compose/canary/searxng-settings.yml"
 )
-run_with_expect \
+run_remote_with_retry \
   scp -F "${SSH_CONFIG_FILE}" \
   "${config_files[@]}" \
   "canary-deploy:${REMOTE_DEPLOY_PATH}/"
 echo "==> Uploading compose env from ${COMPOSE_ENV_FILE}"
-run_with_expect \
+run_remote_with_retry \
   scp -F "${SSH_CONFIG_FILE}" \
   "${COMPOSE_ENV_FILE}" \
   "canary-deploy:${REMOTE_DEPLOY_PATH}/.env"
 
 echo "==> Patching remote .env: S3_ENDPOINT + INTERNAL_APP_URL (async /trpc/async must hit container :3210)"
 CANARY_INTERNAL_APP_URL="${CANARY_INTERNAL_APP_URL:-http://127.0.0.1:3210}"
-run_with_expect \
+run_remote_with_retry \
   ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
   "f=${REMOTE_DEPLOY_PATH}/.env; test -f \"\$f\" || touch \"\$f\"; if grep -q '^S3_ENDPOINT=' \"\$f\"; then sed -i.bak \"s|^S3_ENDPOINT=.*|S3_ENDPOINT=${PUBLIC_S3_ENDPOINT}|\" \"\$f\"; else printf '\\nS3_ENDPOINT=%s\\n' \"${PUBLIC_S3_ENDPOINT}\" >> \"\$f\"; fi; if grep -q '^INTERNAL_APP_URL=' \"\$f\"; then sed -i.bak \"s|^INTERNAL_APP_URL=.*|INTERNAL_APP_URL=${CANARY_INTERNAL_APP_URL}|\" \"\$f\"; else printf '\\nINTERNAL_APP_URL=%s\\n' \"${CANARY_INTERNAL_APP_URL}\" >> \"\$f\"; fi"
 
 echo "==> Uploading artifact to ${DEPLOY_HOST}"
-run_with_expect \
+run_remote_with_retry \
   scp -F "${SSH_CONFIG_FILE}" \
   "${TMP_ARTIFACT_DIR}/${ARTIFACT_NAME}" \
   "canary-deploy:${REMOTE_ARTIFACT_DIR}/"
 
 echo "==> Loading image and restarting ${REMOTE_RUNTIME_TAG} on remote"
-run_with_expect \
+run_remote_with_retry \
   ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
   "bash -lc '
 set -euo pipefail
@@ -262,7 +297,7 @@ docker logs --tail 50 canary-lobe
 '"
 
 echo "==> Verifying remote service on 127.0.0.1:3211${DEPLOY_VERIFY_PATH}"
-run_with_expect \
+run_remote_with_retry \
   ssh -F "${SSH_CONFIG_FILE}" canary-deploy \
   "bash -lc '
 set -euo pipefail

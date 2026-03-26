@@ -6,6 +6,7 @@ import { memo } from 'react';
 
 import { useGlassNavVisual } from '@/features/NavPanel/GlassNavVisualContext';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
+import { useFetchAgentList } from '@/hooks/useFetchAgentList';
 
 import Agent from './Agent';
 import GroupsPanel from './Groups';
@@ -20,6 +21,7 @@ export enum GroupKey {
 
 const Body = memo(() => {
   const glass = useGlassNavVisual();
+  const { isRevalidating } = useFetchAgentList();
 
   return (
     <Flexbox
@@ -32,7 +34,7 @@ const Body = memo(() => {
         defaultExpandedKeys={[GroupKey.Agent, GroupKey.Groups, GroupKey.RecentTopics]}
         gap={10}
       >
-        <Agent itemKey={GroupKey.Agent} />
+        <Agent isRevalidating={isRevalidating} itemKey={GroupKey.Agent} />
         <GroupsPanel itemKey={GroupKey.Groups} />
         <RecentTopics itemKey={GroupKey.RecentTopics} />
       </Accordion>

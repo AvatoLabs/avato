@@ -461,6 +461,41 @@ describe('UserModel', () => {
       });
     });
 
+    describe('searchByKeyword', () => {
+      it('should return fuzzy matched users and prioritize stronger matches', async () => {
+        await serverDB.delete(users);
+        await serverDB.insert(users).values([
+          { id: 'u-1', fullName: 'Zhang Yan', username: 'zhangyan' },
+          { id: 'u-2', fullName: 'Yan Zhang', username: 'yan_zhang' },
+          { id: 'u-3', fullName: 'Arthur Zhang', username: 'arthur' },
+          { id: 'u-4', fullName: 'No Username' },
+        ]);
+
+        const result = await UserModel.searchByKeyword(serverDB, 'zhy');
+
+        expect(result.map((item) => item.username)).toEqual(['zhangyan']);
+      });
+
+      it('should match username and full name substrings', async () => {
+        await serverDB.delete(users);
+        await serverDB.insert(users).values([
+          { id: 'u-1', fullName: 'John Carter', username: 'johncarter' },
+          { id: 'u-2', fullName: 'Johnny Appleseed', username: 'appleseed' },
+          { id: 'u-3', fullName: 'Mary Stone', username: 'mstone' },
+        ]);
+
+        const result = await UserModel.searchByKeyword(serverDB, 'john');
+
+        expect(result.map((item) => item.id)).toEqual(['u-1', 'u-2']);
+      });
+
+      it('should return empty array for blank keyword', async () => {
+        const result = await UserModel.searchByKeyword(serverDB, '   ');
+
+        expect(result).toEqual([]);
+      });
+    });
+
     describe('getUserApiKeys', () => {
       it('should return decrypted API keys', async () => {
         await serverDB.insert(userSettings).values({

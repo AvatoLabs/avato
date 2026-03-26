@@ -361,6 +361,107 @@ describe('DataSlice', () => {
       expect(message?.content).toBe('Hello');
     });
 
+    it('getDbMessageByToolCallId should find tool result message', () => {
+      const store = createTestStore();
+
+      store.getState().replaceMessages([
+        {
+          id: 'tool-msg-1',
+          content: 'Tool result',
+          role: 'tool',
+          createdAt: 1000,
+          tool_call_id: 'tool-call-1',
+          updatedAt: 1000,
+        } as any,
+      ]);
+
+      const message = dataSelectors.getDbMessageByToolCallId('tool-call-1')(store.getState());
+      expect(message?.id).toBe('tool-msg-1');
+    });
+
+    it('latestUserMessageId and userMessageCount should ignore tool messages in long tool flow', () => {
+      const store = createTestStore();
+
+      store.getState().replaceMessages([
+        {
+          id: 'user-msg-1',
+          content: 'Need a tool',
+          role: 'user',
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+        {
+          id: 'assistant-msg-1',
+          content: '',
+          role: 'assistant',
+          createdAt: 2000,
+          updatedAt: 2000,
+          tools: [
+            {
+              apiName: 'search',
+              arguments: '{}',
+              id: 'tool-call-1',
+              identifier: 'search',
+              type: 'default',
+            },
+          ],
+        } as any,
+        {
+          id: 'tool-msg-1',
+          content: 'Tool result',
+          role: 'tool',
+          createdAt: 3000,
+          tool_call_id: 'tool-call-1',
+          updatedAt: 3000,
+        } as any,
+        {
+          id: 'assistant-msg-2',
+          content: 'Final answer',
+          role: 'assistant',
+          createdAt: 4000,
+          updatedAt: 4000,
+        },
+      ]);
+
+      expect(dataSelectors.latestUserMessageId(store.getState())).toBe('user-msg-1');
+      expect(dataSelectors.userMessageCount(store.getState())).toBe(1);
+    });
+
+    it('latestUserMessageId and userMessageCount should stay correct for group chat messages', () => {
+      const store = createTestStore();
+
+      store.getState().replaceMessages([
+        {
+          id: 'user-msg-1',
+          content: 'Start group task',
+          role: 'user',
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+        {
+          id: 'group-msg-1',
+          content: '',
+          role: 'assistantGroup',
+          createdAt: 2000,
+          updatedAt: 2000,
+          children: [
+            { id: 'worker-1', content: 'A', role: 'assistant' },
+            { id: 'worker-2', content: 'B', role: 'assistant' },
+          ],
+        } as any,
+        {
+          id: 'user-msg-2',
+          content: 'Follow-up',
+          role: 'user',
+          createdAt: 3000,
+          updatedAt: 3000,
+        },
+      ]);
+
+      expect(dataSelectors.latestUserMessageId(store.getState())).toBe('user-msg-2');
+      expect(dataSelectors.userMessageCount(store.getState())).toBe(2);
+    });
+
     it('messagesInit should return initialization state', () => {
       const store = createTestStore();
 

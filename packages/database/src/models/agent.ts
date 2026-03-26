@@ -211,6 +211,29 @@ export class AgentModel {
     knowledgeBaseId: string,
     enabled: boolean = true,
   ) => {
+    const existing = await this.db.query.agentsKnowledgeBases.findFirst({
+      where: and(
+        eq(agentsKnowledgeBases.agentId, agentId),
+        eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
+        eq(agentsKnowledgeBases.userId, this.userId),
+      ),
+    });
+
+    if (existing) {
+      await this.db
+        .update(agentsKnowledgeBases)
+        .set({ enabled })
+        .where(
+          and(
+            eq(agentsKnowledgeBases.agentId, agentId),
+            eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
+            eq(agentsKnowledgeBases.userId, this.userId),
+          ),
+        );
+
+      return;
+    }
+
     return this.db.insert(agentsKnowledgeBases).values({
       agentId,
       enabled,
@@ -258,8 +281,22 @@ export class AgentModel {
       );
 
     const existingFilesIds = new Set(existingFiles.map((item) => item.id));
+    const existingFileIds = Array.from(existingFilesIds);
 
     const needToInsertFileIds = fileIds.filter((fileId) => !existingFilesIds.has(fileId));
+
+    if (existingFileIds.length > 0) {
+      await this.db
+        .update(agentsFiles)
+        .set({ enabled })
+        .where(
+          and(
+            eq(agentsFiles.agentId, agentId),
+            eq(agentsFiles.userId, this.userId),
+            inArray(agentsFiles.fileId, existingFileIds),
+          ),
+        );
+    }
 
     if (needToInsertFileIds.length === 0) return;
 

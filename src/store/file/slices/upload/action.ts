@@ -42,6 +42,7 @@ interface UploadWithProgressParams {
    */
   source?: string;
   spaceId?: string;
+  uploadId?: string;
 }
 
 interface UploadWithProgressResult {
@@ -93,8 +94,10 @@ export class FileUploadActionImpl {
     spaceId,
     source,
     abortController,
+    uploadId,
   }: UploadWithProgressParams): Promise<UploadWithProgressResult | undefined> => {
     try {
+      const statusUpdateId = uploadId ?? file.name;
       const fileArrayBuffer = await file.arrayBuffer();
 
       // 1. extract image dimensions if applicable
@@ -110,7 +113,7 @@ export class FileUploadActionImpl {
       if (checkStatus.isExist) {
         metadata = checkStatus.metadata as FileMetadata;
         onStatusUpdate?.({
-          id: file.name,
+          id: statusUpdateId,
           type: 'updateFile',
           value: { status: 'processing', uploadState: { progress: 100, restTime: 0, speed: 0 } },
         });
@@ -121,7 +124,7 @@ export class FileUploadActionImpl {
           abortController,
           knowledgeBaseId,
           onNotSupported: () => {
-            onStatusUpdate?.({ id: file.name, type: 'removeFile' });
+            onStatusUpdate?.({ id: statusUpdateId, type: 'removeFile' });
             message.info({
               content: t('upload.fileOnlySupportInServerMode', {
                 cloud: LOBE_CHAT_CLOUD,
@@ -133,7 +136,7 @@ export class FileUploadActionImpl {
           },
           onProgress: (status, upload) => {
             onStatusUpdate?.({
-              id: file.name,
+              id: statusUpdateId,
               type: 'updateFile',
               value: { status: status === 'success' ? 'processing' : status, uploadState: upload },
             });
@@ -175,11 +178,11 @@ export class FileUploadActionImpl {
       );
 
       onStatusUpdate?.({
-        id: file.name,
+        id: statusUpdateId,
         type: 'updateFile',
         value: {
+          fileId: data.id,
           fileUrl: data.url,
-          id: data.id,
           status: 'success',
           uploadState: { progress: 100, restTime: 0, speed: 0 },
         },
@@ -189,13 +192,20 @@ export class FileUploadActionImpl {
     } catch (error) {
       // Handle file storage plan limit error
       if ((error as any)?.message?.includes('beyond the plan limit')) {
-        onStatusUpdate?.({ id: file.name, type: 'removeFile' });
+        onStatusUpdate?.({ id: statusUpdateId, type: 'removeFile' });
         uploadErrorNotification.error(error, {
           description: t('upload.storageLimitExceeded', { ns: 'error' }),
           message: t('upload.title', { ns: 'error' }),
         });
         return;
       }
+
+      onStatusUpdate?.({
+        id: statusUpdateId,
+        type: 'updateFile',
+        value: { status: abortController?.signal.aborted ? 'cancelled' : 'error' },
+      });
+
       throw error;
     }
   };

@@ -38,6 +38,10 @@ export interface UploadFileItem {
   base64Url?: string;
   file: File;
   /**
+   * the persisted file record id after upload succeeds
+   */
+  fileId?: string;
+  /**
    * the file url after upload,it will be s3 url
    * if enable the S3 storage, or the data is same as base64Url
    */

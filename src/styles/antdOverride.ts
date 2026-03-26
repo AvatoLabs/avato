@@ -28,6 +28,29 @@ const antdOverride = ({ token }: { prefixCls: string; token: Theme }) => css`
     color: #fff !important;
   }
 
+  /**
+   * 亮色主题下：所有彩色实心按钮使用白色文字
+   */
+  html[data-theme='light']
+    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
+      :disabled
+    ):not(.${token.prefixCls}-btn-disabled) {
+    color: #fff !important;
+  }
+
+  html[data-theme='light']
+    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
+      :disabled
+    ):not(.${token.prefixCls}-btn-disabled)
+    .${token.prefixCls}icon,
+    html[data-theme='light']
+    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
+      :disabled
+    ):not(.${token.prefixCls}-btn-disabled)
+    svg {
+    color: #fff !important;
+  }
+
   .${token.prefixCls}-popover {
     z-index: 1100;
   }

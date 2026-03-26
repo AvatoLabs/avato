@@ -190,7 +190,7 @@ describe('FileUploadAction', () => {
           });
         });
 
-        expect(fileService.checkFileHash).toHaveBeenCalledWith('mock-hash-value');
+        expect(fileService.checkFileHash).toHaveBeenCalledWith('mock-hash-value', undefined);
         expect(uploadToS3Spy).not.toHaveBeenCalled();
         expect(onStatusUpdate).toHaveBeenCalledWith({
           id: mockFile.name,
@@ -250,10 +250,11 @@ describe('FileUploadAction', () => {
           return await result.current.uploadWithProgress({
             file: mockFile,
             onStatusUpdate,
+            uploadId: 'upload-item-1',
           });
         });
 
-        expect(fileService.checkFileHash).toHaveBeenCalledWith('mock-hash-value');
+        expect(fileService.checkFileHash).toHaveBeenCalledWith('mock-hash-value', undefined);
         expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(
           mockFile,
           expect.objectContaining({
@@ -275,11 +276,11 @@ describe('FileUploadAction', () => {
           undefined,
         );
         expect(onStatusUpdate).toHaveBeenCalledWith({
-          id: mockFile.name,
+          id: 'upload-item-1',
           type: 'updateFile',
           value: {
+            fileId: mockFileResponse.id,
             fileUrl: mockFileResponse.url,
-            id: mockFileResponse.id,
             status: 'success',
             uploadState: { progress: 100, restTime: 0, speed: 0 },
           },
@@ -677,7 +678,6 @@ describe('FileUploadAction', () => {
         vi.mocked(getImageDimensions).mockResolvedValue(undefined);
         vi.spyOn(fileService, 'checkFileHash').mockResolvedValue(mockCheckResult);
         vi.spyOn(uploadService, 'uploadFileToS3').mockRejectedValue(new Error('Upload failed'));
-
         await expect(
           act(async () => {
             await result.current.uploadWithProgress({
@@ -712,6 +712,30 @@ describe('FileUploadAction', () => {
             });
           }),
         ).rejects.toThrow('DB creation failed');
+      });
+
+      it('should mark cancelled when upload aborts', async () => {
+        const { result } = renderHook(() => useStore());
+
+        const mockFile = new File(['test content'], 'cancel.png', { type: 'image/png' });
+        const mockCheckResult = { isExist: false };
+        const abortController = new AbortController();
+        abortController.abort();
+
+        vi.mocked(getImageDimensions).mockResolvedValue(undefined);
+        vi.spyOn(fileService, 'checkFileHash').mockResolvedValue(mockCheckResult);
+        vi.spyOn(uploadService, 'uploadFileToS3').mockRejectedValue(
+          new Error('Upload cancelled by user'),
+        );
+
+        await expect(
+          act(async () => {
+            await result.current.uploadWithProgress({
+              abortController,
+              file: mockFile,
+            });
+          }),
+        ).rejects.toThrow('Upload cancelled by user');
       });
     });
   });

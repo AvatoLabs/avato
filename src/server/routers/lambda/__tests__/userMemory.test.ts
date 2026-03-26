@@ -306,6 +306,7 @@ describe('userMemoryRouter.getMemoryExtractionTask', () => {
         source: 'chat_topic',
       },
       status: AsyncTaskStatus.Processing,
+      updatedAt: new Date('2024-03-01T00:00:00.000Z'),
       userId: 'user-1',
     });
 
@@ -338,6 +339,38 @@ describe('userMemoryRouter.getMemoryExtractionTask', () => {
         source: 'chat_topic',
       },
       status: AsyncTaskStatus.Error,
+    });
+  });
+
+  it('does not time out an active task when progress updated recently', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-03-01T01:00:00.000Z'));
+
+    mockFindActiveByType.mockResolvedValue({
+      createdAt: new Date('2024-03-01T00:00:00.000Z'),
+      id: 'task-active',
+      metadata: {
+        progress: { completedTopics: 3, totalTopics: 5 },
+        source: 'chat_topic',
+      },
+      status: AsyncTaskStatus.Processing,
+      updatedAt: new Date('2024-03-01T00:50:00.000Z'),
+      userId: 'user-1',
+    });
+
+    const caller = createCaller();
+    const result = await caller.getMemoryExtractionTask();
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      error: undefined,
+      id: 'task-active',
+      metadata: {
+        progress: { completedTopics: 3, totalTopics: 5 },
+        range: undefined,
+        source: 'chat_topic',
+      },
+      status: AsyncTaskStatus.Processing,
     });
   });
 });

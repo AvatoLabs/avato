@@ -6,6 +6,7 @@ import { memo } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 
+import { usePageAgentContextFallback } from '../../hooks/usePageAgentContextFallback';
 import { useTextFileLoader } from '../../hooks/useTextFileLoader';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -194,31 +195,43 @@ const getLanguage = (fileName?: string): string => {
 };
 
 interface CodeViewerProps {
+  enablePageAgentContext?: boolean;
   fileId: string;
   fileName?: string;
+  pageAgentContextKey?: string;
   url: string | null;
 }
 
 /**
  * Render any code file.
  */
-const CodeViewer = memo<CodeViewerProps>(({ url, fileName }) => {
-  const { fileData, loading } = useTextFileLoader(url);
-  const language = getLanguage(fileName);
+const CodeViewer = memo<CodeViewerProps>(
+  ({ enablePageAgentContext, fileId, url, fileName, pageAgentContextKey }) => {
+    const { fileData, loading } = useTextFileLoader(url);
+    const language = getLanguage(fileName);
 
-  return (
-    <Flexbox className={styles.page}>
-      {!loading && fileData ? (
-        <Highlighter language={language} showLanguage={false} variant={'borderless'}>
-          {fileData}
-        </Highlighter>
-      ) : (
-        <Center height={'100%'}>
-          <NeuralNetworkLoading size={36} />
-        </Center>
-      )}
-    </Flexbox>
-  );
-});
+    usePageAgentContextFallback({
+      contextKey: pageAgentContextKey,
+      enabled: enablePageAgentContext,
+      fileId,
+      fileName,
+      text: fileData,
+    });
+
+    return (
+      <Flexbox className={styles.page}>
+        {!loading && fileData !== null ? (
+          <Highlighter language={language} showLanguage={false} variant={'borderless'}>
+            {fileData}
+          </Highlighter>
+        ) : (
+          <Center height={'100%'}>
+            <NeuralNetworkLoading size={36} />
+          </Center>
+        )}
+      </Flexbox>
+    );
+  },
+);
 
 export default CodeViewer;

@@ -110,9 +110,7 @@ describe('agentRouter', () => {
       const mockSession = { id: 'inboxSessionId' };
 
       vi.mocked(UserModel.findById).mockResolvedValue(mockUser as any);
-      sessionModelMock.findByIdOrSlug
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(mockSession);
+      sessionModelMock.findByIdOrSlug.mockResolvedValue(mockSession);
       agentModelMock.findBySessionId.mockResolvedValue(DEFAULT_AGENT_CONFIG);
 
       const caller = agentRouter.createCaller(mockCtx);
@@ -188,6 +186,38 @@ describe('agentRouter', () => {
           enabled: false,
           id: 'kb2',
           name: 'KB 2',
+          type: KnowledgeType.KnowledgeBase,
+        },
+      ]);
+    });
+
+    it('should keep disabled assigned items disabled in the modal data', async () => {
+      fileModelMock.query.mockResolvedValue([{ id: 'file1', name: 'File 1', fileType: 'text' }]);
+      knowledgeBaseModelMock.query.mockResolvedValue([
+        { id: 'kb1', name: 'KB 1', description: 'desc 1', avatar: 'avatar1' },
+      ]);
+      agentModelMock.getAgentAssignedKnowledge.mockResolvedValue({
+        files: [{ id: 'file1', enabled: false }],
+        knowledgeBases: [{ id: 'kb1', enabled: false }],
+      });
+
+      const caller = agentRouter.createCaller(mockCtx);
+      const result = await caller.getKnowledgeBasesAndFiles({ agentId: 'agent1' });
+
+      expect(result).toEqual([
+        {
+          enabled: false,
+          fileType: 'text',
+          id: 'file1',
+          name: 'File 1',
+          type: KnowledgeType.File,
+        },
+        {
+          avatar: 'avatar1',
+          description: 'desc 1',
+          enabled: false,
+          id: 'kb1',
+          name: 'KB 1',
           type: KnowledgeType.KnowledgeBase,
         },
       ]);
