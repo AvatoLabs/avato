@@ -21,20 +21,21 @@ import {
   LibraryBig,
   ServerCrash,
 } from 'lucide-react';
-import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import KnowledgeIcon from '@/components/KnowledgeIcon';
-import { buildResourceLibraryPath, buildResourceRootPath } from '@/features/ResourceSpaces';
 import { useClientDataSWR } from '@/libs/swr';
 import { fileService } from '@/services/file';
 import { agentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
+import { useFileStore } from '@/store/file';
 import { useKnowledgeBaseStore } from '@/store/library';
 import { useSessionStore } from '@/store/session/store';
 import { type FileListItem, type PaginatedFileList, type QueryFileListParams } from '@/types/files';
 import { KnowledgeType } from '@/types/knowledgeBase';
+import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 
 import { type LibraryModalScope } from './types';
 
@@ -66,12 +67,6 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     max-width: 360px;
     text-align: center;
   `,
-  intro: css`
-    padding-block: 6px 12px;
-    padding-inline: 16px;
-    border-block-end: 1px solid ${cssVar.colorBorderSecondary};
-    background: ${cssVar.colorFillQuaternary};
-  `,
   itemRow: css`
     cursor: pointer;
 
@@ -101,9 +96,6 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   locationBar: css`
     min-height: 32px;
   `,
-  metaTag: css`
-    margin: 0 !important;
-  `,
   panelTitle: css`
     font-size: 12px;
     font-weight: 600;
@@ -128,9 +120,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   sourceItemActive: css`
-    border-color: ${cssVar.colorPrimaryBorder};
-    background: ${cssVar.colorFillTertiary};
-    box-shadow: inset 0 0 0 1px ${cssVar.colorPrimaryBorder};
+    border-color: ${cssVar.colorBorderSecondary};
+    background: ${cssVar.colorBgElevated};
   `,
   sourceSecondary: css`
     font-size: 12px;
@@ -151,10 +142,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     font-size: 13px;
     font-weight: 600;
   `,
-  summaryText: css`
-    font-size: 12px;
-    line-height: 1.5;
-    color: ${cssVar.colorTextDescription};
+  emptyActions: css`
+    margin-block-start: 4px;
   `,
   titleRow: css`
     min-height: 32px;
@@ -282,6 +271,7 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
   const isConversationScope = scope === 'conversation';
   const activeGroupId = useChatStore((s) => s.activeGroupId);
   const activeAgentId = useAgentStore((s) => s.activeAgentId);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const conversationFileContext = activeGroupId
     ? { groupId: activeGroupId }
     : { agentId: activeAgentId };
@@ -308,6 +298,11 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
     ]);
 
   const useFetchKnowledgeBaseList = useKnowledgeBaseStore((s) => s.useFetchKnowledgeBaseList);
+  const [refreshFileList, uploadWithProgress, parseFilesToChunks] = useFileStore((s) => [
+    s.refreshFileList,
+    s.uploadWithProgress,
+    s.parseFilesToChunks,
+  ]);
 
   const { data: knowledgeBases = [] } = useFetchKnowledgeBaseList();
   const { data: conversationFiles = [] } = useFetchConversationFiles(
@@ -368,7 +363,7 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
 
   const queryParams = useMemo<QueryFileListParams>(() => {
     const base: QueryFileListParams = {
-      attachableOnly: true,
+      attachableOnly: isConversationScope,
       limit: 200,
       parentId: currentParentId,
       q: searchQuery.trim() || undefined,
@@ -380,9 +375,14 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
     }
 
     return base;
-  }, [currentParentId, searchQuery, selectedKnowledgeBase]);
+  }, [currentParentId, isConversationScope, searchQuery, selectedKnowledgeBase]);
 
-  const { data, error, isLoading } = useClientDataSWR<PaginatedFileList>(
+  const {
+    data,
+    error,
+    isLoading,
+    mutate: mutateItems,
+  } = useClientDataSWR<PaginatedFileList>(
     selectedSource
       ? [
           'knowledgePickerItems',
@@ -527,28 +527,85 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
     visibleDetachedFileIds,
   ]);
 
-  const openResourcePage = useCallback(() => {
-    const targetPath = selectedKnowledgeBase
-      ? buildResourceLibraryPath(selectedKnowledgeBase.spaceId, selectedKnowledgeBase.id)
-      : buildResourceRootPath();
-
-    window.location.href = targetPath;
-  }, [selectedKnowledgeBase]);
-
-  const attachedLibraryCount = attachedKnowledgeBaseIds.size;
-  const attachedFileCount = attachedFileIds.size;
   const selectedKnowledgeBaseAttached = selectedKnowledgeBase
     ? attachedKnowledgeBaseIds.has(selectedKnowledgeBase.id)
     : false;
-  const scopeBadge = t(
-    isConversationScope ? 'conversationFiles.library.scope' : 'knowledgeBase.library.scope',
-  );
-  const scopeDesc = t(
-    isConversationScope ? 'conversationFiles.library.desc' : 'knowledgeBase.library.desc',
-  );
   const canAddVisibleFiles = !selectedKnowledgeBase && visibleDetachedFileIds.length > 0;
-  const visibleFilesAllAttached =
-    !selectedKnowledgeBase && visibleFileItems.length > 0 && visibleDetachedFileIds.length === 0;
+  const showHeaderUpload = items.length > 0 || Boolean(searchQuery);
+
+  const openUploadDialog = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleUploadFiles = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      e.target.value = '';
+
+      if (files.length === 0) return;
+
+      setMutatingKey('upload-files');
+      try {
+        const uploaded = await Promise.all(
+          files.map((file) =>
+            uploadWithProgress({
+              file,
+              knowledgeBaseId: selectedKnowledgeBase?.id,
+              parentId: currentParentId ?? undefined,
+              spaceId: selectedKnowledgeBase?.spaceId,
+            }),
+          ),
+        );
+
+        const uploadedFileIds = uploaded.map((item) => item?.id).filter((id): id is string => !!id);
+
+        if (uploadedFileIds.length > 0) {
+          const chunkableFileIds = uploaded.reduce<string[]>((acc, item, index) => {
+            if (!item?.id) return acc;
+            if (isChunkingUnsupported(files[index]?.type || '')) return acc;
+
+            acc.push(item.id);
+            return acc;
+          }, []);
+
+          if (chunkableFileIds.length > 0) {
+            await parseFilesToChunks(chunkableFileIds, { skipExist: true });
+          }
+        }
+
+        if (isConversationScope) {
+          if (uploadedFileIds.length > 0) {
+            await addFilesToConversation(uploadedFileIds, conversationFileContext);
+          }
+        } else if (selectedKnowledgeBase) {
+          if (!selectedKnowledgeBaseAttached) {
+            await addKnowledgeBaseToAgent(selectedKnowledgeBase.id);
+          }
+        } else if (uploadedFileIds.length > 0) {
+          await addFilesToAgent(uploadedFileIds, true);
+        }
+
+        await refreshFileList();
+        await mutateItems();
+      } finally {
+        setMutatingKey(null);
+      }
+    },
+    [
+      addFilesToAgent,
+      addFilesToConversation,
+      addKnowledgeBaseToAgent,
+      conversationFileContext,
+      currentParentId,
+      isConversationScope,
+      mutateItems,
+      parseFilesToChunks,
+      refreshFileList,
+      selectedKnowledgeBase,
+      selectedKnowledgeBaseAttached,
+      uploadWithProgress,
+    ],
+  );
 
   return (
     <Flexbox horizontal className={styles.container}>
@@ -599,32 +656,6 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
       </Flexbox>
 
       <Flexbox className={styles.content} flex={1} gap={12}>
-        <Flexbox
-          horizontal
-          align={'center'}
-          className={styles.intro}
-          gap={12}
-          justify={'space-between'}
-        >
-          <Flexbox gap={8}>
-            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-              <Tag className={styles.metaTag}>{scopeBadge}</Tag>
-              {selectedKnowledgeBase && (
-                <Tag className={styles.metaTag}>{selectedKnowledgeBase.name}</Tag>
-              )}
-            </Flexbox>
-            <Text className={styles.summaryText}>{scopeDesc}</Text>
-          </Flexbox>
-          <Text className={styles.countText}>
-            {isConversationScope
-              ? t('conversationFiles.library.attachedCount', { count: attachedFileCount })
-              : t('knowledgeBase.library.attachedCount', {
-                  files: attachedFileCount,
-                  libraries: attachedLibraryCount,
-                })}
-          </Text>
-        </Flexbox>
-
         <Flexbox gap={8}>
           <Flexbox
             horizontal
@@ -635,78 +666,79 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
           >
             <Flexbox horizontal align={'center'} className={styles.locationBar} gap={6}>
               {folderStack.length > 0 && (
-                <ActionIcon icon={ArrowLeft} size={'small'} onClick={handleBack} />
+                <>
+                  <ActionIcon icon={ArrowLeft} size={'small'} onClick={handleBack} />
+
+                  {folderStack.map((folder, index) => (
+                    <Flexbox horizontal align={'center'} gap={6} key={folder.id}>
+                      {index > 0 && <Icon icon={ChevronRight} size={14} />}
+                      <Button
+                        className={styles.breadcrumbButton}
+                        size={'small'}
+                        type={'text'}
+                        onClick={() => handleCrumbClick(index)}
+                      >
+                        {folder.name}
+                      </Button>
+                    </Flexbox>
+                  ))}
+                </>
               )}
-
-              <Text ellipsis strong className={styles.crumbText}>
-                {selectedSource?.name}
-              </Text>
-
-              {folderStack.map((folder, index) => (
-                <Flexbox horizontal align={'center'} gap={6} key={folder.id}>
-                  <Icon icon={ChevronRight} size={14} />
-                  <Button
-                    className={styles.breadcrumbButton}
-                    size={'small'}
-                    type={'text'}
-                    onClick={() => handleCrumbClick(index)}
-                  >
-                    {folder.name}
-                  </Button>
-                </Flexbox>
-              ))}
             </Flexbox>
 
-            {selectedKnowledgeBase && !isConversationScope ? (
-              <Button
-                className={styles.actionButton}
-                icon={selectedKnowledgeBaseAttached ? <Icon icon={CheckIcon} /> : undefined}
-                loading={mutatingKey === `library:${selectedKnowledgeBase.id}`}
-                size={'small'}
-                type={selectedKnowledgeBaseAttached ? 'default' : 'primary'}
-                onClick={() =>
-                  void toggleKnowledgeBase(selectedKnowledgeBase.id, selectedKnowledgeBaseAttached)
-                }
-              >
-                {selectedKnowledgeBaseAttached
-                  ? t('knowledgeBase.library.action.added')
-                  : t('knowledgeBase.library.action.addLibrary')}
-              </Button>
-            ) : (
-              <Button
-                className={styles.actionButton}
-                icon={visibleFilesAllAttached ? <Icon icon={CheckIcon} /> : undefined}
-                loading={canAddVisibleFiles ? mutatingKey === 'visible-files' : false}
-                size={'small'}
-                type={canAddVisibleFiles ? 'primary' : 'default'}
-                onClick={() => {
-                  if (canAddVisibleFiles) {
-                    void addVisibleFiles();
-                    return;
-                  }
+            <Flexbox horizontal gap={8} wrap={'wrap'}>
+              {showHeaderUpload && (
+                <Button
+                  className={styles.actionButton}
+                  loading={mutatingKey === 'upload-files'}
+                  size={'small'}
+                  type={'default'}
+                  onClick={openUploadDialog}
+                >
+                  {t(
+                    isConversationScope
+                      ? 'conversationFiles.library.action.upload'
+                      : 'knowledgeBase.library.action.upload',
+                  )}
+                </Button>
+              )}
 
-                  openResourcePage();
-                }}
-              >
-                {visibleFilesAllAttached
-                  ? t(
-                      isConversationScope
-                        ? 'conversationFiles.library.action.added'
-                        : 'knowledgeBase.library.action.added',
+              {selectedKnowledgeBase && !isConversationScope ? (
+                <Button
+                  className={styles.actionButton}
+                  icon={selectedKnowledgeBaseAttached ? <Icon icon={CheckIcon} /> : undefined}
+                  loading={mutatingKey === `library:${selectedKnowledgeBase.id}`}
+                  size={'small'}
+                  type={selectedKnowledgeBaseAttached ? 'default' : 'primary'}
+                  onClick={() =>
+                    void toggleKnowledgeBase(
+                      selectedKnowledgeBase.id,
+                      selectedKnowledgeBaseAttached,
                     )
-                  : canAddVisibleFiles
-                    ? t(
-                        isConversationScope
-                          ? 'conversationFiles.library.action.addVisible'
-                          : 'knowledgeBase.library.action.addVisible',
-                      )
-                    : t(
-                        isConversationScope
-                          ? 'conversationFiles.library.action.openResources'
-                          : 'knowledgeBase.library.action.openResources',
-                      )}
-              </Button>
-            )}
+                  }
+                >
+                  {selectedKnowledgeBaseAttached
+                    ? t('knowledgeBase.library.action.added')
+                    : t('knowledgeBase.library.action.addLibrary')}
+                </Button>
+              ) : canAddVisibleFiles ? (
+                <Button
+                  className={styles.actionButton}
+                  loading={mutatingKey === 'visible-files'}
+                  size={'small'}
+                  type={'primary'}
+                  onClick={() => {
+                    void addVisibleFiles();
+                  }}
+                >
+                  {t(
+                    isConversationScope
+                      ? 'conversationFiles.library.action.addVisible'
+                      : 'knowledgeBase.library.action.addVisible',
+                  )}
+                </Button>
+              ) : null}
+            </Flexbox>
           </Flexbox>
 
           <SearchBar
@@ -723,6 +755,7 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
         </Flexbox>
 
         <Flexbox flex={1} gap={10} style={{ minHeight: 0, overflowY: 'auto' }}>
+          <input hidden multiple ref={fileInputRef} type={'file'} onChange={handleUploadFiles} />
           {isLoading ? (
             <Center flex={1}>
               <Text className={styles.countText}>{t('loading', 'Loading...', { ns: 'file' })}</Text>
@@ -747,13 +780,22 @@ export const List = memo<{ scope: LibraryModalScope }>(({ scope }) => {
                       )
                 }
               />
-              <Button size={'small'} type={'default'} onClick={openResourcePage}>
-                {t(
-                  isConversationScope
-                    ? 'conversationFiles.library.action.openResources'
-                    : 'knowledgeBase.library.action.openResources',
-                )}
-              </Button>
+              {!searchQuery && (
+                <Flexbox horizontal className={styles.emptyActions} gap={8}>
+                  <Button
+                    loading={mutatingKey === 'upload-files'}
+                    size={'small'}
+                    type={'primary'}
+                    onClick={openUploadDialog}
+                  >
+                    {t(
+                      isConversationScope
+                        ? 'conversationFiles.library.action.upload'
+                        : 'knowledgeBase.library.action.upload',
+                    )}
+                  </Button>
+                </Flexbox>
+              )}
             </Center>
           ) : (
             items.map((item) => (

@@ -10,12 +10,19 @@ import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
-import { type LobeDocument } from '@/types/document';
+import { DocumentSourceType, type LobeDocument } from '@/types/document';
 
 import { FileService } from '../file';
 import { AuthorizedResourceResolver, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
+
+const getDocumentTitle = (filename: string, metadataTitle?: string | null) => {
+  if (metadataTitle?.trim()) return metadataTitle;
+
+  const stripped = filename.replace(/\.[^.]+$/, '').trim();
+  return stripped || 'Untitled';
+};
 
 export class DocumentService {
   userId: string;
@@ -534,10 +541,7 @@ export class DocumentService {
       });
 
       // Extract title from metadata or use file name (remove extension)
-      const title =
-        fileDocument.metadata?.title ||
-        file.name.replace(/\.(pdf|docx?|md|markdown)$/i, '') ||
-        'Untitled';
+      const title = getDocumentTitle(file.name, fileDocument.metadata?.title);
 
       // Clean up content - remove <page> tags if present
       let cleanContent = fileDocument.content;
@@ -611,10 +615,7 @@ export class DocumentService {
       });
 
       // Extract title from metadata or use file name (remove extension)
-      const title =
-        fileDocument.metadata?.title ||
-        file.name.replace(/\.(pdf|docx?|md|markdown)$/i, '') ||
-        'Untitled';
+      const title = getDocumentTitle(file.name, fileDocument.metadata?.title);
 
       const document = await this.documentModel.create({
         content: fileDocument.content,
@@ -654,6 +655,44 @@ export class DocumentService {
       return document as LobeDocument;
     } catch (error) {
       console.error(`${logPrefix} File parsing failed:`, error);
+      throw error;
+    } finally {
+      cleanup();
+    }
+  }
+
+  async previewFile(fileId: string): Promise<LobeDocument> {
+    const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(
+      fileId,
+      'preview_content',
+    );
+
+    const logPrefix = `[${file.name}]`;
+    log(`${logPrefix} Starting to preview file, path: ${filePath}`);
+
+    try {
+      const fileDocument = await loadFile(filePath);
+      const title = getDocumentTitle(file.name, fileDocument.metadata?.title);
+
+      return {
+        content: fileDocument.content,
+        createdAt: file.createdAt,
+        editorData: null,
+        fileType: file.fileType,
+        filename: file.name,
+        id: file.id,
+        metadata: fileDocument.metadata,
+        pages: fileDocument.pages,
+        parentId: file.parentId,
+        source: file.url,
+        sourceType: DocumentSourceType.FILE,
+        title,
+        totalCharCount: fileDocument.totalCharCount,
+        totalLineCount: fileDocument.totalLineCount,
+        updatedAt: file.updatedAt,
+      };
+    } catch (error) {
+      console.error(`${logPrefix} File preview failed:`, error);
       throw error;
     } finally {
       cleanup();

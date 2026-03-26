@@ -6,14 +6,18 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
+import { usePageEditorStore } from '@/features/PageEditor/store';
 import SuggestQuestions from '@/features/SuggestQuestions';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
+import { TABLE_PAGE_KIND } from '@/utils/page';
 
 const AgentBuilderWelcome = memo(() => {
   const { t } = useTranslation('chat');
   const agentId = useConversationStore(conversationSelectors.agentId);
   const agent = useAgentStore(agentByIdSelectors.getAgentConfigById(agentId));
+  const pageKind = usePageEditorStore((s) => s.pageKind);
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
 
   return (
     <>
@@ -31,10 +35,10 @@ const AgentBuilderWelcome = memo(() => {
           size={78}
         />
         <Text fontSize={24} weight={'bold'}>
-          {t('pageCopilot.title')}
+          {t(isTablePage ? 'pageCopilot.table.title' : 'pageCopilot.title')}
         </Text>
         <Markdown fontSize={14} variant={'chat'}>
-          {t('pageCopilot.welcome')}
+          {t(isTablePage ? 'pageCopilot.table.welcome' : 'pageCopilot.welcome')}
         </Markdown>
         <SuggestQuestions count={3} mode="write" />
       </Flexbox>

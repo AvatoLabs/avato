@@ -1,5 +1,7 @@
 import { type IconProps } from '@lobehub/ui';
 
+import { type PageKind } from '@/utils/page';
+
 // ======== Page Types ======== //
 
 /**
@@ -40,6 +42,7 @@ export interface GroupTopicParams {
 
 export interface PageParams {
   pageId: string;
+  pageKind?: PageKind;
 }
 
 export interface SettingsParams {

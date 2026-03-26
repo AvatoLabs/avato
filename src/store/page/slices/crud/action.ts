@@ -5,7 +5,15 @@ import { documentService } from '@/services/document';
 import { type StoreSetter } from '@/store/types';
 import { type LobeDocument } from '@/types/document';
 import { DocumentSourceType } from '@/types/document';
-import { standardizeIdentifier } from '@/utils/identifier';
+import {
+  createStarterTableMarkdown,
+  DEFAULT_PAGE_KIND,
+  getPageDetailPath,
+  getPageKindFromDocument,
+  getPageRootPath,
+  type PageKind,
+  TABLE_PAGE_KIND,
+} from '@/utils/page';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type PageStore } from '../../store';
@@ -13,6 +21,8 @@ import { type PageStore } from '../../store';
 const n = setNamespace('page/crud');
 
 const EDITOR_PAGE_FILE_TYPE = 'custom/document';
+const DEFAULT_TABLE_COLUMNS = 5;
+const DEFAULT_TABLE_ROWS = 8;
 
 /**
  * Page update parameters - flattened for easier use
@@ -36,16 +46,25 @@ export class CrudActionImpl {
     this.#get = get;
   }
 
-  createNewPage = async (title: string): Promise<string> => {
+  #createNewDocument = async (title: string, pageKind: PageKind): Promise<string> => {
     const { createOptimisticPage, createPage, replaceTempPageWithReal } = this.#get();
 
     // Create optimistic page immediately
-    const tempPageId = createOptimisticPage(title);
-    this.#set({ isCreatingNew: true, selectedPageId: tempPageId }, false, n('createNewPage/start'));
+    const tempPageId = createOptimisticPage(title, pageKind);
+    this.#set(
+      { isCreatingNew: true, selectedPageId: tempPageId },
+      false,
+      n(`createNewDocument/${pageKind}/start`),
+    );
 
     try {
+      const content =
+        pageKind === TABLE_PAGE_KIND
+          ? createStarterTableMarkdown(DEFAULT_TABLE_COLUMNS, DEFAULT_TABLE_ROWS)
+          : '';
+
       // Create real page
-      const newPage = await createPage({ content: '', title });
+      const newPage = await createPage({ content, pageKind, title });
 
       // Convert to LobeDocument
       const realPage: LobeDocument = {
@@ -72,36 +91,56 @@ export class CrudActionImpl {
       this.#set(
         { isCreatingNew: false, selectedPageId: newPage.id },
         false,
-        n('createNewPage/success'),
+        n(`createNewDocument/${pageKind}/success`),
       );
 
       // Navigate to the new page
-      this.#get().navigateToPage(newPage.id);
+      this.#get().navigateToPage(newPage.id, pageKind);
 
       return newPage.id;
     } catch (error) {
       console.error('Failed to create page:', error);
       this.#get().removeTempPage(tempPageId);
-      this.#set({ isCreatingNew: false, selectedPageId: null }, false, n('createNewPage/error'));
-      this.#get().navigate?.('/page');
+      this.#set(
+        { isCreatingNew: false, selectedPageId: null },
+        false,
+        n(`createNewDocument/${pageKind}/error`),
+      );
+      this.#get().navigate?.(getPageRootPath(pageKind));
 
       throw error;
     }
   };
 
-  createOptimisticPage = (title: string = 'Untitled'): string => {
+  createNewPage = async (title: string): Promise<string> => {
+    return this.#createNewDocument(title, DEFAULT_PAGE_KIND);
+  };
+
+  createNewTable = async (title: string): Promise<string> => {
+    return this.#createNewDocument(title, TABLE_PAGE_KIND);
+  };
+
+  createOptimisticPage = (
+    title: string = 'Untitled',
+    pageKind: PageKind = DEFAULT_PAGE_KIND,
+  ): string => {
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-page-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const now = new Date();
 
     const newPage: LobeDocument = {
-      content: null,
+      content:
+        pageKind === TABLE_PAGE_KIND
+          ? createStarterTableMarkdown(DEFAULT_TABLE_COLUMNS, DEFAULT_TABLE_ROWS)
+          : null,
       createdAt: now,
       editorData: null,
       fileType: EDITOR_PAGE_FILE_TYPE,
       filename: title,
       id: tempId,
-      metadata: {},
+      metadata: {
+        pageKind,
+      },
       source: 'document',
       sourceType: DocumentSourceType.EDITOR,
       title,
@@ -121,10 +160,12 @@ export class CrudActionImpl {
     content = '',
     knowledgeBaseId,
     parentId,
+    pageKind = DEFAULT_PAGE_KIND,
   }: {
     content?: string;
     knowledgeBaseId?: string;
     parentId?: string;
+    pageKind?: PageKind;
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
@@ -136,6 +177,7 @@ export class CrudActionImpl {
       knowledgeBaseId,
       metadata: {
         createdAt: now,
+        pageKind,
       },
       parentId,
       title,
@@ -145,11 +187,12 @@ export class CrudActionImpl {
   };
 
   deletePage = async (pageId: string): Promise<void> => {
-    const { selectedPageId } = this.#get();
+    const { documents, selectedPageId } = this.#get();
 
     if (selectedPageId === pageId) {
+      const pageKind = getPageKindFromDocument(documents?.find((doc) => doc.id === pageId));
       this.#set({ isCreatingNew: false, selectedPageId: null }, false, n('deletePage'));
-      this.#get().navigateToPage(null);
+      this.#get().navigateToPage(null, pageKind);
     }
   };
 
@@ -203,16 +246,20 @@ export class CrudActionImpl {
     return newPage;
   };
 
-  navigateToPage = (pageId: string | null): void => {
+  navigateToPage = (pageId: string | null, pageKind?: PageKind): void => {
     if (!pageId) {
-      this.#get().navigate?.('/page');
+      this.#get().navigate?.(getPageRootPath(pageKind));
     } else {
-      this.#get().navigate?.(`/page/${standardizeIdentifier(pageId)}`);
+      const document = this.#get().documents?.find((doc) => doc.id === pageId);
+      const nextPageKind = pageKind || getPageKindFromDocument(document);
+
+      this.#get().navigate?.(getPageDetailPath(pageId, nextPageKind));
     }
   };
 
   removePage = async (pageId: string): Promise<void> => {
     const { documents, selectedPageId } = this.#get();
+    const pageKind = getPageKindFromDocument(documents?.find((doc) => doc.id === pageId));
 
     // Store original documents for rollback
     const originalDocuments = documents;
@@ -223,7 +270,7 @@ export class CrudActionImpl {
     // Clear selected page ID if the deleted page is currently selected
     if (selectedPageId === pageId) {
       this.#set({ selectedPageId: null }, false, n('removePage/clearSelection'));
-      this.#get().navigateToPage(null);
+      this.#get().navigateToPage(null, pageKind);
     }
 
     try {
@@ -239,7 +286,7 @@ export class CrudActionImpl {
       }
       if (selectedPageId === pageId) {
         this.#set({ selectedPageId: pageId }, false, n('removePage/restoreSelection'));
-        this.#get().navigateToPage(pageId);
+        this.#get().navigateToPage(pageId, pageKind);
       }
       throw error;
     }

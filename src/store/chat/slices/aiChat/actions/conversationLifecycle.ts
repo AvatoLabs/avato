@@ -110,7 +110,7 @@ export class ConversationLifecycleActionImpl {
       ...(isGroupSupervisor && { isSupervisor: true }),
     };
 
-    const fileIdList = files?.map((f) => f.id);
+    const fileIdList = files?.flatMap((f) => (f.fileId ? [f.fileId] : []));
 
     const hasFile = !!fileIdList && fileIdList.length > 0;
 

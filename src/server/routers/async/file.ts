@@ -46,6 +46,23 @@ const getEmbeddingErrorMessage = (error: any) => {
 const formatEmbeddingErrorMessage = (provider: string, model: string, error: any) =>
   `${provider}/${model}: ${getEmbeddingErrorMessage(error)}`;
 
+const isPdfFile = (fileType: string, filename: string) =>
+  fileType.toLowerCase() === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
+
+const getChunkingEmptyResultError = (fileType: string, filename: string) => {
+  if (isPdfFile(fileType, filename)) {
+    return new AsyncTaskError(
+      AsyncTaskErrorType.NoExtractableText,
+      'No extractable text was found in this PDF. It is likely a scanned or image-only PDF. Please run OCR first and try again.',
+    );
+  }
+
+  return new AsyncTaskError(
+    AsyncTaskErrorType.NoChunkError,
+    'No chunk found in this file. it may due to current chunking method can not parse file accurately',
+  );
+};
+
 const categorizeEmbeddingError = (provider: string, model: string, error: any): AsyncTaskError => {
   if (error instanceof AsyncTaskError) return error;
 
@@ -285,11 +302,7 @@ export const fileRouter = router({
 
           // if no chunk found, throw error
           if (chunks.length === 0) {
-            throw {
-              message:
-                'No chunk found in this file. it may due to current chunking method can not parse file accurately',
-              name: AsyncTaskErrorType.NoChunkError,
-            };
+            throw getChunkingEmptyResultError(file.fileType, file.name);
           }
 
           await ctx.chunkModel.bulkCreate(chunks, input.fileId);

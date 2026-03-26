@@ -47,10 +47,9 @@ const PreferencesArea = memo(() => {
 
   // Reset list when search or sort changes
   useEffect(() => {
-    if (!apiSort) return;
     const sort = viewMode === 'grid' ? apiSort : undefined;
     resetPreferencesList({ q: searchValue || undefined, sort });
-  }, [searchValue, apiSort, viewMode]);
+  }, [searchValue, apiSort, viewMode, resetPreferencesList]);
 
   // Call SWR hook to fetch data
   const { isLoading } = useFetchPreferences({

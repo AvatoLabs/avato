@@ -44,10 +44,9 @@ const ActivitiesArea = memo(() => {
   const apiSort = sortValue === 'capturedAt' ? undefined : (sortValue as 'startsAt');
 
   useEffect(() => {
-    if (!apiSort) return;
     const sort = viewMode === 'grid' ? apiSort : undefined;
     resetActivitiesList({ q: searchValue || undefined, sort });
-  }, [searchValue, apiSort, viewMode]);
+  }, [searchValue, apiSort, viewMode, resetActivitiesList]);
 
   const { isLoading } = useFetchActivities({
     page: activitiesPage,

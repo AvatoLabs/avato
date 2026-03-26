@@ -48,6 +48,8 @@ import MemoryPreferencesPage from '@/routes/(main)/memory/preferences';
 import PageIndexPage from '@/routes/(main)/page';
 import DesktopPageLayout from '@/routes/(main)/page/_layout';
 import PageDetailPage from '@/routes/(main)/page/[id]';
+import PageTablePage from '@/routes/(main)/page/table';
+import PageTableDetailPage from '@/routes/(main)/page/table/[id]';
 import ResourceRootRedirectPage from '@/routes/(main)/resource';
 import ResourceLayout from '@/routes/(main)/resource/_layout';
 import ResourceHomePage from '@/routes/(main)/resource/(home)';
@@ -384,6 +386,19 @@ export const desktopRoutes: RouteObject[] = [
           {
             element: <PageIndexPage />,
             index: true,
+          },
+          {
+            children: [
+              {
+                element: <PageTablePage />,
+                index: true,
+              },
+              {
+                element: <PageTableDetailPage />,
+                path: ':id',
+              },
+            ],
+            path: 'table',
           },
           {
             element: <PageDetailPage />,

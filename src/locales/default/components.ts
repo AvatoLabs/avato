@@ -74,6 +74,9 @@ export default {
   'FileParsingStatus.chunks.status.error': 'Chunking failed',
   'FileParsingStatus.chunks.status.errorResult':
     'Chunking failed, please check and try again. Error detail:',
+  'FileParsingStatus.chunks.status.noExtractableText': 'No text detected',
+  'FileParsingStatus.chunks.status.noExtractableTextResult':
+    'No extractable text was found in this PDF. It is likely scanned or image-only. Run OCR first, then try again.',
   'FileParsingStatus.chunks.status.processing': 'Chunking',
   'FileParsingStatus.chunks.status.processingTip':
     'The server is splitting text chunks; closing the page will not affect the chunking progress.',

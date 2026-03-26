@@ -216,6 +216,22 @@ export const documentRouter = router({
       return lobeDocument;
     }),
 
+  previewFileContent: documentProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.id,
+        kind: 'file',
+      });
+
+      return ctx.documentService.previewFile(input.id);
+    }),
+
   queryDocuments: documentProcedure
     .input(
       z

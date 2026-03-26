@@ -1,30 +1,29 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { SearchIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import NavItem from '@/features/NavPanel/components/NavItem';
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
-import { useGlobalStore } from '@/store/global';
+import { usePageKind } from '@/features/Pages/usePageKind';
+import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/page';
 
 import AddButton from './AddButton';
+import Nav from './Nav';
 
 const Header = memo(() => {
   const { t } = useTranslation('common');
-  const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
+  const pageKind = usePageKind();
+
   return (
     <>
-      <SubSidebarTitleBar title={t('tab.pages')} titleTo="/page" />
+      <SubSidebarTitleBar
+        title={t(pageKind === TABLE_PAGE_KIND ? 'tab.table' : 'tab.pages')}
+        titleTo={getPageRootPath(pageKind)}
+      />
       <Flexbox horizontal align={'center'} gap={4} paddingBlock={4} paddingInline={4}>
         <Flexbox flex={1} style={{ minWidth: 0 }}>
-          <NavItem
-            icon={SearchIcon}
-            key={'search'}
-            title={t('tab.search')}
-            onClick={() => toggleCommandMenu(true)}
-          />
+          <Nav />
         </Flexbox>
         <AddButton />
       </Flexbox>

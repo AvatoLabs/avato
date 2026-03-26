@@ -21,6 +21,7 @@ export interface StoreUpdaterProps extends Partial<PublicState> {
 const StoreUpdater = memo<StoreUpdaterProps>(
   ({
     pageId,
+    pageKind,
     knowledgeBaseId,
     onDocumentIdChange,
     onEmojiChange,
@@ -45,6 +46,7 @@ const StoreUpdater = memo<StoreUpdaterProps>(
     useStoreUpdater('onEmojiChange', onEmojiChange);
     useStoreUpdater('onSave', onSave);
     useStoreUpdater('onTitleChange', onTitleChange);
+    useStoreUpdater('pageKind', pageKind);
     useStoreUpdater('onDelete', onDelete);
     useStoreUpdater('onBack', onBack);
     useStoreUpdater('parentId', parentId);
@@ -52,7 +54,7 @@ const StoreUpdater = memo<StoreUpdaterProps>(
     // Initialize meta (title/emoji) with dirty tracking
     useEffect(() => {
       initMeta(title, emoji);
-    }, [pageId, title, emoji]);
+    }, [emoji, initMeta, pageId, title]);
 
     // Connect editor to page agent runtime
     useEffect(() => {

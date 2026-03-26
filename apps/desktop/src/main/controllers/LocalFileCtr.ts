@@ -561,9 +561,12 @@ export default class LocalFileCtr extends ControllerModule {
   }
 
   @IpcMethod()
-  async handleWriteFile({ path: filePath, content }: WriteLocalFileParams) {
+  async handleWriteFile({ path: filePath, content, encoding = 'utf8' }: WriteLocalFileParams) {
     const logPrefix = `[Writing file ${filePath}]`;
-    logger.debug(`${logPrefix} Starting to write file`, { contentLength: content?.length });
+    logger.debug(`${logPrefix} Starting to write file`, {
+      contentLength: content?.length,
+      encoding,
+    });
 
     // Validate parameters
     if (!filePath) {
@@ -584,7 +587,11 @@ export default class LocalFileCtr extends ControllerModule {
 
       // Write file content
       logger.debug(`${logPrefix} Starting to write content to file`);
-      await writeFile(filePath, content, 'utf8');
+      if (encoding === 'base64') {
+        await writeFile(filePath, Buffer.from(content, 'base64'));
+      } else {
+        await writeFile(filePath, content, 'utf8');
+      }
       logger.info(`${logPrefix} File written successfully`, {
         path: filePath,
         size: content.length,

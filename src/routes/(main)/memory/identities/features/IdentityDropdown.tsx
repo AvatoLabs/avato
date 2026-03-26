@@ -6,6 +6,8 @@ import { type KeyboardEvent, type MouseEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useQueryState } from '@/hooks/useQueryParam';
+import { useGlobalStore } from '@/store/global';
 import { useUserMemoryStore } from '@/store/userMemory';
 
 interface IdentityDropdownProps {
@@ -16,6 +18,8 @@ interface IdentityDropdownProps {
 const IdentityDropdown = memo<IdentityDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
   const { modal } = App.useApp();
+  const [identityId, setIdentityId] = useQueryState('identityId', { clearOnDefault: true });
+  const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
   const identities = useUserMemoryStore((s) => s.identities);
   const deleteIdentity = useUserMemoryStore((s) => s.deleteIdentity);
@@ -37,6 +41,10 @@ const IdentityDropdown = memo<IdentityDropdownProps>(({ id, size = 'small' }) =>
         okText: t('delete', { ns: 'common' }),
         onOk: async () => {
           await deleteIdentity(id);
+          if (identityId === id) {
+            setIdentityId(null);
+            toggleRightPanel(false);
+          }
         },
         title: t('identity.list.confirmDelete'),
         type: 'warning',

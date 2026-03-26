@@ -514,6 +514,25 @@ export const desktopRoutes: RouteObject[] = [
             index: true,
           },
           {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/page/table'),
+                  'Desktop > Page > Table',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/page/table/[id]'),
+                  'Desktop > Page > Table > Detail',
+                ),
+                path: ':id',
+              },
+            ],
+            path: 'table',
+          },
+          {
             element: dynamicElement(
               () => import('@/routes/(main)/page/[id]'),
               'Desktop > Page > Detail',

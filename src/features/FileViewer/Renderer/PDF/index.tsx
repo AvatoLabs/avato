@@ -4,7 +4,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 import { Flexbox } from '@lobehub/ui';
-import { Fragment, memo, useCallback, useState } from 'react';
+import { Fragment, memo, useCallback, useMemo, useState } from 'react';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { Document, Page, pdfjs } from '@/libs/pdfjs';
@@ -13,6 +13,7 @@ import { lambdaQuery } from '@/libs/trpc/client';
 import HighlightLayer from './HighlightLayer';
 import { styles } from './style';
 import useResizeObserver from './useResizeObserver';
+import { createPdfDocumentSource } from './utils';
 
 const options = {
   cMapUrl: `https://registry.npmmirror.com/pdfjs-dist/${pdfjs.version}/files/cmaps/`,
@@ -31,8 +32,8 @@ const PDFViewer = memo<PDFViewerProps>(({ url, fileId }) => {
   const [containerRef, setContainerRef] = useState<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState<number>();
   const [isLoaded, setIsLoaded] = useState(false);
+  const file = useMemo(() => createPdfDocumentSource(url), [url]);
 
-   
   const onResize = useCallback<ResizeObserverCallback>((entries) => {
     const [entry] = entries;
 
@@ -55,6 +56,8 @@ const PDFViewer = memo<PDFViewerProps>(({ url, fileId }) => {
 
   const dataSource = data?.pages.flatMap((page) => page.items) || [];
 
+  if (!file) return null;
+
   return (
     <Flexbox className={styles.container}>
       <Flexbox
@@ -66,7 +69,7 @@ const PDFViewer = memo<PDFViewerProps>(({ url, fileId }) => {
       >
         <Document
           className={styles.document}
-          file={url}
+          file={file}
           loading={<NeuralNetworkLoading size={36} />}
           options={options}
           onLoadSuccess={onDocumentLoadSuccess}

@@ -1,4 +1,4 @@
-import { Flexbox, Modal } from '@lobehub/ui';
+import { Flexbox, Modal, Text } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +17,9 @@ export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
   ({ setOpen, open, scope = 'agent' }) => {
     const { t } = useTranslation('chat');
     const mobile = useServerConfigStore((s) => s.isMobile);
+    const subtitle = t(
+      scope === 'conversation' ? 'conversationFiles.library.scope' : 'knowledgeBase.library.scope',
+    );
 
     return (
       <Modal
@@ -24,8 +27,13 @@ export const AttachKnowledgeModal = memo<AttachKnowledgeModalProps>(
         footer={null}
         open={open}
         styles={{ body: { overflow: 'hidden', padding: 0 } }}
-        title={t('knowledgeBase.library.title')}
         width={'min(88vw, 980px)'}
+        title={
+          <Flexbox gap={2}>
+            <Text strong>{t('knowledgeBase.library.title')}</Text>
+            <Text type={'secondary'}>{subtitle}</Text>
+          </Flexbox>
+        }
         onCancel={() => {
           setOpen(false);
         }}

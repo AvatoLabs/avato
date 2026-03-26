@@ -64,6 +64,8 @@
   "FileParsingStatus.chunks.embeddings": "向量化",
   "FileParsingStatus.chunks.status.error": "分块失败",
   "FileParsingStatus.chunks.status.errorResult": "分块失败，请检查后重试。失败原因：",
+  "FileParsingStatus.chunks.status.noExtractableText": "无法提取文本",
+  "FileParsingStatus.chunks.status.noExtractableTextResult": "这个 PDF 没有检测到可提取文本，通常是扫描件或图片版。请先做 OCR，再重新上传。",
   "FileParsingStatus.chunks.status.processing": "分块中…",
   "FileParsingStatus.chunks.status.processingTip": "服务端正在拆分文本块，关闭页面不会影响进度",
   "GoBack.back": "返回",

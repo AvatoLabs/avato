@@ -1,3 +1,4 @@
+import { type ShowSaveDialogParams } from '@lobechat/electron-client-ipc';
 import { toast } from '@lobehub/ui';
 import i18next from 'i18next';
 
@@ -5,7 +6,9 @@ import { localFileService } from './localFileService';
 
 export interface DesktopExportOptions {
   content: string;
+  encoding?: 'base64' | 'utf8';
   fileName: string;
+  filters: ShowSaveDialogParams['filters'];
 }
 
 export interface DesktopExportResult {
@@ -14,12 +17,11 @@ export interface DesktopExportResult {
 }
 
 class DesktopExportService {
-  async exportMarkdown(options: DesktopExportOptions): Promise<DesktopExportResult> {
-    const { content, fileName } = options;
-
+  private async exportFile(options: DesktopExportOptions): Promise<DesktopExportResult> {
+    const { content, encoding = 'utf8', fileName, filters } = options;
     const result = await localFileService.showSaveDialog({
       defaultPath: fileName,
-      filters: [{ extensions: ['md'], name: 'Markdown' }],
+      filters,
       title: i18next.t('pageEditor.exportDialogTitle', { ns: 'file' }),
     });
 
@@ -29,12 +31,36 @@ class DesktopExportService {
 
     await localFileService.writeFile({
       content,
+      encoding,
       path: result.filePath,
     });
 
     this.showExportSuccessToast(result.filePath);
 
     return { canceled: false, filePath: result.filePath };
+  }
+
+  async exportCsv(options: Omit<DesktopExportOptions, 'encoding' | 'filters'>) {
+    return this.exportFile({
+      ...options,
+      filters: [{ extensions: ['csv'], name: 'CSV' }],
+    });
+  }
+
+  async exportMarkdown(options: Omit<DesktopExportOptions, 'encoding' | 'filters'>) {
+    return this.exportFile({
+      ...options,
+      filters: [{ extensions: ['md'], name: 'Markdown' }],
+    });
+  }
+
+  async exportXlsx(options: { base64Content: string; fileName: string }) {
+    return this.exportFile({
+      content: options.base64Content,
+      encoding: 'base64',
+      fileName: options.fileName,
+      filters: [{ extensions: ['xlsx'], name: 'Excel Workbook' }],
+    });
   }
 
   private showExportSuccessToast(filePath: string) {

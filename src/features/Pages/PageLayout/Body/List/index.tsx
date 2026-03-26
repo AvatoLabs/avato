@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
+import { usePageKind } from '@/features/Pages/usePageKind';
 import { pageSelectors, usePageStore } from '@/store/page';
 
 import Item from './Item';
@@ -15,10 +16,11 @@ import Item from './Item';
  */
 const PageList = () => {
   const { t } = useTranslation(['file', 'common']);
+  const pageKind = usePageKind();
 
   const [filteredDocuments, hasMore, isLoadingMore, openAllPagesDrawer] = usePageStore((s) => [
-    pageSelectors.getFilteredDocumentsLimited(s),
-    pageSelectors.hasMoreFilteredDocuments(s),
+    pageSelectors.getFilteredDocumentsLimitedByKind(pageKind)(s),
+    pageSelectors.hasMoreFilteredDocumentsByKind(pageKind)(s),
     pageSelectors.isLoadingMoreDocuments(s),
     s.openAllPagesDrawer,
   ]);

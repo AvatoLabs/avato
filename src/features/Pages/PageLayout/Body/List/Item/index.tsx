@@ -9,6 +9,7 @@ import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plug
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useElectronStore } from '@/store/electron';
 import { pageSelectors, usePageStore } from '@/store/page';
+import { getPageDetailPath, getPageKindFromDocument, TABLE_PAGE_KIND } from '@/utils/page';
 
 import Actions from './Actions';
 import Editing from './Editing';
@@ -31,7 +32,11 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const addTab = useElectronStore((s) => s.addTab);
 
   const active = selectedPageId === pageId;
-  const title = document?.title || t('pageList.untitled');
+  const pageKind = getPageKindFromDocument(document);
+  const href = getPageDetailPath(pageId, pageKind);
+  const title =
+    document?.title ||
+    t(pageKind === TABLE_PAGE_KIND ? 'pageList.tableUntitled' : 'pageList.untitled');
   const emoji = document?.metadata?.emoji;
 
   const toggleEditing = useCallback(
@@ -67,12 +72,12 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
       clearTimeout(clickTimerRef.current);
       clickTimerRef.current = null;
     }
-    const reference = pluginRegistry.parseUrl(`/page/${pageId}`, '');
+    const reference = pluginRegistry.parseUrl(href, '');
     if (reference) {
       addTab(reference);
       selectPage(pageId);
     }
-  }, [pageId, addTab, selectPage]);
+  }, [href, pageId, addTab, selectPage]);
 
   // Icon with emoji support
   const icon = useMemo(() => {
@@ -92,7 +97,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
         className={className}
         contextMenuItems={dropdownMenu}
         disabled={editing}
-        href={`/page/${pageId}`}
+        href={href}
         icon={icon}
         key={pageId}
         title={title}

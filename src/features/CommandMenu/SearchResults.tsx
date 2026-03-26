@@ -18,7 +18,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { type SearchResult } from '@/database/repositories/search';
+import { usePageStore } from '@/store/page';
+import { listSelectors } from '@/store/page/slices/list/selectors';
 import { markdownToTxt } from '@/utils/markdownToTxt';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
 
 import { CommandItem } from './components';
 import { styles } from './styles';
@@ -93,7 +96,8 @@ const SearchResults = memo<SearchResultsProps>(
           break;
         }
         case 'page': {
-          navigate(`/page/${result.id.split('_')[1]}`);
+          const document = listSelectors.getDocumentById(result.id)(usePageStore.getState());
+          navigate(getPageDetailPath(result.id, getPageKindFromDocument(document)));
           break;
         }
         case 'mcp': {

@@ -1,12 +1,14 @@
 'use client';
 
 import { Accordion, AccordionItem, ContextMenuTrigger, Flexbox, Text } from '@lobehub/ui';
-import React, { memo, Suspense } from 'react';
+import { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
+import { usePageKind } from '@/features/Pages/usePageKind';
 import { pageSelectors, usePageStore } from '@/store/page';
+import { TABLE_PAGE_KIND } from '@/utils/page';
 
 import Actions from './Actions';
 import AllPagesDrawer from './AllPagesDrawer';
@@ -22,6 +24,8 @@ export enum GroupKey {
  */
 const Body = memo(() => {
   const { t } = useTranslation('file');
+  const pageKind = usePageKind();
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
 
   // Initialize documents list via SWR
   const useFetchDocuments = usePageStore((s) => s.useFetchDocuments);
@@ -29,8 +33,8 @@ const Body = memo(() => {
 
   const isLoading = usePageStore(pageSelectors.isDocumentsLoading);
 
-  const filteredDocumentsCount = usePageStore(pageSelectors.filteredDocumentsCount);
-  const filteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsLimited);
+  const filteredDocumentsCount = usePageStore(pageSelectors.filteredDocumentsCountByKind(pageKind));
+  const filteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsLimitedByKind(pageKind));
   const searchKeywords = usePageStore((s) => s.searchKeywords);
   const dropdownMenu = useDropdownMenu();
   const [allPagesDrawerOpen, closeAllPagesDrawer] = usePageStore((s) => [
@@ -51,7 +55,7 @@ const Body = memo(() => {
           )}
           title={
             <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
-              {t('pageList.title')}
+              {t(isTablePage ? 'pageList.tableTitle' : 'pageList.title')}
               {filteredDocumentsCount > 0 && ` ${filteredDocumentsCount}`}
             </Text>
           }
@@ -62,7 +66,7 @@ const Body = memo(() => {
             ) : (
               <Flexbox gap={1} paddingBlock={1}>
                 {filteredDocuments.length === 0 ? (
-                  <PageEmpty search={Boolean(searchKeywords.trim())} />
+                  <PageEmpty pageKind={pageKind} search={Boolean(searchKeywords.trim())} />
                 ) : (
                   <List />
                 )}

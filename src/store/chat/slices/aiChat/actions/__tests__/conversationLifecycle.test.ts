@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { aiChatService } from '@/services/aiChat';
-import * as agentGroupStore from '@/store/agentGroup';
+import * as agentGroupStore from '@/store/agentGroup/store';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 import { getSessionStoreState } from '@/store/session';
 
@@ -36,6 +36,7 @@ beforeEach(() => {
       refreshMessages: vi.fn(),
       refreshTopic: vi.fn(),
       internal_execAgentRuntime: vi.fn(),
+      internal_updateTopics: vi.fn(),
     });
   });
 });
@@ -136,6 +137,42 @@ describe('ConversationLifecycle actions', () => {
         });
 
         expect(result.current.internal_execAgentRuntime).toHaveBeenCalled();
+      });
+
+      it('should send persisted file ids instead of temporary upload ids', async () => {
+        const { result } = renderHook(() => useChatStore());
+
+        const sendMessageInServerSpy = vi
+          .spyOn(aiChatService, 'sendMessageInServer')
+          .mockResolvedValue({
+            messages: [
+              createMockMessage({ id: TEST_IDS.USER_MESSAGE_ID, role: 'user' }),
+              createMockMessage({ id: TEST_IDS.ASSISTANT_MESSAGE_ID, role: 'assistant' }),
+            ],
+            topics: [],
+            assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
+            userMessageId: TEST_IDS.USER_MESSAGE_ID,
+          } as any);
+
+        await act(async () => {
+          await result.current.sendMessage({
+            message: TEST_CONTENT.USER_MESSAGE,
+            files: [
+              { id: 'upload-1', fileId: 'file-1' } as any,
+              { id: 'upload-2', fileId: 'file-2' } as any,
+            ],
+            context: createTestContext(),
+          });
+        });
+
+        expect(sendMessageInServerSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            newUserMessage: expect.objectContaining({
+              files: ['file-1', 'file-2'],
+            }),
+          }),
+          expect.any(AbortController),
+        );
       });
 
       it('should work when sending from home page (activeAgentId is empty but context.agentId exists)', async () => {

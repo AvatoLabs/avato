@@ -49,10 +49,9 @@ const ContextsArea = memo(() => {
 
   // Reset list when search or sort changes
   useEffect(() => {
-    if (!apiSort) return;
     const sort = viewMode === 'grid' ? apiSort : undefined;
     resetContextsList({ q: searchValue || undefined, sort });
-  }, [searchValue, apiSort, viewMode]);
+  }, [searchValue, apiSort, viewMode, resetContextsList]);
 
   // Call SWR hook to fetch data
   const { isLoading } = useFetchContexts({

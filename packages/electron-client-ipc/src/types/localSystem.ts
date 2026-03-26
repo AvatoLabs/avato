@@ -97,6 +97,12 @@ export interface WriteLocalFileParams {
   content: string;
 
   /**
+   * Content encoding
+   * @default 'utf8'
+   */
+  encoding?: 'base64' | 'utf8';
+
+  /**
    * File path to write to
    */
   path: string;

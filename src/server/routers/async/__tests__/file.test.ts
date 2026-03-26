@@ -146,6 +146,64 @@ describe('async fileRouter', () => {
     mockEmbeddingModelBulkCreate.mockResolvedValue(undefined);
   });
 
+  it('should mark scanned pdfs with no extractable text as a specific chunking error', async () => {
+    mockFileModelFindByIdAny.mockResolvedValue({
+      fileType: 'application/pdf',
+      id: 'file-1',
+      name: 'scan.pdf',
+      url: 'files/scan.pdf',
+    });
+    mockFileServiceGetFileByteArray.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    mockChunkServiceChunkContent.mockResolvedValue({ chunks: [] });
+
+    const caller = fileRouter.createCaller({
+      authorizationToken: 'test-token',
+      userId: 'test-user',
+    } as any);
+
+    await expect(caller.parseFileToChunks({ fileId: 'file-1', taskId: 'task-1' })).resolves.toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining('failed to chunking'),
+        success: false,
+      }),
+    );
+
+    expect(mockAsyncTaskModelUpdate).toHaveBeenLastCalledWith('task-1', {
+      error: new AsyncTaskError(
+        AsyncTaskErrorType.NoExtractableText,
+        'No extractable text was found in this PDF. It is likely a scanned or image-only PDF. Please run OCR first and try again.',
+      ),
+      status: AsyncTaskStatus.Error,
+    });
+    expect(mockChunkModelBulkCreate).not.toHaveBeenCalled();
+  });
+
+  it('should keep generic no chunk error for non-pdf files with empty chunk result', async () => {
+    mockFileServiceGetFileByteArray.mockResolvedValue(new Uint8Array([1, 2, 3]));
+    mockChunkServiceChunkContent.mockResolvedValue({ chunks: [] });
+
+    const caller = fileRouter.createCaller({
+      authorizationToken: 'test-token',
+      userId: 'test-user',
+    } as any);
+
+    await expect(caller.parseFileToChunks({ fileId: 'file-1', taskId: 'task-1' })).resolves.toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining('failed to chunking'),
+        success: false,
+      }),
+    );
+
+    expect(mockAsyncTaskModelUpdate).toHaveBeenLastCalledWith('task-1', {
+      error: new AsyncTaskError(
+        AsyncTaskErrorType.NoChunkError,
+        'No chunk found in this file. it may due to current chunking method can not parse file accurately',
+      ),
+      status: AsyncTaskStatus.Error,
+    });
+    expect(mockChunkModelBulkCreate).not.toHaveBeenCalled();
+  });
+
   it('should mark the task as error and keep the file when storage object is missing', async () => {
     const caller = fileRouter.createCaller({
       authorizationToken: 'test-token',

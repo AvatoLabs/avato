@@ -1,19 +1,22 @@
-import { FILE_URL } from '@lobechat/business-const';
-import { Notion } from '@lobehub/icons';
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { ArrowUpIcon, PlusIcon } from 'lucide-react';
-import React, { memo, useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import GuideModal from '@/components/GuideModal';
-import GuideVideo from '@/components/GuideVideo';
-import useNotionImport from '@/features/ResourceManager/components/Header/hooks/useNotionImport';
 import { useFileStore } from '@/store/file';
 import { usePageStore } from '@/store/page';
 import { DocumentSourceType } from '@/types/document';
 import { standardizeIdentifier } from '@/utils/identifier';
+import {
+  DEFAULT_PAGE_KIND,
+  getPageDetailPath,
+  getPageKindFromDocument,
+  getPageRootPath,
+  type PageKind,
+  TABLE_PAGE_KIND,
+} from '@/utils/page';
 
 const ICON_SIZE = 80;
 
@@ -70,55 +73,38 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 interface PageExplorerPlaceholderProps {
   hasPages?: boolean;
   knowledgeBaseId?: string;
+  pageKind?: PageKind;
 }
 
 const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
-  ({ hasPages = false, knowledgeBaseId }) => {
+  ({ hasPages = false, knowledgeBaseId, pageKind = DEFAULT_PAGE_KIND }) => {
     const { t } = useTranslation(['file', 'common']);
     const [isUploading, setIsUploading] = useState(false);
+    const isTablePage = pageKind === TABLE_PAGE_KIND;
 
     // Page-specific operations from pageStore
     const [
       createNewPage,
+      createNewTable,
       createOptimisticPage,
       replaceTempPageWithReal,
       setSelectedPageId,
-      fetchDocuments,
+      createPage,
     ] = usePageStore((s) => [
       s.createNewPage,
+      s.createNewTable,
       s.createOptimisticPage,
       s.replaceTempPageWithReal,
       s.setSelectedPageId,
-      s.fetchDocuments,
+      s.createPage,
     ]);
 
-    // File operations from FileStore (for uploads and notion import)
-    const [createDocument] = useFileStore((s) => [s.createDocument]);
-
-    const notionImport = useNotionImport({
-      createDocument,
-      currentFolderId: null,
-      libraryId: knowledgeBaseId ?? null,
-      refetchResources: async () => {
-        const { revalidateResources } = await import('@/store/file/slices/resource/hooks');
-        await revalidateResources();
-        await fetchDocuments();
-      },
-      t,
-    });
-
-    // Wrap handleNotionImport to ensure UI updates
-    const handleNotionImportWithLocalUpdate = async (
-      event: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-      await notionImport.handleNotionImport(event);
-      // Fetch documents to update the UI immediately
-      // The hook calls refreshFileList which invalidates SWR cache,
-      // but we need to explicitly fetch to update the zustand store
-      await fetchDocuments();
-    };
-
     const handleCreateDocument = async (content: string, title: string) => {
+      if (isTablePage) {
+        await createNewTable(title);
+        return;
+      }
+
       if (!content) {
         // For empty pages, use createNewPage which handles optimistic updates
         await createNewPage(title);
@@ -131,9 +117,10 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
       setSelectedPageId(tempPageId, false);
 
       try {
-        const newDoc = await createDocument({
+        const newDoc = await createPage({
           content,
           knowledgeBaseId,
+          pageKind,
           title,
         });
 
@@ -233,7 +220,8 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
             // Update URL with stripped ID (without prefix)
             const cleanId = standardizeIdentifier(parsedDocument.id);
-            const newPath = cleanId ? `/page/${cleanId}` : '/page';
+            const nextPageKind = getPageKindFromDocument(realPage);
+            const newPath = cleanId ? getPageDetailPath(cleanId, nextPageKind) : getPageRootPath();
             window.history.replaceState({}, '', newPath);
           } catch (error) {
             console.error('Failed to upload and parse file:', error);
@@ -264,83 +252,64 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
             <Flexbox
               className={styles.card}
               padding={16}
-              onClick={() => handleCreateDocument('', t('pageList.untitled'))}
+              onClick={() =>
+                handleCreateDocument(
+                  '',
+                  isTablePage ? t('pageList.tableUntitled') : t('pageList.untitled'),
+                )
+              }
             >
-              <span className={styles.actionTitle}>{t('pageEditor.empty.createNewDocument')}</span>
-              <div className={styles.glow} style={{ background: cssVar.purple }} />
+              <span className={styles.actionTitle}>
+                {t(
+                  isTablePage
+                    ? 'pageEditor.empty.createNewTable'
+                    : 'pageEditor.empty.createNewDocument',
+                )}
+              </span>
+              <div
+                className={styles.glow}
+                style={{ background: isTablePage ? cssVar.geekblue : cssVar.purple }}
+              />
               <FileTypeIcon
                 className={styles.icon}
-                color={cssVar.purple}
+                color={isTablePage ? cssVar.geekblue : cssVar.purple}
                 icon={<Icon color={'#fff'} icon={PlusIcon} />}
                 size={ICON_SIZE}
                 type={'file'}
               />
             </Flexbox>
 
-            {/* Upload Files (PDF, DOCX, Markdown) */}
-            <Upload
-              accept=".md,.markdown,.pdf,.docx"
-              beforeUpload={handleUploadFile}
-              disabled={isUploading}
-              multiple={false}
-              showUploadList={false}
-            >
-              <Flexbox
-                className={styles.card}
-                padding={16}
-                style={{ opacity: isUploading ? 0.5 : 1 }}
+            {!isTablePage && (
+              <Upload
+                accept=".md,.markdown,.pdf,.docx"
+                beforeUpload={handleUploadFile}
+                disabled={isUploading}
+                multiple={false}
+                showUploadList={false}
               >
-                <span className={styles.actionTitle}>
-                  {isUploading
-                    ? t('uploadDock.uploadStatus.uploading')
-                    : t('pageEditor.empty.uploadFiles')}
-                </span>
-                <div className={styles.glow} style={{ background: cssVar.gold }} />
-                <FileTypeIcon
-                  className={styles.icon}
-                  color={cssVar.gold}
-                  icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
-                  size={ICON_SIZE}
-                  type={'file'}
-                />
-              </Flexbox>
-            </Upload>
-
-            {/* Import from Notion */}
-            <Flexbox
-              className={styles.card}
-              padding={16}
-              onClick={notionImport.handleOpenNotionGuide}
-            >
-              <span className={styles.actionTitle}>{t('pageEditor.empty.importNotion')}</span>
-              <div className={styles.glow} style={{ background: cssVar.geekblue }} />
-              <FileTypeIcon
-                className={styles.icon}
-                color={cssVar.geekblue}
-                icon={<Notion color={'#fff'} />}
-                size={ICON_SIZE}
-                type={'file'}
-              />
-            </Flexbox>
+                <Flexbox
+                  className={styles.card}
+                  padding={16}
+                  style={{ opacity: isUploading ? 0.5 : 1 }}
+                >
+                  <span className={styles.actionTitle}>
+                    {isUploading
+                      ? t('uploadDock.uploadStatus.uploading')
+                      : t('pageEditor.empty.uploadFiles')}
+                  </span>
+                  <div className={styles.glow} style={{ background: cssVar.gold }} />
+                  <FileTypeIcon
+                    className={styles.icon}
+                    color={cssVar.gold}
+                    icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
+                    size={ICON_SIZE}
+                    type={'file'}
+                  />
+                </Flexbox>
+              </Upload>
+            )}
           </Flexbox>
         </Center>
-        <GuideModal
-          cancelText={t('header.actions.notionGuide.cancel')}
-          cover={<GuideVideo height={269} src={FILE_URL.importFromNotionGuide} width={358} />}
-          desc={t('header.actions.notionGuide.desc')}
-          okText={t('header.actions.notionGuide.ok')}
-          open={notionImport.notionGuideOpen}
-          title={t('header.actions.notionGuide.title')}
-          onCancel={notionImport.handleCloseNotionGuide}
-          onOk={notionImport.handleStartNotionImport}
-        />
-        <input
-          accept=".zip"
-          ref={notionImport.notionInputRef}
-          style={{ display: 'none' }}
-          type="file"
-          onChange={handleNotionImportWithLocalUpdate}
-        />
       </>
     );
   },

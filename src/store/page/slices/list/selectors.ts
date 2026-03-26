@@ -1,5 +1,6 @@
 import { useGlobalStore } from '@/store/global';
 import { type LobeDocument } from '@/types/document';
+import { DEFAULT_PAGE_KIND, getPageKindFromDocument, type PageKind } from '@/utils/page';
 
 import { type PageState } from '../../initialState';
 
@@ -8,7 +9,7 @@ import { type PageState } from '../../initialState';
  */
 const isDocumentsLoading = (s: PageState): boolean => s.documents === undefined;
 
-const getFilteredDocuments = (s: PageState): LobeDocument[] => {
+const filterDocuments = (s: PageState, pageKind: PageKind = DEFAULT_PAGE_KIND): LobeDocument[] => {
   const docs = s.documents ?? [];
 
   const { searchKeywords, showOnlyPagesNotInLibrary } = s;
@@ -17,6 +18,9 @@ const getFilteredDocuments = (s: PageState): LobeDocument[] => {
 
   // Filter out documents with sourceType='file'
   result = result.filter((doc: LobeDocument) => doc.sourceType !== 'file');
+
+  // Filter by page kind
+  result = result.filter((doc: LobeDocument) => getPageKindFromDocument(doc) === pageKind);
 
   // Filter by library membership
   if (showOnlyPagesNotInLibrary) {
@@ -38,12 +42,22 @@ const getFilteredDocuments = (s: PageState): LobeDocument[] => {
   }
 
   // Sort by creation date (newest first)
-  return result.sort((a: LobeDocument, b: LobeDocument) => {
+  return [...result].sort((a: LobeDocument, b: LobeDocument) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return dateB - dateA;
   });
 };
+
+const getFilteredDocuments = (s: PageState): LobeDocument[] => {
+  return filterDocuments(s);
+};
+
+const getFilteredDocumentsByKind =
+  (pageKind: PageKind) =>
+  (s: PageState): LobeDocument[] => {
+    return filterDocuments(s, pageKind);
+  };
 
 // Limited filtered documents for sidebar display
 const getFilteredDocumentsLimited = (s: PageState): LobeDocument[] => {
@@ -51,6 +65,14 @@ const getFilteredDocumentsLimited = (s: PageState): LobeDocument[] => {
   const allDocs = getFilteredDocuments(s);
   return allDocs.slice(0, pageSize);
 };
+
+const getFilteredDocumentsLimitedByKind =
+  (pageKind: PageKind) =>
+  (s: PageState): LobeDocument[] => {
+    const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
+    const allDocs = filterDocuments(s, pageKind);
+    return allDocs.slice(0, pageSize);
+  };
 
 const getDocumentById = (docId: string | undefined) => (s: PageState) => {
   if (!docId) return undefined;
@@ -72,19 +94,37 @@ const hasMoreFilteredDocuments = (s: PageState): boolean => {
   return allDocs.length > pageSize;
 };
 
+const hasMoreFilteredDocumentsByKind =
+  (pageKind: PageKind) =>
+  (s: PageState): boolean => {
+    const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
+    const allDocs = filterDocuments(s, pageKind);
+    return allDocs.length > pageSize;
+  };
+
 // Get total count of filtered documents
 const filteredDocumentsCount = (s: PageState): number => {
   return getFilteredDocuments(s).length;
 };
 
+const filteredDocumentsCountByKind =
+  (pageKind: PageKind) =>
+  (s: PageState): number => {
+    return filterDocuments(s, pageKind).length;
+  };
+
 export const listSelectors = {
   documentsTotal,
   filteredDocumentsCount,
+  filteredDocumentsCountByKind,
   getDocumentById,
   getFilteredDocuments,
+  getFilteredDocumentsByKind,
   getFilteredDocumentsLimited,
+  getFilteredDocumentsLimitedByKind,
   hasMoreDocuments,
   hasMoreFilteredDocuments,
+  hasMoreFilteredDocumentsByKind,
   isDocumentsLoading,
   isLoadingMoreDocuments,
 };

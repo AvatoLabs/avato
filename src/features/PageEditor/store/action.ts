@@ -5,7 +5,8 @@ import { type StateCreator } from 'zustand';
 
 import { useDocumentStore } from '@/store/document';
 import { useFileStore } from '@/store/file';
-import { standardizeIdentifier } from '@/utils/identifier';
+import { usePageStore } from '@/store/page';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
 
 import { type State } from './initialState';
 import { initialState } from './initialState';
@@ -72,7 +73,8 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
             ? debugProxyBase
             : '';
 
-        const pagePath = `/page/${standardizeIdentifier(documentId)}`;
+        const document = usePageStore.getState().documents?.find((doc) => doc.id === documentId);
+        const pagePath = getPageDetailPath(documentId, getPageKindFromDocument(document));
         const url = `${window.location.origin}${spaBase}${pagePath}`;
 
         navigator.clipboard.writeText(url);

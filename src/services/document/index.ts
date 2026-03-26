@@ -1,6 +1,7 @@
 import { type DocumentItem } from '@lobechat/database/schemas';
 
 import { lambdaClient } from '@/libs/trpc/client';
+import { type LobeDocument } from '@/types/document';
 
 import { abortableRequest } from '../utils/abortableRequest';
 
@@ -72,6 +73,10 @@ export class DocumentService {
 
   async updateDocument(params: UpdateDocumentParams): Promise<void> {
     await lambdaClient.document.updateDocument.mutate(params);
+  }
+
+  async previewFileContent(id: string): Promise<LobeDocument> {
+    return lambdaClient.document.previewFileContent.query({ id });
   }
 }
 

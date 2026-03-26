@@ -21,9 +21,7 @@ export const SOCIAL_URL = {
   youtube: undefined,
 };
 
-export const FILE_URL = {
-  importFromNotionGuide: 'https://hub-apac-1.lobeobjects.space/assets/notion.mp4',
-};
+export const FILE_URL = {};
 
 export const BRANDING_EMAIL = {
   business: undefined,

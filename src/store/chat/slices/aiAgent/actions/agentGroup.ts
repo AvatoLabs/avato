@@ -55,7 +55,7 @@ export class ChatGroupChatActionImpl {
     // This ensures isAgentRuntimeRunningByContext returns true during mutate call
     const tempUserId = 'tmp_' + nanoid();
     const tempAssistantId = 'tmp_' + nanoid();
-    const fileIds = files?.map((f) => f.id);
+    const fileIds = files?.flatMap((f) => (f.fileId ? [f.fileId] : []));
 
     const { operationId: execOperationId, abortController: execAbortController } = startOperation({
       context: { ...context, messageId: tempUserId },

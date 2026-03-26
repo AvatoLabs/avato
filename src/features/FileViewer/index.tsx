@@ -7,9 +7,9 @@ import { type FileListItem } from '@/types/files';
 
 import NotSupport from './NotSupport';
 import CodeViewer from './Renderer/Code';
+import ExcelViewer from './Renderer/Excel';
 import ImageViewer from './Renderer/Image';
 import MarkdownViewer from './Renderer/Markdown';
-import MSDocViewer from './Renderer/MSDoc';
 import PDFViewer from './Renderer/PDF';
 import VideoViewer from './Renderer/Video';
 
@@ -174,22 +174,26 @@ const CODE_MIME_TYPES = new Set([
   'text/plain',
 ]);
 
-const MSDOC_EXTENSIONS = ['.doc', '.docx', '.odt', '.ppt', '.pptx', '.xls', '.xlsx'];
-const MSDOC_MIME_TYPES = new Set([
+const EXCEL_EXTENSIONS = ['.xls', '.xlsx'];
+const EXCEL_MIME_TYPES = new Set([
+  'xls',
+  'xlsx',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
+
+const OFFICE_EXTENSIONS = ['.doc', '.docx', '.odt', '.ppt', '.pptx'];
+const OFFICE_MIME_TYPES = new Set([
   'doc',
   'docx',
   'odt',
   'ppt',
   'pptx',
-  'xls',
-  'xlsx',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.oasis.opendocument.text',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]);
 
 // Archive file types - not supported for preview
@@ -270,10 +274,22 @@ const FileViewer = memo<FileViewerProps>(
       return <NotSupport fileName={name} style={style} url={url} />;
     }
 
-    // Microsoft Office documents - check before code files to avoid false matches
-    // (e.g., 'doc' contains 'c' which would match CODE_EXTENSIONS)
-    if (matchesFileType(fileType, name, MSDOC_EXTENSIONS, MSDOC_MIME_TYPES)) {
-      return <MSDocViewer fileId={id} url={url} />;
+    // Excel spreadsheets - render locally instead of delegating to Office Online.
+    if (matchesFileType(fileType, name, EXCEL_EXTENSIONS, EXCEL_MIME_TYPES)) {
+      return (
+        <ExcelViewer
+          enablePageAgentContext={enablePageAgentContext}
+          fileId={id}
+          fileName={name}
+          pageAgentContextKey={pageAgentContextKey}
+          url={url}
+        />
+      );
+    }
+
+    // Other Office documents are currently download-only until a local renderer is added.
+    if (matchesFileType(fileType, name, OFFICE_EXTENSIONS, OFFICE_MIME_TYPES)) {
+      return <NotSupport fileName={name} style={style} url={url} />;
     }
 
     // Markdown files

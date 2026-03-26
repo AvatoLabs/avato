@@ -7,6 +7,7 @@ import { VList } from 'virtua';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
+import { usePageKind } from '@/features/Pages/usePageKind';
 import { pageSelectors, usePageStore } from '@/store/page';
 import { type LobeDocument } from '@/types/document';
 
@@ -17,6 +18,7 @@ interface ContentProps {
 }
 
 const Content = memo<ContentProps>(({ searchKeyword }) => {
+  const pageKind = usePageKind();
   const virtuaRef = useRef<VListHandle>(null);
   const fetchedCountRef = useRef(-1);
 
@@ -26,7 +28,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
     s.loadMoreDocuments,
   ]);
 
-  const allFilteredDocuments = usePageStore(pageSelectors.getFilteredDocuments);
+  const allFilteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsByKind(pageKind));
 
   // Filter by search keyword
   const displayDocuments = useMemo(() => {
@@ -65,7 +67,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
 
   // Show empty state
   if (count === 0) {
-    return <PageEmpty search={isSearching} />;
+    return <PageEmpty pageKind={pageKind} search={isSearching} />;
   }
 
   return (

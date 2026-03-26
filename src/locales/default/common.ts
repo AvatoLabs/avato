@@ -487,6 +487,7 @@ export default {
   'tab.me': 'Me',
   'tab.memory': 'Memory',
   'tab.pages': 'Documents',
+  'tab.table': 'Tables',
   'tab.resource': 'Library',
   'tab.search': 'Search',
   'tab.setting': 'Settings',

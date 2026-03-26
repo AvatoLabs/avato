@@ -1,7 +1,7 @@
 'use client';
 
 import { ActionIcon, Avatar, DropdownMenu, Icon, Segmented, Text } from '@lobehub/ui';
-import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen } from 'lucide-react';
+import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen, Table2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import { AutoSaveHint } from '@/features/EditorCanvas';
 import NavHeader from '@/features/NavHeader';
 import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton';
+import { TABLE_PAGE_KIND } from '@/utils/page';
 
 import { usePageEditorStore } from '../store';
 import Breadcrumb from './Breadcrumb';
@@ -16,10 +17,19 @@ import { useMenu } from './useMenu';
 
 const Header = memo(() => {
   const { t } = useTranslation('file');
-  const [documentId, emoji, title, parentId, onBack, setViewMode, viewMode] = usePageEditorStore(
-    (s) => [s.documentId, s.emoji, s.title, s.parentId, s.onBack, s.setViewMode, s.viewMode],
-  );
+  const [documentId, emoji, pageKind, title, parentId, onBack, setViewMode, viewMode] =
+    usePageEditorStore((s) => [
+      s.documentId,
+      s.emoji,
+      s.pageKind,
+      s.title,
+      s.parentId,
+      s.onBack,
+      s.setViewMode,
+      s.viewMode,
+    ]);
   const { menuItems } = useMenu();
+  const isTablePage = pageKind === TABLE_PAGE_KIND;
 
   return (
     <NavHeader
@@ -50,8 +60,8 @@ const Header = memo(() => {
             value={viewMode}
             options={[
               {
-                icon: <Icon icon={SquarePen} />,
-                title: t('pageEditor.mode.rich'),
+                icon: <Icon icon={isTablePage ? Table2Icon : SquarePen} />,
+                title: t(isTablePage ? 'pageEditor.mode.table' : 'pageEditor.mode.rich'),
                 value: 'rich',
               },
               {

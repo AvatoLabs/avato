@@ -9,17 +9,31 @@ import { useTranslation } from 'react-i18next';
 import { editorSelectors, useDocumentStore } from '@/store/document';
 
 import RichEditorCanvas from './EditorCanvas';
+import { type PublicState } from './store';
 import { type PageEditorViewMode } from './store/initialState';
+import TableSheet from './TableSheet';
 
 interface ModeContentProps {
   documentId?: string;
   editor?: IEditor;
+  pageKind: NonNullable<PublicState['pageKind']>;
   viewMode: PageEditorViewMode;
 }
 
-const ModeContent = memo<ModeContentProps>(({ documentId, editor, viewMode }) => {
+const HIDDEN_EDITOR_STYLE = {
+  height: 0,
+  minHeight: 0,
+  opacity: 0,
+  overflow: 'hidden',
+  pointerEvents: 'none' as const,
+  position: 'absolute' as const,
+  width: 1,
+};
+
+const ModeContent = memo<ModeContentProps>(({ documentId, editor, pageKind, viewMode }) => {
   const { t } = useTranslation('file');
   const [markdownValue, setMarkdownValue] = useState('');
+  const isTablePage = pageKind === 'table';
 
   const documentMarkdown = useDocumentStore((s) =>
     documentId ? editorSelectors.content(documentId)(s) : '',
@@ -53,11 +67,34 @@ const ModeContent = memo<ModeContentProps>(({ documentId, editor, viewMode }) =>
     }
   };
 
+  const handleTableMarkdownCommit = (value: string) => {
+    setMarkdownValue(value);
+
+    try {
+      editor?.setDocument('markdown', value, { keepId: true });
+      useDocumentStore.getState().handleContentChange();
+    } catch (error) {
+      console.error('[PageEditor] Failed to sync table source:', error);
+    }
+  };
+
   return (
     <>
-      <div style={{ display: viewMode === 'rich' ? undefined : 'none', minHeight: 0 }}>
+      <div
+        aria-hidden={isTablePage && viewMode === 'rich'}
+        style={
+          viewMode !== 'rich'
+            ? { display: 'none', minHeight: 0 }
+            : isTablePage
+              ? HIDDEN_EDITOR_STYLE
+              : { minHeight: 0 }
+        }
+      >
         <RichEditorCanvas />
       </div>
+      {viewMode === 'rich' && isTablePage && (
+        <TableSheet markdownValue={markdownValue} onMarkdownCommit={handleTableMarkdownCommit} />
+      )}
       {viewMode !== 'rich' && (
         <Flexbox
           flex={1}

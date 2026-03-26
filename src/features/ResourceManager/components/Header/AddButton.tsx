@@ -1,7 +1,5 @@
 'use client';
 
-import { FILE_URL } from '@lobechat/business-const';
-import { Notion } from '@lobehub/icons';
 import { type MenuProps } from '@lobehub/ui';
 import { ActionIcon, Button, DropdownMenu, Icon } from '@lobehub/ui';
 import { type ChangeEvent } from 'react';
@@ -9,8 +7,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { message } from '@/components/AntdStaticMethods';
-import GuideModal from '@/components/GuideModal';
-import GuideVideo from '@/components/GuideVideo';
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
@@ -18,7 +14,6 @@ import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { FilesTabs } from '@/types/files';
 
-import useNotionImport from './hooks/useNotionImport';
 import useUploadFolder from './hooks/useUploadFolder';
 
 const getAcceptedFileTypes = (category: FilesTabs): string | undefined => {
@@ -56,10 +51,6 @@ const AddButton = ({ compact }: AddButtonProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const fileUploadInputRef = useRef<HTMLInputElement>(null);
   const folderUploadInputRef = useRef<HTMLInputElement>(null);
-
-  // TODO: Migrate Notion import to use createResource
-  // Keep old functions temporarily for components not yet migrated
-  const createDocument = useFileStore((s) => s.createDocument);
 
   const [
     libraryId,
@@ -172,25 +163,6 @@ const AddButton = ({ compact }: AddButtonProps) => {
     t,
   ]);
 
-  const {
-    handleCloseNotionGuide,
-    handleNotionImport,
-    handleOpenNotionGuide,
-    handleStartNotionImport,
-    notionGuideOpen,
-    notionInputRef,
-  } = useNotionImport({
-    createDocument,
-    currentFolderId,
-    libraryId,
-    spaceId,
-    refetchResources: async () => {
-      const { revalidateResources } = await import('@/store/file/slices/resource/hooks');
-      await revalidateResources();
-    },
-    t,
-  });
-
   const { handleFolderUpload } = useUploadFolder({
     currentFolderId,
     libraryId,
@@ -260,27 +232,10 @@ const AddButton = ({ compact }: AddButtonProps) => {
         label: t('header.actions.uploadFolder'),
         onClick: openFolderUploadDialog,
       },
-      {
-        type: 'divider',
-      },
-      {
-        children: [
-          {
-            icon: <Notion />,
-            key: 'connect-notion',
-            label: 'Notion',
-            onClick: handleOpenNotionGuide,
-          },
-        ],
-        icon: <Icon icon={RESOURCE_ENTRY_ICONS.link} />,
-        key: 'connect',
-        label: t('header.actions.connect'),
-      },
     ],
     [
       handleCreateFolder,
       handleOpenPageEditor,
-      handleOpenNotionGuide,
       libraryId,
       openFileUploadDialog,
       openFolderUploadDialog,
@@ -312,16 +267,6 @@ const AddButton = ({ compact }: AddButtonProps) => {
       >
         {trigger}
       </DropdownMenu>
-      <GuideModal
-        cancelText={t('header.actions.notionGuide.cancel')}
-        cover={<GuideVideo height={269} src={FILE_URL.importFromNotionGuide} width={358} />}
-        desc={t('header.actions.notionGuide.desc')}
-        okText={t('header.actions.notionGuide.ok')}
-        open={notionGuideOpen}
-        title={t('header.actions.notionGuide.title')}
-        onCancel={handleCloseNotionGuide}
-        onOk={handleStartNotionImport}
-      />
       <input
         multiple
         accept={getAcceptedFileTypes(category)}
@@ -338,13 +283,6 @@ const AddButton = ({ compact }: AddButtonProps) => {
         // @ts-expect-error - webkitdirectory is not in the React types
         webkitdirectory=""
         onChange={handleFolderUploadWithClose}
-      />
-      <input
-        accept=".zip"
-        ref={notionInputRef}
-        style={{ display: 'none' }}
-        type="file"
-        onChange={handleNotionImport}
       />
     </>
   );

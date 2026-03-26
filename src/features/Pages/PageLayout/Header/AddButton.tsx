@@ -5,22 +5,29 @@ import { SquarePenIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePageKind } from '@/features/Pages/usePageKind';
 import { usePageStore } from '@/store/page';
+import { TABLE_PAGE_KIND } from '@/utils/page';
 
 const AddButton = memo(() => {
   const { t } = useTranslation('file');
+  const pageKind = usePageKind();
 
-  const createNewPage = usePageStore((s) => s.createNewPage);
+  const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
 
   const handleNewDocument = () => {
-    const untitledTitle = t('pageList.untitled');
-    createNewPage(untitledTitle);
+    if (pageKind === TABLE_PAGE_KIND) {
+      void createNewTable(t('pageList.tableUntitled'));
+      return;
+    }
+
+    void createNewPage(t('pageList.untitled'));
   };
 
   return (
     <ActionIcon
       icon={SquarePenIcon}
-      title={t('header.newPageButton')}
+      title={t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton')}
       size={{
         blockSize: 32,
         size: 18,

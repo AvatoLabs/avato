@@ -9,7 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import { useElectronStore } from '@/store/electron';
-import { usePageStore } from '@/store/page';
+import { pageSelectors, usePageStore } from '@/store/page';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
 
 interface ActionProps {
   pageId: string;
@@ -26,8 +27,10 @@ export const useDropdownMenu = ({
   const addTab = useElectronStore((s) => s.addTab);
   const removePage = usePageStore((s) => s.removePage);
   const duplicatePage = usePageStore((s) => s.duplicatePage);
+  const document = usePageStore(pageSelectors.getDocumentById(pageId));
+  const href = getPageDetailPath(pageId, getPageKindFromDocument(document));
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     modal.confirm({
       cancelText: t('cancel'),
       content: t('pageEditor.deleteConfirm.content', { ns: 'file' }),
@@ -44,15 +47,15 @@ export const useDropdownMenu = ({
       },
       title: t('pageEditor.deleteConfirm.title', { ns: 'file' }),
     });
-  };
+  }, [message, modal, pageId, removePage, t]);
 
-  const handleDuplicate = async () => {
+  const handleDuplicate = useCallback(async () => {
     try {
       await duplicatePage(pageId);
     } catch (error) {
       console.error('Failed to duplicate page:', error);
     }
-  };
+  }, [duplicatePage, pageId]);
 
   return useCallback(
     () =>
@@ -64,11 +67,10 @@ export const useDropdownMenu = ({
                 key: 'openInNewTab',
                 label: t('pageList.actions.openInNewTab', { ns: 'file' }),
                 onClick: () => {
-                  const url = `/page/${pageId}`;
-                  const reference = pluginRegistry.parseUrl(url, '');
+                  const reference = pluginRegistry.parseUrl(href, '');
                   if (reference) {
                     addTab(reference);
-                    navigate(url);
+                    navigate(href);
                   }
                 },
               },
@@ -96,6 +98,6 @@ export const useDropdownMenu = ({
           onClick: handleDelete,
         },
       ].filter(Boolean) as MenuProps['items'],
-    [t, toggleEditing, handleDuplicate, handleDelete, pageId, addTab, navigate],
+    [t, toggleEditing, handleDuplicate, handleDelete, href, addTab, navigate],
   );
 };

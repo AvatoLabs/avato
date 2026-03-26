@@ -6,7 +6,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type FileParsingTask } from '@/types/asyncTask';
-import { AsyncTaskStatus } from '@/types/asyncTask';
+import { AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 
 import EmbeddingStatus from './EmbeddingStatus';
 
@@ -47,6 +47,14 @@ const FileParsingStatus = memo<FileParsingStatusProps>(
     hideEmbeddingButton,
   }) => {
     const { t } = useTranslation(['components', 'common']);
+    const isNoExtractableText = chunkingError?.name === AsyncTaskErrorType.NoExtractableText;
+
+    const errorTitleKey = isNoExtractableText
+      ? 'FileParsingStatus.chunks.status.noExtractableTextResult'
+      : 'FileParsingStatus.chunks.status.errorResult';
+    const errorTagKey = isNoExtractableText
+      ? 'FileParsingStatus.chunks.status.noExtractableText'
+      : 'FileParsingStatus.chunks.status.error';
 
     switch (chunkingStatus) {
       case AsyncTaskStatus.Processing: {
@@ -68,7 +76,7 @@ const FileParsingStatus = memo<FileParsingStatusProps>(
             styles={{ root: { maxWidth: 340, pointerEvents: 'none' } }}
             title={
               <Flexbox gap={4}>
-                {t('FileParsingStatus.chunks.status.errorResult')}
+                {t(errorTitleKey)}
                 {chunkingError && (
                   <Flexbox className={styles.errorReason}>
                     [{chunkingError.name}]:{' '}
@@ -81,7 +89,7 @@ const FileParsingStatus = memo<FileParsingStatusProps>(
             }
           >
             <Tag className={className} color={'error'} variant={'filled'}>
-              {t('FileParsingStatus.chunks.status.error')}{' '}
+              {t(errorTagKey)}{' '}
               <Icon
                 icon={RotateCwIcon}
                 style={{ cursor: 'pointer' }}

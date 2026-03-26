@@ -6,6 +6,8 @@ import { type KeyboardEvent, type MouseEvent } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useQueryState } from '@/hooks/useQueryParam';
+import { useGlobalStore } from '@/store/global';
 import { useUserMemoryStore } from '@/store/userMemory';
 
 interface ContextDropdownProps {
@@ -16,6 +18,8 @@ interface ContextDropdownProps {
 const ContextDropdown = memo<ContextDropdownProps>(({ id, size = 'small' }) => {
   const { t } = useTranslation(['memory', 'common']);
   const { modal } = App.useApp();
+  const [contextId, setContextId] = useQueryState('contextId', { clearOnDefault: true });
+  const toggleRightPanel = useGlobalStore((s) => s.toggleRightPanel);
 
   const contexts = useUserMemoryStore((s) => s.contexts);
   const deleteContext = useUserMemoryStore((s) => s.deleteContext);
@@ -37,6 +41,10 @@ const ContextDropdown = memo<ContextDropdownProps>(({ id, size = 'small' }) => {
         okText: t('confirm', { ns: 'common' }),
         onOk: async () => {
           await deleteContext(id);
+          if (contextId === id) {
+            setContextId(null);
+            toggleRightPanel(false);
+          }
         },
         title: t('context.deleteTitle'),
         type: 'warning',

@@ -16,6 +16,7 @@ import { abortableRequest } from '@/services/utils/abortableRequest';
 import { useFileStore } from '@/store/file';
 import { documentSelectors } from '@/store/file/slices/document/selectors';
 import { DocumentSourceType, type LobeDocument } from '@/types/document';
+import { getPageKindFromDocument } from '@/utils/page';
 
 import FileEditor from './components/Editor';
 import Explorer from './components/Explorer';
@@ -213,6 +214,7 @@ const ResourceManager = memo(() => {
                 emoji={currentDocument?.metadata?.emoji as string | undefined}
                 knowledgeBaseId={libraryId}
                 pageId={currentViewItemId}
+                pageKind={getPageKindFromDocument(currentDocument)}
                 title={currentDocument?.title}
                 onBack={handleBack}
                 onDelete={handleBack}
