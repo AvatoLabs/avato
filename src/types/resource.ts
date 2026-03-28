@@ -84,6 +84,8 @@ export interface ResourceQueryParams {
   showFilesInKnowledgeBase?: boolean;
   sorter?: 'name' | 'createdAt' | 'size';
   sortType?: SortType;
+  spaceId?: string;
+  trash?: boolean;
 }
 
 /**
@@ -119,6 +121,18 @@ export interface CreateDocumentParams {
  * Union type for create operations
  */
 export type CreateResourceParams = CreateFileParams | CreateDocumentParams;
+
+/**
+ * Delete operation options
+ */
+export interface DeleteResourceOptions {
+  /**
+   * If true, perform soft delete (move to trash)
+   * If false, perform hard delete (permanent)
+   * Default: true (soft delete)
+   */
+  trash?: boolean;
+}
 
 /**
  * Update operation payload

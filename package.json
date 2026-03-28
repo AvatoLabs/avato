@@ -167,6 +167,8 @@
     "@azure/core-auth": "^1.10.1",
     "@better-auth/expo": "1.4.6",
     "@better-auth/passkey": "1.4.6",
+    "@blocksuite/affine": "0.22.4",
+    "@blocksuite/integration-test": "0.22.4",
     "@cfworker/json-schema": "^4.1.1",
     "@chat-adapter/discord": "^4.17.0",
     "@chat-adapter/state-ioredis": "^4.17.0",
@@ -444,6 +446,7 @@
     "@types/ws": "^8.18.1",
     "@types/xast": "^2.0.4",
     "@typescript/native-preview": "7.0.0-dev.20260207.1",
+    "@vanilla-extract/vite-plugin": "^5.2.1",
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/coverage-v8": "^3.2.4",
     "ajv": "^8.17.1",
@@ -513,8 +516,13 @@
       "drizzle-orm": "^0.45.1"
     },
     "patchedDependencies": {
+      "@radix-ui/react-slot": "patches/@radix-ui__react-slot.patch",
+      "@base-ui/react": "patches/@base-ui__react.patch",
+      "@base-ui/utils": "patches/@base-ui__utils.patch",
       "@lobehub/ui": "patches/@lobehub__ui.patch",
       "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch",
+      "cmdk@1.1.1": "patches/cmdk@1.1.1.patch",
+      "framer-motion@12.38.0": "patches/framer-motion@12.38.0.patch",
       "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
     }
   }

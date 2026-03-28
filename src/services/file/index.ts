@@ -42,12 +42,20 @@ export class FileService {
     };
   };
 
-  removeFile = async (id: string): Promise<void> => {
-    await lambdaClient.file.removeFile.mutate({ id });
+  removeFile = async (id: string, trash?: boolean): Promise<void> => {
+    await lambdaClient.file.removeFile.mutate({ id, trash });
   };
 
-  removeFiles = async (ids: string[]): Promise<void> => {
-    await lambdaClient.file.removeFiles.mutate({ ids });
+  removeFiles = async (ids: string[], trash?: boolean): Promise<void> => {
+    await lambdaClient.file.removeFiles.mutate({ ids, trash });
+  };
+
+  restoreFile = async (id: string): Promise<void> => {
+    await lambdaClient.file.restoreFile.mutate({ id });
+  };
+
+  restoreFiles = async (ids: string[]): Promise<void> => {
+    await lambdaClient.file.restoreFiles.mutate({ ids });
   };
 
   removeAllFiles = async () => {

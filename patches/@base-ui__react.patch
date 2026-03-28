@@ -1,0 +1,30 @@
+diff --git a/esm/utils/useRenderElement.js b/esm/utils/useRenderElement.js
+--- a/esm/utils/useRenderElement.js
++++ b/esm/utils/useRenderElement.js
+@@ -80,7 +80,10 @@ function evaluateRenderProp(element, render, props, state) {
+     }
+     const mergedProps = mergeProps(props, render.props);
+     mergedProps.ref = props.ref;
+-    return /*#__PURE__*/React.cloneElement(render, mergedProps);
++    return /*#__PURE__*/React.createElement(render.type, {
++      ...mergedProps,
++      key: render.key
++    });
+   }
+   if (element) {
+     if (typeof element === 'string') {
+diff --git a/utils/useRenderElement.js b/utils/useRenderElement.js
+--- a/utils/useRenderElement.js
++++ b/utils/useRenderElement.js
+@@ -86,7 +86,10 @@ function evaluateRenderProp(element, render, props, state) {
+     }
+     const mergedProps = (0, _mergeProps.mergeProps)(props, render.props);
+     mergedProps.ref = props.ref;
+-    return /*#__PURE__*/React.cloneElement(render, mergedProps);
++    return /*#__PURE__*/React.createElement(render.type, {
++      ...mergedProps,
++      key: render.key
++    });
+   }
+   if (element) {
+     if (typeof element === 'string') {

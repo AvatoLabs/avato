@@ -1,7 +1,7 @@
 'use client';
 
 import { DEFAULT_DOC_COPILOT_AVATAR, normalizeBuiltinAvatar } from '@lobechat/const';
-import { Avatar, Block, Flexbox, Icon, Markdown, Text } from '@lobehub/ui';
+import { Avatar, Block, Flexbox, Icon, Text } from '@lobehub/ui';
 import { createStyles, cssVar } from 'antd-style';
 import {
   ArrowDownWideNarrowIcon,
@@ -10,7 +10,7 @@ import {
   SearchIcon,
   SparklesIcon,
 } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { type ReactNode, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
@@ -21,6 +21,16 @@ import { useAgentStore } from '@/store/agent/store';
 import { TABLE_PAGE_KIND } from '@/utils/page';
 
 const useStyles = createStyles(({ css, token }) => ({
+  welcomeCopy: css`
+    font-size: 14px;
+    line-height: 1.7;
+    color: ${cssVar.colorTextSecondary};
+
+    strong {
+      color: ${cssVar.colorText};
+      font-weight: 600;
+    }
+  `,
   tableCard: css`
     cursor: pointer;
     border-radius: ${token.borderRadiusLG}px;
@@ -48,6 +58,18 @@ const useStyles = createStyles(({ css, token }) => ({
     background: color-mix(in srgb, ${cssVar.colorPrimaryBg} 82%, transparent);
   `,
 }));
+
+const renderInlineMarks = (content: string): ReactNode[] =>
+  content
+    .split(/(\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((segment, index) =>
+      segment.startsWith('**') && segment.endsWith('**') ? (
+        <strong key={`${segment}-${index}`}>{segment.slice(2, -2)}</strong>
+      ) : (
+        <span key={`${segment}-${index}`}>{segment}</span>
+      ),
+    );
 
 const AgentBuilderWelcome = memo(() => {
   const { t } = useTranslation('chat');
@@ -117,6 +139,19 @@ const AgentBuilderWelcome = memo(() => {
     ],
     [t],
   );
+  const welcomeCopy = t(isTablePage ? 'pageCopilot.table.welcome' : 'pageCopilot.welcome', {
+    defaultValue: isTablePage
+      ? '**Keep the table usable**\n\nFill blanks, standardize values, spot anomalies, or reshape columns without leaving this page.'
+      : `**Clearer, sharper writing**\n\nDraft, rewrite, or polish—tell me your intent and I'll refine the rest.`,
+  });
+  const welcomeParagraphs = useMemo(
+    () =>
+      welcomeCopy
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean),
+    [welcomeCopy],
+  );
 
   return (
     <>
@@ -138,13 +173,11 @@ const AgentBuilderWelcome = memo(() => {
             defaultValue: isTablePage ? 'Table Assistant' : 'Page Agent',
           })}
         </Text>
-        <Markdown fontSize={14} variant={'chat'}>
-          {t(isTablePage ? 'pageCopilot.table.welcome' : 'pageCopilot.welcome', {
-            defaultValue: isTablePage
-              ? '**Keep the table usable**\n\nFill blanks, standardize values, spot anomalies, or reshape columns without leaving this page.'
-              : `**Clearer, sharper writing**\n\nDraft, rewrite, or polish—tell me your intent and I'll refine the rest.`,
-          })}
-        </Markdown>
+        <Flexbox className={styles.welcomeCopy} gap={4}>
+          {welcomeParagraphs.map((paragraph, index) => (
+            <div key={`${paragraph}-${index}`}>{renderInlineMarks(paragraph)}</div>
+          ))}
+        </Flexbox>
         {isTablePage ? (
           <Flexbox gap={12}>
             {tablePrompts.map((item) => (

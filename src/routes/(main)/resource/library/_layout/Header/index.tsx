@@ -5,7 +5,6 @@ import { memo } from 'react';
 import { useParams } from 'react-router-dom';
 
 import BackButton from '@/features/NavPanel/components/BackButton';
-import { LibraryTrashButton } from '@/routes/(main)/resource/features/LibraryTrashButton';
 
 import LibraryHead from './LibraryHead';
 
@@ -29,7 +28,6 @@ const Header = memo(() => {
         />
         <LibraryHead id={id || ''} />
       </Flexbox>
-      <LibraryTrashButton knowledgeBaseId={id} />
     </Flexbox>
   );
 });

@@ -104,15 +104,15 @@ export const documentRouter = router({
     }),
 
   deleteDocument: documentProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string(), trash: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.documentService.deleteDocument(input.id);
+      return ctx.documentService.deleteDocument(input.id, input.trash !== false);
     }),
 
   deleteDocuments: documentProcedure
-    .input(z.object({ ids: z.array(z.string()) }))
+    .input(z.object({ ids: z.array(z.string()), trash: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.documentService.deleteDocuments(input.ids);
+      return ctx.documentService.deleteDocuments(input.ids, input.trash !== false);
     }),
 
   ensureFileDocument: documentProcedure
@@ -131,6 +131,12 @@ export const documentRouter = router({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.documentService.restoreDocument(input.id);
+    }),
+
+  restoreDocuments: documentProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.documentService.restoreDocuments(input.ids);
     }),
 
   getDocumentById: documentProcedure

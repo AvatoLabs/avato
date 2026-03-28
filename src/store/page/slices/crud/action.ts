@@ -306,6 +306,30 @@ export class CrudActionImpl {
 
     try {
       await documentService.deleteDocument(pageId);
+
+      const [{ useFileStore }, { removePageDocumentsFromCache }, { revalidateResources }] =
+        await Promise.all([
+          import('@/store/file/store'),
+          import('../list/action'),
+          import('@/store/file/slices/resource/hooks'),
+        ]);
+
+      useFileStore.setState((state) => {
+        const nextLocalDocumentMap = new Map(state.localDocumentMap);
+        nextLocalDocumentMap.delete(pageId);
+
+        const nextResourceMap = new Map(state.resourceMap);
+        nextResourceMap.delete(pageId);
+
+        return {
+          documents: state.documents.filter((doc) => doc.id !== pageId),
+          localDocumentMap: nextLocalDocumentMap,
+          resourceList: state.resourceList.filter((item) => item.id !== pageId),
+          resourceMap: nextResourceMap,
+        };
+      }, false);
+
+      await Promise.all([removePageDocumentsFromCache([pageId]), revalidateResources()]);
     } catch (error) {
       console.error('Failed to delete page:', error);
       // Restore documents on error

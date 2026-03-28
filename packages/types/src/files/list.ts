@@ -57,6 +57,7 @@ export const QueryFileListSchema = z.object({
   spaceId: z.string().optional(),
   sortType: z.enum(['desc', 'asc']).optional(),
   sorter: z.enum(['createdAt', 'name', 'size']).optional(),
+  trash: z.boolean().optional(),
 });
 
 export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
@@ -73,6 +74,7 @@ export interface QueryFileListParams {
   sorter?: string;
   sortType?: string;
   spaceId?: string;
+  trash?: boolean;
 }
 
 export interface PaginatedFileList {

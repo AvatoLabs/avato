@@ -57,8 +57,11 @@ import ResourceHomeLayout from '@/routes/(main)/resource/(home)/_layout';
 import ResourceLibraryPage from '@/routes/(main)/resource/library';
 import ResourceLibraryLayout from '@/routes/(main)/resource/library/_layout';
 import ResourceLibrarySlugPage from '@/routes/(main)/resource/library/[slug]';
+import ResourceLibraryTrashPage from '@/routes/(main)/resource/library/trash';
 import ResourceSharedPage from '@/routes/(main)/resource/shared';
 import ResourceSpaceSettingsPage from '@/routes/(main)/resource/space/[spaceId]/settings';
+import ResourceSpaceTrashPage from '@/routes/(main)/resource/space/[spaceId]/trash';
+import ResourceTrashPage from '@/routes/(main)/resource/trash';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
@@ -235,8 +238,16 @@ export const desktopRoutes: RouteObject[] = [
                 path: 'shared',
               },
               {
+                element: <ResourceTrashPage />,
+                path: 'trash',
+              },
+              {
                 element: <ResourceHomePage />,
                 path: 'space/:spaceId',
+              },
+              {
+                element: <ResourceSpaceTrashPage />,
+                path: 'space/:spaceId/trash',
               },
               {
                 element: <ResourceSpaceSettingsPage />,
@@ -252,6 +263,10 @@ export const desktopRoutes: RouteObject[] = [
                 index: true,
               },
               {
+                element: <ResourceLibraryTrashPage />,
+                path: 'trash',
+              },
+              {
                 element: <ResourceLibrarySlugPage />,
                 path: ':slug',
               },
@@ -264,6 +279,10 @@ export const desktopRoutes: RouteObject[] = [
               {
                 element: <ResourceLibraryPage />,
                 index: true,
+              },
+              {
+                element: <ResourceLibraryTrashPage />,
+                path: 'trash',
               },
               {
                 element: <ResourceLibrarySlugPage />,

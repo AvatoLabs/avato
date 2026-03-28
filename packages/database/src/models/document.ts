@@ -64,6 +64,32 @@ export class DocumentModel {
     }
   };
 
+  /** Hard delete by ids only. Caller must enforce authorization first. */
+  hardDeleteManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db.delete(documents).where(inArray(documents.id, chunk));
+    }
+  };
+
+  /** Restore soft-deleted rows by ids only. Caller must enforce authorization first. */
+  restoreManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return;
+
+    const now = new Date();
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db
+        .update(documents)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(and(inArray(documents.id, chunk), isNotNull(documents.deletedAt)));
+    }
+  };
+
   deleteAll = async () => {
     const now = new Date();
     return this.db

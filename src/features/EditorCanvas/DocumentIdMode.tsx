@@ -60,6 +60,7 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
     ...editorProps
   }) => {
     const { t } = useTranslation(['file', 'ui']);
+    const shouldGuardUnsavedChanges = unsavedChangesGuard?.enabled ?? false;
 
     const storeUpdater = createStoreUpdater(useDocumentStore);
     storeUpdater('activeDocumentId', documentId);
@@ -82,8 +83,9 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
 
     // Check loading state via selector (document not yet in store)
     const isLoading = useDocumentStore(editorSelectors.isDocumentLoading(documentId));
-    const isDirty = useDocumentStore(editorSelectors.isDirty(documentId));
-    const shouldGuardUnsavedChanges = unsavedChangesGuard?.enabled ?? false;
+    const isDirty = useDocumentStore((s) =>
+      shouldGuardUnsavedChanges ? editorSelectors.isDirty(documentId)(s) : false,
+    );
 
     const handleAutoSaveBeforeLeave = useCallback(async () => {
       if (!shouldGuardUnsavedChanges) return true;
@@ -105,10 +107,10 @@ const DocumentIdMode = memo<DocumentIdModeProps>(
     );
 
     // Handle content change
-    const handleChange = () => {
+    const handleChange = useCallback(() => {
       handleContentChangeStore();
       onContentChange?.();
-    };
+    }, [handleContentChangeStore, onContentChange]);
 
     const isEditorInitialized = !!editor?.getLexicalEditor();
     const contentChangeLockRef = useRef(false);

@@ -8,7 +8,6 @@ describe('themePresets', () => {
     expect(resolveThemePreset(undefined, undefined)).toBe('classic');
     expect(resolveThemePreset('green', 'slate')).toBe('classic');
     expect(resolveThemePreset('cyan', 'slate')).toBe('tide');
-    expect(resolveThemePreset('lime', 'slate')).toBe('canopy');
     expect(resolveThemePreset('volcano', 'slate')).toBe('ember');
     expect(resolveThemePreset('magenta', 'slate')).toBe('velvet');
     expect(resolveThemePreset('geekblue', 'slate')).toBe('midnight');

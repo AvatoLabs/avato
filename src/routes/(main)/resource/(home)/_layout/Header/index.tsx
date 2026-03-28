@@ -6,7 +6,6 @@ import { useParams } from 'react-router-dom';
 
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 import { buildResourceRootPath } from '@/features/ResourceSpaces';
-import { LibraryTrashButton } from '@/routes/(main)/resource/features/LibraryTrashButton';
 
 import CategoryMenu from './CategoryMenu';
 
@@ -17,11 +16,7 @@ const Header = memo(() => {
 
   return (
     <>
-      <SubSidebarTitleBar
-        right={<LibraryTrashButton />}
-        title={t('tab.resource')}
-        titleTo={resourceRoot}
-      />
+      <SubSidebarTitleBar title={t('tab.resource')} titleTo={resourceRoot} />
       <CategoryMenu />
     </>
   );

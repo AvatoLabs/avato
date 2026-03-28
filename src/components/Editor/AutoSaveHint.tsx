@@ -22,23 +22,32 @@ const AutoSaveHint = memo<AutoSaveHintProps>(({ style, saveStatus, lastUpdatedTi
   const { t } = useTranslation('editor');
 
   const isSaving = saveStatus === 'saving';
+  const hintStyle: CSSProperties = {
+    display: 'inline-flex',
+    justifyContent: 'center',
+    minWidth: 160,
+    ...style,
+  };
+  const updatedAtTitle = lastUpdatedTime
+    ? dayjs(lastUpdatedTime).format('YYYY-MM-DD HH:mm:ss')
+    : undefined;
 
   if (isSaving)
     return (
-      <Tag icon={<Icon spin icon={Loader2Icon} />} style={style}>
+      <Tag icon={<Icon spin icon={Loader2Icon} />} style={hintStyle}>
         {t('autoSave.saving')}
       </Tag>
     );
 
   if (saveStatus === 'saved' && lastUpdatedTime)
     return (
-      <Tag icon={<Icon icon={CloudIcon} />} style={style}>
-        {t('autoSave.saved')} {dayjs(lastUpdatedTime).fromNow()}
+      <Tag icon={<Icon icon={CloudIcon} />} style={hintStyle} title={updatedAtTitle}>
+        {t('autoSave.saved')}
       </Tag>
     );
 
   return (
-    <Tag icon={<Icon icon={CloudIcon} />} style={style}>
+    <Tag icon={<Icon icon={CloudIcon} />} style={hintStyle} title={updatedAtTitle}>
       {t('autoSave.latest')}
     </Tag>
   );

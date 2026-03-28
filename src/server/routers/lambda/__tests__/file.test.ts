@@ -32,6 +32,8 @@ const mockFileModelFindExistingByBlobAndContext = vi.fn();
 const mockFileModelFindById = vi.fn();
 const mockFileModelQuery = vi.fn();
 const mockFileModelClear = vi.fn();
+const mockFileModelSoftDeleteAny = vi.fn();
+const mockFileModelSoftDeleteManyAny = vi.fn();
 const mockFileModelUpdate = vi.fn();
 
 // Patch: Use actual router context middleware to inject the correct models/services
@@ -48,6 +50,8 @@ function createCallerWithCtx(partialCtx: any = {}) {
     findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
     clear: mockFileModelClear,
+    softDeleteAny: mockFileModelSoftDeleteAny,
+    softDeleteManyAny: mockFileModelSoftDeleteManyAny,
     update: mockFileModelUpdate,
     updateAny: mockFileModelUpdate,
   };
@@ -168,6 +172,8 @@ vi.mock('@/database/models/file', () => ({
     findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
     clear: mockFileModelClear,
+    softDeleteAny: mockFileModelSoftDeleteAny,
+    softDeleteManyAny: mockFileModelSoftDeleteManyAny,
     update: mockFileModelUpdate,
     updateAny: mockFileModelUpdate,
   })),
@@ -251,6 +257,8 @@ describe('fileRouter', () => {
     mockFileModelDelete.mockResolvedValue(undefined);
     mockFileModelDeleteMany.mockResolvedValue([]);
     mockFileModelClear.mockResolvedValue({} as any);
+    mockFileModelSoftDeleteAny.mockResolvedValue(undefined);
+    mockFileModelSoftDeleteManyAny.mockResolvedValue([]);
     mockFileModelUpdate.mockResolvedValue(undefined);
 
     mockResourceAuthorizerAssertCapability.mockResolvedValue({ canAccess: true });
@@ -676,7 +684,7 @@ describe('fileRouter', () => {
 
   describe('removeFile', () => {
     it('should do nothing when file not found', async () => {
-      ctx.fileModel.deleteAny.mockResolvedValue(null);
+      ctx.fileModel.softDeleteAny.mockResolvedValue(null);
 
       await caller.removeFile({ id: 'invalid-id' });
 
@@ -686,11 +694,34 @@ describe('fileRouter', () => {
 
   describe('removeFiles', () => {
     it('should do nothing when no files found', async () => {
-      ctx.fileModel.deleteManyAny.mockResolvedValue([]);
+      ctx.fileModel.softDeleteManyAny.mockResolvedValue([]);
 
       await caller.removeFiles({ ids: ['invalid-1', 'invalid-2'] });
 
       expect(ctx.fileService.deleteFiles).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restoreFile', () => {
+    it('should restore a soft-deleted file', async () => {
+      const deletedFile = { ...mockFile, deletedAt: new Date(), resourceUid: 'res_test', spaceId: 'spc_test' };
+      ctx.fileModel.findByIdAny
+        .mockResolvedValueOnce(deletedFile)
+        .mockResolvedValueOnce({ ...deletedFile, deletedAt: null });
+
+      const result = await caller.restoreFile({ id: 'test-id' });
+
+      expect(ctx.fileModel.updateAny).toHaveBeenCalledWith('test-id', { deletedAt: null });
+      expect(ctx.resourceModel.invalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
+        { resourceUid: 'res_test', spaceId: 'spc_test' },
+      ]);
+      expect(result).toMatchObject({ id: 'test-id' });
+    });
+
+    it('should throw when file is not in trash', async () => {
+      ctx.fileModel.findByIdAny.mockResolvedValueOnce({ ...mockFile, deletedAt: null });
+
+      await expect(caller.restoreFile({ id: 'test-id' })).rejects.toThrow(TRPCError);
     });
   });
 

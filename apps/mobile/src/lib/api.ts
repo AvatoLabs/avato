@@ -124,12 +124,12 @@ const buildCommunityMarketCacheKey = (
 ) => {
   const normalizedParams = params
     ? JSON.stringify(
-        Object.fromEntries(
-          Object.entries(params)
-            .filter(([, value]) => value !== undefined && value !== null && value !== '')
-            .sort(([left], [right]) => left.localeCompare(right)),
-        ),
-      )
+      Object.fromEntries(
+        Object.entries(params)
+          .filter(([, value]) => value !== undefined && value !== null && value !== '')
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    )
     : '';
 
   return `${baseUrl}::${scope}::${normalizedParams}`;
@@ -461,9 +461,9 @@ const normalizeMessageContent = (content: unknown) => {
     metadata:
       hasImages && normalizedParts.length > 0
         ? ({
-            isMultimodal: true,
-            tempDisplayContent: JSON.stringify(normalizedParts),
-          } satisfies Partial<ChatMessageMetadata>)
+          isMultimodal: true,
+          tempDisplayContent: JSON.stringify(normalizedParts),
+        } satisfies Partial<ChatMessageMetadata>)
         : undefined,
   };
 };
@@ -475,9 +475,9 @@ const normalizeMessage = (message: any, parentSessionId?: string): ChatMessage =
   const metadata =
     baseMetadata || derivedMetadata
       ? ({
-          ...baseMetadata,
-          ...derivedMetadata,
-        } as ChatMessageMetadata)
+        ...baseMetadata,
+        ...derivedMetadata,
+      } as ChatMessageMetadata)
       : null;
 
   const sessionId = String(message?.sessionId ?? parentSessionId ?? '');
@@ -752,14 +752,14 @@ export const agentApi = {
 
   /** Get agent config by session ID. Returns the agent config including plugins. */
   getConfigBySession: (sessionId: string) =>
-    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+    trpcQuery<{ id: string; plugins?: string[];[key: string]: any } | null>(
       'agent.getAgentConfig',
       { sessionId },
     ),
 
   /** Get agent config by agent ID (for editing without session). */
   getConfigByAgentId: (agentId: string) =>
-    trpcQuery<{ id: string; plugins?: string[]; [key: string]: any } | null>(
+    trpcQuery<{ id: string; plugins?: string[];[key: string]: any } | null>(
       'agent.getAgentConfigById',
       { agentId },
     ),
@@ -858,7 +858,7 @@ export const sessionApi = {
 // ── Agent Group API (multi-agent chat) ───────────────────────────────
 export interface AgentGroupDetail {
   [key: string]: any;
-  agents?: Array<{ id: string; title?: string; [key: string]: any }>;
+  agents?: Array<{ id: string; title?: string;[key: string]: any }>;
   config?: Record<string, any>;
   id: string;
   meta?: { avatar?: string; description?: string; title?: string };
@@ -1418,10 +1418,10 @@ const buildMarketCloudMcpManifest = (item: Record<string, any>) => {
     Array.isArray(item.api) && item.api.length > 0
       ? item.api
       : tools?.map((tool) => ({
-          description: tool?.description || '',
-          name: tool?.name,
-          parameters: tool?.inputSchema || {},
-        }));
+        description: tool?.description || '',
+        name: tool?.name,
+        parameters: tool?.inputSchema || {},
+      }));
 
   return {
     api: Array.isArray(api) ? api : [],
@@ -1600,10 +1600,10 @@ export const aiChatApi = {
           callbacks.onReasoning?.(
             hasReasoningImages
               ? {
-                  content: accReasoning,
-                  isMultimodal: true,
-                  tempDisplayContent: reasoningParts,
-                }
+                content: accReasoning,
+                isMultimodal: true,
+                tempDisplayContent: reasoningParts,
+              }
               : { content: accReasoning },
           );
         };
@@ -1614,9 +1614,9 @@ export const aiChatApi = {
 
           contentMetadata = hasContentImages
             ? {
-                isMultimodal: true,
-                tempDisplayContent: serializeContentParts(contentParts),
-              }
+              isMultimodal: true,
+              tempDisplayContent: serializeContentParts(contentParts),
+            }
             : undefined;
 
           callbacks.onContent?.({
@@ -1863,12 +1863,12 @@ export const aiChatApi = {
             reasoning:
               reasoningParts.length > 0
                 ? {
-                    content: accReasoning,
-                    isMultimodal: reasoningParts.some((part) => part.type === 'image'),
-                    ...(reasoningParts.some((part) => part.type === 'image')
-                      ? { tempDisplayContent: reasoningParts }
-                      : {}),
-                  }
+                  content: accReasoning,
+                  isMultimodal: reasoningParts.some((part) => part.type === 'image'),
+                  ...(reasoningParts.some((part) => part.type === 'image')
+                    ? { tempDisplayContent: reasoningParts }
+                    : {}),
+                }
                 : accReasoning
                   ? { content: accReasoning }
                   : undefined,
@@ -2005,15 +2005,15 @@ export const aiChatApi = {
         const body =
           'approvedToolCall' in params
             ? {
-                approvedToolCall: params.approvedToolCall,
-                sessionId: params.sessionId,
-                topicId: params.topicId,
-              }
+              approvedToolCall: params.approvedToolCall,
+              sessionId: params.sessionId,
+              topicId: params.topicId,
+            }
             : {
-                rejectedToolCall: params.rejectedToolCall,
-                sessionId: params.sessionId,
-                topicId: params.topicId,
-              };
+              rejectedToolCall: params.rejectedToolCall,
+              sessionId: params.sessionId,
+              topicId: params.topicId,
+            };
 
         xhr.send(JSON.stringify(body));
       });
@@ -2043,11 +2043,11 @@ export const topicApi = {
       options?.sessionType === 'group'
         ? { groupId: containerId, messages: options?.messageIds, tagId: options?.tagId, title }
         : {
-            messages: options?.messageIds,
-            sessionId: containerId,
-            tagId: options?.tagId,
-            title,
-          };
+          messages: options?.messageIds,
+          sessionId: containerId,
+          tagId: options?.tagId,
+          title,
+        };
     return trpcMutate<string>('topic.createTopic', params);
   },
   remove: (id: string) => trpcMutate('topic.removeTopic', { id }),
@@ -2238,7 +2238,11 @@ export const resourceApi = {
   ) =>
     trpcMutate('document.updateDocument', { id, ...updates }),
 
-  deleteDocument: (id: string) => trpcMutate('document.deleteDocument', { id }),
+  deleteDocument: (id: string, trash: boolean = true) =>
+    trpcMutate('document.deleteDocument', { id, trash }),
+
+  deleteDocuments: (ids: string[], trash: boolean = true) =>
+    trpcMutate('document.deleteDocuments', { ids, trash }),
 
   queryTrashedDocuments: (params?: {
     current?: number;
@@ -2536,7 +2540,10 @@ export const fileApi = {
     };
   },
 
-  remove: (id: string) => trpcMutate('file.removeFile', { id }),
+  remove: (id: string, trash: boolean = true) => trpcMutate('file.removeFile', { id, trash }),
+
+  removeFiles: (ids: string[], trash: boolean = true) =>
+    trpcMutate('file.removeFiles', { ids, trash }),
 
   update: (id: string, updates: { name?: string; parentId?: string | null }) =>
     trpcMutate('file.updateFile', { id, ...updates }),
@@ -2853,15 +2860,15 @@ export const marketSkillApi = {
             : input.page,
         items: Array.isArray(mcpResult?.items)
           ? mcpResult.items.map((m: any) => ({
-              ...m,
-              _source: 'mcp' as const,
-              avatar: m.meta?.avatar || m.avatar,
-              category: m.category ?? m.meta?.category,
-              description: m.meta?.description || m.description || '',
-              identifier: m.identifier,
-              manifestUrl: m.manifestUrl,
-              name: m.meta?.title || m.name || m.title || m.identifier,
-            }))
+            ...m,
+            _source: 'mcp' as const,
+            avatar: m.meta?.avatar || m.avatar,
+            category: m.category ?? m.meta?.category,
+            description: m.meta?.description || m.description || '',
+            identifier: m.identifier,
+            manifestUrl: m.manifestUrl,
+            name: m.meta?.title || m.name || m.title || m.identifier,
+          }))
           : [],
         pageSize,
         totalCount: resolveMarketTotalCount(mcpResult ?? {}),
@@ -2909,14 +2916,14 @@ export const marketSkillApi = {
             : input.page,
         items: Array.isArray(result?.items)
           ? result.items.map((s: any) => ({
-              ...s,
-              _source: 'skill' as const,
-              avatar: s.icon || s.logo || s.avatar,
-              category: s.category ?? s.meta?.category,
-              description: s.description || s.meta?.description || '',
-              identifier: s.identifier,
-              name: s.name || s.meta?.title || s.identifier,
-            }))
+            ...s,
+            _source: 'skill' as const,
+            avatar: s.icon || s.logo || s.avatar,
+            category: s.category ?? s.meta?.category,
+            description: s.description || s.meta?.description || '',
+            identifier: s.identifier,
+            name: s.name || s.meta?.title || s.identifier,
+          }))
           : [],
         pageSize,
         totalCount: resolveMarketTotalCount(result ?? {}),

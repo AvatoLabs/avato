@@ -281,11 +281,9 @@ export const ModelItemRender = memo<ModelItemRenderProps>(
         >
           <ModelIcon model={id} size={20} />
           <Text
+            ellipsis
             style={mobile ? { maxWidth: '60vw' } : { minWidth: 0, overflow: 'hidden' }}
-            ellipsis={{
-              tooltip: displayNameOrId,
-              tooltipWhenOverflow: true,
-            }}
+            title={displayNameOrId}
           >
             {displayNameOrId}
           </Text>

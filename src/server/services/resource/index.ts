@@ -590,13 +590,17 @@ export class ResourceAuthorizer {
     return fileIds.filter((_, i) => matches[i]?.canAccess);
   };
 
-  filterVisibleDocumentIdsForList = async (documentIds: string[]) => {
+  filterVisibleDocumentIdsForList = async (
+    documentIds: string[],
+    options?: { documentIncludeDeleted?: boolean },
+  ) => {
     if (documentIds.length === 0) return [];
 
     const matches = await Promise.all(
       documentIds.map((documentId) =>
         this.getAccessMatch({
           capability: 'read_metadata',
+          documentIncludeDeleted: options?.documentIncludeDeleted,
           id: documentId,
           kind: 'document',
         }),

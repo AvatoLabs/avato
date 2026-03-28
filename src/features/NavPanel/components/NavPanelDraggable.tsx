@@ -252,14 +252,14 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
       expand={expand}
       expandable={false}
       maxWidth={leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : 400}
-      minWidth={
-        leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : WORKSPACE_SHELL_RAIL_MIN_WIDTH
-      }
       placement="left"
       resize={!expand || leftPanelCollapsed ? false : undefined}
       showBorder={false}
       size={expand ? { height: '100%', width: panelWidth } : undefined}
       style={styles}
+      minWidth={
+        leftPanelCollapsed ? WORKSPACE_LEFT_PANEL_MINI_WIDTH_PX : WORKSPACE_SHELL_RAIL_MIN_WIDTH
+      }
       onSizeDragging={handleSizeChange}
     >
       <div className={cx(draggableStyles.inner, leftPanelCollapsed && draggableStyles.innerMini)}>
@@ -270,7 +270,7 @@ export const NavPanelDraggable = memo<NavPanelDraggableProps>(({ activeContent }
             </GlassNavVisualProvider>
           </div>
         ) : shouldUseMotion ? (
-          <AnimatePresence custom={motionDirection} initial={false} mode="sync">
+          <AnimatePresence custom={motionDirection} initial={false} mode="wait">
             <motion.div
               animate="animate"
               className={draggableStyles.layer}

@@ -38,8 +38,19 @@ export class EditorActionImpl {
   }
 
   getEditorContent = (): { editorData: any; markdown: string } | null => {
-    const { editor } = this.#get();
-    if (!editor) return null;
+    const { activeDocumentId, documents, editor } = this.#get();
+
+    if (!editor) {
+      if (!activeDocumentId) return null;
+
+      const doc = documents[activeDocumentId];
+      if (!doc) return null;
+
+      return {
+        editorData: doc.editorData,
+        markdown: doc.content || '',
+      };
+    }
 
     try {
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
@@ -82,6 +93,39 @@ export class EditorActionImpl {
       }
     } catch (error) {
       console.error('[DocumentStore] Failed to update content:', error);
+    }
+  };
+
+  syncExternalDocumentContent = (
+    documentId: string,
+    value: { content?: string; editorData?: any },
+  ): void => {
+    const { documents, internal_dispatchDocument } = this.#get();
+    const doc = documents[documentId];
+
+    if (!doc) return;
+
+    const nextContent = value.content ?? doc.content ?? '';
+    const nextEditorData = value.editorData ?? doc.editorData;
+    const markdownChanged = nextContent !== doc.lastSavedContent;
+    const editorDataChanged = !isEqual(nextEditorData, doc.lastSavedEditorData);
+    const contentChanged = markdownChanged || editorDataChanged;
+
+    internal_dispatchDocument(
+      {
+        id: documentId,
+        type: 'updateDocument',
+        value: {
+          content: nextContent,
+          editorData: nextEditorData,
+          isDirty: contentChanged,
+        },
+      },
+      'syncExternalDocumentContent',
+    );
+
+    if (contentChanged && doc.autoSave !== false) {
+      this.#get().triggerDebouncedSave(documentId);
     }
   };
 
@@ -148,9 +192,9 @@ export class EditorActionImpl {
 
     if (!id) return;
 
-    const { editor, documents, internal_dispatchDocument } = this.#get();
+    const { activeDocumentId, editor, documents, internal_dispatchDocument } = this.#get();
     const doc = documents[id];
-    if (!doc || !editor) return;
+    if (!doc) return;
 
     const hasExtraSavePayload = metadata?.metadata !== undefined || metadata?.title !== undefined;
 
@@ -161,8 +205,11 @@ export class EditorActionImpl {
     internal_dispatchDocument({ id, type: 'updateDocument', value: { saveStatus: 'saving' } });
 
     try {
-      const currentContent = (editor.getDocument('markdown') as unknown as string) || '';
-      const currentEditorData = editor.getDocument('json');
+      const shouldReadFromEditor = !!editor && activeDocumentId === id;
+      const currentContent = shouldReadFromEditor
+        ? ((editor.getDocument('markdown') as unknown as string) || '')
+        : (doc.content ?? '');
+      const currentEditorData = shouldReadFromEditor ? editor.getDocument('json') : doc.editorData;
 
       // Save document
       await documentService.updateDocument({

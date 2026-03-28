@@ -1,19 +1,19 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type DocumentItem } from '@lobechat/database/schemas';
-import { documents, files } from '@lobechat/database/schemas';
 import { loadFile } from '@lobechat/file-loaders';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
+import { serverDBEnv } from '@/config/db';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { DocumentSourceType, type LobeDocument } from '@/types/document';
 
+import { ChunkService } from '../chunk';
 import { FileService } from '../file';
-import { AuthorizedResourceResolver, TreeGuard } from '../resource';
+import { AuthorizedResourceResolver, ResourceAuthorizer, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
 
@@ -28,10 +28,12 @@ export class DocumentService {
   userId: string;
   private fileModel: FileModel;
   private documentModel: DocumentModel;
+  private chunkService: ChunkService;
   private fileService: FileService;
   private db: LobeChatDatabase;
   private resourceModel: ResourceModel;
   private resolver: AuthorizedResourceResolver;
+  private resourceAuthorizer: ResourceAuthorizer;
   private spaceModel: SpaceModel;
   private treeGuard: TreeGuard;
 
@@ -39,10 +41,12 @@ export class DocumentService {
     this.userId = userId;
     this.db = db;
     this.fileModel = new FileModel(db, userId);
+    this.chunkService = new ChunkService(db, userId);
     this.fileService = new FileService(db, userId);
     this.documentModel = new DocumentModel(db, userId);
     this.resourceModel = new ResourceModel(db, userId);
     this.resolver = new AuthorizedResourceResolver(db, userId);
+    this.resourceAuthorizer = new ResourceAuthorizer(db, userId);
     this.spaceModel = new SpaceModel(db, userId);
     this.treeGuard = new TreeGuard(db, userId);
   }
@@ -184,6 +188,12 @@ export class DocumentService {
       totalLineCount,
     });
 
+    if (fileId) {
+      await this.fileModel.updateAny(fileId, {
+        url: `internal://document/${document.id}`,
+      });
+    }
+
     const registry = await this.resourceModel.ensureResourceRegistry({
       createdBy: this.userId,
       kind: 'document',
@@ -259,21 +269,33 @@ export class DocumentService {
     return result;
   }
 
-  private async collectDocumentsForDeletion(rootIds: string[]): Promise<{
+  private async collectDocumentsForDeletion(
+    rootIds: string[],
+    options?: { includeDeleted?: boolean },
+  ): Promise<{
     documentIds: string[];
     fileIds: string[];
     folderIds: string[];
   }> {
+    interface DeletionDocumentNode {
+      fileId: string | null;
+      fileType: string | null;
+      id: string;
+    }
+
     const dedupRootIds = [...new Set(rootIds)].filter(Boolean);
     if (dedupRootIds.length === 0) return { documentIds: [], fileIds: [], folderIds: [] };
 
-    const rootDocuments = await this.db.query.documents.findMany({
+    const rootDocuments: DeletionDocumentNode[] = await this.db.query.documents.findMany({
       columns: {
         fileId: true,
         fileType: true,
         id: true,
       },
-      where: and(inArray(documents.id, dedupRootIds), isNull(documents.deletedAt)),
+      where: (fields, { and, inArray, isNull }) =>
+        options?.includeDeleted
+          ? inArray(fields.id, dedupRootIds)
+          : and(inArray(fields.id, dedupRootIds), isNull(fields.deletedAt)),
     });
 
     const rootMap = new Map(rootDocuments.map((doc) => [doc.id, doc] as const));
@@ -289,17 +311,20 @@ export class DocumentService {
       const nextFolderQueue: string[] = [];
 
       for (const folderChunk of this.chunk(folderQueue)) {
-        const children = await this.db.query.documents.findMany({
+        const children: DeletionDocumentNode[] = await this.db.query.documents.findMany({
           columns: {
             fileId: true,
             fileType: true,
             id: true,
           },
-          where: and(inArray(documents.parentId, folderChunk), isNull(documents.deletedAt)),
+          where: (fields, { and, inArray, isNull }) =>
+            options?.includeDeleted
+              ? inArray(fields.parentId, folderChunk)
+              : and(inArray(fields.parentId, folderChunk), isNull(fields.deletedAt)),
         });
 
         for (const child of children) {
-          let resolvedChild = child;
+          let resolvedChild: DeletionDocumentNode = child;
           if (!resolvedChild.fileType) {
             const fallbackChild = await this.documentModel.findByIdAny(child.id);
             if (!fallbackChild) continue;
@@ -332,7 +357,7 @@ export class DocumentService {
       for (const folderChunk of this.chunk(folderIds)) {
         const childFiles = await this.db.query.files.findMany({
           columns: { id: true },
-          where: inArray(files.parentId, folderChunk),
+          where: (fields, { inArray }) => inArray(fields.parentId, folderChunk),
         });
         for (const file of childFiles) {
           fileIds.add(file.id);
@@ -349,23 +374,39 @@ export class DocumentService {
 
   /**
    * Delete document (recursively deletes children if it's a folder)
+   * @param id Document ID
+   * @param trash If true, soft delete (move to trash). If false, hard delete. Default: true
    */
-  async deleteDocument(id: string) {
-    return this.deleteDocuments([id]);
+  async deleteDocument(id: string, trash: boolean = true) {
+    return this.deleteDocuments([id], trash);
   }
 
   /**
    * Delete multiple documents in batch
+   * @param ids Document IDs
+   * @param trash If true, soft delete (move to trash). If false, hard delete. Default: true
    */
-  async deleteDocuments(ids: string[]) {
+  async deleteDocuments(ids: string[], trash: boolean = true) {
     const dedupIds = [...new Set(ids)].filter(Boolean);
     if (dedupIds.length === 0) return;
+    const includeDeleted = !trash;
 
     for (const id of dedupIds) {
-      await this.resolver.requireDocument(id, 'delete');
+      if (includeDeleted) {
+        await this.resourceAuthorizer.assertCapability({
+          capability: 'delete',
+          documentIncludeDeleted: true,
+          id,
+          kind: 'document',
+        });
+      } else {
+        await this.resolver.requireDocument(id, 'delete');
+      }
     }
 
-    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(dedupIds);
+    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(dedupIds, {
+      includeDeleted,
+    });
     if (documentIds.length === 0) return;
 
     const bumpEntries: Array<{ resourceUid?: string | null; spaceId?: string | null }> = [];
@@ -373,7 +414,7 @@ export class DocumentService {
     if (fileIds.length > 0) {
       const fileRows = await this.db.query.files.findMany({
         columns: { resourceUid: true, spaceId: true },
-        where: inArray(files.id, fileIds),
+        where: (fields, { inArray }) => inArray(fields.id, fileIds),
       });
       bumpEntries.push(
         ...fileRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })),
@@ -382,66 +423,106 @@ export class DocumentService {
 
     const docRows = await this.db.query.documents.findMany({
       columns: { resourceUid: true, spaceId: true },
-      where: inArray(documents.id, documentIds),
+      where: (fields, { inArray }) => inArray(fields.id, documentIds),
     });
     bumpEntries.push(...docRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })));
 
-    if (fileIds.length > 0) {
-      await this.fileModel.deleteManyAny(fileIds);
-    }
-
-    if (typeof (this.db as any).delete === 'function') {
-      const now = new Date();
-      for (const idChunk of this.chunk(documentIds)) {
-        await this.db
-          .update(documents)
-          .set({ deletedAt: now, updatedAt: now })
-          .where(and(inArray(documents.id, idChunk), isNull(documents.deletedAt)));
+    // Soft delete or hard delete based on trash parameter
+    if (trash) {
+      if (fileIds.length > 0) {
+        await this.fileModel.softDeleteManyAny(fileIds);
       }
-      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
-      return;
-    }
 
-    await this.documentModel.deleteManyAny(documentIds);
-    await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+      await this.documentModel.deleteManyAny(documentIds);
+      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+    } else {
+      const removedFiles =
+        fileIds.length > 0
+          ? await this.fileModel.deleteManyAny(fileIds, serverDBEnv.REMOVE_GLOBAL_FILE)
+          : [];
+
+      // Hard delete: permanently remove from database
+      await this.documentModel.hardDeleteManyAny(documentIds);
+      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+
+      if (removedFiles.length > 0) {
+        await this.fileService.deleteFiles(removedFiles.map((item) => item.url!).filter(Boolean));
+      }
+    }
   }
 
   /**
    * Clear soft-delete (restore). Requires same capability as delete; ACL rows are unchanged.
    */
   async restoreDocument(id: string) {
-    await this.resourceAuthorizer.assertCapability({
-      capability: 'delete',
-      documentIncludeDeleted: true,
-      id,
-      kind: 'document',
-    });
-
-    const [tomb] = await this.db
-      .select({
-        id: documents.id,
-        resourceUid: documents.resourceUid,
-        spaceId: documents.spaceId,
-      })
-      .from(documents)
-      .where(and(eq(documents.id, id), isNotNull(documents.deletedAt)))
-      .limit(1);
-
-    if (!tomb) {
+    const [restored] = await this.restoreDocuments([id]);
+    if (!restored) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'DOCUMENT_NOT_FOUND' });
     }
 
-    const now = new Date();
-    await this.db
-      .update(documents)
-      .set({ deletedAt: null, updatedAt: now })
-      .where(eq(documents.id, id));
+    return restored;
+  }
+
+  async restoreDocuments(ids: string[]) {
+    const dedupIds = [...new Set(ids)].filter(Boolean);
+    if (dedupIds.length === 0) return [];
+
+    for (const id of dedupIds) {
+      await this.resourceAuthorizer.assertCapability({
+        capability: 'delete',
+        documentIncludeDeleted: true,
+        id,
+        kind: 'document',
+      });
+    }
+
+    const tombs = await this.db.query.documents.findMany({
+      columns: {
+        fileId: true,
+        id: true,
+        resourceUid: true,
+        spaceId: true,
+      },
+      where: (fields, { and, inArray, isNotNull }) =>
+        and(inArray(fields.id, dedupIds), isNotNull(fields.deletedAt)),
+    });
+
+    if (tombs.length === 0) return [];
+
+    await this.documentModel.restoreManyAny(tombs.map((item) => item.id));
+
+    const fileIds = [...new Set(tombs.map((item) => item.fileId).filter(Boolean) as string[])];
+    const restoredFileRows =
+      fileIds.length === 0
+        ? []
+        : await this.db.query.files.findMany({
+            columns: {
+              id: true,
+              resourceUid: true,
+              spaceId: true,
+            },
+            where: (fields, { and, inArray, isNotNull }) =>
+              and(inArray(fields.id, fileIds), isNotNull(fields.deletedAt)),
+          });
+
+    if (restoredFileRows.length > 0) {
+      await Promise.all(
+        restoredFileRows.map((item) =>
+          this.fileModel.updateAny(item.id, {
+            deletedAt: null,
+          }),
+        ),
+      );
+    }
 
     await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
-      { resourceUid: tomb.resourceUid, spaceId: tomb.spaceId },
+      ...tombs.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
+      ...restoredFileRows.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
     ]);
 
-    return this.documentModel.findByIdAny(id);
+    const restored = await Promise.all(tombs.map((item) => this.documentModel.findByIdAny(item.id)));
+
+    return restored.filter(Boolean);
   }
 
   /**
@@ -497,6 +578,17 @@ export class DocumentService {
     }
 
     const result = await this.documentModel.updateAny(id, updates);
+    const needsRefreshedDocument =
+      params.title !== undefined ||
+      params.parentId !== undefined ||
+      params.content !== undefined ||
+      params.editorData !== undefined;
+    const refreshedDocument = needsRefreshedDocument
+      ? await this.documentModel.findByIdAny(id)
+      : null;
+    const shouldReindexResource =
+      (params.content !== undefined || params.editorData !== undefined) &&
+      Boolean(refreshedDocument?.fileId);
 
     if (params.parentId !== undefined) {
       const row = await this.documentModel.findByIdAny(id);
@@ -506,13 +598,18 @@ export class DocumentService {
     }
 
     // If title was updated and this document has an associated file, update the file name too
-    if (params.title !== undefined || params.parentId !== undefined) {
-      const document = await this.documentModel.findByIdAny(id);
-      if (document?.fileId) {
+    if (refreshedDocument?.fileId) {
+      if (params.title !== undefined || params.parentId !== undefined || params.content !== undefined) {
         const fileUpdates: any = {};
         if (params.title !== undefined) fileUpdates.name = params.title;
         if (params.parentId !== undefined) fileUpdates.parentId = params.parentId;
-        await this.fileModel.updateAny(document.fileId, fileUpdates);
+        if (params.content !== undefined) fileUpdates.size = params.content.length;
+        await this.fileModel.updateAny(refreshedDocument.fileId, fileUpdates);
+      }
+
+      if (shouldReindexResource) {
+        await this.fileModel.clearFileChunks([refreshedDocument.fileId]);
+        await this.chunkService.asyncParseFileToChunks(refreshedDocument.fileId, false);
       }
     }
 

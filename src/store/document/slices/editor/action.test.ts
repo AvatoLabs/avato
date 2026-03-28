@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { documentService } from '@/services/document';
+
 import { useDocumentStore } from '../../store';
 
 // Mock services
@@ -360,6 +362,124 @@ describe('DocumentStore - Editor Actions', () => {
       expect(content).toEqual({
         editorData: { type: 'doc' },
         markdown: '# Test',
+      });
+    });
+
+    it('should fall back to stored document content when no editor is mounted', () => {
+      const { result } = renderHook(() => useDocumentStore());
+
+      act(() => {
+        result.current.initDocumentWithEditor({
+          content: '# Stored',
+          documentId: 'doc-1',
+          editorData: { type: 'snapshot' },
+          sourceType: 'page',
+        });
+      });
+
+      expect(result.current.getEditorContent()).toEqual({
+        editorData: { type: 'snapshot' },
+        markdown: '# Stored',
+      });
+    });
+  });
+
+  describe('syncExternalDocumentContent', () => {
+    it('should update markdown content and preserve autosave metadata', () => {
+      const { result } = renderHook(() => useDocumentStore());
+
+      act(() => {
+        result.current.initDocumentWithEditor({
+          content: '# Test',
+          documentId: 'doc-1',
+          editorData: { type: 'snapshot', version: 1 },
+          sourceType: 'page',
+        });
+      });
+
+      act(() => {
+        result.current.syncExternalDocumentContent('doc-1', {
+          content: '# Updated',
+          editorData: { type: 'snapshot', version: 2 },
+        });
+      });
+
+      expect(result.current.documents['doc-1']).toMatchObject({
+        content: '# Updated',
+        editorData: { type: 'snapshot', version: 2 },
+        isDirty: true,
+      });
+    });
+  });
+
+  describe('performSave', () => {
+    it('should save stored content when no editor instance is mounted', async () => {
+      const { result } = renderHook(() => useDocumentStore());
+
+      act(() => {
+        result.current.initDocumentWithEditor({
+          content: '# Persisted',
+          documentId: 'doc-1',
+          editorData: { type: 'snapshot', version: 1 },
+          sourceType: 'page',
+        });
+        result.current.syncExternalDocumentContent('doc-1', {
+          content: '# Persisted updated',
+          editorData: { type: 'snapshot', version: 2 },
+        });
+      });
+
+      await act(async () => {
+        await result.current.performSave('doc-1');
+      });
+
+      expect(documentService.updateDocument).toHaveBeenCalledWith({
+        content: '# Persisted updated',
+        editorData: JSON.stringify({ type: 'snapshot', version: 2 }),
+        id: 'doc-1',
+        metadata: undefined,
+        title: undefined,
+      });
+      expect(result.current.documents['doc-1']).toMatchObject({
+        content: '# Persisted updated',
+        editorData: { type: 'snapshot', version: 2 },
+        isDirty: false,
+      });
+    });
+
+    it('should save stored content when saving a non-active document', async () => {
+      const { result } = renderHook(() => useDocumentStore());
+      const mockEditor = createMockEditor() as any;
+
+      act(() => {
+        result.current.initDocumentWithEditor({
+          content: '# Original',
+          documentId: 'doc-1',
+          editorData: { type: 'snapshot', version: 1 },
+          sourceType: 'page',
+        });
+        result.current.syncExternalDocumentContent('doc-1', {
+          content: '# Stored doc-1',
+          editorData: { type: 'snapshot', version: 2 },
+        });
+        result.current.initDocumentWithEditor({
+          content: '# Active doc-2',
+          documentId: 'doc-2',
+          editor: mockEditor,
+          sourceType: 'page',
+        });
+      });
+
+      await act(async () => {
+        await result.current.performSave('doc-1');
+      });
+
+      expect(documentService.updateDocument).toHaveBeenCalledWith({
+        content: '# Stored doc-1',
+        editorData: JSON.stringify({ type: 'snapshot', version: 2 }),
+        id: 'doc-1',
+        metadata: undefined,
+        title: undefined,
       });
     });
   });

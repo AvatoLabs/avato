@@ -1,5 +1,6 @@
 import { type SWRResponse } from 'swr';
 
+import { mutate } from '@/libs/swr';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { documentService } from '@/services/document';
 import { useGlobalStore } from '@/store/global';
@@ -11,6 +12,7 @@ import { type PageQueryFilter } from '../../initialState';
 import { type PageStore } from '../../store';
 
 const n = setNamespace('page/list');
+export const PAGE_DOCUMENTS_SWR_KEY = 'pageDocuments';
 
 const ALLOWED_PAGE_SOURCE_TYPES = new Set(['editor', 'file', 'api']);
 const ALLOWED_PAGE_FILE_TYPES = new Set(['custom/document', 'application/pdf']);
@@ -22,6 +24,25 @@ const isAllowedPage = (page: { fileType: string; sourceType: string }) => {
   return (
     ALLOWED_PAGE_SOURCE_TYPES.has(page.sourceType) && ALLOWED_PAGE_FILE_TYPES.has(page.fileType)
   );
+};
+
+export const removePageDocumentsFromCache = async (ids: string[]) => {
+  if (ids.length === 0) return;
+
+  const idsSet = new Set(ids);
+
+  await mutate(
+    [PAGE_DOCUMENTS_SWR_KEY],
+    async (currentData: LobeDocument[] | undefined) =>
+      currentData?.filter((document) => !idsSet.has(document.id)),
+    {
+      revalidate: true,
+    },
+  );
+};
+
+export const revalidatePageDocuments = async () => {
+  await mutate([PAGE_DOCUMENTS_SWR_KEY]);
 };
 
 type Setter = StoreSetter<PageStore>;
@@ -136,7 +157,7 @@ export class ListActionImpl {
 
   useFetchDocuments = (): SWRResponse<LobeDocument[]> => {
     return useClientDataSWRWithSync<LobeDocument[]>(
-      ['pageDocuments'],
+      [PAGE_DOCUMENTS_SWR_KEY],
       async () => {
         const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
         const queryFilters: PageQueryFilter = {

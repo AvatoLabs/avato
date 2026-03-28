@@ -3,6 +3,7 @@ import { inferContentTypeFromImageUrl, nanoid, uuid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { sha256 } from 'js-sha256';
 
+import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
@@ -14,6 +15,8 @@ import { createFileServiceModule } from './impls';
 import { type FileServiceImpl } from './impls/type';
 import { isStorageObjectMissingError, STORAGE_OBJECT_MISSING_MESSAGE } from './storageErrors';
 
+const INTERNAL_DOCUMENT_URL_PREFIX = 'internal://document/';
+
 /**
  * File service class
  * Provides file operation services using a modular implementation approach
@@ -21,6 +24,7 @@ import { isStorageObjectMissingError, STORAGE_OBJECT_MISSING_MESSAGE } from './s
 export class FileService {
   private readonly db: LobeChatDatabase;
   private userId: string;
+  private documentModel: DocumentModel;
   private fileModel: FileModel;
   private resourceModel: ResourceModel;
   private resolver: AuthorizedResourceResolver;
@@ -30,10 +34,28 @@ export class FileService {
   constructor(db: LobeChatDatabase, userId: string) {
     this.db = db;
     this.userId = userId;
+    this.documentModel = new DocumentModel(db, userId);
     this.fileModel = new FileModel(db, userId);
     this.resourceModel = new ResourceModel(db, userId);
     this.resolver = new AuthorizedResourceResolver(db, userId);
     this.impl = createFileServiceModule(db);
+  }
+
+  private extractInternalDocumentId(key: string) {
+    if (!key.startsWith(INTERNAL_DOCUMENT_URL_PREFIX)) return;
+
+    const documentId = key.slice(INTERNAL_DOCUMENT_URL_PREFIX.length).trim();
+    return documentId || undefined;
+  }
+
+  private async getInternalDocumentContent(documentId: string) {
+    const document = await this.documentModel.findByIdAny(documentId);
+
+    if (!document) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: `Document not found: ${documentId}` });
+    }
+
+    return document.content || '';
   }
 
   /**
@@ -54,6 +76,11 @@ export class FileService {
    * Get file content
    */
   public async getFileContent(key: string): Promise<string> {
+    const internalDocumentId = this.extractInternalDocumentId(key);
+    if (internalDocumentId) {
+      return this.getInternalDocumentContent(internalDocumentId);
+    }
+
     return this.impl.getFileContent(key);
   }
 
@@ -61,6 +88,12 @@ export class FileService {
    * Get file byte array
    */
   public async getFileByteArray(key: string): Promise<Uint8Array> {
+    const internalDocumentId = this.extractInternalDocumentId(key);
+    if (internalDocumentId) {
+      const content = await this.getInternalDocumentContent(internalDocumentId);
+      return new TextEncoder().encode(content);
+    }
+
     return this.impl.getFileByteArray(key);
   }
 

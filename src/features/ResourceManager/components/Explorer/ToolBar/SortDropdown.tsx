@@ -41,7 +41,7 @@ const SortDropdown = memo(() => {
     sortOptions.find((option) => option.key === sorter)?.label || t('FileManager.sort.dateAdded');
 
   return (
-    <DropdownMenu items={menuItems}>
+    <DropdownMenu nativeButton items={menuItems}>
       <ActionIconWithChevron icon={RESOURCE_ENTRY_ICONS.sort} title={currentSortLabel} />
     </DropdownMenu>
   );

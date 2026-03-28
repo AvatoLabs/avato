@@ -1,126 +1,48 @@
 'use client';
 
-import { Button, Flexbox } from '@lobehub/ui';
-import { Divider } from 'antd';
-import { useTheme } from 'antd-style';
-import isEqual from 'fast-deep-equal';
-import { Clock, PlayIcon, Settings2Icon } from 'lucide-react';
-import React, { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import urlJoin from 'url-join';
+import { Flexbox } from '@lobehub/ui';
+import { memo } from 'react';
 
-import ModelSelect from '@/features/ModelSelect';
-import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
-import { useQueryRoute } from '@/hooks/useQueryRoute';
-import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
-import { useAgentStore } from '@/store/agent/store';
-import { useChatStore } from '@/store/chat';
-import { ChatSettingsTabs } from '@/store/global/initialState';
-import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
-
+import ActionBar from '../ActionBar';
 import AgentCronJobs from '../AgentCronJobs';
 import AgentSettings from '../AgentSettings';
-import EditorCanvas from '../EditorCanvas';
-import AgentPublishButton from '../Header/AgentPublishButton';
-import AgentHeader from './AgentHeader';
-import AgentKnowledgeInline from './AgentKnowledgeInline';
-import AgentTool from './AgentTool';
+import CapabilityCard from '../CapabilityCard';
+import IdentityCard from '../IdentityCard';
+import PromptSection from '../PromptSection';
 
 const ProfileEditor = memo(() => {
-  const { t } = useTranslation('setting');
-  const theme = useTheme();
-  const [config, isInbox] = useAgentStore(
-    (s) => [agentSelectors.currentAgentConfig(s), builtinAgentSelectors.isInboxAgent(s)],
-    isEqual,
-  );
-  const updateConfig = useAgentStore((s) => s.updateAgentConfig);
-  const agentId = useAgentStore((s) => s.activeAgentId);
-  const switchTopic = useChatStore((s) => s.switchTopic);
-  const router = useQueryRoute();
-  const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
-  const openAdvancedSettings = useOpenChatSettings(
-    isInbox ? ChatSettingsTabs.Modal : ChatSettingsTabs.Meta,
-  );
-
-  const handleCreateCronJob = useCallback(() => {
-    if (!agentId) return;
-    router.push(urlJoin('/agent', agentId, 'cron', 'new'));
-  }, [agentId, router]);
-
   return (
-    <>
-      <Flexbox
-        style={{ cursor: 'default', marginBottom: 12 }}
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        {/* Header: Avatar + Name + Description */}
-        <AgentHeader />
-        {/* Config Bar: Model Selector + Settings Button */}
-        <Flexbox
-          horizontal
-          align={'center'}
-          gap={8}
-          justify={'flex-start'}
-          style={{ marginBottom: 12 }}
-        >
-          <ModelSelect
-            initialWidth
-            popupWidth={400}
-            value={{
-              model: config.model,
-              provider: config.provider,
-            }}
-            onChange={updateConfig}
-          />
-          <Button
-            icon={Settings2Icon}
-            size={'small'}
-            style={{ color: theme.colorTextSecondary }}
-            type={'text'}
-            onClick={openAdvancedSettings}
-          >
-            {t('advancedSettings')}
-          </Button>
-        </Flexbox>
-        <AgentTool />
-        <AgentKnowledgeInline />
-        <Flexbox
-          horizontal
-          align={'center'}
-          gap={8}
-          justify={'flex-start'}
-          style={{ marginTop: 16 }}
-        >
-          <Button
-            icon={PlayIcon}
-            type={'primary'}
-            onClick={() => {
-              if (!agentId) return;
-              // Clear topicId before navigating to prevent stale state
-              switchTopic(null, { skipRefreshMessage: true });
-              router.push(urlJoin('/agent', agentId));
-            }}
-          >
-            {t('startConversation')}
-          </Button>
-          <AgentPublishButton />
-          {enableBusinessFeatures && (
-            <Button icon={Clock} onClick={handleCreateCronJob}>
-              {t('agentCronJobs.addJob')}
-            </Button>
-          )}
-        </Flexbox>
-      </Flexbox>
-      <Divider />
-      {/* Main Content: Prompt Editor */}
-      <EditorCanvas />
+    <Flexbox
+      flex={1}
+      gap={0}
+      style={{
+        cursor: 'default',
+        height: '100%',
+        overflow: 'auto',
+        padding: '0 0 24px',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+    >
+      {/* Identity Section: Avatar + Name + Description */}
+      <IdentityCard />
+
+      {/* Capability Section: Model + Tools + Knowledge */}
+      <CapabilityCard />
+
+      {/* Prompt Editor Section */}
+      <PromptSection />
+
+      {/* Action Bar: Start Chat + Publish + Cron Jobs */}
+      <ActionBar />
+
       {/* Agent Cron Jobs Display (only show if jobs exist) */}
-      {enableBusinessFeatures && <AgentCronJobs />}
+      <AgentCronJobs />
+
       {/* Advanced Settings Modal */}
       <AgentSettings />
-    </>
+    </Flexbox>
   );
 });
 

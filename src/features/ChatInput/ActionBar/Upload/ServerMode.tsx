@@ -1,9 +1,17 @@
 import { validateVideoFileSize } from '@lobechat/utils/client';
 import { type ItemType } from '@lobehub/ui';
 import { Icon, Tooltip } from '@lobehub/ui';
-import { Upload } from 'antd';
 import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig } from 'lucide-react';
-import { memo, Suspense, useState } from 'react';
+import {
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { message } from '@/components/AntdStaticMethods';
@@ -46,10 +54,72 @@ const FileUpload = memo(() => {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const useFetchConversationFiles = useSessionStore((s) => s.useFetchConversationFiles);
   const toggleConversationFile = useSessionStore((s) => s.toggleConversationFile);
   const { data: conversationFiles = [] } = useFetchConversationFiles(conversationFileContext);
+
+  useEffect(() => {
+    const folderInput = folderInputRef.current;
+
+    if (!folderInput) return;
+
+    folderInput.setAttribute('directory', '');
+    folderInput.setAttribute('webkitdirectory', '');
+  }, []);
+
+  const uploadSelectedFiles = useCallback(
+    async (selectedFiles: FileList | null, options?: { imagesOnly?: boolean }) => {
+      if (!selectedFiles?.length) return;
+
+      const files = Array.from(selectedFiles);
+      const acceptedFiles: File[] = [];
+
+      for (const file of files) {
+        if (options?.imagesOnly) {
+          acceptedFiles.push(file);
+          continue;
+        }
+
+        if (!canUploadImage && (file.type.startsWith('image') || file.type.startsWith('video')))
+          continue;
+
+        const validation = validateVideoFileSize(file);
+        if (!validation.isValid) {
+          message.error(
+            t('upload.validation.videoSizeExceeded', {
+              actualSize: validation.actualSize,
+            }),
+          );
+          continue;
+        }
+
+        acceptedFiles.push(file);
+      }
+
+      if (acceptedFiles.length === 0) return;
+
+      setDropdownOpen(false);
+      await upload(acceptedFiles);
+    },
+    [canUploadImage, t, upload],
+  );
+
+  const createInputChangeHandler = useCallback(
+    (options?: { imagesOnly?: boolean }) =>
+      async (event: ChangeEvent<HTMLInputElement>) => {
+        await uploadSelectedFiles(event.target.files, options);
+        event.target.value = '';
+      },
+    [uploadSelectedFiles],
+  );
+
+  const openFileDialog = useCallback((ref: RefObject<HTMLInputElement>) => {
+    ref.current?.click();
+  }, []);
 
   const uploadItems: ActionDropdownMenuItems = [
     {
@@ -58,91 +128,47 @@ const FileUpload = memo(() => {
       icon: ImageUp,
       key: 'upload-image',
       label: canUploadImage ? (
-        <Upload
-          multiple
-          accept={'image/*'}
-          showUploadList={false}
-          beforeUpload={async (file) => {
-            setDropdownOpen(false);
-            await upload([file]);
-
-            return false;
-          }}
-        >
+        <div>
+          <input
+            hidden
+            multiple
+            accept={'image/*'}
+            ref={imageInputRef}
+            type={'file'}
+            onChange={createInputChangeHandler({ imagesOnly: true })}
+          />
           <div>{t('upload.action.imageUpload')}</div>
-        </Upload>
+        </div>
       ) : (
         <Tooltip placement={'right'} title={t('upload.action.imageDisabled')}>
           <div>{t('upload.action.imageUpload')}</div>
         </Tooltip>
       ),
+      onClick: canUploadImage ? () => openFileDialog(imageInputRef) : undefined,
     },
     {
       closeOnClick: false,
       icon: FileUp,
       key: 'upload-file',
       label: (
-        <Upload
-          multiple
-          showUploadList={false}
-          beforeUpload={async (file) => {
-            if (!canUploadImage && (file.type.startsWith('image') || file.type.startsWith('video')))
-              return false;
-
-            // Validate video file size
-            const validation = validateVideoFileSize(file);
-            if (!validation.isValid) {
-              message.error(
-                t('upload.validation.videoSizeExceeded', {
-                  actualSize: validation.actualSize,
-                }),
-              );
-              return false;
-            }
-
-            setDropdownOpen(false);
-            await upload([file]);
-
-            return false;
-          }}
-        >
+        <div>
+          <input hidden multiple ref={fileInputRef} type={'file'} onChange={createInputChangeHandler()} />
           <div>{t('upload.action.fileUpload')}</div>
-        </Upload>
+        </div>
       ),
+      onClick: () => openFileDialog(fileInputRef),
     },
     {
       closeOnClick: false,
       icon: FolderUp,
       key: 'upload-folder',
       label: (
-        <Upload
-          directory
-          multiple={true}
-          showUploadList={false}
-          beforeUpload={async (file) => {
-            if (!canUploadImage && (file.type.startsWith('image') || file.type.startsWith('video')))
-              return false;
-
-            // Validate video file size
-            const validation = validateVideoFileSize(file);
-            if (!validation.isValid) {
-              message.error(
-                t('upload.validation.videoSizeExceeded', {
-                  actualSize: validation.actualSize,
-                }),
-              );
-              return false;
-            }
-
-            setDropdownOpen(false);
-            await upload([file]);
-
-            return false;
-          }}
-        >
+        <div>
+          <input hidden multiple ref={folderInputRef} type={'file'} onChange={createInputChangeHandler()} />
           <div>{t('upload.action.folderUpload')}</div>
-        </Upload>
+        </div>
       ),
+      onClick: () => openFileDialog(folderInputRef),
     },
   ];
 

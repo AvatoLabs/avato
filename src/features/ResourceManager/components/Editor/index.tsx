@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavHeader from '@/features/NavHeader';
 import { PageAgentProvider } from '@/features/PageEditor/PageAgentProvider';
+import { Provider as PageEditorStoreProvider } from '@/features/PageEditor/store';
 import FileDetailComponent from '@/routes/(main)/resource/features/FileDetail';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
@@ -116,9 +117,11 @@ FileEditorCanvas.displayName = 'FileEditorCanvas';
  */
 const FileEditor = memo<FileEditorProps>(({ onBack }) => {
   return (
-    <PageAgentProvider>
-      <FileEditorCanvas onBack={onBack} />
-    </PageAgentProvider>
+    <PageEditorStoreProvider>
+      <PageAgentProvider>
+        <FileEditorCanvas onBack={onBack} />
+      </PageAgentProvider>
+    </PageEditorStoreProvider>
   );
 });
 

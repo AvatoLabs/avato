@@ -260,6 +260,7 @@ const AddButton = ({ compact }: AddButtonProps) => {
     <>
       <DropdownMenu
         items={items}
+        nativeButton={!useCompact}
         open={menuOpen}
         placement="bottomRight"
         trigger="both"

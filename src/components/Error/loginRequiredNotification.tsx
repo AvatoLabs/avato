@@ -11,7 +11,7 @@ export const loginRequired = {
       description: <RedirectLogin timeout={timeout} />,
       duration: timeout / 1000,
       icon: <FluentEmoji emoji={'🫡'} size={24} />,
-      message: t('loginRequired.title', { ns: 'error' }),
+      title: t('loginRequired.title', { ns: 'error' }),
       showProgress: true,
       type: 'warning',
     });

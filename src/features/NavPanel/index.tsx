@@ -9,10 +9,12 @@ import { NavPanelDraggable } from './components/NavPanelDraggable';
 
 export const NAV_PANEL_RIGHT_DRAWER_ID = 'nav-panel-drawer';
 
-type NavPanelSnapshot = {
+type NavPanelContent = {
   key: string;
   node: ReactNode;
-} | null;
+};
+
+type NavPanelSnapshot = (NavPanelContent & { owner: symbol }) | null;
 
 let currentSnapshot: NavPanelSnapshot = null;
 const listeners = new Set<() => void>();
@@ -40,20 +42,25 @@ export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'd
   useLayoutEffect(() => {
     if (!children) return;
 
+    const owner = Symbol(navKey);
+
     setNavPanelSnapshot({
       key: navKey,
       node: children,
+      owner,
     });
 
     return () => {
-      // Only clear the snapshot if it still belongs to this portal instance.
-      // This prevents a race condition where the old portal's cleanup runs *after*
-      // the new portal has already written its snapshot (e.g. during Suspense delay
-      // or React concurrent-mode batching), which would wipe the new snapshot and
-      // leave the sidebar stuck showing stale content.
-      if (currentSnapshot?.key === navKey) {
-        setNavPanelSnapshot(null);
-      }
+      // Let the next portal commit within the same render pass before deciding
+      // whether this snapshot should be cleared.
+      queueMicrotask(() => {
+        // Only clear the snapshot if it still belongs to this exact write.
+        // Comparing by navKey is insufficient because multiple portal instances
+        // can legitimately reuse the same key across route transitions.
+        if (currentSnapshot?.owner === owner) {
+          setNavPanelSnapshot(null);
+        }
+      });
     };
   }, [children, navKey]);
 
@@ -65,9 +72,9 @@ export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'd
  * Renders the Home sidebar content directly – intentionally does NOT wrap in another
  * NavPanelPortal to avoid an infinite loop:
  *   snapshot=null → FALLBACK renders Portal → Portal writes snapshot → snapshot≠null
- *   → FALLBACK unmounts Portal → cleanup: snapshot.key==='home' → clears snapshot → loop.
+ *   → FALLBACK unmounts Portal → cleanup sees the same snapshot owner → clears snapshot → loop.
  */
-const FALLBACK_HOME_SIDEBAR: NavPanelSnapshot = {
+const FALLBACK_HOME_SIDEBAR: NavPanelContent = {
   key: 'home',
   node: <SidebarContent />,
 };

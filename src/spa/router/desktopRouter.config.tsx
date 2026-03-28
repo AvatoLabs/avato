@@ -292,10 +292,24 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/trash'),
+                  'Desktop > Resource > Trash',
+                ),
+                path: 'trash',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/(home)'),
                   'Desktop > Resource > Space Home',
                 ),
                 path: 'space/:spaceId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/space/[spaceId]/trash'),
+                  'Desktop > Resource > Space Trash',
+                ),
+                path: 'space/:spaceId/trash',
               },
               {
                 element: dynamicElement(
@@ -321,6 +335,13 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/trash'),
+                  'Desktop > Resource > Library > Trash',
+                ),
+                path: 'trash',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/library/[slug]'),
                   'Desktop > Resource > Library > Slug',
                 ),
@@ -341,6 +362,13 @@ export const desktopRoutes: RouteObject[] = [
                   'Desktop > Resource > Space Library',
                 ),
                 index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/trash'),
+                  'Desktop > Resource > Space Library > Trash',
+                ),
+                path: 'trash',
               },
               {
                 element: dynamicElement(

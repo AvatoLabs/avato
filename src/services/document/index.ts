@@ -59,12 +59,12 @@ export class DocumentService {
     return lambdaClient.document.getDocumentById.query({ id });
   }
 
-  async deleteDocument(id: string): Promise<void> {
-    await lambdaClient.document.deleteDocument.mutate({ id });
+  async deleteDocument(id: string, trash?: boolean): Promise<void> {
+    await lambdaClient.document.deleteDocument.mutate({ id, trash });
   }
 
-  async deleteDocuments(ids: string[]): Promise<void> {
-    await lambdaClient.document.deleteDocuments.mutate({ ids });
+  async deleteDocuments(ids: string[], trash?: boolean): Promise<void> {
+    await lambdaClient.document.deleteDocuments.mutate({ ids, trash });
   }
 
   async ensureFileDocument(id: string): Promise<DocumentItem> {
@@ -73,6 +73,11 @@ export class DocumentService {
 
   async restoreDocument(id: string): Promise<DocumentItem | undefined> {
     return lambdaClient.document.restoreDocument.mutate({ id });
+  }
+
+  async restoreDocuments(ids: string[]): Promise<DocumentItem[]> {
+    const restored = await lambdaClient.document.restoreDocuments.mutate({ ids });
+    return restored.filter(Boolean) as DocumentItem[];
   }
 
   async updateDocument(params: UpdateDocumentParams): Promise<void> {

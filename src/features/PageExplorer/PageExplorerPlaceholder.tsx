@@ -1,19 +1,14 @@
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
-import { Upload } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { ArrowUpIcon, PlusIcon } from 'lucide-react';
-import { memo, useState } from 'react';
+import { type ChangeEvent, type KeyboardEvent, memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useFileStore } from '@/store/file';
 import { usePageStore } from '@/store/page';
 import { DocumentSourceType } from '@/types/document';
-import { standardizeIdentifier } from '@/utils/identifier';
 import {
   DEFAULT_PAGE_KIND,
-  getPageDetailPath,
-  getPageKindFromDocument,
-  getPageRootPath,
   type PageKind,
   TABLE_PAGE_KIND,
 } from '@/utils/page';
@@ -123,6 +118,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
   ({ hasPages = false, knowledgeBaseId, pageKind = DEFAULT_PAGE_KIND }) => {
     const { t } = useTranslation(['file', 'common']);
     const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const isTablePage = pageKind === TABLE_PAGE_KIND;
 
     // Page-specific operations from pageStore
@@ -258,14 +254,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
             // Replace optimistic with real document in the store
             replaceTempPageWithReal(tempPageId, realPage);
 
-            // Update selected page ID in store (with full ID including prefix)
-            setSelectedPageId(parsedDocument.id, false);
-
-            // Update URL with stripped ID (without prefix)
-            const cleanId = standardizeIdentifier(parsedDocument.id);
-            const nextPageKind = getPageKindFromDocument(realPage);
-            const newPath = cleanId ? getPageDetailPath(cleanId, nextPageKind) : getPageRootPath();
-            window.history.replaceState({}, '', newPath);
+            setSelectedPageId(parsedDocument.id);
           } catch (error) {
             console.error('Failed to upload and parse file:', error);
             // Remove temp document on error
@@ -280,6 +269,29 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
       }
 
       return false; // Prevent default upload behavior
+    };
+
+    const openUploadFileDialog = () => {
+      if (isUploading) return;
+
+      fileInputRef.current?.click();
+    };
+
+    const handleUploadFileInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+
+      if (file) {
+        await handleUploadFile(file);
+      }
+
+      event.target.value = '';
+    };
+
+    const handleUploadCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+
+      event.preventDefault();
+      openUploadFileDialog();
     };
 
     return (
@@ -345,18 +357,17 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
               </Flexbox>
 
               {!isTablePage && (
-                <Upload
-                  accept=".md,.markdown,.pdf,.docx"
-                  beforeUpload={handleUploadFile}
-                  disabled={isUploading}
-                  multiple={false}
-                  showUploadList={false}
-                >
+                <>
                   <Flexbox
+                    aria-disabled={isUploading}
                     className={styles.card}
                     gap={4}
                     padding={20}
+                    role={'button'}
                     style={{ opacity: isUploading ? 0.65 : 1 }}
+                    tabIndex={isUploading ? -1 : 0}
+                    onClick={openUploadFileDialog}
+                    onKeyDown={handleUploadCardKeyDown}
                   >
                     <span className={styles.actionTitle}>
                       {isUploading
@@ -373,7 +384,14 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                       type={'file'}
                     />
                   </Flexbox>
-                </Upload>
+                  <input
+                    accept=".md,.markdown,.pdf,.docx"
+                    hidden
+                    ref={fileInputRef}
+                    type={'file'}
+                    onChange={handleUploadFileInputChange}
+                  />
+                </>
               )}
             </Flexbox>
           </div>

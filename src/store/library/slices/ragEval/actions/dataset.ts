@@ -58,7 +58,7 @@ export class RAGEvalDatasetActionImpl {
       } catch (e) {
         notification.error({
           description: (e as Error).message,
-          message: i18n.t('errors.invalidFileFormat', { ns: 'common' }),
+          title: i18n.t('errors.invalidFileFormat', { ns: 'common' }),
         });
       }
     }

@@ -1,0 +1,24 @@
+diff --git a/dist/cjs/index.js b/dist/cjs/index.js
+index 660b9cdc..17b13aa1 100644
+--- a/dist/cjs/index.js
++++ b/dist/cjs/index.js
+@@ -134,8 +134,7 @@ function PopChild({ children, isPresent, anchorX, anchorY, root, pop }) {
+-    const childRef = children.props?.ref ??
+-        children?.ref;
++    const childRef = children.props?.ref;
+     const ref = React.useMemo(() => motion.utils.combineRefs(pop.setChild, childRef), [childRef]);
+     const props = {
+         ref,
+diff --git a/dist/framer-motion.dev.js b/dist/framer-motion.dev.js
+index 3c30ec50..a9c8cd12 100644
+--- a/dist/framer-motion.dev.js
++++ b/dist/framer-motion.dev.js
+@@ -10248,8 +10248,7 @@
+         function PopChild({ children, isPresent, anchorX, anchorY, root, pop }) {
+             const id = react.useId();
+-            const childRef = children.props?.ref ??
+-                children?.ref;
++            const childRef = children.props?.ref;
+             const ref = react.useMemo(() => utils.combineRefs(pop.setChild, childRef), [childRef]);
+             const props = {
+                 ref,

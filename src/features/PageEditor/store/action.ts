@@ -13,6 +13,14 @@ import { initialState } from './initialState';
 
 const log = debug('page:editor');
 
+interface MetaSaveSnapshot {
+  documentId?: string;
+  emoji?: string;
+  lastSavedEmoji?: string;
+  lastSavedTitle?: string;
+  title?: string;
+}
+
 export interface Action {
   flushMetaSave: () => void;
   handleCopyLink: (t: (key: string) => string, message: any) => void;
@@ -24,7 +32,7 @@ export interface Action {
   ) => Promise<void>;
   handleTitleSubmit: () => Promise<void>;
   initMeta: (title?: string, emoji?: string) => void;
-  performMetaSave: () => Promise<void>;
+  performMetaSave: (snapshot?: MetaSaveSnapshot) => Promise<void>;
   setEmoji: (emoji: string | undefined) => void;
   setTitle: (title: string) => void;
   setViewMode: (viewMode: State['viewMode']) => void;
@@ -41,9 +49,9 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
     const getOrCreateDebouncedMetaSave = () => {
       if (!debouncedMetaSave) {
         debouncedMetaSave = debounce(
-          async () => {
+          async (snapshot: MetaSaveSnapshot) => {
             try {
-              await get().performMetaSave();
+              await get().performMetaSave(snapshot);
             } catch (error) {
               console.error('[PageEditor] Failed to auto-save meta:', error);
             }
@@ -128,21 +136,21 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         });
       },
 
-      performMetaSave: async () => {
-        const {
-          documentId,
-          title,
-          emoji,
-          lastSavedTitle,
-          lastSavedEmoji,
-          isMetaDirty,
-          onTitleChange,
-          onEmojiChange,
-        } = get();
+      performMetaSave: async (snapshot?: MetaSaveSnapshot) => {
+        const state = get();
+        const documentId = snapshot?.documentId ?? state.documentId;
+        const title = snapshot?.title ?? state.title;
+        const emoji = snapshot ? snapshot.emoji : state.emoji;
+        const lastSavedTitle = snapshot?.lastSavedTitle ?? state.lastSavedTitle;
+        const lastSavedEmoji = snapshot?.lastSavedEmoji ?? state.lastSavedEmoji;
+        const { isMetaDirty, onTitleChange, onEmojiChange } = state;
+        const isCurrentDocument = state.documentId === documentId;
 
-        if (!documentId || !isMetaDirty) return;
+        if (!documentId || (!snapshot && !isMetaDirty)) return;
 
-        set({ metaSaveStatus: 'saving' });
+        if (isCurrentDocument) {
+          set({ metaSaveStatus: 'saving' });
+        }
 
         try {
           const currentDocument = usePageStore
@@ -168,15 +176,19 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
             onEmojiChange?.(emoji);
           }
 
-          set({
-            isMetaDirty: false,
-            lastSavedEmoji: emoji,
-            lastSavedTitle: title,
-            metaSaveStatus: 'saved',
-          });
+          if (get().documentId === documentId) {
+            set({
+              isMetaDirty: false,
+              lastSavedEmoji: emoji,
+              lastSavedTitle: title,
+              metaSaveStatus: 'saved',
+            });
+          }
         } catch (error) {
           console.error('[PageEditor] Failed to save meta:', error);
-          set({ metaSaveStatus: 'idle' });
+          if (get().documentId === documentId) {
+            set({ metaSaveStatus: 'idle' });
+          }
         }
       },
 
@@ -208,7 +220,15 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
 
       triggerDebouncedMetaSave: () => {
         const save = getOrCreateDebouncedMetaSave();
-        save();
+        const { documentId, emoji, lastSavedEmoji, lastSavedTitle, title } = get();
+
+        save({
+          documentId,
+          emoji,
+          lastSavedEmoji,
+          lastSavedTitle,
+          title,
+        });
       },
     };
   };

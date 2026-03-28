@@ -109,10 +109,10 @@ const ResourceExplorer = memo(() => {
   const showLibraryListSection = isMobile && !libraryId;
 
   return (
-    <Flexbox height={'100%'}>
+    <Flexbox height={'100%'} style={{ minHeight: 0 }}>
       <Header />
       {showLibraryListSection && <LibraryListSection />}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
         {showEmptyStatus ? (
           <EmptyPlaceholder />
         ) : viewMode === 'list' ? (

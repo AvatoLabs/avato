@@ -779,8 +779,6 @@ export default {
   'settingAppearance.primaryColor.title': 'Accent Color',
   'settingAppearance.themePreset.desc':
     'Choose a saturated accent palette on neutral slate. Works in light and dark mode.',
-  'settingAppearance.themePreset.options.canopy.desc': 'Bright lime accent',
-  'settingAppearance.themePreset.options.canopy.title': 'Canopy',
   'settingAppearance.themePreset.options.classic.desc': 'Balanced default',
   'settingAppearance.themePreset.options.classic.title': 'Classic',
   'settingAppearance.themePreset.options.custom.desc': 'Edit theme and neutral colors manually',

@@ -30,9 +30,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 interface AvailableAgentListProps {
   agents: AgentItemData[];
   isLoading: boolean;
+  open: boolean;
 }
 
-const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading }) => {
+const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading, open }) => {
   const { t } = useTranslation(['chat', 'common']);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -78,9 +79,12 @@ const AvailableAgentList = memo<AvailableAgentListProps>(({ agents, isLoading })
             search={Boolean(searchTerm)}
             variant={searchTerm ? 'empty' : 'noAvailable'}
           />
+        ) : !open ? (
+          <div style={{ flex: 1 }} />
         ) : (
           <Virtuoso
-            style={{ flex: 1 }}
+            defaultItemHeight={44}
+            style={{ flex: 1, height: '100%' }}
             totalCount={filteredAgents.length}
             itemContent={(index) => {
               const agent = filteredAgents[index];

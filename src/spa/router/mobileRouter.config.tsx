@@ -253,10 +253,24 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/trash'),
+                  'Mobile > Resource > Trash',
+                ),
+                path: 'trash',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/(home)'),
                   'Mobile > Resource > Space Home',
                 ),
                 path: 'space/:spaceId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/space/[spaceId]/trash'),
+                  'Mobile > Resource > Space Trash',
+                ),
+                path: 'space/:spaceId/trash',
               },
               {
                 element: dynamicElement(
@@ -282,6 +296,13 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/trash'),
+                  'Mobile > Resource > Library > Trash',
+                ),
+                path: 'trash',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/resource/library/[slug]'),
                   'Mobile > Resource > Library > Slug',
                 ),
@@ -302,6 +323,13 @@ export const mobileRoutes: RouteObject[] = [
                   'Mobile > Resource > Space Library',
                 ),
                 index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/resource/library/trash'),
+                  'Mobile > Resource > Space Library > Trash',
+                ),
+                path: 'trash',
               },
               {
                 element: dynamicElement(

@@ -109,6 +109,7 @@ export interface ResourceItem {
   size: number;
   slug?: string | null;
   sourceType: 'document' | 'file';
+  spaceId?: string;
   title?: string;
   updatedAt: Date;
   url?: string;
@@ -136,6 +137,7 @@ export interface ResourceQueryParams {
   sorter?: 'createdAt' | 'name' | 'size';
   sortType?: SortType;
   spaceId?: string;
+  trash?: boolean;
 }
 
 export interface CreateFileResourceParams {
@@ -164,6 +166,10 @@ export interface CreateDocumentResourceParams {
 }
 
 export type CreateResourceParams = CreateDocumentResourceParams | CreateFileResourceParams;
+
+export interface DeleteResourceOptions {
+  trash?: boolean;
+}
 
 export interface UpdateResourceParams {
   content?: string;

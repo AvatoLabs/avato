@@ -31,6 +31,7 @@ const SubSidebarTitleBar = memo<SubSidebarTitleBarProps>(({ title, titleTo, righ
   const { t } = useTranslation('common');
   const glass = useGlassNavVisual();
   const titleMarginStart = getWorkspaceSubSidebarTitleMarginInlineStartPx(glass);
+  const titleText = typeof title === 'number' || typeof title === 'string' ? String(title) : undefined;
 
   const titleStyles = {
     color: 'inherit' as const,
@@ -44,8 +45,9 @@ const SubSidebarTitleBar = memo<SubSidebarTitleBarProps>(({ title, titleTo, righ
 
   const titleNode = (
     <Text
-      ellipsis={{ tooltipWhenOverflow: true }}
+      ellipsis
       fontSize={cssVar.fontSizeLG}
+      title={titleText}
       weight={500}
       style={{
         color: cssVar.colorTextHeading,

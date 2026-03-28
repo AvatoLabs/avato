@@ -341,8 +341,46 @@ export class FileModel {
     });
   };
 
+  /**
+   * Soft delete by id only. Caller must enforce authorization first.
+   */
+  softDeleteAny = async (id: string) => {
+    const file = await this.findByIdAny(id);
+    if (!file) return;
+
+    const now = new Date();
+    await this.db.update(files).set({ deletedAt: now, updatedAt: now }).where(eq(files.id, id));
+
+    return file;
+  };
+
+  /**
+   * Batch soft delete by ids only. Caller must enforce authorization first.
+   */
+  softDeleteManyAny = async (ids: string[]) => {
+    if (ids.length === 0) return [];
+
+    const now = new Date();
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      await this.db
+        .update(files)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(inArray(files.id, chunk));
+    }
+
+    return ids;
+  };
+
   clear = async () => {
     return this.db.delete(files).where(eq(files.userId, this.userId));
+  };
+
+  clearFileChunks = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return [];
+
+    return this.db.transaction(async (trx) => this.deleteFileChunks(trx as any, fileIds));
   };
 
   findExistingByBlobAndContext = async ({

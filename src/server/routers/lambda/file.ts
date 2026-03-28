@@ -100,6 +100,42 @@ const resolveWriteSpaceId = async (
   return personalSpace.id;
 };
 
+const restoreDeletedFiles = async (
+  ctx: {
+    fileModel: FileModel;
+    resourceAuthorizer: ResourceAuthorizer;
+    resourceModel: ResourceModel;
+  },
+  ids: string[],
+) => {
+  const dedupIds = [...new Set(ids)].filter(Boolean);
+  if (dedupIds.length === 0) return [];
+
+  for (const id of dedupIds) {
+    await ctx.resourceAuthorizer.assertCapability({
+      capability: 'delete',
+      id,
+      kind: 'file',
+    });
+  }
+
+  const fileRows = (
+    await Promise.all(dedupIds.map((id) => ctx.fileModel.findByIdAny(id)))
+  ).filter((item): item is NonNullable<typeof item> => Boolean(item?.deletedAt));
+
+  if (fileRows.length === 0) return [];
+
+  await Promise.all(fileRows.map((item) => ctx.fileModel.updateAny(item.id, { deletedAt: null })));
+
+  await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval(
+    fileRows.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
+  );
+
+  const restored = await Promise.all(fileRows.map((item) => ctx.fileModel.findByIdAny(item.id)));
+
+  return restored.filter(Boolean);
+};
+
 export const fileRouter = router({
   checkFileHash: fileProcedure
     .use(checkFileStorageUsage)
@@ -214,14 +250,14 @@ export const fileRouter = router({
       const existingFile =
         input.knowledgeBaseId || input.spaceId || resolvedParentId
           ? await ctx.fileModel.findExistingByBlobAndContext({
-              blobId: blob.id,
-              fileType: actualFileType,
-              knowledgeBaseId: input.knowledgeBaseId,
-              name: input.name,
-              parentId: resolvedParentId,
-              source: input.source,
-              spaceId,
-            })
+            blobId: blob.id,
+            fileType: actualFileType,
+            knowledgeBaseId: input.knowledgeBaseId,
+            name: input.name,
+            parentId: resolvedParentId,
+            source: input.source,
+            spaceId,
+          })
           : undefined;
 
       if (existingFile) {
@@ -433,10 +469,10 @@ export const fileRouter = router({
     const itemsToProcess = hasMore ? knowledgeItems.slice(0, limit) : knowledgeItems;
 
     // Filter out folders from Documents category when in Inbox (no knowledgeBaseId)
-    const filteredItems = !input.knowledgeBaseId
+    const filteredItems = !input.knowledgeBaseId && !input.trash
       ? itemsToProcess.filter(
-          (item) => !(item.sourceType === 'document' && item.fileType === 'custom/folder'),
-        )
+        (item) => !(item.sourceType === 'document' && item.fileType === 'custom/folder'),
+      )
       : itemsToProcess;
 
     const fileIdsInList = filteredItems
@@ -447,7 +483,9 @@ export const fileRouter = router({
       .map((item) => item.id);
     const [visibleFileIdList, visibleDocIdList] = await Promise.all([
       ctx.resourceAuthorizer.filterVisibleFileIdsForList(fileIdsInList),
-      ctx.resourceAuthorizer.filterVisibleDocumentIdsForList(docIdsInList),
+      ctx.resourceAuthorizer.filterVisibleDocumentIdsForList(docIdsInList, {
+        documentIncludeDeleted: input.trash,
+      }),
     ]);
     const visibleFiles = new Set(visibleFileIdList);
     const visibleDocs = new Set(visibleDocIdList);
@@ -460,12 +498,12 @@ export const fileRouter = router({
 
     const attachableFileIds = input.attachableOnly
       ? new Set(
-          await ctx.fileModel.getConversationAttachableFileIds(
-            aclFiltered
-              .filter((item) => item.sourceType === 'file')
-              .map((item: any) => item.fileId || item.id),
-          ),
-        )
+        await ctx.fileModel.getConversationAttachableFileIds(
+          aclFiltered
+            .filter((item) => item.sourceType === 'file')
+            .map((item: any) => item.fileId || item.id),
+        ),
+      )
       : null;
 
     const scopedItems = aclFiltered.filter((item) => {
@@ -642,24 +680,39 @@ export const fileRouter = router({
     return cleared;
   }),
 
-  removeFile: fileProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
-    await ctx.resourceAuthorizer.assertCapability({
-      capability: 'delete',
-      id: input.id,
-      kind: 'file',
-    });
+  removeFile: fileProcedure
+    .input(z.object({ id: z.string(), trash: z.boolean().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      await ctx.resourceAuthorizer.assertCapability({
+        capability: 'delete',
+        id: input.id,
+        kind: 'file',
+      });
 
-    const file = await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
+      // Default to soft delete (trash=true)
+      const shouldSoftDelete = input.trash !== false;
 
-    if (!file) return;
+      if (shouldSoftDelete) {
+        // Soft delete: just set deletedAt
+        const file = await ctx.fileModel.softDeleteAny(input.id);
+        if (!file) return;
 
-    await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-      { resourceUid: file.resourceUid, spaceId: file.spaceId },
-    ]);
+        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
+          { resourceUid: file.resourceUid, spaceId: file.spaceId },
+        ]);
+      } else {
+        // Hard delete: remove from database and S3
+        const file = await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
+        if (!file) return;
 
-    // delete the file from S3 if it is not used by other files
-    await ctx.fileService.deleteFile(file.url!);
-  }),
+        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
+          { resourceUid: file.resourceUid, spaceId: file.spaceId },
+        ]);
+
+        // delete the file from S3 if it is not used by other files
+        await ctx.fileService.deleteFile(file.url!);
+      }
+    }),
 
   removeFileAsyncTask: fileProcedure
     .input(
@@ -687,7 +740,7 @@ export const fileRouter = router({
     }),
 
   removeFiles: fileProcedure
-    .input(z.object({ ids: z.array(z.string()) }))
+    .input(z.object({ ids: z.array(z.string()), trash: z.boolean().optional() }))
     .mutation(async ({ input, ctx }) => {
       for (const fid of input.ids) {
         await ctx.resourceAuthorizer.assertCapability({
@@ -697,19 +750,48 @@ export const fileRouter = router({
         });
       }
 
-      const needToRemoveFileList = await ctx.fileModel.deleteManyAny(
-        input.ids,
-        serverDBEnv.REMOVE_GLOBAL_FILE,
-      );
+      // Default to soft delete (trash=true)
+      const shouldSoftDelete = input.trash !== false;
 
-      if (!needToRemoveFileList || needToRemoveFileList.length === 0) return;
+      if (shouldSoftDelete) {
+        // Soft delete: just set deletedAt
+        await ctx.fileModel.softDeleteManyAny(input.ids);
+        // Note: soft delete doesn't need to invalidate authz epochs immediately
+        // as the files are still in the database (just marked as deleted)
+      } else {
+        // Hard delete: remove from database and S3
+        const needToRemoveFileList = await ctx.fileModel.deleteManyAny(
+          input.ids,
+          serverDBEnv.REMOVE_GLOBAL_FILE,
+        );
 
-      await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval(
-        needToRemoveFileList.map((f) => ({ resourceUid: f.resourceUid, spaceId: f.spaceId })),
-      );
+        if (!needToRemoveFileList || needToRemoveFileList.length === 0) return;
 
-      // remove from S3
-      await ctx.fileService.deleteFiles(needToRemoveFileList.map((file) => file.url!));
+        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval(
+          needToRemoveFileList.map((f) => ({ resourceUid: f.resourceUid, spaceId: f.spaceId })),
+        );
+
+        // remove from S3
+        await ctx.fileService.deleteFiles(needToRemoveFileList.map((file) => file.url!));
+      }
+    }),
+
+  restoreFile: fileProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const [restored] = await restoreDeletedFiles(ctx, [input.id]);
+
+      if (!restored) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'FILE_NOT_FOUND' });
+      }
+
+      return restored;
+    }),
+
+  restoreFiles: fileProcedure
+    .input(z.object({ ids: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      return restoreDeletedFiles(ctx, input.ids);
     }),
 
   updateFile: fileProcedure

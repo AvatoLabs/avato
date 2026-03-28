@@ -97,6 +97,7 @@ const SearchResultsOverlay = memo(() => {
         display: 'flex',
         flexDirection: 'column',
         left: 0,
+        minHeight: 0,
         position: 'absolute',
         right: 0,
         top: 0,
@@ -120,8 +121,16 @@ const SearchResultsOverlay = memo(() => {
           </Flexbox>
         </Center>
       ) : viewMode === 'list' ? (
-        <Flexbox height={'100%'}>
-          <div style={{ flex: 1, overflow: 'auto hidden' }}>
+        <Flexbox height={'100%'} style={{ minHeight: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              flex: 1,
+              flexDirection: 'column',
+              minHeight: 0,
+              overflow: 'auto hidden',
+            }}
+          >
             <Flexbox
               horizontal
               align="center"
@@ -177,7 +186,7 @@ const SearchResultsOverlay = memo(() => {
                 {t('FileManager.title.size')}
               </Flexbox>
             </Flexbox>
-            <div style={{ height: 'calc(100% - 40px)', overflow: 'hidden', position: 'relative' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
               <Virtuoso
                 data={data}
                 defaultItemHeight={48}
@@ -212,6 +221,7 @@ const SearchResultsOverlay = memo(() => {
           style={{
             flex: 1,
             height: '100%',
+            minHeight: 0,
             overflowY: 'auto',
           }}
         >

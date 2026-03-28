@@ -50,7 +50,7 @@ export const SSOProvidersList = memo(() => {
     // Prevent unlink if this is the only login method
     if (!allowUnlink) {
       notification.error({
-        message: t('profile.sso.unlink.forbidden'),
+        title: t('profile.sso.unlink.forbidden'),
       });
       return;
     }

@@ -4,16 +4,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 
+import { ChunkService } from '../../chunk';
 import { FileService } from '../../file';
 import { DocumentService } from '../index';
 
-const { mockRequireDocument, mockRequireFile } = vi.hoisted(() => ({
+const {
+  mockAssertCapability,
+  mockAsyncParseFileToChunks,
+  mockRequireDocument,
+  mockRequireFile,
+} = vi.hoisted(() => ({
+  mockAssertCapability: vi.fn(),
+  mockAsyncParseFileToChunks: vi.fn(),
   mockRequireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
   mockRequireFile: vi.fn().mockResolvedValue({ id: 'file-1' }),
 }));
 
 vi.mock('@/database/models/document');
 vi.mock('@/database/models/file');
+vi.mock('../../chunk', () => ({
+  ChunkService: vi.fn(() => ({
+    asyncParseFileToChunks: mockAsyncParseFileToChunks,
+  })),
+}));
+vi.mock('@/config/db', () => ({
+  serverDBEnv: {
+    REMOVE_GLOBAL_FILE: false,
+  },
+}));
 vi.mock('@/database/models/resource', () => ({
   ResourceModel: vi.fn(() => ({
     ensureOwnerPermission: vi.fn(),
@@ -36,7 +54,7 @@ vi.mock('../../resource', () => ({
     requireKnowledgeBase: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
   })),
   ResourceAuthorizer: vi.fn(() => ({
-    assertCapability: vi.fn(),
+    assertCapability: mockAssertCapability,
     getAccessMatch: vi.fn().mockResolvedValue({
       authzEpoch: 1,
       canAccess: true,
@@ -67,6 +85,11 @@ describe('DocumentService', () => {
 
   beforeEach(() => {
     mockDb = {
+      update: vi.fn(() => ({
+        set: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue(undefined),
+        })),
+      })),
       query: {
         documents: {
           findFirst: vi.fn(),
@@ -85,26 +108,37 @@ describe('DocumentService', () => {
       findByFileId: vi.fn(),
       findById: vi.fn(),
       findByIdAny: vi.fn(),
+      hardDeleteManyAny: vi.fn(),
       query: vi.fn(),
+      restoreManyAny: vi.fn(),
       update: vi.fn(),
       updateAny: vi.fn(),
     };
 
     mockFileModel = {
+      clearFileChunks: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
       deleteManyAny: vi.fn(),
       findById: vi.fn(),
+      softDeleteManyAny: vi.fn(),
       update: vi.fn(),
       updateAny: vi.fn(),
     };
 
     mockFileService = {
+      deleteFiles: vi.fn(),
       downloadFileToLocal: vi.fn(),
     };
 
     vi.mocked(DocumentModel).mockImplementation(() => mockDocumentModel);
     vi.mocked(FileModel).mockImplementation(() => mockFileModel);
+    vi.mocked(ChunkService).mockImplementation(
+      () =>
+        ({
+          asyncParseFileToChunks: mockAsyncParseFileToChunks,
+        }) as any,
+    );
     vi.mocked(FileService).mockImplementation(() => mockFileService);
 
     service = new DocumentService(mockDb, userId);
@@ -205,6 +239,9 @@ describe('DocumentService', () => {
           knowledgeBaseId: 'kb-1',
         }),
       );
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', {
+        url: 'internal://document/doc-1',
+      });
       expect(result).toEqual(mockDoc);
     });
 
@@ -370,7 +407,7 @@ describe('DocumentService', () => {
       await service.deleteDocument('doc-1');
 
       expect(mockRequireDocument).toHaveBeenCalledWith('doc-1', 'delete');
-      expect(mockFileModel.deleteManyAny).not.toHaveBeenCalled();
+      expect(mockFileModel.softDeleteManyAny).not.toHaveBeenCalled();
       expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1']);
     });
 
@@ -381,7 +418,7 @@ describe('DocumentService', () => {
 
       await service.deleteDocument('doc-1');
 
-      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-1']);
+      expect(mockFileModel.softDeleteManyAny).toHaveBeenCalledWith(['file-1']);
       expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1']);
     });
 
@@ -403,7 +440,7 @@ describe('DocumentService', () => {
 
       await service.deleteDocument('folder-1');
 
-      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-child-1']);
+      expect(mockFileModel.softDeleteManyAny).toHaveBeenCalledWith(['file-child-1']);
       expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith([
         'folder-1',
         'child-doc-1',
@@ -423,7 +460,7 @@ describe('DocumentService', () => {
 
       await service.deleteDocument('folder-1');
 
-      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith([
+      expect(mockFileModel.softDeleteManyAny).toHaveBeenCalledWith([
         'file-in-folder-1',
         'file-in-folder-2',
       ]);
@@ -443,12 +480,36 @@ describe('DocumentService', () => {
       expect(mockRequireDocument).toHaveBeenCalledWith('doc-1', 'delete');
       expect(mockRequireDocument).toHaveBeenCalledWith('doc-2', 'delete');
       expect(mockDocumentModel.deleteManyAny).toHaveBeenCalledWith(['doc-1', 'doc-2']);
-      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-2']);
+      expect(mockFileModel.softDeleteManyAny).toHaveBeenCalledWith(['file-2']);
     });
 
     it('should handle empty ids array', async () => {
       await service.deleteDocuments([]);
       expect(mockRequireDocument).not.toHaveBeenCalled();
+    });
+
+    it('should hard delete soft-deleted documents and remove backing files', async () => {
+      (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([{ fileId: 'file-1', fileType: 'custom/document', id: 'doc-1' }])
+        .mockResolvedValueOnce([{ resourceUid: 'res_doc_1', spaceId: 'spc_test' }]);
+
+      (mockDb.query as any).files.findMany.mockResolvedValueOnce([
+        { resourceUid: 'res_file_1', spaceId: 'spc_test' },
+      ]);
+
+      mockFileModel.deleteManyAny.mockResolvedValue([{ url: 'storage/file-1' }]);
+
+      await service.deleteDocuments(['doc-1'], false);
+
+      expect(mockAssertCapability).toHaveBeenCalledWith({
+        capability: 'delete',
+        documentIncludeDeleted: true,
+        id: 'doc-1',
+        kind: 'document',
+      });
+      expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-1'], expect.any(Boolean));
+      expect(mockDocumentModel.hardDeleteManyAny).toHaveBeenCalledWith(['doc-1']);
+      expect(mockFileService.deleteFiles).toHaveBeenCalledWith(['storage/file-1']);
     });
   });
 
@@ -506,6 +567,32 @@ describe('DocumentService', () => {
       await service.updateDocument('doc-1', { title: 'New Title' });
 
       expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { name: 'New Title' });
+    });
+
+    it('should re-index associated file after content updates', async () => {
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.updateAny.mockResolvedValue(undefined);
+      mockFileModel.clearFileChunks.mockResolvedValue([]);
+      mockAsyncParseFileToChunks.mockResolvedValue('task-1');
+
+      await service.updateDocument('doc-1', { content: 'Updated\nContent' });
+
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { size: 'Updated\nContent'.length });
+      expect(mockFileModel.clearFileChunks).toHaveBeenCalledWith(['file-1']);
+      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false);
+    });
+
+    it('should re-index associated file after editorData updates', async () => {
+      mockDocumentModel.updateAny.mockResolvedValue({ id: 'doc-1' });
+      mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
+      mockFileModel.clearFileChunks.mockResolvedValue([]);
+      mockAsyncParseFileToChunks.mockResolvedValue('task-1');
+
+      await service.updateDocument('doc-1', { editorData: { blocks: [] } });
+
+      expect(mockFileModel.clearFileChunks).toHaveBeenCalledWith(['file-1']);
+      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false);
     });
 
     it('should sync parentId update to associated file', async () => {

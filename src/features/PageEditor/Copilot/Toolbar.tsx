@@ -39,11 +39,10 @@ const CopilotToolbar = memo(() => {
       showTogglePanelButton={false}
       left={
         <Text
+          ellipsis
           style={{ fontSize: 13, fontWeight: 500, marginLeft: 8 }}
+          title={topicTitle}
           type={'secondary'}
-          ellipsis={{
-            tooltipWhenOverflow: true,
-          }}
         >
           {topicTitle}
         </Text>

@@ -52,7 +52,7 @@ const LibraryMobileHeader: FC<LibraryMobileHeaderProps> = ({ onFolderTreeClick }
               onClick={onFolderTreeClick}
             />
           )}
-          <LibraryTrashButton knowledgeBaseId={id} />
+          <LibraryTrashButton knowledgeBaseId={id} spaceId={spaceId} />
         </Flexbox>
       }
     />

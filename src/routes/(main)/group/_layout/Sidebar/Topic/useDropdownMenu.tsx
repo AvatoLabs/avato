@@ -1,9 +1,9 @@
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
-import { App, Upload } from 'antd';
+import { App } from 'antd';
 import { css, cx } from 'antd-style';
 import { Hash, Import, LucideCheck, Trash } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useChatStore } from '@/store/chat';
@@ -32,6 +32,7 @@ export const useTopicActionsDropdownMenu = (
   const { t } = useTranslation(['topic', 'common']);
   const { modal } = App.useApp();
   const { onUploadClose } = options;
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const [removeUnstarredTopic, removeAllTopic, importTopic] = useChatStore((s) => [
     s.removeUnstarredTopic,
@@ -57,6 +58,21 @@ export const useTopicActionsDropdownMenu = (
     },
     [importTopic, modal, onUploadClose, t],
   );
+
+  const handleImportInputChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      await handleImport(file);
+      event.target.value = '';
+    },
+    [handleImport],
+  );
+
+  const openImportDialog = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
 
   const [topicDisplayMode, updatePreference] = useUserStore((s) => [
     preferenceSelectors.topicDisplayMode(s),
@@ -106,11 +122,19 @@ export const useTopicActionsDropdownMenu = (
         icon: <Icon icon={Import} />,
         key: 'import',
         label: (
-          <Upload accept=".json" beforeUpload={handleImport} showUploadList={false}>
-            <div className={cx(hotArea)}>{t('actions.import')}</div>
-          </Upload>
+          <div className={cx(hotArea)}>
+            <input
+              hidden
+              accept={'.json'}
+              ref={importInputRef}
+              type={'file'}
+              onChange={handleImportInputChange}
+            />
+            <div>{t('actions.import')}</div>
+          </div>
         ),
         ...(onUploadClose ? { closeOnClick: false } : null),
+        onClick: openImportDialog,
       },
       {
         type: 'divider' as const,
@@ -152,7 +176,8 @@ export const useTopicActionsDropdownMenu = (
     topicPageSize,
     updatePreference,
     updateSystemStatus,
-    handleImport,
+    handleImportInputChange,
+    openImportDialog,
     onUploadClose,
     removeUnstarredTopic,
     removeAllTopic,

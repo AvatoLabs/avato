@@ -19,6 +19,7 @@ import useSWR from 'swr';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
+import { TrashNavItem } from '@/features/ResourceTrash';
 import { lambdaClient } from '@/libs/trpc/client';
 
 import { buildResourceRootPath, buildResourceSharedPath, buildSpaceSettingsPath } from './paths';
@@ -105,7 +106,7 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
           }}
         />
       ),
-      focusTriggerAfterClose: true,
+      focusable: { focusTriggerAfterClose: true },
       footer: null,
       title: t('space.create.title'),
       width: 420,
@@ -141,6 +142,7 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
             title={t('shared.title')}
             onClick={() => navigate(buildResourceSharedPath())}
           />
+          <TrashNavItem spaceId={currentSpaceId} />
           {data?.map((space) => {
             const active = currentSpaceId === space.id && !location.pathname.endsWith('/settings');
             const isCurrentSettings =

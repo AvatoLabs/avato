@@ -22,6 +22,7 @@ const MIN_INFRA_ERROR_INTERVAL = 3000;
 
 const isInfrastructureStatus = (status?: number) =>
   typeof status !== 'number' || status === 408 || status === 429 || status >= 500;
+const isRetryableClientStatus = (status?: number) => status === 408 || status === 429;
 
 // handle error
 const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
@@ -68,6 +69,12 @@ const errorHandlingLink: TRPCLink<LambdaRouter> = () => {
               }
 
               default: {
+                if (typeof status === 'number' && status >= 400 && status < 500) {
+                  if (!isRetryableClientStatus(status)) {
+                    err.meta = { ...err.meta, shouldRetry: false };
+                  }
+                }
+
                 if (isInfrastructureStatus(status)) {
                   const normalizedStatus = typeof status === 'number' ? status : 0;
                   const errorKey = `${normalizedStatus}:${err.message}`;

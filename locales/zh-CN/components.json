@@ -161,7 +161,7 @@
   "OllamaSetupGuide.cors.macos": "请打开「终端」应用程序，并粘贴以下指令，并按回车运行",
   "OllamaSetupGuide.cors.reboot": "请在执行完成后重启 Ollama 服务",
   "OllamaSetupGuide.cors.title": "配置 Ollama 允许跨域访问",
-  "OllamaSetupGuide.cors.windows": "在 Windows 上，点击「控制面板」，进入编辑系统环境变量。为你的用户账户新建名为「OLLAMA_ORIGINS」的环境变量，值为 * ，点击「OK/应用」保存",
+  "OllamaSetupGuide.cors.windows": "在 Windows 上，点击「控制面板」进入环境变量设置。为你的用户新建「OLLAMA_ORIGINS」环境变量，值设为 * ，点击「OK/应用」保存",
   "OllamaSetupGuide.install.description": "请确认你已经开启 Ollama ，如果没有下载 Ollama ，请前往官网<1>下载</1>",
   "OllamaSetupGuide.install.docker": "如果你更倾向于使用 Docker，Ollama 也提供了官方 Docker 镜像，你可以通过以下命令拉取：",
   "OllamaSetupGuide.install.linux.command": "通过以下命令安装：",
@@ -173,7 +173,7 @@
   "Thinking.thoughtWithDuration": "已深度思考",
   "devTools.cache.empty": "缓存为空",
   "devTools.metadata.empty": "暂无元数据",
-  "knowledgeBase.empty.description": "创建一个知识库以组织和管理您的资源",
+  "knowledgeBase.empty.description": "创建一个知识库以组织和管理你的资源",
   "knowledgeBase.empty.search": "未找到匹配的知识库",
   "knowledgeBase.empty.title": "暂无知识库"
 }

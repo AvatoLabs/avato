@@ -33,8 +33,14 @@ import { useChatInputStore, useStoreApi } from '../store';
 import Placeholder from './Placeholder';
 
 const className = cx(css`
+  display: block !important;
+
   p {
     margin-block-end: 0;
+  }
+
+  > [contenteditable='true'] {
+    min-height: 100%;
   }
 `);
 
@@ -114,7 +120,7 @@ const InputEditor = memo<{ defaultRows?: number }>(({ defaultRows = 2 }) => {
               }),
             ],
           },
-    [enableRichRender],
+    [enableRichRender, expand, slashMenuRef],
   );
 
   return (

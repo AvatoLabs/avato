@@ -5,9 +5,12 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
-import { DocumentTrashModal } from '@/routes/(main)/resource/features/modal/DocumentTrashModal';
+import { ResourceTrashModal } from '@/routes/(main)/resource/features/modal/ResourceTrashModal';
 
-export const LibraryTrashButton = memo<{ knowledgeBaseId?: string }>(({ knowledgeBaseId }) => {
+export const LibraryTrashButton = memo<{
+  knowledgeBaseId?: string;
+  spaceId?: string;
+}>(({ knowledgeBaseId, spaceId }) => {
   const { t } = useTranslation('file');
   const [open, setOpen] = useState(false);
 
@@ -20,9 +23,10 @@ export const LibraryTrashButton = memo<{ knowledgeBaseId?: string }>(({ knowledg
         title={t('trash.open')}
         onClick={() => setOpen(true)}
       />
-      <DocumentTrashModal
+      <ResourceTrashModal
         knowledgeBaseId={knowledgeBaseId}
         open={open}
+        spaceId={spaceId}
         onClose={() => setOpen(false)}
       />
     </>

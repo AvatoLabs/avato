@@ -51,8 +51,11 @@ const styles = createStaticStyles(({ css }) => ({
     padding-inline: 0 24px;
   `,
   scrollContainer: css`
+    display: flex;
+    flex-direction: column;
     overflow: auto hidden;
     flex: 1;
+    min-height: 0;
   `,
 }));
 
@@ -91,6 +94,7 @@ const ListView = memo(function ListView() {
   const isDragActive = useDragActive();
   const [isDropZoneActive, setIsDropZoneActive] = useState(false);
   const [isAnyRowHovered, setIsAnyRowHovered] = useState(false);
+  const [viewportSize, setViewportSize] = useState({ height: 0, width: 0 });
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,20 +123,23 @@ const ListView = memo(function ListView() {
   const { hasMore, loadMoreResources } = useFileStore();
 
   // Map ResourceItem[] to FileListItem[] for compatibility
-  const rawData =
-    resourceList?.map<FileListItemType>((item) => ({
-      ...item,
-      chunkCount: item.chunkCount ?? null,
-      chunkingError: item.chunkingError ?? null,
-      chunkingStatus: (item.chunkingStatus ?? null) as AsyncTaskStatus | null,
-      embeddingError: item.embeddingError ?? null,
-      embeddingStatus: (item.embeddingStatus ?? null) as AsyncTaskStatus | null,
-      finishEmbedding: item.finishEmbedding ?? false,
-      url: item.url ?? '',
-    })) ?? [];
+  const rawData = useMemo(
+    () =>
+      resourceList?.map<FileListItemType>((item) => ({
+        ...item,
+        chunkCount: item.chunkCount ?? null,
+        chunkingError: item.chunkingError ?? null,
+        chunkingStatus: (item.chunkingStatus ?? null) as AsyncTaskStatus | null,
+        embeddingError: item.embeddingError ?? null,
+        embeddingStatus: (item.embeddingStatus ?? null) as AsyncTaskStatus | null,
+        finishEmbedding: item.finishEmbedding ?? false,
+        url: item.url ?? '',
+      })) ?? [],
+    [resourceList],
+  );
 
   // Sort data using current sort settings
-  const data = sortFileList(rawData, sorter, sortType) || [];
+  const data = useMemo(() => sortFileList(rawData, sorter, sortType) || [], [rawData, sorter, sortType]);
 
   const dataLength = data.length;
   const effectiveIsLoading = isLoading ?? false;
@@ -145,6 +152,29 @@ const ListView = memo(function ListView() {
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (!container) return;
+
+    const updateViewportSize = () => {
+      const { height, width } = container.getBoundingClientRect();
+
+      setViewportSize((current) => {
+        if (current.height === height && current.width === width) return current;
+
+        return { height, width };
+      });
+    };
+
+    updateViewportSize();
+
+    const observer = new ResizeObserver(updateViewportSize);
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Handle selection change with shift-click support for range selection
   const handleSelectionChange = useCallback(
@@ -322,8 +352,10 @@ const ListView = memo(function ListView() {
 
   if (showSkeleton) return <ListViewSkeleton columnWidths={columnWidths} />;
 
+  const isViewportReady = viewportSize.height > 0 && viewportSize.width > 0;
+
   return (
-    <Flexbox height={'100%'}>
+    <Flexbox height={'100%'} style={{ minHeight: 0 }}>
       <div className={styles.scrollContainer}>
         <Flexbox
           horizontal
@@ -404,12 +436,19 @@ const ListView = memo(function ListView() {
           data-drop-target-id={currentFolderId || undefined}
           data-is-folder="true"
           ref={containerRef}
-          style={{ overflow: 'hidden', position: 'relative' }}
           className={cx(
             styles.dropZone,
             isDropZoneActive && styles.dropZoneActive,
             isAnyRowHovered && 'any-row-hovered',
           )}
+          style={{
+            display: 'flex',
+            flex: 1,
+            flexDirection: 'column',
+            minHeight: 0,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
           onDragLeave={handleDropZoneDragLeave}
           onDrop={handleDropZoneDrop}
           onDragOver={(e) => {
@@ -417,33 +456,35 @@ const ListView = memo(function ListView() {
             handleDragMove(e);
           }}
         >
-          <Virtuoso
-            components={{ Footer }}
-            data={data}
-            defaultItemHeight={48}
-            endReached={handleEndReached}
-            increaseViewportBy={{ bottom: 800, top: 1200 }}
-            initialItemCount={30}
-            overscan={48 * 5}
-            ref={virtuosoRef}
-            style={{ height: 'calc(100vh - 100px)' }}
-            itemContent={(index, item) => {
-              if (!item) return null;
-              return (
-                <FileListItem
-                  columnWidths={columnWidths}
-                  index={index}
-                  isAnyRowHovered={isAnyRowHovered}
-                  key={item.id}
-                  pendingRenameItemId={pendingRenameItemId}
-                  selected={selectFileIds.includes(item.id)}
-                  onHoverChange={setIsAnyRowHovered}
-                  onSelectedChange={handleSelectionChange}
-                  {...item}
-                />
-              );
-            }}
-          />
+          {isViewportReady && (
+            <Virtuoso
+              components={{ Footer }}
+              data={data}
+              defaultItemHeight={48}
+              endReached={handleEndReached}
+              increaseViewportBy={{ bottom: 800, top: 1200 }}
+              initialItemCount={30}
+              overscan={48 * 5}
+              ref={virtuosoRef}
+              style={{ height: '100%', width: '100%' }}
+              itemContent={(index, item) => {
+                if (!item) return null;
+                return (
+                  <FileListItem
+                    columnWidths={columnWidths}
+                    index={index}
+                    isAnyRowHovered={isAnyRowHovered}
+                    key={item.id}
+                    pendingRenameItemId={pendingRenameItemId}
+                    selected={selectFileIds.includes(item.id)}
+                    onHoverChange={setIsAnyRowHovered}
+                    onSelectedChange={handleSelectionChange}
+                    {...item}
+                  />
+                );
+              }}
+            />
+          )}
         </div>
       </div>
     </Flexbox>

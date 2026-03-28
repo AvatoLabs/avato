@@ -135,7 +135,7 @@ const CreateGroupModal = memo<CreateGroupModalProps>(({ id, onCancel, open }) =>
       >
         <Flexbox horizontal className={styles.container}>
           {/* Left Column - Available Agents */}
-          <AvailableAgentList agents={allAgents} isLoading={isLoadingAgents} />
+          <AvailableAgentList agents={allAgents} isLoading={isLoadingAgents} open={open} />
 
           {/* Right Column - Selected Agents and Group Name */}
           <Flexbox className={styles.rightColumn}>

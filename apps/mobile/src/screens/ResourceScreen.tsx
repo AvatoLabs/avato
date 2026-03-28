@@ -716,9 +716,9 @@ const FilePreviewModal = memo(
     // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
     const officeFile = item
       ? item.fileType.includes('msword') ||
-        item.fileType.includes('vnd.openxmlformats') ||
-        item.fileType.includes('vnd.ms-excel') ||
-        item.fileType.includes('vnd.ms-powerpoint')
+      item.fileType.includes('vnd.openxmlformats') ||
+      item.fileType.includes('vnd.ms-excel') ||
+      item.fileType.includes('vnd.ms-powerpoint')
       : false;
     const previewableDoc = textFile || pdfFile || officeFile;
 
@@ -1058,12 +1058,12 @@ const FilePreviewModal = memo(
                 ...(imageFile
                   ? {}
                   : {
-                      shadowColor: colors.shadow,
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.03,
-                      shadowRadius: 4,
-                      elevation: 1,
-                    }),
+                    shadowColor: colors.shadow,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.03,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }),
               }}
             >
               <TouchableOpacity
@@ -1210,11 +1210,11 @@ const FilePreviewModal = memo(
                           ? { uri: cachedEntry.localUri }
                           : fileUrl
                             ? {
-                                ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
-                                  ? { headers: remoteHeaders }
-                                  : {}),
-                                uri: fileUrl,
-                              }
+                              ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+                                ? { headers: remoteHeaders }
+                                : {}),
+                              uri: fileUrl,
+                            }
                             : undefined
                       }
                       onError={handlePreviewError}
@@ -1416,10 +1416,10 @@ const FilePreviewModal = memo(
           target={
             item
               ? {
-                  id: item.id,
-                  kind: item.sourceType === 'file' ? 'file' : 'document',
-                  name: item.name || item.id,
-                }
+                id: item.id,
+                kind: item.sourceType === 'file' ? 'file' : 'document',
+                name: item.name || item.id,
+              }
               : null
           }
           onClose={() => setShareSheetOpen(false)}
@@ -1518,11 +1518,11 @@ function ResourceThumbnail({
   );
   const remoteThumbnailSource = shouldUseRemoteThumbnail
     ? {
-        ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
-          ? { headers: remoteHeaders }
-          : {}),
-        uri: thumbnailUrl!,
-      }
+      ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+        ? { headers: remoteHeaders }
+        : {}),
+      uri: thumbnailUrl!,
+    }
     : null;
 
   const handleImageError = useCallback(() => {
@@ -2255,6 +2255,46 @@ export default function ResourceScreen() {
     [loadFiles, refreshTreeData, t.resourceTrashRestored, t.resourceTrashRestoreFailed, toast],
   );
 
+  /**
+   * Unified resource deletion - handles both files and documents concurrently
+   */
+  const deleteResourcesUnified = useCallback(
+    async (ids: string[], trash: boolean = true) => {
+      // Classify resources by type for concurrent deletion
+      const fileIds: string[] = [];
+      const documentIds: string[] = [];
+
+      for (const id of ids) {
+        const item = files.find((f) => f.id === id);
+        if (item?.sourceType === 'document' || item?.fileType === 'custom/folder') {
+          documentIds.push(id);
+        } else {
+          fileIds.push(id);
+        }
+      }
+
+      // Execute deletions concurrently
+      const promises: Promise<void>[] = [];
+      if (fileIds.length > 0) {
+        if (fileIds.length === 1) {
+          promises.push(fileApi.remove(fileIds[0]!, trash));
+        } else {
+          promises.push(fileApi.removeFiles(fileIds, trash));
+        }
+      }
+      if (documentIds.length > 0) {
+        if (documentIds.length === 1) {
+          promises.push(resourceApi.deleteDocument(documentIds[0]!, trash));
+        } else {
+          promises.push(resourceApi.deleteDocuments(documentIds, trash));
+        }
+      }
+
+      await Promise.all(promises);
+    },
+    [files],
+  );
+
   const handleBatchDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     const hasFolders = ids.some((id) => {
@@ -2270,17 +2310,9 @@ export default function ResourceScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            for (const id of ids) {
-              const item = files.find((f) => f.id === id);
-              if (!item) continue;
-              if (item.fileType === 'custom/folder' || item.sourceType === 'document') {
-                await resourceApi.deleteDocument(id);
-              } else {
-                await fileApi.remove(id);
-              }
-            }
-            await purgeDeletedResources(ids);
+            await deleteResourcesUnified(ids);
             haptics.success();
+            await purgeDeletedResources(ids);
             clearSelection();
             clearResourceListCache();
             await loadFiles(true);
@@ -2294,6 +2326,7 @@ export default function ResourceScreen() {
   }, [
     selectedIds,
     files,
+    deleteResourcesUnified,
     purgeDeletedResources,
     clearSelection,
     loadFiles,
@@ -2599,12 +2632,7 @@ export default function ResourceScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const existingItem = files.find((item) => item.id === id);
-              if (isFolderItem || existingItem?.sourceType === 'document') {
-                await resourceApi.deleteDocument(id);
-              } else {
-                await fileApi.remove(id);
-              }
+              await deleteResourcesUnified([id]);
               haptics.success();
               await purgeDeletedResources([id]);
               clearResourceListCache();
@@ -2617,7 +2645,7 @@ export default function ResourceScreen() {
         },
       ]);
     },
-    [files, loadFiles, purgeDeletedResources, refreshTreeData, t, toast],
+    [deleteResourcesUnified, loadFiles, purgeDeletedResources, refreshTreeData, t, toast],
   );
 
   const closeActionSheet = useCallback(() => setActionItem(null), []);
@@ -3332,11 +3360,11 @@ export default function ResourceScreen() {
           contentContainerStyle={
             (treeMode ? treeRows.length === 0 : filtered.length === 0)
               ? {
-                  flex: 1,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingBottom: scrollListPaddingBottom,
-                }
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingBottom: scrollListPaddingBottom,
+              }
               : { paddingBottom: scrollListPaddingBottom }
           }
           refreshControl={
@@ -3565,10 +3593,10 @@ export default function ResourceScreen() {
                 onMoveToFolder={
                   libraryId
                     ? (i) => {
-                        setMoveToFolderItem(i);
-                        setBatchMoveIds(new Set());
-                        setMoveFolderStack([null]);
-                      }
+                      setMoveToFolderItem(i);
+                      setBatchMoveIds(new Set());
+                      setMoveFolderStack([null]);
+                    }
                     : undefined
                 }
               />
@@ -3619,9 +3647,9 @@ export default function ResourceScreen() {
         onNewFolder={
           libraryId
             ? () => {
-                setAttachmentSheetVisible(false);
-                setCreateFolderVisible(true);
-              }
+              setAttachmentSheetVisible(false);
+              setCreateFolderVisible(true);
+            }
             : undefined
         }
       />

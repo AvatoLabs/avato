@@ -53,12 +53,7 @@ export const FilePathDisplay = memo<FilePathDisplayProps>(({ filePath, isDirecto
         />
       )}
       {displayPath && (
-        <Text
-          className={styles.text}
-          ellipsis={{
-            tooltipWhenOverflow: true,
-          }}
-        >
+        <Text className={styles.text} ellipsis title={displayPath}>
           {displayPath}
         </Text>
       )}

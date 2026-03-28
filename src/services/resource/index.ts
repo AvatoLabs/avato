@@ -184,23 +184,37 @@ export class ResourceService {
 
   /**
    * Delete a resource
+   * @param id Resource ID
+   * @param trash If true, soft delete (move to trash). If false, hard delete. Default: true
    */
-  async deleteResource(id: string): Promise<void> {
+  async deleteResource(id: string, trash: boolean = true): Promise<void> {
+    if (!trash) {
+      if (id.startsWith('docs_')) {
+        await documentService.deleteDocument(id, false);
+      } else {
+        await fileService.removeFile(id, false);
+      }
+
+      return;
+    }
+
     // Check if this is a file or document
     const existing = await this.getResource(id);
     if (!existing) return; // Already deleted
 
     if (existing.sourceType === 'file') {
-      await fileService.removeFile(id);
+      await fileService.removeFile(id, trash);
     } else {
-      await documentService.deleteDocument(id);
+      await documentService.deleteDocument(id, trash);
     }
   }
 
   /**
    * Batch delete resources
+   * @param ids Resource IDs
+   * @param trash If true, soft delete (move to trash). If false, hard delete. Default: true
    */
-  async deleteResources(ids: string[]): Promise<void> {
+  async deleteResources(ids: string[], trash: boolean = true): Promise<void> {
     // Use ID prefix to separate files (file_*) and documents (docs_*) without N API calls
     const fileIds: string[] = [];
     const documentIds: string[] = [];
@@ -214,8 +228,8 @@ export class ResourceService {
     }
 
     await Promise.all([
-      fileIds.length > 0 ? fileService.removeFiles(fileIds) : Promise.resolve(),
-      documentIds.length > 0 ? documentService.deleteDocuments(documentIds) : Promise.resolve(),
+      fileIds.length > 0 ? fileService.removeFiles(fileIds, trash) : Promise.resolve(),
+      documentIds.length > 0 ? documentService.deleteDocuments(documentIds, trash) : Promise.resolve(),
     ]);
   }
 
@@ -229,6 +243,27 @@ export class ResourceService {
   /** Restore a soft-deleted document (same authorization as server `document.restoreDocument`). */
   async restoreDocument(id: string) {
     return documentService.restoreDocument(id);
+  }
+
+  async restoreResource(item: Pick<ResourceItem, 'id' | 'sourceType'>) {
+    if (item.sourceType === 'file') {
+      await fileService.restoreFile(item.id);
+      return;
+    }
+
+    await documentService.restoreDocument(item.id);
+  }
+
+  async restoreResources(items: Array<Pick<ResourceItem, 'id' | 'sourceType'>>) {
+    const fileIds = items.filter((item) => item.sourceType === 'file').map((item) => item.id);
+    const documentIds = items
+      .filter((item) => item.sourceType === 'document')
+      .map((item) => item.id);
+
+    await Promise.all([
+      fileIds.length > 0 ? fileService.restoreFiles(fileIds) : Promise.resolve(),
+      documentIds.length > 0 ? documentService.restoreDocuments(documentIds) : Promise.resolve(),
+    ]);
   }
 }
 

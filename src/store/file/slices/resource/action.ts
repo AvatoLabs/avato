@@ -6,6 +6,7 @@ import { resourceService } from '@/services/resource';
 import { type StoreSetter } from '@/store/types';
 import {
   type CreateResourceParams,
+  type DeleteResourceOptions,
   type ResourceItem,
   type UpdateResourceParams,
 } from '@/types/resource';
@@ -34,6 +35,24 @@ export class ResourceActionImpl {
     this.#set = set;
     this.#get = get;
   }
+
+  #syncDeletedDocumentsToPageStore = async (documentIds: string[]) => {
+    if (documentIds.length === 0) return;
+
+    const idsSet = new Set(documentIds);
+    const [{ usePageStore }, { removePageDocumentsFromCache }] = await Promise.all([
+      import('@/store/page/store'),
+      import('@/store/page/slices/list/action'),
+    ]);
+
+    usePageStore.setState((state) => ({
+      documents: state.documents?.filter((document) => !idsSet.has(document.id)),
+      selectedPageId:
+        state.selectedPageId && idsSet.has(state.selectedPageId) ? null : state.selectedPageId,
+    }), false);
+
+    await removePageDocumentsFromCache(documentIds);
+  };
 
   #getSyncEngine = () => {
     if (!syncEngineInstance) {
@@ -95,14 +114,14 @@ export class ResourceActionImpl {
       updatedAt: new Date(),
       ...(params.sourceType === 'file'
         ? {
-            url: 'url' in params ? params.url : '',
-          }
+          url: 'url' in params ? params.url : '',
+        }
         : {
-            content: 'content' in params ? params.content : '',
-            editorData: 'editorData' in params ? params.editorData : {},
-            slug: 'slug' in params ? params.slug : undefined,
-            title: 'title' in params ? params.title : 'Untitled',
-          }),
+          content: 'content' in params ? params.content : '',
+          editorData: 'editorData' in params ? params.editorData : {},
+          slug: 'slug' in params ? params.slug : undefined,
+          title: 'title' in params ? params.title : 'Untitled',
+        }),
       metadata: params.metadata,
     };
 
@@ -155,14 +174,14 @@ export class ResourceActionImpl {
       updatedAt: new Date(),
       ...(params.sourceType === 'file'
         ? {
-            url: 'url' in params ? params.url : '',
-          }
+          url: 'url' in params ? params.url : '',
+        }
         : {
-            content: 'content' in params ? params.content : '',
-            editorData: 'editorData' in params ? params.editorData : {},
-            slug: 'slug' in params ? params.slug : undefined,
-            title: 'title' in params ? params.title : 'Untitled',
-          }),
+          content: 'content' in params ? params.content : '',
+          editorData: 'editorData' in params ? params.editorData : {},
+          slug: 'slug' in params ? params.slug : undefined,
+          title: 'title' in params ? params.title : 'Untitled',
+        }),
       metadata: params.metadata,
     };
 
@@ -195,17 +214,44 @@ export class ResourceActionImpl {
   };
 
   /**
-   * Delete a resource with optimistic update
+   * Delete a resource with optimistic update and rollback on failure
+   * @param id Resource ID to delete
+   * @param options Delete options (trash: true for soft delete, false for hard delete)
    */
-  deleteResource = async (id: string): Promise<void> => {
-    const { resourceList, resourceMap } = this.#get();
+  deleteResource = async (id: string, options?: DeleteResourceOptions): Promise<void> => {
+    const { documents, localDocumentMap, resourceList, resourceMap } = this.#get();
+    const existing = resourceMap.get(id);
+    if (!existing) {
+      log('deleteResource: resource not found', id);
+      return;
+    }
+
+    // Save state for rollback
+    const rollbackState = {
+      documents,
+      localDocumentMap,
+      resourceList,
+      resourceMap,
+    };
+
+    const isDocument = existing.sourceType === 'document';
+    const trash = options?.trash ?? true; // Default to soft delete
+
+    // Optimistic update
     const newMap = new Map(resourceMap);
     newMap.delete(id);
 
-    log('deleteResource', id, newMap, resourceList);
+    const nextLocalDocumentMap = new Map(localDocumentMap);
+    if (isDocument) {
+      nextLocalDocumentMap.delete(id);
+    }
+
+    log('deleteResource: optimistic update', id, { isDocument, trash });
 
     this.#set(
       {
+        documents: isDocument ? documents.filter((document) => document.id !== id) : documents,
+        localDocumentMap: isDocument ? nextLocalDocumentMap : localDocumentMap,
         resourceList: resourceList.filter((item) => item.id !== id),
         resourceMap: newMap,
       },
@@ -213,24 +259,51 @@ export class ResourceActionImpl {
       'deleteResource/optimistic',
     );
 
-    const syncEngine = this.#getSyncEngine();
-    await syncEngine.enqueue({
-      id: `sync-${id}-${Date.now()}`,
-      payload: {},
-      resourceId: id,
-      retryCount: 0,
-      timestamp: new Date(),
-      type: 'delete',
-    });
+    try {
+      // Execute the actual delete
+      await resourceService.deleteResource(id, trash);
 
-    log('enqueue deleteResource', id, syncEngine);
+      if (isDocument) {
+        await this.#syncDeletedDocumentsToPageStore([id]);
+      }
+
+      log('deleteResource: success', id);
+    } catch (error) {
+      console.error('deleteResource: failed, rolling back', id, error);
+      // Rollback on failure
+      this.#set(
+        {
+          documents: rollbackState.documents,
+          localDocumentMap: rollbackState.localDocumentMap,
+          resourceList: rollbackState.resourceList,
+          resourceMap: rollbackState.resourceMap,
+        },
+        false,
+        'deleteResource/rollback',
+      );
+      throw error;
+    }
   };
 
-  deleteResources = async (ids: string[]) => {
+  /**
+   * Batch delete resources with optimistic update and rollback on failure
+   * @param ids Resource IDs to delete
+   * @param options Delete options (trash: true for soft delete, false for hard delete)
+   */
+  deleteResources = async (ids: string[], options?: DeleteResourceOptions): Promise<void> => {
     if (ids.length === 0) return;
 
-    // 1. Read sourceType from resourceMap for each ID (client-side, no API call)
-    const { resourceMap, resourceList } = this.#get();
+    const { documents, localDocumentMap, resourceMap, resourceList } = this.#get();
+
+    // Save state for rollback
+    const rollbackState = {
+      documents,
+      localDocumentMap,
+      resourceList,
+      resourceMap,
+    };
+
+    // Classify resources by type
     const fileIds: string[] = [];
     const documentIds: string[] = [];
 
@@ -243,15 +316,27 @@ export class ResourceActionImpl {
       }
     }
 
-    // 2. Optimistically remove all items from store in one set() call
     const idsSet = new Set(ids);
+    const documentIdsSet = new Set(documentIds);
+    const trash = options?.trash ?? true; // Default to soft delete
+
+    // Optimistic update
     const newMap = new Map(resourceMap);
     for (const id of ids) {
       newMap.delete(id);
     }
 
+    const nextLocalDocumentMap = new Map(localDocumentMap);
+    for (const id of documentIds) {
+      nextLocalDocumentMap.delete(id);
+    }
+
+    log('deleteResources: optimistic update', ids, { documentIds, fileIds, trash });
+
     this.#set(
       {
+        documents: documents.filter((document) => !documentIdsSet.has(document.id)),
+        localDocumentMap: nextLocalDocumentMap,
         resourceList: resourceList.filter((r) => !idsSet.has(r.id)),
         resourceMap: newMap,
       },
@@ -259,14 +344,30 @@ export class ResourceActionImpl {
       'deleteResources/optimistic',
     );
 
-    // 3. Fire batch delete APIs in background (no await — UI already updated)
-    const promises: Promise<void>[] = [];
-    if (fileIds.length > 0) promises.push(fileService.removeFiles(fileIds));
-    if (documentIds.length > 0) promises.push(documentService.deleteDocuments(documentIds));
+    try {
+      // Execute actual delete with concurrency
+      await resourceService.deleteResources(ids, trash);
 
-    Promise.all(promises).catch((error) => {
-      console.error('Failed to delete resources:', error);
-    });
+      if (documentIds.length > 0) {
+        await this.#syncDeletedDocumentsToPageStore(documentIds);
+      }
+
+      log('deleteResources: success', ids);
+    } catch (error) {
+      console.error('deleteResources: failed, rolling back', ids, error);
+      // Rollback on failure
+      this.#set(
+        {
+          documents: rollbackState.documents,
+          localDocumentMap: rollbackState.localDocumentMap,
+          resourceList: rollbackState.resourceList,
+          resourceMap: rollbackState.resourceMap,
+        },
+        false,
+        'deleteResources/rollback',
+      );
+      throw error;
+    }
   };
 
   /**

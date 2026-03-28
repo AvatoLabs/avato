@@ -175,7 +175,7 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
   ]);
 
   return (
-    <DropdownMenu items={menuItems} placement="bottomLeft">
+    <DropdownMenu nativeButton items={menuItems} placement="bottomLeft">
       <ActionIconWithChevron
         icon={RESOURCE_ENTRY_ICONS.more}
         title={t('FileManager.actions.batchActions', 'Batch actions')}

@@ -156,6 +156,8 @@ const NavItem = memo<NavItemProps>(
     const iconSize = iconSizeProp ?? (glass ? 20 : 18);
     const iconSizeForLobeIcon = { size: iconSize, strokeWidth: ENTRY_ICON_STROKE };
     const labelColor = cssVar.colorText;
+    const titleText =
+      typeof title === 'number' || typeof title === 'string' ? String(title) : undefined;
     const variant = 'borderless';
 
     const { titlePrefix, iconPostfix } = slots || {};
@@ -219,15 +221,14 @@ const NavItem = memo<NavItemProps>(
           {titlePrefix}
           <Text
             color={labelColor}
-            ellipsis={{
-              tooltipWhenOverflow: true,
-            }}
+            ellipsis
             style={{
               flex: 1,
               fontSize: cssVar.fontSize,
               fontWeight: active ? 450 : 400,
               lineHeight: 1.3,
             }}
+            title={titleText}
           >
             {title}
           </Text>

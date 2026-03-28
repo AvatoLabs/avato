@@ -88,6 +88,7 @@ const AddGroupMemberModal = memo<AddGroupMemberModalProps>(
     return (
       <Modal
         allowFullscreen
+        destroyOnHidden
         open={open}
         title={t('memberSelection.addMember')}
         width={800}
@@ -108,7 +109,7 @@ const AddGroupMemberModal = memo<AddGroupMemberModalProps>(
       >
         <Flexbox horizontal className={styles.container} gap={8}>
           {/* Left Column - Available Agents */}
-          <AvailableAgentList agents={availableAgents} isLoading={isLoadingAgents} />
+          <AvailableAgentList agents={availableAgents} isLoading={isLoadingAgents} open={open} />
 
           <Divider orientation={'vertical'} style={{ height: '100%' }} />
 

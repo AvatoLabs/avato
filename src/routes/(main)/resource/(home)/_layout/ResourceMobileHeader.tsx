@@ -15,10 +15,12 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import useSWR from 'swr';
 
+import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import {
   buildResourceRootPath,
   buildResourceSharedPath,
+  buildResourceTrashPath,
   buildSpaceSettingsPath,
 } from '@/features/ResourceSpaces';
 import { CreateSpaceForm } from '@/features/ResourceSpaces/SpaceSection';
@@ -59,7 +61,7 @@ const ResourceMobileHeader = memo(() => {
           }}
         />
       ),
-      focusTriggerAfterClose: true,
+      focusable: { focusTriggerAfterClose: true },
       footer: null,
       title: t('space.create.title', { ns: 'file' }),
       width: 420,
@@ -108,6 +110,15 @@ const ResourceMobileHeader = memo(() => {
             title={t('shared.title', { ns: 'file' })}
             onClick={() => {
               navigate(buildResourceSharedPath());
+              setWorkspaceOpen(false);
+            }}
+          />
+          <NavItem
+            active={location.pathname === buildResourceTrashPath(currentSpaceId)}
+            icon={RESOURCE_ENTRY_ICONS.trash}
+            title={t('trash.title', { ns: 'file' })}
+            onClick={() => {
+              navigate(buildResourceTrashPath(currentSpaceId));
               setWorkspaceOpen(false);
             }}
           />

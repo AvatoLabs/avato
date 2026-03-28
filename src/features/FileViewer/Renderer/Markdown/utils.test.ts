@@ -100,4 +100,11 @@ describe('isLikelyMermaidContent', () => {
   it('does not over-match ordinary text', () => {
     expect(isLikelyMermaidContent('hello world')).toBe(false);
   });
+
+  it('recognizes mermaid blocks with init directives or comments', () => {
+    expect(
+      isLikelyMermaidContent('%%{init: { "theme": "dark" }}%%\nflowchart TD\nA-->B'),
+    ).toBe(true);
+    expect(isLikelyMermaidContent('%% comment\nsequenceDiagram\nA->>B: ping')).toBe(true);
+  });
 });

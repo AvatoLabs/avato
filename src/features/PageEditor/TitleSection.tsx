@@ -229,11 +229,13 @@ const TitleSection = memo(() => {
             </Tag>
           )}
         </Flexbox>
-        {lastUpdatedTime && saveStatus !== 'saving' && (
+        {lastUpdatedTime && (
           <Text fontSize={13} style={{ color: cssVar.colorTextSecondary }}>
-            {t('pageEditor.editedAt', {
-              time: dayjs(lastUpdatedTime).format('MMM D, YYYY h:mm A'),
-            })}
+            <span style={{ visibility: saveStatus === 'saving' ? 'hidden' : 'visible' }}>
+              {t('pageEditor.editedAt', {
+                time: dayjs(lastUpdatedTime).format('MMM D, YYYY h:mm A'),
+              })}
+            </span>
           </Text>
         )}
         {outlineItems.length > 0 && (

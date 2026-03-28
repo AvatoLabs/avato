@@ -65,6 +65,7 @@ export class KnowledgeRepo {
     showFilesInKnowledgeBase,
     parentId,
     spaceId,
+    trash,
     limit = 50,
     offset = 0,
   }: QueryFileListParams = {}): Promise<KnowledgeItem[]> {
@@ -89,6 +90,7 @@ export class KnowledgeRepo {
       spaceId,
       sortType,
       sorter,
+      trash,
     });
 
     // Build document query (notes)
@@ -100,6 +102,7 @@ export class KnowledgeRepo {
       spaceId,
       sortType,
       sorter,
+      trash,
     });
 
     // Combine both queries with UNION ALL
@@ -193,6 +196,7 @@ export class KnowledgeRepo {
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
       WHERE f.user_id = ${this.userId}
+        AND f.deleted_at IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM ${knowledgeBaseFiles}
           WHERE ${knowledgeBaseFiles.fileId} = f.id
@@ -219,6 +223,7 @@ export class KnowledgeRepo {
       WHERE user_id = ${this.userId}
         AND source_type != ${'file'}
         AND knowledge_base_id IS NULL
+        AND deleted_at IS NULL
     `;
 
     const combinedQuery = sql`
@@ -321,9 +326,11 @@ export class KnowledgeRepo {
     showFilesInKnowledgeBase,
     parentId,
     spaceId,
+    trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [
       spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+      trash ? sql`f.deleted_at IS NOT NULL` : sql`f.deleted_at IS NULL`,
     ];
 
     // Parent ID filter
@@ -358,6 +365,7 @@ export class KnowledgeRepo {
       // Build where conditions using proper table references (f.column instead of files.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
+        trash ? sql`f.deleted_at IS NOT NULL` : sql`f.deleted_at IS NULL`,
       ];
 
       // Parent ID filter
@@ -461,10 +469,12 @@ export class KnowledgeRepo {
     knowledgeBaseId,
     parentId,
     spaceId,
+    trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [
       spaceId ? sql`${documents.spaceId} = ${spaceId}` : sql`${documents.userId} = ${this.userId}`,
       sql`${documents.sourceType} != ${'file'}`,
+      trash ? sql`${documents.deletedAt} IS NOT NULL` : sql`${documents.deletedAt} IS NULL`,
     ];
 
     // Parent ID filter
@@ -531,6 +541,7 @@ export class KnowledgeRepo {
       // Build where conditions using proper table references (d.column instead of documents.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`d.space_id = ${spaceId}` : sql`d.user_id = ${this.userId}`,
+        trash ? sql`d.deleted_at IS NOT NULL` : sql`d.deleted_at IS NULL`,
       ];
 
       // Parent ID filter

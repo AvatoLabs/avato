@@ -1,4 +1,5 @@
-import type { Highlighter, type MarkdownProps, SyntaxMermaid } from '@lobehub/ui';
+import type { MarkdownProps } from '@lobehub/ui';
+import { Highlighter, SyntaxMermaid } from '@lobehub/ui';
 import { type ComponentProps } from 'react';
 
 const FALLBACK_CODE_LANGUAGE = 'plaintext';
@@ -13,6 +14,32 @@ const MERMAID_LANGUAGE_ALIASES = new Set([
 ]);
 const MERMAID_BLOCK_START =
   /^(?:architecture-beta|block-beta|c4context|classDiagram|erDiagram|flowchart|gitGraph|gantt|graph|journey|kanban|mindmap|packet-beta|pie|quadrantChart|requirementDiagram|sankey-beta|sequenceDiagram|stateDiagram(?:-v2)?|timeline|xychart-beta)\b/i;
+const MERMAID_INIT_DIRECTIVE = /^%%\{[\s\S]*?\}%%\s*/i;
+const MERMAID_LINE_COMMENT = /^%%.*(?:\r?\n|$)/;
+
+const stripMermaidPreamble = (content: string) => {
+  let normalized = content.trimStart();
+
+  while (normalized) {
+    const withoutInit = normalized.replace(MERMAID_INIT_DIRECTIVE, '');
+
+    if (withoutInit !== normalized) {
+      normalized = withoutInit.trimStart();
+      continue;
+    }
+
+    const withoutComment = normalized.replace(MERMAID_LINE_COMMENT, '');
+
+    if (withoutComment !== normalized) {
+      normalized = withoutComment.trimStart();
+      continue;
+    }
+
+    break;
+  }
+
+  return normalized;
+};
 
 export interface MarkdownPreviewSettings {
   fontSize?: number;
@@ -26,7 +53,7 @@ export interface MarkdownCodeBlock {
 }
 
 export const isLikelyMermaidContent = (content: string) => {
-  const normalized = content.trimStart();
+  const normalized = stripMermaidPreamble(content);
 
   if (!normalized) return false;
 

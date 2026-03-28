@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
@@ -41,6 +42,7 @@ vi.mock('../impls', () => ({
 }));
 
 vi.mock('@/database/models/file');
+vi.mock('@/database/models/document');
 
 vi.mock('@/database/models/space', () => ({
   SpaceModel: vi.fn(() => ({
@@ -72,6 +74,7 @@ describe('FileService', () => {
   const mockDb = {} as any;
   const mockUserId = 'test-user';
   let mockFileModel: any;
+  let mockDocumentModel: any;
   let mockTempManager: any;
   let consoleErrorSpy: any;
 
@@ -80,11 +83,15 @@ describe('FileService', () => {
       deleteAny: vi.fn(),
       findById: vi.fn(),
     };
+    mockDocumentModel = {
+      findByIdAny: vi.fn(),
+    };
     mockTempManager = {
       writeTempFile: vi.fn(),
       cleanup: vi.fn(),
     };
     vi.mocked(FileModel).mockImplementation(() => mockFileModel);
+    vi.mocked(DocumentModel).mockImplementation(() => mockDocumentModel);
     vi.mocked(TempFileManager).mockImplementation(() => mockTempManager);
 
     // Mock console.error to test error logging
@@ -205,6 +212,15 @@ describe('FileService', () => {
     expect(result).toBe(expectedContent);
   });
 
+  it('should read internal document content directly from document model', async () => {
+    mockDocumentModel.findByIdAny.mockResolvedValue({ content: '# Internal Markdown' });
+
+    const result = await service.getFileContent('internal://document/doc-1');
+
+    expect(result).toBe('# Internal Markdown');
+    expect(service['impl'].getFileContent).not.toHaveBeenCalled();
+  });
+
   it('should delegate getFileByteArray to implementation', async () => {
     const testKey = 'test-key';
     const expectedBytes = new Uint8Array([1, 2, 3]);
@@ -214,6 +230,15 @@ describe('FileService', () => {
 
     expect(service['impl'].getFileByteArray).toHaveBeenCalledWith(testKey);
     expect(result).toBe(expectedBytes);
+  });
+
+  it('should convert internal document content to bytes', async () => {
+    mockDocumentModel.findByIdAny.mockResolvedValue({ content: '# Internal Markdown' });
+
+    const result = await service.getFileByteArray('internal://document/doc-1');
+
+    expect(new TextDecoder().decode(result)).toBe('# Internal Markdown');
+    expect(service['impl'].getFileByteArray).not.toHaveBeenCalled();
   });
 
   it('should delegate createPreSignedUrl to implementation', async () => {
