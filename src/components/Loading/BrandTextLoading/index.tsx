@@ -4,6 +4,8 @@ import { BRANDING_NAME } from '@lobechat/business-const';
 import { createStyles } from 'antd-style';
 import { motion } from 'motion/react';
 
+import { useIsDark } from '@/hooks/useIsDark';
+
 import styles from './index.module.css';
 
 const useLaunchStyles = createStyles(({ css, token }) => ({
@@ -60,6 +62,7 @@ const BrandTextLoading = ({
   onStart,
 }: BrandTextLoadingProps) => {
   const { styles: launchStyles } = useLaunchStyles();
+  const isDark = useIsDark();
   const isLaunchMode = mode === 'launch';
   const showDebug = process.env.NODE_ENV === 'development' && debugId && isLaunchMode;
   const resolvedBrandName = brandName ?? BRANDING_NAME;
@@ -87,7 +90,11 @@ const BrandTextLoading = ({
             <img
               alt={resolvedBrandName}
               className={styles.defaultLogoImg}
-              src="/icons/icon-192x192-transparent.png"
+              src={
+                isDark
+                  ? '/icons/icon-192x192-transparent-dark.png'
+                  : '/icons/icon-192x192-transparent.png'
+              }
             />
           </div>
           <span className={styles.defaultText}>{resolvedBrandName}</span>
@@ -111,7 +118,11 @@ const BrandTextLoading = ({
           <img
             alt={resolvedBrandName}
             className={styles.brandLogoImg}
-            src="/icons/icon-192x192.png"
+            src={
+              isDark
+                ? '/icons/icon-192x192-transparent-dark.png'
+                : '/icons/icon-192x192-transparent.png'
+            }
           />
         </motion.div>
 

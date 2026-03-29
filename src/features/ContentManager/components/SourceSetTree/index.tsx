@@ -148,6 +148,8 @@ const SourceSetTree = memo(() => {
 
     const result: VisibleNode[] = [];
 
+    const visited = new Set<string>();
+
     const walk = (nodes: TreeItem[], level: number) => {
       for (const node of nodes) {
         const key = node.id;
@@ -156,6 +158,9 @@ const SourceSetTree = memo(() => {
 
         if (!node.isFolder) continue;
         if (!expandedFolders.has(key)) continue;
+        // Prevent infinite recursion from circular folder references
+        if (visited.has(key)) continue;
+        visited.add(key);
 
         const children = folderChildrenCache.get(key);
         if (!children || children.length === 0) continue;

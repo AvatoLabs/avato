@@ -601,9 +601,22 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
 
   const commitTable = useCallback(
     (nextTable: TableDocumentState) => {
+      const nextMarkdown = tableDocumentToMarkdown(nextTable);
+
+      // Always update local state to ensure UI responsiveness
+      lastCommittedTableRef.current = nextTable;
+      startTransition(() => {
+        setTable(nextTable);
+      });
+
+      // Sync markdown content to parent
+      if (nextMarkdown !== markdownValue) {
+        onMarkdownCommit(nextMarkdown);
+      }
+
+      // Skip persistence if documentId is not available
       if (!documentId) return;
 
-      const nextMarkdown = tableDocumentToMarkdown(nextTable);
       const nextDocument = usePageStore
         .getState()
         .documents?.find((item) => item.id === documentId);
@@ -612,12 +625,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
         ...nextDocument?.metadata,
         table: nextTable,
       };
-
-      lastCommittedTableRef.current = nextTable;
-
-      startTransition(() => {
-        setTable(nextTable);
-      });
 
       if (nextDocument) {
         usePageStore.getState().internal_dispatchDocuments({
@@ -632,10 +639,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
           id: documentId,
           type: 'updateDocument',
         });
-      }
-
-      if (nextMarkdown !== markdownValue) {
-        onMarkdownCommit(nextMarkdown);
       }
 
       metadataSaveRef.current?.({ documentId, metadata: nextMetadata });
