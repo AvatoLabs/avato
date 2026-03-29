@@ -413,6 +413,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     }, []);
 
     const { menuItems } = useFileItemDropdown({
+      fileId,
       fileType,
       filename: name,
       id,

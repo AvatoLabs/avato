@@ -217,7 +217,7 @@ export default {
   'portal.openInDocEditor': 'Open in Docs',
   'preview.diagramOpenLarge': 'Open large diagram',
   'preview.downloadFile': 'Download File',
-  'preview.editAsDocument': 'Edit as Document',
+  'preview.editAsDocument': 'Open in Document Editor',
   'preview.markdownLoadError': 'Failed to load Markdown preview',
   'preview.unsupportedFileAndContact':
     'This file format is not currently supported for online preview. If you have a request for previewing, feel free to <1>contact us</1>.',

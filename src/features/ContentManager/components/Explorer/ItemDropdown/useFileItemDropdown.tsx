@@ -8,6 +8,8 @@ import { shallow } from 'zustand/shallow';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
 import { PAGE_FILE_TYPE } from '@/features/ContentManager/constants';
+import { useOpenFileDocument } from '@/features/ContentManager/hooks/useOpenFileDocument';
+import { isMarkdownContentFile } from '@/features/ContentManager/utils/isMarkdownContentFile';
 import { useResourceShareModal } from '@/features/ResourceSharing';
 import { buildContentPreviewPath } from '@/features/ResourceSpaces';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
@@ -21,6 +23,7 @@ import MoveToFolderModal from '../MoveToFolderModal';
 
 interface UseFileItemDropdownParams {
   enabled?: boolean;
+  fileId?: string | null;
   filename: string;
   fileType: string;
   id: string;
@@ -38,6 +41,7 @@ interface UseFileItemDropdownReturn {
  * Shared with folder tree and explorer
  */
 export const useFileItemDropdown = ({
+  fileId,
   id,
   sourceSetId,
   url,
@@ -84,6 +88,8 @@ export const useFileItemDropdown = ({
     lowerFilename?.endsWith('.odt');
   const isPage =
     !isPDF && !isOfficeFile && (sourceType === 'document' || fileType === PAGE_FILE_TYPE);
+  const canOpenInDocumentEditor = !isPage && !isFolder && isMarkdownContentFile(filename, fileType);
+  const openFileDocument = useOpenFileDocument({ fileId, id });
 
   const menuItems = useCallback(() => {
     const availableSourceSets = (libraries || []).filter(
@@ -210,6 +216,21 @@ export const useFileItemDropdown = ({
             });
           },
         },
+        canOpenInDocumentEditor && {
+          icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
+          key: 'openInDocumentEditor',
+          label: t('preview.editAsDocument', { ns: 'file' }),
+          onClick: async ({ domEvent }) => {
+            domEvent.stopPropagation();
+
+            try {
+              await openFileDocument();
+            } catch (error) {
+              console.error('Failed to open markdown in document editor:', error);
+              message.error(t('FileManager.actions.openDocumentError'));
+            }
+          },
+        },
         {
           icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
           key: 'rename',
@@ -331,6 +352,7 @@ export const useFileItemDropdown = ({
     ).filter(Boolean);
   }, [
     addFilesToSourceSet,
+    canOpenInDocumentEditor,
     deleteContentItem,
     filename,
     id,
@@ -343,6 +365,7 @@ export const useFileItemDropdown = ({
     message,
     modal,
     moveContentItem,
+    openFileDocument,
     openShareModal,
     onRenameStart,
     refreshFileList,

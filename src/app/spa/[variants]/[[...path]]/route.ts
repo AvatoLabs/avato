@@ -40,6 +40,16 @@ export function generateStaticParams() {
 const isDev = process.env.NODE_ENV === 'development';
 const VITE_DEV_ORIGIN = 'http://localhost:9876';
 
+function normalizeSpaShellAssetUrls(html: string): string {
+  return html
+    .replaceAll('/spa/manifest.webmanifest', '/manifest.webmanifest')
+    .replaceAll('/spa/favicon-32x32.png', '/favicon-32x32.png')
+    .replaceAll('/spa/favicon-16x16.png', '/favicon-16x16.png')
+    .replaceAll('/spa/favicon-32x32-dark.png', '/favicon-32x32-dark.png')
+    .replaceAll('/spa/favicon-16x16-dark.png', '/favicon-16x16-dark.png')
+    .replaceAll('/spa/icons/', '/icons/');
+}
+
 async function rewriteViteAssetUrls(html: string): Promise<string> {
   const { parseHTML } = await import('linkedom');
   const { document } = parseHTML(html);
@@ -215,6 +225,7 @@ export async function GET(
   };
 
   let html = await getTemplate(isMobile);
+  html = normalizeSpaShellAssetUrls(html);
 
   html = html.replace(
     /window\.__SERVER_CONFIG__\s*=\s*undefined;\s*\/\*\s*SERVER_CONFIG\s*\*\//,

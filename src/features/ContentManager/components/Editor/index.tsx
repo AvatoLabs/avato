@@ -1,11 +1,10 @@
 'use client';
 
-import { ActionIcon, Flexbox } from '@lobehub/ui';
+import { ActionIcon, Button, Flexbox } from '@lobehub/ui';
 import { Modal } from 'antd';
 import { cssVar, useTheme } from 'antd-style';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavHeader from '@/features/NavHeader';
@@ -16,10 +15,10 @@ import {
 } from '@/features/PageEditor/store';
 import FileDetailComponent from '@/routes/(main)/content/features/FileDetail';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
-import { documentService } from '@/services/document';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { downloadFile } from '@/utils/client/downloadFile';
 
+import { useOpenFileDocument } from '../../hooks/useOpenFileDocument';
 import { isMarkdownContentFile } from '../../utils/isMarkdownContentFile';
 import FileContent from './FileContent';
 
@@ -32,40 +31,31 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
   const theme = useTheme();
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
-  const [, setSearchParams] = useSearchParams();
 
-  const [currentViewItemId, setCurrentViewItemId, setMode] = useContentManagerStore((s) => [
-    s.currentViewItemId,
-    s.setCurrentViewItemId,
-    s.setMode,
-  ]);
+  const currentViewItemId = useContentManagerStore((s) => s.currentViewItemId);
+  const useFetchKnowledgeItem = useFileStore((s) => s.useFetchKnowledgeItem);
 
   const fileDetail = useFileStore(fileManagerSelectors.getFileById(currentViewItemId));
+  const { data: fetchedFileDetail } = useFetchKnowledgeItem(currentViewItemId);
+  const resolvedFileDetail = fileDetail || fetchedFileDetail;
+  const openFileDocument = useOpenFileDocument({
+    fileId: resolvedFileDetail?.fileId,
+    id: currentViewItemId || '',
+  });
 
-  const isMarkdown = isMarkdownContentFile(fileDetail?.name, fileDetail?.fileType);
+  const isMarkdown = isMarkdownContentFile(resolvedFileDetail?.name, resolvedFileDetail?.fileType);
 
   const handleEditAsDoc = useCallback(async () => {
     if (!currentViewItemId || isConverting) return;
     try {
       setIsConverting(true);
-      const document = await documentService.ensureFileDocument(currentViewItemId);
-      setSearchParams(
-        (prev) => {
-          const newParams = new URLSearchParams(prev);
-          newParams.set('file', document.id);
-          return newParams;
-        },
-        { replace: true },
-      );
-      // Switch to doc mode
-      setCurrentViewItemId(document.id);
-      setMode('doc');
+      await openFileDocument();
     } catch (error) {
       console.error('Failed to convert markdown to doc:', error);
     } finally {
       setIsConverting(false);
     }
-  }, [currentViewItemId, isConverting, setCurrentViewItemId, setMode, setSearchParams]);
+  }, [currentViewItemId, isConverting, openFileDocument]);
 
   return (
     <>
@@ -81,7 +71,7 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
               >
                 <ActionIcon icon={RESOURCE_ENTRY_ICONS.back} title={t('back')} onClick={onBack} />
                 <span
-                  title={fileDetail?.name}
+                  title={resolvedFileDetail?.name}
                   style={{
                     color: theme.colorText,
                     fontSize: 14,
@@ -91,7 +81,7 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {fileDetail?.name}
+                  {resolvedFileDetail?.name}
                 </span>
               </Flexbox>
             }
@@ -99,20 +89,24 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
               <Flexbox horizontal gap={8}>
                 {/* <ToggleRightPanelButton icon={BotMessageSquareIcon} showActive={true} size={20} /> */}
                 {isMarkdown && (
-                  <ActionIcon
+                  <Button
                     icon={RESOURCE_ENTRY_ICONS.edit}
                     loading={isConverting}
+                    size={'small'}
                     title={t('preview.editAsDocument', { ns: 'file' })}
+                    type={'primary'}
                     onClick={handleEditAsDoc}
-                  />
+                  >
+                    {t('preview.editAsDocument', { ns: 'file' })}
+                  </Button>
                 )}
-                {fileDetail?.url && (
+                {resolvedFileDetail?.url && (
                   <ActionIcon
                     icon={RESOURCE_ENTRY_ICONS.download}
                     title={t('download', { ns: 'common' })}
                     onClick={() => {
-                      if (fileDetail?.url && fileDetail?.name) {
-                        downloadFile(fileDetail.url, fileDetail.name);
+                      if (resolvedFileDetail?.url && resolvedFileDetail?.name) {
+                        downloadFile(resolvedFileDetail.url, resolvedFileDetail.name);
                       }
                     }}
                   />
@@ -144,8 +138,12 @@ const FileEditorCanvas = memo<FileEditorProps>(({ onBack }) => {
         width={400}
         onCancel={() => setIsDetailModalOpen(false)}
       >
-        {fileDetail && (
-          <FileDetailComponent {...fileDetail} showDownloadButton={false} showTitle={false} />
+        {resolvedFileDetail && (
+          <FileDetailComponent
+            {...resolvedFileDetail}
+            showDownloadButton={false}
+            showTitle={false}
+          />
         )}
       </Modal>
     </>

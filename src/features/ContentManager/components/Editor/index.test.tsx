@@ -15,9 +15,19 @@ interface MockContentManagerState {
 }
 
 interface MockFileStoreState {
+  fetchedFiles?: Record<
+    string,
+    {
+      fileId?: string;
+      fileType?: string;
+      name?: string;
+      url?: string;
+    }
+  >;
   files: Record<
     string,
     {
+      fileId?: string;
       fileType?: string;
       name?: string;
       url?: string;
@@ -47,6 +57,11 @@ let mockFileStoreState: MockFileStoreState = {
 vi.mock('@lobehub/ui', () => ({
   ActionIcon: vi.fn(({ onClick, title }) => (
     <button title={title} type="button" onClick={onClick} />
+  )),
+  Button: vi.fn(({ children, onClick, title }) => (
+    <button title={title} type="button" onClick={onClick}>
+      {children}
+    </button>
   )),
   Flexbox: vi.fn(({ children }) => <div>{children}</div>),
 }));
@@ -125,8 +140,13 @@ vi.mock('@/store/file', () => ({
   fileManagerSelectors: {
     getFileById: (id?: string) => (state: MockFileStoreState) => (id ? state.files[id] : undefined),
   },
-  useFileStore: vi.fn((selector: (state: MockFileStoreState) => unknown) =>
-    selector(mockFileStoreState),
+  useFileStore: vi.fn(
+    (selector: (state: MockFileStoreState & Record<string, unknown>) => unknown) =>
+      selector({
+        ...mockFileStoreState,
+        useFetchKnowledgeItem: (id?: string) =>
+          ({ data: id ? mockFileStoreState.fetchedFiles?.[id] : undefined }) as any,
+      }),
   ),
 }));
 
@@ -155,6 +175,7 @@ describe('FileEditor', () => {
           url: '/spec.md',
         },
       },
+      fetchedFiles: {},
     };
     mockEnsureFileDocument.mockReset();
     mockSetSearchParams.mockReset();
@@ -187,6 +208,7 @@ describe('FileEditor', () => {
           url: '/roadmap.md',
         },
       },
+      fetchedFiles: {},
     };
 
     rerender(<FileEditor onBack={secondOnBack} />);
@@ -201,7 +223,7 @@ describe('FileEditor', () => {
 
     render(<FileEditor />);
 
-    fireEvent.click(screen.getByTitle('preview.editAsDocument'));
+    fireEvent.click(screen.getByRole('button', { name: 'preview.editAsDocument' }));
 
     await waitFor(() => {
       expect(mockEnsureFileDocument).toHaveBeenCalledWith('file-1');
@@ -216,5 +238,29 @@ describe('FileEditor', () => {
     ) => URLSearchParams;
 
     expect(updateQuery(new URLSearchParams()).get('file')).toBe('docs-converted-1');
+  });
+
+  it('renders a visible document editor button for markdown previews', () => {
+    render(<FileEditor />);
+
+    expect(screen.getByRole('button', { name: 'preview.editAsDocument' })).toBeVisible();
+  });
+
+  it('shows the document editor entry when the preview file comes from knowledge fetch fallback', () => {
+    mockFileStoreState = {
+      fetchedFiles: {
+        'file-1': {
+          fileType: 'text/plain',
+          name: 'Fetched.md',
+          url: '/fetched.md',
+        },
+      },
+      files: {},
+    };
+
+    render(<FileEditor />);
+
+    expect(screen.getByText('Fetched.md')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'preview.editAsDocument' })).toBeVisible();
   });
 });

@@ -29,6 +29,7 @@ export default {
   'FileManager.actions.goBack': 'Go to previous page',
   'FileManager.actions.goForward': 'Go to next page',
   'FileManager.actions.goToParent': 'Go to parent folder',
+  'FileManager.actions.openDocumentError': 'Failed to open in the document editor.',
   'FileManager.actions.moveError': 'Failed to move file',
   'FileManager.actions.moveHere': 'Move here',
   'FileManager.actions.moveSuccess': 'File moved successfully',

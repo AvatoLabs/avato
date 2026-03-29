@@ -30,6 +30,7 @@
   "FileManager.actions.moveToOtherSourceSet": "移动到其他资料集",
   "FileManager.actions.moveToRoot": "移动到根目录",
   "FileManager.actions.moving": "正在移动...",
+  "FileManager.actions.openDocumentError": "打开文档编辑器失败，请重试",
   "FileManager.actions.removeFromSourceSet": "从资料集中移除",
   "FileManager.actions.removeFromSourceSetSuccess": "文件移除成功。",
   "FileManager.actions.rename": "重命名",

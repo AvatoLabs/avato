@@ -363,6 +363,7 @@ const FileListItem = memo<FileListItemProps>(
     }, [pendingRenameItemId, id, isRenaming, handleRenameStart, contentManagerState]);
 
     const { menuItems } = useFileItemDropdown({
+      fileId,
       fileType,
       filename: name,
       id,
