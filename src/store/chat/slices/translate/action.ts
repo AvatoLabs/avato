@@ -3,7 +3,7 @@ import { type ChatTranslate, type TracePayload } from '@lobechat/types';
 import { TraceNameMap } from '@lobechat/types';
 import { merge } from '@lobechat/utils';
 
-import { supportLocales } from '@/locales/resources';
+import { supportLocales } from '@/locales/contents';
 import { chatService } from '@/services/chat';
 import { messageService } from '@/services/message';
 import { dbMessageSelectors } from '@/store/chat/selectors';

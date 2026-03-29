@@ -17,7 +17,6 @@ import file from './file';
 import home from './home';
 import hotkey from './hotkey';
 import image from './image';
-import knowledgeBase from './knowledgeBase';
 import labs from './labs';
 import marketAuth from './marketAuth';
 import memory from './memory';
@@ -32,6 +31,7 @@ import portal from './portal';
 import providers from './providers';
 import ragEval from './ragEval';
 import setting from './setting';
+import sourceSet from './sourceSet';
 import spend from './spend';
 import subscription from './subscription';
 import suggestQuestions from './suggestQuestions';
@@ -63,7 +63,7 @@ const resources = {
   hotkey,
 
   image,
-  knowledgeBase,
+  sourceSet,
 
   labs,
   marketAuth,

@@ -4,14 +4,10 @@ import { ArrowUpIcon, PlusIcon } from 'lucide-react';
 import { type ChangeEvent, type KeyboardEvent, memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePageStore } from '@/store/docs';
 import { useFileStore } from '@/store/file';
-import { usePageStore } from '@/store/page';
 import { DocumentSourceType } from '@/types/document';
-import {
-  DEFAULT_PAGE_KIND,
-  type PageKind,
-  TABLE_PAGE_KIND,
-} from '@/utils/page';
+import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
 
 const ICON_SIZE = 80;
 
@@ -110,12 +106,12 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 interface PageExplorerPlaceholderProps {
   hasPages?: boolean;
-  knowledgeBaseId?: string;
   pageKind?: PageKind;
+  sourceSetId?: string;
 }
 
 const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
-  ({ hasPages = false, knowledgeBaseId, pageKind = DEFAULT_PAGE_KIND }) => {
+  ({ hasPages = false, sourceSetId, pageKind = DEFAULT_PAGE_KIND }) => {
     const { t } = useTranslation(['file', 'common']);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -158,7 +154,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
       try {
         const newDoc = await createPage({
           content,
-          knowledgeBaseId,
+          sourceSetId,
           pageKind,
           title,
         });
@@ -218,7 +214,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
             // Upload file to server
             const uploadResult = await useFileStore.getState().uploadWithProgress({
               file,
-              knowledgeBaseId,
+              sourceSetId,
             });
 
             if (!uploadResult) {
@@ -301,13 +297,13 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
             <Flexbox className={styles.accentCard} gap={18} justify={'center'} padding={28}>
               <Flexbox className={styles.previewPanel}>
                 <Text as={'h2'} style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1 }}>
-                  {t(isTablePage ? 'pageEditor.empty.tableTitle' : 'pageEditor.empty.title')}
+                  {t(isTablePage ? 'docEditor.empty.tableTitle' : 'docEditor.empty.title')}
                 </Text>
                 <Text style={{ color: cssVar.colorTextSecondary, fontSize: 15, lineHeight: 1.7 }}>
                   {t(
                     isTablePage
-                      ? 'pageEditor.empty.tableAutoSaveMessage'
-                      : 'pageEditor.autoSaveMessage',
+                      ? 'docEditor.empty.tableAutoSaveMessage'
+                      : 'docEditor.autoSaveMessage',
                   )}
                 </Text>
                 <Flexbox gap={10} style={{ marginTop: 8 }}>
@@ -339,18 +335,16 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                 <span className={styles.actionTitle}>
                   {t(
                     isTablePage
-                      ? 'pageEditor.empty.createNewTable'
-                      : 'pageEditor.empty.createNewDocument',
+                      ? 'docEditor.empty.createNewTable'
+                      : 'docEditor.empty.createNewDocument',
                   )}
                 </span>
-                <span className={styles.actionDescription}>
-                  {t('pageEditor.editorPlaceholder')}
-                </span>
+                <span className={styles.actionDescription}>{t('docEditor.editorPlaceholder')}</span>
                 <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
                 <FileTypeIcon
                   className={styles.icon}
                   color={cssVar.colorPrimary}
-                  icon={<Icon color={'#fff'} icon={PlusIcon} />}
+                  icon={<Icon color={cssVar.colorTextLightSolid} icon={PlusIcon} />}
                   size={ICON_SIZE}
                   type={'file'}
                 />
@@ -372,21 +366,21 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
                     <span className={styles.actionTitle}>
                       {isUploading
                         ? t('uploadDock.uploadStatus.uploading')
-                        : t('pageEditor.empty.uploadFiles')}
+                        : t('docEditor.empty.uploadFiles')}
                     </span>
                     <span className={styles.actionDescription}>{t('empty')}</span>
                     <div className={styles.glow} style={{ background: cssVar.colorPrimary }} />
                     <FileTypeIcon
                       className={styles.icon}
                       color={cssVar.colorPrimary}
-                      icon={<Icon color={'#fff'} icon={ArrowUpIcon} />}
+                      icon={<Icon color={cssVar.colorTextLightSolid} icon={ArrowUpIcon} />}
                       size={ICON_SIZE}
                       type={'file'}
                     />
                   </Flexbox>
                   <input
-                    accept=".md,.markdown,.pdf,.docx"
                     hidden
+                    accept=".md,.markdown,.pdf,.docx"
                     ref={fileInputRef}
                     type={'file'}
                     onChange={handleUploadFileInputChange}

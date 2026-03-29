@@ -125,7 +125,7 @@ export type TranslationKeys = {
   chatToolStreamingAddExperience: string;
   chatToolStreamingAddPreference: string;
   chatToolStreamingWebSearch: string;
-  chatToolStreamingKnowledgeBase: string;
+  chatToolStreamingSourceSet: string;
   chatToolStreamingSearchSkill: string;
   chatToolStreamingRunning: string;
   chatToolTapToExpand: string;
@@ -763,7 +763,7 @@ export type TranslationKeys = {
   providerDetailPlaceholderRegion: string;
   providerDetailPlaceholderApiVersion: string;
 
-  // Resources / Files
+  // Content / Files
   resourceTitle: string;
   resourceTabAll: string;
   resourceTabImages: string;
@@ -798,8 +798,8 @@ export type TranslationKeys = {
   resourceShareLinkTitle: string;
   resourceShareLinkSheetSubtitle: string;
   resourceShareCreateLinkAction: string;
-  resourceShareLibraryMenuTitle: string;
-  resourceFolderOpenNeedsLibrary: string;
+  resourceShareSourceSetMenuTitle: string;
+  resourceFolderOpenNeedsSourceSet: string;
   resourceBatchShareLink: string;
   resourceShareExpiresLabel: string;
   resourceShareExpires1d: string;
@@ -808,7 +808,7 @@ export type TranslationKeys = {
   resourceSharePasswordOptional: string;
   resourceSharePasswordPlaceholder: string;
   resourceShareConfirm: string;
-  resourceShareLibrary: string;
+  resourceShareSourceSet: string;
   resourcePickerPickLocation: string;
   resourceShareManage: string;
   resourceShareManageLinks: string;
@@ -835,7 +835,7 @@ export type TranslationKeys = {
   resourceSharedWithMeLoadFailed: string;
   resourceSharedKindFile: string;
   resourceSharedKindDocument: string;
-  resourceSharedKindLibrary: string;
+  resourceSharedKindSourceSet: string;
   resourceSharedFolderHint: string;
   resourceShareGrantInheritChildren: string;
   resourceShareGrantCanReshare: string;
@@ -877,14 +877,14 @@ export type TranslationKeys = {
   resourcePublicShareDocEmpty: string;
   resourcePublicShareNotFoundHint: string;
   resourcePublicShareDownloadFailed: string;
-  resourcePublicShareKbHint: string;
+  resourcePublicShareSourceSetHint: string;
   resourceBytes: string;
   resourceKB: string;
   resourceMB: string;
   resourceGB: string;
-  resourceLibraryAll: string;
-  resourceLibraryInbox: string;
-  resourceLibrarySelect: string;
+  resourceAllFiles: string;
+  resourceSourceSetUnassigned: string;
+  resourceSourceSetSelect: string;
   resourceFolderRoot: string;
   resourceNewFolder: string;
   resourceMoveToFolder: string;
@@ -1350,7 +1350,7 @@ const en: TranslationKeys = {
   chatToolStreamingAddExperience: 'Adding experience…',
   chatToolStreamingAddPreference: 'Adding preference…',
   chatToolStreamingWebSearch: 'Searching…',
-  chatToolStreamingKnowledgeBase: 'Searching knowledge base…',
+  chatToolStreamingSourceSet: 'Searching source sets…',
   chatToolStreamingSearchSkill: 'Searching skills…',
   chatToolStreamingRunning: 'Running…',
   chatToolTapToExpand: 'Tap to expand',
@@ -1477,8 +1477,8 @@ const en: TranslationKeys = {
   notebookDocContentPlaceholder: 'Start writing in Markdown...',
   notebookDeleteConfirm: 'Delete Document',
   notebookDeleteDesc:
-    'This document will be moved to the recycle bin. You can restore it from the Resources screen.',
-  notebookDeletedToTrash: 'Moved to recycle bin. Restore from Resources if needed.',
+    'This document will be moved to the recycle bin. You can restore it from the Content screen.',
+  notebookDeletedToTrash: 'Moved to recycle bin. Restore from Content if needed.',
   notebookDeleteFailed: 'Could not delete document',
   notebookEditorMore: 'More options',
   notebookListOpenDoc: 'Open',
@@ -1704,7 +1704,7 @@ const en: TranslationKeys = {
   fileDocument: 'Document',
   fileDocumentDesc: 'Attach files, notes, PDFs, or other supporting material.',
   fileFromWorkspace: 'From Workspace',
-  fileFromWorkspaceDesc: 'Import files from your resource workspace.',
+  fileFromWorkspaceDesc: 'Import files from Content.',
   fileGallery: 'Photo Library',
   fileGalleryDesc: 'Pick one or more images from your library.',
   fileNewFolderDesc: 'Create a folder in the current location.',
@@ -1967,8 +1967,8 @@ const en: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  // Resources / Files
-  resourceTitle: 'Resources',
+  // Content / Files
+  resourceTitle: 'Content',
   resourceTabAll: 'All',
   resourceTabImages: 'Images',
   resourceTabDocuments: 'Documents',
@@ -1980,7 +1980,7 @@ const en: TranslationKeys = {
   resourceUploadFile: 'Choose File',
   resourceDeleting: 'Deleting…',
   resourceDeleteConfirm: 'Delete File',
-  resourceDeleteDesc: 'The file will be moved to the recycle bin. You can restore it from Resources.',
+  resourceDeleteDesc: 'The file will be moved to the recycle bin. You can restore it from Content.',
   resourceUploadFailed: 'Upload failed',
   resourceUploaded: 'Uploaded successfully',
   resourceDownload: 'Download',
@@ -1991,7 +1991,7 @@ const en: TranslationKeys = {
   resourceCollapseAll: 'Collapse all',
   resourceCurrentFolder: 'Current folder',
   resourceExpandAll: 'Expand all',
-  resourceExplorer: 'Explorer',
+  resourceExplorer: 'Content Explorer',
   resourceOpenExternal: 'Open in Browser',
   resourcePreviewUnavailable: 'Unable to load preview',
   resourceDeleteFailed: 'Delete failed',
@@ -2003,8 +2003,8 @@ const en: TranslationKeys = {
   resourceShareLinkSheetSubtitle:
     'Creates a time-limited link others can open. This is not the same as sending the raw file.',
   resourceShareCreateLinkAction: 'Create share link',
-  resourceShareLibraryMenuTitle: 'Library sharing',
-  resourceFolderOpenNeedsLibrary: 'Pick a library above to open folders.',
+  resourceShareSourceSetMenuTitle: 'Source set sharing',
+  resourceFolderOpenNeedsSourceSet: 'Pick a source set above to browse folders.',
   resourceBatchShareLink: 'Share link',
   resourceShareExpiresLabel: 'Link expires after',
   resourceShareExpires1d: '1 day',
@@ -2013,7 +2013,7 @@ const en: TranslationKeys = {
   resourceSharePasswordOptional: 'Password (optional)',
   resourceSharePasswordPlaceholder: 'Leave empty for no password',
   resourceShareConfirm: 'Create & share',
-  resourceShareLibrary: 'Share library',
+  resourceShareSourceSet: 'Share source set',
   resourcePickerPickLocation: 'Location',
   resourceShareManage: 'Manage sharing',
   resourceShareManageLinks: 'Share links',
@@ -2036,12 +2036,12 @@ const en: TranslationKeys = {
   resourceShareCopyAccess: 'Copy',
   resourceAccessCopied: 'Copied',
   resourceSharedWithMe: 'Shared with me',
-  resourceSharedWithMeEmpty: 'Nothing has been shared with you yet',
+  resourceSharedWithMeEmpty: 'No one has shared content with you yet',
   resourceSharedWithMeLoadFailed: 'Could not load shared items',
   resourceSharedKindFile: 'File',
   resourceSharedKindDocument: 'Document',
-  resourceSharedKindLibrary: 'Library',
-  resourceSharedFolderHint: 'Open folders from a library in Resources.',
+  resourceSharedKindSourceSet: 'Source Set',
+  resourceSharedFolderHint: 'Open this folder from its source set on the Content page.',
   resourceShareGrantInheritChildren: 'Apply to items inside (inherit)',
   resourceShareGrantCanReshare: 'Allow this editor to manage sharing',
   resourceShareGrantExpiresPlaceholder: 'Access expiry (optional, YYYY-MM-DD)',
@@ -2055,9 +2055,9 @@ const en: TranslationKeys = {
   resourceShareGrantExpirySelected: 'Ends:',
   resourceShareMemberCanReshare: 'Can manage sharing',
   resourceShareMemberInheritOff: 'Not inherited to sub-items',
-  resourcePublicShareTitle: 'Shared resource',
+  resourcePublicShareTitle: 'Shared content',
   resourcePublicSharePasswordTitle: 'Password protected',
-  resourcePublicSharePasswordSubtitle: 'Enter the password to view this resource.',
+  resourcePublicSharePasswordSubtitle: 'Enter the password to view this content.',
   resourcePublicSharePasswordPlaceholder: 'Password',
   resourcePublicShareUnlock: 'Unlock',
   resourcePublicShareNotFound: 'This share link is invalid or has expired.',
@@ -2065,8 +2065,8 @@ const en: TranslationKeys = {
   resourcePublicShareDownload: 'Download file',
   resourceSharedAccessNoExpiry: 'No expiry',
   resourceSharedPermissionValidUntil: 'Access valid until',
-  resourceShareAccessOk: 'You can access this resource',
-  resourceShareAccessDenied: "You don't have access to this resource",
+  resourceShareAccessOk: 'You can access this content',
+  resourceShareAccessDenied: "You don't have access to this content",
   resourceShareAccessUnknown: 'Could not load access details',
   resourceShareAccessViaSpace: 'Through your space membership',
   resourceShareAccessViaDirect: 'Shared with you directly',
@@ -2076,7 +2076,7 @@ const en: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     'Anyone with the link will lose access. You can create a new link later, but old links will stay broken.',
   resourceShareConfirmRevokeTitle: 'Remove this person?',
-  resourceShareConfirmRevokeMessage: 'They will lose access to this resource.',
+  resourceShareConfirmRevokeMessage: 'They will lose access to this content.',
   resourceShareRetry: 'Retry',
   resourceShareGrantUsernamePlaceholder: 'Username',
   resourceUntitled: 'Untitled',
@@ -2084,19 +2084,19 @@ const en: TranslationKeys = {
   resourcePublicShareNotFoundHint:
     'Check the link and password. A wrong password looks the same as an expired or invalid link.',
   resourcePublicShareDownloadFailed: 'Could not open the download link.',
-  resourcePublicShareKbHint: 'For the full library and file list, use LobeHub in a browser.',
+  resourcePublicShareSourceSetHint: 'For the full source set and file list, use LobeHub in a browser.',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: 'All Files',
-  resourceLibraryInbox: 'Uncategorized',
+  resourceAllFiles: 'All Files',
+  resourceSourceSetUnassigned: 'Uncategorized',
   resourceFolderRoot: 'Root',
-  resourceLibrarySelect: 'Select Library',
+  resourceSourceSetSelect: 'Select Source Set',
   resourceNewFolder: 'New Folder',
   resourceMoveToFolder: 'Move to Folder',
   resourceFolderDeleteConfirm: 'Delete Folder',
-  resourceFolderDeleteDesc: 'The folder will be moved to the recycle bin. You can restore it from Resources.',
+  resourceFolderDeleteDesc: 'The folder will be moved to the recycle bin. You can restore it from Content.',
   resourceCreateFolder: 'Create Folder',
   resourceCreateFolderPlaceholder: 'Folder name',
   resourceSortBy: 'Sort by',
@@ -2553,7 +2553,7 @@ const zh_tw: TranslationKeys = {
   chatToolStreamingAddExperience: '正在添加經驗記憶…',
   chatToolStreamingAddPreference: '正在添加偏好記憶…',
   chatToolStreamingWebSearch: '正在搜索…',
-  chatToolStreamingKnowledgeBase: '正在檢索知識庫…',
+  chatToolStreamingSourceSet: '正在檢索來源集…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
   chatToolStreamingRunning: '執行中…',
   chatToolTapToExpand: '點擊展開',
@@ -2674,8 +2674,8 @@ const zh_tw: TranslationKeys = {
   notebookDocTitlePlaceholder: '文檔標題...',
   notebookDocContentPlaceholder: '開始用 Markdown 撰寫...',
   notebookDeleteConfirm: '刪除文檔',
-  notebookDeleteDesc: '此文檔將移至資源回收筒，可於「資源」頁的回收筒還原。',
-  notebookDeletedToTrash: '已移至資源回收筒。如需還原請至「資源」頁。',
+  notebookDeleteDesc: '此文檔將移至回收筒，可於「內容」頁的回收筒還原。',
+  notebookDeletedToTrash: '已移至回收筒。如需還原請至「內容」頁。',
   notebookDeleteFailed: '無法刪除文檔',
   notebookEditorMore: '更多選項',
   notebookListOpenDoc: '開啟',
@@ -2901,7 +2901,7 @@ const zh_tw: TranslationKeys = {
   fileDocument: '文件',
   fileDocumentDesc: '附加文件、筆記、PDF 或其他補充資料。',
   fileFromWorkspace: '從工作區',
-  fileFromWorkspaceDesc: '從資源工作區導入文件。',
+  fileFromWorkspaceDesc: '從內容頁導入文件。',
   fileGallery: '相簿',
   fileGalleryDesc: '從相簿選取一張或多張圖片。',
   fileNewFolderDesc: '在目前位置建立資料夾。',
@@ -3163,7 +3163,7 @@ const zh_tw: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  resourceTitle: '資源',
+  resourceTitle: '內容',
   resourceTabAll: '全部',
   resourceTabImages: '圖片',
   resourceTabDocuments: '文件',
@@ -3175,7 +3175,7 @@ const zh_tw: TranslationKeys = {
   resourceUploadFile: '選擇檔案',
   resourceDeleting: '刪除中…',
   resourceDeleteConfirm: '刪除檔案',
-  resourceDeleteDesc: '檔案將移至資源回收筒，可於資源頁的回收筒還原。',
+  resourceDeleteDesc: '檔案將移至回收筒，可在內容頁的回收筒還原。',
   resourceUploadFailed: '上傳失敗',
   resourceUploaded: '上傳成功',
   resourceDownload: '下載',
@@ -3186,7 +3186,7 @@ const zh_tw: TranslationKeys = {
   resourceCollapseAll: '全部收合',
   resourceCurrentFolder: '目前資料夾',
   resourceExpandAll: '全部展開',
-  resourceExplorer: '資料總管',
+  resourceExplorer: '內容目錄',
   resourceOpenExternal: '在瀏覽器中打開',
   resourcePreviewUnavailable: '無法載入預覽',
   resourceDeleteFailed: '刪除失敗',
@@ -3197,8 +3197,8 @@ const zh_tw: TranslationKeys = {
   resourceShareLinkTitle: '分享連結',
   resourceShareLinkSheetSubtitle: '會建立有期限的連結供他人開啟，與直接傳送原始檔案不同。',
   resourceShareCreateLinkAction: '建立分享連結',
-  resourceShareLibraryMenuTitle: '資源庫分享',
-  resourceFolderOpenNeedsLibrary: '請先在上方選擇資源庫，才能瀏覽資料夾。',
+  resourceShareSourceSetMenuTitle: '來源集分享',
+  resourceFolderOpenNeedsSourceSet: '請先在上方選擇來源集，才能瀏覽資料夾。',
   resourceBatchShareLink: '分享連結',
   resourceShareExpiresLabel: '連結有效期限',
   resourceShareExpires1d: '1 天',
@@ -3207,7 +3207,7 @@ const zh_tw: TranslationKeys = {
   resourceSharePasswordOptional: '密碼（選填）',
   resourceSharePasswordPlaceholder: '留空則不需密碼',
   resourceShareConfirm: '建立並分享',
-  resourceShareLibrary: '分享資源庫',
+  resourceShareSourceSet: '分享來源集',
   resourcePickerPickLocation: '位置',
   resourceShareManage: '管理分享',
   resourceShareManageLinks: '分享連結',
@@ -3230,12 +3230,12 @@ const zh_tw: TranslationKeys = {
   resourceShareCopyAccess: '複製',
   resourceAccessCopied: '已複製',
   resourceSharedWithMe: '與我分享',
-  resourceSharedWithMeEmpty: '目前沒有人與你分享資源',
+  resourceSharedWithMeEmpty: '暫時沒有人與你分享內容',
   resourceSharedWithMeLoadFailed: '無法載入分享列表',
   resourceSharedKindFile: '檔案',
   resourceSharedKindDocument: '文件',
-  resourceSharedKindLibrary: '資源庫',
-  resourceSharedFolderHint: '請在資源頁的資源庫中開啟此資料夾。',
+  resourceSharedKindSourceSet: '來源集',
+  resourceSharedFolderHint: '請在內容頁的來源集中開啟此資料夾。',
   resourceShareGrantInheritChildren: '對內部項目生效（繼承）',
   resourceShareGrantCanReshare: '允許此編輯者管理分享',
   resourceShareGrantExpiresPlaceholder: '存取過期（選填，YYYY-MM-DD）',
@@ -3249,9 +3249,9 @@ const zh_tw: TranslationKeys = {
   resourceShareGrantExpirySelected: '到期：',
   resourceShareMemberCanReshare: '可管理分享',
   resourceShareMemberInheritOff: '不繼承至子項目',
-  resourcePublicShareTitle: '分享的資源',
+  resourcePublicShareTitle: '分享的內容',
   resourcePublicSharePasswordTitle: '受密碼保護',
-  resourcePublicSharePasswordSubtitle: '輸入密碼以檢視此資源。',
+  resourcePublicSharePasswordSubtitle: '輸入密碼以檢視此內容。',
   resourcePublicSharePasswordPlaceholder: '密碼',
   resourcePublicShareUnlock: '解鎖',
   resourcePublicShareNotFound: '分享連結無效或已過期。',
@@ -3259,8 +3259,8 @@ const zh_tw: TranslationKeys = {
   resourcePublicShareDownload: '下載檔案',
   resourceSharedAccessNoExpiry: '無過期',
   resourceSharedPermissionValidUntil: '存取有效至',
-  resourceShareAccessOk: '你可以存取此資源',
-  resourceShareAccessDenied: '你無法存取此資源',
+  resourceShareAccessOk: '你可以存取此內容',
+  resourceShareAccessDenied: '你無法存取此內容',
   resourceShareAccessUnknown: '無法載入存取詳情',
   resourceShareAccessViaSpace: '透過空間成員身分',
   resourceShareAccessViaDirect: '有人直接與你分享',
@@ -3270,7 +3270,7 @@ const zh_tw: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     '擁有連結的人將無法再開啟。之後可以建立新連結，但舊連結會永久失效。',
   resourceShareConfirmRevokeTitle: '要移除此人嗎？',
-  resourceShareConfirmRevokeMessage: '對方將失去此資源的存取權。',
+  resourceShareConfirmRevokeMessage: '對方將失去對此內容的存取權。',
   resourceShareRetry: '重試',
   resourceShareGrantUsernamePlaceholder: '使用者名稱',
   resourceUntitled: '未命名',
@@ -3278,19 +3278,19 @@ const zh_tw: TranslationKeys = {
   resourcePublicShareNotFoundHint:
     '請確認連結與密碼是否正確；密碼錯誤時顯示可能與連結過期相同。',
   resourcePublicShareDownloadFailed: '無法開啟下載連結。',
-  resourcePublicShareKbHint: '若要瀏覽完整資源庫與檔案列表，請在瀏覽器使用 LobeHub。',
+  resourcePublicShareSourceSetHint: '若要瀏覽完整來源集與檔案列表，請在瀏覽器使用 LobeHub。',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: '全部檔案',
-  resourceLibraryInbox: '未归类',
+  resourceAllFiles: '全部檔案',
+  resourceSourceSetUnassigned: '未分類',
   resourceFolderRoot: '根目錄',
-  resourceLibrarySelect: '選擇資源庫',
+  resourceSourceSetSelect: '選擇來源集',
   resourceNewFolder: '新建資料夾',
   resourceMoveToFolder: '移至資料夾',
   resourceFolderDeleteConfirm: '刪除資料夾',
-  resourceFolderDeleteDesc: '資料夾將移至資源回收筒，可於資源頁的回收筒還原。',
+  resourceFolderDeleteDesc: '資料夾將移至回收筒，可在內容頁的回收筒還原。',
   resourceCreateFolder: '建立資料夾',
   resourceCreateFolderPlaceholder: '資料夾名稱',
   resourceSortBy: '排序',
@@ -3745,7 +3745,7 @@ const zh: TranslationKeys = {
   chatToolStreamingAddExperience: '正在添加经验记忆…',
   chatToolStreamingAddPreference: '正在添加偏好记忆…',
   chatToolStreamingWebSearch: '正在搜索…',
-  chatToolStreamingKnowledgeBase: '正在检索知识库…',
+  chatToolStreamingSourceSet: '正在检索来源集…',
   chatToolStreamingSearchSkill: '正在搜索技能…',
   chatToolStreamingRunning: '执行中…',
   chatToolTapToExpand: '点击展开',
@@ -3867,8 +3867,8 @@ const zh: TranslationKeys = {
   notebookDocTitlePlaceholder: '文档标题...',
   notebookDocContentPlaceholder: '开始用 Markdown 撰写...',
   notebookDeleteConfirm: '删除文档',
-  notebookDeleteDesc: '该文档将移至回收站，可在「资源」页的回收站中恢复。',
-  notebookDeletedToTrash: '已移至回收站。如需恢复请打开「资源」页。',
+  notebookDeleteDesc: '该文档将移至回收站，可在「内容」页的回收站中恢复。',
+  notebookDeletedToTrash: '已移至回收站。如需恢复请打开「内容」页。',
   notebookDeleteFailed: '无法删除文档',
   notebookEditorMore: '更多选项',
   notebookListOpenDoc: '打开',
@@ -4093,7 +4093,7 @@ const zh: TranslationKeys = {
   fileDocument: '文档',
   fileDocumentDesc: '附加文件、笔记、PDF 或其他补充材料。',
   fileFromWorkspace: '从工作区',
-  fileFromWorkspaceDesc: '从资源工作区导入文件。',
+  fileFromWorkspaceDesc: '从内容页导入文件。',
   fileGallery: '相册',
   fileGalleryDesc: '从相册选择一张或多张图片。',
   fileNewFolderDesc: '在当前位置创建文件夹。',
@@ -4355,8 +4355,8 @@ const zh: TranslationKeys = {
   providerDetailPlaceholderRegion: 'us-east-1',
   providerDetailPlaceholderApiVersion: '2024-02-01',
 
-  // Resources / Files
-  resourceTitle: '资源',
+  // Content / Files
+  resourceTitle: '内容',
   resourceTabAll: '全部',
   resourceTabImages: '图片',
   resourceTabDocuments: '文档',
@@ -4368,7 +4368,7 @@ const zh: TranslationKeys = {
   resourceUploadFile: '选择文件',
   resourceDeleting: '删除中…',
   resourceDeleteConfirm: '删除文件',
-  resourceDeleteDesc: '文件将移至回收站，可在资源页的回收站中恢复。',
+  resourceDeleteDesc: '文件将移至回收站，可在内容页的回收站中恢复。',
   resourceUploadFailed: '上传失败',
   resourceUploaded: '上传成功',
   resourceDownload: '下载',
@@ -4379,7 +4379,7 @@ const zh: TranslationKeys = {
   resourceCollapseAll: '全部收拢',
   resourceCurrentFolder: '当前文件夹',
   resourceExpandAll: '全部展开',
-  resourceExplorer: '资源目录',
+  resourceExplorer: '内容目录',
   resourceOpenExternal: '在浏览器中打开',
   resourcePreviewUnavailable: '无法加载预览',
   resourceDeleteFailed: '删除失败',
@@ -4390,8 +4390,8 @@ const zh: TranslationKeys = {
   resourceShareLinkTitle: '分享链接',
   resourceShareLinkSheetSubtitle: '将生成限时链接供他人打开，与直接发送原始文件不同。',
   resourceShareCreateLinkAction: '创建分享链接',
-  resourceShareLibraryMenuTitle: '资源库分享',
-  resourceFolderOpenNeedsLibrary: '请先在上方选择资源库，才能浏览文件夹。',
+  resourceShareSourceSetMenuTitle: '来源集分享',
+  resourceFolderOpenNeedsSourceSet: '请先在上方选择来源集，才能浏览文件夹。',
   resourceBatchShareLink: '分享链接',
   resourceShareExpiresLabel: '链接有效期',
   resourceShareExpires1d: '1 天',
@@ -4400,7 +4400,7 @@ const zh: TranslationKeys = {
   resourceSharePasswordOptional: '密码（可选）',
   resourceSharePasswordPlaceholder: '留空则无需密码',
   resourceShareConfirm: '创建并分享',
-  resourceShareLibrary: '分享资源库',
+  resourceShareSourceSet: '分享来源集',
   resourcePickerPickLocation: '位置',
   resourceShareManage: '管理分享',
   resourceShareManageLinks: '分享链接',
@@ -4423,12 +4423,12 @@ const zh: TranslationKeys = {
   resourceShareCopyAccess: '复制',
   resourceAccessCopied: '已复制',
   resourceSharedWithMe: '与我分享',
-  resourceSharedWithMeEmpty: '暂时没有人与你分享资源',
+  resourceSharedWithMeEmpty: '暂时没有人与你分享内容',
   resourceSharedWithMeLoadFailed: '无法加载分享列表',
   resourceSharedKindFile: '文件',
   resourceSharedKindDocument: '文档',
-  resourceSharedKindLibrary: '资源库',
-  resourceSharedFolderHint: '请在资源页的资源库中打开此文件夹。',
+  resourceSharedKindSourceSet: '来源集',
+  resourceSharedFolderHint: '请在内容页的来源集中打开此文件夹。',
   resourceShareGrantInheritChildren: '对内部项目生效（继承）',
   resourceShareGrantCanReshare: '允许该编辑者管理分享',
   resourceShareGrantExpiresPlaceholder: '访问过期（选填，YYYY-MM-DD）',
@@ -4442,9 +4442,9 @@ const zh: TranslationKeys = {
   resourceShareGrantExpirySelected: '到期：',
   resourceShareMemberCanReshare: '可管理分享',
   resourceShareMemberInheritOff: '不继承到子项',
-  resourcePublicShareTitle: '分享的资源',
+  resourcePublicShareTitle: '分享的内容',
   resourcePublicSharePasswordTitle: '受密码保护',
-  resourcePublicSharePasswordSubtitle: '输入密码以查看此资源。',
+  resourcePublicSharePasswordSubtitle: '输入密码以查看此内容。',
   resourcePublicSharePasswordPlaceholder: '密码',
   resourcePublicShareUnlock: '解锁',
   resourcePublicShareNotFound: '分享链接无效或已过期。',
@@ -4452,8 +4452,8 @@ const zh: TranslationKeys = {
   resourcePublicShareDownload: '下载文件',
   resourceSharedAccessNoExpiry: '无过期',
   resourceSharedPermissionValidUntil: '访问有效期至',
-  resourceShareAccessOk: '你可以访问此资源',
-  resourceShareAccessDenied: '你无法访问此资源',
+  resourceShareAccessOk: '你可以访问此内容',
+  resourceShareAccessDenied: '你无法访问此内容',
   resourceShareAccessUnknown: '无法加载访问详情',
   resourceShareAccessViaSpace: '通过空间成员身份',
   resourceShareAccessViaDirect: '有人直接与你分享',
@@ -4463,26 +4463,26 @@ const zh: TranslationKeys = {
   resourceShareConfirmDisableLinkMessage:
     '拥有链接的人将无法再打开。之后可以新建链接，但旧链接将永久失效。',
   resourceShareConfirmRevokeTitle: '要移除此人吗？',
-  resourceShareConfirmRevokeMessage: '对方将失去对此资源的访问权限。',
+  resourceShareConfirmRevokeMessage: '对方将失去对此内容的访问权限。',
   resourceShareRetry: '重试',
   resourceShareGrantUsernamePlaceholder: '用户名',
   resourceUntitled: '未命名',
   resourcePublicShareDocEmpty: '此文档没有可预览的内容。',
   resourcePublicShareNotFoundHint: '请核对链接与密码；密码错误时提示可能与链接过期相同。',
   resourcePublicShareDownloadFailed: '无法打开下载链接。',
-  resourcePublicShareKbHint: '若要查看完整资源库与文件列表，请在浏览器中使用 LobeHub。',
+  resourcePublicShareSourceSetHint: '若要查看完整来源集与文件列表，请在浏览器中使用 LobeHub。',
   resourceBytes: 'B',
   resourceKB: 'KB',
   resourceMB: 'MB',
   resourceGB: 'GB',
-  resourceLibraryAll: '全部文件',
-  resourceLibraryInbox: '未归类',
+  resourceAllFiles: '全部文件',
+  resourceSourceSetUnassigned: '未归类',
   resourceFolderRoot: '根目录',
-  resourceLibrarySelect: '选择资源库',
+  resourceSourceSetSelect: '选择来源集',
   resourceNewFolder: '新建文件夹',
   resourceMoveToFolder: '移动到文件夹',
   resourceFolderDeleteConfirm: '删除文件夹',
-  resourceFolderDeleteDesc: '文件夹将移至回收站，可在资源页的回收站中恢复。',
+  resourceFolderDeleteDesc: '文件夹将移至回收站，可在内容页的回收站中恢复。',
   resourceCreateFolder: '创建文件夹',
   resourceCreateFolderPlaceholder: '文件夹名称',
   resourceSortBy: '排序',

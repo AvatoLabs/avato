@@ -215,7 +215,7 @@ describe('UserModel', () => {
       const newGuide: Partial<UserGuide> = {
         topic: true,
         moveSettingsToAvatar: true,
-        uploadFileInKnowledgeBase: true,
+        uploadFileInSourceSet: true,
       };
       await userModel.updateGuide(newGuide);
 

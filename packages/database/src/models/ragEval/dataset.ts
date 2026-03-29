@@ -1,7 +1,7 @@
 import type { RAGEvalDataSetItem } from '@lobechat/types';
 import { and, desc, eq } from 'drizzle-orm';
 
-import type {NewEvalDatasetsItem } from '../../schemas';
+import type { NewEvalDatasetsItem } from '../../schemas';
 import { evalDatasets } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
@@ -28,7 +28,7 @@ export class EvalDatasetModel {
       .where(and(eq(evalDatasets.id, id), eq(evalDatasets.userId, this.userId)));
   };
 
-  query = async (knowledgeBaseId: string): Promise<RAGEvalDataSetItem[]> => {
+  query = async (sourceSetId: string): Promise<RAGEvalDataSetItem[]> => {
     return this.db
       .select({
         createdAt: evalDatasets.createdAt,
@@ -38,12 +38,7 @@ export class EvalDatasetModel {
         updatedAt: evalDatasets.updatedAt,
       })
       .from(evalDatasets)
-      .where(
-        and(
-          eq(evalDatasets.userId, this.userId),
-          eq(evalDatasets.knowledgeBaseId, knowledgeBaseId),
-        ),
-      )
+      .where(and(eq(evalDatasets.userId, this.userId), eq(evalDatasets.sourceSetId, sourceSetId)))
       .orderBy(desc(evalDatasets.createdAt));
   };
 

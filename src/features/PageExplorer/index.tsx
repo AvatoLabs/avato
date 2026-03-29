@@ -3,13 +3,13 @@
 import { memo, useCallback } from 'react';
 
 import { PageEditor } from '@/features/PageEditor';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import {
   DEFAULT_PAGE_KIND,
   getPageKindFromDocument,
   type PageKind,
   TABLE_PAGE_KIND,
-} from '@/utils/page';
+} from '@/utils/docs';
 
 interface PageExplorerProps {
   pageId: string;
@@ -17,7 +17,7 @@ interface PageExplorerProps {
 }
 
 /**
- * Dedicated for the /page route
+ * Dedicated for the /docs route
  *
  * Work together with a sidebar @/features/Pages/PageLayout/Body
  */
@@ -28,6 +28,8 @@ const PageExplorer = memo<PageExplorerProps>(({ pageId, pageKind = DEFAULT_PAGE_
 
   // Get document title and emoji from PageStore
   const document = usePageStore(pageSelectors.getDocumentById(pageId));
+  const parentId = document?.parentId ?? undefined;
+  const sourceSetId = document?.sourceSetId ?? undefined;
   const title = document?.title;
   const emoji = document?.metadata?.emoji as string | undefined;
   const isTablePage =
@@ -56,6 +58,8 @@ const PageExplorer = memo<PageExplorerProps>(({ pageId, pageKind = DEFAULT_PAGE_
       key={pageId}
       pageId={pageId}
       pageKind={isTablePage ? TABLE_PAGE_KIND : pageKind}
+      parentId={parentId}
+      sourceSetId={sourceSetId}
       title={title}
       onEmojiChange={handleEmojiChange}
       onTitleChange={handleTitleChange}

@@ -1,11 +1,11 @@
-import { resourceRegistry } from '@lobechat/database/schemas';
+import { contentRegistry } from '@lobechat/database/schemas';
 import bcrypt from 'bcryptjs';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
 
 import { auth } from '@/auth';
+import { ContentModel } from '@/database/models/content';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { getServerDB } from '@/database/server';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
 
@@ -30,8 +30,8 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
     log('Share file proxy request (token-first)');
 
     const db = await getServerDB();
-    const resourceModel = new ResourceModel(db, 'anonymous');
-    const link = await resourceModel.resolveShareLinkByToken(token);
+    const contentModel = new ContentModel(db, 'anonymous');
+    const link = await contentModel.resolveShareLinkByToken(token);
 
     if (!link) {
       return new Response('Not found', { status: 404 });
@@ -50,8 +50,8 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
 
     const [reg] = await db
       .select()
-      .from(resourceRegistry)
-      .where(eq(resourceRegistry.resourceUid, link.resourceUid))
+      .from(contentRegistry)
+      .where(eq(contentRegistry.contentUid, link.contentUid))
       .limit(1);
 
     if (!reg || reg.kind !== 'file') {

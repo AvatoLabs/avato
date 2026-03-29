@@ -6,7 +6,9 @@ import useSWR from 'swr';
 
 import { isDesktop } from '@/const/version';
 import { type SearchResult } from '@/database/repositories/search';
-import { useCreateNewModal } from '@/features/LibraryModal';
+import { buildSourceSetPath } from '@/features/ResourceSpaces';
+import { useCreateSourceSetModal } from '@/features/SourceSetModal';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useGroupWizard } from '@/layout/GlobalProvider/GroupWizardProvider';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks';
@@ -50,7 +52,7 @@ export const useCommandMenu = () => {
   const inboxAgentId = useAgentStore(builtinAgentSelectors.inboxAgentId);
   const { openGroupWizard } = useGroupWizard();
   const { createGroupWithMembers, createGroupFromTemplate, createPage } = useCreateMenuItems();
-  const { open: openCreateLibraryModal } = useCreateNewModal();
+  const { open: openCreateSourceSetModal } = useCreateSourceSetModal();
 
   // Extract agentId from pathname when in agent context
   const agentId = useMemo(() => {
@@ -185,14 +187,14 @@ export const useCommandMenu = () => {
     onClose();
   }, [openNewTopicOrSaveTopic, onClose]);
 
-  const handleCreateLibrary = useCallback(() => {
+  const handleCreateSourceSet = useCallback(() => {
     onClose();
-    openCreateLibraryModal({
+    openCreateSourceSetModal({
       onSuccess: (id) => {
-        navigate(`/resource/library/${id}`);
+        navigate(buildSourceSetPath(getActiveWorkspaceSpaceId(), id));
       },
     });
-  }, [onClose, openCreateLibraryModal, navigate]);
+  }, [onClose, openCreateSourceSetModal, navigate]);
 
   const handleCreatePage = useCallback(async () => {
     await createPage();
@@ -217,7 +219,7 @@ export const useCommandMenu = () => {
     handleAskLobeAI,
     handleBack,
     handleCreateAgentTeam,
-    handleCreateLibrary,
+    handleCreateSourceSet,
     handleCreatePage,
     handleCreateSession,
     handleCreateTopic,

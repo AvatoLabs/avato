@@ -20,6 +20,6 @@
   "notebook.delete": "حذف",
   "notebook.empty": "لا توجد صفحات بعد. ستظهر الصفحات المرتبطة بهذا الموضوع هنا.",
   "notebook.title": "دفتر الملاحظات",
-  "openInPageEditor": "تحرير في الصفحة",
+  "openInDocEditor": "تحرير في الصفحة",
   "title": "مساحة العمل"
 }

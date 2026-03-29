@@ -30,6 +30,14 @@ export default ({ token }: { prefixCls: string; token: Theme }) => css`
     transform: translateZ(0);
   }
 
+  ::selection {
+    background: ${token.colorPrimaryBgHover};
+  }
+
+  html[data-theme='dark'] ::selection {
+    color: ${token.colorTextLightSolid};
+  }
+
   * {
     scrollbar-color: ${token.colorFill} transparent;
     scrollbar-width: thin;

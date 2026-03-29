@@ -21,11 +21,11 @@ import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 
 import { lambdaClient } from '@/libs/trpc/client';
-import { type ResourceKind, type ResourcePermissionItem } from '@/types/resource';
+import { type ContentKind, type ContentPermissionItem } from '@/types/content';
 
 interface ResourceShareModalProps {
   id: string;
-  kind: ResourceKind;
+  kind: ContentKind;
   name: string;
 }
 
@@ -48,10 +48,10 @@ const getPermissionRoleKey = (role: 'editor' | 'owner' | 'viewer') => {
   return 'share.roles.viewer' as const;
 };
 
-const getPermissionLabel = (permission: ResourcePermissionItem) =>
+const getPermissionLabel = (permission: ContentPermissionItem) =>
   permission.subjectName || permission.subjectUsername || permission.subjectId;
 
-const getPermissionSubLabel = (permission: ResourcePermissionItem) =>
+const getPermissionSubLabel = (permission: ContentPermissionItem) =>
   permission.subjectUsername ? `@${permission.subjectUsername}` : permission.subjectId;
 
 const getMemberLabel = (member: MemberSearchResult) =>
@@ -95,7 +95,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     mutate: mutatePermissions,
   } = useSWR(
     ['resource-share-permissions', kind, id],
-    () => lambdaClient.resourceShare.listResourcePermissions.query({ id, kind }),
+    () => lambdaClient.contentShare.listContentPermissions.query({ id, kind }),
     {
       revalidateOnFocus: false,
       shouldRetryOnError: false,
@@ -109,7 +109,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     mutate: mutateLinks,
   } = useSWR(
     ['resource-share-links', kind, id],
-    () => lambdaClient.resourceShare.listResourceShareLinks.query({ id, kind }),
+    () => lambdaClient.contentShare.listContentShareLinks.query({ id, kind }),
     {
       revalidateOnFocus: false,
       shouldRetryOnError: false,
@@ -121,8 +121,8 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     isLoading: accessLoading,
     mutate: mutateAccess,
   } = useSWR(
-    ['resource-share-explain', kind, id],
-    () => lambdaClient.resourceShare.explainAccess.query({ id, kind }),
+    ['content-share-explain', kind, id],
+    () => lambdaClient.contentShare.explainContentAccess.query({ id, kind }),
     {
       revalidateOnFocus: false,
       shouldRetryOnError: false,
@@ -209,7 +209,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     setGranting(true);
 
     try {
-      await lambdaClient.resourceShare.grantResourcePermission.mutate({
+      await lambdaClient.contentShare.grantContentPermission.mutate({
         canReshare: role === 'editor' && canReshare,
         expiresAt: resolvedExpiresAt,
         id,
@@ -235,7 +235,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
     setCreatingLink(true);
 
     try {
-      const link = await lambdaClient.resourceShare.createResourceShareLink.mutate({
+      const link = await lambdaClient.contentShare.createContentShareLink.mutate({
         expiresInDays,
         id,
         kind,
@@ -592,7 +592,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                                       setRevokingPermissionId(permission.id);
 
                                       try {
-                                        await lambdaClient.resourceShare.revokeResourcePermission.mutate(
+                                        await lambdaClient.contentShare.revokeContentPermission.mutate(
                                           {
                                             permissionId: permission.id,
                                           },
@@ -743,7 +743,7 @@ const ResourceShareModal = memo<ResourceShareModalProps>(({ id, kind, name }) =>
                               setDisablingLinkId(link.id);
 
                               try {
-                                await lambdaClient.resourceShare.disableResourceShareLink.mutate({
+                                await lambdaClient.contentShare.disableContentShareLink.mutate({
                                   shareLinkId: link.id,
                                 });
                                 await refresh();

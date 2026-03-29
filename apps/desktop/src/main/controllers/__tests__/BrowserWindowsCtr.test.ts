@@ -1,7 +1,8 @@
-import { InterceptRouteParams } from '@lobechat/electron-client-ipc';
-import { Mock, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { InterceptRouteParams } from '@lobechat/electron-client-ipc';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AppBrowsersIdentifiers, BrowsersIdentifiers } from '@/appBrowsers';
+import type { AppBrowsersIdentifiers } from '@/appBrowsers';
 import type { App } from '@/core/App';
 import type { IpcContext } from '@/utils/ipc';
 import { runWithIpcContext } from '@/utils/ipc';
@@ -152,8 +153,8 @@ describe('BrowserWindowsCtr', () => {
     it('should open target window if matched route is found', async () => {
       const params: InterceptRouteParams = {
         ...baseParams,
-        path: '/other/page',
-        url: 'app://host/other/page',
+        path: '/other/docs',
+        url: 'app://host/other/docs',
       };
       const targetWindowIdentifier = 'some-other-window' as AppBrowsersIdentifiers;
       const matchedRoute = { targetWindow: targetWindowIdentifier, pathPrefix: '/other' };

@@ -5,7 +5,7 @@ import { Copy, Edit, LanguagesIcon, Play, RotateCcw, Trash } from 'lucide-react'
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { localeOptions } from '@/locales/resources';
+import { localeOptions } from '@/locales/contents';
 import { type UIChatMessage } from '@/types/index';
 
 import { messageStateSelectors, useConversationStore } from '../../../store';

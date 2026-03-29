@@ -9,7 +9,7 @@ import { CustomMDX } from '@/components/mdx';
 import { documentService } from '@/services/document';
 import { type LobeDocument } from '@/types/document';
 
-import { usePageAgentContextFallback } from '../../hooks/usePageAgentContextFallback';
+import { useDocsAgentContextFallback } from '../../hooks/useDocsAgentContextFallback';
 import NotSupport from '../../NotSupport';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -56,15 +56,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 interface ExcelViewerProps {
-  enablePageAgentContext?: boolean;
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   fileId: string;
   fileName?: string;
-  pageAgentContextKey?: string;
   url: string | null;
 }
 
 const ExcelViewer = memo<ExcelViewerProps>(
-  ({ enablePageAgentContext, fileId, fileName, pageAgentContextKey, url }) => {
+  ({ enableDocsAgentContext, fileId, fileName, docsAgentContextKey, url }) => {
     const [preview, setPreview] = useState<LobeDocument | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -120,9 +120,9 @@ const ExcelViewer = memo<ExcelViewerProps>(
 
     const currentContent = selectedSheet?.pageContent || preview?.content || '';
 
-    usePageAgentContextFallback({
-      contextKey: pageAgentContextKey,
-      enabled: enablePageAgentContext,
+    useDocsAgentContextFallback({
+      contextKey: docsAgentContextKey,
+      enabled: enableDocsAgentContext,
       fileId,
       fileName,
       text: currentContent,

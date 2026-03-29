@@ -86,7 +86,7 @@ export const contentBlocksToString = (blocks: ToolCallContent[] | null | undefin
         }
 
         case 'resource': {
-          return `<resource type="${item.type}">${JSON.stringify(item.resource)}</resource>}`;
+          return `<resource type="${item.type}">${JSON.stringify(item.resource)}</content>}`;
         }
 
         default: {

@@ -26,7 +26,7 @@ vi.mock('@/server/services/file', () => ({
 }));
 
 // Mock SkillResourceService to avoid S3 dependency
-vi.mock('@/server/services/skill/resource', () => ({
+vi.mock('@/server/services/skill/content', () => ({
   SkillResourceService: vi.fn().mockImplementation(() => ({
     storeResources: vi.fn().mockResolvedValue({}),
     readResource: vi.fn().mockRejectedValue(new Error('Resource not found')),

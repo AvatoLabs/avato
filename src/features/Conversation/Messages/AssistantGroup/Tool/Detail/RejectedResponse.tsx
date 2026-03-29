@@ -15,7 +15,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   title: css`
     font-size: 14px;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
 }));
 

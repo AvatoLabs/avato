@@ -102,7 +102,7 @@ const createMockResponseWithMultipleTools = (roundNum: number) => {
         type: 'function_call',
         call_id: toolCallId2,
         name: 'lobe-web-browsing____crawl____builtin',
-        arguments: JSON.stringify({ url: `https://example.com/page${roundNum}` }),
+        arguments: JSON.stringify({ url: `https://example.com/docs${roundNum}` }),
       },
     },
     {
@@ -136,7 +136,7 @@ const createMockResponseWithMultipleTools = (roundNum: number) => {
             type: 'function_call',
             call_id: toolCallId2,
             name: 'lobe-web-browsing____crawl____builtin',
-            arguments: JSON.stringify({ url: `https://example.com/page${roundNum}` }),
+            arguments: JSON.stringify({ url: `https://example.com/docs${roundNum}` }),
           },
         ],
         usage: {

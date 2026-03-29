@@ -112,15 +112,15 @@ export class GlobalGeneralActionImpl {
     }
   };
 
-  updateResourceManagerColumnWidth = (column: 'name' | 'date' | 'size', width: number): void => {
-    const currentWidths = this.#get().status.resourceManagerColumnWidths || {
+  updateContentManagerColumnWidth = (column: 'name' | 'date' | 'size', width: number): void => {
+    const currentWidths = this.#get().status.contentManagerColumnWidths || {
       date: 160,
       name: 574,
       size: 140,
     };
 
     this.#get().updateSystemStatus({
-      resourceManagerColumnWidths: {
+      contentManagerColumnWidths: {
         ...currentWidths,
         [column]: width,
       },

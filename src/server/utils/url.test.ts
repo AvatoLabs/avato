@@ -27,7 +27,7 @@ describe('getCanonicalUrl', () => {
 
     const { getCanonicalUrl } = await import('./url'); // 动态导入以获取最新的环境变量状态
     const result = getCanonicalUrl('path', 'to', 'page');
-    expect(result).toBe('https://lobechat.com/path/to/page');
+    expect(result).toBe('https://lobechat.com/path/to/docs');
     expect(urlJoin).toHaveBeenCalledWith('https://lobechat.com', 'path', 'to', 'page');
   });
 
@@ -38,7 +38,7 @@ describe('getCanonicalUrl', () => {
 
     const { getCanonicalUrl } = await import('./url'); // 动态导入
     const result = getCanonicalUrl('path', 'to', 'page');
-    expect(result).toBe('https://preview-url.vercel.app/path/to/page');
+    expect(result).toBe('https://preview-url.vercel.app/path/to/docs');
     expect(urlJoin).toHaveBeenCalledWith('https://preview-url.vercel.app', 'path', 'to', 'page');
   });
 
@@ -48,7 +48,7 @@ describe('getCanonicalUrl', () => {
 
     const { getCanonicalUrl } = await import('./url'); // 动态导入
     const result = getCanonicalUrl('path', 'to', 'page');
-    expect(result).toBe('https://lobechat.com/path/to/page');
+    expect(result).toBe('https://lobechat.com/path/to/docs');
     expect(urlJoin).toHaveBeenCalledWith('https://lobechat.com', 'path', 'to', 'page');
   });
 

@@ -83,7 +83,7 @@ describe('UnsavedChangesGuard', () => {
     await waitFor(() => {
       expect(onAutoSave).toHaveBeenCalledTimes(1);
       expect(messageLoadingMock).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'pageEditor.saving', duration: 0 }),
+        expect.objectContaining({ content: 'docEditor.saving', duration: 0 }),
       );
       expect(messageDestroyMock).toHaveBeenCalled();
       expect(blocker.proceed).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ describe('UnsavedChangesGuard', () => {
     await waitFor(() => {
       expect(onAutoSave).toHaveBeenCalledTimes(1);
       expect(messageErrorMock).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'networkError' }),
+        expect.objectContaining({ content: 'docEditor.saveFailed' }),
       );
       expect(blocker.reset).toHaveBeenCalledTimes(1);
       expect(blocker.proceed).not.toHaveBeenCalled();

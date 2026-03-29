@@ -77,7 +77,7 @@ const params = Object.entries(args)
   .map(([key, value]) => `${key}: ${formatToolArgumentValue(value)}`);
 ```
 
-**现状**: 多参数工具（如 `searchKnowledgeBase` 的 `query`、`spaceId`）在摘要中展示前 3 个参数，其余依赖 `formatToolArguments` 的完整 JSON。
+**现状**: 多参数工具（如 `searchSourceSet` 的 `query`、`spaceId`）在摘要中展示前 3 个参数，其余依赖 `formatToolArguments` 的完整 JSON。
 
 ### 2.3 ToolCard 中的 argumentsText 展示
 
@@ -227,7 +227,7 @@ const params = Object.entries(args)
 | lobe-group-agent-builder | createAgent, inviteAgent, updateConfig, ...                   | ✅         | ✅ 通用   | ✅ 通用                                  | -                                   |
 | lobe-group-management    | broadcast, speak, executeAgentTask, executeAgentTasks         | ✅         | ✅        | ✅ broadcast, speak, executeAgentTask(s) | executeAgentTask, executeAgentTasks |
 | lobe-gtd                 | createPlan, execTask, execTasks, ...                          | ✅         | ✅        | createPlan, execTask, execTasks          | createPlan, createTodos             |
-| lobe-knowledge-base      | searchKnowledgeBase                                           | ✅         | ✅        | ✅                                       | -                                   |
+| lobe-source-set          | searchSourceSet                                               | ✅         | ✅        | ✅                                       | -                                   |
 | lobe-local-system        | listLocalFiles, runCommand, searchLocalFiles, ...             | ✅         | ✅ 通用   | ✅ 通用                                  | 全 API                              |
 | lobe-user-memory         | addExperienceMemory, addPreferenceMemory, searchUserMemory    | ✅         | ✅        | addExperienceMemory, addPreferenceMemory | addExperienceMemory                 |
 | lobe-notebook            | createDocument                                                | ✅         | ✅        | ✅                                       | createDocument                      |
@@ -423,7 +423,7 @@ raw messages
 | lobe-notebook            | createDocument                                                     | createDocument                                        |
 | lobe-user-memory         | addExperienceMemory                                                | addExperienceMemory, addPreferenceMemory              |
 | lobe-cloud-sandbox       | executeCode                                                        | executeCode                                           |
-| lobe-knowledge-base      | -                                                                  | searchKnowledgeBase                                   |
+| lobe-source-set          | -                                                                  | searchSourceSet                                       |
 | lobe-web-browsing        | -                                                                  | search                                                |
 | lobe-skill-store         | -                                                                  | searchSkill                                           |
 | lobe-skills              | -                                                                  | searchSkill                                           |
@@ -585,7 +585,7 @@ SSE tool_calls (或 tool_executions)
 | lobe-group-agent-builder | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ❌ (Web 无 intervention)                                             |
 | lobe-group-management    | ✅  | ✅        | broadcast, speak, executeAgentTask, executeAgentTasks | ✅ executeAgentTask, executeAgentTasks (GenericFallbackIntervention) |
 | lobe-gtd                 | ✅  | ✅        | createPlan, execTask, execTasks                       | createPlan, createTodos                                              |
-| lobe-knowledge-base      | ✅  | ✅        | searchKnowledgeBase                                   | ❌                                                                   |
+| lobe-source-set          | ✅  | ✅        | searchSourceSet                                       | ❌                                                                   |
 | lobe-local-system        | ✅  | ✅ 通用   | ✅ 通用 (GenericFallbackStreaming)                    | ✅ 全 API (GenericFallbackIntervention)                              |
 | lobe-user-memory         | ✅  | ✅        | addExperience, addPreference                          | addExperienceMemory                                                  |
 | lobe-notebook            | ✅  | ✅        | createDocument                                        | createDocument                                                       |

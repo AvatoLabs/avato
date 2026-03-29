@@ -30,7 +30,7 @@ const ArtifactIcon = memo<ArtifactProps>(({ type }) => {
     }
     default: {
       return (
-        <Icon color={cssVar.purple} icon={OrigamiIcon} size={{ size: SIZE, strokeWidth: 1.2 }} />
+        <Icon color={cssVar.gold} icon={OrigamiIcon} size={{ size: SIZE, strokeWidth: 1.2 }} />
       );
     }
   }

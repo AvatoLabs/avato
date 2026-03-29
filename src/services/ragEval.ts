@@ -17,8 +17,8 @@ class RAGEvalService {
     return lambdaClient.ragEval.createDataset.mutate(params);
   };
 
-  getDatasets = async (knowledgeBaseId: string): Promise<RAGEvalDataSetItem[]> => {
-    return lambdaClient.ragEval.getDatasets.query({ knowledgeBaseId });
+  getDatasets = async (sourceSetId: string): Promise<RAGEvalDataSetItem[]> => {
+    return lambdaClient.ragEval.getDatasets.query({ sourceSetId });
   };
 
   removeDataset = async (id: string): Promise<void> => {
@@ -57,8 +57,8 @@ class RAGEvalService {
     return lambdaClient.ragEval.createEvaluation.mutate(params);
   };
 
-  getEvaluationList = async (knowledgeBaseId: string): Promise<RAGEvalEvaluationItem[]> => {
-    return lambdaClient.ragEval.getEvaluationList.query({ knowledgeBaseId });
+  getEvaluationList = async (sourceSetId: string): Promise<RAGEvalEvaluationItem[]> => {
+    return lambdaClient.ragEval.getEvaluationList.query({ sourceSetId });
   };
 
   startEvaluationTask = async (id: string) => {

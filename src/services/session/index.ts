@@ -1,4 +1,4 @@
-import { type KnowledgeItem } from '@lobechat/types';
+import { type AgentSourceItem } from '@lobechat/types';
 import { type PartialDeep } from 'type-fest';
 
 import { lambdaClient } from '@/libs/trpc/client';
@@ -60,7 +60,7 @@ export class SessionService {
     return lambdaClient.session.getConversationFileContents.query(context);
   };
 
-  getConversationFiles = (context: ConversationFileContext): Promise<KnowledgeItem[]> => {
+  getConversationFiles = (context: ConversationFileContext): Promise<AgentSourceItem[]> => {
     return lambdaClient.session.getConversationFiles.query(context);
   };
 

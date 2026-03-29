@@ -19,6 +19,7 @@ import { getChatgptDarkSurfaceTokenOverrides } from '@/const/chatgptDarkSurfaces
 import { LOBE_THEME_NEUTRAL_COLOR, LOBE_THEME_PRIMARY_COLOR } from '@/const/theme';
 import { isDesktop } from '@/const/version';
 import { useIsDark } from '@/hooks/useIsDark';
+import { resolveSolidTextColor, resolveThemeMode } from '@/layout/GlobalProvider/themeShared';
 import { getUILocaleAndResources } from '@/libs/getUILocaleAndResources';
 import Image from '@/libs/next/Image';
 import { useGlobalStore } from '@/store/global';
@@ -168,25 +169,17 @@ const AppTheme = memo<AppThemeProps>(
 
     const currentAppearence = isDark ? 'dark' : 'light';
 
-    /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). Must not use resolved appearance here — that breaks system mode + controlled appearance. */
-    const antdThemeMode = useMemo(() => {
-      switch (themeMode) {
-        case 'light': {
-          return 'light';
-        }
-        case 'dark': {
-          return 'dark';
-        }
-        case 'system':
-        default: {
-          return 'auto';
-        }
-      }
-    }, [themeMode]);
+    /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). */
+    const antdThemeMode = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
+    const solidTextColor = useMemo(
+      () => resolveSolidTextColor(primaryColor, defaultPrimaryColor),
+      [defaultPrimaryColor, primaryColor],
+    );
 
     const customToken = useCallback(
-      ({ isDarkMode }: CustomTokenParams) => getChatgptDarkSurfaceTokenOverrides(isDarkMode),
-      [],
+      ({ isDarkMode }: CustomTokenParams) =>
+        getChatgptDarkSurfaceTokenOverrides(isDarkMode, solidTextColor),
+      [solidTextColor],
     );
 
     return (
@@ -203,8 +196,8 @@ const AppTheme = memo<AppThemeProps>(
           theme={{
             cssVar: { key: 'lobe-vars' },
             token: {
-              /** @lobehub/ui dark 算法把 colorTextLightSolid 设成 colorBgLayout，主色实心按钮会黑字；必须写进 antd theme（customToken 进不了 ConfigProvider） */
-              ...(isDark ? { colorTextLightSolid: '#ffffff' } : {}),
+              // Keep solid primary surfaces legible across bright and dark accents.
+              colorTextLightSolid: solidTextColor,
               fontFamily: customFontFamily
                 ? `${customFontFamily},${antdTheme.fontFamily}`
                 : undefined,

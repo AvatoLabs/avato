@@ -46,7 +46,7 @@ export interface RAGEvalEvaluationItem {
 export const insertEvalEvaluationSchema = z.object({
   datasetId: z.string(),
   description: z.string().optional(),
-  knowledgeBaseId: z.string(),
+  sourceSetId: z.string(),
   name: z.string(),
 });
 

@@ -54,16 +54,24 @@ export interface LobeDocument {
    * Parent Folder ID
    */
   parentId?: string | null;
-
   /**
    * Full path of the original file
    */
   source: string;
+  /**
+   * Source set association when the document is indexed for retrieval.
+   */
+  sourceSetId?: string | null;
 
   /**
    * Document source type
    */
   sourceType: DocumentSourceType;
+
+  /**
+   * Owning space for this document.
+   */
+  spaceId?: string | null;
 
   /**
    * Document title (if available)
@@ -89,7 +97,7 @@ export interface LobeDocument {
 }
 
 /**
- * Represents a logical unit/page/block in a file
+ * Represents a logical unit/docs/block in a file
  */
 export interface LobeDocumentPage {
   /**
@@ -225,6 +233,10 @@ export interface NotebookDocument {
    * Document metadata (e.g., todos for agent/plan documents)
    */
   metadata: Record<string, any> | null;
+  /**
+   * Owning space for this notebook document.
+   */
+  spaceId?: string | null;
   /**
    * Document title
    */

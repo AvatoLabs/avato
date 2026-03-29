@@ -18,10 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../components/ui/ScreenHeader';
 import { useToast } from '../components/ui/Toast';
 import {
+  contentShareApi,
   getApiUrl,
   isSharePasswordRequiredError,
-  type PublicSharedResourcePayload,
-  resourceShareApi,
+  type PublicSharedContentPayload,
 } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
@@ -55,7 +55,7 @@ export default function PublicResourceShareScreen({
   const [passwordDraft, setPasswordDraft] = useState(initialPassword ?? '');
   const [submittedPassword, setSubmittedPassword] = useState<string | undefined>(initialPassword);
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<PublicSharedResourcePayload | null>(null);
+  const [data, setData] = useState<PublicSharedContentPayload | null>(null);
   const [passwordGate, setPasswordGate] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
@@ -71,7 +71,7 @@ export default function PublicResourceShareScreen({
     setLoading(true);
     setNotFound(false);
     try {
-      const res = await resourceShareApi.getSharedResourceByToken({
+      const res = await contentShareApi.getSharedContentByToken({
         password: submittedPassword,
         token,
       });
@@ -117,8 +117,8 @@ export default function PublicResourceShareScreen({
   const kindLabel =
     data?.kind === 'file'
       ? t.resourceSharedKindFile
-      : data?.kind === 'knowledge_base'
-        ? t.resourceSharedKindLibrary
+      : data?.kind === 'source_set'
+        ? t.resourceSharedKindSourceSet
         : t.resourceSharedKindDocument;
 
   return (
@@ -216,9 +216,9 @@ export default function PublicResourceShareScreen({
               {description}
             </Text>
           ) : null}
-          {data.kind === 'knowledge_base' ? (
+          {data.kind === 'source_set' ? (
             <Text className="text-[13px] mt-3 leading-5" style={{ color: colors.secondaryText }}>
-              {t.resourcePublicShareKbHint}
+              {t.resourcePublicShareSourceSetHint}
             </Text>
           ) : null}
 

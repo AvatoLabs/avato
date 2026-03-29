@@ -67,8 +67,8 @@ const Content = memo(() => {
           : null,
         {
           icon: <Icon icon={LibraryBig} />,
-          key: ChatSettingsTabs.Knowledge,
-          label: t('agentTab.knowledge'),
+          key: ChatSettingsTabs.Sources,
+          label: t('agentTab.sources'),
         },
         {
           icon: <Icon icon={MessagesSquareIcon} />,

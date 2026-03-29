@@ -703,7 +703,7 @@ describe('RuntimeExecutors', () => {
         expect(callArgs.capabilities.isCanUseVideo('unknown', 'unknown')).toBe(false);
       });
 
-      it('should filter disabled files and knowledgeBases from agentConfig', async () => {
+      it('should filter disabled files and sourceSets from agentConfig', async () => {
         const ctxWithConfig: RuntimeExecutorContext = {
           ...ctx,
           agentConfig: {
@@ -712,7 +712,7 @@ describe('RuntimeExecutors', () => {
               { content: 'no', enabled: false, id: 'f2', name: 'disabled.pdf' },
               { content: 'maybe', enabled: null, id: 'f3', name: 'null.pdf' },
             ],
-            knowledgeBases: [
+            sourceSets: [
               { enabled: true, id: 'kb1', name: 'Enabled KB' },
               { enabled: false, id: 'kb2', name: 'Disabled KB' },
             ],
@@ -745,8 +745,8 @@ describe('RuntimeExecutors', () => {
         });
 
         // Only enabled knowledge bases
-        expect(callArgs.knowledge.knowledgeBases).toHaveLength(1);
-        expect(callArgs.knowledge.knowledgeBases[0]).toEqual({
+        expect(callArgs.knowledge.sourceSets).toHaveLength(1);
+        expect(callArgs.knowledge.sourceSets[0]).toEqual({
           id: 'kb1',
           name: 'Enabled KB',
         });

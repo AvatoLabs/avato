@@ -22,7 +22,7 @@ describe('KnowledgeInjector', () => {
     it('should inject knowledge before the first user message', async () => {
       const provider = new KnowledgeInjector({
         fileContents: [{ content: 'File content here', fileId: 'file-1', filename: 'test.md' }],
-        knowledgeBases: [],
+        sourceSets: [],
       });
 
       const context = createContext([
@@ -41,10 +41,10 @@ describe('KnowledgeInjector', () => {
       expect(result.metadata.knowledgeInjected).toBe(true);
     });
 
-    it('should skip injection when no files or knowledge bases', async () => {
+    it('should skip injection when no files or source sets', async () => {
       const provider = new KnowledgeInjector({
         fileContents: [],
-        knowledgeBases: [],
+        sourceSets: [],
       });
 
       const context = createContext([{ content: 'Hello', id: 'user-1', role: 'user' }]);
@@ -99,10 +99,10 @@ describe('KnowledgeInjector', () => {
     });
   });
 
-  describe('knowledge bases', () => {
-    it('should inject knowledge bases', async () => {
+  describe('source sets', () => {
+    it('should inject source sets', async () => {
       const provider = new KnowledgeInjector({
-        knowledgeBases: [
+        sourceSets: [
           { description: 'Description 1', id: 'kb-1', name: 'KB 1' },
           { description: 'Description 2', id: 'kb-2', name: 'KB 2' },
         ],
@@ -113,15 +113,15 @@ describe('KnowledgeInjector', () => {
       const result = await provider.process(context);
 
       expect(result.messages[0].content).toMatchSnapshot();
-      expect(result.metadata.knowledgeBasesCount).toBe(2);
+      expect(result.metadata.sourceSetsCount).toBe(2);
     });
   });
 
   describe('mixed content', () => {
-    it('should inject both files and knowledge bases', async () => {
+    it('should inject both files and source sets', async () => {
       const provider = new KnowledgeInjector({
         fileContents: [{ content: 'File content', fileId: 'file-1', filename: 'readme.md' }],
-        knowledgeBases: [{ description: 'API docs', id: 'kb-1', name: 'API Reference' }],
+        sourceSets: [{ description: 'API docs', id: 'kb-1', name: 'API Reference' }],
       });
 
       const context = createContext([{ content: 'Hello', id: 'user-1', role: 'user' }]);
@@ -130,7 +130,7 @@ describe('KnowledgeInjector', () => {
 
       expect(result.messages[0].content).toMatchSnapshot();
       expect(result.metadata.filesCount).toBe(1);
-      expect(result.metadata.knowledgeBasesCount).toBe(1);
+      expect(result.metadata.sourceSetsCount).toBe(1);
     });
   });
 
@@ -184,7 +184,7 @@ describe('KnowledgeInjector', () => {
           { content: 'Content 2', fileId: 'file-2', filename: 'file2.md' },
           { content: 'Content 3', fileId: 'file-3', filename: 'file3.md' },
         ],
-        knowledgeBases: [
+        sourceSets: [
           { description: 'KB 1', id: 'kb-1', name: 'KB1' },
           { description: 'KB 2', id: 'kb-2', name: 'KB2' },
         ],
@@ -196,13 +196,13 @@ describe('KnowledgeInjector', () => {
 
       expect(result.metadata.knowledgeInjected).toBe(true);
       expect(result.metadata.filesCount).toBe(3);
-      expect(result.metadata.knowledgeBasesCount).toBe(2);
+      expect(result.metadata.sourceSetsCount).toBe(2);
     });
 
     it('should not set metadata when no content is injected', async () => {
       const provider = new KnowledgeInjector({
         fileContents: [],
-        knowledgeBases: [],
+        sourceSets: [],
       });
 
       const context = createContext([{ content: 'Hello', id: 'user-1', role: 'user' }]);
@@ -211,7 +211,7 @@ describe('KnowledgeInjector', () => {
 
       expect(result.metadata.knowledgeInjected).toBeUndefined();
       expect(result.metadata.filesCount).toBeUndefined();
-      expect(result.metadata.knowledgeBasesCount).toBeUndefined();
+      expect(result.metadata.sourceSetsCount).toBeUndefined();
     });
   });
 

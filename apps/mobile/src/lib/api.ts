@@ -36,7 +36,6 @@ import type {
   HeatmapDay,
   ImageGenerationParams,
   InstalledPlugin,
-  KnowledgeBaseItem,
   MarketAgent,
   MemoryActivityItem,
   MemoryContextItem,
@@ -53,6 +52,7 @@ import type {
   ModelRankItem,
   RecentTopic,
   SessionRankItem,
+  SourceSetItem,
   Tag,
   Topic,
   TopicRankItem,
@@ -2119,43 +2119,43 @@ export const aiProviderApi = {
     trpcMutate('aiProvider.updateAiProviderConfig', { id, value }),
 };
 
-// ── Knowledge Base API ──────────────────────────────────────────────
+// ── Source Set API ──────────────────────────────────────────────────
 
-export const knowledgeBaseApi = {
+export const sourceSetApi = {
   list: (params?: { spaceId?: string }) =>
-    trpcQuery<KnowledgeBaseItem[]>('knowledgeBase.getKnowledgeBases', params),
+    trpcQuery<SourceSetItem[]>('sourceSet.getSourceSets', params),
 
-  getById: (id: string) => trpcQuery<KnowledgeBaseItem | undefined>('knowledgeBase.getKnowledgeBaseById', { id }),
+  getById: (id: string) => trpcQuery<SourceSetItem | undefined>('sourceSet.getSourceSetById', { id }),
 
   create: (params: { avatar?: string; description?: string; name: string; spaceId?: string }) =>
-    trpcMutate<string | undefined>('knowledgeBase.createKnowledgeBase', params),
+    trpcMutate<string | undefined>('sourceSet.createSourceSet', params),
 
   update: (id: string, value: Record<string, unknown>) =>
-    trpcMutate('knowledgeBase.updateKnowledgeBase', { id, value }),
+    trpcMutate('sourceSet.updateSourceSet', { id, value }),
 
-  addFiles: (knowledgeBaseId: string, ids: string[]) =>
-    trpcMutate('knowledgeBase.addFilesToKnowledgeBase', { ids, knowledgeBaseId }),
+  addFiles: (sourceSetId: string, ids: string[]) =>
+    trpcMutate('sourceSet.addFilesToSourceSet', { ids, sourceSetId }),
 
-  removeFiles: (knowledgeBaseId: string, ids: string[]) =>
-    trpcMutate('knowledgeBase.removeFilesFromKnowledgeBase', { ids, knowledgeBaseId }),
+  removeFiles: (sourceSetId: string, ids: string[]) =>
+    trpcMutate('sourceSet.removeFilesFromSourceSet', { ids, sourceSetId }),
 
   remove: (id: string, removeFiles?: boolean) =>
-    trpcMutate('knowledgeBase.removeKnowledgeBase', { id, removeFiles }),
+    trpcMutate('sourceSet.deleteSourceSet', { id, removeFiles }),
 };
 
 // ── Resource API (unified files + documents with folder support) ─────
 
 export interface ResourceQueryParams {
   category?: string;
-  knowledgeBaseId?: string;
   limit?: number;
   offset?: number;
   parentId?: string | null;
   q?: string | null;
-  showFilesInKnowledgeBase?: boolean;
+  showFilesInSourceSet?: boolean;
   sorter?: 'createdAt' | 'size' | 'name';
   sortType?: 'asc' | 'desc';
-  /** When set with a library context, matches server `getKnowledgeItems` space scoping. */
+  sourceSetId?: string;
+  /** When set with a source set context, matches server `getKnowledgeItems` space scoping. */
   spaceId?: string;
 }
 
@@ -2184,7 +2184,7 @@ export const resourceApi = {
     trpcQuery<ResourceListResponse>('file.getKnowledgeItems', {
       limit: 50,
       offset: 0,
-      showFilesInKnowledgeBase: false,
+      showFilesInSourceSet: false,
       ...params,
     }),
 
@@ -2197,21 +2197,21 @@ export const resourceApi = {
       editorData?: Record<string, any> | null;
       fileType?: string | null;
       id: string;
-      knowledgeBaseId?: string | null;
+      sourceSetId?: string | null;
       parentId?: string | null;
       slug?: string | null;
       title?: string | null;
     }>('document.getDocumentById', { id }),
 
   createFolder: (params: {
-    knowledgeBaseId: string;
+    sourceSetId: string;
     parentId?: string;
     title: string;
   }) =>
     trpcMutate<{ id: string }>('document.createDocument', {
       editorData: '{}',
       fileType: 'custom/folder',
-      knowledgeBaseId: params.knowledgeBaseId,
+      sourceSetId: params.sourceSetId,
       parentId: params.parentId,
       title: params.title,
     }),
@@ -2246,37 +2246,37 @@ export const resourceApi = {
 
   queryTrashedDocuments: (params?: {
     current?: number;
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     pageSize?: number;
   }) =>
     trpcQuery<{ items: TrashedDocumentItem[]; total: number }>('document.queryDocuments', {
       current: params?.current ?? 0,
       pageSize: params?.pageSize ?? 100,
       trash: true,
-      ...(params?.knowledgeBaseId ? { knowledgeBaseId: params.knowledgeBaseId } : {}),
+      ...(params?.sourceSetId ? { sourceSetId: params.sourceSetId } : {}),
     }),
 
   restoreDocument: (id: string) => trpcMutate('document.restoreDocument', { id }),
 };
 
-export type ResourceShareKind = 'document' | 'file' | 'knowledge_base';
+export type ContentShareKind = 'document' | 'file' | 'source_set';
 
 export interface ExplainAccessResult {
   authzEpoch: number;
   canAccess: boolean;
+  contentUid: string;
   matchedBy?: string;
   reason?: string;
-  resourceUid: string;
   spaceId: string;
 }
 
-export interface ResourcePermissionListItem {
+export interface ContentPermissionListItem {
   canReshare?: boolean;
+  contentUid?: string;
   createdAt?: string | Date | null;
   expiresAt?: string | Date | null;
   id: string;
   inheritsToChildren?: boolean;
-  resourceUid?: string;
   role: 'owner' | 'editor' | 'viewer';
   spaceId?: string;
   subjectId?: string;
@@ -2285,91 +2285,91 @@ export interface ResourcePermissionListItem {
   subjectUsername?: string | null;
 }
 
-export interface ResourceShareLinkListItem {
+export interface ContentShareLinkListItem {
+  contentUid?: string;
   createdAt?: string | Date | null;
   disabledAt?: string | Date | null;
   expiresAt?: string | Date | null;
   id: string;
-  resourceUid?: string;
   spaceId?: string;
 }
 
 export interface SharedWithMeListItem {
-  kind: 'document' | 'file' | 'knowledge_base';
+  contentUid: string;
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   name: string;
   parentId?: string | null;
-  resourceUid: string;
   sharedExpiresAt?: string | Date | null;
   sharedInheritsToChildren?: boolean;
   sharedRole?: 'owner' | 'editor' | 'viewer';
   spaceId: string | null;
 }
 
-/** Payload from `getSharedResourceByToken` (shape varies by `kind`). */
-export interface PublicSharedResourcePayload {
+/** Payload from `getSharedContentByToken` (shape varies by `kind`). */
+export interface PublicSharedContentPayload {
   avatar?: string | null;
   content?: string;
-  /** Knowledge base summary text when `kind === 'knowledge_base'`. */
+  contentUid: string;
+  /** Source set summary text when `kind === 'source_set'`. */
   description?: string | null;
   expiresAt: string | Date;
   fileType?: string;
-  kind: 'document' | 'file' | 'knowledge_base';
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   metadata?: unknown;
   name: string;
-  resourceUid: string;
   role: 'viewer';
   spaceId: string | null;
   /** Present for shared documents. */
   title?: string;
 }
 
-export const resourceShareApi = {
-  createResourceShareLink: (params: {
+export const contentShareApi = {
+  createContentShareLink: (params: {
     expiresInDays?: 1 | 7 | 30;
     id?: string;
-    kind?: ResourceShareKind;
+    kind?: ContentShareKind;
     password?: string;
-    resourceUid?: string;
+    contentUid?: string;
   }) =>
     trpcMutate<{
       expiresAt: string;
       fileShareDownloadUrl?: string;
       id: string;
       shareUrl: string;
-    }>('resourceShare.createResourceShareLink', params),
+    }>('contentShare.createContentShareLink', params),
 
-  disableResourceShareLink: (shareLinkId: string) =>
-    trpcMutate<{ success: boolean }>('resourceShare.disableResourceShareLink', { shareLinkId }),
+  disableContentShareLink: (shareLinkId: string) =>
+    trpcMutate<{ success: boolean }>('contentShare.disableContentShareLink', { shareLinkId }),
 
-  explainAccess: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ExplainAccessResult>('resourceShare.explainAccess', params),
+  explainContentAccess: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ExplainAccessResult>('contentShare.explainContentAccess', params),
 
-  getSharedResourceByToken: (params: { password?: string; token: string }) =>
-    trpcQuery<PublicSharedResourcePayload>('resourceShare.getSharedResourceByToken', params),
+  getSharedContentByToken: (params: { password?: string; token: string }) =>
+    trpcQuery<PublicSharedContentPayload>('contentShare.getSharedContentByToken', params),
 
-  grantResourcePermission: (params: {
+  grantContentPermission: (params: {
     canReshare?: boolean;
+    contentUid?: string;
     expiresAt?: Date | string;
     id?: string;
     inheritsToChildren?: boolean;
-    kind?: ResourceShareKind;
-    resourceUid?: string;
+    kind?: ContentShareKind;
     role: 'owner' | 'editor' | 'viewer';
     username: string;
-  }) => trpcMutate<ResourcePermissionListItem>('resourceShare.grantResourcePermission', params),
+  }) => trpcMutate<ContentPermissionListItem>('contentShare.grantContentPermission', params),
 
-  listResourcePermissions: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ResourcePermissionListItem[]>('resourceShare.listResourcePermissions', params),
+  listContentPermissions: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ContentPermissionListItem[]>('contentShare.listContentPermissions', params),
 
-  listResourceShareLinks: (params: { id?: string; kind?: ResourceShareKind; resourceUid?: string }) =>
-    trpcQuery<ResourceShareLinkListItem[]>('resourceShare.listResourceShareLinks', params),
+  listContentShareLinks: (params: { id?: string; kind?: ContentShareKind; contentUid?: string }) =>
+    trpcQuery<ContentShareLinkListItem[]>('contentShare.listContentShareLinks', params),
 
-  listSharedWithMe: () => trpcQuery<SharedWithMeListItem[]>('resourceShare.listSharedWithMe'),
+  listSharedWithMe: () => trpcQuery<SharedWithMeListItem[]>('contentShare.listSharedWithMe'),
 
-  revokeResourcePermission: (permissionId: string) =>
-    trpcMutate<{ success: boolean }>('resourceShare.revokeResourcePermission', { permissionId }),
+  revokeContentPermission: (permissionId: string) =>
+    trpcMutate<{ success: boolean }>('contentShare.revokeContentPermission', { permissionId }),
 };
 
 // ── File / Upload API ──────────────────────────────────────────────
@@ -2384,7 +2384,7 @@ export const fileApi = {
     trpcQuery<FileListItem[]>('file.getFiles', {
       limit: 50,
       offset: 0,
-      showFilesInKnowledgeBase: false,
+      showFilesInSourceSet: false,
       ...params,
     }),
 
@@ -2399,7 +2399,7 @@ export const fileApi = {
     options?: {
       agentId?: string;
       directory?: string;
-      knowledgeBaseId?: string;
+      sourceSetId?: string;
       onProgress?: (progress: number) => void;
       parentId?: string;
       sessionId?: string;
@@ -2441,7 +2441,7 @@ export const fileApi = {
       }>('upload.prepareResourceUpload', {
         filename: name,
         fileType,
-        knowledgeBaseId: options?.knowledgeBaseId,
+        sourceSetId: options?.sourceSetId,
         parentId: options?.parentId,
         sha256: sha256Hex,
         size,
@@ -2482,7 +2482,7 @@ export const fileApi = {
     const created = await trpcMutate<{ id: string; url: string }>('file.createFile', {
       fileType,
       hash: sha256Hex,
-      knowledgeBaseId: options?.knowledgeBaseId,
+      sourceSetId: options?.sourceSetId,
       metadata: fileMetadata,
       name,
       parentId: options?.parentId,

@@ -1,6 +1,6 @@
 import { type BuiltinAgentSlug } from '@lobechat/builtin-agents';
 import { BUILTIN_AGENT_SLUGS, getAgentRuntimeConfig } from '@lobechat/builtin-agents';
-import { PageAgentIdentifier } from '@lobechat/builtin-tool-page-agent';
+import { DocsAgentIdentifier } from '@lobechat/builtin-tool-docs-agent';
 import { type LobeToolManifest } from '@lobechat/context-engine';
 import {
   type ChatCompletionTool,
@@ -73,7 +73,7 @@ export interface AgentConfigResolverContext {
   disableTools?: boolean;
 
   // Builtin agent specific context
-  /** Document content for page-agent */
+  /** Document content for docs-agent */
   documentContent?: string;
 
   /**
@@ -96,7 +96,7 @@ export interface AgentConfigResolverContext {
   /** Current provider */
   provider?: string;
 
-  /** Message map scope (e.g., 'page', 'main', 'thread') */
+  /** Message map scope (e.g., 'doc', 'main', 'thread') */
   scope?: MessageMapScope;
   /** Target agent config for agent-builder */
   targetAgentConfig?: LobeAgentConfig;
@@ -229,25 +229,24 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
     let finalAgentConfig = applyParamsFromChatConfig(agentConfig, chatConfig);
     let finalChatConfig = chatConfig;
 
-    // === Page Editor Auto-Injection ===
-    // When custom agent is used in page editor (scope === 'page'),
-    // automatically inject page-agent tools and system role
-    if (ctx.scope === 'page') {
-      // 1. Inject page-agent tool if not already present
-      const pageAgentPlugins = finalPlugins.includes(PageAgentIdentifier)
+    // === Doc Editor Auto-Injection ===
+    // When a custom agent is used in the doc editor (scope === 'doc'),
+    // automatically inject Docs Agent tools and system role.
+    if (ctx.scope === 'doc') {
+      // 1. Inject Docs Agent tool if not already present.
+      const docsAgentPlugins = finalPlugins.includes(DocsAgentIdentifier)
         ? finalPlugins
-        : [PageAgentIdentifier, ...finalPlugins];
+        : [DocsAgentIdentifier, ...finalPlugins];
 
-      // 2. Get page-agent system prompt from builtin agent runtime
-      const pageAgentRuntime = getAgentRuntimeConfig(BUILTIN_AGENT_SLUGS.pageAgent, {});
-      const pageAgentSystemRole = pageAgentRuntime?.systemRole || '';
+      // 2. Get the Docs Agent system prompt from the builtin agent runtime.
+      const docsAgentRuntime = getAgentRuntimeConfig(BUILTIN_AGENT_SLUGS.docsAgent, {});
+      const docsAgentSystemRole = docsAgentRuntime?.systemRole || '';
 
-      // 3. Merge system roles: custom agent's role + page-agent role
-      // Only append page-agent role if it exists
-      const mergedSystemRole = pageAgentSystemRole
+      // 3. Merge system roles: custom agent role + Docs Agent role.
+      const mergedSystemRole = docsAgentSystemRole
         ? agentConfig.systemRole
-          ? `${agentConfig.systemRole}\n\n${pageAgentSystemRole}`
-          : pageAgentSystemRole
+          ? `${agentConfig.systemRole}\n\n${docsAgentSystemRole}`
+          : docsAgentSystemRole
         : agentConfig.systemRole || '';
 
       finalAgentConfig = {
@@ -255,7 +254,7 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
         systemRole: mergedSystemRole,
       };
 
-      // 4. Apply chatConfig overrides (same as builtin page-copilot)
+      // 4. Apply chatConfig overrides (same as the builtin docs copilot).
       finalChatConfig = {
         ...chatConfig,
         enableHistoryCount: false, // Disable history truncation for full document context
@@ -265,11 +264,11 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
         agentConfig: finalAgentConfig,
         chatConfig: finalChatConfig,
         isBuiltinAgent: false,
-        plugins: applyPluginFilters(pageAgentPlugins),
+        plugins: applyPluginFilters(docsAgentPlugins),
       };
     }
 
-    // Not in page scope - return standard config
+    // Not in doc scope - return standard config.
     return {
       agentConfig: finalAgentConfig,
       chatConfig: finalChatConfig,
@@ -351,24 +350,24 @@ export const resolveAgentConfig = (ctx: AgentConfigResolverContext): ResolvedAge
     ...runtimeConfig?.chatConfig,
   };
 
-  // === Page Editor Auto-Injection for Builtin Agents ===
-  // When a builtin agent (other than page-agent itself) is used in page editor,
-  // inject page-agent tools and system role
-  if (ctx.scope === 'page' && slug !== BUILTIN_AGENT_SLUGS.pageAgent) {
-    // 1. Inject page-agent tool if not already present
-    if (!finalPlugins.includes(PageAgentIdentifier)) {
-      finalPlugins = [PageAgentIdentifier, ...finalPlugins];
+  // === Doc Editor Auto-Injection for Builtin Agents ===
+  // When a builtin agent other than Docs Agent itself is used in the doc editor,
+  // inject Docs Agent tools and system role.
+  if (ctx.scope === 'doc' && slug !== BUILTIN_AGENT_SLUGS.docsAgent) {
+    // 1. Inject Docs Agent tool if not already present.
+    if (!finalPlugins.includes(DocsAgentIdentifier)) {
+      finalPlugins = [DocsAgentIdentifier, ...finalPlugins];
     }
 
-    // 2. Get page-agent system prompt
-    const pageAgentRuntime = getAgentRuntimeConfig(BUILTIN_AGENT_SLUGS.pageAgent, {});
-    const pageAgentSystemRole = pageAgentRuntime?.systemRole || '';
+    // 2. Get the Docs Agent system prompt.
+    const docsAgentRuntime = getAgentRuntimeConfig(BUILTIN_AGENT_SLUGS.docsAgent, {});
+    const docsAgentSystemRole = docsAgentRuntime?.systemRole || '';
 
-    // 3. Merge system roles: builtin agent's role + page-agent role
-    if (pageAgentSystemRole) {
+    // 3. Merge system roles: builtin agent role + Docs Agent role.
+    if (docsAgentSystemRole) {
       resolvedSystemRole = resolvedSystemRole
-        ? `${resolvedSystemRole}\n\n${pageAgentSystemRole}`
-        : pageAgentSystemRole;
+        ? `${resolvedSystemRole}\n\n${docsAgentSystemRole}`
+        : docsAgentSystemRole;
     }
 
     // 4. Apply chatConfig overrides

@@ -14,7 +14,7 @@ export type MessageMapScope =
   | 'group'
   | 'group_agent'
   | 'group_agent_builder'
-  | 'page'
+  | 'doc'
   | 'agent_builder'
   | 'sub_agent';
 
@@ -154,6 +154,11 @@ export interface ConversationContext {
    */
   sourceMessageId?: string;
   /**
+   * Active resource Space (e.g. team library). Optional; callers may map to
+   * `ExecAgentAppContext.spaceId` or similar server payloads for tool/export scoping.
+   */
+  spaceId?: string | null;
+  /**
    * Sub Agent ID for group orchestration scenarios
    * - Used to get Agent config (model, provider, plugins) instead of agentId
    * - Used to set message.agentId (mark message source)
@@ -188,9 +193,4 @@ export interface ConversationContext {
    * When present, allows unauthenticated access to topic messages
    */
   topicShareId?: string;
-  /**
-   * Active resource Space (e.g. team library). Optional; callers may map to
-   * `ExecAgentAppContext.spaceId` or similar server payloads for tool/export scoping.
-   */
-  spaceId?: string | null;
 }

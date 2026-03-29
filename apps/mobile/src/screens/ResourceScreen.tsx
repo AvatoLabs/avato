@@ -1,8 +1,8 @@
 /**
- * ResourceScreen — File / Resource management aligned with web /resource
+ * ResourceScreen — File / Resource management aligned with web /content
  *
  * Features:
- *  • Library selection (All Files / specific library)
+ *  • Source-set selection (unassigned files / specific source set)
  *  • Folder hierarchy with breadcrumb navigation
  *  • List files and folders with tabs: All, Images, Documents, Others
  *  • Create folder, move to folder
@@ -82,30 +82,30 @@ import {
   fileApi,
   type FolderCrumb,
   getApiUrl,
-  knowledgeBaseApi,
   resourceApi,
+  sourceSetApi,
   type TrashedDocumentItem,
 } from '../lib/api';
 import { getAuthHeaders } from '../lib/auth';
 import { useMainTabScrollableContentPaddingBottom } from '../lib/bottomChrome';
-import { haptics } from '../lib/haptics';
-import { useI18n } from '../lib/i18n';
 import {
   clearResourceCacheEntry,
   getResourceCacheEntry,
   listResourceCacheEntries,
   type ResourceCacheEntry,
   saveResourceCacheEntry,
-} from '../lib/resourceCache';
+} from '../lib/contentCache';
 import {
   clearResourceListCache,
   getResourceListCacheEntry,
   saveResourceListCacheEntry,
-} from '../lib/resourceListCache';
+} from '../lib/contentListCache';
+import { haptics } from '../lib/haptics';
+import { useI18n } from '../lib/i18n';
 import { useConnectionStore } from '../store/connection';
 import { useThemeColors } from '../theme/colors';
 import { tokens } from '../theme/tokens';
-import type { FileListItem, KnowledgeBaseItem } from '../types';
+import type { FileListItem, SourceSetItem } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -716,9 +716,9 @@ const FilePreviewModal = memo(
     // Office docs: use Microsoft Office Viewer (same as Web), not Google Docs
     const officeFile = item
       ? item.fileType.includes('msword') ||
-      item.fileType.includes('vnd.openxmlformats') ||
-      item.fileType.includes('vnd.ms-excel') ||
-      item.fileType.includes('vnd.ms-powerpoint')
+        item.fileType.includes('vnd.openxmlformats') ||
+        item.fileType.includes('vnd.ms-excel') ||
+        item.fileType.includes('vnd.ms-powerpoint')
       : false;
     const previewableDoc = textFile || pdfFile || officeFile;
 
@@ -1058,12 +1058,12 @@ const FilePreviewModal = memo(
                 ...(imageFile
                   ? {}
                   : {
-                    shadowColor: colors.shadow,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.03,
-                    shadowRadius: 4,
-                    elevation: 1,
-                  }),
+                      shadowColor: colors.shadow,
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.03,
+                      shadowRadius: 4,
+                      elevation: 1,
+                    }),
               }}
             >
               <TouchableOpacity
@@ -1210,11 +1210,11 @@ const FilePreviewModal = memo(
                           ? { uri: cachedEntry.localUri }
                           : fileUrl
                             ? {
-                              ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
-                                ? { headers: remoteHeaders }
-                                : {}),
-                              uri: fileUrl,
-                            }
+                                ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+                                  ? { headers: remoteHeaders }
+                                  : {}),
+                                uri: fileUrl,
+                              }
                             : undefined
                       }
                       onError={handlePreviewError}
@@ -1416,10 +1416,10 @@ const FilePreviewModal = memo(
           target={
             item
               ? {
-                id: item.id,
-                kind: item.sourceType === 'file' ? 'file' : 'document',
-                name: item.name || item.id,
-              }
+                  id: item.id,
+                  kind: item.sourceType === 'file' ? 'file' : 'document',
+                  name: item.name || item.id,
+                }
               : null
           }
           onClose={() => setShareSheetOpen(false)}
@@ -1518,11 +1518,11 @@ function ResourceThumbnail({
   );
   const remoteThumbnailSource = shouldUseRemoteThumbnail
     ? {
-      ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
-        ? { headers: remoteHeaders }
-        : {}),
-      uri: thumbnailUrl!,
-    }
+        ...(remoteHeaders && Object.keys(remoteHeaders).length > 0
+          ? { headers: remoteHeaders }
+          : {}),
+        uri: thumbnailUrl!,
+      }
     : null;
 
   const handleImageError = useCallback(() => {
@@ -1772,12 +1772,12 @@ export default function ResourceScreen() {
   const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileListItem | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [libraryId, setLibraryId] = useState<string | null>(null);
+  const [sourceSetId, setSourceSetId] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentFolderSlug, setCurrentFolderSlug] = useState<string | null>(null);
   const [folderBreadcrumb, setFolderBreadcrumb] = useState<FolderCrumb[]>([]);
-  const [libraries, setLibraries] = useState<KnowledgeBaseItem[]>([]);
-  const [librarySelectVisible, setLibrarySelectVisible] = useState(false);
+  const [sourceSets, setSourceSets] = useState<SourceSetItem[]>([]);
+  const [sourceSetSelectVisible, setSourceSetSelectVisible] = useState(false);
   const [createFolderVisible, setCreateFolderVisible] = useState(false);
   const [createFolderName, setCreateFolderName] = useState('');
   const [moveToFolderItem, setMoveToFolderItem] = useState<FileListItem | null>(null);
@@ -1813,7 +1813,7 @@ export default function ResourceScreen() {
   const [restoringTrashId, setRestoringTrashId] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<ResourceShareSheetTarget | null>(null);
   const [manageShareTarget, setManageShareTarget] = useState<ResourceShareSheetTarget | null>(null);
-  const [librarySharingMenuVisible, setLibrarySharingMenuVisible] = useState(false);
+  const [sourceSetSharingMenuVisible, setSourceSetSharingMenuVisible] = useState(false);
   const [sharedWithMeVisible, setSharedWithMeVisible] = useState(false);
   const viewabilityConfig = useMemo(
     () => ({ itemVisiblePercentThreshold: 10, minimumViewTime: 100 }),
@@ -1837,32 +1837,32 @@ export default function ResourceScreen() {
   const loadRequestRef = useRef(0);
   const searchRef = useRef<TextInput>(null);
 
-  const librarySpaceId = useMemo(() => {
-    if (!libraryId) return undefined;
-    return libraries.find((l) => l.id === libraryId)?.spaceId ?? undefined;
-  }, [libraryId, libraries]);
+  const sourceSetSpaceId = useMemo(() => {
+    if (!sourceSetId) return undefined;
+    return sourceSets.find((l) => l.id === sourceSetId)?.spaceId ?? undefined;
+  }, [sourceSetId, sourceSets]);
 
   const resourceListQueryParams = useMemo(
     () => ({
-      knowledgeBaseId: libraryId ?? undefined,
+      sourceSetId: sourceSetId ?? undefined,
       limit: RESOURCE_LIST_PAGE_SIZE,
-      parentId: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
+      parentId: sourceSetId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
       q: searchText.trim() || undefined,
-      ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
+      ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
     }),
-    [libraryId, currentFolderId, currentFolderSlug, librarySpaceId, searchText],
+    [sourceSetId, currentFolderId, currentFolderSlug, sourceSetSpaceId, searchText],
   );
 
   /** Stable identity for list reload — avoids re-running when only the loadFiles callback reference changes */
   const resourceListQueryKey = useMemo(
     () =>
       JSON.stringify({
-        kb: libraryId ?? null,
-        parent: libraryId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
+        sourceSet: sourceSetId ?? null,
+        parent: sourceSetId ? (currentFolderId ?? currentFolderSlug ?? null) : null,
         q: searchText.trim() || null,
-        space: librarySpaceId ?? null,
+        space: sourceSetSpaceId ?? null,
       }),
-    [libraryId, currentFolderId, currentFolderSlug, librarySpaceId, searchText],
+    [sourceSetId, currentFolderId, currentFolderSlug, sourceSetSpaceId, searchText],
   );
 
   useEffect(() => {
@@ -2016,12 +2016,12 @@ export default function ResourceScreen() {
 
   // ── Data (defined early for handleBatchDelete etc.) ──────────────────
 
-  const loadLibraries = useCallback(async () => {
+  const loadSourceSets = useCallback(async () => {
     try {
-      const list = await knowledgeBaseApi.list();
-      setLibraries(list ?? []);
+      const list = await sourceSetApi.list();
+      setSourceSets(list ?? []);
     } catch {
-      setLibraries([]);
+      setSourceSets([]);
     }
   }, []);
 
@@ -2036,7 +2036,7 @@ export default function ResourceScreen() {
 
   const syncVisibleTreeChildren = useCallback(
     (parentId: string | null, items: FileListItem[]) => {
-      if (!libraryId || searchText.trim()) return;
+      if (!sourceSetId || searchText.trim()) return;
 
       const treeKey = parentId ?? ROOT_TREE_KEY;
 
@@ -2049,7 +2049,7 @@ export default function ResourceScreen() {
         };
       });
     },
-    [libraryId, searchText],
+    [sourceSetId, searchText],
   );
 
   const loadFiles = useCallback(
@@ -2126,14 +2126,14 @@ export default function ResourceScreen() {
 
   const loadTreeChildren = useCallback(
     async (parentId: string | null, force = false) => {
-      if (!libraryId) return;
+      if (!sourceSetId) return;
 
       const treeKey = parentId ?? ROOT_TREE_KEY;
       const cacheParams = {
-        knowledgeBaseId: libraryId,
+        sourceSetId,
         limit: RESOURCE_TREE_PAGE_SIZE,
         parentId,
-        ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
+        ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
       };
 
       if (!force) {
@@ -2161,11 +2161,11 @@ export default function ResourceScreen() {
 
       try {
         const result = await resourceApi.getKnowledgeItems({
-          knowledgeBaseId: libraryId,
+          sourceSetId,
           limit: RESOURCE_TREE_PAGE_SIZE,
           offset: 0,
           parentId,
-          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
+          ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
         });
 
         const items = result?.items ?? [];
@@ -2192,11 +2192,11 @@ export default function ResourceScreen() {
         });
       }
     },
-    [libraryId, librarySpaceId],
+    [sourceSetId, sourceSetSpaceId],
   );
 
   const refreshTreeData = useCallback(async () => {
-    if (!libraryId) {
+    if (!sourceSetId) {
       setTreeChildrenByParent({});
       setTreeExpandedIds(new Set());
       return;
@@ -2207,7 +2207,7 @@ export default function ResourceScreen() {
     if (currentFolderId) {
       await loadTreeChildren(currentFolderId, true);
     }
-  }, [currentFolderId, libraryId, loadTreeChildren]);
+  }, [currentFolderId, sourceSetId, loadTreeChildren]);
 
   useEffect(() => {
     if (!trashModalVisible) return;
@@ -2218,7 +2218,7 @@ export default function ResourceScreen() {
         const res = await resourceApi.queryTrashedDocuments({
           current: 0,
           pageSize: 100,
-          ...(libraryId ? { knowledgeBaseId: libraryId } : {}),
+          ...(sourceSetId ? { sourceSetId } : {}),
         });
         if (!cancelled) setTrashedDocuments(res?.items ?? []);
       } catch {
@@ -2233,7 +2233,7 @@ export default function ResourceScreen() {
     return () => {
       cancelled = true;
     };
-  }, [libraryId, t.resourceTrashLoadFailed, toast, trashModalVisible]);
+  }, [sourceSetId, t.resourceTrashLoadFailed, toast, trashModalVisible]);
 
   const handleRestoreTrashed = useCallback(
     async (id: string) => {
@@ -2355,12 +2355,12 @@ export default function ResourceScreen() {
   const moveFolderCurrent = moveFolderStack.length > 1 ? moveFolderStack.at(-1) : null;
 
   useEffect(() => {
-    if (moveToFolderItem && libraryId) {
+    if (moveToFolderItem && sourceSetId) {
       resourceApi
         .getKnowledgeItems({
-          knowledgeBaseId: libraryId,
+          sourceSetId,
           parentId: moveFolderParentId,
-          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
+          ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
         })
         .then((res) => {
           const folders = (res?.items ?? []).filter((i) => i.fileType === 'custom/folder');
@@ -2371,7 +2371,7 @@ export default function ResourceScreen() {
       setMoveTargetFolders([]);
       setMoveFolderStack([null]);
     }
-  }, [librarySpaceId, moveFolderParentId, moveToFolderItem, libraryId]);
+  }, [sourceSetSpaceId, moveFolderParentId, moveToFolderItem, sourceSetId]);
 
   const handlePreview = useCallback((item: FileListItem) => {
     haptics.light();
@@ -2384,9 +2384,9 @@ export default function ResourceScreen() {
   }, []);
 
   useEffect(() => {
-    loadLibraries();
+    loadSourceSets();
     void refreshCachedResources();
-  }, [loadLibraries, refreshCachedResources]);
+  }, [loadSourceSets, refreshCachedResources]);
 
   useEffect(() => {
     if (currentFolderSlug) {
@@ -2406,9 +2406,9 @@ export default function ResourceScreen() {
   }, [resourceListQueryKey, refreshCachedResources]);
 
   useEffect(() => {
-    if (!libraryId) return;
+    if (!sourceSetId) return;
     void loadTreeChildren(null);
-  }, [libraryId, loadTreeChildren]);
+  }, [sourceSetId, loadTreeChildren]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -2428,13 +2428,13 @@ export default function ResourceScreen() {
 
   const handleFolderPressResolved = useCallback(
     (item: FileListItem) => {
-      if (!libraryId) {
-        toast.show('info', t.resourceFolderOpenNeedsLibrary);
+      if (!sourceSetId) {
+        toast.show('info', t.resourceFolderOpenNeedsSourceSet);
         return;
       }
       handleFolderPress(item);
     },
-    [handleFolderPress, libraryId, t.resourceFolderOpenNeedsLibrary, toast],
+    [handleFolderPress, sourceSetId, t.resourceFolderOpenNeedsSourceSet, toast],
   );
 
   const handleBreadcrumbPress = useCallback(
@@ -2454,13 +2454,13 @@ export default function ResourceScreen() {
   }, []);
 
   const handleCreateFolder = useCallback(async () => {
-    if (!libraryId) return;
+    if (!sourceSetId) return;
     const name = createFolderName.trim() || t.resourceNewFolder;
     setCreateFolderVisible(false);
     setCreateFolderName('');
     try {
       await resourceApi.createFolder({
-        knowledgeBaseId: libraryId,
+        sourceSetId,
         parentId: currentFolderId ?? currentFolderSlug ?? undefined,
         title: name,
       });
@@ -2472,7 +2472,7 @@ export default function ResourceScreen() {
       toast.show('error', t.resourceUploadFailed);
     }
   }, [
-    libraryId,
+    sourceSetId,
     currentFolderId,
     currentFolderSlug,
     createFolderName,
@@ -2533,7 +2533,7 @@ export default function ResourceScreen() {
       setUploadProgress(0);
       try {
         const created = await fileApi.upload(uri, name, mimeType, {
-          knowledgeBaseId: libraryId ?? undefined,
+          sourceSetId: sourceSetId ?? undefined,
           onProgress: (p) => setUploadProgress(p),
           parentId: currentFolderId ?? currentFolderSlug ?? undefined,
         });
@@ -2573,7 +2573,7 @@ export default function ResourceScreen() {
     [
       currentFolderId,
       currentFolderSlug,
-      libraryId,
+      sourceSetId,
       loadFiles,
       refreshCachedResources,
       refreshTreeData,
@@ -2614,9 +2614,9 @@ export default function ResourceScreen() {
     setAttachmentSheetVisible(true);
   }, []);
 
-  const currentLibraryName = libraryId
-    ? (libraries.find((l) => l.id === libraryId)?.name ?? '')
-    : t.resourceLibraryInbox;
+  const currentSourceSetName = sourceSetId
+    ? (sourceSets.find((l) => l.id === sourceSetId)?.name ?? '')
+    : t.resourceSourceSetUnassigned;
 
   // ── Delete ────────────────────────────────────────────────────────
 
@@ -2707,14 +2707,14 @@ export default function ResourceScreen() {
     [closeActionSheet, openItemShareSheet],
   );
 
-  const handleShareLibrary = useCallback(() => {
-    if (!libraryId) return;
+  const handleShareSourceSet = useCallback(() => {
+    if (!sourceSetId) return;
     setShareTarget({
-      id: libraryId,
-      kind: 'knowledge_base',
-      name: libraries.find((l) => l.id === libraryId)?.name || t.resourceTitle,
+      id: sourceSetId,
+      kind: 'source_set',
+      name: sourceSets.find((l) => l.id === sourceSetId)?.name || t.resourceTitle,
     });
-  }, [libraryId, libraries, t.resourceTitle]);
+  }, [sourceSetId, sourceSets, t.resourceTitle]);
 
   const openManageShareFromItem = useCallback(
     (item: FileListItem) => {
@@ -2728,22 +2728,22 @@ export default function ResourceScreen() {
     [closeActionSheet],
   );
 
-  const openManageLibraryShare = useCallback(() => {
-    if (!libraryId) return;
+  const openManageSourceSetShare = useCallback(() => {
+    if (!sourceSetId) return;
     setManageShareTarget({
-      id: libraryId,
-      kind: 'knowledge_base',
-      name: libraries.find((l) => l.id === libraryId)?.name || t.resourceTitle,
+      id: sourceSetId,
+      kind: 'source_set',
+      name: sourceSets.find((l) => l.id === sourceSetId)?.name || t.resourceTitle,
     });
-  }, [libraryId, libraries, t.resourceTitle]);
+  }, [sourceSetId, sourceSets, t.resourceTitle]);
 
-  const canMoveAction = !!libraryId;
+  const canMoveAction = !!sourceSetId;
 
   const handleSharedWithMePick = useCallback(
     async (row: SharedWithMeRow) => {
       setSharedWithMeVisible(false);
-      if (row.kind === 'knowledge_base') {
-        setLibraryId(row.localId);
+      if (row.kind === 'source_set') {
+        setSourceSetId(row.localId);
         setCurrentFolderId(null);
         setCurrentFolderSlug(null);
         setTreeChildrenByParent({});
@@ -2764,17 +2764,17 @@ export default function ResourceScreen() {
       const doc = await resourceApi.getDocument(row.localId).catch(() => null);
       const ft = doc?.fileType ?? 'text/plain';
       if (ft === 'custom/folder') {
-        const kbId = doc?.knowledgeBaseId;
+        const kbId = doc?.sourceSetId;
         if (typeof kbId === 'string' && kbId.length > 0) {
           const slug = doc?.slug ?? row.localId;
-          setLibraryId(kbId);
+          setSourceSetId(kbId);
           setCurrentFolderId(row.localId);
           setCurrentFolderSlug(slug);
           setTreeChildrenByParent({});
           setTreeExpandedIds(new Set());
           setFolderBreadcrumb([]);
           clearResourceListCache();
-          void loadLibraries();
+          void loadSourceSets();
           void loadFolderBreadcrumb(slug);
           haptics.success();
           return;
@@ -2793,18 +2793,12 @@ export default function ResourceScreen() {
       setPreviewVisible(true);
       haptics.light();
     },
-    [
-      clearResourceListCache,
-      loadFolderBreadcrumb,
-      loadLibraries,
-      toast,
-      t.resourceSharedFolderHint,
-    ],
+    [loadFolderBreadcrumb, loadSourceSets, toast, t.resourceSharedFolderHint],
   );
 
   // ── Filtered & sorted files ────────────────────────────────────────
 
-  const treeMode = libraryId !== null && viewMode === 'list' && !searchText.trim();
+  const treeMode = sourceSetId !== null && viewMode === 'list' && !searchText.trim();
 
   const treeRows = useMemo(() => {
     if (!treeMode) return [];
@@ -2904,7 +2898,7 @@ export default function ResourceScreen() {
   );
 
   const handleExpandAllTree = useCallback(async () => {
-    if (!libraryId) return;
+    if (!sourceSetId) return;
 
     const nextChildren: Record<string, FileListItem[]> = {};
     const expandedIds = new Set<string>();
@@ -2917,11 +2911,11 @@ export default function ResourceScreen() {
       let children = treeChildrenByParent[treeKey];
       if (!children) {
         const result = await resourceApi.getKnowledgeItems({
-          knowledgeBaseId: libraryId,
+          sourceSetId,
           limit: 200,
           offset: 0,
           parentId,
-          ...(librarySpaceId ? { spaceId: librarySpaceId } : {}),
+          ...(sourceSetSpaceId ? { spaceId: sourceSetSpaceId } : {}),
         });
         children = sortFileList(result?.items ?? [], sorter, sortOrder, locale);
       }
@@ -2937,7 +2931,7 @@ export default function ResourceScreen() {
 
     setTreeChildrenByParent((prev) => ({ ...prev, ...nextChildren }));
     setTreeExpandedIds(expandedIds);
-  }, [libraryId, librarySpaceId, locale, sortOrder, sorter, treeChildrenByParent]);
+  }, [sourceSetId, sourceSetSpaceId, locale, sortOrder, sorter, treeChildrenByParent]);
 
   const handleCollapseAllTree = useCallback(() => {
     setTreeExpandedIds(new Set());
@@ -3015,10 +3009,10 @@ export default function ResourceScreen() {
               >
                 <Link2 color={colors.primary} size={20} strokeWidth={tokens.icon.strokeWidth} />
               </HeaderIconButton>
-              {libraryId ? (
+              {sourceSetId ? (
                 <HeaderIconButton
-                  accessibilityLabel={t.resourceShareLibraryMenuTitle}
-                  onPress={() => setLibrarySharingMenuVisible(true)}
+                  accessibilityLabel={t.resourceShareSourceSetMenuTitle}
+                  onPress={() => setSourceSetSharingMenuVisible(true)}
                 >
                   <MoreVertical
                     color={colors.primary}
@@ -3051,7 +3045,7 @@ export default function ResourceScreen() {
             : t.resourceTitle
         }
       >
-        {/* Library selector */}
+        {/* Source-set selector */}
         <TouchableOpacity
           activeOpacity={0.7}
           className="mx-6 mb-2 flex-row items-center rounded-xl px-3.5 py-2.5"
@@ -3060,11 +3054,11 @@ export default function ResourceScreen() {
             borderColor: colors.borderSubtle,
             borderWidth: 1,
           }}
-          onPress={() => setLibrarySelectVisible(true)}
+          onPress={() => setSourceSetSelectVisible(true)}
         >
           <FolderOpen color={colors.primary} size={18} strokeWidth={tokens.icon.strokeWidth} />
           <Text className="ml-2.5 flex-1 text-[14px] font-medium text-foreground" numberOfLines={1}>
-            {currentLibraryName}
+            {currentSourceSetName}
           </Text>
           <ChevronRight color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
         </TouchableOpacity>
@@ -3085,7 +3079,7 @@ export default function ResourceScreen() {
             >
               <ArrowLeft color={colors.primary} size={14} strokeWidth={tokens.icon.strokeWidth} />
               <Text className="ml-1 text-[12px] font-medium" style={{ color: colors.primary }}>
-                {libraryId ? t.resourceFolderRoot : t.resourceLibraryInbox}
+                {sourceSetId ? t.resourceFolderRoot : t.resourceSourceSetUnassigned}
               </Text>
             </TouchableOpacity>
             {folderBreadcrumb.map((crumb, index) => (
@@ -3123,7 +3117,7 @@ export default function ResourceScreen() {
           </ScrollView>
         )}
 
-        {libraryId && treeMode ? (
+        {sourceSetId && treeMode ? (
           <View className="mx-6 mb-2 rounded-2xl border border-border bg-card px-3 py-3">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
@@ -3256,7 +3250,7 @@ export default function ResourceScreen() {
           <TouchableOpacity className="flex-1 items-center" onPress={handleBatchDelete}>
             <Text style={{ color: colors.danger }}>{t.resourceBatchDelete}</Text>
           </TouchableOpacity>
-          {libraryId && (
+          {sourceSetId && (
             <TouchableOpacity className="flex-1 items-center" onPress={handleBatchMove}>
               <Text style={{ color: colors.primary }}>{t.resourceBatchMove}</Text>
             </TouchableOpacity>
@@ -3303,7 +3297,7 @@ export default function ResourceScreen() {
                       {t.resourceUpload}
                     </Text>
                   </TouchableOpacity>
-                  {libraryId && (
+                  {sourceSetId && (
                     <TouchableOpacity
                       activeOpacity={0.7}
                       className="flex-row items-center rounded-2xl px-5 py-3"
@@ -3360,11 +3354,11 @@ export default function ResourceScreen() {
           contentContainerStyle={
             (treeMode ? treeRows.length === 0 : filtered.length === 0)
               ? {
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingBottom: scrollListPaddingBottom,
-              }
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingBottom: scrollListPaddingBottom,
+                }
               : { paddingBottom: scrollListPaddingBottom }
           }
           refreshControl={
@@ -3582,7 +3576,7 @@ export default function ResourceScreen() {
                 item={item}
                 remoteHeaders={resourceAuthHeaders}
                 selectMode={selectMode}
-                showFolderActions={!!libraryId}
+                showFolderActions={!!sourceSetId}
                 onDelete={handleDelete}
                 onFolderPress={handleFolderPressResolved}
                 onInvalidateCache={invalidateCachedResource}
@@ -3591,12 +3585,12 @@ export default function ResourceScreen() {
                 onPress={handlePreview}
                 onSelect={selectMode ? toggleSelect : undefined}
                 onMoveToFolder={
-                  libraryId
+                  sourceSetId
                     ? (i) => {
-                      setMoveToFolderItem(i);
-                      setBatchMoveIds(new Set());
-                      setMoveFolderStack([null]);
-                    }
+                        setMoveToFolderItem(i);
+                        setBatchMoveIds(new Set());
+                        setMoveFolderStack([null]);
+                      }
                     : undefined
                 }
               />
@@ -3645,11 +3639,11 @@ export default function ResourceScreen() {
         onDocument={() => void handlePickFile()}
         onGallery={() => void handlePickPhoto()}
         onNewFolder={
-          libraryId
+          sourceSetId
             ? () => {
-              setAttachmentSheetVisible(false);
-              setCreateFolderVisible(true);
-            }
+                setAttachmentSheetVisible(false);
+                setCreateFolderVisible(true);
+              }
             : undefined
         }
       />
@@ -3803,12 +3797,12 @@ export default function ResourceScreen() {
         accessibilityViewIsModal
         transparent
         animationType="slide"
-        visible={librarySharingMenuVisible}
-        onRequestClose={() => setLibrarySharingMenuVisible(false)}
+        visible={sourceSetSharingMenuVisible}
+        onRequestClose={() => setSourceSetSharingMenuVisible(false)}
       >
         <Pressable
           className="flex-1 justify-end bg-black/40"
-          onPress={() => setLibrarySharingMenuVisible(false)}
+          onPress={() => setSourceSetSharingMenuVisible(false)}
         >
           <Pressable
             className="bg-card rounded-t-2xl overflow-hidden"
@@ -3819,23 +3813,23 @@ export default function ResourceScreen() {
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
             <Text className="px-5 text-[16px] font-semibold text-foreground mb-1">
-              {t.resourceShareLibraryMenuTitle}
+              {t.resourceShareSourceSetMenuTitle}
             </Text>
             <Pressable
               className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
               onPress={() => {
-                setLibrarySharingMenuVisible(false);
-                handleShareLibrary();
+                setSourceSetSharingMenuVisible(false);
+                handleShareSourceSet();
               }}
             >
               <Share2 color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
-              <Text className="ml-3 text-base text-foreground">{t.resourceShareLibrary}</Text>
+              <Text className="ml-3 text-base text-foreground">{t.resourceShareSourceSet}</Text>
             </Pressable>
             <Pressable
               className="flex-row items-center py-3.5 px-5 active:bg-foreground/5"
               onPress={() => {
-                setLibrarySharingMenuVisible(false);
-                openManageLibraryShare();
+                setSourceSetSharingMenuVisible(false);
+                openManageSourceSetShare();
               }}
             >
               <Users color={colors.muted} size={18} strokeWidth={tokens.icon.strokeWidth} />
@@ -3844,7 +3838,7 @@ export default function ResourceScreen() {
             <View className="px-5 mt-1">
               <Pressable
                 className="items-center py-3.5 rounded-xl bg-foreground/[0.04]"
-                onPress={() => setLibrarySharingMenuVisible(false)}
+                onPress={() => setSourceSetSharingMenuVisible(false)}
               >
                 <Text className="text-base font-medium" style={{ color: colors.secondaryText }}>
                   {t.cancel}
@@ -3961,18 +3955,18 @@ export default function ResourceScreen() {
         onSubmit={handleRenameSubmit}
       />
 
-      {/* Library select modal */}
+      {/* Source-set select modal */}
       <Modal
         accessibilityViewIsModal
         transparent
         animationType="slide"
-        visible={librarySelectVisible}
-        onRequestClose={() => setLibrarySelectVisible(false)}
+        visible={sourceSetSelectVisible}
+        onRequestClose={() => setSourceSetSelectVisible(false)}
       >
         <TouchableOpacity
           activeOpacity={1}
           className="flex-1 justify-end bg-black/40"
-          onPress={() => setLibrarySelectVisible(false)}
+          onPress={() => setSourceSetSelectVisible(false)}
         >
           <View
             className="rounded-t-2xl bg-card"
@@ -3982,63 +3976,63 @@ export default function ResourceScreen() {
               <View className="w-9 h-1 rounded-full bg-foreground/10" />
             </View>
             <Text className="px-5 text-[18px] font-bold text-foreground">
-              {t.resourceLibrarySelect}
+              {t.resourceSourceSetSelect}
             </Text>
             <ScrollView className="mt-2 max-h-64">
               <TouchableOpacity
                 activeOpacity={0.7}
                 className="mx-5 flex-row items-center rounded-xl px-4 py-3"
                 style={{
-                  backgroundColor: !libraryId ? colors.primary + '20' : colors.fillTertiary,
+                  backgroundColor: !sourceSetId ? colors.primary + '20' : colors.fillTertiary,
                 }}
                 onPress={() => {
-                  setLibraryId(null);
+                  setSourceSetId(null);
                   setCurrentFolderId(null);
                   setCurrentFolderSlug(null);
                   setTreeChildrenByParent({});
                   setTreeExpandedIds(new Set());
-                  setLibrarySelectVisible(false);
+                  setSourceSetSelectVisible(false);
                 }}
               >
                 <FolderOpen
-                  color={!libraryId ? colors.primary : colors.muted}
+                  color={!sourceSetId ? colors.primary : colors.muted}
                   size={22}
                   strokeWidth={tokens.icon.strokeWidth}
                 />
                 <Text
                   className="ml-3 text-[16px] font-medium"
-                  style={{ color: !libraryId ? colors.primary : colors.foreground }}
+                  style={{ color: !sourceSetId ? colors.primary : colors.foreground }}
                 >
-                  {t.resourceLibraryInbox}
+                  {t.resourceSourceSetUnassigned}
                 </Text>
               </TouchableOpacity>
-              {libraries.map((lib) => (
+              {sourceSets.map((lib) => (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   className="mx-5 mt-1 flex-row items-center rounded-xl px-4 py-3"
                   key={lib.id}
                   style={{
                     backgroundColor:
-                      libraryId === lib.id ? colors.primary + '20' : colors.fillTertiary,
+                      sourceSetId === lib.id ? colors.primary + '20' : colors.fillTertiary,
                   }}
                   onPress={() => {
-                    setLibraryId(lib.id);
+                    setSourceSetId(lib.id);
                     setCurrentFolderId(null);
                     setCurrentFolderSlug(null);
                     setTreeChildrenByParent({});
                     setTreeExpandedIds(new Set());
-                    setLibrarySelectVisible(false);
+                    setSourceSetSelectVisible(false);
                   }}
                 >
                   <FolderOpen
-                    color={libraryId === lib.id ? colors.primary : colors.muted}
+                    color={sourceSetId === lib.id ? colors.primary : colors.muted}
                     size={22}
                     strokeWidth={tokens.icon.strokeWidth}
                   />
                   <Text
                     className="ml-3 flex-1 text-[16px] font-medium"
                     numberOfLines={1}
-                    style={{ color: libraryId === lib.id ? colors.primary : colors.foreground }}
+                    style={{ color: sourceSetId === lib.id ? colors.primary : colors.foreground }}
                   >
                     {lib.name}
                   </Text>

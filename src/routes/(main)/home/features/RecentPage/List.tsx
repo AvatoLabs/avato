@@ -7,7 +7,7 @@ import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleto
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { homeRecentSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
-import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/docs';
 
 import RecentPageItem from './Item';
 
@@ -18,7 +18,11 @@ const RecentPageList = memo(() => {
   // Loading state
   if (!isInit) {
     return (
-      <GroupSkeleton height={RECENT_BLOCK_SIZE.PAGE.HEIGHT} width={RECENT_BLOCK_SIZE.PAGE.WIDTH} />
+      <GroupSkeleton
+        height={RECENT_BLOCK_SIZE.PAGE.HEIGHT}
+        variant={'page'}
+        width={RECENT_BLOCK_SIZE.PAGE.WIDTH}
+      />
     );
   }
 

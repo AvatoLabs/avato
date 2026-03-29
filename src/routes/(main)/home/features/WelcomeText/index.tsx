@@ -6,7 +6,12 @@ import { shuffle } from 'es-toolkit/compat';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const WelcomeText = memo(() => {
+interface WelcomeTextProps {
+  align?: 'center' | 'left';
+  compact?: boolean;
+}
+
+const WelcomeText = memo<WelcomeTextProps>(({ align = 'center', compact = false }) => {
   const { t, i18n } = useTranslation('welcome');
   const locale = i18n.language;
 
@@ -18,9 +23,11 @@ const WelcomeText = memo(() => {
   return (
     <Center
       style={{
-        fontSize: 28,
+        fontSize: compact ? 18 : 28,
         fontWeight: 'bold',
-        marginBlock: '36px 24px',
+        justifyContent: align === 'left' ? 'flex-start' : 'center',
+        marginBlock: compact ? '0' : '36px 24px',
+        width: '100%',
       }}
     >
       <TypewriterEffect

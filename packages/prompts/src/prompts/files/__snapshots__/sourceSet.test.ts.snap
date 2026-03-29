@@ -1,0 +1,103 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`promptAgentSources > should format both files and source sets 1`] = `
+"<agent_knowledge>
+<instruction>The following files and source sets are available. For files, refer to their content directly. For source sets, use the searchSourceSet tool to find relevant information.</instruction>
+<files totalCount="1">
+<file id="file1" name="readme.md">
+File content here
+</file>
+</files>
+<source_sets totalCount="1">
+<source_set id="kb1" name="Internal Docs" description="Company knowledge base" />
+</source_sets>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should format only files when no source sets 1`] = `
+"<agent_knowledge>
+<instruction>The following files are available. Refer to their content directly to answer questions. No source sets are associated.</instruction>
+<files totalCount="2">
+<file id="file1" name="doc1.txt">
+This is the content of document 1
+</file>
+<file id="file2" name="doc2.md">
+This is the content of document 2
+</file>
+</files>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should format only source sets when no files 1`] = `
+"<agent_knowledge>
+<instruction>The following source sets are available for semantic search. Use the searchSourceSet tool to find relevant information.</instruction>
+<source_sets totalCount="2">
+<source_set id="kb1" name="Documentation" description="API documentation" />
+<source_set id="kb2" name="FAQs" />
+</source_sets>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should handle a source set without description 1`] = `
+"<agent_knowledge>
+<instruction>The following source sets are available for semantic search. Use the searchSourceSet tool to find relevant information.</instruction>
+<source_sets totalCount="1">
+<source_set id="kb1" name="Simple KB" />
+</source_sets>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should handle file with error 1`] = `
+"<agent_knowledge>
+<instruction>The following files are available. Refer to their content directly to answer questions. No source sets are associated.</instruction>
+<files totalCount="1">
+<file id="file1" name="missing.txt" error="File not found" />
+</files>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should handle file with multiline content 1`] = `
+"<agent_knowledge>
+<instruction>The following files are available. Refer to their content directly to answer questions. No source sets are associated.</instruction>
+<files totalCount="1">
+<file id="file1" name="multiline.txt">
+Line 1
+Line 2
+Line 3
+
+Line 5 with gap
+</file>
+</files>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should handle file with special characters in filename 1`] = `
+"<agent_knowledge>
+<instruction>The following files are available. Refer to their content directly to answer questions. No source sets are associated.</instruction>
+<files totalCount="1">
+<file id="file1" name="file with spaces &amp; special-chars.txt">
+Special content
+</file>
+</files>
+</agent_knowledge>"
+`;
+
+exports[`promptAgentSources > should handle multiple files and multiple source sets 1`] = `
+"<agent_knowledge>
+<instruction>The following files and source sets are available. For files, refer to their content directly. For source sets, use the searchSourceSet tool to find relevant information.</instruction>
+<files totalCount="3">
+<file id="file1" name="first.txt">
+Content of first file
+</file>
+<file id="file2" name="second.md">
+Content of second file
+</file>
+<file id="file3" name="broken.pdf" error="Parse error" />
+</files>
+<source_sets totalCount="3">
+<source_set id="kb1" name="Tech Docs" description="Technical documentation" />
+<source_set id="kb2" name="User Guides" />
+<source_set id="kb3" name="FAQ Database" description="Frequently asked questions" />
+</source_sets>
+</agent_knowledge>"
+`;

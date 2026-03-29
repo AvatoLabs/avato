@@ -22,7 +22,7 @@ export const loadResources = async (lng: string, ns: string) => {
   }
 
   try {
-    const { default: content } = await import(`@/../../resources/locales/${lng}/${ns}.json`);
+    const { default: content } = await import(`@/../../contents/locales/${lng}/${ns}.json`);
 
     return content;
   } catch (error) {

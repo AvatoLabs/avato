@@ -7,7 +7,7 @@ import { analyticsEnv } from '@/envs/analytics';
 import { appEnv } from '@/envs/app';
 import { fileEnv } from '@/envs/file';
 import { pythonEnv } from '@/envs/python';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { getServerGlobalConfig } from '@/server/globalConfig';
 import { translation } from '@/server/translation';
 import { serializeForHtml } from '@/server/utils/serializeForHtml';

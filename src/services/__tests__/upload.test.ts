@@ -101,7 +101,7 @@ describe('UploadService', () => {
 
     it('should forward space context to prepareResourceUpload', async () => {
       await uploadService.uploadFileToS3(mockFile, {
-        knowledgeBaseId: 'kb_1',
+        sourceSetId: 'kb_1',
         parentId: 'doc_1',
         sha256: 'prefixed',
         spaceId: 'spc_x',
@@ -109,7 +109,7 @@ describe('UploadService', () => {
 
       expect(lambdaClient.upload.prepareResourceUpload.mutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          knowledgeBaseId: 'kb_1',
+          sourceSetId: 'kb_1',
           parentId: 'doc_1',
           sha256: 'prefixed',
           spaceId: 'spc_x',

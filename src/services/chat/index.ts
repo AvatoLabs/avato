@@ -91,10 +91,10 @@ interface FetchAITaskResultParams extends FetchSSEOptions {
 interface CreateAssistantMessageStream extends FetchSSEOptions {
   abortController?: AbortController;
   historySummary?: string;
-  /** Initial context for page editor (captured at operation start) */
+  /** Initial context for doc editor (captured at operation start) */
   initialContext?: RuntimeInitialContext;
   params: GetChatCompletionPayload;
-  /** Step context for page editor (updated each step) */
+  /** Step context for doc editor (updated each step) */
   stepContext?: RuntimeStepContext;
   trace?: TracePayload;
 }

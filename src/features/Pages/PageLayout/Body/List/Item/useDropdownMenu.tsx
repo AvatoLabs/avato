@@ -8,9 +8,9 @@ import { useNavigate } from 'react-router-dom';
 
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
-import { pageSelectors, usePageStore } from '@/store/page';
-import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/docs';
 
 interface ActionProps {
   pageId: string;
@@ -33,19 +33,19 @@ export const useDropdownMenu = ({
   const handleDelete = useCallback(() => {
     modal.confirm({
       cancelText: t('cancel'),
-      content: t('pageEditor.deleteConfirm.content', { ns: 'file' }),
+      content: t('docEditor.deleteConfirm.content', { ns: 'file' }),
       okButtonProps: { danger: true },
       okText: t('delete'),
       onOk: async () => {
         try {
           await removePage(pageId);
-          message.success(t('pageEditor.deleteSuccess', { ns: 'file' }));
+          message.success(t('docEditor.deleteSuccess', { ns: 'file' }));
         } catch (error) {
           console.error('Failed to delete page:', error);
-          message.error(t('pageEditor.deleteError', { ns: 'file' }));
+          message.error(t('docEditor.deleteError', { ns: 'file' }));
         }
       },
-      title: t('pageEditor.deleteConfirm.title', { ns: 'file' }),
+      title: t('docEditor.deleteConfirm.title', { ns: 'file' }),
     });
   }, [message, modal, pageId, removePage, t]);
 

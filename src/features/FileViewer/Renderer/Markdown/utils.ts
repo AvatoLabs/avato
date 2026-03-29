@@ -1,6 +1,7 @@
-import type { MarkdownProps } from '@lobehub/ui';
-import { Highlighter, SyntaxMermaid } from '@lobehub/ui';
+import type { Highlighter, MarkdownProps, SyntaxMermaid } from '@lobehub/ui';
 import { type ComponentProps } from 'react';
+
+import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
 
 const FALLBACK_CODE_LANGUAGE = 'plaintext';
 const MERMAID_LANGUAGE_ALIASES = new Set([
@@ -14,7 +15,7 @@ const MERMAID_LANGUAGE_ALIASES = new Set([
 ]);
 const MERMAID_BLOCK_START =
   /^(?:architecture-beta|block-beta|c4context|classDiagram|erDiagram|flowchart|gitGraph|gantt|graph|journey|kanban|mindmap|packet-beta|pie|quadrantChart|requirementDiagram|sankey-beta|sequenceDiagram|stateDiagram(?:-v2)?|timeline|xychart-beta)\b/i;
-const MERMAID_INIT_DIRECTIVE = /^%%\{[\s\S]*?\}%%\s*/i;
+const MERMAID_INIT_DIRECTIVE = /^%%\{[\s\S]*?\}%%\s*/;
 const MERMAID_LINE_COMMENT = /^%%.*(?:\r?\n|$)/;
 
 const stripMermaidPreamble = (content: string) => {
@@ -110,6 +111,7 @@ export const createMarkdownPreviewProps = ({
   | 'enableMermaid'
   | 'fontSize'
   | 'fullFeaturedCodeBlock'
+  | 'remarkPluginsAhead'
 > => ({
   componentProps: {
     highlight: {
@@ -127,4 +129,5 @@ export const createMarkdownPreviewProps = ({
   enableMermaid: true,
   fontSize,
   fullFeaturedCodeBlock: true,
+  remarkPluginsAhead: [...documentMarkdownRemarkPlugins],
 });

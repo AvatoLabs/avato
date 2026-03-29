@@ -94,7 +94,7 @@ export class HomeInputActionImpl {
       // 2. Navigate to Page
       const navigate = useGlobalStore.getState().navigate;
       if (navigate) {
-        navigate(`/page/${newDoc.id}`);
+        navigate(`/docs/${newDoc.id}`);
       }
 
       // 3. Send message with document scope context
@@ -102,7 +102,7 @@ export class HomeInputActionImpl {
       await sendMessage({
         context: {
           agentId: newDoc.id,
-          scope: 'page',
+          scope: 'doc',
         },
         message,
       });

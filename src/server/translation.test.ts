@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LANG } from '@/const/locale';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 import { getLocale, translation } from './translation';
 
@@ -17,7 +17,7 @@ vi.mock('@/const/locale', () => ({
   LOBE_LOCALE_COOKIE: 'LOBE_LOCALE',
 }));
 
-vi.mock('@/locales/resources', () => ({
+vi.mock('@/locales/contents', () => ({
   normalizeLocale: vi.fn((locale) => locale),
 }));
 
@@ -28,15 +28,15 @@ vi.mock('@/utils/env', () => ({
 // Mock default locale modules with flat key structure (i18n keys are flat, not nested objects)
 // Keys like 'nested.key' are direct string keys, not nested property paths
 vi.mock('@/locales/default/common', () => ({
-  key1: 'Value 1',
-  key2: 'Value 2 with {{param}}',
+  'key1': 'Value 1',
+  'key2': 'Value 2 with {{param}}',
   'nested.key': 'Nested value',
-  multiParam: 'Hello {{name}}, you have {{count}} messages',
-  simpleText: 'Just a simple text',
-  withParam: 'Text with {{param}}',
+  'multiParam': 'Hello {{name}}, you have {{count}} messages',
+  'simpleText': 'Just a simple text',
+  'withParam': 'Text with {{param}}',
   'very.deeply.nested.key': 'Found the nested value',
   // Add exports for testing missing keys (will be undefined, triggering fallback)
-  nonexistent: undefined,
+  'nonexistent': undefined,
   'totally.missing.key': undefined,
 }));
 

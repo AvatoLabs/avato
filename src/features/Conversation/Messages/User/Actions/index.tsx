@@ -86,7 +86,13 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
       defaultActions.copy,
     ];
     return [...base, ...extraBarItems];
-  }, [actionsConfig?.bar, defaultActions.regenerate, defaultActions.edit, extraBarItems]);
+  }, [
+    actionsConfig?.bar,
+    defaultActions.regenerate,
+    defaultActions.edit,
+    defaultActions.copy,
+    extraBarItems,
+  ]);
 
   const menuItems = useMemo(() => {
     const base = actionsConfig?.menu ?? [
@@ -164,11 +170,7 @@ const Actions = memo<ActionsProps>(({ id, data, disableEditing }) => {
 
   return (
     <Flexbox horizontal align={'center'}>
-      {!disableEditing && (
-        <Flexbox align={'flex-start'} role="menubar">
-          {actionBarHolder}
-        </Flexbox>
-      )}
+      {!disableEditing && <Flexbox align={'flex-start'}>{actionBarHolder}</Flexbox>}
       {branch && (
         <MessageBranch
           activeBranchIndex={branch.activeBranchIndex}

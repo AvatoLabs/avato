@@ -21,18 +21,20 @@ const styles = createStaticStyles(({ css }) => ({
     width: 100%;
     height: 100%;
     padding: 12px;
-    border: 1.5px dashed #fff;
+    border: 1.5px dashed
+      color-mix(in srgb, ${cssVar.colorTextLightSolid} 68%, ${cssVar.colorPrimary});
     border-radius: ${cssVar.borderRadiusLG};
   `,
   desc: css`
     font-size: 12px;
     line-height: 18px;
-    color: #fff;
+    color: ${cssVar.colorTextLightSolid};
   `,
   icon: css`
     border-radius: ${cssVar.borderRadiusSM};
-    color: color-mix(in srgb, ${cssVar.geekblue} 95%, black);
-    background: color-mix(in srgb, ${cssVar.geekblue} 38%, white);
+    color: ${cssVar.colorPrimary};
+    background: color-mix(in srgb, ${cssVar.colorBgContainer} 86%, ${cssVar.colorPrimary});
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorTextLightSolid} 12%, transparent);
   `,
   iconGroup: css`
     margin-block-start: -32px;
@@ -55,12 +57,15 @@ const styles = createStaticStyles(({ css }) => ({
   overlayContent: css`
     padding: ${cssVar.borderRadiusLG};
     border-radius: 12px;
-    background: ${cssVar.geekblue};
+    background: color-mix(in srgb, ${cssVar.colorPrimary} 84%, ${cssVar.colorBgElevated});
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, ${cssVar.colorTextLightSolid} 18%, transparent),
+      0 18px 42px -18px color-mix(in srgb, ${cssVar.colorPrimary} 32%, transparent);
   `,
   title: css`
     font-size: 16px;
     font-weight: bold;
-    color: #fff;
+    color: ${cssVar.colorTextLightSolid};
   `,
 }));
 
@@ -133,7 +138,7 @@ const DragUploadZone = memo<DragUploadZoneProps>(
                     height={BLOCK_SIZE * 1.2}
                     width={BLOCK_SIZE}
                     style={{
-                      background: `color-mix(in srgb, ${cssVar.geekblue} 68%, white)`,
+                      background: `color-mix(in srgb, ${cssVar.colorBgContainer} 80%, ${cssVar.colorPrimary})`,
                       transform: 'rotateZ(-20deg) translateX(8px)',
                     }}
                   >
@@ -155,7 +160,7 @@ const DragUploadZone = memo<DragUploadZoneProps>(
                     height={BLOCK_SIZE * 1.2}
                     width={BLOCK_SIZE}
                     style={{
-                      background: `color-mix(in srgb, ${cssVar.geekblue} 68%, white)`,
+                      background: `color-mix(in srgb, ${cssVar.colorBgContainer} 80%, ${cssVar.colorPrimary})`,
                       transform: 'rotateZ(20deg) translateX(-8px)',
                     }}
                   >

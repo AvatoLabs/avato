@@ -509,7 +509,7 @@ describe('FileUploadAction', () => {
     });
 
     describe('knowledge base integration', () => {
-      it('should pass knowledgeBaseId to createFile when provided', async () => {
+      it('should pass sourceSetId to createFile when provided', async () => {
         const { result } = renderHook(() => useStore());
 
         const mockFile = new File(['test content'], 'kb-file.txt', { type: 'text/plain' });
@@ -522,7 +522,7 @@ describe('FileUploadAction', () => {
         const mockCheckResult = { isExist: false };
         const mockUploadResult = { data: mockMetadata, success: true };
         const mockFileResponse = { id: 'file-id-kb', url: 'https://example.com/kb-file.txt' };
-        const knowledgeBaseId = 'kb-123';
+        const sourceSetId = 'kb-123';
 
         vi.mocked(getImageDimensions).mockResolvedValue(undefined);
         vi.spyOn(fileService, 'checkFileHash').mockResolvedValue(mockCheckResult);
@@ -532,14 +532,14 @@ describe('FileUploadAction', () => {
         await act(async () => {
           await result.current.uploadWithProgress({
             file: mockFile,
-            knowledgeBaseId,
+            sourceSetId,
           });
         });
 
         expect(uploadService.uploadFileToS3).toHaveBeenCalledWith(
           mockFile,
           expect.objectContaining({
-            knowledgeBaseId,
+            sourceSetId,
             sha256: 'mock-hash-value',
           }),
         );
@@ -547,7 +547,7 @@ describe('FileUploadAction', () => {
           expect.objectContaining({
             name: mockFile.name,
           }),
-          knowledgeBaseId,
+          sourceSetId,
         );
       });
     });

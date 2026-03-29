@@ -13,7 +13,7 @@ import Conversation from './Conversation';
  */
 const Copilot = memo(() => {
   const [width, updateSystemStatus] = useGlobalStore((s) => [
-    systemStatusSelectors.pageAgentPanelWidth(s),
+    systemStatusSelectors.docsAgentPanelWidth(s),
     s.updateSystemStatus,
   ]);
 
@@ -23,7 +23,7 @@ const Copilot = memo(() => {
       onSizeChange={(size) => {
         if (size?.width) {
           const w = typeof size.width === 'string' ? Number.parseInt(size.width) : size.width;
-          if (!!w) updateSystemStatus({ pageAgentPanelWidth: w });
+          if (!!w) updateSystemStatus({ docsAgentPanelWidth: w });
         }
       }}
     >

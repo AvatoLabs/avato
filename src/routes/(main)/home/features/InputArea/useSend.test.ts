@@ -14,7 +14,7 @@ const fileState = {
     {
       content: '<selection>Hello world</selection>',
       id: 'selection-1',
-      pageId: 'page-1',
+      docId: 'doc-1',
       preview: 'Hello world',
       type: 'text' as const,
     },
@@ -97,7 +97,7 @@ describe('useSend', () => {
     sendMessage.mockClear();
   });
 
-  it('maps chat context selections to pageSelections for inbox sends', async () => {
+  it('maps chat context selections to docSelections for inbox sends', async () => {
     const { result } = renderHook(() => useSend());
 
     await act(async () => {
@@ -108,11 +108,11 @@ describe('useSend', () => {
       context: { agentId: 'inbox-agent' },
       files: [],
       message: 'Ask this',
-      pageSelections: [
+      docSelections: [
         {
           content: 'Hello world',
+          docId: 'doc-1',
           id: 'selection-1',
-          pageId: 'page-1',
           xml: '<selection>Hello world</selection>',
         },
       ],

@@ -1,4 +1,4 @@
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 // eager: true — antd locale fully inlined at build time
 const antdLocaleModules = import.meta.glob(

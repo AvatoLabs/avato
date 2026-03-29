@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { createStoreUpdater } from 'zustand-utils';
 
-import { usePageStore } from '@/store/page';
+import { usePageStore } from '@/store/docs';
 
 const DataSync = () => {
   const usePageStoreUpdater = createStoreUpdater(usePageStore);

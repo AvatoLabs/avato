@@ -1,4 +1,4 @@
-import { ActionIcon, Flexbox } from '@lobehub/ui';
+import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { ChatHeader } from '@lobehub/ui/mobile';
 import { createStaticStyles } from 'antd-style';
 import { ChevronDown } from 'lucide-react';
@@ -17,15 +17,35 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     color: ${cssVar.colorTextDescription};
     background: color-mix(in srgb, ${cssVar.colorFillSecondary} 90%, transparent);
   `,
+  countPill: css`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 20px;
+    height: 20px;
+    padding-inline: 7px;
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 600;
+    color: ${cssVar.colorPrimary};
+
+    background: color-mix(in srgb, ${cssVar.colorPrimaryBg} 68%, ${cssVar.colorBgContainer});
+  `,
   desc: css`
     overflow: hidden;
 
-    max-width: 60vw;
+    max-width: 58vw;
 
+    font-size: 12px;
     line-height: 1.2;
     color: ${cssVar.colorTextDescription};
     text-overflow: ellipsis;
     white-space: nowrap;
+  `,
+  subtitleRow: css`
+    min-width: 0;
   `,
   trigger: css`
     cursor: pointer;
@@ -34,12 +54,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   title: css`
     overflow: hidden;
 
-    max-width: 64vw;
-    margin-inline-end: 8px;
+    max-width: 62vw;
 
+    font-size: 14px;
     font-weight: 600;
     line-height: 1.2;
     text-overflow: ellipsis;
+    letter-spacing: -0.01em;
     white-space: nowrap;
   `,
 }));
@@ -55,6 +76,7 @@ const ChatHeaderTitle = memo(() => {
   const title = useAgentStore(agentSelectors.currentAgentTitle);
 
   const displayTitle = isInbox ? 'Avato' : title;
+  const topicTitle = topic?.title || t('title', { ns: 'topic' });
 
   return (
     <ChatHeader.Title
@@ -62,11 +84,14 @@ const ChatHeaderTitle = memo(() => {
         <Flexbox
           horizontal
           align={'center'}
-          className={styles.trigger}
+          className={styles.subtitleRow}
           gap={4}
           onClick={() => toggleConfig()}
         >
-          <span className={styles.desc}>{topic?.title || t('title', { ns: 'topic' })}</span>
+          <Text ellipsis as={'span'} className={styles.desc}>
+            {displayTitle}
+          </Text>
+          {topicCount > 1 && <span className={styles.countPill}>{topicCount}</span>}
           <ActionIcon
             active
             className={styles.chevron}
@@ -76,10 +101,9 @@ const ChatHeaderTitle = memo(() => {
         </Flexbox>
       }
       title={
-        <div className={styles.title} onClick={() => toggleConfig()}>
-          {displayTitle}
-          {topicCount > 0 ? ` (${topicCount})` : ''}
-        </div>
+        <Text ellipsis as={'div'} className={styles.title} onClick={() => toggleConfig()}>
+          {topicTitle}
+        </Text>
       }
     />
   );

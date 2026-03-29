@@ -37,7 +37,7 @@ export const estimateReadingMinutes = (wordCount: number) => {
 
 export const extractDocumentOutline = (
   content: string,
-  limit: number = 8,
+  limit: number = Number.POSITIVE_INFINITY,
 ): DocumentOutlineItem[] => {
   if (!content) return [];
 

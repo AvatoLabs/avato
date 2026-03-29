@@ -49,7 +49,7 @@ export class FileController extends BaseController {
       }
 
       // 获取其他参数
-      const knowledgeBaseId = (formData.get('knowledgeBaseId') as string | null) || null;
+      const sourceSetId = (formData.get('sourceSetId') as string | null) || null;
       const skipCheckFileType = formData.get('skipCheckFileType') === 'true';
       const directory = (formData.get('directory') as string | null) || null;
       const agentId = (formData.get('agentId') as string | null) || null;
@@ -59,7 +59,7 @@ export class FileController extends BaseController {
         agentId: agentId || undefined,
         directory: directory || undefined,
         files,
-        knowledgeBaseId: knowledgeBaseId || undefined,
+        sourceSetId: sourceSetId || undefined,
         sessionId: sessionId || undefined,
         skipCheckFileType,
       };
@@ -161,7 +161,7 @@ export class FileController extends BaseController {
       }
 
       // 获取其他参数
-      const knowledgeBaseId = (formData.get('knowledgeBaseId') as string | null) || null;
+      const sourceSetId = (formData.get('sourceSetId') as string | null) || null;
       const skipCheckFileType = formData.get('skipCheckFileType') === 'true';
       const directory = (formData.get('directory') as string | null) || null;
       const agentId = (formData.get('agentId') as string | null) || null;
@@ -171,7 +171,7 @@ export class FileController extends BaseController {
       const options: PublicFileUploadRequest = {
         agentId: agentId || undefined,
         directory: directory || undefined,
-        knowledgeBaseId: knowledgeBaseId || undefined,
+        sourceSetId: sourceSetId || undefined,
         sessionId: sessionId || undefined,
         skipCheckFileType,
         skipDeduplication,

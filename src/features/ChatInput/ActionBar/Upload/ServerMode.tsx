@@ -3,14 +3,14 @@ import { type ItemType } from '@lobehub/ui';
 import { Icon, Tooltip } from '@lobehub/ui';
 import { ArrowRight, FileUp, FolderUp, ImageUp, LibraryBig } from 'lucide-react';
 import {
+  type ChangeEvent,
   memo,
+  type RefObject,
   Suspense,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type ChangeEvent,
-  type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,7 +18,7 @@ import { message } from '@/components/AntdStaticMethods';
 import FileIcon from '@/components/FileIcon';
 import TipGuide from '@/components/TipGuide';
 import { CHAT_INPUT_ACTION_ICONS } from '@/config/entryIcons';
-import { AttachKnowledgeModal } from '@/features/LibraryModal';
+import { AttachSourceSetModal } from '@/features/SourceSetModal';
 import { useModelSupportVision } from '@/hooks/useModelSupportVision';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
@@ -45,10 +45,10 @@ const FileUpload = memo(() => {
 
   const canUploadImage = useModelSupportVision(model, provider);
   const conversationFileContext = activeGroupId ? { groupId: activeGroupId } : { agentId };
-  const libraryScope = 'conversation';
+  const sourceSetScope = 'conversation';
 
   const [showTip, updateGuideState] = useUserStore((s) => [
-    preferenceSelectors.showUploadFileInKnowledgeBaseTip(s),
+    preferenceSelectors.showUploadFileInSourceSetTip(s),
     s.updateGuideState,
   ]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -109,11 +109,10 @@ const FileUpload = memo(() => {
   );
 
   const createInputChangeHandler = useCallback(
-    (options?: { imagesOnly?: boolean }) =>
-      async (event: ChangeEvent<HTMLInputElement>) => {
-        await uploadSelectedFiles(event.target.files, options);
-        event.target.value = '';
-      },
+    (options?: { imagesOnly?: boolean }) => async (event: ChangeEvent<HTMLInputElement>) => {
+      await uploadSelectedFiles(event.target.files, options);
+      event.target.value = '';
+    },
     [uploadSelectedFiles],
   );
 
@@ -152,7 +151,13 @@ const FileUpload = memo(() => {
       key: 'upload-file',
       label: (
         <div>
-          <input hidden multiple ref={fileInputRef} type={'file'} onChange={createInputChangeHandler()} />
+          <input
+            hidden
+            multiple
+            ref={fileInputRef}
+            type={'file'}
+            onChange={createInputChangeHandler()}
+          />
           <div>{t('upload.action.fileUpload')}</div>
         </div>
       ),
@@ -164,7 +169,13 @@ const FileUpload = memo(() => {
       key: 'upload-folder',
       label: (
         <div>
-          <input hidden multiple ref={folderInputRef} type={'file'} onChange={createInputChangeHandler()} />
+          <input
+            hidden
+            multiple
+            ref={folderInputRef}
+            type={'file'}
+            onChange={createInputChangeHandler()}
+          />
           <div>{t('upload.action.folderUpload')}</div>
         </div>
       ),
@@ -172,10 +183,10 @@ const FileUpload = memo(() => {
     },
   ];
 
-  const knowledgeItems: ItemType[] = [];
+  const sourceItems: ItemType[] = [];
 
   if (conversationFiles.length > 0) {
-    knowledgeItems.push({
+    sourceItems.push({
       children: conversationFiles.map((item) => ({
         icon: <FileIcon fileName={item.name} fileType={item.fileType} size={20} />,
         key: item.id,
@@ -199,14 +210,14 @@ const FileUpload = memo(() => {
   }
 
   // Always add the "View More" option
-  knowledgeItems.push(
+  sourceItems.push(
     {
       type: 'divider',
     },
     {
       extra: <Icon icon={ArrowRight} />,
       icon: LibraryBig,
-      key: 'knowledge-base-store',
+      key: 'source-set-store',
       label: t('conversationFiles.viewMore'),
       onClick: () => {
         setModalOpen(true);
@@ -216,7 +227,7 @@ const FileUpload = memo(() => {
 
   const items: ActionDropdownMenuItems = [
     ...uploadItems,
-    ...(knowledgeItems.length > 0 ? knowledgeItems : []),
+    ...(sourceItems.length > 0 ? sourceItems : []),
   ];
 
   const content = (
@@ -251,9 +262,9 @@ const FileUpload = memo(() => {
         <TipGuide
           open={showTip}
           placement={'top'}
-          title={t('knowledgeBase.uploadGuide')}
+          title={t('sourceSet.uploadGuide')}
           onOpenChange={() => {
-            updateGuideState({ uploadFileInKnowledgeBase: false });
+            updateGuideState({ uploadFileInSourceSet: false });
           }}
         >
           {content}
@@ -261,7 +272,7 @@ const FileUpload = memo(() => {
       ) : (
         content
       )}
-      <AttachKnowledgeModal open={modalOpen} scope={libraryScope} setOpen={setModalOpen} />
+      <AttachSourceSetModal open={modalOpen} scope={sourceSetScope} setOpen={setModalOpen} />
     </Suspense>
   );
 });

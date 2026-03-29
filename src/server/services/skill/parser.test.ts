@@ -281,7 +281,7 @@ Content`;
       const testFiles = {
         'README.md': new TextEncoder().encode('Root readme'),
         'my-skill/SKILL.md': new TextEncoder().encode(skillMd),
-        'my-skill/resource.txt': new TextEncoder().encode('Skill resource'),
+        'my-skill/content.txt': new TextEncoder().encode('Skill resource'),
         'other-folder/file.txt': new TextEncoder().encode('Other file'),
       };
 
@@ -406,7 +406,7 @@ Deep nested content`;
           '---\nname: other\ndescription: other\n---\nOther',
         ),
         'openclaw-main/skills/skill-creator/SKILL.md': new TextEncoder().encode(skillMd),
-        'openclaw-main/skills/skill-creator/resources/template.md': new TextEncoder().encode(
+        'openclaw-main/skills/skill-creator/contents/template.md': new TextEncoder().encode(
           'Template',
         ),
       };
@@ -508,7 +508,7 @@ GitHub skill content`;
         'repo-main/README.md': new TextEncoder().encode('# Large Repository\n'.repeat(1000)),
         'repo-main/other-folder/large-file.txt': new TextEncoder().encode('x'.repeat(10000)),
         'repo-main/skills/my-skill/SKILL.md': new TextEncoder().encode(skillMd),
-        'repo-main/skills/my-skill/resources/template.md': new TextEncoder().encode('Template'),
+        'repo-main/skills/my-skill/contents/template.md': new TextEncoder().encode('Template'),
       };
 
       const zipped = await createZip(testFiles);
@@ -538,7 +538,7 @@ Stable content`;
       const testFilesV1 = {
         'repo-main/README.md': new TextEncoder().encode('# Version 1'),
         'repo-main/skills/my-skill/SKILL.md': new TextEncoder().encode(skillMd),
-        'repo-main/skills/my-skill/resource.txt': new TextEncoder().encode('Resource'),
+        'repo-main/skills/my-skill/content.txt': new TextEncoder().encode('Resource'),
       };
 
       // V2: Repo changed (README updated), but skill directory unchanged
@@ -546,7 +546,7 @@ Stable content`;
         'repo-main/CHANGELOG.md': new TextEncoder().encode('# Changelog\n- Added feature'),
         'repo-main/README.md': new TextEncoder().encode('# Version 2 - Updated!'),
         'repo-main/skills/my-skill/SKILL.md': new TextEncoder().encode(skillMd),
-        'repo-main/skills/my-skill/resource.txt': new TextEncoder().encode('Resource'),
+        'repo-main/skills/my-skill/content.txt': new TextEncoder().encode('Resource'),
       };
 
       const zippedV1 = await createZip(testFilesV1);

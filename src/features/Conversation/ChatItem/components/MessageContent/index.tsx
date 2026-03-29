@@ -18,14 +18,23 @@ export const MSG_CONTENT_CLASSNAME = 'msg_content_flag';
 export const styles = createStaticStyles(({ css, cssVar }) => {
   return {
     bubble: css`
-      padding-block: 8px;
-      padding-inline: 12px;
-      border-radius: ${cssVar.borderRadiusLG};
-      background-color: ${cssVar.colorFillTertiary};
+      padding-block: 10px;
+      padding-inline: 14px;
+      border: 1px solid color-mix(in srgb, ${cssVar.colorBorderSecondary} 72%, transparent);
+      border-radius: 20px 20px 10px;
+
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, ${cssVar.colorBgElevated} 96%, ${cssVar.colorFillQuaternary}) 0%,
+        color-mix(in srgb, ${cssVar.colorFillQuaternary} 82%, ${cssVar.colorBgContainer}) 100%
+      );
+      box-shadow:
+        inset 0 1px 0 color-mix(in srgb, ${cssVar.colorTextLightSolid} 12%, transparent),
+        0 16px 30px -26px color-mix(in srgb, ${cssVar.colorText} 24%, transparent);
     `,
     disabled: css`
       user-select: ${'none'};
-      color: ${cssVar.colorTextSecondary};
+      color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     `,
     message: css`
       position: relative;

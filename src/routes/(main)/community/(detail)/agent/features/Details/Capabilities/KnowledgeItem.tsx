@@ -22,7 +22,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
   };
 });
 
-const KnowledgeItem = memo<{ avatar?: string; description?: string; title: string }>(
+const AgentSourceItem = memo<{ avatar?: string; description?: string; title: string }>(
   ({ avatar, title, description }) => {
     return (
       <Block horizontal gap={12} padding={12} variant={'outlined'}>
@@ -52,4 +52,4 @@ const KnowledgeItem = memo<{ avatar?: string; description?: string; title: strin
   },
 );
 
-export default KnowledgeItem;
+export default AgentSourceItem;

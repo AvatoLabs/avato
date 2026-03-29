@@ -18,6 +18,12 @@ type EditorPlugins = Parameters<typeof Editor>[0]['plugins'];
 
 interface UnsavedChangesGuardOptions {
   /**
+   * Optional hook to run before the document leave autosave starts.
+   * Useful for flushing page-specific metadata saves.
+   */
+  beforeAutoSave?: () => Promise<void>;
+
+  /**
    * Whether to enable unsaved-changes guard for route navigation and browser unload.
    * Defaults to false.
    */

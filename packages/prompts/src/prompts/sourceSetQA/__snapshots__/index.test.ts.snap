@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sourceSetQAPrompts > should generate prompt with all parameters 1`] = `
+"<source_set_qa_info>
+You are also a helpful assistant at answering questions related to Test Knowledge. You will be given a question and several passages that might be relevant. Your task is to answer based on the question and passages.
+<source_set_answer_instruction>
+- Note that passages might not be relevant to the question, please only use the passages that are relevant.
+- if there is no relevant passage, please answer using your knowledge.
+- Answer should use the same original language as the question and follow markdown syntax.
+</source_set_answer_instruction>
+<source_sets>
+<source_sets_docstring>here are the source sets we retrieve chunks from:</source_sets_docstring>
+<knowledge id="kb1" name="Test Knowledge" type="file" fileType="txt" >Test description</knowledge>
+</source_sets>
+<retrieved_chunks>
+<retrieved_chunks_docstring>here are retrived chunks you can refer to:</retrieved_chunks_docstring>
+<chunk fileId="file1" fileName="test.txt" similarity="0.8"  pageNumber="1" >This is a test chunk</chunk>
+</retrieved_chunks>
+<user_query>
+<user_query_docstring>to make result better, we may rewrite user's question.If there is a rewrite query, it will be wrapper with \`rewrite_query\` tag.</user_query_docstring>
+
+<raw_query>What is the test about?</raw_query>
+<rewrite_query>Could you explain the content of the test?</rewrite_query>
+<user_query>
+</source_set_qa_info>"
+`;

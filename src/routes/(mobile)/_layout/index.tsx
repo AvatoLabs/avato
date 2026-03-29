@@ -21,12 +21,12 @@ const MOBILE_NAV_ROUTES = new Set([
   '/community/plugin',
   '/community/model',
   '/community/provider',
-  '/resource',
+  '/content',
   '/me',
 ]);
 
 const isResourceRoute = (pathname: string) =>
-  pathname === '/resource' || pathname.startsWith('/resource/');
+  pathname === '/content' || pathname.startsWith('/content/');
 
 const MobileMainLayout: FC = () => {
   const { showCloudPromotion } = useServerConfigStore(featureFlagsSelectors);

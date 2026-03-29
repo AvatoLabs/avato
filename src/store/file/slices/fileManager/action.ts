@@ -172,7 +172,7 @@ export class FileManageActionImpl {
 
   pushDockFileList = async (
     rawFiles: File[],
-    knowledgeBaseId?: string,
+    sourceSetId?: string,
     parentId?: string,
     spaceId?: string,
   ): Promise<void> => {
@@ -216,7 +216,7 @@ export class FileManageActionImpl {
           const result = await this.#get().uploadWithProgress({
             abortController: uploadFileItem.abortController,
             file: uploadFileItem.file,
-            knowledgeBaseId,
+            sourceSetId,
             onStatusUpdate: dispatchDockFileList,
             parentId,
             spaceId,
@@ -304,9 +304,9 @@ export class FileManageActionImpl {
       },
     );
 
-    // Also revalidate the ResourceManager resource list cache (SWR_RESOURCES)
+    // Also revalidate the ContentManager content list cache (SWR_CONTENT_ITEMS)
     // so uploaded files appear immediately in the Explorer without a full refresh.
-    const { revalidateResources } = await import('../resource/hooks');
+    const { revalidateResources } = await import('../content/hooks');
     await revalidateResources();
   };
 
@@ -397,7 +397,7 @@ export class FileManageActionImpl {
 
   uploadFolderWithStructure = async (
     files: File[],
-    knowledgeBaseId?: string,
+    sourceSetId?: string,
     currentFolderId?: string,
     spaceId?: string,
   ): Promise<void> => {
@@ -452,7 +452,7 @@ export class FileManageActionImpl {
             content: '',
             editorData: '{}',
             fileType: 'custom/folder',
-            knowledgeBaseId,
+            sourceSetId,
             metadata: { createdAt: Date.now() },
             parentId,
             spaceId,
@@ -516,7 +516,7 @@ export class FileManageActionImpl {
             const result = await this.#get().uploadWithProgress({
               abortController,
               file,
-              knowledgeBaseId,
+              sourceSetId,
               onStatusUpdate: dispatchDockFileList,
               parentId,
               spaceId,
@@ -560,11 +560,14 @@ export class FileManageActionImpl {
     }
   };
 
-  useFetchFolderBreadcrumb = (slug?: string | null): SWRResponse<FolderCrumb[]> => {
+  useFetchFolderBreadcrumb = (
+    slug?: string | null,
+    spaceId?: string,
+  ): SWRResponse<FolderCrumb[]> => {
     return useClientDataSWR<FolderCrumb[]>(
-      !slug ? null : ['useFetchFolderBreadcrumb', slug],
+      !slug ? null : ['useFetchFolderBreadcrumb', slug, spaceId ?? null],
       async () => {
-        const response = await serverFileService.getFolderBreadcrumb(slug!);
+        const response = await serverFileService.getFolderBreadcrumb(slug!, spaceId);
         return response;
       },
     );

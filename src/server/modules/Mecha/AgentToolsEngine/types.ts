@@ -52,7 +52,7 @@ export interface ServerCreateAgentToolsEngineParams {
   /** Whether the user's global memory setting is enabled */
   globalMemoryEnabled?: boolean;
   /** Whether agent has enabled knowledge bases */
-  hasEnabledKnowledgeBases?: boolean;
+  hasEnabledSourceSets?: boolean;
   /** Model name for function calling compatibility check */
   model: string;
   /** Provider name for function calling compatibility check */

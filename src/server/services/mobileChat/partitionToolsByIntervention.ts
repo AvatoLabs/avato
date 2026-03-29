@@ -3,14 +3,18 @@ import {
   DEFAULT_SECURITY_BLACKLIST,
   InterventionChecker,
 } from '@lobechat/agent-runtime';
+import type { LobeToolManifest } from '@lobechat/context-engine';
 import type {
   ChatToolPayload,
   ExtendedHumanInterventionConfig,
   HumanInterventionConfig,
   HumanInterventionPolicy,
-  LobeToolManifest,
   UserInterventionConfig,
 } from '@lobechat/types';
+
+type InterventionAwareToolManifest = LobeToolManifest & {
+  humanIntervention?: ExtendedHumanInterventionConfig;
+};
 
 /**
  * Partition tool calls by intervention requirement.
@@ -19,7 +23,7 @@ import type {
 export function partitionToolsByIntervention(
   toolsCalling: ChatToolPayload[],
   userInterventionConfig: UserInterventionConfig | undefined,
-  manifestMap: Record<string, LobeToolManifest>,
+  manifestMap: Record<string, InterventionAwareToolManifest>,
 ): [ChatToolPayload[], ChatToolPayload[]] {
   const toolsNeedingIntervention: ChatToolPayload[] = [];
   const toolsToExecute: ChatToolPayload[] = [];
@@ -115,7 +119,7 @@ export function partitionToolsByIntervention(
 
 function getToolInterventionConfig(
   toolCalling: ChatToolPayload,
-  manifestMap: Record<string, LobeToolManifest>,
+  manifestMap: Record<string, InterventionAwareToolManifest>,
 ): ExtendedHumanInterventionConfig | undefined {
   const { identifier, apiName } = toolCalling;
   const manifest = manifestMap[identifier];

@@ -87,7 +87,7 @@ const BrandTextLoading = ({
             <img
               alt={resolvedBrandName}
               className={styles.defaultLogoImg}
-              src="/icons/icon-192x192.png"
+              src="/icons/icon-192x192-transparent.png"
             />
           </div>
           <span className={styles.defaultText}>{resolvedBrandName}</span>

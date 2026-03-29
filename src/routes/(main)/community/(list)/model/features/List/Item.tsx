@@ -1,7 +1,7 @@
 'use client';
 
 import { ModelIcon, ProviderIcon } from '@lobehub/icons';
-import { Block, Flexbox, Icon, Popover, Tag, Text } from '@lobehub/ui';
+import { Block, Flexbox, Icon, Popover, stopPropagation, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import dayjs from 'dayjs';
 import { ClockIcon } from 'lucide-react';
@@ -103,7 +103,11 @@ const ModelItem = memo<DiscoverModelItem>(
                   overflow: 'hidden',
                 }}
               >
-                <Link style={{ color: 'inherit', overflow: 'hidden' }} to={link}>
+                <Link
+                  style={{ color: 'inherit', overflow: 'hidden' }}
+                  to={link}
+                  onClick={stopPropagation}
+                >
                   <Text ellipsis as={'h2'} className={styles.title}>
                     {displayName}
                   </Text>

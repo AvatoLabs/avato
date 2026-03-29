@@ -1,5 +1,5 @@
 /**
- * ResourcePickerSheet — Pick files from workspace (inbox or library, folders, paginated).
+ * ResourcePickerSheet — Pick files from a workspace (unassigned area or source set, folders, paginated).
  */
 import { ArrowLeft, Check, ChevronRight, FolderOpen } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,12 +15,12 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { knowledgeBaseApi, resourceApi } from '../../lib/api';
+import { resourceApi, sourceSetApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
-import type { FileListItem, KnowledgeBaseItem } from '../../types';
+import type { FileListItem, SourceSetItem } from '../../types';
 
 const PAGE_SIZE = 50;
 
@@ -42,8 +42,8 @@ export default function ResourcePickerSheet({
   const colors = useThemeColors();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
-  const [libraries, setLibraries] = useState<KnowledgeBaseItem[]>([]);
-  const [activeKb, setActiveKb] = useState<KnowledgeBaseItem | null>(null);
+  const [sourceSets, setSourceSets] = useState<SourceSetItem[]>([]);
+  const [activeSourceSet, setActiveSourceSet] = useState<SourceSetItem | null>(null);
   const [folderStack, setFolderStack] = useState<string[]>([]);
   const [rows, setRows] = useState<FileListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,9 +55,9 @@ export default function ResourcePickerSheet({
   const parentId = folderStack.length === 0 ? null : folderStack.at(-1)!;
 
   const locationLabel = useMemo(() => {
-    if (!activeKb) return t.resourceLibraryInbox;
-    return activeKb.name || t.resourceLibrarySelect;
-  }, [activeKb, t.resourceLibraryInbox, t.resourceLibrarySelect]);
+    if (!activeSourceSet) return t.resourceSourceSetUnassigned;
+    return activeSourceSet.name || t.resourceSourceSetSelect;
+  }, [activeSourceSet, t.resourceSourceSetUnassigned, t.resourceSourceSetSelect]);
 
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -72,14 +72,14 @@ export default function ResourcePickerSheet({
     () => ({
       limit: PAGE_SIZE,
       parentId,
-      ...(activeKb
+      ...(activeSourceSet
         ? {
-            knowledgeBaseId: activeKb.id,
-            ...(activeKb.spaceId ? { spaceId: activeKb.spaceId } : {}),
+            sourceSetId: activeSourceSet.id,
+            ...(activeSourceSet.spaceId ? { spaceId: activeSourceSet.spaceId } : {}),
           }
         : {}),
     }),
-    [activeKb, parentId],
+    [activeSourceSet, parentId],
   );
 
   const loadInitial = useCallback(async () => {
@@ -117,10 +117,10 @@ export default function ResourcePickerSheet({
     if (!visible) return;
     void (async () => {
       try {
-        const list = await knowledgeBaseApi.list();
-        setLibraries(list ?? []);
+        const list = await sourceSetApi.list();
+        setSourceSets(list ?? []);
       } catch {
-        setLibraries([]);
+        setSourceSets([]);
       }
     })();
   }, [visible]);
@@ -145,9 +145,9 @@ export default function ResourcePickerSheet({
     setFolderStack((s) => (s.length > 0 ? s.slice(0, -1) : s));
   }, []);
 
-  const pickLocation = useCallback((kb: KnowledgeBaseItem | null) => {
+  const pickLocation = useCallback((sourceSet: SourceSetItem | null) => {
     haptics.selection();
-    setActiveKb(kb);
+    setActiveSourceSet(sourceSet);
     setFolderStack([]);
     setLocationMenuVisible(false);
   }, []);
@@ -256,14 +256,14 @@ export default function ResourcePickerSheet({
             <View className="px-5 pb-2 pt-2">
               <View className="flex-row items-center justify-between mb-2">
                 <View className="flex-row items-center gap-2 flex-1 min-w-0">
-                  {(folderStack.length > 0 || activeKb) && (
+                  {(folderStack.length > 0 || activeSourceSet) && (
                     <TouchableOpacity
                       accessibilityRole="button"
                       className="p-1"
                       hitSlop={10}
                       onPress={() => {
                         if (folderStack.length > 0) goBackFolder();
-                        else setActiveKb(null);
+                        else setActiveSourceSet(null);
                       }}
                     >
                       <ArrowLeft color={colors.primary} size={22} strokeWidth={2} />
@@ -380,14 +380,14 @@ export default function ResourcePickerSheet({
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-foreground text-[16px] font-bold px-5 pt-4 pb-2">
-              {t.resourceLibrarySelect}
+              {t.resourceSourceSetSelect}
             </Text>
             <FlatList
-              data={[
-                { id: '__inbox__', name: t.resourceLibraryInbox } as KnowledgeBaseItem,
-                ...libraries,
-              ]}
               keyExtractor={(i) => i.id}
+              data={[
+                { id: '__inbox__', name: t.resourceSourceSetUnassigned } as SourceSetItem,
+                ...sourceSets,
+              ]}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   className="px-5 py-3.5 border-b border-foreground/5"

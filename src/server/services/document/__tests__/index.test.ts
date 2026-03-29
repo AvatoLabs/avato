@@ -11,11 +11,19 @@ import { DocumentService } from '../index';
 const {
   mockAssertCapability,
   mockAsyncParseFileToChunks,
+  mockEnsureOwnerPermission,
+  mockEnsureContentRegistry,
+  mockFilterVisibleDocumentIdsForList,
+  mockGetOrCreatePersonalSpace,
   mockRequireDocument,
   mockRequireFile,
 } = vi.hoisted(() => ({
   mockAssertCapability: vi.fn(),
   mockAsyncParseFileToChunks: vi.fn(),
+  mockEnsureOwnerPermission: vi.fn(),
+  mockEnsureContentRegistry: vi.fn().mockResolvedValue({ contentUid: 'res_test' }),
+  mockFilterVisibleDocumentIdsForList: vi.fn(),
+  mockGetOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_test' }),
   mockRequireDocument: vi.fn().mockResolvedValue({ id: 'docs_test', spaceId: 'spc_test' }),
   mockRequireFile: vi.fn().mockResolvedValue({ id: 'file-1' }),
 }));
@@ -32,33 +40,34 @@ vi.mock('@/config/db', () => ({
     REMOVE_GLOBAL_FILE: false,
   },
 }));
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn(() => ({
-    ensureOwnerPermission: vi.fn(),
-    ensureResourceRegistry: vi.fn().mockResolvedValue({ resourceUid: 'res_test' }),
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn(() => ({
+    ensureOwnerPermission: mockEnsureOwnerPermission,
+    ensureContentRegistry: mockEnsureContentRegistry,
     invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 vi.mock('@/database/models/space', () => ({
   SpaceModel: vi.fn(() => ({
     findAccessibleSpaceById: vi.fn().mockResolvedValue(undefined),
-    getOrCreatePersonalSpace: vi.fn().mockResolvedValue({ id: 'spc_test' }),
+    getOrCreatePersonalSpace: mockGetOrCreatePersonalSpace,
   })),
 }));
 vi.mock('../../file');
 
-vi.mock('../../resource', () => ({
+vi.mock('../../content', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
     requireDocument: mockRequireDocument,
     requireFile: mockRequireFile,
-    requireKnowledgeBase: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
+    requireSourceSet: vi.fn().mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' }),
   })),
-  ResourceAuthorizer: vi.fn(() => ({
+  ContentAuthorizer: vi.fn(() => ({
     assertCapability: mockAssertCapability,
+    filterVisibleDocumentIdsForList: mockFilterVisibleDocumentIdsForList,
     getAccessMatch: vi.fn().mockResolvedValue({
       authzEpoch: 1,
       canAccess: true,
-      resourceUid: 'res_test',
+      contentUid: 'res_test',
       spaceId: 'spc_test',
     }),
   })),
@@ -110,6 +119,7 @@ describe('DocumentService', () => {
       findByIdAny: vi.fn(),
       hardDeleteManyAny: vi.fn(),
       query: vi.fn(),
+      queryIds: vi.fn(),
       restoreManyAny: vi.fn(),
       update: vi.fn(),
       updateAny: vi.fn(),
@@ -149,7 +159,7 @@ describe('DocumentService', () => {
   });
 
   describe('createDocument', () => {
-    it('should create a document without knowledgeBase', async () => {
+    it('should create a document without sourceSet', async () => {
       const mockDoc = { id: 'doc-1', title: 'Test Doc' };
       mockDocumentModel.create.mockResolvedValue(mockDoc);
 
@@ -172,7 +182,7 @@ describe('DocumentService', () => {
           sourceType: 'api',
         }),
       );
-      // Should not create a file record when no knowledgeBaseId
+      // Should not create a file record when no sourceSetId
       expect(mockFileModel.create).not.toHaveBeenCalled();
     });
 
@@ -210,7 +220,7 @@ describe('DocumentService', () => {
       );
     });
 
-    it('should create a file record when knowledgeBaseId is provided and fileType is not folder', async () => {
+    it('should create a file record when sourceSetId is provided and fileType is not folder', async () => {
       const mockFile = { id: 'file-1' };
       const mockDoc = { id: 'doc-1', title: 'Test' };
       mockFileModel.create.mockResolvedValue(mockFile);
@@ -220,13 +230,13 @@ describe('DocumentService', () => {
         title: 'Test',
         editorData: {},
         content: 'Content',
-        knowledgeBaseId: 'kb-1',
+        sourceSetId: 'kb-1',
       });
 
       expect(mockFileModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Test',
-          knowledgeBaseId: 'kb-1',
+          sourceSetId: 'kb-1',
           fileType: 'custom/document',
           url: 'internal://document/placeholder',
           size: 'Content'.length,
@@ -236,7 +246,7 @@ describe('DocumentService', () => {
       expect(mockDocumentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
           fileId: 'file-1',
-          knowledgeBaseId: 'kb-1',
+          sourceSetId: 'kb-1',
         }),
       );
       expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', {
@@ -252,7 +262,7 @@ describe('DocumentService', () => {
       await service.createDocument({
         title: 'My Folder',
         editorData: {},
-        knowledgeBaseId: 'kb-1',
+        sourceSetId: 'kb-1',
         fileType: 'custom/folder',
       });
 
@@ -261,26 +271,26 @@ describe('DocumentService', () => {
         expect.objectContaining({
           fileId: null,
           fileType: 'custom/folder',
-          // folders store knowledgeBaseId in metadata
-          metadata: { knowledgeBaseId: 'kb-1' },
+          // folders store sourceSetId in metadata
+          metadata: { sourceSetId: 'kb-1' },
         }),
       );
     });
 
-    it('should store knowledgeBaseId in metadata for folders', async () => {
+    it('should store sourceSetId in metadata for folders', async () => {
       mockDocumentModel.create.mockResolvedValue({ id: 'doc-1' });
 
       await service.createDocument({
         title: 'Folder',
         editorData: {},
-        knowledgeBaseId: 'kb-1',
+        sourceSetId: 'kb-1',
         fileType: 'custom/folder',
         metadata: { existingKey: 'value' },
       });
 
       expect(mockDocumentModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          metadata: { existingKey: 'value', knowledgeBaseId: 'kb-1' },
+          metadata: { existingKey: 'value', sourceSetId: 'kb-1' },
         }),
       );
     });
@@ -292,7 +302,7 @@ describe('DocumentService', () => {
       await service.createDocument({
         title: 'PDF Doc',
         editorData: {},
-        knowledgeBaseId: 'kb-1',
+        sourceSetId: 'kb-1',
         fileType: 'application/pdf',
       });
 
@@ -357,14 +367,46 @@ describe('DocumentService', () => {
     });
 
     it('should delegate to documentModel.query with params', async () => {
-      const params = { current: 1, pageSize: 10, fileTypes: ['pdf'] };
+      const params = { current: 0, fileTypes: ['pdf'], pageSize: 10, spaceId: 'spc_test' };
       const mockResult = { items: [{ id: 'doc-1' }], total: 1 };
+      mockDocumentModel.queryIds.mockResolvedValue(['doc-1', 'doc-2']);
+      mockFilterVisibleDocumentIdsForList.mockResolvedValue(['doc-2']);
       mockDocumentModel.query.mockResolvedValue(mockResult);
 
       const result = await service.queryDocuments(params);
 
       expect(result).toEqual(mockResult);
-      expect(mockDocumentModel.query).toHaveBeenCalledWith(params);
+      expect(mockDocumentModel.queryIds).toHaveBeenCalledWith({
+        fileTypes: ['pdf'],
+        sourceSetId: undefined,
+        sourceTypes: undefined,
+        spaceId: 'spc_test',
+        trash: undefined,
+      });
+      expect(mockFilterVisibleDocumentIdsForList).toHaveBeenCalledWith(['doc-1', 'doc-2'], {
+        documentIncludeDeleted: undefined,
+      });
+      expect(mockDocumentModel.query).toHaveBeenCalledWith({
+        current: 0,
+        fileTypes: ['pdf'],
+        ids: ['doc-2'],
+        pageSize: 10,
+        spaceId: 'spc_test',
+      });
+    });
+
+    it('should return the filtered total even when a later page becomes empty after ACL filtering', async () => {
+      mockDocumentModel.queryIds.mockResolvedValue(['doc-1', 'doc-2', 'doc-3']);
+      mockFilterVisibleDocumentIdsForList.mockResolvedValue(['doc-2']);
+
+      const result = await service.queryDocuments({
+        current: 1,
+        pageSize: 1,
+        spaceId: 'spc_shared',
+      });
+
+      expect(result).toEqual({ items: [], total: 1 });
+      expect(mockDocumentModel.query).not.toHaveBeenCalled();
     });
   });
 
@@ -491,10 +533,10 @@ describe('DocumentService', () => {
     it('should hard delete soft-deleted documents and remove backing files', async () => {
       (mockDb.query as any).documents.findMany
         .mockResolvedValueOnce([{ fileId: 'file-1', fileType: 'custom/document', id: 'doc-1' }])
-        .mockResolvedValueOnce([{ resourceUid: 'res_doc_1', spaceId: 'spc_test' }]);
+        .mockResolvedValueOnce([{ contentUid: 'res_doc_1', spaceId: 'spc_test' }]);
 
       (mockDb.query as any).files.findMany.mockResolvedValueOnce([
-        { resourceUid: 'res_file_1', spaceId: 'spc_test' },
+        { contentUid: 'res_file_1', spaceId: 'spc_test' },
       ]);
 
       mockFileModel.deleteManyAny.mockResolvedValue([{ url: 'storage/file-1' }]);
@@ -510,6 +552,41 @@ describe('DocumentService', () => {
       expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-1'], expect.any(Boolean));
       expect(mockDocumentModel.hardDeleteManyAny).toHaveBeenCalledWith(['doc-1']);
       expect(mockFileService.deleteFiles).toHaveBeenCalledWith(['storage/file-1']);
+    });
+  });
+
+  describe('restoreDocuments', () => {
+    it('should restore folder descendants and nested files when restoring a folder root', async () => {
+      (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([{ fileId: null, fileType: 'custom/folder', id: 'docs_root' }])
+        .mockResolvedValueOnce([
+          { fileId: 'file_mirror', fileType: 'custom/document', id: 'docs_child' },
+        ])
+        .mockResolvedValueOnce([
+          { contentUid: 'res_root', fileId: null, id: 'docs_root', spaceId: 'spc_test' },
+          {
+            contentUid: 'res_child',
+            fileId: 'file_mirror',
+            id: 'docs_child',
+            spaceId: 'spc_test',
+          },
+        ]);
+
+      (mockDb.query as any).files.findMany
+        .mockResolvedValueOnce([{ id: 'file_nested' }])
+        .mockResolvedValueOnce([
+          { contentUid: 'res_file_mirror', id: 'file_mirror', spaceId: 'spc_test' },
+          { contentUid: 'res_file_nested', id: 'file_nested', spaceId: 'spc_test' },
+        ]);
+
+      mockDocumentModel.findByIdAny.mockImplementation(async (id: string) => ({ id }));
+
+      const result = await service.restoreDocuments(['docs_root']);
+
+      expect(mockDocumentModel.restoreManyAny).toHaveBeenCalledWith(['docs_root', 'docs_child']);
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file_mirror', { deletedAt: null });
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file_nested', { deletedAt: null });
+      expect(result).toEqual([{ id: 'docs_root' }, { id: 'docs_child' }]);
     });
   });
 
@@ -578,7 +655,9 @@ describe('DocumentService', () => {
 
       await service.updateDocument('doc-1', { content: 'Updated\nContent' });
 
-      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', { size: 'Updated\nContent'.length });
+      expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', {
+        size: 'Updated\nContent'.length,
+      });
       expect(mockFileModel.clearFileChunks).toHaveBeenCalledWith(['file-1']);
       expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false);
     });
@@ -731,7 +810,7 @@ describe('DocumentService', () => {
 
     it('should strip <page> tags from content', async () => {
       vi.mocked(loadFile).mockResolvedValue({
-        content: '<page number="1">Page one content</page><page number="2">Page two content</page>',
+        content: '<page number="1">Page one content</docs><page number="2">Page two content</docs>',
         fileType: 'pdf',
         metadata: {},
         pages: undefined,
@@ -878,7 +957,7 @@ describe('DocumentService', () => {
 
     it('should NOT strip page tags in parseFile (unlike parseDocument)', async () => {
       const contentWithPageTags =
-        '<page number="1">First page</page><page number="2">Second page</page>';
+        '<page number="1">First page</docs><page number="2">Second page</docs>';
       vi.mocked(loadFile).mockResolvedValue({
         content: contentWithPageTags,
         fileType: 'pdf',

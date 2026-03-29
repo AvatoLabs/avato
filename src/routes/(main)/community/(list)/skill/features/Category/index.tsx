@@ -3,7 +3,7 @@
 import { Icon, Tag } from '@lobehub/ui';
 import qs from 'query-string';
 import { memo, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { withSuspense } from '@/components/withSuspense';
 import { useQuery } from '@/hooks/useQuery';
@@ -78,7 +78,7 @@ const Category = memo(() => {
                 ),
           ...item,
           icon: <Icon icon={item.icon} size={18} />,
-          label: <Link to={genUrl(item.key)}>{item.label}</Link>,
+          label: item.label,
         };
       })}
       onClick={(v) => handleClick(v.key as SkillCategory)}

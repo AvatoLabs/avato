@@ -2,7 +2,7 @@ import { getCachedTextInputUnitRate } from '@lobechat/utils';
 import { ModelIcon } from '@lobehub/icons';
 import { Accordion, AccordionItem, Flexbox, Icon, Tag, Text, Tooltip } from '@lobehub/ui';
 import { Divider } from 'antd';
-import { createStaticStyles } from 'antd-style';
+import { createStaticStyles, cssVar } from 'antd-style';
 import { type LucideIcon } from 'lucide-react';
 import {
   ArrowDownToDot,
@@ -152,6 +152,14 @@ const UNIT_LABEL_MAP: Record<string, string> = {
   millionTokens: '/M tokens',
   second: '/s',
 };
+
+const getSectionMarkerStyle = (accentWeight: number) => ({
+  background: `color-mix(in srgb, ${cssVar.colorPrimary} ${accentWeight}%, ${cssVar.colorBgContainer})`,
+  borderRadius: 2,
+  flexShrink: 0,
+  height: 14,
+  width: 3,
+});
 
 const formatUnitRate = (unit: PricingUnit, currency?: ModelPriceCurrency): string => {
   const unitLabel = UNIT_LABEL_MAP[unit.unit] || '';
@@ -305,15 +313,7 @@ const ModelDetailPanel: FC<ModelDetailPanelProps> = memo(({ model: modelId, prov
               }
               title={
                 <Flexbox horizontal align={'center'} gap={8}>
-                  <div
-                    style={{
-                      background: '#1677ff',
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      height: 14,
-                      width: 3,
-                    }}
-                  />
+                  <div style={getSectionMarkerStyle(90)} />
                   <span className={styles.titleText}>{t('ModelSwitchPanel.detail.context')}</span>
                 </Flexbox>
               }
@@ -344,15 +344,7 @@ const ModelDetailPanel: FC<ModelDetailPanelProps> = memo(({ model: modelId, prov
               }
               title={
                 <Flexbox horizontal align={'center'} gap={8}>
-                  <div
-                    style={{
-                      background: '#722ed1',
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      height: 14,
-                      width: 3,
-                    }}
-                  />
+                  <div style={getSectionMarkerStyle(72)} />
                   <span className={styles.titleText}>{t('ModelSwitchPanel.detail.abilities')}</span>
                 </Flexbox>
               }
@@ -428,15 +420,7 @@ const ModelDetailPanel: FC<ModelDetailPanelProps> = memo(({ model: modelId, prov
               }
               title={
                 <Flexbox horizontal align={'center'} gap={8}>
-                  <div
-                    style={{
-                      background: '#fa8c16',
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      height: 14,
-                      width: 3,
-                    }}
-                  />
+                  <div style={getSectionMarkerStyle(54)} />
                   <span className={styles.titleText}>{t('ModelSwitchPanel.detail.pricing')}</span>
                 </Flexbox>
               }
@@ -483,15 +467,7 @@ const ModelDetailPanel: FC<ModelDetailPanelProps> = memo(({ model: modelId, prov
               paddingInline={8}
               title={
                 <Flexbox horizontal align={'center'} gap={8}>
-                  <div
-                    style={{
-                      background: '#52c41a',
-                      borderRadius: 2,
-                      flexShrink: 0,
-                      height: 14,
-                      width: 3,
-                    }}
-                  />
+                  <div style={getSectionMarkerStyle(36)} />
                   <span className={styles.titleText}>{t('ModelSwitchPanel.detail.config')}</span>
                 </Flexbox>
               }

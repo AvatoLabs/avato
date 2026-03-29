@@ -1,3 +1,5 @@
+import type { NavigateFunction, To } from 'react-router-dom';
+
 import { isDesktop } from '@/const/version';
 
 /**
@@ -8,4 +10,21 @@ import { isDesktop } from '@/const/version';
 export const isModifierClick = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => {
   if (isDesktop) return false;
   return e.metaKey || e.ctrlKey;
+};
+
+export const getHistoryIndex = (): number => {
+  if (typeof window === 'undefined') return 0;
+
+  return typeof window.history.state?.idx === 'number' ? window.history.state.idx : 0;
+};
+
+export const canNavigateBack = (): boolean => getHistoryIndex() > 0;
+
+export const navigateBackOrTo = (navigate: NavigateFunction, to: To = '/') => {
+  if (canNavigateBack()) {
+    navigate(-1);
+    return;
+  }
+
+  navigate(to);
 };

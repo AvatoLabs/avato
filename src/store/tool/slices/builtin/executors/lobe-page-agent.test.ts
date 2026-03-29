@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ReadyPageAgentRuntime } from './lobe-page-agent';
+import { ReadyDocsAgentRuntime } from './lobe-docs-agent';
 
-describe('ReadyPageAgentRuntime', () => {
+describe('ReadyDocsAgentRuntime', () => {
   it('waits for editor initialization before writing markdown', async () => {
     let initializedHandler: ((editor: unknown) => void) | undefined;
 
@@ -17,7 +17,7 @@ describe('ReadyPageAgentRuntime', () => {
       setDocument: vi.fn(),
     };
 
-    const runtime = new ReadyPageAgentRuntime();
+    const runtime = new ReadyDocsAgentRuntime();
     runtime.setEditor(editor as any);
 
     const pending = runtime.initPage({ markdown: 'Hello world' });
@@ -38,7 +38,7 @@ describe('ReadyPageAgentRuntime', () => {
       once: vi.fn(),
     };
 
-    const runtime = new ReadyPageAgentRuntime();
+    const runtime = new ReadyDocsAgentRuntime();
     runtime.setTitleHandlers(null, () => 'Draft Title');
     runtime.setEditor(editor as any);
 
@@ -54,7 +54,7 @@ describe('ReadyPageAgentRuntime', () => {
   });
 
   it('returns fallback page content when external text context is provided', () => {
-    const runtime = new ReadyPageAgentRuntime();
+    const runtime = new ReadyDocsAgentRuntime();
 
     runtime.setFallbackPageContentContext({
       markdown: '# Resource Title\n\nLoaded from resource viewer.',
@@ -76,7 +76,7 @@ describe('ReadyPageAgentRuntime', () => {
   });
 
   it('isolates fallback page content by conversation key', async () => {
-    const runtime = new ReadyPageAgentRuntime();
+    const runtime = new ReadyDocsAgentRuntime();
 
     runtime.setScopedFallbackPageContentContext({
       context: {

@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useFileStore } from '@/store/file';
-import { knowledgeBaseSelectors, useKnowledgeBaseStore } from '@/store/library';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 
 import { usePageEditorStore } from '../store';
 
@@ -41,11 +41,11 @@ const Breadcrumb = memo(() => {
   const { t } = useTranslation('file');
 
   const title = usePageEditorStore((s) => s.title);
-  const knowledgeBaseId = usePageEditorStore((s) => s.knowledgeBaseId);
+  const sourceSetId = usePageEditorStore((s) => s.sourceSetId);
   const parentId = usePageEditorStore((s) => s.parentId);
 
-  const knowledgeBaseName = useKnowledgeBaseStore(
-    knowledgeBaseSelectors.getKnowledgeBaseNameById(knowledgeBaseId || ''),
+  const sourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
   );
 
   // Fetch the parent folder to get its slug
@@ -54,22 +54,25 @@ const Breadcrumb = memo(() => {
 
   // Fetch folder breadcrumb chain from backend using parent folder's slug
   const useFetchFolderBreadcrumb = useFileStore((s) => s.useFetchFolderBreadcrumb);
-  const { data: folderChain = [] } = useFetchFolderBreadcrumb(parentFolder?.slug || null);
+  const { data: folderChain = [] } = useFetchFolderBreadcrumb(
+    parentFolder?.slug || null,
+    parentFolder?.spaceId ?? undefined,
+  );
 
   // If no parent folder data yet, don't render
   if (!parentFolder || !parentId) {
     return null;
   }
 
-  const documentTitle = title || t('pageEditor.titlePlaceholder');
+  const documentTitle = title || t('docEditor.titlePlaceholder');
 
   return (
     <Flexbox horizontal align={'center'} className={styles.breadcrumb} flex={1} gap={0}>
-      {/* Knowledge Base (root) */}
-      {knowledgeBaseId && (
+      {/* Source set root */}
+      {sourceSetId && (
         <>
           <span className={styles.breadcrumbItem} style={{ cursor: 'default' }}>
-            {knowledgeBaseName || 'Knowledge Base'}
+            {sourceSetName || 'Source Set'}
           </span>
           <span className={styles.separator}>/</span>
         </>

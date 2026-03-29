@@ -64,7 +64,7 @@ import matter from 'gray-matter';
 import urlJoin from 'url-join';
 
 import { type TrustedClientUserInfo } from '@/libs/trusted-client';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 import { MarketService } from '@/server/services/market';
 
 const log = debug('lobe-server:discover');
@@ -504,7 +504,7 @@ export class DiscoverService {
         identifier: (data as any).identifier,
         isValidated: (data as any).isValidated,
         knowledgeCount:
-          (data.config as any)?.knowledgeBases?.length || (data as any).knowledgeCount || 0,
+          (data.config as any)?.sourceSets?.length || (data as any).knowledgeCount || 0,
         pluginCount: (data.config as any)?.plugins?.length || (data as any).pluginCount || 0,
         readme: data.documentationUrl || '',
         schemaVersion: 1,
@@ -644,7 +644,7 @@ export class DiscoverService {
           homepage: item.homepage || `https://lobehub.com/discover/assistant/${item.identifier}`,
           identifier: item.identifier,
           installCount: item.installCount,
-          knowledgeCount: item.knowledgeCount ?? item.config?.knowledgeBases?.length ?? 0,
+          knowledgeCount: item.knowledgeCount ?? item.config?.sourceSets?.length ?? 0,
           pluginCount: item.pluginCount ?? item.config?.plugins?.length ?? 0,
           schemaVersion: item.schemaVersion ?? 1,
           tags: item.tags || [],

@@ -6,7 +6,7 @@ import { builtinAgentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { fileChatSelectors, useFileStore } from '@/store/file';
-import { toPageSelections } from '@/store/file/utils/toPageSelections';
+import { toDocSelections } from '@/store/file/utils/toDocSelections';
 import { useHomeStore } from '@/store/home/store';
 
 export const useSend = () => {
@@ -56,9 +56,9 @@ export const useSend = () => {
 
           sendMessage({
             context: { agentId: inboxAgentId },
+            docSelections: toDocSelections(contextList),
             files: fileList,
             message: inputMessage,
-            pageSelections: toPageSelections(contextList),
           });
 
           router.push(SESSION_CHAT_URL(inboxAgentId, false));

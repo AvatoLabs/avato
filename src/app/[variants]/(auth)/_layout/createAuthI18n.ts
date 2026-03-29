@@ -3,7 +3,7 @@ import resourcesToBackend from 'i18next-resources-to-backend';
 import { initReactI18next } from 'react-i18next';
 
 import { DEFAULT_LANG } from '@/const/locale';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 const AUTH_I18N_NAMESPACES = [
   'auth',

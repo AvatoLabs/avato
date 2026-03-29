@@ -6,7 +6,7 @@ import { memo, useMemo } from 'react';
 
 import { selectors, useChatInputStore } from '../store';
 
-/** 主色发送键：跟随主题 colorPrimary，字与图标用 colorTextLightSolid（深色模式仍为白字） */
+/** 主色发送键：跟随主题 colorPrimary，字与图标用按背景对比度校正后的 colorTextLightSolid */
 const useStyles = createStyles(({ css, token }) => ({
   primarySendIcon: css`
     &.ant-btn-primary:not(.ant-btn-disabled),

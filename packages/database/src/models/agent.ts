@@ -9,12 +9,12 @@ import type { AgentItem } from '../schemas';
 import {
   agents,
   agentsFiles,
-  agentsKnowledgeBases,
+  agentsSourceSets,
   agentsToSessions,
   documents,
   files,
-  knowledgeBases,
   sessions,
+  sourceSets,
 } from '../schemas';
 import type { LobeChatDatabase } from '../type';
 
@@ -72,7 +72,7 @@ export class AgentModel {
 
     if (!agent) return null;
 
-    return this.enrichAgentWithKnowledge(this.normalizeBuiltinInboxAgent(agent));
+    return this.enrichAgentWithSources(this.normalizeBuiltinInboxAgent(agent));
   };
 
   /**
@@ -120,54 +120,47 @@ export class AgentModel {
 
     if (!agent) return null;
 
-    return this.enrichAgentWithKnowledge(this.normalizeBuiltinInboxAgent(agent));
+    return this.enrichAgentWithSources(this.normalizeBuiltinInboxAgent(agent));
   };
 
   /**
-   * Enrich agent with knowledge base and files data
+   * Enrich agent with assigned source sets and files.
    */
-  private enrichAgentWithKnowledge = async (agent: AgentItem) => {
-    const knowledge = await this.getAgentAssignedKnowledge(agent.id);
+  private enrichAgentWithSources = async (agent: AgentItem) => {
+    const sources = await this.getAgentAssignedSources(agent.id);
 
     // Fetch document content for enabled files
-    const enabledFileIds = knowledge.files
+    const enabledFileIds = sources.files
       .filter((f) => f.enabled)
       .map((f) => f.id)
       .filter((id) => id !== undefined);
-    let files: Array<(typeof knowledge.files)[number] & { content?: string | null }> =
-      knowledge.files;
+    let files: Array<(typeof sources.files)[number] & { content?: string | null }> = sources.files;
 
     if (enabledFileIds.length > 0) {
       const documentsData = await this.db.query.documents.findMany({
-        where: and(
-          eq(documents.userId, this.userId),
-          inArray(documents.fileId, enabledFileIds),
-          isNull(documents.deletedAt),
-        ),
+        where: and(inArray(documents.fileId, enabledFileIds), isNull(documents.deletedAt)),
       });
 
       const documentMap = new Map(documentsData.map((doc) => [doc.fileId, doc.content]));
-      files = knowledge.files.map((file) => ({
+      files = sources.files.map((file) => ({
         ...file,
         content: file.enabled && file.id ? documentMap.get(file.id) : undefined,
       }));
     }
 
-    return { ...agent, ...knowledge, files };
+    return { ...agent, ...sources, files };
   };
 
-  getAgentAssignedKnowledge = async (id: string) => {
+  getAgentAssignedSources = async (id: string) => {
     // Run both queries in parallel for better performance
-    // Include userId check to ensure user can only access their own agent's knowledge
-    const [knowledgeBaseResult, fileResult] = await Promise.all([
+    // Include userId check to ensure user can only access their own assigned sources
+    const [sourceSetResult, fileResult] = await Promise.all([
       this.db
-        .select({ enabled: agentsKnowledgeBases.enabled, knowledgeBases })
-        .from(agentsKnowledgeBases)
-        .where(
-          and(eq(agentsKnowledgeBases.agentId, id), eq(agentsKnowledgeBases.userId, this.userId)),
-        )
-        .orderBy(desc(agentsKnowledgeBases.createdAt))
-        .leftJoin(knowledgeBases, eq(knowledgeBases.id, agentsKnowledgeBases.knowledgeBaseId)),
+        .select({ enabled: agentsSourceSets.enabled, sourceSets })
+        .from(agentsSourceSets)
+        .where(and(eq(agentsSourceSets.agentId, id), eq(agentsSourceSets.userId, this.userId)))
+        .orderBy(desc(agentsSourceSets.createdAt))
+        .leftJoin(sourceSets, eq(sourceSets.id, agentsSourceSets.sourceSetId)),
       this.db
         .select({ enabled: agentsFiles.enabled, files })
         .from(agentsFiles)
@@ -181,8 +174,8 @@ export class AgentModel {
         ...item.files,
         enabled: item.enabled,
       })),
-      knowledgeBases: knowledgeBaseResult.map((item) => ({
-        ...item.knowledgeBases,
+      sourceSets: sourceSetResult.map((item) => ({
+        ...item.sourceSets,
         enabled: item.enabled,
       })),
     };
@@ -206,63 +199,63 @@ export class AgentModel {
     return this.getAgentConfigById(agentId);
   };
 
-  createAgentKnowledgeBase = async (
+  attachSourceSetToAgent = async (
     agentId: string,
-    knowledgeBaseId: string,
+    sourceSetId: string,
     enabled: boolean = true,
   ) => {
-    const existing = await this.db.query.agentsKnowledgeBases.findFirst({
+    const existing = await this.db.query.agentsSourceSets.findFirst({
       where: and(
-        eq(agentsKnowledgeBases.agentId, agentId),
-        eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
-        eq(agentsKnowledgeBases.userId, this.userId),
+        eq(agentsSourceSets.agentId, agentId),
+        eq(agentsSourceSets.sourceSetId, sourceSetId),
+        eq(agentsSourceSets.userId, this.userId),
       ),
     });
 
     if (existing) {
       await this.db
-        .update(agentsKnowledgeBases)
+        .update(agentsSourceSets)
         .set({ enabled })
         .where(
           and(
-            eq(agentsKnowledgeBases.agentId, agentId),
-            eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
-            eq(agentsKnowledgeBases.userId, this.userId),
+            eq(agentsSourceSets.agentId, agentId),
+            eq(agentsSourceSets.sourceSetId, sourceSetId),
+            eq(agentsSourceSets.userId, this.userId),
           ),
         );
 
       return;
     }
 
-    return this.db.insert(agentsKnowledgeBases).values({
+    return this.db.insert(agentsSourceSets).values({
       agentId,
       enabled,
-      knowledgeBaseId,
+      sourceSetId,
       userId: this.userId,
     });
   };
 
-  deleteAgentKnowledgeBase = async (agentId: string, knowledgeBaseId: string) => {
+  detachSourceSetFromAgent = async (agentId: string, sourceSetId: string) => {
     return this.db
-      .delete(agentsKnowledgeBases)
+      .delete(agentsSourceSets)
       .where(
         and(
-          eq(agentsKnowledgeBases.agentId, agentId),
-          eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
-          eq(agentsKnowledgeBases.userId, this.userId),
+          eq(agentsSourceSets.agentId, agentId),
+          eq(agentsSourceSets.sourceSetId, sourceSetId),
+          eq(agentsSourceSets.userId, this.userId),
         ),
       );
   };
 
-  toggleKnowledgeBase = async (agentId: string, knowledgeBaseId: string, enabled?: boolean) => {
+  setSourceSetEnabled = async (agentId: string, sourceSetId: string, enabled?: boolean) => {
     return this.db
-      .update(agentsKnowledgeBases)
+      .update(agentsSourceSets)
       .set({ enabled })
       .where(
         and(
-          eq(agentsKnowledgeBases.agentId, agentId),
-          eq(agentsKnowledgeBases.knowledgeBaseId, knowledgeBaseId),
-          eq(agentsKnowledgeBases.userId, this.userId),
+          eq(agentsSourceSets.agentId, agentId),
+          eq(agentsSourceSets.sourceSetId, sourceSetId),
+          eq(agentsSourceSets.userId, this.userId),
         ),
       );
   };

@@ -33,23 +33,19 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   banner: css`
     cursor: pointer;
 
-    position: absolute;
-    z-index: 0;
-    inset-block-end: 0;
-    inset-inline: 0;
-
     display: flex;
     gap: 12px;
     align-items: center;
     justify-content: space-between;
 
-    margin-block-end: 6px;
-    padding-block: 42px 10px;
+    width: 100%;
+    padding-block: 10px;
     padding-inline: 16px;
-    border: 1px solid ${cssVar.colorFillSecondary};
-    border-radius: 20px;
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: 18px;
 
-    background: color-mix(in srgb, ${cssVar.colorFillQuaternary} 50%, ${cssVar.colorBgContainer});
+    background: color-mix(in srgb, ${cssVar.colorBgContainer} 90%, ${cssVar.colorFillTertiary} 10%);
+    box-shadow: ${cssVar.boxShadowSecondary};
   `,
   icon: css`
     color: ${cssVar.colorTextSecondary};
@@ -57,6 +53,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   iconGroup: css`
     display: flex;
     align-items: center;
+    margin-inline-start: auto;
   `,
   text: css`
     font-size: 13px;

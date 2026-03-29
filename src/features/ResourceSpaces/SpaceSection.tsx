@@ -1,17 +1,8 @@
 'use client';
 
-import {
-  AccordionItem,
-  ActionIcon,
-  Button,
-  createModal,
-  Flexbox,
-  Input,
-  Text,
-  TextArea,
-  useModalContext,
-} from '@lobehub/ui';
-import { HouseIcon, PlusIcon, Settings2Icon, Share2Icon, Users2Icon } from 'lucide-react';
+import { AccordionItem, ActionIcon, Button, Flexbox, Input, Text, TextArea } from '@lobehub/ui';
+import { createModal, useModalContext } from '@lobehub/ui/base-ui';
+import { HouseIcon, PlusIcon, Settings2Icon, Users2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -19,10 +10,9 @@ import useSWR from 'swr';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
-import { TrashNavItem } from '@/features/ResourceTrash';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildResourceRootPath, buildResourceSharedPath, buildSpaceSettingsPath } from './paths';
+import { buildContentRootPath, buildSpaceSettingsPath } from './paths';
 
 const SPACE_LIST_KEY = 'resource-space-list';
 
@@ -102,11 +92,10 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
         <CreateSpaceForm
           onCreated={(spaceId) => {
             void mutate();
-            navigate(buildResourceRootPath(spaceId));
+            navigate(buildContentRootPath(spaceId));
           }}
         />
       ),
-      focusable: { focusTriggerAfterClose: true },
       footer: null,
       title: t('space.create.title'),
       width: 420,
@@ -136,13 +125,6 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
         <SkeletonList paddingInline={4} rows={4} />
       ) : (
         <Flexbox gap={1} paddingInline={4}>
-          <NavItem
-            active={location.pathname === buildResourceSharedPath()}
-            icon={Share2Icon}
-            title={t('shared.title')}
-            onClick={() => navigate(buildResourceSharedPath())}
-          />
-          <TrashNavItem spaceId={currentSpaceId} />
           {data?.map((space) => {
             const active = currentSpaceId === space.id && !location.pathname.endsWith('/settings');
             const isCurrentSettings =
@@ -169,7 +151,7 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
                     />
                   ) : undefined
                 }
-                onClick={() => navigate(buildResourceRootPath(space.id))}
+                onClick={() => navigate(buildContentRootPath(space.id))}
               />
             );
           })}

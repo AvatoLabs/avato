@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { type LobeChatDatabase } from '@lobechat/database';
-import { agents, agentsToSessions, sessions, threads, topics } from '@lobechat/database/schemas';
+import {
+  agents,
+  agentsToSessions,
+  sessions,
+  spaces,
+  threads,
+  topics,
+} from '@lobechat/database/schemas';
 import { getTestDB } from '@lobechat/database/test-utils';
 import { eq } from 'drizzle-orm';
 import type * as ModelBankModule from 'model-bank';
@@ -106,6 +113,7 @@ describe('AI Agent Router Integration Tests', () => {
   });
 
   afterEach(async () => {
+    await serverDB.delete(spaces);
     await cleanupTestUser(serverDB, userId);
     vi.clearAllMocks();
   });
@@ -309,6 +317,28 @@ describe('AI Agent Router Integration Tests', () => {
           }),
         }),
       );
+    });
+
+    it('should reject inaccessible appContext.spaceId', async () => {
+      const caller = aiAgentRouter.createCaller(createTestContext());
+
+      await serverDB.insert(spaces).values({
+        createdBy: userId,
+        id: 'spc_blocked_agent',
+        kind: 'team',
+        name: 'Blocked Agent Space',
+      });
+
+      await expect(
+        caller.execAgent({
+          agentId: testAgentId,
+          appContext: { spaceId: 'spc_blocked_agent' },
+          prompt: 'Blocked space prompt',
+        }),
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'SPACE_ACCESS_DENIED',
+      });
     });
   });
 });

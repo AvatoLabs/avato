@@ -19,13 +19,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   modeButton: css`
     font-size: ${cssVar.fontSizeSM};
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
   modeDesc: css`
     margin-block-start: 2px;
     font-size: 12px;
     line-height: 1.4;
-    color: ${cssVar.colorTextDescription};
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
   `,
   modeItem: css`
     min-width: 160px;

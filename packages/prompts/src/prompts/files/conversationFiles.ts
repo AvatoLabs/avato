@@ -1,5 +1,5 @@
-import type { FileContent } from '../knowledgeBaseQA';
 import { escapeXmlAttr, escapeXmlContent } from '../search/xmlEscape';
+import type { FileContent } from '../sourceSetQA';
 
 const formatConversationFile = (file: FileContent) => {
   if (file.error) {

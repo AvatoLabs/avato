@@ -51,14 +51,14 @@ export const ragEvalRouter = router({
     .input(
       z.object({
         description: z.string().optional(),
-        knowledgeBaseId: z.string(),
+        sourceSetId: z.string(),
         name: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.datasetModel.create({
         description: input.description,
-        knowledgeBaseId: input.knowledgeBaseId,
+        sourceSetId: input.sourceSetId,
         name: input.name,
       });
 
@@ -66,10 +66,10 @@ export const ragEvalRouter = router({
     }),
 
   getDatasets: ragEvalProcedure
-    .input(z.object({ knowledgeBaseId: z.string() }))
+    .input(z.object({ sourceSetId: z.string() }))
 
     .query(async ({ ctx, input }): Promise<RAGEvalDataSetItem[]> => {
-      return ctx.datasetModel.query(input.knowledgeBaseId);
+      return ctx.datasetModel.query(input.sourceSetId);
     }),
 
   removeDataset: ragEvalProcedure
@@ -280,7 +280,7 @@ export const ragEvalRouter = router({
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.evaluationModel.create({
         description: input.description,
-        knowledgeBaseId: input.knowledgeBaseId,
+        sourceSetId: input.sourceSetId,
         datasetId: input.datasetId,
         name: input.name,
       });
@@ -295,8 +295,8 @@ export const ragEvalRouter = router({
     }),
 
   getEvaluationList: ragEvalProcedure
-    .input(z.object({ knowledgeBaseId: z.string() }))
+    .input(z.object({ sourceSetId: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.evaluationModel.queryByKnowledgeBaseId(input.knowledgeBaseId);
+      return ctx.evaluationModel.queryBySourceSetId(input.sourceSetId);
     }),
 });

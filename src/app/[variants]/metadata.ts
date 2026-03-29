@@ -10,6 +10,36 @@ import { RouteVariants } from '@/utils/server/routeVariants';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+const customBrandingIcons = {
+  apple: BRANDING_LOGO_URL,
+  icon: [
+    {
+      media: '(prefers-color-scheme: light)',
+      sizes: '16x16',
+      type: 'image/png',
+      url: '/favicon-16x16.png?v=1',
+    },
+    {
+      media: '(prefers-color-scheme: light)',
+      sizes: '32x32',
+      type: 'image/png',
+      url: '/favicon-32x32.png?v=1',
+    },
+    {
+      media: '(prefers-color-scheme: dark)',
+      sizes: '16x16',
+      type: 'image/png',
+      url: '/favicon-16x16-dark.png?v=1',
+    },
+    {
+      media: '(prefers-color-scheme: dark)',
+      sizes: '32x32',
+      type: 'image/png',
+      url: '/favicon-32x32-dark.png?v=1',
+    },
+  ],
+} as const;
+
 export const generateMetadata = async (props: DynamicLayoutProps) => {
   const locale = await RouteVariants.getLocale(props);
   const { t } = await translation('metadata', locale);
@@ -24,7 +54,7 @@ export const generateMetadata = async (props: DynamicLayoutProps) => {
     },
     description: t('chat.description', { appName: BRANDING_NAME }),
     icons: isCustomBranding
-      ? BRANDING_LOGO_URL
+      ? customBrandingIcons
       : {
           apple: '/apple-touch-icon.png?v=1',
           icon: isDev ? '/favicon-dev.ico' : '/favicon.ico?v=1',

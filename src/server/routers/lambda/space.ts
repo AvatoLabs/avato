@@ -2,7 +2,7 @@ import type { SpaceRole } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { ResourceModel } from '@/database/models/resource';
+import { ContentModel } from '@/database/models/content';
 import { SpaceModel } from '@/database/models/space';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -12,7 +12,7 @@ const MANAGEABLE_ROLES = new Set<SpaceRole>(['admin', 'owner']);
 const spaceProcedure = authedProcedure.use(serverDatabase).use(async ({ ctx, next }) => {
   return next({
     ctx: {
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
       spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
     },
   });
@@ -65,7 +65,7 @@ export const spaceRouter = router({
         input.role,
       );
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.member.add',
         metadata: { role: input.role, targetUserId: user.id, username: input.username },
         spaceId: input.spaceId,
@@ -84,7 +84,7 @@ export const spaceRouter = router({
     .mutation(async ({ ctx, input }) => {
       const space = await ctx.spaceModel.createTeamSpace(input);
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.create',
         metadata: { kind: 'team', name: input.name },
         spaceId: space.id,
@@ -99,7 +99,7 @@ export const spaceRouter = router({
       await assertOwnerRole(ctx, input.id);
       await ctx.spaceModel.deleteSpace(input.id);
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.delete',
         metadata: { spaceId: input.id },
         spaceId: input.id,
@@ -137,7 +137,7 @@ export const spaceRouter = router({
       await assertManageRole(ctx, input.spaceId);
       await ctx.spaceModel.removeMember(input.spaceId, input.userId);
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.member.remove',
         metadata: { targetUserId: input.userId },
         spaceId: input.spaceId,
@@ -157,7 +157,7 @@ export const spaceRouter = router({
       await assertOwnerRole(ctx, input.spaceId);
       await ctx.spaceModel.transferOwnership(input.spaceId, input.userId);
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.owner.transfer',
         metadata: { targetUserId: input.userId },
         spaceId: input.spaceId,
@@ -193,7 +193,7 @@ export const spaceRouter = router({
       await assertManageRole(ctx, input.spaceId);
       await ctx.spaceModel.updateMemberRole(input.spaceId, input.userId, input.role);
 
-      await ctx.resourceModel.createAuditLog({
+      await ctx.contentModel.createAuditLog({
         action: 'space.member.role.update',
         metadata: { role: input.role, targetUserId: input.userId },
         spaceId: input.spaceId,

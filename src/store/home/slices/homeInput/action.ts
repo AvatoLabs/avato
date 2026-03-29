@@ -9,7 +9,7 @@ import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
 import { settingsSelectors } from '@/store/user/selectors';
 import { useUserStore } from '@/store/user/store';
-import { resolveModelProviderWithFallback } from '@/utils/pageAgentModel';
+import { resolveModelProviderWithFallback } from '@/utils/docsAgentModel';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type StarterMode } from './initialState';
@@ -185,21 +185,21 @@ export class HomeInputActionImpl {
       // 3. Navigate to Page
       const { navigate } = this.#get();
       if (navigate) {
-        navigate(`/page/${newDoc.id}`);
+        navigate(`/docs/${newDoc.id}`);
       }
 
-      // 4. Update pageAgent's model config and send initial message
-      const pageAgentId = builtinAgentSelectors.pageAgentId(agentState);
+      // 4. Update docsAgent's model config and send initial message
+      const docsAgentId = builtinAgentSelectors.docsAgentId(agentState);
 
-      if (pageAgentId) {
-        // Update pageAgent's model to match inbox selection
+      if (docsAgentId) {
+        // Update docsAgent's model to match inbox selection
         if (model && provider) {
-          await agentState.updateAgentConfigById(pageAgentId, { model, provider });
+          await agentState.updateAgentConfigById(docsAgentId, { model, provider });
         }
 
         const { sendMessage } = useChatStore.getState();
         await sendMessage({
-          context: { agentId: pageAgentId, scope: 'page' },
+          context: { agentId: docsAgentId, scope: 'doc' },
           message,
         });
       }

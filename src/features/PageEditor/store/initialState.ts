@@ -1,6 +1,6 @@
 import { type IEditor } from '@lobehub/editor';
 
-import { DEFAULT_PAGE_KIND, type PageKind } from '@/utils/page';
+import { DEFAULT_PAGE_KIND, type PageKind } from '@/utils/docs';
 
 export type MetaSaveStatus = 'idle' | 'saving' | 'saved';
 export type PageEditorViewMode = 'markdown' | 'preview' | 'rich';
@@ -8,7 +8,6 @@ export type PageEditorViewMode = 'markdown' | 'preview' | 'rich';
 export interface PublicState {
   autoSave?: boolean;
   emoji?: string;
-  knowledgeBaseId?: string;
   onBack?: () => void;
   onDelete?: () => void;
   onDocumentIdChange?: (newId: string) => void;
@@ -17,6 +16,7 @@ export interface PublicState {
   onTitleChange?: (title: string) => void;
   pageKind?: PageKind;
   parentId?: string;
+  sourceSetId?: string;
   title?: string;
 }
 

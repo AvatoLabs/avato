@@ -1,4 +1,4 @@
-import { type KnowledgeItem } from '@lobechat/types';
+import { type AgentSourceItem } from '@lobechat/types';
 import { getSingletonAnalyticsOptional } from '@lobehub/analytics';
 import isEqual from 'fast-deep-equal';
 import { t } from 'i18next';
@@ -336,8 +336,10 @@ export class SessionActionImpl {
     );
   };
 
-  useFetchConversationFiles = (context?: ConversationFileContext): SWRResponse<KnowledgeItem[]> => {
-    return useClientDataSWR<KnowledgeItem[]>(
+  useFetchConversationFiles = (
+    context?: ConversationFileContext,
+  ): SWRResponse<AgentSourceItem[]> => {
+    return useClientDataSWR<AgentSourceItem[]>(
       getConversationFilesKey(context),
       ([, agentId, groupId, sessionId]) =>
         sessionService.getConversationFiles({

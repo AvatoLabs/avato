@@ -19,7 +19,7 @@ const styles = createStaticStyles(({ css }) => ({
     height: 20px;
     border-radius: 4px;
 
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
 
     transition: all 0.2s ease;
 
@@ -50,7 +50,7 @@ const styles = createStaticStyles(({ css }) => ({
 
     font-size: 12px;
     font-variant-numeric: tabular-nums;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     text-align: center;
   `,
 }));

@@ -32,7 +32,7 @@ const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
 
       const leaveWithAutoSave = async () => {
         messageApi.loading({
-          content: t('pageEditor.saving'),
+          content: t('docEditor.saving'),
           duration: 0,
           key: messageKey,
         });
@@ -42,7 +42,7 @@ const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
 
           if (!saved) {
             messageApi.error({
-              content: t('networkError'),
+              content: t('docEditor.saveFailed'),
               duration: 2,
               key: messageKey,
             });
@@ -54,7 +54,7 @@ const UnsavedChangesGuard = memo<UnsavedChangesGuardProps>(
           blockerRef.current?.proceed?.();
         } catch (error) {
           const content =
-            error instanceof Error && error.message ? error.message : t('networkError');
+            error instanceof Error && error.message ? error.message : t('docEditor.saveFailed');
 
           messageApi.error({
             content,

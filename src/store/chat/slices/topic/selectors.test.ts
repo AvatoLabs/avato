@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
+import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type ChatStore } from '@/store/chat';
 import { initialState } from '@/store/chat/initialState';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
@@ -33,6 +34,10 @@ const createTopicDataMap = (agentId: string, groupId?: string) => ({
 const topicDataMap = createTopicDataMap('test');
 
 describe('topicSelectors', () => {
+  beforeEach(() => {
+    setActiveWorkspaceSpaceId(undefined);
+  });
+
   describe('currentTopics', () => {
     it('should return undefined if there are no topics with activeAgentId', () => {
       const topics = topicSelectors.currentTopics(initialStore);

@@ -8,7 +8,7 @@ import { VList } from 'virtua';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
 import { usePageKind } from '@/features/Pages/usePageKind';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { type LobeDocument } from '@/types/document';
 
 import Item from '../List/Item';

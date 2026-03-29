@@ -1,19 +1,22 @@
 import { DEFAULT_AGENT_CONFIG, INBOX_SESSION_ID } from '@lobechat/const';
-import { type KnowledgeItem } from '@lobechat/types';
-import { KnowledgeType } from '@lobechat/types';
+import { type AgentSourceItem } from '@lobechat/types';
+import { AgentSourceKind } from '@lobechat/types';
 import { merge } from '@lobechat/utils';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { AgentModel } from '@/database/models/agent';
 import { ChatGroupModel } from '@/database/models/chatGroup';
 import { FileModel } from '@/database/models/file';
-import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
+import { SourceSetModel } from '@/database/models/sourceSet';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { insertAgentSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentService } from '@/server/services/agent';
+import { ContentAuthorizer } from '@/server/services/content';
 
 /** Merge config but omit model/provider when source has none — lets client use its own default. */
 function mergeConfigWithoutForcingModelProvider(
@@ -36,8 +39,10 @@ const agentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
       agentService: new AgentService(ctx.serverDB, ctx.userId),
       chatGroupModel: new ChatGroupModel(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
-      knowledgeBaseModel: new KnowledgeBaseModel(ctx.serverDB, ctx.userId),
+      sourceSetModel: new SourceSetModel(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
       sessionModel: new SessionModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -106,20 +111,16 @@ export const agentRouter = router({
       return ctx.agentModel.createAgentFiles(input.agentId, input.fileIds, input.enabled);
     }),
 
-  createAgentKnowledgeBase: agentProcedure
+  attachSourceSetToAgent: agentProcedure
     .input(
       z.object({
         agentId: z.string(),
         enabled: z.boolean().optional(),
-        knowledgeBaseId: z.string(),
+        sourceSetId: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return ctx.agentModel.createAgentKnowledgeBase(
-        input.agentId,
-        input.knowledgeBaseId,
-        input.enabled,
-      );
+      return ctx.agentModel.attachSourceSetToAgent(input.agentId, input.sourceSetId, input.enabled);
     }),
 
   /**
@@ -155,15 +156,15 @@ export const agentRouter = router({
       return ctx.agentModel.deleteAgentFile(input.agentId, input.fileId);
     }),
 
-  deleteAgentKnowledgeBase: agentProcedure
+  detachSourceSetFromAgent: agentProcedure
     .input(
       z.object({
         agentId: z.string(),
-        knowledgeBaseId: z.string(),
+        sourceSetId: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return ctx.agentModel.deleteAgentKnowledgeBase(input.agentId, input.knowledgeBaseId);
+      return ctx.agentModel.detachSourceSetFromAgent(input.agentId, input.sourceSetId);
     }),
 
   /**
@@ -270,29 +271,47 @@ export const agentRouter = router({
       return ctx.agentService.getBuiltinAgent(input.slug);
     }),
 
-  getKnowledgeBasesAndFiles: agentProcedure
+  listAvailableSources: agentProcedure
     .input(
       z.object({
         agentId: z.string(),
+        spaceId: z.string().nullish(),
       }),
     )
-    .query(async ({ ctx, input }): Promise<KnowledgeItem[]> => {
-      const knowledgeBases = await ctx.knowledgeBaseModel.query();
+    .query(async ({ ctx, input }): Promise<AgentSourceItem[]> => {
+      if (input.spaceId) {
+        const space = await ctx.spaceModel.findAccessibleSpaceById(input.spaceId);
+        if (!space?.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+        }
+      }
+
+      const sourceSets = await ctx.sourceSetModel.query(input.spaceId ?? undefined);
+      const visibleSourceSetIds = new Set(
+        await ctx.contentAuthorizer.filterVisibleSourceSetIdsForList(
+          sourceSets.map((sourceSet) => sourceSet.id),
+        ),
+      );
 
       const files = await ctx.fileModel.query({
-        showFilesInKnowledgeBase: false,
+        spaceId: input.spaceId ?? undefined,
+        showFilesInSourceSet: false,
       });
-
-      const knowledge = await ctx.agentModel.getAgentAssignedKnowledge(input.agentId);
-      const enabledFileIds = new Set(
-        knowledge.files.filter((item) => item.enabled).map((item) => item.id),
+      const visibleFileIds = new Set(
+        await ctx.contentAuthorizer.filterVisibleFileIdsForList(files.map((file) => file.id)),
       );
-      const enabledKnowledgeBaseIds = new Set(
-        knowledge.knowledgeBases.filter((item) => item.enabled).map((item) => item.id),
+
+      const sources = await ctx.agentModel.getAgentAssignedSources(input.agentId);
+      const enabledFileIds = new Set(
+        sources.files.filter((item) => item.enabled).map((item) => item.id),
+      );
+      const enabledSourceSetIds = new Set(
+        sources.sourceSets.filter((item) => item.enabled).map((item) => item.id),
       );
 
       return [
         ...files
+          .filter((file) => visibleFileIds.has(file.id))
           // Filter out all images
           .filter((file) => !file.fileType.startsWith('image'))
           .map((file) => ({
@@ -300,16 +319,20 @@ export const agentRouter = router({
             fileType: file.fileType,
             id: file.id,
             name: file.name,
-            type: KnowledgeType.File,
+            spaceId: file.spaceId,
+            type: AgentSourceKind.File,
           })),
-        ...knowledgeBases.map((knowledgeBase) => ({
-          avatar: knowledgeBase.avatar,
-          description: knowledgeBase.description,
-          enabled: enabledKnowledgeBaseIds.has(knowledgeBase.id),
-          id: knowledgeBase.id,
-          name: knowledgeBase.name,
-          type: KnowledgeType.KnowledgeBase,
-        })),
+        ...sourceSets
+          .filter((sourceSet) => visibleSourceSetIds.has(sourceSet.id))
+          .map((sourceSet) => ({
+            avatar: sourceSet.avatar,
+            description: sourceSet.description,
+            enabled: enabledSourceSetIds.has(sourceSet.id),
+            id: sourceSet.id,
+            name: sourceSet.name,
+            spaceId: sourceSet.spaceId,
+            type: AgentSourceKind.SourceSet,
+          })),
       ];
     }),
 
@@ -353,20 +376,16 @@ export const agentRouter = router({
       return ctx.agentModel.toggleFile(input.agentId, input.fileId, input.enabled);
     }),
 
-  toggleKnowledgeBase: agentProcedure
+  setSourceSetEnabled: agentProcedure
     .input(
       z.object({
         agentId: z.string(),
         enabled: z.boolean().optional(),
-        knowledgeBaseId: z.string(),
+        sourceSetId: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      return ctx.agentModel.toggleKnowledgeBase(
-        input.agentId,
-        input.knowledgeBaseId,
-        input.enabled,
-      );
+      return ctx.agentModel.setSourceSetEnabled(input.agentId, input.sourceSetId, input.enabled);
     }),
 
   updateAgentConfig: agentProcedure

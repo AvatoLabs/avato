@@ -8,5 +8,6 @@ export * from './model.service';
 export * from './permission.service';
 export * from './provider.service';
 export * from './role.service';
+export * from './source-set.service';
 export * from './topic.service';
 export * from './user.service';

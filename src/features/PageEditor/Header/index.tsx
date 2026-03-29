@@ -10,7 +10,7 @@ import { DESKTOP_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import { AutoSaveHint } from '@/features/EditorCanvas';
 import NavHeader from '@/features/NavHeader';
 import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore } from '../store';
 import Breadcrumb from './Breadcrumb';
@@ -47,7 +47,7 @@ const Header = memo(() => {
                 type={'secondary'}
                 weight={600}
               >
-                {title || t('pageEditor.titlePlaceholder')}
+                {title || t('docEditor.titlePlaceholder')}
               </Text>
             </>
           )}
@@ -62,17 +62,17 @@ const Header = memo(() => {
             options={[
               {
                 icon: <Icon icon={isTablePage ? Table2Icon : SquarePen} />,
-                title: t(isTablePage ? 'pageEditor.mode.table' : 'pageEditor.mode.rich'),
+                title: t(isTablePage ? 'docEditor.mode.table' : 'docEditor.mode.rich'),
                 value: 'rich',
               },
               {
                 icon: <Icon icon={Code2} />,
-                title: t('pageEditor.mode.markdown'),
+                title: t('docEditor.mode.markdown'),
                 value: 'markdown',
               },
               {
                 icon: <Icon icon={Eye} />,
-                title: t('pageEditor.mode.preview'),
+                title: t('docEditor.mode.preview'),
                 value: 'preview',
               },
             ]}
@@ -82,6 +82,7 @@ const Header = memo(() => {
           <DropdownMenu
             iconSpaceMode="group"
             items={menuItems}
+            nativeButton={false}
             placement="bottomRight"
             popupProps={{
               style: {

@@ -33,6 +33,13 @@ Intro
     ]);
   });
 
+  it('does not truncate the outline unless a limit is provided', () => {
+    const content = Array.from({ length: 10 }, (_, index) => `## Section ${index + 1}`).join('\n');
+
+    expect(extractDocumentOutline(content)).toHaveLength(10);
+    expect(extractDocumentOutline(content, 3)).toHaveLength(3);
+  });
+
   it('normalizes heading text for matching editor content', () => {
     expect(normalizeHeadingText('## [Hello](https://example.com)  World')).toBe('hello world');
   });

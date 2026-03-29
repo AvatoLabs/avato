@@ -7,12 +7,36 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <!--SEO_META-->
   <style>
-    html body {
-      background: #f8f8f8;
+    :root {
+      color-scheme: light;
+      --loading-bg: #f4f1eb;
+      --loading-text: rgba(17, 23, 22, 0.95);
+      --loading-subtext: rgba(17, 23, 22, 0.54);
+      --loading-track: rgba(17, 23, 22, 0.12);
+      --loading-accent: #5fb193;
+      --loading-accent-soft: rgba(95, 177, 147, 0.18);
+      --loading-logo-filter: none;
     }
 
-    html[data-theme='dark'] body {
-      background-color: #000;
+    html[data-theme='dark'] {
+      color-scheme: dark;
+      --loading-bg: #090a0a;
+      --loading-text: rgba(243, 247, 245, 0.96);
+      --loading-subtext: rgba(243, 247, 245, 0.48);
+      --loading-track: rgba(243, 247, 245, 0.12);
+      --loading-accent: #76c4a5;
+      --loading-accent-soft: rgba(118, 196, 165, 0.2);
+      --loading-logo-filter: invert(1);
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--loading-bg);
     }
 
     #loading-screen {
@@ -23,13 +47,115 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: inherit;
-      gap: 12px;
+      padding: 24px;
+      background: var(--loading-bg);
     }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
+    #loading-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--loading-text);
+      font-family: 'Geist', 'SF Pro Display', 'Segoe UI Variable', 'Segoe UI', sans-serif;
+      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      user-select: none;
+    }
+
+    .loading-logo-wrap {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 96px;
+      height: 96px;
+    }
+
+    .loading-logo-core {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 76px;
+      height: 76px;
+    }
+
+    .loading-logo-core img {
+      display: block;
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      backface-visibility: hidden;
+      filter: var(--loading-logo-filter);
+      transform: translateZ(0);
+    }
+
+    .loading-headline {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .loading-subtext {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: var(--loading-subtext);
+    }
+
+    .loading-subtext::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--loading-accent);
+      box-shadow: 0 0 0 4px var(--loading-accent-soft);
+    }
+
+    .loading-subtext::after {
+      content: '';
+      animation: dots 1.4s steps(4, end) infinite;
+    }
+
+    .loading-bar {
+      position: relative;
+      overflow: hidden;
+      width: 168px;
+      height: 2px;
+      border-radius: 999px;
+      background: var(--loading-track);
+    }
+
+    .loading-bar::after {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 38%;
+      border-radius: inherit;
+      background: linear-gradient(90deg,
+          transparent 0%,
+          var(--loading-accent) 28%,
+          transparent 100%);
+      content: '';
+      transform: translateX(-100%);
+      animation: track 1.35s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes track {
+      0% {
+        transform: translateX(-100%);
+      }
+
+      100% {
+        transform: translateX(220%);
       }
     }
 
@@ -37,68 +163,37 @@
 
       0%,
       20% {
-        content: ".";
+        content: '.';
       }
 
       40% {
-        content: "..";
+        content: '..';
       }
 
       60%,
       100% {
-        content: "...";
+        content: '...';
       }
     }
 
-    #loading-brand {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 24px;
-      color: #1f1f1f;
+    @media (max-width: 640px) {
+      .loading-logo-core {
+        width: 72px;
+        height: 72px;
+      }
+
+      .loading-logo-core img {
+        width: 52px;
+        height: 52px;
+      }
     }
 
-    .avato-logo-wrapper {
-      position: relative;
-    }
+    @media (prefers-reduced-motion: reduce) {
 
-    .avato-logo-img {
-      width: 64px;
-      height: 64px;
-      border-radius: 16px;
-      display: block;
-      position: relative;
-      z-index: 2;
-      backface-visibility: hidden;
-      transform: translateZ(0);
-    }
-
-    .avato-spinner {
-      position: absolute;
-      inset: -12px;
-      border-radius: 24px;
-      border: 2px dashed currentColor;
-      opacity: 0.25;
-      animation: spin 6s linear infinite;
-      z-index: 1;
-    }
-
-    .avato-text {
-      font-family: ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, 'Arial Rounded MT Bold', -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      opacity: 0.8;
-    }
-
-    .avato-text::after {
-      content: "";
-      animation: dots 1.5s infinite;
-      position: absolute;
-    }
-
-    html[data-theme='dark'] #loading-brand {
-      color: #f0f0f0;
+      .loading-bar::after,
+      .loading-subtext::after {
+        animation: none;
+      }
     }
   </style>
   <script>
@@ -166,6 +261,47 @@
       var rtl = ['ar', 'arc', 'dv', 'fa', 'ha', 'he', 'khw', 'ks', 'ku', 'ps', 'ur', 'yi'];
       document.documentElement.dir =
         rtl.indexOf(locale.split('-')[0].toLowerCase()) >= 0 ? 'rtl' : 'ltr';
+
+      var loadingLabels = {
+        'ar': 'جارٍ التحميل',
+        'bg': 'Зареждане',
+        'bg-bg': 'Зареждане',
+        'de': 'Wird geladen',
+        'de-de': 'Wird geladen',
+        'en': 'Loading',
+        'en-us': 'Loading',
+        'es': 'Cargando',
+        'es-es': 'Cargando',
+        'fa': 'در حال بارگذاری',
+        'fa-ir': 'در حال بارگذاری',
+        'fr': 'Chargement',
+        'fr-fr': 'Chargement',
+        'it': 'Caricamento',
+        'it-it': 'Caricamento',
+        'ja': '読み込み中',
+        'ja-jp': '読み込み中',
+        'ko': '로딩 중',
+        'ko-kr': '로딩 중',
+        'nl': 'Laden',
+        'nl-nl': 'Laden',
+        'pl': 'Ładowanie',
+        'pl-pl': 'Ładowanie',
+        'pt': 'Carregando',
+        'pt-br': 'Carregando',
+        'ru': 'Загрузка',
+        'ru-ru': 'Загрузка',
+        'tr': 'Yükleniyor',
+        'tr-tr': 'Yükleniyor',
+        'vi': 'Đang tải',
+        'vi-vn': 'Đang tải',
+        'zh': '加载中',
+        'zh-cn': '加载中',
+        'zh-tw': '載入中',
+      };
+      var normalizedLocale = locale.toLowerCase();
+      var shortLocale = normalizedLocale.split('-')[0];
+      window.__LOADING_LABEL__ =
+        loadingLabels[normalizedLocale] || loadingLabels[shortLocale] || loadingLabels.en;
     })();
   </script>
   <script>
@@ -175,17 +311,36 @@
 
 <body>
   <div id="loading-screen">
-    <div id="loading-brand" aria-label="Loading" role="status">
-      <div class="avato-logo-wrapper">
-        <div class="avato-spinner"></div>
-        <img alt="Avato" class="avato-logo-img" src="/icons/icon-192x192.png" />
+    <div id="loading-brand" aria-label="Loading" aria-live="polite" role="status">
+      <div class="loading-logo-wrap">
+        <div class="loading-logo-core">
+          <img alt="Avato" decoding="async" draggable="false" fetchpriority="high" height="56"
+            src="/icons/icon-512x512-transparent.png" width="56" />
+        </div>
       </div>
-      <span class="avato-text">Avato</span>
+      <div class="loading-headline">Avato</div>
+      <div class="loading-subtext"><span id="loading-label">Loading</span></div>
+      <div class="loading-bar"></div>
     </div>
   </div>
   <div id="root" style="height: 100%"></div>
 
   <!--ANALYTICS_SCRIPTS-->
+  <script>
+    (function () {
+      var loadingLabel = window.__LOADING_LABEL__ || 'Loading';
+      var loadingBrand = document.getElementById('loading-brand');
+      var loadingLabelNode = document.getElementById('loading-label');
+
+      if (loadingBrand) {
+        loadingBrand.setAttribute('aria-label', loadingLabel);
+      }
+
+      if (loadingLabelNode) {
+        loadingLabelNode.textContent = loadingLabel;
+      }
+    })();
+  </script>
   <script type="module" src="/src/spa/entry.web.tsx"></script>
 </body>
 

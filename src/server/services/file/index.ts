@@ -3,12 +3,12 @@ import { inferContentTypeFromImageUrl, nanoid, uuid } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { sha256 } from 'js-sha256';
 
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { type FileItem } from '@/database/schemas';
-import { AuthorizedResourceResolver, type ResourceCapability } from '@/server/services/resource';
+import { AuthorizedResourceResolver, type ContentCapability } from '@/server/services/content';
 import { TempFileManager } from '@/server/utils/tempFileManager';
 
 import { createFileServiceModule } from './impls';
@@ -26,7 +26,7 @@ export class FileService {
   private userId: string;
   private documentModel: DocumentModel;
   private fileModel: FileModel;
-  private resourceModel: ResourceModel;
+  private contentModel: ContentModel;
   private resolver: AuthorizedResourceResolver;
 
   private impl: FileServiceImpl;
@@ -36,7 +36,7 @@ export class FileService {
     this.userId = userId;
     this.documentModel = new DocumentModel(db, userId);
     this.fileModel = new FileModel(db, userId);
-    this.resourceModel = new ResourceModel(db, userId);
+    this.contentModel = new ContentModel(db, userId);
     this.resolver = new AuthorizedResourceResolver(db, userId);
     this.impl = createFileServiceModule(db);
   }
@@ -198,7 +198,7 @@ export class FileService {
     );
 
     if (resolvedSpaceId) {
-      await this.resourceModel.upsertSpaceBlob({
+      await this.contentModel.upsertSpaceBlob({
         createdBy: this.userId,
         fileType: params.fileType,
         metadata: {},
@@ -399,7 +399,7 @@ export class FileService {
 
   async downloadFileToLocal(
     fileId: string,
-    capability: ResourceCapability = 'read_content',
+    capability: ContentCapability = 'read_content',
   ): Promise<{ cleanup: () => void; file: FileItem; filePath: string }> {
     const file = (await this.resolver.requireFile(fileId, capability)) as FileItem;
 

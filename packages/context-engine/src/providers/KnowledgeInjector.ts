@@ -1,5 +1,5 @@
-import type { FileContent, KnowledgeBaseInfo } from '@lobechat/prompts';
-import { promptAgentKnowledge } from '@lobechat/prompts';
+import type { FileContent, SourceSetInfo } from '@lobechat/prompts';
+import { promptAgentSources } from '@lobechat/prompts';
 import debug from 'debug';
 
 import { BaseFirstUserContentProvider } from '../base/BaseFirstUserContentProvider';
@@ -10,13 +10,13 @@ const log = debug('context-engine:provider:KnowledgeInjector');
 export interface KnowledgeInjectorConfig {
   /** File contents to inject */
   fileContents?: FileContent[];
-  /** Knowledge bases to inject */
-  knowledgeBases?: KnowledgeBaseInfo[];
+  /** Source sets to inject */
+  sourceSets?: SourceSetInfo[];
 }
 
 /**
  * Knowledge Injector
- * Responsible for injecting agent's knowledge (files and knowledge bases) into context
+ * Responsible for injecting agent sources (files and source sets) into context
  * before the first user message
  */
 export class KnowledgeInjector extends BaseFirstUserContentProvider {
@@ -31,19 +31,17 @@ export class KnowledgeInjector extends BaseFirstUserContentProvider {
 
   protected buildContent(_context: PipelineContext): string | null {
     const fileContents = this.config.fileContents || [];
-    const knowledgeBases = this.config.knowledgeBases || [];
+    const sourceSets = this.config.sourceSets || [];
 
     // Generate unified knowledge prompt
-    const formattedContent = promptAgentKnowledge({ fileContents, knowledgeBases });
+    const formattedContent = promptAgentSources({ fileContents, sourceSets });
 
     if (!formattedContent) {
       log('No knowledge to inject');
       return null;
     }
 
-    log(
-      `Knowledge prepared: ${fileContents.length} file(s), ${knowledgeBases.length} knowledge base(s)`,
-    );
+    log(`Knowledge prepared: ${fileContents.length} file(s), ${sourceSets.length} source set(s)`);
 
     return formattedContent;
   }
@@ -53,12 +51,12 @@ export class KnowledgeInjector extends BaseFirstUserContentProvider {
 
     // Update metadata
     const fileContents = this.config.fileContents || [];
-    const knowledgeBases = this.config.knowledgeBases || [];
+    const sourceSets = this.config.sourceSets || [];
 
-    if (fileContents.length > 0 || knowledgeBases.length > 0) {
+    if (fileContents.length > 0 || sourceSets.length > 0) {
       result.metadata.knowledgeInjected = true;
       result.metadata.filesCount = fileContents.length;
-      result.metadata.knowledgeBasesCount = knowledgeBases.length;
+      result.metadata.sourceSetsCount = sourceSets.length;
     }
 
     return result;

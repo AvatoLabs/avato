@@ -536,8 +536,8 @@ export function renderPayload(step: StepSnapshot): string {
   const knowledge = input.knowledge;
   if (knowledge) {
     const fileContents: any[] = knowledge.fileContents ?? [];
-    const knowledgeBases: any[] = knowledge.knowledgeBases ?? [];
-    if (fileContents.length > 0 || knowledgeBases.length > 0) {
+    const sourceSets: any[] = knowledge.sourceSets ?? [];
+    if (fileContents.length > 0 || sourceSets.length > 0) {
       lines.push('');
       lines.push(bold('Knowledge:'));
       if (fileContents.length > 0) {
@@ -547,9 +547,9 @@ export function renderPayload(step: StepSnapshot): string {
           lines.push(`    ${dim('─')} ${name}`);
         }
       }
-      if (knowledgeBases.length > 0) {
-        lines.push(`  Knowledge Bases: ${knowledgeBases.length}`);
-        for (const kb of knowledgeBases) {
+      if (sourceSets.length > 0) {
+        lines.push(`  Knowledge Bases: ${sourceSets.length}`);
+        for (const kb of sourceSets) {
           lines.push(`    ${dim('─')} ${kb.name ?? kb.id ?? '?'}`);
         }
       }
@@ -846,7 +846,7 @@ export function renderStepDetail(
       if (ceEvent.input?.knowledge) {
         const k = ceEvent.input.knowledge;
         const fileCount = k.fileContents?.length ?? 0;
-        const kbCount = k.knowledgeBases?.length ?? 0;
+        const kbCount = k.sourceSets?.length ?? 0;
         if (fileCount > 0 || kbCount > 0) {
           lines.push(`  knowledge: ${fileCount} files, ${kbCount} knowledge bases`);
         }

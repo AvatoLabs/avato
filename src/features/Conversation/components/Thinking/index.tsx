@@ -14,10 +14,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     max-height: min(40vh, 320px);
     padding-block-end: 8px;
     padding-inline: 8px;
-    color: ${cssVar.colorTextDescription};
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
 
     article * {
-      color: ${cssVar.colorTextDescription};
+      color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
     }
   `,
 }));

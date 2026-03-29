@@ -8,7 +8,7 @@ import { auth } from '@/auth';
 import { LOBE_LOCALE_COOKIE } from '@/const/locale';
 import { appEnv } from '@/envs/app';
 import { authEnv } from '@/envs/auth';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 
 import { parseBrowserLanguage } from '../../../utils/locale';
 import { RouteVariants } from '../../../utils/server/routeVariants';

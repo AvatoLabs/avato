@@ -8,7 +8,7 @@ import urlJoin from 'url-join';
 
 import { CustomMDX } from '@/components/mdx';
 import { OFFICIAL_SITE } from '@/const/url';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { ChangelogService } from '@/server/services/changelog';
 import { type ChangelogIndexItem } from '@/types/changelog';
 

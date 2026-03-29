@@ -20,6 +20,6 @@
   "notebook.delete": "Supprimer",
   "notebook.empty": "Aucune page pour le moment. Les pages liées à ce sujet apparaîtront ici.",
   "notebook.title": "Carnet",
-  "openInPageEditor": "Modifier dans la page",
+  "openInDocEditor": "Modifier dans la page",
   "title": "Espace de travail"
 }

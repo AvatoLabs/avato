@@ -13,20 +13,20 @@ import { aiModelRouter } from '../lambda/aiModel';
 import { aiProviderRouter } from '../lambda/aiProvider';
 import { chunkRouter } from '../lambda/chunk';
 import { configRouter } from '../lambda/config';
+import { contentShareRouter } from '../lambda/contentShare';
 import { documentRouter } from '../lambda/document';
 import { fileRouter } from '../lambda/file';
 import { generationRouter } from '../lambda/generation';
 import { generationBatchRouter } from '../lambda/generationBatch';
 import { generationTopicRouter } from '../lambda/generationTopic';
 import { imageRouter } from '../lambda/image';
-import { knowledgeBaseRouter } from '../lambda/knowledgeBase';
 import { marketRouter } from '../lambda/market';
 import { messageRouter } from '../lambda/message';
 import { notebookRouter } from '../lambda/notebook';
 import { pluginRouter } from '../lambda/plugin';
-import { resourceShareRouter } from '../lambda/resourceShare';
 import { sessionRouter } from '../lambda/session';
 import { sessionGroupRouter } from '../lambda/sessionGroup';
+import { sourceSetRouter } from '../lambda/sourceSet';
 import { tagRouter } from '../lambda/tag';
 import { topicRouter } from '../lambda/topic';
 import { uploadRouter } from '../lambda/upload';
@@ -52,15 +52,15 @@ export const mobileRouter = router({
   generationTopic: generationTopicRouter,
   healthcheck: publicProcedure.query(() => "i'm live!"),
   image: imageRouter,
-  knowledgeBase: knowledgeBaseRouter,
   market: marketRouter,
   mcp: mcpRouter,
   message: messageRouter,
   notebook: notebookRouter,
   plugin: pluginRouter,
-  resourceShare: resourceShareRouter,
+  contentShare: contentShareRouter,
   session: sessionRouter,
   sessionGroup: sessionGroupRouter,
+  sourceSet: sourceSetRouter,
   tag: tagRouter,
   topic: topicRouter,
   upload: uploadRouter,

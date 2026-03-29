@@ -4,10 +4,10 @@ import { sql } from 'drizzle-orm';
 
 import { DocumentModel } from '../../models/document';
 import { FileModel } from '../../models/file';
-import { documents, files, knowledgeBaseFiles } from '../../schemas';
+import { documents, files, sourceSetFiles } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
-export interface KnowledgeItem {
+export interface AgentSourceItem {
   attachable?: boolean;
   chunkTaskId?: string | null;
   content?: string | null;
@@ -17,12 +17,12 @@ export interface KnowledgeItem {
   fileId?: string | null;
   fileType: string;
   id: string;
-  knowledgeBaseId?: string | null;
   metadata?: Record<string, any> | null;
   name: string;
   parentId?: string | null;
   size: number;
   slug?: string | null;
+  sourceSetId?: string | null;
   /**
    * Source type to distinguish between files and documents
    * - 'file': from files table
@@ -53,6 +53,20 @@ export class KnowledgeRepo {
     this.documentModel = new DocumentModel(db, userId);
   }
 
+  private resolveParentId = async (parentId?: string | null, spaceId?: string) => {
+    if (!parentId) return parentId;
+
+    if (spaceId) {
+      const scoped = await this.documentModel.findBySlugInSpace(parentId, spaceId);
+      if (scoped) return scoped.id;
+
+      return parentId;
+    }
+
+    const docBySlug = await this.documentModel.findBySlug(parentId);
+    return docBySlug?.id || parentId;
+  };
+
   /**
    * Query combined results from files and documents tables
    */
@@ -61,32 +75,23 @@ export class KnowledgeRepo {
     q,
     sortType,
     sorter,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
+    sourceSetId,
+    showFilesInSourceSet,
     parentId,
     spaceId,
     trash,
     limit = 50,
     offset = 0,
-  }: QueryFileListParams = {}): Promise<KnowledgeItem[]> {
-    // If parentId is provided, check if it's a slug and resolve it to an ID
-    let resolvedParentId = parentId;
-    if (parentId) {
-      // Try to find a document with this slug
-      const docBySlug = await this.documentModel.findBySlug(parentId);
-      if (docBySlug) {
-        resolvedParentId = docBySlug.id;
-      }
-      // Otherwise assume it's already an ID
-    }
+  }: QueryFileListParams = {}): Promise<AgentSourceItem[]> {
+    const resolvedParentId = await this.resolveParentId(parentId, spaceId);
 
     // Build file query
     const fileQuery = this.buildFileQuery({
       category,
-      knowledgeBaseId,
+      sourceSetId,
       parentId: resolvedParentId,
       q,
-      showFilesInKnowledgeBase,
+      showFilesInSourceSet,
       spaceId,
       sortType,
       sorter,
@@ -96,7 +101,7 @@ export class KnowledgeRepo {
     // Build document query (notes)
     const documentQuery = this.buildDocumentQuery({
       category,
-      knowledgeBaseId,
+      sourceSetId,
       parentId: resolvedParentId,
       q,
       spaceId,
@@ -156,7 +161,7 @@ export class KnowledgeRepo {
         fileId: row.file_id ?? null,
         fileType: row.file_type,
         id: row.id,
-        knowledgeBaseId: row.knowledge_base_id ?? null,
+        sourceSetId: row.source_set_id ?? null,
         metadata,
         name: row.name,
         parentId: row.parent_id ?? null,
@@ -175,7 +180,7 @@ export class KnowledgeRepo {
    * Query recent items (files and documents)
    * Returns the most recently updated items
    */
-  async queryRecent(limit: number = 12): Promise<KnowledgeItem[]> {
+  async queryRecent(limit: number = 12): Promise<AgentSourceItem[]> {
     const fileQuery = sql`
       SELECT
         COALESCE(d.id, f.id) as id,
@@ -198,8 +203,8 @@ export class KnowledgeRepo {
       WHERE f.user_id = ${this.userId}
         AND f.deleted_at IS NULL
         AND NOT EXISTS (
-          SELECT 1 FROM ${knowledgeBaseFiles}
-          WHERE ${knowledgeBaseFiles.fileId} = f.id
+          SELECT 1 FROM ${sourceSetFiles}
+          WHERE ${sourceSetFiles.fileId} = f.id
         )
     `;
 
@@ -222,7 +227,7 @@ export class KnowledgeRepo {
       FROM ${documents}
       WHERE user_id = ${this.userId}
         AND source_type != ${'file'}
-        AND knowledge_base_id IS NULL
+        AND source_set_id IS NULL
         AND deleted_at IS NULL
     `;
 
@@ -322,8 +327,8 @@ export class KnowledgeRepo {
   private buildFileQuery({
     category,
     q,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
+    sourceSetId,
+    showFilesInSourceSet,
     parentId,
     spaceId,
     trash,
@@ -361,7 +366,7 @@ export class KnowledgeRepo {
     }
 
     // Knowledge base filter
-    if (knowledgeBaseId) {
+    if (sourceSetId) {
       // Build where conditions using proper table references (f.column instead of files.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
@@ -414,11 +419,11 @@ export class KnowledgeRepo {
           COALESCE(d.metadata, f.metadata) as metadata,
           'file' as source_type,
           f.parent_id,
-          ${knowledgeBaseId}::text as knowledge_base_id
+          ${sourceSetId}::text as source_set_id
         FROM ${files} f
-        INNER JOIN ${knowledgeBaseFiles} kbf
+        INNER JOIN ${sourceSetFiles} kbf
           ON f.id = kbf.file_id
-          AND kbf.knowledge_base_id = ${knowledgeBaseId}
+          AND kbf.source_set_id = ${sourceSetId}
         LEFT JOIN ${documents} d
           ON f.id = d.file_id
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
@@ -426,12 +431,12 @@ export class KnowledgeRepo {
     }
 
     // Exclude files in knowledge base if needed
-    if (!showFilesInKnowledgeBase) {
+    if (!showFilesInSourceSet) {
       whereConditions.push(
         sql`
           NOT EXISTS (
-                    SELECT 1 FROM ${knowledgeBaseFiles}
-                    WHERE ${knowledgeBaseFiles.fileId} = f.id
+                    SELECT 1 FROM ${sourceSetFiles}
+                    WHERE ${sourceSetFiles.fileId} = f.id
                   )
         `,
       );
@@ -455,7 +460,7 @@ export class KnowledgeRepo {
         COALESCE(d.metadata, f.metadata) as metadata,
         'file' as source_type,
         f.parent_id,
-        NULL::text as knowledge_base_id
+        NULL::text as source_set_id
       FROM ${files} f
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
@@ -466,7 +471,7 @@ export class KnowledgeRepo {
   private buildDocumentQuery({
     category,
     q,
-    knowledgeBaseId,
+    sourceSetId,
     parentId,
     spaceId,
     trash,
@@ -515,6 +520,7 @@ export class KnowledgeRepo {
         return sql`
           SELECT
             NULL::varchar(30) as id,
+            NULL::varchar(30) as file_id,
             NULL::text as name,
             NULL::varchar(255) as file_type,
             NULL::integer as size,
@@ -529,7 +535,7 @@ export class KnowledgeRepo {
             NULL::jsonb as metadata,
             NULL::text as source_type,
             NULL::varchar(255) as parent_id,
-            NULL::text as knowledge_base_id
+            NULL::text as source_set_id
           WHERE false
         `;
       }
@@ -537,7 +543,7 @@ export class KnowledgeRepo {
 
     // Knowledge base filter for documents
     // Documents are linked to knowledge bases through files table via fileId
-    if (knowledgeBaseId) {
+    if (sourceSetId) {
       // Build where conditions using proper table references (d.column instead of documents.column)
       const kbWhereConditions: any[] = [
         spaceId ? sql`d.space_id = ${spaceId}` : sql`d.user_id = ${this.userId}`,
@@ -597,16 +603,18 @@ export class KnowledgeRepo {
               NULL::text as content,
               NULL::varchar(255) as slug,
               NULL::jsonb as metadata,
-              NULL::text as source_type
+              NULL::text as source_type,
+              NULL::varchar(255) as parent_id,
+              NULL::text as source_set_id
             WHERE false
           `;
         }
       }
 
       // When in a knowledge base, return standalone documents (folders and notes without fileId)
-      // that have the knowledgeBaseId column set. Documents with fileId are already
+      // that have the sourceSetId column set. Documents with fileId are already
       // returned by the file query via their linked file records.
-      kbWhereConditions.push(sql`d.file_id IS NULL`, sql`d.knowledge_base_id = ${knowledgeBaseId}`);
+      kbWhereConditions.push(sql`d.file_id IS NULL`, sql`d.source_set_id = ${sourceSetId}`);
 
       return sql`
         SELECT
@@ -626,7 +634,7 @@ export class KnowledgeRepo {
           d.metadata,
           'document' as source_type,
           d.parent_id,
-          d.knowledge_base_id
+          d.source_set_id
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
       `;
@@ -650,7 +658,7 @@ export class KnowledgeRepo {
         metadata,
         'document' as source_type,
         parent_id,
-        knowledge_base_id
+        source_set_id
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}
     `;

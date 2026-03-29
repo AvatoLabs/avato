@@ -8,8 +8,8 @@ import { ChunkModel } from '@/database/models/chunk';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { ChunkService } from '@/server/services/chunk';
+import { AuthorizedResourceResolver, ContentAuthorizer } from '@/server/services/content';
 import { ServerRagService } from '@/server/services/rag';
-import { AuthorizedResourceResolver, ResourceAuthorizer } from '@/server/services/resource';
 
 const chunkProcedure = authedProcedure
   .use(serverDatabase)
@@ -24,7 +24,7 @@ const chunkProcedure = authedProcedure
         chunkService: new ChunkService(ctx.serverDB, ctx.userId),
         ragService: new ServerRagService(ctx.serverDB, ctx.userId),
         resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
-        resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
+        contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
       },
     });
   });
@@ -37,7 +37,7 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
@@ -56,7 +56,7 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
@@ -75,7 +75,7 @@ export const chunkRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',

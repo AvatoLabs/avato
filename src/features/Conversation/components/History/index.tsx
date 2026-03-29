@@ -17,7 +17,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     border-radius: 12px;
   `,
   content: css`
-    color: ${cssVar.colorTextDescription};
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
   `,
   line: css`
     width: 3px;

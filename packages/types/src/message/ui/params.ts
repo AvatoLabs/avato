@@ -6,7 +6,7 @@ import type { MessageSemanticSearchChunk } from '../../rag';
 import type { ChatMessageError } from '../common/base';
 import { ChatMessageErrorSchema } from '../common/base';
 // Import for local use
-import type { PageSelection } from '../common/pageSelection';
+import type { DocSelection } from '../common/docSelection';
 import type { ChatPluginPayload } from '../common/tools';
 import { ToolInterventionSchema } from '../common/tools';
 import type { UIChatMessage } from './chat';
@@ -76,15 +76,13 @@ export interface CreateNewMessageParams {
 
 export interface ChatContextContent {
   content: string;
+  /** Doc ID the selection belongs to. */
+  docId?: string;
   /**
    * Format of the content. Defaults to text.
    */
   format?: 'xml' | 'text' | 'markdown';
   id: string;
-  /**
-   * Page ID the selection belongs to (for page editor selections)
-   */
-  pageId?: string;
   /**
    * Optional short preview for displaying in UI.
    */
@@ -93,14 +91,13 @@ export interface ChatContextContent {
   type: 'text';
 }
 
-// Re-export PageSelection from common for backwards compatibility
-export type { PageSelection } from '../common/pageSelection';
-export { PageSelectionSchema } from '../common/pageSelection';
+export type { DocSelection } from '../common/docSelection';
+export { DocSelectionSchema } from '../common/docSelection';
 
 export interface SendMessageParams {
   /**
    * Additional contextual snippets (e.g., text selections) attached to the request.
-   * @deprecated Use pageSelections instead for page editor selections
+   * @deprecated Use docSelections instead for doc editor selections
    */
   contexts?: ChatContextContent[];
   /**
@@ -108,6 +105,11 @@ export interface SendMessageParams {
    * @deprecated Use ConversationContext.newThread instead
    */
   createThread?: boolean;
+  /**
+   * Doc selections attached to the message (for Ask AI functionality)
+   * These will be persisted to the database and injected via context-engine
+   */
+  docSelections?: DocSelection[];
   files?: UploadFileItem[];
   /**
    *
@@ -115,6 +117,7 @@ export interface SendMessageParams {
    */
   isWelcomeQuestion?: boolean;
   message: string;
+
   /**
    * Display messages for the current conversation context.
    * If provided, sendMessage will use these messages instead of querying from store.
@@ -126,13 +129,7 @@ export interface SendMessageParams {
    * Additional metadata for the message (e.g., mentioned users)
    */
   metadata?: Record<string, any>;
-
   onlyAddUserMessage?: boolean;
-  /**
-   * Page selections attached to the message (for Ask AI functionality)
-   * These will be persisted to the database and injected via context-engine
-   */
-  pageSelections?: PageSelection[];
   /**
    * Parent message ID for the new message.
    * If not provided, will be calculated from messages list.

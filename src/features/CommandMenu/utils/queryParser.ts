@@ -22,7 +22,7 @@ const VALID_TYPES = [
   'mcp',
   'plugin',
   'communityAgent',
-  'knowledgeBase',
+  'sourceSet',
 ] as const;
 
 export type ValidSearchType = (typeof VALID_TYPES)[number];

@@ -18,7 +18,7 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { localeOptions } from '@/locales/resources';
+import { localeOptions } from '@/locales/contents';
 
 const translateStyle = css`
   .ant-dropdown-menu-sub {

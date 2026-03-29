@@ -14,9 +14,9 @@ const getBuiltinAgentId = (slug: string) => (s: AgentStoreState) => s.builtinAge
 const isBuiltinAgentInit = (slug: string) => (s: AgentStoreState) => !!s.builtinAgentIdMap[slug];
 
 /**
- * Get page agent ID (convenience selector)
+ * Get Docs Agent ID (convenience selector)
  */
-const pageAgentId = (s: AgentStoreState) => s.builtinAgentIdMap[BUILTIN_AGENT_SLUGS.pageAgent];
+const docsAgentId = (s: AgentStoreState) => s.builtinAgentIdMap[BUILTIN_AGENT_SLUGS.docsAgent];
 
 /**
  * Get agent builder ID (convenience selector)
@@ -56,5 +56,5 @@ export const builtinAgentSelectors = {
   isBuiltinAgentInit,
   isInboxAgent,
   isInboxAgentConfigInit,
-  pageAgentId,
+  docsAgentId,
 };

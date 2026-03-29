@@ -22,7 +22,7 @@ class DesktopExportService {
     const result = await localFileService.showSaveDialog({
       defaultPath: fileName,
       filters,
-      title: i18next.t('pageEditor.exportDialogTitle', { ns: 'file' }),
+      title: i18next.t('docEditor.exportDialogTitle', { ns: 'file' }),
     });
 
     if (result.canceled || !result.filePath) {
@@ -69,17 +69,17 @@ class DesktopExportService {
     toast.success({
       actions: [
         {
-          label: t('pageEditor.exportActions.showInFolder', { ns: 'file' }),
+          label: t('docEditor.exportActions.showInFolder', { ns: 'file' }),
           onClick: () => localFileService.openFileFolder(filePath),
           variant: 'text',
         },
         {
-          label: t('pageEditor.exportActions.openFile', { ns: 'file' }),
+          label: t('docEditor.exportActions.openFile', { ns: 'file' }),
           onClick: () => localFileService.openLocalFile({ path: filePath }),
           variant: 'primary',
         },
       ],
-      title: t('pageEditor.exportSuccess', { ns: 'file' }),
+      title: t('docEditor.exportSuccess', { ns: 'file' }),
     });
   }
 }

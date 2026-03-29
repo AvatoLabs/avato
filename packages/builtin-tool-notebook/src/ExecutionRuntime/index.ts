@@ -41,6 +41,7 @@ interface NotebookService {
     source: string;
     sourceType: 'api' | 'file' | 'web';
     title: string;
+    topicId?: string;
     totalCharCount: number;
     totalLineCount: number;
   }) => Promise<DocumentServiceResult>;
@@ -134,6 +135,7 @@ export class NotebookExecutionRuntime {
         source: `notebook:${options.topicId}`,
         sourceType: 'api',
         title,
+        topicId: options.topicId ?? undefined,
         totalCharCount: countWords(content),
         totalLineCount: countLines(content),
       });

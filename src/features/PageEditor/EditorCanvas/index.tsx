@@ -18,21 +18,28 @@ interface EditorCanvasProps {
 const EditorCanvas = memo<EditorCanvasProps>(({ placeholder, style }) => {
   const { t } = useTranslation(['file', 'ui']);
 
-  const editor = usePageEditorStore((s) => s.editor);
-  const documentId = usePageEditorStore((s) => s.documentId);
+  const [documentId, editor, performMetaSave] = usePageEditorStore((s) => [
+    s.documentId,
+    s.editor,
+    s.performMetaSave,
+  ]);
 
   const slashItems = useSlashItems();
   const askCopilotItem = useAskCopilotItem(editor);
+  const beforeAutoSave = async () => {
+    await performMetaSave();
+  };
 
   return (
     <SharedEditorCanvas
       documentId={documentId}
       editor={editor}
-      placeholder={placeholder || t('pageEditor.editorPlaceholder')}
+      placeholder={placeholder || t('docEditor.editorPlaceholder')}
       slashItems={slashItems}
       style={style}
       toolbarExtraItems={askCopilotItem}
       unsavedChangesGuard={{
+        beforeAutoSave,
         enabled: true,
         message: t('form.unsavedWarning', { ns: 'ui' }),
         title: t('form.unsavedChanges', { ns: 'ui' }),

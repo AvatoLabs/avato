@@ -16,6 +16,7 @@ import { createNanoId, idGenerator } from '../utils/idGenerator';
 import { createdAt, timestamps, timestamptz } from './_helpers';
 import { agents } from './agent';
 import { chatGroups } from './chatGroup';
+import { spaces } from './content';
 import { documents } from './file';
 import { sessions } from './session';
 import { tags } from './tag';
@@ -35,6 +36,7 @@ export const topics = pgTable(
     editorData: jsonb('editor_data'),
     agentId: text('agent_id').references(() => agents.id, { onDelete: 'cascade' }),
     groupId: text('group_id').references(() => chatGroups.id, { onDelete: 'cascade' }),
+    spaceId: text('space_id').references(() => spaces.id, { onDelete: 'set null' }),
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
@@ -52,6 +54,7 @@ export const topics = pgTable(
     index('topics_session_id_idx').on(t.sessionId),
     index('topics_tag_id_idx').on(t.tagId),
     index('topics_group_id_idx').on(t.groupId),
+    index('topics_space_id_idx').on(t.spaceId),
     index('topics_agent_id_idx').on(t.agentId),
     index('topics_trigger_idx').on(t.trigger),
     index('topics_extract_status_gin_idx').using(

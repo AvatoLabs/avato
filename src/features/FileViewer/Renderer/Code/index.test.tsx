@@ -34,8 +34,8 @@ vi.mock('../../hooks/useTextFileLoader', () => ({
   useTextFileLoader: (...args: any[]) => useTextFileLoaderMock(...args),
 }));
 
-vi.mock('../../hooks/usePageAgentContextFallback', () => ({
-  usePageAgentContextFallback: vi.fn(),
+vi.mock('../../hooks/useDocsAgentContextFallback', () => ({
+  useDocsAgentContextFallback: vi.fn(),
 }));
 
 vi.mock('@/components/NeuralNetworkLoading', () => ({

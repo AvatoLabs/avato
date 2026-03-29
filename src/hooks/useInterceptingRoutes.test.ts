@@ -63,13 +63,13 @@ describe('useOpenChatSettings', () => {
     useAgentStore.setState({ activeAgentId: '456' });
     vi.mocked(useIsMobile).mockReturnValue(false);
 
-    const { result } = renderHook(() => useOpenChatSettings(ChatSettingsTabs.Knowledge));
+    const { result } = renderHook(() => useOpenChatSettings(ChatSettingsTabs.Sources));
 
     act(() => {
       result.current();
     });
 
     expect(useAgentStore.getState().showAgentSetting).toBeTruthy();
-    expect(useAgentStore.getState().activeAgentSettingTab).toBe(ChatSettingsTabs.Knowledge);
+    expect(useAgentStore.getState().activeAgentSettingTab).toBe(ChatSettingsTabs.Sources);
   });
 });

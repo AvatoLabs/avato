@@ -19,6 +19,7 @@ const RecentResourceList = memo(() => {
     return (
       <GroupSkeleton
         height={RECENT_BLOCK_SIZE.RESOURCE.HEIGHT}
+        variant={'resource'}
         width={RECENT_BLOCK_SIZE.RESOURCE.WIDTH}
       />
     );
@@ -26,7 +27,7 @@ const RecentResourceList = memo(() => {
 
   return files.map((file) => {
     const isPage = file.fileType === 'text/plain';
-    const fileUrl = isPage ? `/resource/${file.id}` : `/resource?file=${file.id}`;
+    const fileUrl = isPage ? `/content/${file.id}` : `/content?file=${file.id}`;
 
     return (
       <Link

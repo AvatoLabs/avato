@@ -3,12 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AiAgentService } from '../index';
 
-const { mockMessageCreate, mockCreateOperation, mockUploadFromUrl, mockFindFilesByIds } = vi.hoisted(() => ({
-  mockCreateOperation: vi.fn(),
-  mockFindFilesByIds: vi.fn(),
-  mockMessageCreate: vi.fn(),
-  mockUploadFromUrl: vi.fn(),
-}));
+const { mockMessageCreate, mockCreateOperation, mockUploadFromUrl, mockFindFilesByIds } =
+  vi.hoisted(() => ({
+    mockCreateOperation: vi.fn(),
+    mockFindFilesByIds: vi.fn(),
+    mockMessageCreate: vi.fn(),
+    mockUploadFromUrl: vi.fn(),
+  }));
 
 vi.mock('@/libs/trusted-client', () => ({
   generateTrustedClientToken: vi.fn().mockReturnValue(undefined),
@@ -30,7 +31,7 @@ vi.mock('@/database/models/agent', () => ({
       chatConfig: {},
       files: [],
       id: 'agent-1',
-      knowledgeBases: [],
+      sourceSets: [],
       model: 'gpt-4',
       plugins: [],
       provider: 'openai',
@@ -51,7 +52,7 @@ vi.mock('@/server/services/agent', () => ({
       chatConfig: {},
       files: [],
       id: 'agent-1',
-      knowledgeBases: [],
+      sourceSets: [],
       model: 'gpt-4',
       plugins: [],
       provider: 'openai',

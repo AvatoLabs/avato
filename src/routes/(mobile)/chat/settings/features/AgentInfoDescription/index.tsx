@@ -38,11 +38,6 @@ interface AgentInfoDescriptionProps {
     type: string;
   }>;
   isRemote?: boolean;
-  knowledgeBases?: Array<{
-    enabled?: boolean;
-    id: string;
-    name: string;
-  }>;
   meta?: Partial<AgentItemDetail> & {
     description?: string;
     name?: string;
@@ -51,6 +46,11 @@ interface AgentInfoDescriptionProps {
   model?: string;
   plugins?: string[];
   provider?: string;
+  sourceSets?: Array<{
+    enabled?: boolean;
+    id: string;
+    name: string;
+  }>;
   systemRole?: string;
   ttsConfig?: TTSConfig;
 }
@@ -61,7 +61,7 @@ const AgentInfoDescription = memo<AgentInfoDescriptionProps>(
     chatConfig,
     files = [],
     isRemote = false,
-    knowledgeBases = [],
+    sourceSets = [],
     meta,
     model,
     plugins = [],
@@ -77,7 +77,7 @@ const AgentInfoDescription = memo<AgentInfoDescriptionProps>(
           agentConfig,
           chatConfig,
           files,
-          knowledgeBases,
+          sourceSets,
           meta,
           model,
           plugins,
@@ -97,7 +97,7 @@ const AgentInfoDescription = memo<AgentInfoDescriptionProps>(
         },
         chatConfig: config.chatConfig || {},
         files: config.files || [],
-        knowledgeBases: config.knowledgeBases || [],
+        sourceSets: config.sourceSets || [],
         meta: {
           avatar: remoteData?.avatar,
           description: remoteData?.description,

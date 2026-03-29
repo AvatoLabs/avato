@@ -3,8 +3,8 @@ import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfi
 import ServerMode from './ServerMode';
 
 const Upload = () => {
-  const { enableKnowledgeBase } = useServerConfigStore(featureFlagsSelectors);
-  return enableKnowledgeBase && <ServerMode />;
+  const { enableSourceSet } = useServerConfigStore(featureFlagsSelectors);
+  return enableSourceSet && <ServerMode />;
 };
 
 export default Upload;

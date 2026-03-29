@@ -15,7 +15,7 @@ import { usePageEditorStore } from '@/features/PageEditor/store';
 import { agentByIdSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import AgentSelectorAction from './AgentSelector/AgentSelectorAction';
 import CopilotModelSelector from './CopilotModelSelector';
@@ -37,7 +37,7 @@ const Conversation = memo(() => {
     s.useFetchAgentConfig,
   ]);
   const currentAgentId = useConversationStore(conversationSelectors.agentId);
-  const pageAgentId = useAgentStore(builtinAgentSelectors.pageAgentId);
+  const docsAgentId = useAgentStore(builtinAgentSelectors.docsAgentId);
   const pageKind = usePageEditorStore((s) => s.pageKind);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
 
@@ -56,14 +56,14 @@ const Conversation = memo(() => {
 
     // Reset topic on agent/context switch to avoid reusing old topic scope.
     if (activeAgentId !== currentAgentId || !!activeTopicId) {
-      void switchTopic(null, { scope: 'page', skipRefreshMessage: true });
+      void switchTopic(null, { scope: 'doc', skipRefreshMessage: true });
     }
   }, [currentAgentId, setActiveAgentId]);
 
   useEffect(() => {
-    if (!isTablePage || !pageAgentId || currentAgentId === pageAgentId) return;
-    setActiveAgentId(pageAgentId);
-  }, [currentAgentId, isTablePage, pageAgentId, setActiveAgentId]);
+    if (!isTablePage || !docsAgentId || currentAgentId === docsAgentId) return;
+    setActiveAgentId(docsAgentId);
+  }, [currentAgentId, isTablePage, docsAgentId, setActiveAgentId]);
 
   useFetchAgentConfig(true, currentAgentId);
 

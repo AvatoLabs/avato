@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 import type { UIChatMessage } from './message';
-import type { PageSelection } from './message/ui/params';
-import { PageSelectionSchema } from './message/ui/params';
+import type { DocSelection } from './message/ui/params';
+import { DocSelectionSchema } from './message/ui/params';
 import type { OpenAIChatMessage } from './openai/chat';
 import type { LobeUniformTool } from './tool';
 import { LobeUniformToolSchema } from './tool';
@@ -13,9 +13,9 @@ import { ThreadType } from './topic/thread';
 export interface SendNewMessage {
   content: string;
   // if message has attached with files, then add files to message and the agent
+  /** Doc selections attached to this message (for Ask AI functionality) */
+  docSelections?: DocSelection[];
   files?: string[];
-  /** Page selections attached to this message (for Ask AI functionality) */
-  pageSelections?: PageSelection[];
   parentId?: string;
 }
 
@@ -59,6 +59,8 @@ export interface SendMessageServerParams {
   };
   newUserMessage: SendNewMessage;
   sessionId?: string;
+  /** Preferred resource space for topic/notebook side effects. */
+  spaceId?: string;
   threadId?: string;
   // if there is activeTopicId，then add topicId to message
   topicId?: string;
@@ -74,6 +76,7 @@ export const CreateThreadWithMessageSchema = z.object({
 export const AiSendMessageServerSchema = z.object({
   agentId: z.string().optional(),
   groupId: z.string().optional(),
+  spaceId: z.string().optional(),
   newAssistantMessage: z.object({
     metadata: z.record(z.unknown()).optional(),
     model: z.string().optional(),
@@ -88,8 +91,8 @@ export const AiSendMessageServerSchema = z.object({
     .optional(),
   newUserMessage: z.object({
     content: z.string(),
+    docSelections: z.array(DocSelectionSchema).optional(),
     files: z.array(z.string()).optional(),
-    pageSelections: z.array(PageSelectionSchema).optional(),
     parentId: z.string().optional(),
   }),
   sessionId: z.string().optional(),

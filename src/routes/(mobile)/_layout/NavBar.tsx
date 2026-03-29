@@ -69,7 +69,7 @@ const NavBar = memo(() => {
           ),
           key: SidebarTabKey.Resource,
           onClick: () => {
-            navigate('/resource');
+            navigate('/content');
           },
           title: t('tab.resource'),
         },

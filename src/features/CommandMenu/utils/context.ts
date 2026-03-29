@@ -43,13 +43,13 @@ const CONTEXT_CONFIGS: ContextConfig[] = [
   },
   {
     captureSubPath: true,
-    matcher: /^\/resource(?:\/([^/]+))?/,
+    matcher: /^\/content(?:\/([^/]+))?/,
     name: 'Resource',
     type: 'resource',
   },
   {
     captureSubPath: true,
-    matcher: /^\/page(?:\/([^/]+))?/,
+    matcher: /^\/docs(?:\/([^/]+))?/,
     name: 'Page',
     type: 'page',
   },

@@ -13,11 +13,13 @@ const styles = createStaticStyles(({ css, cssVar }) => {
   return {
     active: css`
       background: color-mix(in srgb, ${cssVar.colorPrimary} 7%, ${cssVar.colorBgContainer});
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorPrimaryBorder} 68%, transparent);
     `,
     container: css`
       position: relative;
 
       margin-block: 2px;
+      padding-block: 6px;
       padding-inline: 12px 16px;
       border-radius: ${cssVar.borderRadius};
 
@@ -32,10 +34,12 @@ const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     mobile: css`
       margin-block: 0;
+      padding-block: 8px;
       padding-inline-start: 12px;
       border-radius: 14px;
     `,
     title: css`
+      font-size: 14px;
       font-weight: 500;
       line-height: 1.25;
       letter-spacing: -0.01em;

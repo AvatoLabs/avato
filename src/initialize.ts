@@ -31,6 +31,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-if (__DEV__) {
+if (__DEV__ && process.env.NEXT_PUBLIC_ENABLE_REACT_SCAN === '1') {
   scan({ enabled: true });
 }

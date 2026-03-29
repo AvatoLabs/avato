@@ -1,5 +1,6 @@
 'use client';
 
+import { Text } from '@lobehub/ui';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -36,16 +37,17 @@ const ThreadChatList = memo(() => {
 
   if (data.length === 0) {
     return (
-      <div
+      <Text
+        as="div"
+        type="secondary"
         style={{
-          color: '#999',
-          fontSize: '14px',
+          fontSize: 14,
           padding: '32px 16px',
           textAlign: 'center',
         }}
       >
         {t('dm.placeholder', { agentTitle })}
-      </div>
+      </Text>
     );
   }
 

@@ -409,7 +409,7 @@ describe('isDesktopLocalStaticServerUrl', () => {
     expect(isDesktopLocalStaticServerUrl('http://127.0.0.1')).toBe(true);
     expect(isDesktopLocalStaticServerUrl('https://127.0.0.1')).toBe(true);
     expect(isDesktopLocalStaticServerUrl('http://127.0.0.1:8080')).toBe(true);
-    expect(isDesktopLocalStaticServerUrl('http://127.0.0.1/path/to/resource')).toBe(true);
+    expect(isDesktopLocalStaticServerUrl('http://127.0.0.1/path/to/content')).toBe(true);
     expect(isDesktopLocalStaticServerUrl('https://127.0.0.1/path?query=1#hash')).toBe(true);
   });
 
@@ -443,7 +443,7 @@ describe('isLocalOrPrivateUrl', () => {
       expect(isLocalOrPrivateUrl('http://127.0.0.1')).toBe(true);
       expect(isLocalOrPrivateUrl('https://127.0.0.1')).toBe(true);
       expect(isLocalOrPrivateUrl('http://127.0.0.1:8080')).toBe(true);
-      expect(isLocalOrPrivateUrl('http://127.0.0.1/path/to/resource')).toBe(true);
+      expect(isLocalOrPrivateUrl('http://127.0.0.1/path/to/content')).toBe(true);
       expect(isLocalOrPrivateUrl('https://127.0.0.1/path?query=1#hash')).toBe(true);
     });
 

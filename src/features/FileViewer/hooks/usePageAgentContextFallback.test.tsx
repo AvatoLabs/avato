@@ -4,19 +4,19 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { pageAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-page-agent';
+import { docsAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-docs-agent';
 
-import { usePageAgentContextFallback } from './usePageAgentContextFallback';
+import { useDocsAgentContextFallback } from './useDocsAgentContextFallback';
 
-const TestComponent = (props: Parameters<typeof usePageAgentContextFallback>[0]) => {
-  usePageAgentContextFallback(props);
+const TestComponent = (props: Parameters<typeof useDocsAgentContextFallback>[0]) => {
+  useDocsAgentContextFallback(props);
   return null;
 };
 
-describe('usePageAgentContextFallback', () => {
+describe('useDocsAgentContextFallback', () => {
   it('syncs file content into page agent runtime and clears on unmount', () => {
     const setScopedFallbackPageContentContext = vi.spyOn(
-      pageAgentRuntime,
+      docsAgentRuntime,
       'setScopedFallbackPageContentContext',
     );
 

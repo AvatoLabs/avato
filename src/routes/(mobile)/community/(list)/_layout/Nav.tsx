@@ -64,7 +64,7 @@ const Nav = memo(() => {
         open={open}
         placement={'left'}
         rootStyle={{ position: 'absolute' }}
-        width={260}
+        size={260}
         zIndex={10}
         bodyStyle={{
           display: 'flex',

@@ -1,6 +1,7 @@
 import { createNanoId } from '@lobechat/utils';
 import { type SWRResponse } from 'swr';
 
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { documentService } from '@/services/document';
 import { useGlobalStore } from '@/store/global';
@@ -9,23 +10,21 @@ import { type LobeDocument } from '@/types/document';
 import { DocumentSourceType } from '@/types/document';
 import { setNamespace } from '@/utils/storeDebug';
 
+import { isPageEntryFileType, PAGE_ENTRY_FILE_TYPES } from '../../../../utils/docsDocument';
 import { type FileStore } from '../../store';
 import { type DocumentQueryFilter } from './initialState';
 
 const n = setNamespace('document');
 
 const ALLOWED_DOCUMENT_SOURCE_TYPES = new Set(['editor', 'file', 'api']);
-const ALLOWED_DOCUMENT_FILE_TYPES = new Set(['custom/document', 'application/pdf']);
+const ALLOWED_DOCUMENT_FILE_TYPES = PAGE_ENTRY_FILE_TYPES;
 const EDITOR_DOCUMENT_FILE_TYPE = 'custom/document';
 
 /**
  * Check if a page should be displayed in the page list
  */
 const isAllowedDocument = (page: { fileType: string; sourceType: string }) => {
-  return (
-    ALLOWED_DOCUMENT_SOURCE_TYPES.has(page.sourceType) &&
-    ALLOWED_DOCUMENT_FILE_TYPES.has(page.fileType)
-  );
+  return ALLOWED_DOCUMENT_SOURCE_TYPES.has(page.sourceType) && isPageEntryFileType(page.fileType);
 };
 
 type Setter = StoreSetter<FileStore>;
@@ -45,12 +44,12 @@ export class DocumentActionImpl {
   createDocument = async ({
     title,
     content,
-    knowledgeBaseId,
+    sourceSetId,
     parentId,
     spaceId,
   }: {
     content: string;
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     parentId?: string;
     spaceId?: string;
     title: string;
@@ -62,7 +61,7 @@ export class DocumentActionImpl {
       content,
       editorData: '{}', // Empty JSON object instead of empty string
       fileType: EDITOR_DOCUMENT_FILE_TYPE,
-      knowledgeBaseId,
+      sourceSetId,
       metadata: {
         createdAt: now,
       },
@@ -81,7 +80,7 @@ export class DocumentActionImpl {
   createFolder = async (
     name: string,
     parentId?: string,
-    knowledgeBaseId?: string,
+    sourceSetId?: string,
     spaceId?: string,
   ): Promise<string> => {
     const now = Date.now();
@@ -94,7 +93,7 @@ export class DocumentActionImpl {
       content: '',
       editorData: '{}',
       fileType: 'custom/folder',
-      knowledgeBaseId,
+      sourceSetId,
       metadata: {
         createdAt: now,
       },
@@ -105,7 +104,7 @@ export class DocumentActionImpl {
     });
 
     // Refetch resource list to show the new folder
-    const { revalidateResources } = await import('../resource/hooks');
+    const { revalidateResources } = await import('../content/hooks');
     await revalidateResources();
 
     return folder.id;
@@ -113,6 +112,7 @@ export class DocumentActionImpl {
 
   createOptimisticDocument = (title: string = 'Untitled'): string => {
     const { localDocumentMap } = this.#get();
+    const activeSpaceId = getActiveWorkspaceSpaceId();
 
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-document-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -126,6 +126,7 @@ export class DocumentActionImpl {
       filename: title,
       id: tempId,
       metadata: {},
+      spaceId: activeSpaceId ?? null,
       source: 'document',
       sourceType: DocumentSourceType.EDITOR,
       title,
@@ -164,6 +165,8 @@ export class DocumentActionImpl {
         createdAt: Date.now(),
         duplicatedFrom: documentId,
       },
+      parentId: sourcePage.parentId ?? undefined,
+      spaceId: sourcePage.spaceId ?? getActiveWorkspaceSpaceId(),
       title: `${sourcePage.title} (Copy)`,
     });
 
@@ -180,7 +183,10 @@ export class DocumentActionImpl {
       fileType: newPage.fileType,
       filename: newPage.title || newPage.filename || '',
       id: newPage.id,
+      sourceSetId: newPage.sourceSetId ?? null,
       metadata: newPage.metadata || {},
+      parentId: newPage.parentId ?? null,
+      spaceId: newPage.spaceId ?? null,
       source: 'document',
       sourceType: DocumentSourceType.EDITOR,
       title: newPage.title || '',
@@ -220,7 +226,10 @@ export class DocumentActionImpl {
         fileType: document.fileType,
         filename: document.title || document.filename || 'Untitled',
         id: document.id,
+        sourceSetId: document.sourceSetId ?? null,
         metadata: document.metadata || {},
+        parentId: document.parentId ?? null,
+        spaceId: document.spaceId ?? null,
         source: 'document',
         sourceType: DocumentSourceType.EDITOR,
         title: document.title || '',
@@ -241,12 +250,16 @@ export class DocumentActionImpl {
 
     try {
       const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
+      const activeSpaceId = getActiveWorkspaceSpaceId();
       const queryFilters: DocumentQueryFilter | undefined = pageOnly
         ? {
             fileTypes: Array.from(ALLOWED_DOCUMENT_FILE_TYPES),
+            spaceId: activeSpaceId,
             sourceTypes: Array.from(ALLOWED_DOCUMENT_SOURCE_TYPES),
           }
-        : undefined;
+        : activeSpaceId
+          ? { spaceId: activeSpaceId }
+          : undefined;
 
       const queryParams = queryFilters
         ? { current: 0, pageSize, ...queryFilters }
@@ -332,9 +345,12 @@ export class DocumentActionImpl {
 
     try {
       const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
+      const activeSpaceId = getActiveWorkspaceSpaceId();
       const queryParams = documentQueryFilter
         ? { current: nextPage, pageSize, ...documentQueryFilter }
-        : { current: nextPage, pageSize };
+        : activeSpaceId
+          ? { current: nextPage, pageSize, spaceId: activeSpaceId }
+          : { current: nextPage, pageSize };
 
       const result = await documentService.queryDocuments(queryParams);
 
@@ -431,7 +447,7 @@ export class DocumentActionImpl {
     });
 
     // Refetch resource list to show updated document
-    const { revalidateResources } = await import('../resource/hooks');
+    const { revalidateResources } = await import('../content/hooks');
     await revalidateResources();
   };
 
@@ -492,7 +508,7 @@ export class DocumentActionImpl {
       });
 
       // After successful sync, refetch resources to get server state
-      const { revalidateResources } = await import('../resource/hooks');
+      const { revalidateResources } = await import('../content/hooks');
       await revalidateResources();
     } catch (error) {
       console.error('[updateDocumentOptimistically] Failed to sync to DB:', error);

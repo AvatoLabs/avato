@@ -4,7 +4,7 @@ import { FileText, Table2 } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/page';
+import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
 
 interface PageEmptyProps extends Omit<EmptyProps, 'icon'> {
   pageKind?: PageKind;

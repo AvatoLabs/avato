@@ -4,22 +4,25 @@ import { Flexbox } from '@lobehub/ui';
 import { memo, useLayoutEffect } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
+import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 
 import { TrashContent } from './TrashContent';
 
 const TrashPage = memo(() => {
-  const { id: knowledgeBaseId, spaceId } = useParams<{ id?: string; spaceId?: string }>();
-  const [setLibraryId, setSpaceId] = useResourceManagerStore((s) => [s.setLibraryId, s.setSpaceId]);
+  const { id: sourceSetId, spaceId } = useParams<{ id?: string; spaceId?: string }>();
+  const [setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
+    s.setSourceSetId,
+    s.setSpaceId,
+  ]);
 
   useLayoutEffect(() => {
-    setLibraryId(knowledgeBaseId);
+    setSourceSetId(sourceSetId);
     setSpaceId(spaceId);
-  }, [knowledgeBaseId, setLibraryId, setSpaceId, spaceId]);
+  }, [sourceSetId, setSourceSetId, setSpaceId, spaceId]);
 
   return (
     <Flexbox gap={16} padding={24} width={'100%'}>
-      <TrashContent knowledgeBaseId={knowledgeBaseId} spaceId={spaceId} variant="page" />
+      <TrashContent sourceSetId={sourceSetId} spaceId={spaceId} variant="page" />
     </Flexbox>
   );
 });

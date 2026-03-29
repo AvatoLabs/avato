@@ -58,7 +58,7 @@ const Item = memo<ItemProps>(({ avatar, description, identifier, onOpenDetail, t
     if (isInstalled) {
       return (
         <DropdownMenu
-          nativeButton={false}
+          nativeButton
           placement="bottomRight"
           items={[
             {

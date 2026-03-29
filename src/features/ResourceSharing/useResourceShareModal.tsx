@@ -1,16 +1,16 @@
 'use client';
 
-import { createModal } from '@lobehub/ui';
+import { createModal } from '@lobehub/ui/base-ui';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type ResourceKind } from '@/types/resource';
+import { type ContentKind } from '@/types/content';
 
 import ResourceShareModal from './ResourceShareModal';
 
 interface OpenShareModalParams {
   id: string;
-  kind: ResourceKind;
+  kind: ContentKind;
   name: string;
 }
 

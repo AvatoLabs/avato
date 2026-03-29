@@ -23,6 +23,7 @@ const CommunityAgentsList = memo(() => {
     return (
       <GroupSkeleton
         height={RECENT_BLOCK_SIZE.AGENT.HEIGHT}
+        variant={'agent'}
         width={RECENT_BLOCK_SIZE.AGENT.WIDTH}
       />
     );

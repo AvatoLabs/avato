@@ -10,7 +10,7 @@ import {
   SearchIcon,
   SparklesIcon,
 } from 'lucide-react';
-import { type ReactNode, memo, useMemo } from 'react';
+import { memo, type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { conversationSelectors, useConversationStore } from '@/features/Conversation';
@@ -18,7 +18,7 @@ import { usePageEditorStore } from '@/features/PageEditor/store';
 import SuggestQuestions from '@/features/SuggestQuestions';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const useStyles = createStyles(({ css, token }) => ({
   welcomeCopy: css`
@@ -27,8 +27,8 @@ const useStyles = createStyles(({ css, token }) => ({
     color: ${cssVar.colorTextSecondary};
 
     strong {
-      color: ${cssVar.colorText};
       font-weight: 600;
+      color: ${cssVar.colorText};
     }
   `,
   tableCard: css`
@@ -84,62 +84,62 @@ const AgentBuilderWelcome = memo(() => {
       {
         icon: SparklesIcon,
         key: 'fill-missing',
-        prompt: t('pageCopilot.table.cards.fillMissing.prompt', {
+        prompt: t('docsCopilot.table.cards.fillMissing.prompt', {
           defaultValue:
             'Fill the cells that can be inferred safely. Keep the current structure and flag anything uncertain.',
         }),
-        title: t('pageCopilot.table.cards.fillMissing.title', {
+        title: t('docsCopilot.table.cards.fillMissing.title', {
           defaultValue: 'Fill obvious blanks',
         }),
       },
       {
         icon: Columns3Icon,
         key: 'normalize',
-        prompt: t('pageCopilot.table.cards.normalize.prompt', {
+        prompt: t('docsCopilot.table.cards.normalize.prompt', {
           defaultValue:
             'Standardize column names, dates, and status values without changing the meaning.',
         }),
-        title: t('pageCopilot.table.cards.normalize.title', {
+        title: t('docsCopilot.table.cards.normalize.title', {
           defaultValue: 'Standardize values',
         }),
       },
       {
         icon: SearchIcon,
         key: 'audit',
-        prompt: t('pageCopilot.table.cards.audit.prompt', {
+        prompt: t('docsCopilot.table.cards.audit.prompt', {
           defaultValue:
             'Scan for duplicates, inconsistent values, and obvious gaps, then tell me what to fix first.',
         }),
-        title: t('pageCopilot.table.cards.audit.title', {
+        title: t('docsCopilot.table.cards.audit.title', {
           defaultValue: 'Find issues first',
         }),
       },
       {
         icon: Rows3Icon,
         key: 'reshape',
-        prompt: t('pageCopilot.table.cards.reshape.prompt', {
+        prompt: t('docsCopilot.table.cards.reshape.prompt', {
           defaultValue:
             'Review this table structure, split overloaded columns, merge duplicate fields, and suggest a cleaner schema.',
         }),
-        title: t('pageCopilot.table.cards.reshape.title', {
+        title: t('docsCopilot.table.cards.reshape.title', {
           defaultValue: 'Reshape the schema',
         }),
       },
       {
         icon: ArrowDownWideNarrowIcon,
         key: 'summary',
-        prompt: t('pageCopilot.table.cards.summary.prompt', {
+        prompt: t('docsCopilot.table.cards.summary.prompt', {
           defaultValue:
             'Summarize this table for me: row count, missing data, inconsistent values, and the next cleanup actions.',
         }),
-        title: t('pageCopilot.table.cards.summary.title', {
+        title: t('docsCopilot.table.cards.summary.title', {
           defaultValue: 'Summarize the table',
         }),
       },
     ],
     [t],
   );
-  const welcomeCopy = t(isTablePage ? 'pageCopilot.table.welcome' : 'pageCopilot.welcome', {
+  const welcomeCopy = t(isTablePage ? 'docsCopilot.table.welcome' : 'docsCopilot.welcome', {
     defaultValue: isTablePage
       ? '**Keep the table usable**\n\nFill blanks, standardize values, spot anomalies, or reshape columns without leaving this page.'
       : `**Clearer, sharper writing**\n\nDraft, rewrite, or polish—tell me your intent and I'll refine the rest.`,
@@ -169,8 +169,8 @@ const AgentBuilderWelcome = memo(() => {
           size={78}
         />
         <Text fontSize={24} weight={'bold'}>
-          {t(isTablePage ? 'pageCopilot.table.title' : 'pageCopilot.title', {
-            defaultValue: isTablePage ? 'Table Assistant' : 'Page Agent',
+          {t(isTablePage ? 'docsCopilot.table.title' : 'docsCopilot.title', {
+            defaultValue: isTablePage ? 'Table Assistant' : 'Docs Agent',
           })}
         </Text>
         <Flexbox className={styles.welcomeCopy} gap={4}>

@@ -7,9 +7,9 @@ import { createStoreUpdater } from 'zustand-utils';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorer from '@/features/PageExplorer';
-import { usePageStore } from '@/store/page';
+import { usePageStore } from '@/store/docs';
+import { type PageKind } from '@/utils/docs';
 import { getIdFromIdentifier } from '@/utils/identifier';
-import { type PageKind } from '@/utils/page';
 
 import PageTitle from './PageTitle';
 

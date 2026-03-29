@@ -28,7 +28,6 @@ type OnStatusUpdate = (
 interface UploadWithProgressParams {
   abortController?: AbortController;
   file: File;
-  knowledgeBaseId?: string;
   onStatusUpdate?: OnStatusUpdate;
   parentId?: string;
   /**
@@ -41,6 +40,7 @@ interface UploadWithProgressParams {
    * Optional source identifier for the file (e.g., 'page-editor', 'image_generation')
    */
   source?: string;
+  sourceSetId?: string;
   spaceId?: string;
   uploadId?: string;
 }
@@ -88,7 +88,7 @@ export class FileUploadActionImpl {
   uploadWithProgress = async ({
     file,
     onStatusUpdate,
-    knowledgeBaseId,
+    sourceSetId,
     skipCheckFileType,
     parentId,
     spaceId,
@@ -122,7 +122,7 @@ export class FileUploadActionImpl {
       else {
         const { data, success } = await uploadService.uploadFileToS3(file, {
           abortController,
-          knowledgeBaseId,
+          sourceSetId,
           onNotSupported: () => {
             onStatusUpdate?.({ id: statusUpdateId, type: 'removeFile' });
             message.info({
@@ -174,7 +174,7 @@ export class FileUploadActionImpl {
           source,
           url: metadata.path || checkStatus.url,
         },
-        knowledgeBaseId,
+        sourceSetId,
       );
 
       onStatusUpdate?.({

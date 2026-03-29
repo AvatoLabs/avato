@@ -14,7 +14,7 @@ import {
 } from '@lobehub/ui';
 import { useHover } from 'ahooks';
 import { List as AntdList, Switch } from 'antd';
-import { createStaticStyles, cx } from 'antd-style';
+import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { X } from 'lucide-react';
 import { type ChangeEvent } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
@@ -294,7 +294,7 @@ const MemberSelectionModal = memo<MemberSelectionModalProps>(
               <ActionIcon
                 icon={X}
                 size="small"
-                style={{ color: '#999' }}
+                style={{ color: cssVar.colorTextTertiary }}
                 onClick={() => handleRemoveAgent(agentId)}
               />
             ),
@@ -444,7 +444,7 @@ const MemberSelectionModal = memo<MemberSelectionModalProps>(
                       {t('groupWizard.host.title')}
                     </Text>
                     <Text
-                      style={{ color: '#999', fontSize: 12 }}
+                      style={{ color: cssVar.colorTextTertiary, fontSize: 12 }}
                       type={isHostRemoved ? 'secondary' : undefined}
                     >
                       {t('groupWizard.host.description')}

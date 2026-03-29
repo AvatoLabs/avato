@@ -110,6 +110,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
       if (isBuiltinInstalled) {
         return (
           <DropdownMenu
+            nativeButton
             placement="bottomRight"
             items={[
               {
@@ -136,6 +137,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
       <Space.Compact>
         <Button onClick={() => setEditOpen(true)}>{tp('store.actions.configure')}</Button>
         <DropdownMenu
+          nativeButton
           placement="bottomRight"
           items={[
             ...(skill.zipFileHash

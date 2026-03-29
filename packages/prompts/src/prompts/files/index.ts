@@ -5,8 +5,8 @@ import { imagesPrompts } from './image';
 import { videosPrompts } from './video';
 
 export { promptConversationFiles } from './conversationFiles';
-export type { KnowledgeBaseInfo, PromptKnowledgeOptions } from './knowledgeBase';
-export { promptAgentKnowledge } from './knowledgeBase';
+export type { PromptAgentSourcesOptions, SourceSetInfo } from './sourceSet';
+export { promptAgentSources } from './sourceSet';
 
 export const filesPrompts = ({
   imageList,

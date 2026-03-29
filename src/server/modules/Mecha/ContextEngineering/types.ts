@@ -5,11 +5,11 @@ import type {
   DiscordContext,
   EvalContext,
   FileContent,
-  KnowledgeBaseInfo,
   LobeToolManifest,
+  SourceSetInfo,
   UserMemoryData,
 } from '@lobechat/context-engine';
-import type { PageContentContext } from '@lobechat/prompts';
+import type { DocContentContext } from '@lobechat/prompts';
 import type { UIChatMessage } from '@lobechat/types';
 
 /**
@@ -32,8 +32,8 @@ export interface ServerKnowledgeConfig {
   conversationFileContents?: FileContent[];
   /** File contents to inject */
   fileContents?: FileContent[];
-  /** Knowledge base metadata to inject */
-  knowledgeBases?: KnowledgeBaseInfo[];
+  /** Source-set metadata to inject */
+  sourceSets?: SourceSetInfo[];
 }
 
 /**
@@ -107,7 +107,7 @@ export interface ServerMessagesEngineParams {
   model: string;
 
   /** Page content context (optional, for document editing) */
-  pageContentContext?: PageContentContext;
+  docContentContext?: DocContentContext;
 
   /** Provider ID */
   provider: string;
@@ -131,7 +131,7 @@ export {
   type DiscordContext,
   type EvalContext,
   type FileContent,
-  type KnowledgeBaseInfo,
+  type SourceSetInfo,
   type UserMemoryData,
 } from '@lobechat/context-engine';
-export type { PageContentContext } from '@lobechat/prompts';
+export type { DocContentContext } from '@lobechat/prompts';

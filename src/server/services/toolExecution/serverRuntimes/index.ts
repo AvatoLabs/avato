@@ -9,13 +9,13 @@
 import { type ToolExecutionContext } from '../types';
 import { calculatorRuntime } from './calculator';
 import { cloudSandboxRuntime } from './cloudSandbox';
-import { knowledgeBaseRuntime } from './knowledgeBase';
 import { localSystemRuntime } from './localSystem';
 import { memoryRuntime } from './memory';
 import { notebookRuntime } from './notebook';
 import { remoteDeviceRuntime } from './remoteDevice';
 import { skillsRuntime } from './skills';
 import { skillStoreRuntime } from './skillStore';
+import { sourceSetRuntime } from './sourceSet';
 import { toolsActivatorRuntime } from './tools';
 import { type ServerRuntimeFactory, type ServerRuntimeRegistration } from './types';
 import { webBrowsingRuntime } from './webBrowsing';
@@ -38,7 +38,7 @@ const registerRuntimes = (runtimes: ServerRuntimeRegistration[]) => {
 registerRuntimes([
   webBrowsingRuntime,
   cloudSandboxRuntime,
-  knowledgeBaseRuntime,
+  sourceSetRuntime,
   calculatorRuntime,
   notebookRuntime,
   skillStoreRuntime,

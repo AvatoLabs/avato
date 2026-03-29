@@ -78,7 +78,11 @@ const ProviderItem = memo<DiscoverProviderItem>(
               overflow: 'hidden',
             }}
           >
-            <Link style={{ color: 'inherit', overflow: 'hidden' }} to={link}>
+            <Link
+              style={{ color: 'inherit', overflow: 'hidden' }}
+              to={link}
+              onClick={stopPropagation}
+            >
               <ProviderCombine provider={identifier} size={28} style={{ flex: 'none' }} />
             </Link>
             <div className={styles.author}>@{name}</div>
@@ -121,7 +125,7 @@ const ProviderItem = memo<DiscoverProviderItem>(
               .slice(0, 6)
               .filter(Boolean)
               .map((tag: string) => (
-                <Link key={tag} to={urlJoin('/model', tag)}>
+                <Link key={tag} to={urlJoin('/community/model', tag)} onClick={stopPropagation}>
                   <ModelTag model={tag} style={{ margin: 0 }} />
                 </Link>
               ))}

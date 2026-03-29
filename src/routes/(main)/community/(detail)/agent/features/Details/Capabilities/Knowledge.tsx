@@ -4,13 +4,13 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDetailContext } from '../../DetailProvider';
-import KnowledgeItem from './KnowledgeItem';
+import AgentSourceItem from './KnowledgeItem';
 
 const Knowledge = memo(() => {
   const { t } = useTranslation('discover');
   const { config } = useDetailContext();
 
-  if (!config?.knowledgeBases?.length)
+  if (!config?.sourceSets?.length)
     return (
       <Block variant={'outlined'}>
         <Empty
@@ -23,8 +23,8 @@ const Knowledge = memo(() => {
 
   return (
     <Flexbox gap={8}>
-      {config?.knowledgeBases.map((item) => (
-        <KnowledgeItem
+      {config?.sourceSets.map((item) => (
+        <AgentSourceItem
           avatar={item.avatar || item.id}
           description={item?.description || ''}
           key={item.id}

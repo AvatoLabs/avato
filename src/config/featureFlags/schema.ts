@@ -24,7 +24,7 @@ export const FeatureFlagsSchema = z.object({
   changelog: FeatureFlagValue.optional(),
 
   market: FeatureFlagValue.optional(),
-  knowledge_base: FeatureFlagValue.optional(),
+  source_set: FeatureFlagValue.optional(),
 
   rag_eval: FeatureFlagValue.optional(),
 
@@ -72,7 +72,7 @@ export const DEFAULT_FEATURE_FLAGS: IFeatureFlags = {
   welcome_suggest: true,
   token_counter: true,
 
-  knowledge_base: true,
+  source_set: true,
   rag_eval: false,
 
   cloud_promotion: false,
@@ -104,7 +104,7 @@ export const mapFeatureFlagsEnvToState = (config: IFeatureFlags, userId?: string
     enableCheckUpdates: evaluateFeatureFlag(config.check_updates, userId),
     showWelcomeSuggest: evaluateFeatureFlag(config.welcome_suggest, userId),
 
-    enableKnowledgeBase: evaluateFeatureFlag(config.knowledge_base, userId),
+    enableSourceSet: evaluateFeatureFlag(config.source_set, userId),
     enableRAGEval: evaluateFeatureFlag(config.rag_eval, userId),
 
     showCloudPromotion: evaluateFeatureFlag(config.cloud_promotion, userId),

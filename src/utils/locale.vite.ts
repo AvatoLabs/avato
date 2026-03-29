@@ -1,4 +1,4 @@
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 // Use antd ESM locale (es/locale) - CJS locale (locale/*.js) uses module.exports and breaks in Vite
 const antdLocaleLoaders = import.meta.glob(

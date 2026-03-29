@@ -75,17 +75,18 @@ const HighlightNotification = memo<HighlightNotificationProps>(
             {title && <div className={styles.title}>{title}</div>}
             {description && <div className={styles.description}>{description}</div>}
             {actionLabel && (
-              <a
+              <Button
+                block
                 className={styles.action}
                 href={actionHref || '/'}
-                rel="noopener noreferrer"
+                icon={HeartFilled}
+                size="small"
                 target="_blank"
+                type="primary"
                 onClick={onActionClick}
               >
-                <Button block icon={HeartFilled} size="small" type="primary">
-                  {actionLabel}
-                </Button>
-              </a>
+                {actionLabel}
+              </Button>
             )}
           </Flexbox>
         </Flexbox>

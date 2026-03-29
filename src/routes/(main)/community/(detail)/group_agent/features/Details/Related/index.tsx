@@ -76,10 +76,12 @@ const Related = memo(() => {
           ))}
         </Grid>
       ) : (
-        <Flexbox align="center" padding={32} style={{ color: '#999' }}>
-          {t('groupAgents.details.related.empty', {
-            defaultValue: 'No related group agents found',
-          })}
+        <Flexbox align="center" padding={32}>
+          <Text type="secondary">
+            {t('groupAgents.details.related.empty', {
+              defaultValue: 'No related group agents found',
+            })}
+          </Text>
         </Flexbox>
       )}
     </Flexbox>

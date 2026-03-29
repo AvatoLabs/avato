@@ -3,10 +3,11 @@ import debug from 'debug';
 import { debounce } from 'es-toolkit/compat';
 import { type StateCreator } from 'zustand';
 
+import { documentService } from '@/services/document';
+import { usePageStore } from '@/store/docs';
 import { useDocumentStore } from '@/store/document';
 import { useFileStore } from '@/store/file';
-import { usePageStore } from '@/store/page';
-import { getPageDetailPath, getPageKindFromDocument } from '@/utils/page';
+import { getPageDetailPath, getPageKindFromDocument } from '@/utils/docs';
 
 import { type State } from './initialState';
 import { initialState } from './initialState';
@@ -86,7 +87,7 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         const url = `${window.location.origin}${spaBase}${pagePath}`;
 
         navigator.clipboard.writeText(url);
-        message.success(t('pageEditor.linkCopied'));
+        message.success(t('docEditor.linkCopied'));
       },
 
       handleDelete: async (t, message, modal, onDeleteCallback) => {
@@ -96,23 +97,23 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
         return new Promise((resolve, reject) => {
           modal.confirm({
             cancelText: t('cancel'),
-            content: t('pageEditor.deleteConfirm.content'),
+            content: t('docEditor.deleteConfirm.content'),
             okButtonProps: { danger: true },
             okText: t('delete'),
             onOk: async () => {
               try {
                 const { removeDocument } = useFileStore.getState();
                 await removeDocument(documentId);
-                message.success(t('pageEditor.deleteSuccess'));
+                message.success(t('docEditor.deleteSuccess'));
                 onDeleteCallback?.();
                 resolve();
               } catch (error) {
                 log('Failed to delete page:', error);
-                message.error(t('pageEditor.deleteError'));
+                message.error(t('docEditor.deleteError'));
                 reject(error);
               }
             },
-            title: t('pageEditor.deleteConfirm.title'),
+            title: t('docEditor.deleteConfirm.title'),
           });
         });
       },
@@ -156,17 +157,42 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
           const currentDocument = usePageStore
             .getState()
             .documents?.find((document) => document.id === documentId);
-          const nextMetadata = {
-            ...currentDocument?.metadata,
-            ...(emoji !== undefined ? { emoji } : {}),
-          };
+          const needsEmojiSync = emoji !== lastSavedEmoji;
+          let baseMetadata = currentDocument?.metadata as Record<string, any> | undefined;
+
+          if (!baseMetadata && needsEmojiSync) {
+            const remoteDocument = await documentService.getDocumentById(documentId);
+            baseMetadata = remoteDocument?.metadata as Record<string, any> | undefined;
+          }
+
+          let nextMetadata: Record<string, any> | undefined = undefined;
+
+          if (baseMetadata || needsEmojiSync) {
+            nextMetadata = { ...baseMetadata };
+
+            if (emoji === undefined) {
+              delete nextMetadata.emoji;
+            } else {
+              nextMetadata.emoji = emoji;
+            }
+          }
+
+          const documentStore = useDocumentStore.getState();
+          const hasDocumentState = !!documentStore.documents[documentId];
 
           // Trigger save via DocumentStore with metadata
-          await useDocumentStore.getState().performSave(documentId, {
-            emoji,
-            metadata: nextMetadata,
-            title,
-          });
+          if (hasDocumentState) {
+            await documentStore.performSave(documentId, {
+              metadata: nextMetadata,
+              title,
+            });
+          } else {
+            await documentService.updateDocument({
+              id: documentId,
+              ...(nextMetadata !== undefined ? { metadata: nextMetadata } : {}),
+              title,
+            });
+          }
 
           // Notify parent after successful save
           if (title !== lastSavedTitle) {
@@ -189,6 +215,7 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
           if (get().documentId === documentId) {
             set({ metaSaveStatus: 'idle' });
           }
+          throw error;
         }
       },
 

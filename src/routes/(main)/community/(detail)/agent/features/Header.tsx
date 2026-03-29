@@ -223,7 +223,7 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
           {Boolean(knowledgeCount) && (
             <Tooltip
               styles={{ root: { pointerEvents: 'none' } }}
-              title={t('assistants.withKnowledge')}
+              title={t('assistants.withSourceSet')}
             >
               <Flexbox horizontal align={'center'} gap={6}>
                 <Icon icon={BookTextIcon} />

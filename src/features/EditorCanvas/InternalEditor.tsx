@@ -15,43 +15,30 @@ import {
   ReactToolbarPlugin,
 } from '@lobehub/editor';
 import { Editor, useEditorState } from '@lobehub/editor/react';
-import { createStyles, cssVar } from 'antd-style';
+import { createStyles } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { memo, type RefObject, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { themedSelectionCss } from '@/styles';
 import { ensureElectronIpc } from '@/utils/electron/ipc';
 
 import { type EditorCanvasProps } from './EditorCanvas';
 import InlineToolbar from './InlineToolbar';
+import ReactMarkdownBreakPlugin from './plugins/ReactMarkdownBreakPlugin';
 import { useImageUpload } from './useImageUpload';
 
 const IMAGE_FILTERS = [
   { extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'], name: 'Images' },
 ];
+const SNAPSHOT_READ_FAILED = Symbol('editor-snapshot-read-failed');
 
 const useStyles = createStyles(({ css }) => ({
   host: css`
     inline-size: 100%;
     min-block-size: 100%;
 
-    *::selection {
-      background: color-mix(in srgb, ${cssVar.colorPrimary} 28%, transparent);
-    }
-
-    *::selection {
-      background: color-mix(in srgb, ${cssVar.colorPrimary} 28%, transparent);
-    }
-
-    html[data-theme='dark'] & *::selection {
-      color: ${cssVar.colorTextLightSolid};
-      background: color-mix(in srgb, ${cssVar.colorPrimary} 48%, ${cssVar.colorBgContainer} 52%);
-    }
-
-    html[data-theme='dark'] & *::selection {
-      color: ${cssVar.colorTextLightSolid};
-      background: color-mix(in srgb, ${cssVar.colorPrimary} 48%, ${cssVar.colorBgContainer} 52%);
-    }
+    ${themedSelectionCss('*')}
   `,
 }));
 
@@ -60,6 +47,7 @@ const useStyles = createStyles(({ css }) => ({
  */
 const STATIC_PLUGINS = [
   ReactLiteXmlPlugin,
+  ReactMarkdownBreakPlugin,
   ReactListPlugin,
   ReactCodePlugin,
   ReactCodemirrorPlugin,
@@ -114,7 +102,7 @@ const InternalEditor = memo<InternalEditorProps>(
       return new File([data], name, { type: mimeType });
     }, []);
 
-    const finalPlaceholder = placeholder || t('pageEditor.editorPlaceholder');
+    const finalPlaceholder = placeholder || t('docEditor.editorPlaceholder');
 
     // Build plugins array
     const plugins = useMemo(() => {
@@ -174,6 +162,16 @@ const InternalEditor = memo<InternalEditorProps>(
     const previousDocumentSnapshotRef = useRef<unknown>(undefined);
     const onContentChangeRef = useRef(onContentChange);
     onContentChangeRef.current = onContentChange;
+    const readDocumentSnapshot = useCallback(() => {
+      try {
+        return editor.getDocument('json');
+      } catch (error) {
+        // The shared editor can emit teardown updates while route transitions detach
+        // list nodes from the root tree. Ignore snapshot reads during that window.
+        void error;
+        return SNAPSHOT_READ_FAILED;
+      }
+    }, [editor]);
 
     // Listen to Lexical updates directly to trigger content change
     // This bypasses @lobehub/editor's onTextChange which has issues with previousContent reset
@@ -184,13 +182,16 @@ const InternalEditor = memo<InternalEditorProps>(
       if (!lexicalEditor) return;
 
       // Initialize snapshot before registering listener
-      previousDocumentSnapshotRef.current = editor.getDocument('json');
+      const initialSnapshot = readDocumentSnapshot();
+      previousDocumentSnapshotRef.current =
+        initialSnapshot === SNAPSHOT_READ_FAILED ? undefined : initialSnapshot;
 
       const unregister = lexicalEditor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
         // Skip selection-only / caret-movement updates — no content was mutated.
         if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
-        const currentDocumentSnapshot = editor.getDocument('json');
+        const currentDocumentSnapshot = readDocumentSnapshot();
+        if (currentDocumentSnapshot === SNAPSHOT_READ_FAILED) return;
 
         if (!isEqual(currentDocumentSnapshot, previousDocumentSnapshotRef.current)) {
           previousDocumentSnapshotRef.current = currentDocumentSnapshot;
@@ -206,7 +207,7 @@ const InternalEditor = memo<InternalEditorProps>(
       return () => {
         unregister();
       };
-    }, [contentChangeLockRef, editor]); // Only depend on stable refs and editor
+    }, [contentChangeLockRef, editor, readDocumentSnapshot]); // Only depend on stable refs and editor
 
     return (
       <div

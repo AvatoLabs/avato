@@ -8,7 +8,7 @@ import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import SideBarDrawer from '@/features/NavPanel/SideBarDrawer';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import dynamic from '@/libs/next/dynamic';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const Content = dynamic(() => import('./Content'), {
   loading: () => (

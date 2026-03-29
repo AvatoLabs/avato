@@ -9,15 +9,16 @@ import { checkBudgetsUsage, checkEmbeddingUsage } from '@/business/server/trpc-m
 import { DEFAULT_FILE_EMBEDDING_MODEL_ITEM } from '@/const/settings/knowledge';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
+import { ContentModel } from '@/database/models/content';
 import { EmbeddingModel } from '@/database/models/embedding';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { type NewChunkItem, type NewEmbeddingsItem } from '@/database/schemas';
 import { fileEnv } from '@/envs/file';
 import { asyncAuthedProcedure, asyncRouter as router } from '@/libs/trpc/async';
 import { getServerDefaultFilesConfig } from '@/server/globalConfig';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 import { ChunkService } from '@/server/services/chunk';
+import { ContentAuthorizer } from '@/server/services/content';
 import { FileService } from '@/server/services/file';
 import {
   isStorageObjectMissingError,
@@ -28,7 +29,6 @@ import {
   RAG_EMBEDDING_DIMENSIONS,
 } from '@/server/services/rag/constants';
 import { getEffectiveEmbeddingBatchSize } from '@/server/services/rag/embeddingLimits';
-import { ResourceAuthorizer } from '@/server/services/resource';
 import { type IAsyncTaskError } from '@/types/asyncTask';
 import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asyncTask';
 import { safeParseJSON } from '@/utils/safeParseJSON';
@@ -94,8 +94,8 @@ const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
       embeddingModel: new EmbeddingModel(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
-      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
     },
   });
 });
@@ -111,7 +111,7 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.fileId,
         kind: 'file',
@@ -231,7 +231,7 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.fileId,
         kind: 'file',

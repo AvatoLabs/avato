@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
+    "./repositories/aiInfra": "./src/repositories/aiInfra/index.ts",
     "./test-utils": "./tests/test-utils.ts"
   },
   "scripts": {

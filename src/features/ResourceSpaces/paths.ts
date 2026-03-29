@@ -1,37 +1,40 @@
-export const buildResourceRootPath = (spaceId?: string | null) =>
-  spaceId ? `/resource/space/${spaceId}` : '/resource';
+export const buildContentRootPath = (spaceId?: string | null) =>
+  spaceId ? `/content/spaces/${spaceId}` : '/content';
 
-export const buildResourceLibraryPath = (spaceId: string | null | undefined, libraryId: string) =>
-  spaceId ? `/resource/space/${spaceId}/library/${libraryId}` : `/resource/library/${libraryId}`;
+export const buildContentFolderPath = (spaceId: string | null | undefined, folderSlug: string) =>
+  `${buildContentRootPath(spaceId)}/${folderSlug}`;
 
-export const buildResourceFolderPath = (
+export const buildSourceSetPath = (spaceId: string | null | undefined, sourceSetId: string) =>
+  spaceId
+    ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
+    : `/content/source-sets/${sourceSetId}`;
+
+export const buildSourceSetFolderPath = (
   spaceId: string | null | undefined,
-  libraryId: string,
+  sourceSetId: string,
   folderSlug: string,
-) => `${buildResourceLibraryPath(spaceId, libraryId)}/${folderSlug}`;
+) => `${buildSourceSetPath(spaceId, sourceSetId)}/${folderSlug}`;
 
-export const buildResourcePreviewPath = (
+export const buildContentPreviewPath = (
   spaceId: string | null | undefined,
   fileId: string,
-  libraryId?: string | null,
+  sourceSetId?: string | null,
 ) => {
-  const basePath = libraryId
-    ? buildResourceLibraryPath(spaceId, libraryId)
-    : buildResourceRootPath(spaceId);
+  const basePath = sourceSetId
+    ? buildSourceSetPath(spaceId, sourceSetId)
+    : buildContentRootPath(spaceId);
 
   return `${basePath}?file=${encodeURIComponent(fileId)}`;
 };
 
-export const buildResourceSharedPath = () => '/resource/shared';
+export const buildSharedContentPath = () => '/content/shared';
 
-export const buildResourceTrashPath = (spaceId?: string | null) =>
-  spaceId ? `/resource/space/${spaceId}/trash` : '/resource/trash';
+export const buildContentTrashPath = (spaceId?: string | null) =>
+  spaceId ? `/content/spaces/${spaceId}/trash` : '/content/trash';
 
-export const buildResourceLibraryTrashPath = (
-  spaceId: string | null | undefined,
-  libraryId: string,
-) => `${buildResourceLibraryPath(spaceId, libraryId)}/trash`;
+export const buildSourceSetTrashPath = (spaceId: string | null | undefined, sourceSetId: string) =>
+  `${buildSourceSetPath(spaceId, sourceSetId)}/trash`;
 
-export const buildSpaceSettingsPath = (spaceId: string) => `/resource/space/${spaceId}/settings`;
+export const buildSpaceSettingsPath = (spaceId: string) => `/content/spaces/${spaceId}/settings`;
 
-export const buildPublicResourceSharePath = (token: string) => `/share/r/${token}`;
+export const buildPublicContentSharePath = (token: string) => `/share/r/${token}`;

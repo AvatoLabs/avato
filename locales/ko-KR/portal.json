@@ -20,6 +20,6 @@
   "notebook.delete": "삭제",
   "notebook.empty": "문서가 없습니다. 현재 주제와 관련된 문서는 여기에 표시됩니다.",
   "notebook.title": "노트북",
-  "openInPageEditor": "문서에서 편집",
+  "openInDocEditor": "문서에서 편집",
   "title": "작업 공간"
 }

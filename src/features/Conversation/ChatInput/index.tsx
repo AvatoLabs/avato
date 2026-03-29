@@ -18,7 +18,7 @@ import {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useChatStore } from '@/store/chat';
 import { fileChatSelectors, useFileStore } from '@/store/file';
-import { toPageSelections } from '@/store/file/utils/toPageSelections';
+import { toDocSelections } from '@/store/file/utils/toDocSelections';
 
 import WideScreenContainer from '../../WideScreenContainer';
 import { messageStateSelectors, useConversationStore } from '../store';
@@ -153,9 +153,9 @@ const ChatInput = memo<ChatInputProps>(
 
         // Fire and forget - send with captured message
         await sendMessage({
+          docSelections: toDocSelections(currentContextList),
           files: currentFileList,
           message,
-          pageSelections: toPageSelections(currentContextList),
         });
       },
       [isAIGenerating, sendMessage],

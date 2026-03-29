@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Flexbox } from '@lobehub/ui';
+import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import { ChatHeader } from '@lobehub/ui/mobile';
 import { MessageSquarePlus } from 'lucide-react';
 import { memo } from 'react';
@@ -26,9 +26,14 @@ const Header = memo(() => {
       left={
         <Flexbox horizontal align={'center'} className={styles.leftContainer} gap={8}>
           <UserAvatar size={32} onClick={() => navigate('/me')} />
-          <div className={styles.brand}>
-            <ProductLogo type={'text'} />
-          </div>
+          <Flexbox className={styles.brandMeta} gap={2}>
+            <div className={styles.brand}>
+              <ProductLogo size={18} type={'text'} />
+            </div>
+            <Text ellipsis as={'div'} className={styles.brandSubtitle}>
+              {t('tab.chat')}
+            </Text>
+          </Flexbox>
         </Flexbox>
       }
       right={

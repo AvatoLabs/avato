@@ -62,6 +62,7 @@ const BuiltinSkillItem = memo<BuiltinSkillItemProps>(({ identifier, title, avata
     if (isInstalled) {
       return (
         <DropdownMenu
+          nativeButton
           placement="bottomRight"
           items={[
             {

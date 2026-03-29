@@ -45,6 +45,22 @@ vi.mock('../AgentSettings', () => ({
   default: () => <div data-testid="agent-settings">agent-settings</div>,
 }));
 
+vi.mock('../ActionBar', () => ({
+  default: () => <div data-testid="action-bar">action-bar</div>,
+}));
+
+vi.mock('../CapabilityCard', () => ({
+  default: () => <div data-testid="agent-sources-inline">agent-sources-inline</div>,
+}));
+
+vi.mock('../IdentityCard', () => ({
+  default: () => <div data-testid="identity-card">identity-card</div>,
+}));
+
+vi.mock('../PromptSection', () => ({
+  default: () => <div data-testid="prompt-section">prompt-section</div>,
+}));
+
 vi.mock('../EditorCanvas', () => ({
   default: () => <div data-testid="editor-canvas">editor-canvas</div>,
 }));
@@ -55,10 +71,6 @@ vi.mock('../Header/AgentPublishButton', () => ({
 
 vi.mock('./AgentHeader', () => ({
   default: () => <div data-testid="agent-header">agent-header</div>,
-}));
-
-vi.mock('./AgentKnowledgeInline', () => ({
-  default: () => <div data-testid="agent-knowledge-inline">agent-knowledge-inline</div>,
 }));
 
 vi.mock('./AgentTool', () => ({
@@ -110,9 +122,9 @@ vi.mock('@/store/serverConfig', () => ({
 }));
 
 describe('ProfileEditor', () => {
-  it('renders the inline knowledge entry for inbox agents', () => {
+  it('renders the inline sources entry for inbox agents', () => {
     render(<ProfileEditor />);
 
-    expect(screen.getByTestId('agent-knowledge-inline')).toBeInTheDocument();
+    expect(screen.getByTestId('agent-sources-inline')).toBeInTheDocument();
   });
 });

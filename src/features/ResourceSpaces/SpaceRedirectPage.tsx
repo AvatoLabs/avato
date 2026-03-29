@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildResourceRootPath } from './paths';
+import { buildContentRootPath } from './paths';
 
 const SpaceRedirectPage = memo(() => {
   const location = useLocation();
@@ -33,7 +33,7 @@ const SpaceRedirectPage = memo(() => {
     return null;
   }
 
-  return <Navigate replace to={`${buildResourceRootPath(targetSpace.id)}${location.search}`} />;
+  return <Navigate replace to={`${buildContentRootPath(targetSpace.id)}${location.search}`} />;
 });
 
 SpaceRedirectPage.displayName = 'SpaceRedirectPage';

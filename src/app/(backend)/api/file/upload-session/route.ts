@@ -5,7 +5,7 @@ import { type NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
-import { ResourceModel } from '@/database/models/resource';
+import { ContentModel } from '@/database/models/content';
 import { getServerDB } from '@/database/server';
 import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     let body: Buffer | Readable | null = null;
 
     const db = await getServerDB();
-    const resourceModel = new ResourceModel(db, userId);
+    const contentModel = new ContentModel(db, userId);
 
     if (hasRawUploadHeader) {
       if (!uploadSessionId) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Invalid Content-Length header.' }, { status: 400 });
         }
 
-        const uploadSession = await resourceModel.findPendingUploadSessionById(uploadSessionId);
+        const uploadSession = await contentModel.findPendingUploadSessionById(uploadSessionId);
 
         if (!uploadSession) {
           return NextResponse.json(
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid upload payload.' }, { status: 400 });
     }
 
-    const uploadSession = await resourceModel.findPendingUploadSessionById(uploadSessionId);
+    const uploadSession = await contentModel.findPendingUploadSessionById(uploadSessionId);
 
     if (!uploadSession) {
       return NextResponse.json({ error: 'Upload session not found or expired.' }, { status: 400 });

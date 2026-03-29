@@ -15,7 +15,7 @@ const SEARCH_TYPES = [
   'mcp',
   'plugin',
   'communityAgent',
-  'knowledgeBase',
+  'sourceSet',
 ] as const;
 
 type SearchType = (typeof SEARCH_TYPES)[number];
@@ -38,7 +38,7 @@ function renderResultGroup(type: string, items: any[]) {
 export function registerSearchCommand(program: Command) {
   program
     .command('search <query>')
-    .description('Search across topics, agents, files, knowledge bases, and more')
+    .description('Search across topics, agents, files, source sets, and more')
     .option('-t, --type <type>', `Filter by type: ${SEARCH_TYPES.join(', ')}`)
     .option('-L, --limit <n>', 'Results per type', '10')
     .option('--json [fields]', 'Output JSON, optionally specify fields (comma-separated)')

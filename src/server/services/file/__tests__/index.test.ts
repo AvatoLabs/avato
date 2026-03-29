@@ -50,14 +50,14 @@ vi.mock('@/database/models/space', () => ({
   })),
 }));
 
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn(() => ({
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn(() => ({
     invalidateAuthzEpochsAfterRemoval: vi.fn().mockResolvedValue(undefined),
     upsertSpaceBlob: mockUpsertSpaceBlob,
   })),
 }));
 
-vi.mock('@/server/services/resource', () => ({
+vi.mock('@/server/services/content', () => ({
   AuthorizedResourceResolver: vi.fn().mockImplementation(() => ({
     requireFile: mockRequireFile,
   })),

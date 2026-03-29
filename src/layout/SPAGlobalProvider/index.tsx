@@ -3,7 +3,7 @@
 import { type NeutralColors, type PrimaryColors, TooltipGroup } from '@lobehub/ui';
 import { StyleProvider, useResponsive } from 'antd-style';
 import { domMax, LazyMotion } from 'motion/react';
-import { lazy, memo, type PropsWithChildren, Suspense, useLayoutEffect } from 'react';
+import { lazy, memo, type PropsWithChildren, Suspense, useEffect, useState } from 'react';
 
 import { LobeAnalyticsProviderWrapper } from '@/components/Analytics/LobeAnalyticsProviderWrapper';
 import { DragUploadProvider } from '@/components/DragUploadZone/DragUploadProvider';
@@ -26,16 +26,67 @@ import Locale from './Locale';
 const DEFAULT_THEME_PRIMARY: PrimaryColors = 'green';
 const DEFAULT_THEME_NEUTRAL: NeutralColors = 'slate';
 
-const ModalHost = lazy(() => import('@lobehub/ui').then((m) => ({ default: m.ModalHost })));
+const ModalHost = lazy(() => import('@lobehub/ui/base-ui').then((m) => ({ default: m.ModalHost })));
 const ToastHost = lazy(() => import('@lobehub/ui').then((m) => ({ default: m.ToastHost })));
 const ContextMenuHost = lazy(() =>
   import('@lobehub/ui').then((m) => ({ default: m.ContextMenuHost })),
 );
 
 const SPAGlobalProvider = memo<PropsWithChildren>(({ children }) => {
-  useLayoutEffect(() => {
-    document.getElementById('loading-screen')?.remove();
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  // Keep the static loading screen mounted until the initial React fallback disappears.
+  // This prevents the startup chain from flashing through multiple visible loading stages.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const waitForInitialContent = () => {
+      if (cancelled) return;
+
+      const loadingScreen = document.getElementById('loading-screen');
+      if (!loadingScreen) {
+        setIsAppReady(true);
+        return;
+      }
+
+      const activeBrandLoading = document.querySelector('[data-brand-loading="true"]');
+
+      if (activeBrandLoading) {
+        timer = setTimeout(waitForInitialContent, 120);
+        return;
+      }
+
+      setIsAppReady(true);
+    };
+
+    timer = setTimeout(waitForInitialContent, 120);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isAppReady) return;
+
+    const loadingScreen = document.getElementById('loading-screen');
+    if (!loadingScreen) return;
+
+    // Add fade-out transition before removing
+    loadingScreen.style.transition = 'opacity 0.3s ease-out';
+    loadingScreen.style.opacity = '0';
+
+    // Remove after transition completes
+    const removeTimer = setTimeout(() => {
+      loadingScreen.remove();
+    }, 300);
+
+    return () => {
+      clearTimeout(removeTimer);
+    };
+  }, [isAppReady]);
 
   const { mobile } = useResponsive();
   const serverConfig: SPAServerConfig | undefined = window.__SERVER_CONFIG__;

@@ -1,6 +1,5 @@
 import { type GoogleGenAIOptions } from '@google/genai';
 import { ModelRuntime } from '@lobechat/model-runtime';
-import { LobeVertexAI } from '@lobechat/model-runtime/vertexai';
 import {
   type AWSBedrockKeyVault,
   type AzureOpenAIKeyVault,
@@ -22,6 +21,20 @@ import { KeyVaultsGateKeeper } from '../KeyVaultsEncrypt';
 import apiKeyManager from './apiKeyManager';
 
 export * from './trace';
+
+const loadVertexRuntime = async () => {
+  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+    specifier: string,
+  ) => Promise<{
+    LobeVertexAI: {
+      initFromVertexAI: (
+        options: GoogleGenAIOptions,
+      ) => ConstructorParameters<typeof ModelRuntime>[0];
+    };
+  }>;
+
+  return dynamicImport('@lobechat/model-runtime/vertexai');
+};
 
 /**
  * Combined KeyVaults type for all providers
@@ -353,7 +366,7 @@ const buildVertexOptions = (
  * @param params
  * @returns A promise that resolves when the agent runtime is initialized.
  */
-export const initModelRuntimeWithUserPayload = (
+export const initModelRuntimeWithUserPayload = async (
   provider: string,
   payload: ClientSecretPayload,
   params: any = {},
@@ -362,6 +375,7 @@ export const initModelRuntimeWithUserPayload = (
 
   if (runtimeProvider === ModelProvider.VertexAI) {
     const vertexOptions = buildVertexOptions(payload, params);
+    const { LobeVertexAI } = await loadVertexRuntime();
     const runtime = LobeVertexAI.initFromVertexAI(vertexOptions);
 
     return new ModelRuntime(runtime);

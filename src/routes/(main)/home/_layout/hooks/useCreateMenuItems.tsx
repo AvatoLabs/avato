@@ -14,8 +14,8 @@ import { type GroupMemberConfig } from '@/services/chatGroup';
 import { chatGroupService } from '@/services/chatGroup';
 import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
+import { usePageStore } from '@/store/docs';
 import { useHomeStore } from '@/store/home/store';
-import { usePageStore } from '@/store/page';
 
 interface CreateAgentOptions {
   groupId?: string;
@@ -263,7 +263,7 @@ export const useCreateMenuItems = () => {
     const untitledTitle = tFile('pageList.untitled');
     try {
       const newPageId = await createNewPage(untitledTitle);
-      navigate(`/page/${newPageId}`);
+      navigate(`/docs/${newPageId}`);
     } catch (error) {
       console.error('Failed to create page:', error);
       message.error(tFile('pageList.createFailed'));

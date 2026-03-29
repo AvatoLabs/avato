@@ -1,0 +1,70 @@
+diff --git a/es/plugins/math/plugin/index.js b/es/plugins/math/plugin/index.js
+index 3763db42ec9e8309b421d8006d51952629ccdeaf..b3cd57a41a0fb439c08560dfb5a87f15dbcdbe2d 100644
+--- a/es/plugins/math/plugin/index.js
++++ b/es/plugins/math/plugin/index.js
+@@ -14,7 +14,7 @@ function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Objec
+ function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
+ function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
+ function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+-function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
++function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () { })); return true; } catch (e) { return false; } }
+ function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+ function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+ function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : String(i); }
+@@ -141,22 +141,32 @@ export var MathPlugin = (_class = /*#__PURE__*/function (_KernelPlugin) {
+         type: 'element'
+       });
+       markdownService === null || markdownService === void 0 || markdownService.registerMarkdownWriter(MathInlineNode.getType(), function (ctx, node) {
+-        ctx.appendLine(node.getTextContent());
++        ctx.appendLine('$' + node.code + '$');
+         return true;
+       });
+       markdownService === null || markdownService === void 0 || markdownService.registerMarkdownWriter(MathBlockNode.getType(), function (ctx, node) {
+-        ctx.appendLine(node.getTextContent());
++        ctx.appendLine('$$\n' + node.code + '\n$$');
+         return true;
+       });
+       markdownService === null || markdownService === void 0 || markdownService.registerMarkdownReader('inlineMath', function (node) {
++        var code = node.value || '';
++        // Remove surrounding $ if present
++        if (code.startsWith('$') && code.endsWith('$')) {
++          code = code.slice(1, -1);
++        }
+         return INodeHelper.createElementNode('math', {
+-          code: node.value,
++          code: code,
+           version: 1
+         });
+       });
+       markdownService === null || markdownService === void 0 || markdownService.registerMarkdownReader('math', function (node) {
++        var code = node.value || '';
++        // Remove surrounding $$ if present
++        if (code.startsWith('$$') && code.endsWith('$$')) {
++          code = code.slice(2, -2);
++        }
+         return INodeHelper.createElementNode('mathBlock', {
+-          code: node.value,
++          code: code,
+           version: 1
+         });
+       });
+diff --git a/es/plugins/math/react/components/MathInline.js b/es/plugins/math/react/components/MathInline.js
+index fe79a40549ba245b942eed30d8c1f21ca342c9d7..f95aeb7770cc8449f6e61e6372d8cb0d55b01b93 100644
+--- a/es/plugins/math/react/components/MathInline.js
++++ b/es/plugins/math/react/components/MathInline.js
+@@ -32,7 +32,14 @@ var MathInline = function MathInline(_ref) {
+   var isMathBlock = node instanceof MathBlockNode;
+   useEffect(function () {
+     if (ref.current && node.code) {
+-      Katex.render(node.code, ref.current, {
++      // Clean up surrounding $ or $$ if present
++      var code = node.code;
++      if (code.startsWith('$$') && code.endsWith('$$')) {
++        code = code.slice(2, -2);
++      } else if (code.startsWith('$') && code.endsWith('$')) {
++        code = code.slice(1, -1);
++      }
++      Katex.render(code, ref.current, {
+         // 使用 displayMode 渲染块级公式
+         displayMode: node instanceof MathBlockNode,
+         throwOnError: false

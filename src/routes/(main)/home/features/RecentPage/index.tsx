@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { useInitRecentPage } from '@/hooks/useInitRecentPage';
-import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
+import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { homeRecentSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
 import { FilesTabs } from '@/types/files';
@@ -22,7 +22,7 @@ import RecentPageList from './List';
 const RecentPage = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
-  const setCategory = useResourceManagerStore((s) => s.setCategory);
+  const setCategory = useContentManagerStore((s) => s.setCategory);
   const recentPages = useHomeStore(homeRecentSelectors.recentPages);
   const isInit = useHomeStore(homeRecentSelectors.isRecentPagesInit);
   const { isRevalidating } = useInitRecentPage();
@@ -35,7 +35,7 @@ const RecentPage = memo(() => {
   return (
     <GroupBlock
       icon={FileTextIcon}
-      title={t('home.recentPages')}
+      title={t('home.recentDocs', { defaultValue: 'Recent Docs' })}
       action={
         <>
           {isRevalidating && <NeuralNetworkLoading size={14} />}
@@ -43,10 +43,10 @@ const RecentPage = memo(() => {
             items={[
               {
                 key: 'all-documents',
-                label: t('menu.allPages'),
+                label: t('menu.openDocs', { defaultValue: 'Open Docs' }),
                 onClick: () => {
-                  setCategory(FilesTabs.Pages);
-                  navigate('/resource');
+                  setCategory(FilesTabs.Documents);
+                  navigate('/content');
                 },
               },
             ]}
@@ -61,6 +61,7 @@ const RecentPage = memo(() => {
           fallback={
             <GroupSkeleton
               height={RECENT_BLOCK_SIZE.PAGE.HEIGHT}
+              variant={'page'}
               width={RECENT_BLOCK_SIZE.PAGE.WIDTH}
             />
           }

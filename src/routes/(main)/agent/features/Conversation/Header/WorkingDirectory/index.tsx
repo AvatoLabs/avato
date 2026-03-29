@@ -20,7 +20,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       background-color: ${cssVar.colorFillTertiary};
 
       :hover {
-        color: ${cssVar.colorTextSecondary};
+        color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
         background-color: ${cssVar.colorFillSecondary};
       }
     `,

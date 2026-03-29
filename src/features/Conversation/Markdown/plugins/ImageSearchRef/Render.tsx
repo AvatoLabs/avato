@@ -46,7 +46,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     font-size: 0.95em;
     line-height: 1.4;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     text-overflow: ellipsis;
   `,
   refChip: css`
@@ -61,7 +61,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     border-radius: 4px;
 
     font-size: 0.8em;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     text-decoration: none;
     vertical-align: -1px;
 

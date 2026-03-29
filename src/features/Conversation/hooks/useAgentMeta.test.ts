@@ -42,7 +42,7 @@ describe('useAgentMeta', () => {
         },
         builtinAgentIdMap: {
           inbox: 'inbox-agent-id',
-          pageAgent: 'page-agent-id',
+          docsAgent: 'docs-agent-id',
         },
       });
     });
@@ -76,7 +76,7 @@ describe('useAgentMeta', () => {
         },
         builtinAgentIdMap: {
           inbox: mockInboxAgentId,
-          pageAgent: 'page-agent-id',
+          docsAgent: 'docs-agent-id',
         },
       });
     });
@@ -91,25 +91,25 @@ describe('useAgentMeta', () => {
   });
 
   it('should return Avato title for page agent (builtin), preserving avatar from backend', () => {
-    const mockPageAgentId = 'page-agent-id';
+    const mockDocsAgentId = 'docs-agent-id';
     const mockMeta = {
       avatar: '/icons/icon-lobe.png', // Avatar from backend (merged from builtin-agents package)
       title: 'Page Agent Title',
     };
 
     vi.mocked(useConversationStore).mockImplementation((selector: any) => {
-      const state = { context: { agentId: mockPageAgentId } };
+      const state = { context: { agentId: mockDocsAgentId } };
       return selector(state);
     });
 
     act(() => {
       useAgentStore.setState({
         agentMap: {
-          [mockPageAgentId]: mockMeta,
+          [mockDocsAgentId]: mockMeta,
         },
         builtinAgentIdMap: {
           inbox: 'inbox-agent-id',
-          pageAgent: mockPageAgentId,
+          docsAgent: mockDocsAgentId,
         },
       });
     });
@@ -249,7 +249,7 @@ describe('useIsBuiltinAgent', () => {
       useAgentStore.setState({
         builtinAgentIdMap: {
           inbox: mockInboxAgentId,
-          pageAgent: 'page-agent-id',
+          docsAgent: 'docs-agent-id',
         },
       });
     });
@@ -260,10 +260,10 @@ describe('useIsBuiltinAgent', () => {
   });
 
   it('should return true for page agent', () => {
-    const mockPageAgentId = 'page-agent-id';
+    const mockDocsAgentId = 'docs-agent-id';
 
     vi.mocked(useConversationStore).mockImplementation((selector: any) => {
-      const state = { context: { agentId: mockPageAgentId } };
+      const state = { context: { agentId: mockDocsAgentId } };
       return selector(state);
     });
 
@@ -271,7 +271,7 @@ describe('useIsBuiltinAgent', () => {
       useAgentStore.setState({
         builtinAgentIdMap: {
           inbox: 'inbox-agent-id',
-          pageAgent: mockPageAgentId,
+          docsAgent: mockDocsAgentId,
         },
       });
     });
@@ -293,7 +293,7 @@ describe('useIsBuiltinAgent', () => {
       useAgentStore.setState({
         builtinAgentIdMap: {
           inbox: 'inbox-agent-id',
-          pageAgent: 'page-agent-id',
+          docsAgent: 'docs-agent-id',
         },
       });
     });

@@ -25,8 +25,8 @@ vi.mock('@/database/server', () => ({
   getServerDB: vi.fn(),
 }));
 
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn(() => ({
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn(() => ({
     findPendingUploadSessionById: (...args: unknown[]) => mockFindPendingUploadSessionById(...args),
   })),
 }));

@@ -1,7 +1,8 @@
 'use client';
 
 import { SiGithub, SiX } from '@icons-pack/react-simple-icons';
-import { Center, Flexbox, Icon, Input, Modal, Text, TextArea, Tooltip } from '@lobehub/ui';
+import { Center, Flexbox, Icon, Input, Text, TextArea, Tooltip } from '@lobehub/ui';
+import { Modal } from '@lobehub/ui/base-ui';
 import { type UploadProps } from 'antd';
 import { App, Form, Modal as AntModal, Upload } from 'antd';
 import { cssVar } from 'antd-style';

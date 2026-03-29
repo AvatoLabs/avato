@@ -2,7 +2,7 @@
 
 import { ActionIcon, DropdownMenu } from '@lobehub/ui';
 import { BotIcon, MoreHorizontal } from 'lucide-react';
-import { memo,Suspense } from 'react';
+import { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,6 +40,7 @@ const CommunityAgents = memo(() => {
           fallback={
             <GroupSkeleton
               height={RECENT_BLOCK_SIZE.AGENT.HEIGHT}
+              variant={'agent'}
               width={RECENT_BLOCK_SIZE.AGENT.WIDTH}
             />
           }

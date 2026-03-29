@@ -219,7 +219,7 @@ export const createRuntimeExecutors = (
                 fileId: f.id ?? '',
                 filename: f.name ?? '',
               })),
-            knowledgeBases: agentConfig.knowledgeBases
+            sourceSets: agentConfig.sourceSets
               ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
               .map((kb: { id?: string; name?: string }) => ({
                 id: kb.id ?? '',
@@ -629,14 +629,14 @@ export const createRuntimeExecutors = (
 
       // Execute tool using ToolExecutionService
       log(`[${operationLogId}] Executing tool ${toolName} ...`);
-      const knowledgeBaseIds = agentConfig?.knowledgeBases
+      const sourceSetIds = agentConfig?.sourceSets
         ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
         .map((kb: { id?: string }) => kb.id)
         .filter(Boolean) as string[] | undefined;
 
       const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
         activeDeviceId: state.metadata?.activeDeviceId,
-        knowledgeBaseIds,
+        sourceSetIds,
         memoryToolPermission: agentConfig?.chatConfig?.memory?.toolPermission,
         serverDB: ctx.serverDB,
         spaceId: ctx.spaceId,
@@ -853,14 +853,14 @@ export const createRuntimeExecutors = (
           };
 
           const batchAgentConfig = state.metadata?.agentConfig;
-          const knowledgeBaseIds = batchAgentConfig?.knowledgeBases
+          const sourceSetIds = batchAgentConfig?.sourceSets
             ?.filter((kb: { enabled?: boolean | null }) => kb.enabled === true)
             .map((kb: { id?: string }) => kb.id)
             .filter(Boolean) as string[] | undefined;
 
           const executionResult = await toolExecutionService.executeTool(chatToolPayload, {
             activeDeviceId: state.metadata?.activeDeviceId,
-            knowledgeBaseIds,
+            sourceSetIds,
             memoryToolPermission: batchAgentConfig?.chatConfig?.memory?.toolPermission,
             serverDB: ctx.serverDB,
             spaceId: ctx.spaceId,

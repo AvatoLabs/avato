@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import type { RequestFilteringAgentOptions } from 'request-filtering-agent';
 import { RequestFilteringHttpAgent, RequestFilteringHttpsAgent } from 'request-filtering-agent';
 
@@ -8,6 +7,14 @@ const SSRF_DOC_LINK =
 const isSSRFBlockedMessage = (message: string) =>
   message.includes('is not allowed. Because, It is private IP address.') ||
   message.includes('is not allowed. Because, It is meta IP address.');
+
+const loadNodeFetch = async () => {
+  const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+    specifier: string,
+  ) => Promise<{ default: typeof fetch }>;
+
+  return dynamicImport('node-fetch');
+};
 
 /**
  * Options for per-call SSRF configuration overrides
@@ -35,6 +42,8 @@ export const ssrfSafeFetch = async (
   ssrfOptions?: SSRFOptions,
 ): Promise<Response> => {
   try {
+    const { default: nodeFetch } = await loadNodeFetch();
+
     // Configure SSRF protection options with proper precedence using nullish coalescing
     const envAllowPrivate = process.env.SSRF_ALLOW_PRIVATE_IP_ADDRESS === '1';
     const allowPrivate = ssrfOptions?.allowPrivateIPAddress ?? envAllowPrivate;
@@ -56,7 +65,7 @@ export const ssrfSafeFetch = async (
     // Use node-fetch with SSRF protection agent
     // Pass a function to dynamically select agent based on URL protocol
     // This handles redirects from HTTP to HTTPS correctly
-    const response = await fetch(url, {
+    const response = await nodeFetch(url, {
       ...options,
       agent: (parsedURL: URL) => (parsedURL.protocol === 'https:' ? httpsAgent : httpAgent),
     } as any);

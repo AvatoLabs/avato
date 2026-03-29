@@ -1,4 +1,4 @@
-import { resourcesTreePrompt } from '@lobechat/prompts';
+import { contentTreePrompt } from '@lobechat/prompts';
 import {
   type BuiltinServerRuntimeOutput,
   type BuiltinSkill,
@@ -243,7 +243,7 @@ export class SkillsExecutionRuntime {
     let content = skill.content || '';
 
     if (hasResources && skill.resources) {
-      content += '\n\n' + resourcesTreePrompt(skill.name, skill.resources);
+      content += '\n\n' + contentTreePrompt(skill.name, skill.resources);
     }
 
     return {
