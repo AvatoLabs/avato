@@ -47,7 +47,7 @@ const NavBar = memo(() => {
           icon: (active: boolean) => (
             <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.chat} />
           ),
-          key: SidebarTabKey.Chat,
+          key: 'agent',
           onClick: () => {
             navigate('/agent');
           },
@@ -67,7 +67,7 @@ const NavBar = memo(() => {
           icon: (active: boolean) => (
             <Icon className={active ? styles.active : undefined} icon={APP_ENTRY_ICONS.resource} />
           ),
-          key: SidebarTabKey.Resource,
+          key: 'content',
           onClick: () => {
             navigate('/content');
           },

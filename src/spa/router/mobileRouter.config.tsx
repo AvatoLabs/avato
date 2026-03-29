@@ -236,14 +236,14 @@ export const mobileRoutes: RouteObject[] = [
       {
         children: [
           {
-            element: dynamicElement(
-              () => import('@/routes/(main)/content'),
-              'Mobile > Content > Redirect',
-            ),
-            index: true,
-          },
-          {
             children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content'),
+                  'Mobile > Content > Redirect',
+                ),
+                index: true,
+              },
               {
                 element: dynamicElement(
                   () => import('@/routes/(main)/content/shared'),

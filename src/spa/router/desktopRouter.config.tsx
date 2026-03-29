@@ -275,14 +275,14 @@ export const desktopRoutes: RouteObject[] = [
       {
         children: [
           {
-            element: dynamicElement(
-              () => import('@/routes/(main)/content'),
-              'Desktop > Content > Redirect',
-            ),
-            index: true,
-          },
-          {
             children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content'),
+                  'Desktop > Content > Redirect',
+                ),
+                index: true,
+              },
               {
                 element: dynamicElement(
                   () => import('@/routes/(main)/content/shared'),

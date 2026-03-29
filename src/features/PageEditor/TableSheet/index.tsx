@@ -181,7 +181,7 @@ const useStyles = createStyles(({ css, token }) => ({
     );
     --rdg-selection-color: ${cssVar.colorPrimary};
 
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${token.borderRadiusLG}px;
     background: ${cssVar.colorBgContainer};

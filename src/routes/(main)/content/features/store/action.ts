@@ -189,10 +189,9 @@ export const store: CreateStore = (publicState) => (set, get) => ({
         const { clearTreeStateForSourceSet } =
           await import('@/features/ContentManager/components/SourceSetTree');
         clearTreeStateForSourceSet(sourceSetId);
-        // Navigate to resource home (can't use useNavigate hook from store)
-        if (typeof window !== 'undefined') {
-          window.location.href = buildContentRootPath(spaceId);
-        }
+        // Navigate to resource home via SPA navigation
+        const { useGlobalStore } = await import('@/store/global');
+        useGlobalStore.getState().navigate?.(buildContentRootPath(spaceId));
         return;
       }
     }

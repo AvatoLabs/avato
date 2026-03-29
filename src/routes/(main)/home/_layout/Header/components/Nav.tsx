@@ -74,7 +74,7 @@ const Nav = memo(() => {
       },
       {
         icon: APP_ENTRY_ICONS.resource,
-        key: SidebarTabKey.Resource,
+        key: 'content',
         title: t('tab.resource'),
         url: '/content',
       },
