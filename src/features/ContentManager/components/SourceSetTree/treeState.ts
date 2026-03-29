@@ -17,6 +17,7 @@ export const sortTreeItems = <T extends TreeItem>(items: T[]): T[] => {
 
 export const contentItemToTreeItem = (item: ContentItem): TreeItem => {
   return {
+    fileId: item.fileId ?? null,
     fileType: item.fileType,
     id: item.id,
     isFolder: item.fileType === 'custom/folder',
@@ -117,6 +118,7 @@ export const clearTreeFolderCache = async (
 
       if (response?.items) {
         const childItems = response.items.map((item) => ({
+          fileId: item.fileId ?? null,
           fileType: item.fileType,
           id: item.id,
           isFolder: item.fileType === 'custom/folder',

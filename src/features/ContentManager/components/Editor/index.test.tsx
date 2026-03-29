@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePageEditorStore } from '@/features/PageEditor/store';
@@ -10,25 +10,34 @@ import FileEditor from './index';
 
 interface MockContentManagerState {
   currentViewItemId?: string;
+  setCurrentViewItemId: ReturnType<typeof vi.fn>;
+  setMode: ReturnType<typeof vi.fn>;
 }
 
 interface MockFileStoreState {
   files: Record<
     string,
     {
+      fileType?: string;
       name?: string;
       url?: string;
     }
   >;
 }
 
+const mockSetSearchParams = vi.hoisted(() => vi.fn());
+const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
+
 let mockContentManagerState: MockContentManagerState = {
-  currentViewItemId: 'docs-1',
+  currentViewItemId: 'file-1',
+  setCurrentViewItemId: vi.fn(),
+  setMode: vi.fn(),
 };
 
 let mockFileStoreState: MockFileStoreState = {
   files: {
-    'docs-1': {
+    'file-1': {
+      fileType: 'text/plain',
       name: 'Spec.md',
       url: '/spec.md',
     },
@@ -61,9 +70,14 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('react-router-dom', () => ({
+  useSearchParams: () => [new URLSearchParams(), mockSetSearchParams],
+}));
+
 vi.mock('@/config/contentIcons', () => ({
   RESOURCE_ENTRY_ICONS: {
     back: 'back',
+    edit: 'edit',
     download: 'download',
     info: 'info',
   },
@@ -101,6 +115,12 @@ vi.mock('@/routes/(main)/content/features/store', () => ({
   ),
 }));
 
+vi.mock('@/services/document', () => ({
+  documentService: {
+    ensureFileDocument: mockEnsureFileDocument,
+  },
+}));
+
 vi.mock('@/store/file', () => ({
   fileManagerSelectors: {
     getFileById: (id?: string) => (state: MockFileStoreState) => (id ? state.files[id] : undefined),
@@ -123,25 +143,30 @@ vi.mock('./FileContent', () => ({
 describe('FileEditor', () => {
   beforeEach(() => {
     mockContentManagerState = {
-      currentViewItemId: 'docs-1',
+      currentViewItemId: 'file-1',
+      setCurrentViewItemId: vi.fn(),
+      setMode: vi.fn(),
     };
     mockFileStoreState = {
       files: {
-        'docs-1': {
+        'file-1': {
+          fileType: 'text/plain',
           name: 'Spec.md',
           url: '/spec.md',
         },
       },
     };
+    mockEnsureFileDocument.mockReset();
+    mockSetSearchParams.mockReset();
   });
 
   it('renders the file viewer inside a page-editor store context', () => {
     render(<FileEditor />);
 
     expect(screen.getByTestId('docs-agent-provider')).toBeInTheDocument();
-    expect(screen.getByTestId('docs-agent-provider')).toHaveTextContent('docs-1');
+    expect(screen.getByTestId('docs-agent-provider')).toHaveTextContent('file-1');
     expect(screen.getByText('Spec.md')).toBeInTheDocument();
-    expect(screen.getByTestId('file-content')).toHaveTextContent('docs-1');
+    expect(screen.getByTestId('file-content')).toHaveTextContent('file-1');
   });
 
   it('recreates the docs-agent context when switching files in preview mode', () => {
@@ -150,11 +175,14 @@ describe('FileEditor', () => {
     const { rerender } = render(<FileEditor onBack={firstOnBack} />);
 
     mockContentManagerState = {
-      currentViewItemId: 'docs-2',
+      currentViewItemId: 'file-2',
+      setCurrentViewItemId: vi.fn(),
+      setMode: vi.fn(),
     };
     mockFileStoreState = {
       files: {
-        'docs-2': {
+        'file-2': {
+          fileType: 'text/plain',
           name: 'Roadmap.md',
           url: '/roadmap.md',
         },
@@ -163,8 +191,30 @@ describe('FileEditor', () => {
 
     rerender(<FileEditor onBack={secondOnBack} />);
 
-    expect(screen.getByTestId('docs-agent-provider')).toHaveTextContent('docs-2');
+    expect(screen.getByTestId('docs-agent-provider')).toHaveTextContent('file-2');
     expect(screen.getByText('Roadmap.md')).toBeInTheDocument();
-    expect(screen.getByTestId('file-content')).toHaveTextContent('docs-2');
+    expect(screen.getByTestId('file-content')).toHaveTextContent('file-2');
+  });
+
+  it('switches to doc mode with a docs id when editing markdown as a document', async () => {
+    mockEnsureFileDocument.mockResolvedValue({ id: 'docs-converted-1' });
+
+    render(<FileEditor />);
+
+    fireEvent.click(screen.getByTitle('preview.editAsDocument'));
+
+    await waitFor(() => {
+      expect(mockEnsureFileDocument).toHaveBeenCalledWith('file-1');
+    });
+
+    expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs-converted-1');
+    expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
+    expect(mockSetSearchParams).toHaveBeenCalledWith(expect.any(Function), { replace: true });
+
+    const updateQuery = mockSetSearchParams.mock.calls[0][0] as (
+      prev: URLSearchParams,
+    ) => URLSearchParams;
+
+    expect(updateQuery(new URLSearchParams()).get('file')).toBe('docs-converted-1');
   });
 });

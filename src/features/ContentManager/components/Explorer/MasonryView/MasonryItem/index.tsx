@@ -7,7 +7,7 @@ import { shallow } from 'zustand/shallow';
 
 import InlineRename from '@/components/InlineRename';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
-import { isMarkdownContentFile } from '@/features/ContentManager/utils/isMarkdownContentFile';
+import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
   useDragActive,
@@ -42,17 +42,8 @@ const MARKDOWN_PREVIEW_MAX_LENGTH = 4000;
 // Helper to check if it's a custom page that should be rendered
 // PDF and Office files should not be treated as pages even if they have fileType='custom/document'
 const isCustomPage = (fileType?: string, name?: string) => {
-  const lowerName = name?.toLowerCase();
-  const isPDF = fileType?.toLowerCase() === 'pdf' || lowerName?.endsWith('.pdf');
-  const isOfficeFile =
-    lowerName?.endsWith('.xls') ||
-    lowerName?.endsWith('.xlsx') ||
-    lowerName?.endsWith('.doc') ||
-    lowerName?.endsWith('.docx') ||
-    lowerName?.endsWith('.ppt') ||
-    lowerName?.endsWith('.pptx') ||
-    lowerName?.endsWith('.odt');
-  return !isPDF && !isOfficeFile && fileType === CUSTOM_NOTE_TYPE;
+  const result = resolveResourceKind({ fileType, name });
+  return result.isPage && fileType === CUSTOM_NOTE_TYPE;
 };
 
 // Helper function to extract text from editor's JSON format for preview
@@ -228,19 +219,13 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
 
     // Memoize computed values that don't change
     const computedValues = useMemo(() => {
-      const isFolder = fileType === 'custom/folder';
-      const isPage = isCustomPage(fileType, name);
-      // Extract file extension for files (not folders or pages)
-      const lastDotIndex = name?.lastIndexOf('.') ?? -1;
-      const isFile = !isFolder && !isPage;
-      const hasExtension = isFile && lastDotIndex > 0;
+      const resourceKind = resolveResourceKind({
+        fileType,
+        name,
+      });
       return {
-        baseName: hasExtension ? (name?.slice(0, lastDotIndex) ?? '') : (name ?? ''),
-        extension: hasExtension ? (name?.slice(lastDotIndex) ?? '') : '',
-        isFolder,
-        isImage: fileType && IMAGE_TYPES.has(fileType),
-        isMarkdown: isMarkdownContentFile(name, fileType),
-        isPage,
+        ...resourceKind,
+        isImage: fileType ? IMAGE_TYPES.has(fileType) : false,
       };
     }, [fileType, name]);
 
@@ -254,7 +239,6 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
       isPage,
       sourceSetId,
       onOpen,
-      preferPageEditor: isMarkdown,
       slug,
     });
 

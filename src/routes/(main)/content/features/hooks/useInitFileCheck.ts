@@ -3,8 +3,6 @@
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { isMarkdownContentFile } from '@/features/ContentManager/utils/isMarkdownContentFile';
-import { documentService } from '@/services/document';
 import { documentSelectors, useFileStore } from '@/store/file';
 
 import { useContentManagerStore } from '../store';
@@ -15,7 +13,7 @@ import { useContentManagerStore } from '../store';
  * /content?file=xxxxxx
  */
 export const useInitFileCheck = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [setMode, setCurrentViewItemId] = useContentManagerStore((s) => [
     s.setMode,
     s.setCurrentViewItemId,
@@ -66,30 +64,7 @@ export const useInitFileCheck = () => {
         return;
       }
 
-      if (fileData && isMarkdownContentFile(fileData.name, fileData.fileType)) {
-        try {
-          const ensuredDocument = await documentService.ensureFileDocument(
-            fileData.fileId || fileId,
-          );
-
-          if (cancelled) return;
-
-          setCurrentViewItemId(ensuredDocument.id);
-          setMode('doc');
-          setSearchParams(
-            (prev) => {
-              const next = new URLSearchParams(prev);
-              next.set('file', ensuredDocument.id);
-              return next;
-            },
-            { replace: true },
-          );
-          return;
-        } catch (error) {
-          console.error('[ContentManager] Failed to restore markdown doc mode:', error);
-        }
-      }
-
+      // All other files (including markdown) go to editor mode
       if (!cancelled) {
         setMode('editor');
       }
@@ -100,5 +75,5 @@ export const useInitFileCheck = () => {
     return () => {
       cancelled = true;
     };
-  }, [documentData, fileData, fileId, setCurrentViewItemId, setMode, setSearchParams]);
+  }, [documentData, fileData, fileId, setCurrentViewItemId, setMode]);
 };

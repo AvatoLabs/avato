@@ -25,6 +25,7 @@ const mapToContentItem = (item: FileListItem & { sourceSetId?: string | null }):
     embeddingError: item.embeddingError,
     embeddingStatus: item.embeddingStatus,
     embeddingTaskId: item.embeddingStatus ? 'placeholder' : null,
+    fileId: item.fileId ?? null,
     fileType: item.fileType,
     finishEmbedding: item.finishEmbedding,
     id: item.id,

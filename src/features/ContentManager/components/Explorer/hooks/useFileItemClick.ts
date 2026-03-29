@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { message } from '@/components/AntdStaticMethods';
 import { buildContentFolderPath, buildSourceSetFolderPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
@@ -13,7 +11,6 @@ export interface UseFileItemClickOptions {
   isFolder: boolean;
   isPage: boolean;
   onOpen?: (id: string) => void;
-  preferPageEditor?: boolean;
   slug?: string | null;
   sourceSetId?: string | null;
 }
@@ -29,10 +26,7 @@ export const useFileItemClick = ({
   isFolder,
   isPage,
   onOpen,
-  preferPageEditor,
 }: UseFileItemClickOptions) => {
-  const { t } = useTranslation('common');
-  const { t: tFile } = useTranslation('file');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [setMode, setCurrentViewItemId, spaceId] = useContentManagerStore((s) => [
@@ -58,46 +52,40 @@ export const useFileItemClick = ({
           : buildContentFolderPath(spaceId, folderSlug);
         navigate(queryString ? `${basePath}?${queryString}` : basePath);
       }
-    } else if (isPage || preferPageEditor) {
-      let targetId = id;
+      return;
+    }
 
-      if (preferPageEditor && !id.startsWith('docs_')) {
-        const messageKey = `resource-open-page-${fileId || id}`;
-        message.loading({ content: t('loading', { ns: 'common' }), duration: 0, key: messageKey });
+    let previewTargetId = fileId || id;
 
-        try {
-          const ensuredDocument = await documentService.ensureFileDocument(fileId || id);
-          targetId = ensuredDocument.id;
-          message.destroy(messageKey);
-        } catch (error) {
-          console.error('[ContentManager] Failed to open markdown file as doc:', error);
-          message.error({
-            content:
-              error instanceof Error
-                ? error.message
-                : tFile('docEditor.loadError', { defaultValue: 'Failed to load document' }),
-            key: messageKey,
-          });
-          return;
+    if (!fileId && id.startsWith('docs_')) {
+      try {
+        const document = await documentService.getDocumentById(id);
+        if (document?.sourceType === 'file' && document.fileId) {
+          previewTargetId = document.fileId;
         }
+      } catch {
+        // Fall back to the original id when the derived document lookup fails.
       }
+    }
 
-      // Switch to doc mode
-      setCurrentViewItemId(targetId);
-      setMode('doc');
-      // Update URL query parameter for shareable links
+    const isFileBackedEntry = previewTargetId !== id;
+
+    if (isFileBackedEntry) {
+      setCurrentViewItemId(previewTargetId);
+      setMode('editor');
       setSearchParams(
         (prev) => {
           const newParams = new URLSearchParams(prev);
-          newParams.set('file', targetId);
+          newParams.set('file', previewTargetId);
           return newParams;
         },
         { replace: true },
       );
-    } else {
-      // Set mode to editor for regular files
+      onOpen?.(previewTargetId);
+    } else if (isPage) {
+      // Switch to doc mode for existing documents
       setCurrentViewItemId(id);
-      setMode('editor');
+      setMode('doc');
       // Update URL query parameter for shareable links
       setSearchParams(
         (prev) => {
@@ -107,8 +95,21 @@ export const useFileItemClick = ({
         },
         { replace: true },
       );
+    } else {
+      // Set mode to editor for regular files
+      setCurrentViewItemId(previewTargetId);
+      setMode('editor');
+      // Update URL query parameter for shareable links
+      setSearchParams(
+        (prev) => {
+          const newParams = new URLSearchParams(prev);
+          newParams.set('file', previewTargetId);
+          return newParams;
+        },
+        { replace: true },
+      );
       // Call onOpen if provided for backwards compatibility
-      onOpen?.(id);
+      onOpen?.(previewTargetId);
     }
   }, [
     fileId,
@@ -118,14 +119,12 @@ export const useFileItemClick = ({
     sourceSetId,
     navigate,
     onOpen,
-    preferPageEditor,
     searchParams,
     setCurrentViewItemId,
     setMode,
     setSearchParams,
     slug,
     spaceId,
-    t,
   ]);
 
   return handleClick;

@@ -7,6 +7,7 @@ import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleto
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { homeRecentSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
+import { isPageEntryFileType } from '@/utils/docsDocument';
 
 import RecentResourceItem from './Item';
 
@@ -26,8 +27,8 @@ const RecentResourceList = memo(() => {
   }
 
   return files.map((file) => {
-    const isPage = file.fileType === 'text/plain';
-    const fileUrl = isPage ? `/content/${file.id}` : `/content?file=${file.id}`;
+    const isPage = file.sourceType === 'document' || isPageEntryFileType(file.fileType);
+    const fileUrl = isPage ? `/content/${file.id}` : `/content?file=${file.fileId || file.id}`;
 
     return (
       <Link

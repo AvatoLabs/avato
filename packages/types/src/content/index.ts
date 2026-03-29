@@ -99,6 +99,7 @@ export interface ContentItem {
   embeddingError?: any | null;
   embeddingStatus?: string | null;
   embeddingTaskId?: string | null;
+  fileId?: string | null;
   fileType: string;
   finishEmbedding?: boolean;
   id: string;

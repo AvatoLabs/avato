@@ -19,8 +19,7 @@ import { shallow } from 'zustand/shallow';
 import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
-import { PAGE_FILE_TYPE } from '@/features/ContentManager/constants';
-import { isMarkdownContentFile } from '@/features/ContentManager/utils/isMarkdownContentFile';
+import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
   useDragActive,
@@ -196,34 +195,14 @@ const FileListItem = memo<FileListItemProps>(
     const [isOver, setIsOver] = useState(false);
 
     const computedValues = useMemo(() => {
-      const lowerFileType = fileType?.toLowerCase();
-      const lowerName = name?.toLowerCase();
-      const isPDF = lowerFileType === 'pdf' || lowerName?.endsWith('.pdf');
-      // Office files should use the MSDoc viewer, not the page editor
-      const isOfficeFile =
-        lowerName?.endsWith('.xls') ||
-        lowerName?.endsWith('.xlsx') ||
-        lowerName?.endsWith('.doc') ||
-        lowerName?.endsWith('.docx') ||
-        lowerName?.endsWith('.ppt') ||
-        lowerName?.endsWith('.pptx') ||
-        lowerName?.endsWith('.odt');
-      const isFolder = fileType === 'custom/folder';
-      const isPage =
-        !isPDF && !isOfficeFile && (sourceType === 'document' || fileType === PAGE_FILE_TYPE);
-      // Extract file extension for non-folder, non-page items
-      const lastDotIndex = name?.lastIndexOf('.') ?? -1;
-      const hasExtension = !isFolder && !isPage && lastDotIndex > 0;
-      const baseName = hasExtension ? (name?.slice(0, lastDotIndex) ?? '') : (name ?? '');
-      const extension = hasExtension ? (name?.slice(lastDotIndex) ?? '') : '';
+      const resourceKind = resolveResourceKind({
+        fileType,
+        metadata,
+        name,
+        sourceType,
+      });
       return {
-        baseName,
-        emoji: sourceType === 'document' || fileType === PAGE_FILE_TYPE ? metadata?.emoji : null,
-        extension,
-        isFolder,
-        isMarkdown: isMarkdownContentFile(name, fileType),
-        // PDF and Office files should not be treated as pages, even if they have sourceType='document'
-        isPage,
+        ...resourceKind,
         isSupportedForChunking: !isChunkingUnsupported(fileType),
       };
     }, [fileType, sourceType, metadata?.emoji, name]);
@@ -372,7 +351,6 @@ const FileListItem = memo<FileListItemProps>(
       isFolder,
       isPage,
       sourceSetId: contentManagerState.sourceSetId,
-      preferPageEditor: isMarkdown,
       slug,
     });
 

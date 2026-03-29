@@ -1,5 +1,6 @@
 export interface TreeItem {
   children?: TreeItem[];
+  fileId?: string | null;
   fileType: string;
   id: string;
   isFolder: boolean;

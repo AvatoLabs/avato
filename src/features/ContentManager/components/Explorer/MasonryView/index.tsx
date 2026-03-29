@@ -86,6 +86,7 @@ const MasonryView = memo(function MasonryView() {
       editorData: item.editorData,
       embeddingError: item.embeddingError ?? null,
       embeddingStatus: (item.embeddingStatus as any) ?? null,
+      fileId: item.fileId ?? null,
       fileType: item.fileType,
       finishEmbedding: item.finishEmbedding ?? false,
       id: item.id,

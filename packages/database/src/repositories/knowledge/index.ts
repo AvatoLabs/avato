@@ -184,6 +184,7 @@ export class KnowledgeRepo {
     const fileQuery = sql`
       SELECT
         COALESCE(d.id, f.id) as id,
+        f.id as file_id,
         f.name,
         f.file_type,
         f.size,
@@ -211,6 +212,7 @@ export class KnowledgeRepo {
     const documentQuery = sql`
       SELECT
         id,
+        NULL::text as file_id,
         COALESCE(title, filename, 'Untitled') as name,
         file_type,
         total_char_count as size,
@@ -270,6 +272,7 @@ export class KnowledgeRepo {
         createdAt: new Date(row.created_at),
         editorData,
         embeddingTaskId: row.embedding_task_id,
+        fileId: row.file_id ?? null,
         fileType: row.file_type,
         id: row.id,
         metadata,

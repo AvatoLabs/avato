@@ -3,6 +3,10 @@
 import { type CSSProperties } from 'react';
 import { memo } from 'react';
 
+import {
+  MARKDOWN_EXTENSIONS,
+  MARKDOWN_MIME_TYPES,
+} from '@/features/ContentManager/utils/isMarkdownContentFile';
 import { type FileListItem } from '@/types/files';
 
 import NotSupport from './NotSupport';
@@ -27,17 +31,7 @@ const IMAGE_MIME_TYPES = new Set([
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg'];
 const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'mp4', 'webm', 'ogg']);
 
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown', '.mdx', '.mdown', '.mkd'];
-const MARKDOWN_MIME_TYPES = new Set([
-  'md',
-  'markdown',
-  'mdx',
-  'mdown',
-  'mkd',
-  'text/markdown',
-  'text/x-markdown',
-  'application/markdown',
-]);
+// MARKDOWN_EXTENSIONS and MARKDOWN_MIME_TYPES imported from @/features/ContentManager/utils/isMarkdownContentFile
 
 const CODE_EXTENSIONS = [
   // JavaScript/TypeScript

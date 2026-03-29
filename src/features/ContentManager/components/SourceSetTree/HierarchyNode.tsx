@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 
 import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { PAGE_FILE_TYPE } from '@/features/ContentManager/constants';
+import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import { buildSourceSetFolderPath } from '@/features/ResourceSpaces';
 import {
   getTransparentDragImage,
@@ -73,31 +73,19 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
 
     // Memoize computed values that don't change frequently
     const { itemKey, isPage, emoji, baseName, extension } = useMemo(() => {
-      const lowerFileType = item.fileType?.toLowerCase();
-      const lowerName = item.name?.toLowerCase();
-      const isPDF = lowerFileType === 'pdf' || lowerName?.endsWith('.pdf');
-      const isOfficeFile =
-        lowerName?.endsWith('.xls') ||
-        lowerName?.endsWith('.xlsx') ||
-        lowerName?.endsWith('.doc') ||
-        lowerName?.endsWith('.docx') ||
-        lowerName?.endsWith('.ppt') ||
-        lowerName?.endsWith('.pptx') ||
-        lowerName?.endsWith('.odt');
-      const pageMatch =
-        !isPDF &&
-        !isOfficeFile &&
-        (item.sourceType === 'document' || item.fileType === PAGE_FILE_TYPE);
-      // Extract file extension for files (not folders or pages)
-      const lastDotIndex = item.name?.lastIndexOf('.') ?? -1;
-      const isFile = !item.isFolder && !pageMatch;
-      const hasExtension = isFile && lastDotIndex > 0;
+      const resourceKind = resolveResourceKind({
+        fileType: item.fileType,
+        isFolder: item.isFolder,
+        metadata: item.metadata,
+        name: item.name,
+        sourceType: item.sourceType,
+      });
 
       return {
-        baseName: hasExtension ? (item.name?.slice(0, lastDotIndex) ?? '') : (item.name ?? ''),
-        emoji: pageMatch ? item.metadata?.emoji : null,
-        extension: hasExtension ? (item.name?.slice(lastDotIndex) ?? '') : '',
-        isPage: pageMatch,
+        baseName: resourceKind.baseName,
+        emoji: resourceKind.emoji,
+        extension: resourceKind.extension,
+        isPage: resourceKind.isPage,
         // Tree state must always key folders by document id. Slugs are routing aliases only.
         itemKey: item.id,
       };
@@ -247,6 +235,7 @@ export const HierarchyNode = memo<HierarchyNodeProps>(
     }, []);
 
     const handleItemClick = useFileItemClick({
+      fileId: item.fileId,
       id: item.id,
       isFolder: item.isFolder,
       isPage,

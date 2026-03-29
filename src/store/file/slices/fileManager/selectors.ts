@@ -18,6 +18,7 @@ const getFileById = (id?: string | null) => (s: FilesStoreState) => {
       createdAt: fromResourceMap.createdAt,
       embeddingError: fromResourceMap.embeddingError ?? null,
       embeddingStatus: fromResourceMap.embeddingStatus ?? null,
+      fileId: fromResourceMap.fileId ?? null,
       fileType: fromResourceMap.fileType,
       finishEmbedding: fromResourceMap.finishEmbedding ?? false,
       id: fromResourceMap.id,

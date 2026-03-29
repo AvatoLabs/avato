@@ -610,17 +610,17 @@ export const fileRouter = router({
       );
       const visibleFileIds = new Set(
         await ctx.contentAuthorizer.filterVisibleFileIdsForList(
-          fileCandidates.map((item) => item.id),
+          fileCandidates.map((item) => item.fileId || item.id),
         ),
       );
       const fileItems = fileCandidates
-        .filter((item) => visibleFileIds.has(item.id))
+        .filter((item) => visibleFileIds.has(item.fileId || item.id))
         .slice(0, limit);
 
       if (fileItems.length === 0) return [];
 
       // Get file IDs for batch processing
-      const fileIds = fileItems.map((item) => item.id);
+      const fileIds = fileItems.map((item) => item.fileId || item.id);
       const chunksArray = await ctx.chunkModel.countByFileIds(fileIds);
       const chunks: Record<string, number> = {};
       for (const item of chunksArray) {
@@ -644,6 +644,7 @@ export const fileRouter = router({
       // Build result with task status
       const resultFiles: FileListItem[] = [];
       for (const item of fileItems) {
+        const actualFileId = item.fileId || item.id;
         const chunkTask = item.chunkTaskId
           ? chunkTasks.find((task) => task.id === item.chunkTaskId)
           : null;
@@ -653,15 +654,17 @@ export const fileRouter = router({
 
         resultFiles.push({
           ...item,
-          chunkCount: chunks[item.id] ?? 0,
+          chunkCount: chunks[actualFileId] ?? 0,
           chunkingError: chunkTask?.error ?? null,
           chunkingStatus: chunkTask?.status as AsyncTaskStatus,
           embeddingError: embeddingTask?.error ?? null,
           embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+          fileId: actualFileId,
           fileType: normalizeFileType(item.fileType, item.name),
           finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
+          id: actualFileId,
           sourceType: 'file' as const,
-          url: getFileProxyUrl(item.id),
+          url: getFileProxyUrl(actualFileId),
         } as FileListItem);
       }
 

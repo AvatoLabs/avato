@@ -104,6 +104,7 @@ const SourceSetTree = memo(() => {
     if (!rootData) return [];
 
     const mappedItems: TreeItem[] = rootData.map((item) => ({
+      fileId: item.fileId ?? null,
       fileType: item.fileType,
       id: item.id,
       isFolder: item.fileType === 'custom/folder',

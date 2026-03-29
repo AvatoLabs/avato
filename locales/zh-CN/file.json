@@ -197,6 +197,7 @@
   "portal.openInDocEditor": "在文档中打开",
   "preview.diagramOpenLarge": "放大查看图表",
   "preview.downloadFile": "下载文件",
+  "preview.editAsDocument": "作为文档编辑",
   "preview.markdownLoadError": "Markdown 预览加载失败",
   "preview.unsupportedFileAndContact": "此文件格式暂不支持在线预览，如有预览诉求，欢迎<1>反馈给我们</1>",
   "publicShare.download": "下载",
