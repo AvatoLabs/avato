@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 
 import {
   getBrowser,
+  getParser,
   getPlatform,
   isArc,
   isInStandaloneMode,
@@ -11,6 +12,8 @@ import {
 export const usePlatform = () => {
   const platform = useRef(getPlatform());
   const browser = useRef(getBrowser());
+
+  const deviceType = useRef(getParser().getDevice().type);
 
   const platformInfo = {
     isAndroid: platform.current?.toLowerCase() === 'android',
@@ -24,6 +27,7 @@ export const usePlatform = () => {
     isFirefox: browser.current?.toLowerCase() === 'firefox',
     isIOS: platform.current?.toLowerCase() === 'ios',
     isMacOS: platform.current?.toLowerCase() === 'mac os',
+    isMobile: deviceType.current === 'mobile' || deviceType.current === 'tablet',
     isPWA: isInStandaloneMode(),
     isSafari: browser.current?.toLowerCase() === 'safari',
     isSonomaOrLaterSafari: isSonomaOrLaterSafari(),
