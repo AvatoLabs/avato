@@ -25,6 +25,19 @@ export function defineConfig(config: CustomNextConfig) {
 
   const standaloneConfig: NextConfig = {
     output: 'standalone',
+    outputFileTracingExcludes: buildWithDocker
+      ? {
+          '*': [
+            // Sharp is injected via the Docker sharp-runtime stage.
+            // Excluding traced variants avoids shipping every platform binary twice.
+            'node_modules/sharp/**/*',
+            'node_modules/@img/**/*',
+            'node_modules/.pnpm/sharp@*/**/*',
+            'node_modules/.pnpm/@img+sharp-*/**/*',
+            'node_modules/.pnpm/@img+sharp-libvips-*/**/*',
+          ],
+        }
+      : undefined,
 
     outputFileTracingIncludes: {
       '*': [
@@ -42,14 +55,14 @@ export function defineConfig(config: CustomNextConfig) {
 
               'packages/database/migrations/**',
 
-              // Ensure native bindings are included in standalone output.
+              // Ensure the Node canvas loader and the linux-x64-gnu binary are available in
+              // standalone output without tracing every optional platform package.
               // `@napi-rs/canvas` is loaded via dynamic `require()` (see packages/file-loaders),
               // which may not be picked up by Next.js output tracing.
               'node_modules/@napi-rs/canvas/**/*',
-              'node_modules/@napi-rs/canvas-*/**/*',
-              // pnpm real package locations (including platform-specific bindings with `.node`)
-              'node_modules/.pnpm/@napi-rs+canvas*/**/*',
-              'node_modules/.pnpm/@napi-rs+canvas-*/**/*',
+              'node_modules/@napi-rs/canvas-linux-x64-gnu/**/*',
+              'node_modules/.pnpm/@napi-rs+canvas@*/node_modules/@napi-rs/canvas/**/*',
+              'node_modules/.pnpm/@napi-rs+canvas-linux-x64-gnu@*/**/*',
             ]
           : []),
       ],

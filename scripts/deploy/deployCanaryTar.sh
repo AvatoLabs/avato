@@ -128,6 +128,51 @@ cleanup_on_exit() {
   cleanup_tmp_build_dir
 }
 
+prune_runtime_native_modules() {
+  local app_dir="$1"
+  local node_modules_dir="${app_dir}/node_modules"
+  local pnpm_dir="${node_modules_dir}/.pnpm"
+
+  [ -d "${node_modules_dir}" ] || return 0
+
+  # Sharp is injected later from sharp-runtime. Remove traced copies so we do not
+  # ship every platform variant from the builder and then copy linux-x64 on top.
+  rm -rf "${node_modules_dir}/sharp" "${node_modules_dir}/@img"
+  if [ -d "${pnpm_dir}" ]; then
+    rm -rf \
+      "${pnpm_dir}"/sharp@* \
+      "${pnpm_dir}"/@img+sharp-*@* \
+      "${pnpm_dir}"/@img+sharp-libvips-*@*
+  fi
+
+  # Keep only the generic canvas loader and the linux-x64-gnu native binding.
+  if [ -d "${node_modules_dir}/@napi-rs" ]; then
+    find "${node_modules_dir}/@napi-rs" -mindepth 1 -maxdepth 1 \
+      ! -name 'canvas' \
+      ! -name 'canvas-linux-x64-gnu' \
+      -exec rm -rf {} +
+  fi
+
+  if [ -d "${pnpm_dir}" ]; then
+    find "${pnpm_dir}" -mindepth 1 -maxdepth 1 -type d \
+      \( -name '@napi-rs+canvas-android-*' \
+      -o -name '@napi-rs+canvas-darwin-*' \
+      -o -name '@napi-rs+canvas-linux-arm-*' \
+      -o -name '@napi-rs+canvas-linux-arm64-*' \
+      -o -name '@napi-rs+canvas-linux-riscv64-*' \
+      -o -name '@napi-rs+canvas-linux-x64-musl*' \
+      -o -name '@napi-rs+canvas-win32-*' \) \
+      -exec rm -rf {} +
+
+    find "${pnpm_dir}" -type d -path '*/node_modules/@napi-rs' | while read -r native_dir; do
+      find "${native_dir}" -mindepth 1 -maxdepth 1 \
+        ! -name 'canvas' \
+        ! -name 'canvas-linux-x64-gnu' \
+        -exec rm -rf {} +
+    done
+  fi
+}
+
 get_env_value() {
   local env_file="$1"
   local env_key="$2"
@@ -224,6 +269,7 @@ if [ -d "${TMP_BUILD_DIR}/app/.next/node_modules" ]; then
     if [ -e "$target" ]; then rm -f "$link" && cp -a "$target" "$link"; fi
   done || true
 fi
+prune_runtime_native_modules "${TMP_BUILD_DIR}/app"
 mkdir -p "${TMP_BUILD_DIR}/app/.next"
 rsync -a .next/static/ "${TMP_BUILD_DIR}/app/.next/static/"
 # Next 16 Turbopack standalone can miss runtime chunk files that server routes still require
