@@ -1,0 +1,218 @@
+.container {
+  --brand-text-color: var(--colorText, #1f1f1f);
+  --brand-muted-color: var(--colorTextSecondary, #8c8c8c);
+  --brand-border-color: var(--colorBorder, #d9d9d9);
+  --brand-tag-bg: var(--colorFillTertiary, rgb(0 0 0 / 4%));
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+
+[data-theme='dark'] .container {
+  --brand-text-color: var(--colorText, #f0f0f0);
+  --brand-muted-color: var(--colorTextSecondary, #a6a6a6);
+  --brand-border-color: var(--colorBorder, #424242);
+  --brand-tag-bg: var(--colorFillTertiary, rgb(255 255 255 / 8%));
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+
+  color: var(--brand-text-color);
+  text-align: center;
+}
+
+.defaultBrand {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+
+  color: var(--brand-text-color);
+  text-align: center;
+}
+
+.defaultLogoWrapper {
+  position: relative;
+}
+
+.defaultLogoImg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  object-fit: cover;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.defaultSpinner {
+  position: absolute;
+  z-index: 1;
+  inset: -12px;
+  border: 2px dashed currentColor;
+  border-radius: 24px;
+  opacity: 0.25;
+  animation: spin 6s linear infinite;
+}
+
+.defaultText {
+  position: relative;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.defaultText::after {
+  position: absolute;
+  content: '';
+  animation: dots 1.5s infinite;
+}
+
+.brandLogoWrapper {
+  width: 104px;
+  height: 104px;
+  border-radius: 28px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: visible;
+}
+
+.brandLogoImg {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  box-shadow: 0 22px 48px rgb(0 0 0 / 18%);
+  object-fit: cover;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.brandName {
+  margin-top: 2px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.slogan {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25em 0.4em;
+  max-width: min(560px, calc(100vw - 64px));
+  color: var(--brand-muted-color);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.sloganWord {
+  display: inline-block;
+}
+
+.startButton {
+  margin-top: 14px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 11px 20px;
+  min-width: 172px;
+  color: #fff;
+  background: linear-gradient(135deg, #6a5af9, #9a5aff 49%, #6cb8ff);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 22px rgb(89 98 255 / 35%);
+}
+
+.startButton:active {
+  transform: translateY(1px);
+}
+
+.startButton:hover {
+  filter: brightness(1.05);
+}
+
+.debug {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+
+  padding: 16px;
+}
+
+.debugRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  font-size: 12px;
+  color: var(--brand-muted-color);
+}
+
+.debugRow code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+}
+
+.debugTag {
+  display: inline-flex;
+  align-items: center;
+
+  padding-block: 2px;
+  padding-inline: 8px;
+  border-radius: 6px;
+
+  background: var(--brand-tag-bg);
+}
+
+.debugTag code {
+  color: var(--brand-text-color);
+}
+
+.debugHint {
+  font-size: 12px;
+  color: var(--brand-muted-color);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dots {
+  0%,
+  20% {
+    content: '.';
+  }
+
+  40% {
+    content: '..';
+  }
+
+  60%,
+  100% {
+    content: '...';
+  }
+}
