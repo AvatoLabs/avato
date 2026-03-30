@@ -2,7 +2,7 @@
 
 import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
-import { Hash, LucideCheck } from 'lucide-react';
+import { Filter, Hash, LucideCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -32,6 +32,17 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     }));
 
     return [
+      {
+        icon: showOnlyPagesWithoutSourceSet ? <Icon icon={LucideCheck} /> : <Icon icon={Filter} />,
+        key: 'only-unassigned',
+        label: t('pageList.filter.onlyUnassigned', { ns: 'file' }),
+        onClick: () => {
+          setShowOnlyPagesWithoutSourceSet(!showOnlyPagesWithoutSourceSet);
+        },
+      },
+      {
+        type: 'divider',
+      },
       {
         children: pageSizeItems,
         icon: <Icon icon={Hash} />,

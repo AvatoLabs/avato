@@ -6,7 +6,9 @@ import { memo, Suspense, useMemo } from 'react';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
 import { usePageKind } from '@/features/Pages/usePageKind';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
+import { useSourceSetStore } from '@/store/sourceSet';
 
 import AllPagesDrawer from './AllPagesDrawer';
 import List from './List';
@@ -22,7 +24,9 @@ const Body = memo(() => {
   );
 
   const useFetchDocuments = usePageStore((s) => s.useFetchDocuments);
+  const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   useFetchDocuments();
+  useFetchSourceSetList(getActiveWorkspaceSpaceId());
 
   const isLoading = usePageStore(pageSelectors.isDocumentsLoading);
   const { displayed: filteredDocuments } = usePageStore(filteredDocumentsSelector);

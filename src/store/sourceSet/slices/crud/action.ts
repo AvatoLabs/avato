@@ -94,9 +94,20 @@ export class SourceSetCrudActionImpl {
       () => sourceSetService.getSourceSets(spaceId),
       {
         fallbackData: [],
-        onSuccess: () => {
-          if (!this.#get().initSourceSetList)
-            this.#set({ initSourceSetList: true }, false, 'useFetchSourceSetList/init');
+        onSuccess: (items) => {
+          const sourceSetMap = Object.fromEntries(items.map((item) => [item.id, item]));
+
+          this.#set(
+            {
+              activeSourceSetItems: {
+                ...this.#get().activeSourceSetItems,
+                ...sourceSetMap,
+              },
+              ...(this.#get().initSourceSetList ? {} : { initSourceSetList: true }),
+            },
+            false,
+            'useFetchSourceSetList/onSuccess',
+          );
         },
         suspense: params.suspense,
       },

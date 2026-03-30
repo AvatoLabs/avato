@@ -1,4 +1,4 @@
-import { Avatar, Icon, Text } from '@lobehub/ui';
+import { Avatar, Icon, Tag, Text } from '@lobehub/ui';
 import dayjs from 'dayjs';
 import { type MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -10,6 +10,7 @@ import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plug
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { getPageDetailPath, getPageKindFromDocument, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import Actions from './Actions';
@@ -35,6 +36,9 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const active = selectedPageId === pageId;
   const pageKind = getPageKindFromDocument(document);
   const href = getPageDetailPath(pageId, pageKind);
+  const sourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(document?.sourceSetId || ''),
+  );
   const title =
     document?.title ||
     t(pageKind === TABLE_PAGE_KIND ? 'pageList.tableUntitled' : 'pageList.untitled');
@@ -96,6 +100,21 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   }, [emoji]);
 
   const dropdownMenu = useDropdownMenu({ pageId, toggleEditing });
+  const ownershipTag = useMemo(() => {
+    const ownershipLabel = document?.sourceSetId
+      ? sourceSetName || t('pageList.sourceSet.assigned')
+      : t('pageList.sourceSet.unassigned');
+
+    return (
+      <Tag
+        size={'small'}
+        style={{ flexShrink: 0, margin: 0 }}
+        variant={document?.sourceSetId ? 'filled' : 'outlined'}
+      >
+        {ownershipLabel}
+      </Tag>
+    );
+  }, [document?.sourceSetId, sourceSetName, t]);
 
   return (
     <>
@@ -108,6 +127,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
         href={href}
         icon={icon}
         key={pageId}
+        slots={{ titlePrefix: ownershipTag }}
         title={title}
         extra={
           updatedLabel ? (

@@ -29,6 +29,10 @@ const Header = memo(() => {
     s.searchKeywords,
     s.setSearchKeywords,
   ]);
+  const [showOnlyPagesWithoutSourceSet, setShowOnlyPagesWithoutSourceSet] = usePageStore((s) => [
+    s.showOnlyPagesWithoutSourceSet,
+    s.setShowOnlyPagesWithoutSourceSet,
+  ]);
 
   return (
     <>
@@ -41,6 +45,18 @@ const Header = memo(() => {
         {spaceName && (
           <Flexbox horizontal paddingInline={4}>
             <Tag size={'small'}>{spaceName}</Tag>
+          </Flexbox>
+        )}
+        {showOnlyPagesWithoutSourceSet && (
+          <Flexbox horizontal paddingInline={4}>
+            <Tag
+              size={'small'}
+              style={{ cursor: 'pointer' }}
+              variant={'filled'}
+              onClick={() => setShowOnlyPagesWithoutSourceSet(false)}
+            >
+              {t('pageList.filter.onlyUnassigned', { ns: 'file' })}
+            </Tag>
           </Flexbox>
         )}
         <Nav />

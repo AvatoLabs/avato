@@ -136,18 +136,18 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
     const handleCreateDocument = async (content: string, title: string) => {
       if (isTablePage) {
-        await createNewTable(title);
+        await createNewTable(title, { sourceSetId });
         return;
       }
 
       if (!content) {
         // For empty pages, use createNewPage which handles optimistic updates
-        await createNewPage(title);
+        await createNewPage(title, { sourceSetId });
         return;
       }
 
       // For markdown uploads with content, use optimistic pattern similar to createNewPage
-      const tempPageId = createOptimisticPage(title);
+      const tempPageId = createOptimisticPage(title, pageKind, sourceSetId);
       // Set selected page to temp ID immediately (with URL update disabled for temp IDs)
       setSelectedPageId(tempPageId, false);
 
@@ -170,9 +170,12 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
           fileType: 'custom/document' as const,
           filename: newDoc.title || title,
           id: newDoc.id,
+          parentId: newDoc.parentId ?? null,
+          sourceSetId: newDoc.sourceSetId ?? sourceSetId ?? null,
           metadata: newDoc.metadata || {},
           source: 'document' as const,
           sourceType: DocumentSourceType.EDITOR,
+          spaceId: newDoc.spaceId ?? null,
           title: newDoc.title || title,
           totalCharCount: newDoc.content?.length || 0,
           totalLineCount: 0,
@@ -208,7 +211,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
           const fileName = file.name.replace(/\.(pdf|docx)$/i, '');
 
           // Create optimistic document but don't select it yet
-          const tempPageId = createOptimisticPage(fileName);
+          const tempPageId = createOptimisticPage(fileName, pageKind, sourceSetId);
 
           try {
             // Upload file to server
@@ -238,9 +241,12 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
               fileType: parsedDocument.fileType || 'custom/document',
               filename: parsedDocument.filename || fileName,
               id: parsedDocument.id,
+              parentId: parsedDocument.parentId ?? null,
+              sourceSetId: parsedDocument.sourceSetId ?? sourceSetId ?? null,
               metadata: parsedDocument.metadata || {},
               source: parsedDocument.source || 'document',
               sourceType: parsedDocument.sourceType || 'file',
+              spaceId: parsedDocument.spaceId ?? null,
               title: parsedDocument.title || fileName,
               totalCharCount: parsedDocument.totalCharCount || 0,
               totalLineCount: parsedDocument.totalLineCount || 0,

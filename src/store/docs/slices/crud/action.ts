@@ -36,6 +36,10 @@ export interface PageUpdateParams {
   title?: string;
 }
 
+interface CreatePageOptions {
+  sourceSetId?: string;
+}
+
 type Setter = StoreSetter<PageStore>;
 export const createCrudSlice = (set: Setter, get: () => PageStore, _api?: unknown) =>
   new CrudActionImpl(set, get, _api);
@@ -50,11 +54,16 @@ export class CrudActionImpl {
     this.#get = get;
   }
 
-  #createNewDocument = async (title: string, pageKind: PageKind): Promise<string> => {
+  #createNewDocument = async (
+    title: string,
+    pageKind: PageKind,
+    options: CreatePageOptions = {},
+  ): Promise<string> => {
     const { createOptimisticPage, createPage, replaceTempPageWithReal } = this.#get();
+    const { sourceSetId } = options;
 
     // Create optimistic page immediately
-    const tempPageId = createOptimisticPage(title, pageKind);
+    const tempPageId = createOptimisticPage(title, pageKind, sourceSetId);
     this.#set(
       { isCreatingNew: true, selectedPageId: tempPageId },
       false,
@@ -76,6 +85,7 @@ export class CrudActionImpl {
       const newPage = await createPage({
         content,
         pageKind,
+        sourceSetId,
         table: defaultTable,
         title,
       });
@@ -129,17 +139,18 @@ export class CrudActionImpl {
     }
   };
 
-  createNewPage = async (title: string): Promise<string> => {
-    return this.#createNewDocument(title, DEFAULT_PAGE_KIND);
+  createNewPage = async (title: string, options: CreatePageOptions = {}): Promise<string> => {
+    return this.#createNewDocument(title, DEFAULT_PAGE_KIND, options);
   };
 
-  createNewTable = async (title: string): Promise<string> => {
-    return this.#createNewDocument(title, TABLE_PAGE_KIND);
+  createNewTable = async (title: string, options: CreatePageOptions = {}): Promise<string> => {
+    return this.#createNewDocument(title, TABLE_PAGE_KIND, options);
   };
 
   createOptimisticPage = (
     title: string = 'Untitled',
     pageKind: PageKind = DEFAULT_PAGE_KIND,
+    sourceSetId?: string,
   ): string => {
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-page-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -162,7 +173,7 @@ export class CrudActionImpl {
       fileType: EDITOR_PAGE_FILE_TYPE,
       filename: title,
       id: tempId,
-      sourceSetId: null,
+      sourceSetId: sourceSetId ?? null,
       metadata: {
         ...(pageKind === TABLE_PAGE_KIND
           ? {
