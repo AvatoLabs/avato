@@ -1,4 +1,5 @@
 import { sourceSetService } from '@/services/sourceSet';
+import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { revalidateResources } from '@/store/file/slices/content/hooks';
 import { type SourceSetStore } from '@/store/sourceSet/store';
 import { type StoreSetter } from '@/store/types';
@@ -17,15 +18,15 @@ export class SourceSetContentActionImpl {
   addFilesToSourceSet = async (sourceSetId: string, ids: string[]): Promise<void> => {
     await sourceSetService.addFilesToSourceSet(sourceSetId, ids);
 
-    // Revalidate content list to show updated source-set associations.
-    await revalidateResources();
+    // Keep content and docs sidebars in sync after source-set assignment changes.
+    await Promise.all([revalidateResources(), revalidatePageDocuments()]);
   };
 
   removeFilesFromSourceSet = async (sourceSetId: string, ids: string[]): Promise<void> => {
     await sourceSetService.removeFilesFromSourceSet(sourceSetId, ids);
 
-    // Revalidate content list to show updated source-set associations.
-    await revalidateResources();
+    // Keep content and docs sidebars in sync after source-set assignment changes.
+    await Promise.all([revalidateResources(), revalidatePageDocuments()]);
   };
 }
 

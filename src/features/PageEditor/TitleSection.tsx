@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import EmojiPicker from '@/components/EmojiPicker';
 import { buildContentRootPath, buildSourceSetPath, useSpaceName } from '@/features/ResourceSpaces';
 import { pageSelectors, usePageStore } from '@/store/docs';
+import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
 import { editorSelectors } from '@/store/document/slices/editor';
 import { useFileStore } from '@/store/file';
@@ -26,7 +27,7 @@ import {
   extractDocumentOutline,
   normalizeHeadingText,
 } from './documentInsights';
-import { usePageEditorStore } from './store';
+import { usePageEditorStore, useStoreApi } from './store';
 
 const useStyles = createStyles(({ css, token }) => ({
   chooseEmojiButton: css`
@@ -273,6 +274,7 @@ const TitleSection = memo(() => {
   const { styles, cx } = useStyles();
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const pageEditorStoreApi = useStoreApi();
   const locale = useGlobalStore(globalGeneralSelectors.currentLanguage);
 
   const [documentId, emoji, title, setEmoji, setTitle, handleTitleSubmit] = usePageEditorStore(
@@ -285,6 +287,7 @@ const TitleSection = memo(() => {
   ]);
   const pageDocument = usePageStore(pageSelectors.getDocumentById(documentId));
   const refreshDocuments = usePageStore((s) => s.refreshDocuments);
+  const internalDispatchDocuments = usePageStore((s) => s.internal_dispatchDocuments);
   const moveContentItem = useFileStore((s) => s.moveContentItem);
   const [addFilesToSourceSet, removeFilesFromSourceSet, useFetchSourceSetList] = useSourceSetStore(
     (s) => [s.addFilesToSourceSet, s.removeFilesFromSourceSet, s.useFetchSourceSetList],
@@ -315,9 +318,25 @@ const TitleSection = memo(() => {
   const resolvedSpaceLabel = spaceName || spaceId;
   const resolvedSourceSetLabel = currentSourceSet?.name || sourceSetId;
 
-  const syncSourceAssignments = useCallback(async () => {
-    await refreshDocuments();
-  }, [refreshDocuments]);
+  const syncSourceAssignments = useCallback(
+    async (nextSourceSetId?: string) => {
+      if (documentId && pageDocument) {
+        internalDispatchDocuments({
+          document: {
+            ...pageDocument,
+            sourceSetId: nextSourceSetId ?? null,
+          },
+          id: documentId,
+          type: 'updateDocument',
+        });
+      }
+
+      pageEditorStoreApi.setState({ sourceSetId: nextSourceSetId }, false);
+
+      await Promise.all([refreshDocuments(), revalidatePageDocuments()]);
+    },
+    [documentId, internalDispatchDocuments, pageDocument, pageEditorStoreApi, refreshDocuments],
+  );
 
   const handleAddToSourceSet = useCallback(
     async (targetSourceSetId: string) => {
@@ -325,7 +344,7 @@ const TitleSection = memo(() => {
 
       try {
         await addFilesToSourceSet(targetSourceSetId, [documentId]);
-        await syncSourceAssignments();
+        await syncSourceAssignments(targetSourceSetId);
         message.success(t('addToSourceSet.addSuccess', { count: 1, ns: 'sourceSet' }));
       } catch (error: any) {
         console.error(error);
@@ -350,7 +369,7 @@ const TitleSection = memo(() => {
         await removeFilesFromSourceSet(sourceSetId, [documentId]);
         await moveContentItem(documentId, null);
         await addFilesToSourceSet(targetSourceSetId, [documentId]);
-        await syncSourceAssignments();
+        await syncSourceAssignments(targetSourceSetId);
         message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
       } catch (error) {
         console.error(error);
@@ -376,7 +395,7 @@ const TitleSection = memo(() => {
       okButtonProps: { danger: true },
       onOk: async () => {
         await removeFilesFromSourceSet(sourceSetId, [documentId]);
-        await syncSourceAssignments();
+        await syncSourceAssignments(undefined);
         message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
       },
       title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
