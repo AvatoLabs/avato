@@ -1,4 +1,4 @@
-import { Checkbox, showContextMenu, stopPropagation } from '@lobehub/ui';
+import { Checkbox, Text, showContextMenu, stopPropagation } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +16,9 @@ import {
 import { documentService } from '@/services/document';
 import { useFileStore } from '@/store/file';
 import { type FileListItem } from '@/types/files';
+import { type FileUploadStatus } from '@/types/files/upload';
 
+import { getInlineUploadStatusKey } from '../../items';
 import { useFileItemClick } from '../../hooks/useFileItemClick';
 import DropdownMenu from '../../ItemDropdown/DropdownMenu';
 import { useFileItemDropdown } from '../../ItemDropdown/useFileItemDropdown';
@@ -165,6 +167,19 @@ const styles = createStaticStyles(({ css }) => ({
       opacity: 1;
     }
   `,
+  uploadBadge: css`
+    position: absolute;
+    z-index: 2;
+    inset-block-end: 8px;
+    inset-inline: 8px;
+
+    padding-block: 4px;
+    padding-inline: 8px;
+    border-radius: ${cssVar.borderRadiusSM};
+
+    background: ${cssVar.colorFillQuaternary};
+    backdrop-filter: blur(4px);
+  `,
 }));
 
 interface MasonryFileItemProps extends FileListItem {
@@ -173,6 +188,7 @@ interface MasonryFileItemProps extends FileListItem {
   selected?: boolean;
   slug?: string | null;
   sourceSetId?: string;
+  uploadStatus?: FileUploadStatus;
 }
 
 const MasonryFileItem = memo<MasonryFileItemProps>(
@@ -196,6 +212,7 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     sourceType,
     slug,
     fileId,
+    uploadStatus,
   }) => {
     const { t } = useTranslation(['components', 'file']);
     const { message } = App.useApp();
@@ -230,6 +247,10 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     }, [fileType, name]);
 
     const { isImage, isMarkdown, isPage, isFolder, baseName, extension } = computedValues;
+    const isInlineUpload = !!uploadStatus;
+    const uploadStatusKey = getInlineUploadStatusKey(uploadStatus);
+    const uploadStatusType =
+      uploadStatus === 'error' ? 'danger' : uploadStatus === 'cancelled' ? 'warning' : 'secondary';
 
     // Use shared click handler hook
     const handleItemClick = useFileItemClick({
@@ -422,12 +443,13 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
       sourceType,
       url,
     });
+    const contextMenuItems = isInlineUpload ? () => [] : menuItems;
 
     return (
       <div
         data-drop-target-id={id}
         data-is-folder={String(isFolder)}
-        draggable={!!sourceSetId}
+        draggable={!isInlineUpload && !!sourceSetId}
         ref={cardRef}
         className={cx(
           styles.card,
@@ -440,8 +462,9 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
         onDragOver={handleDragOver}
         onDragStart={handleDragStart}
         onContextMenu={(e) => {
+          if (isInlineUpload) return;
           e.preventDefault();
-          showContextMenu(menuItems());
+          showContextMenu(contextMenuItems());
         }}
       >
         {/* Inline rename popover */}
@@ -458,26 +481,37 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
           onPointerDown={stopPropagation}
           onClick={(e) => {
             e.stopPropagation();
+            if (isInlineUpload) return;
             onSelectedChange(id, !selected);
           }}
         >
-          <Checkbox checked={selected} />
+          <Checkbox checked={selected} disabled={isInlineUpload} />
         </div>
 
-        <div
-          className={cx('dropdown', styles.dropdown)}
-          onClick={stopPropagation}
-          onPointerDown={stopPropagation}
-        >
-          <DropdownMenu items={menuItems} />
-        </div>
+        {!isInlineUpload && (
+          <div
+            className={cx('dropdown', styles.dropdown)}
+            onClick={stopPropagation}
+            onPointerDown={stopPropagation}
+          >
+            <DropdownMenu items={menuItems} />
+          </div>
+        )}
+
+        {isInlineUpload && uploadStatusKey && (
+          <div className={styles.uploadBadge}>
+            <Text fontSize={12} type={uploadStatusType}>
+              {t(uploadStatusKey, { ns: 'file' })}
+            </Text>
+          </div>
+        )}
 
         <div
           className={cx(
             styles.content,
             !isImage && !isMarkdown && !isPage && styles.contentWithPadding,
           )}
-          onClick={handleItemClick}
+          onClick={isInlineUpload ? undefined : handleItemClick}
         >
           {(() => {
             switch (true) {

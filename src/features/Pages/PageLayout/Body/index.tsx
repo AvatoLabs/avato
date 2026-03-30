@@ -1,7 +1,7 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
-import { memo, Suspense } from 'react';
+import { memo, Suspense, useMemo } from 'react';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
@@ -16,12 +16,16 @@ import List from './List';
  */
 const Body = memo(() => {
   const pageKind = usePageKind();
+  const filteredDocumentsSelector = useMemo(
+    () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
+    [pageKind],
+  );
 
   const useFetchDocuments = usePageStore((s) => s.useFetchDocuments);
   useFetchDocuments();
 
   const isLoading = usePageStore(pageSelectors.isDocumentsLoading);
-  const filteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsLimitedByKind(pageKind));
+  const { displayed: filteredDocuments } = usePageStore(filteredDocumentsSelector);
   const searchKeywords = usePageStore((s) => s.searchKeywords);
   const [allPagesDrawerOpen, closeAllPagesDrawer] = usePageStore((s) => [
     s.allPagesDrawerOpen,

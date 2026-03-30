@@ -268,9 +268,23 @@ export const mobileRoutes: RouteObject[] = [
               {
                 element: dynamicElement(
                   () => import('@/routes/(main)/content/(home)'),
+                  'Mobile > Content > Space Home > Item',
+                ),
+                path: 'spaces/:spaceId/item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
                   'Mobile > Content > Space Folder',
                 ),
                 path: 'spaces/:spaceId/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Mobile > Content > Space Folder > Item',
+                ),
+                path: 'spaces/:spaceId/:slug/item/:fileId',
               },
               {
                 element: dynamicElement(
@@ -292,6 +306,20 @@ export const mobileRoutes: RouteObject[] = [
                   'Mobile > Content > Folder',
                 ),
                 path: ':slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Mobile > Content > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Mobile > Content > Folder > Item',
+                ),
+                path: ':slug/item/:fileId',
               },
             ],
             element: dynamicElement(
@@ -322,6 +350,20 @@ export const mobileRoutes: RouteObject[] = [
                 ),
                 path: ':slug',
               },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets'),
+                  'Mobile > Content > Source Set > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets/[slug]'),
+                  'Mobile > Content > Source Set > Slug > Item',
+                ),
+                path: ':slug/item/:fileId',
+              },
             ],
             element: dynamicElement(
               () => import('@/routes/(main)/content/source-sets/_layout'),
@@ -351,6 +393,20 @@ export const mobileRoutes: RouteObject[] = [
                   'Mobile > Content > Space Source Set > Slug',
                 ),
                 path: ':slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets'),
+                  'Mobile > Content > Space Source Set > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets/[slug]'),
+                  'Mobile > Content > Space Source Set > Slug > Item',
+                ),
+                path: ':slug/item/:fileId',
               },
             ],
             element: dynamicElement(

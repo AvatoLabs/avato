@@ -21,6 +21,10 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
   const pageKind = usePageKind();
   const virtuaRef = useRef<VListHandle>(null);
   const fetchedCountRef = useRef(-1);
+  const filteredDocumentsSelector = useMemo(
+    () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
+    [pageKind],
+  );
 
   const [hasMore, isLoadingMore, loadMoreDocuments] = usePageStore((s) => [
     pageSelectors.hasMoreDocuments(s),
@@ -28,7 +32,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
     s.loadMoreDocuments,
   ]);
 
-  const allFilteredDocuments = usePageStore(pageSelectors.getFilteredDocumentsByKind(pageKind));
+  const { items: allFilteredDocuments } = usePageStore(filteredDocumentsSelector);
 
   // Filter by search keyword
   const displayDocuments = useMemo(() => {

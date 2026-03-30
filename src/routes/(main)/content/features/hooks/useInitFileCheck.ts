@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { buildContentItemPath } from '@/features/ResourceSpaces';
 import { documentSelectors, useFileStore } from '@/store/file';
 
 import { useContentManagerStore } from '../store';
@@ -10,20 +11,38 @@ import { useContentManagerStore } from '../store';
 /**
  * Used for initial loading only, handle URL like:
  *
- * /content?file=xxxxxx
+ * /content/item/:fileId
+ * /content?file=xxxxxx (legacy, auto-migrated)
  */
 export const useInitFileCheck = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { fileId: routeFileId } = useParams<{ fileId?: string }>();
   const [searchParams] = useSearchParams();
   const [setMode, setCurrentViewItemId] = useContentManagerStore((s) => [
     s.setMode,
     s.setCurrentViewItemId,
   ]);
 
-  const fileId = searchParams.get('file');
+  const legacyFileId = searchParams.get('file') ?? searchParams.get('files');
+  const fileId = routeFileId ?? legacyFileId;
 
   const useFetchKnowledgeItem = useFileStore((s) => s.useFetchKnowledgeItem);
   const { data: fileData } = useFetchKnowledgeItem(fileId || undefined);
   const documentData = useFileStore(documentSelectors.getDocumentById(fileId || undefined));
+
+  useEffect(() => {
+    if (routeFileId || !legacyFileId) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('file');
+    nextParams.delete('files');
+
+    const nextPath = buildContentItemPath(location.pathname, legacyFileId);
+    const nextSearch = nextParams.toString();
+
+    navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
+  }, [legacyFileId, location.pathname, navigate, routeFileId, searchParams]);
 
   useEffect(() => {
     if (!fileId) {

@@ -94,6 +94,7 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
     const newParams = new URLSearchParams(searchParams);
     // Remove 'file' parameter when navigating away
     newParams.delete('file');
+    newParams.delete('files');
 
     const queryString = newParams.toString();
     const basePath = rootSourceSetId

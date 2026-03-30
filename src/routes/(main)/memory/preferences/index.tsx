@@ -15,6 +15,7 @@ import { useUserMemoryStore } from '@/store/userMemory';
 import EditableModal from '../features/EditableModal';
 import FilterBar from '../features/FilterBar';
 import Loading from '../features/Loading';
+import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
 import List from './features/List';
@@ -41,6 +42,8 @@ const PreferencesArea = memo(() => {
     { label: t('filter.sort.createdAt'), value: 'capturedAt' },
     { label: t('filter.sort.scorePriority'), value: 'scorePriority' },
   ];
+
+  useResetDetailSelection('preferenceId', [searchValue, sortValue]);
 
   // Convert sort: capturedAt becomes undefined (backend default)
   const apiSort = sortValue === 'capturedAt' ? undefined : (sortValue as 'scorePriority');

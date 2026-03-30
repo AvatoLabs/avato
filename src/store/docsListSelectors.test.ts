@@ -62,10 +62,11 @@ describe('listSelectors', () => {
 
     expect(
       listSelectors
-        .getFilteredDocumentsByKind('doc')(state)
+        .getFilteredDocumentsSnapshotByKind('doc')(state)
+        .items
         .map((doc) => doc.id),
     ).toEqual(['editor-doc', 'file-doc']);
-    expect(listSelectors.filteredDocumentsCountByKind('doc')(state)).toBe(2);
+    expect(listSelectors.getFilteredDocumentsSnapshotByKind('doc')(state).count).toBe(2);
   });
 
   it('still applies source-set filtering after including file-backed docs', () => {
@@ -90,7 +91,8 @@ describe('listSelectors', () => {
 
     expect(
       listSelectors
-        .getFilteredDocumentsByKind('doc')(state)
+        .getFilteredDocumentsSnapshotByKind('doc')(state)
+        .items
         .map((doc) => doc.id),
     ).toEqual(['doc-without-source-set']);
   });

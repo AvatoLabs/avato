@@ -1,67 +1,35 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 
 import { useFolderPath } from '@/routes/(main)/content/features/hooks/useFolderPath';
 import {
   useContentManagerFetchContentFolderBreadcrumb,
   useContentManagerStore,
 } from '@/routes/(main)/content/features/store';
-import { useVisibleResources } from '@/store/file/slices/content/hooks';
-import { type FilesTabs } from '@/types/files';
-
-import { buildExplorerQueryParams } from './queryParams';
 
 interface UseContentExplorerProps {
-  category?: FilesTabs;
-  sourceSetId?: string;
+  hasResolvedData: boolean;
+  isLoading: boolean;
 }
 
 export const useContentExplorer = ({
-  category: categoryProp,
-  sourceSetId,
+  hasResolvedData,
+  isLoading,
 }: UseContentExplorerProps) => {
-  const [
-    viewMode,
-    isTransitioning,
-    setCurrentFolderId,
-    setIsTransitioning,
-    setIsMasonryReady,
-    spaceId,
-    sorter,
-    sortType,
-  ] = useContentManagerStore((s) => [
-    s.viewMode,
-    s.isTransitioning,
-    s.setCurrentFolderId,
-    s.setIsTransitioning,
-    s.setIsMasonryReady,
-    s.spaceId,
-    s.sorter,
-    s.sortType,
-  ]);
-
-  const categoryFromStore = useContentManagerStore((s) => s.category);
-  const category = categoryProp ?? categoryFromStore;
+  const [viewMode, isTransitioning, setCurrentFolderId, setIsTransitioning, setIsMasonryReady, spaceId] =
+    useContentManagerStore((s) => [
+      s.viewMode,
+      s.isTransitioning,
+      s.setCurrentFolderId,
+      s.setIsTransitioning,
+      s.setIsMasonryReady,
+      s.spaceId,
+    ]);
   const { currentFolderSlug } = useFolderPath();
 
   const { data: folderBreadcrumb } = useContentManagerFetchContentFolderBreadcrumb(
     currentFolderSlug,
     spaceId,
   );
-
-  const queryParams = useMemo(
-    () =>
-      buildExplorerQueryParams({
-        category,
-        currentFolderSlug,
-        sourceSetId,
-        sorter,
-        sortType,
-        spaceId,
-      }),
-    [category, currentFolderSlug, sourceSetId, sorter, sortType, spaceId],
-  );
-
-  const { hasResolvedData, isLoading } = useVisibleResources(queryParams);
 
   useEffect(() => {
     if (!currentFolderSlug) {

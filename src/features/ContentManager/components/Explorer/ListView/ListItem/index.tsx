@@ -5,6 +5,7 @@ import {
   ContextMenuTrigger,
   Flexbox,
   Icon,
+  Text,
   stopPropagation,
 } from '@lobehub/ui';
 import { App, Input } from 'antd';
@@ -28,9 +29,11 @@ import {
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { fileManagerSelectors, useFileStore } from '@/store/file';
 import { type FileListItem as FileListItemType } from '@/types/files';
+import { type FileUploadStatus } from '@/types/files/upload';
 import { formatSize } from '@/utils/format';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 
+import { getInlineUploadStatusKey } from '../../items';
 import { useFileItemClick } from '../../hooks/useFileItemClick';
 import DropdownMenu from '../../ItemDropdown/DropdownMenu';
 import { useFileItemDropdown } from '../../ItemDropdown/useFileItemDropdown';
@@ -136,6 +139,7 @@ interface FileListItemProps extends FileListItemType {
   pendingRenameItemId?: string | null;
   selected?: boolean;
   slug?: string | null;
+  uploadStatus?: FileUploadStatus;
 }
 
 const FileListItem = memo<FileListItemProps>(
@@ -160,6 +164,7 @@ const FileListItem = memo<FileListItemProps>(
     metadata,
     sourceType,
     slug,
+    uploadStatus,
     pendingRenameItemId,
     onHoverChange,
   }) => {
@@ -209,6 +214,10 @@ const FileListItem = memo<FileListItemProps>(
 
     const { isSupportedForChunking, isPage, isFolder, isMarkdown, emoji, baseName, extension } =
       computedValues;
+    const isInlineUpload = !!uploadStatus;
+    const uploadStatusKey = getInlineUploadStatusKey(uploadStatus);
+    const uploadStatusType =
+      uploadStatus === 'error' ? 'danger' : uploadStatus === 'cancelled' ? 'warning' : 'secondary';
 
     const dragData = useMemo(
       () => ({
@@ -372,16 +381,17 @@ const FileListItem = memo<FileListItemProps>(
       sourceType,
       url,
     });
+    const contextMenuItems = isInlineUpload ? () => [] : menuItems;
 
     return (
-      <ContextMenuTrigger items={menuItems}>
+      <ContextMenuTrigger items={contextMenuItems}>
         <Flexbox
           horizontal
           align={'center'}
           data-drop-target-id={id}
           data-is-folder={String(isFolder)}
           data-row-index={index}
-          draggable={!!contentManagerState.sourceSetId}
+          draggable={!isInlineUpload && !!contentManagerState.sourceSetId}
           height={48}
           paddingInline={8}
           className={cx(
@@ -396,7 +406,7 @@ const FileListItem = memo<FileListItemProps>(
             borderBlockEnd: `1px solid ${cssVar.colorBorderSecondary}`,
             userSelect: 'none',
           }}
-          onClick={handleItemClick}
+          onClick={isInlineUpload ? undefined : handleItemClick}
           onDragEnd={handleDragEnd}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -410,6 +420,7 @@ const FileListItem = memo<FileListItemProps>(
             style={{ paddingInline: 4 }}
             onClick={(e) => {
               e.stopPropagation();
+              if (isInlineUpload) return;
 
               onSelectedChange(id, !selected, e.shiftKey, index);
             }}
@@ -421,7 +432,7 @@ const FileListItem = memo<FileListItemProps>(
               }
             }}
           >
-            <Checkbox checked={selected} />
+            <Checkbox checked={selected} disabled={isInlineUpload} />
           </Center>
           <Flexbox
             horizontal
@@ -497,11 +508,12 @@ const FileListItem = memo<FileListItemProps>(
               onClick={stopPropagation}
               onPointerDown={stopPropagation}
             >
-              {!isFolder &&
-                !isPage &&
-                (fileStoreState.isCreatingFileParseTask ||
-                isNull(chunkingStatus) ||
-                !chunkingStatus ? (
+              {isInlineUpload && uploadStatusKey ? (
+                <Text fontSize={12} type={uploadStatusType}>
+                  {t(uploadStatusKey, { ns: 'file' })}
+                </Text>
+              ) : !isFolder && !isPage ? (
+                fileStoreState.isCreatingFileParseTask || isNull(chunkingStatus) || !chunkingStatus ? (
                   <div
                     className={fileStoreState.isCreatingFileParseTask ? undefined : styles.hover}
                     title={t(
@@ -539,8 +551,9 @@ const FileListItem = memo<FileListItemProps>(
                       id={id}
                     />
                   </div>
-                ))}
-              <DropdownMenu className={styles.hover} items={menuItems} />
+                )
+              ) : null}
+              {!isInlineUpload && <DropdownMenu className={styles.hover} items={menuItems} />}
             </Flexbox>
           </Flexbox>
           {!isDragging && (
@@ -575,6 +588,7 @@ const FileListItem = memo<FileListItemProps>(
       prevProps.fileType === nextProps.fileType &&
       prevProps.sourceType === nextProps.sourceType &&
       prevProps.slug === nextProps.slug &&
+      prevProps.uploadStatus === nextProps.uploadStatus &&
       prevProps.url === nextProps.url &&
       prevProps.columnWidths.name === nextProps.columnWidths.name &&
       prevProps.columnWidths.date === nextProps.columnWidths.date &&

@@ -1,7 +1,7 @@
 'use client';
 
 import { Flexbox, SearchBar, Tag, Text } from '@lobehub/ui';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
@@ -19,7 +19,11 @@ const Header = memo(() => {
   const { t } = useTranslation(['common', 'file']);
   const pageKind = usePageKind();
   const isTablePage = pageKind === TABLE_PAGE_KIND;
-  const filteredDocumentsCount = usePageStore(pageSelectors.filteredDocumentsCountByKind(pageKind));
+  const filteredDocumentsSelector = useMemo(
+    () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
+    [pageKind],
+  );
+  const { count: filteredDocumentsCount } = usePageStore(filteredDocumentsSelector);
   const spaceName = useSpaceName(getActiveWorkspaceSpaceId());
   const [searchKeywords, setSearchKeywords] = usePageStore((s) => [
     s.searchKeywords,

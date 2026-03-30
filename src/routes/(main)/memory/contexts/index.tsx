@@ -15,6 +15,7 @@ import { useUserMemoryStore } from '@/store/userMemory';
 import EditableModal from '../features/EditableModal';
 import FilterBar from '../features/FilterBar';
 import Loading from '../features/Loading';
+import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
 import ContextRightPanel from './features/ContextRightPanel';
@@ -42,6 +43,8 @@ const ContextsArea = memo(() => {
     { label: t('filter.sort.scoreImpact'), value: 'scoreImpact' },
     { label: t('filter.sort.scoreUrgency'), value: 'scoreUrgency' },
   ];
+
+  useResetDetailSelection('contextId', [searchValue, sortValue]);
 
   // Convert sort: capturedAt becomes undefined (backend default)
   const apiSort =

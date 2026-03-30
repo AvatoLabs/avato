@@ -307,9 +307,23 @@ export const desktopRoutes: RouteObject[] = [
               {
                 element: dynamicElement(
                   () => import('@/routes/(main)/content/(home)'),
+                  'Desktop > Content > Space Home > Item',
+                ),
+                path: 'spaces/:spaceId/item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
                   'Desktop > Content > Space Folder',
                 ),
                 path: 'spaces/:spaceId/:slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Desktop > Content > Space Folder > Item',
+                ),
+                path: 'spaces/:spaceId/:slug/item/:fileId',
               },
               {
                 element: dynamicElement(
@@ -331,6 +345,20 @@ export const desktopRoutes: RouteObject[] = [
                   'Desktop > Content > Folder',
                 ),
                 path: ':slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Desktop > Content > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)'),
+                  'Desktop > Content > Folder > Item',
+                ),
+                path: ':slug/item/:fileId',
               },
             ],
             element: dynamicElement(
@@ -361,6 +389,20 @@ export const desktopRoutes: RouteObject[] = [
                 ),
                 path: ':slug',
               },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets'),
+                  'Desktop > Content > Source Set > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets/[slug]'),
+                  'Desktop > Content > Source Set > Slug > Item',
+                ),
+                path: ':slug/item/:fileId',
+              },
             ],
             element: dynamicElement(
               () => import('@/routes/(main)/content/source-sets/_layout'),
@@ -390,6 +432,20 @@ export const desktopRoutes: RouteObject[] = [
                   'Desktop > Content > Space Source Set > Slug',
                 ),
                 path: ':slug',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets'),
+                  'Desktop > Content > Space Source Set > Item',
+                ),
+                path: 'item/:fileId',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets/[slug]'),
+                  'Desktop > Content > Space Source Set > Slug > Item',
+                ),
+                path: ':slug/item/:fileId',
               },
             ],
             element: dynamicElement(

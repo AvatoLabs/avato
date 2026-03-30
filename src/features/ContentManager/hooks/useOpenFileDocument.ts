@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
+import { buildContentItemPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
 
@@ -10,7 +11,8 @@ interface UseOpenFileDocumentOptions {
 }
 
 export const useOpenFileDocument = ({ fileId, id }: UseOpenFileDocumentOptions) => {
-  const [, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [setCurrentViewItemId, setMode] = useContentManagerStore((s) => [
     s.setCurrentViewItemId,
     s.setMode,
@@ -21,18 +23,17 @@ export const useOpenFileDocument = ({ fileId, id }: UseOpenFileDocumentOptions) 
       ? id
       : (await documentService.ensureFileDocument(fileId || id)).id;
 
-    setSearchParams(
-      (prev) => {
-        const newParams = new URLSearchParams(prev);
-        newParams.set('file', documentId);
-        return newParams;
-      },
-      { replace: true },
-    );
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.delete('file');
+    nextParams.delete('files');
+
+    const nextPath = buildContentItemPath(location.pathname, documentId);
+    const nextSearch = nextParams.toString();
+    navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
 
     setCurrentViewItemId(documentId);
     setMode('doc');
 
     return documentId;
-  }, [fileId, id, setCurrentViewItemId, setMode, setSearchParams]);
+  }, [fileId, id, location.pathname, location.search, navigate, setCurrentViewItemId, setMode]);
 };

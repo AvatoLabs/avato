@@ -1,6 +1,20 @@
 export const buildContentRootPath = (spaceId?: string | null) =>
   spaceId ? `/content/spaces/${spaceId}` : '/content';
 
+const normalizeContentPath = (path: string) => {
+  if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
+  return path;
+};
+
+export const stripContentItemPath = (pathname: string) => {
+  const normalizedPath = normalizeContentPath(pathname);
+
+  return normalizedPath.replace(/\/item\/[^/]+$/, '') || '/';
+};
+
+export const buildContentItemPath = (basePath: string, fileId: string) =>
+  `${stripContentItemPath(normalizeContentPath(basePath))}/item/${encodeURIComponent(fileId)}`;
+
 export const buildContentFolderPath = (spaceId: string | null | undefined, folderSlug: string) =>
   `${buildContentRootPath(spaceId)}/${folderSlug}`;
 
@@ -24,7 +38,7 @@ export const buildContentPreviewPath = (
     ? buildSourceSetPath(spaceId, sourceSetId)
     : buildContentRootPath(spaceId);
 
-  return `${basePath}?file=${encodeURIComponent(fileId)}`;
+  return buildContentItemPath(basePath, fileId);
 };
 
 export const buildSharedContentPath = () => '/content/shared';

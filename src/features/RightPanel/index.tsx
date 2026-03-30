@@ -17,11 +17,20 @@ interface RightPanelProps extends Omit<
   'placement' | 'size' | 'onSizeChange' | 'onExpandChange'
 > {
   defaultWidth?: number | string;
+  onExpandChange?: (expand: boolean) => void;
   onSizeChange?: (size?: Size) => void;
 }
 
 const RightPanel = memo<RightPanelProps>(
-  ({ maxWidth = 600, minWidth = 300, children, defaultWidth = 360, onSizeChange, ...rest }) => {
+  ({
+    maxWidth = 600,
+    minWidth = 300,
+    children,
+    defaultWidth = 360,
+    onExpandChange,
+    onSizeChange,
+    ...rest
+  }) => {
     const [showRightPanel, toggleRightPanel] = useGlobalStore((s) => [
       systemStatusSelectors.showRightPanel(s),
       s.toggleRightPanel,
@@ -41,7 +50,10 @@ const RightPanel = memo<RightPanelProps>(
           height: '100%',
           width,
         }}
-        onExpandChange={(expand) => toggleRightPanel(expand)}
+        onExpandChange={(expand) => {
+          toggleRightPanel(expand);
+          onExpandChange?.(expand);
+        }}
         onSizeChange={(_, size) => {
           if (size?.width) {
             setWidth(size.width);

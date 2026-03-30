@@ -29,10 +29,17 @@ const serverFileService = new FileService();
 const FETCH_ALL_KNOWLEDGE_KEY = 'useFetchKnowledgeItems';
 const createUploadId = createNanoId(12);
 
-const createPendingUploadItem = (file: File): UploadFileItem => ({
+const createPendingUploadItem = (
+  file: File,
+  options?: { parentId?: string; sourceSetId?: string; spaceId?: string },
+): UploadFileItem => ({
   abortController: new AbortController(),
+  createdAt: new Date(),
   file,
   id: createUploadId(),
+  parentId: options?.parentId ?? null,
+  sourceSetId: options?.sourceSetId,
+  spaceId: options?.spaceId,
   status: 'pending',
 });
 
@@ -199,7 +206,9 @@ export class FileManageActionImpl {
     const files = filesToUpload.filter((file) => !FILE_UPLOAD_BLACKLIST.includes(file.name));
 
     // 2. Create upload items with abort controllers
-    const uploadFiles = files.map((file) => createPendingUploadItem(file));
+    const uploadFiles = files.map((file) =>
+      createPendingUploadItem(file, { parentId, sourceSetId, spaceId }),
+    );
 
     // 3. Add all files to dock
     dispatchDockFileList({
@@ -497,7 +506,7 @@ export class FileManageActionImpl {
       const validUploads = allUploads
         .filter(({ file }) => !FILE_UPLOAD_BLACKLIST.includes(file.name))
         .map(({ file, parentId }) => ({
-          ...createPendingUploadItem(file),
+          ...createPendingUploadItem(file, { parentId: targetFolderId, sourceSetId, spaceId }),
           parentId,
         }));
 

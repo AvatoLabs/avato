@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { buildContentPreviewPath } from '@/features/ResourceSpaces';
 import GroupSkeleton from '@/routes/(main)/home/features/components/GroupSkeleton';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { homeRecentSelectors } from '@/store/home/selectors';
@@ -28,7 +29,9 @@ const RecentResourceList = memo(() => {
 
   return files.map((file) => {
     const isPage = file.sourceType === 'document' || isPageEntryFileType(file.fileType);
-    const fileUrl = isPage ? `/content/${file.id}` : `/content?file=${file.fileId || file.id}`;
+    const fileUrl = isPage
+      ? `/content/${file.id}`
+      : buildContentPreviewPath(file.spaceId, file.fileId || file.id);
 
     return (
       <Link

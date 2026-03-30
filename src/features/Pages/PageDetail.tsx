@@ -1,9 +1,8 @@
 'use client';
 
 import { useUnmount } from 'ahooks';
-import { memo, Suspense } from 'react';
+import { memo, Suspense, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { createStoreUpdater } from 'zustand-utils';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorer from '@/features/PageExplorer';
@@ -18,14 +17,16 @@ interface PageDetailProps {
 }
 
 const PageDetail = memo<PageDetailProps>(({ pageKind }) => {
-  const storeUpdater = createStoreUpdater(usePageStore);
   const params = useParams<{ id: string }>();
-
   const pageId = getIdFromIdentifier(params.id ?? '', 'docs');
-  storeUpdater('selectedPageId', pageId);
+  const setSelectedPageId = usePageStore((s) => s.setSelectedPageId);
+
+  useEffect(() => {
+    setSelectedPageId(pageId, false);
+  }, [pageId, setSelectedPageId]);
 
   useUnmount(() => {
-    usePageStore.setState({ selectedPageId: undefined });
+    usePageStore.getState().setSelectedPageId(null, false);
   });
 
   return (

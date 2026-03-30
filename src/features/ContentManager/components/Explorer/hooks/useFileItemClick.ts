@@ -1,7 +1,11 @@
 import { useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import { buildContentFolderPath, buildSourceSetFolderPath } from '@/features/ResourceSpaces';
+import {
+  buildContentFolderPath,
+  buildContentItemPath,
+  buildSourceSetFolderPath,
+} from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
 
@@ -27,8 +31,8 @@ export const useFileItemClick = ({
   isPage,
   onOpen,
 }: UseFileItemClickOptions) => {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [setMode, setCurrentViewItemId, spaceId] = useContentManagerStore((s) => [
     s.setMode,
     s.setCurrentViewItemId,
@@ -40,18 +44,16 @@ export const useFileItemClick = ({
       // Navigate to folder using slug-based routing (Google Drive style)
       const folderSlug = slug || id;
 
-      if (sourceSetId) {
-        // Preserve existing query parameters (view and sort preferences)
-        const newParams = new URLSearchParams(searchParams);
-        // Remove 'file' parameter when navigating to folder
-        newParams.delete('file');
+      // Preserve existing query parameters (view and sort preferences)
+      const newParams = new URLSearchParams(location.search);
+      newParams.delete('file');
+      newParams.delete('files');
 
-        const queryString = newParams.toString();
-        const basePath = sourceSetId
-          ? buildSourceSetFolderPath(spaceId, sourceSetId, folderSlug)
-          : buildContentFolderPath(spaceId, folderSlug);
-        navigate(queryString ? `${basePath}?${queryString}` : basePath);
-      }
+      const queryString = newParams.toString();
+      const basePath = sourceSetId
+        ? buildSourceSetFolderPath(spaceId, sourceSetId, folderSlug)
+        : buildContentFolderPath(spaceId, folderSlug);
+      navigate(queryString ? `${basePath}?${queryString}` : basePath);
       return;
     }
 
@@ -73,41 +75,36 @@ export const useFileItemClick = ({
     if (isFileBackedEntry) {
       setCurrentViewItemId(previewTargetId);
       setMode('editor');
-      setSearchParams(
-        (prev) => {
-          const newParams = new URLSearchParams(prev);
-          newParams.set('file', previewTargetId);
-          return newParams;
-        },
-        { replace: true },
-      );
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('file');
+      nextParams.delete('files');
+
+      const nextPath = buildContentItemPath(location.pathname, previewTargetId);
+      const nextSearch = nextParams.toString();
+      navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
       onOpen?.(previewTargetId);
     } else if (isPage) {
       // Switch to doc mode for existing documents
       setCurrentViewItemId(id);
       setMode('doc');
-      // Update URL query parameter for shareable links
-      setSearchParams(
-        (prev) => {
-          const newParams = new URLSearchParams(prev);
-          newParams.set('file', id);
-          return newParams;
-        },
-        { replace: true },
-      );
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('file');
+      nextParams.delete('files');
+
+      const nextPath = buildContentItemPath(location.pathname, id);
+      const nextSearch = nextParams.toString();
+      navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
     } else {
       // Set mode to editor for regular files
       setCurrentViewItemId(previewTargetId);
       setMode('editor');
-      // Update URL query parameter for shareable links
-      setSearchParams(
-        (prev) => {
-          const newParams = new URLSearchParams(prev);
-          newParams.set('file', previewTargetId);
-          return newParams;
-        },
-        { replace: true },
-      );
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.delete('file');
+      nextParams.delete('files');
+
+      const nextPath = buildContentItemPath(location.pathname, previewTargetId);
+      const nextSearch = nextParams.toString();
+      navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
       // Call onOpen if provided for backwards compatibility
       onOpen?.(previewTargetId);
     }
@@ -117,12 +114,12 @@ export const useFileItemClick = ({
     isFolder,
     isPage,
     sourceSetId,
+    location.pathname,
+    location.search,
     navigate,
     onOpen,
-    searchParams,
     setCurrentViewItemId,
     setMode,
-    setSearchParams,
     slug,
     spaceId,
   ]);

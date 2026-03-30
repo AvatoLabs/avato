@@ -11,6 +11,10 @@ import DetailPanel from '@/routes/(main)/memory/features/DetailPanel';
 import HashTags from '@/routes/(main)/memory/features/HashTags';
 import HighlightedContent from '@/routes/(main)/memory/features/HighlightedContent';
 import Time from '@/routes/(main)/memory/features/Time';
+import {
+  useClearDetailSelection,
+  useCloseInvalidDetailSelection,
+} from '@/routes/(main)/memory/features/useResetDetailSelection';
 import { useUserMemoryStore } from '@/store/userMemory';
 import { LayersEnum } from '@/types/userMemory';
 
@@ -21,6 +25,8 @@ const IdentityRightPanel = memo(() => {
   const useFetchMemoryDetail = useUserMemoryStore((s) => s.useFetchMemoryDetail);
 
   const { data: identity, isLoading } = useFetchMemoryDetail(identityId, LayersEnum.Identity);
+  useCloseInvalidDetailSelection('identityId', identityId, isLoading, Boolean(identity));
+  const clearSelection = useClearDetailSelection('identityId');
 
   if (!identityId) return null;
 
@@ -54,6 +60,9 @@ const IdentityRightPanel = memo(() => {
         right: identityId ? (
           <IdentityDropdown id={identityId} size={DESKTOP_HEADER_ICON_SIZE} />
         ) : undefined,
+      }}
+      onExpandChange={(expand) => {
+        if (!expand) clearSelection();
       }}
     >
       {content}

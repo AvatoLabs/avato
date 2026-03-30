@@ -47,8 +47,8 @@ vi.mock('@/features/ResourceSpaces', () => ({
     sourceSetId?: string | null,
   ) =>
     sourceSetId
-      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}?file=${fileId}`
-      : `/content/spaces/${spaceId}?file=${fileId}`,
+      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}/item/${fileId}`
+      : `/content/spaces/${spaceId}/item/${fileId}`,
   buildContentRootPath: (spaceId: string | null | undefined) =>
     spaceId ? `/content/spaces/${spaceId}` : '/content',
   buildSourceSetFolderPath: (
@@ -156,7 +156,7 @@ describe('SearchResults', () => {
     fireEvent.click(resultButtons[0]);
     expect(mockNavigate).toHaveBeenNthCalledWith(
       1,
-      '/content/spaces/spc_1/source-sets/ss-1?file=file-1',
+      '/content/spaces/spc_1/source-sets/ss-1/item/file-1',
     );
 
     fireEvent.click(resultButtons[1]);

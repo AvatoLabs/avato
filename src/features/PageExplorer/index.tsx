@@ -25,6 +25,8 @@ const TABLE_EDITOR_MIN_WIDTH = 1120;
 
 const PageExplorer = memo<PageExplorerProps>(({ pageId, pageKind = DEFAULT_PAGE_KIND }) => {
   const updatePageOptimistically = usePageStore((s) => s.updatePageOptimistically);
+  const useFetchPageDetail = usePageStore((s) => s.useFetchPageDetail);
+  useFetchPageDetail(pageId);
 
   // Get document title and emoji from PageStore
   const document = usePageStore(pageSelectors.getDocumentById(pageId));

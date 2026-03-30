@@ -1,13 +1,18 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createStoreUpdater } from 'zustand-utils';
 
 import { usePageStore } from '@/store/docs';
 
 const DataSync = () => {
-  const usePageStoreUpdater = createStoreUpdater(usePageStore);
-
   const navigate = useNavigate();
-  usePageStoreUpdater('navigate', navigate);
+
+  useEffect(() => {
+    usePageStore.setState({ navigate });
+
+    return () => {
+      usePageStore.setState({ navigate: undefined });
+    };
+  }, [navigate]);
 
   return null;
 };

@@ -16,16 +16,13 @@ import {
   useContentManagerFetchContentFolderBreadcrumb,
   useContentManagerStore,
 } from '@/routes/(main)/content/features/store';
-import { sortFileList } from '@/routes/(main)/content/features/store/selectors';
 import { useFileStore } from '@/store/file';
-import { useVisibleResources } from '@/store/file/slices/content/hooks';
 import { useGlobalStore } from '@/store/global';
 import { INITIAL_STATUS } from '@/store/global/initialState';
-import { type AsyncTaskStatus } from '@/types/asyncTask';
-import { type FileListItem as FileListItemType, FilesTabs } from '@/types/files';
+import { FilesTabs } from '@/types/files';
 
 import EmptyState from '../../EmptyState';
-import { buildExplorerQueryParams } from '../queryParams';
+import { type ExplorerItem } from '../items';
 import ColumnResizeHandle from './ColumnResizeHandle';
 import FileListItem from './ListItem';
 import ListViewSkeleton from './Skeleton';
@@ -63,32 +60,30 @@ const styles = createStaticStyles(({ css }) => ({
   `,
 }));
 
-const ListView = memo(function ListView() {
+interface ListViewProps {
+  data: ExplorerItem[];
+  hasResolvedData: boolean;
+  isLoading: boolean;
+}
+
+const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, isLoading }) {
   const [
     sourceSetId,
     category,
-    mode,
     spaceId,
     selectFileIds,
     setSelectedFileIds,
     pendingRenameItemId,
-    sorter,
-    sortType,
     storeIsTransitioning,
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.category,
-    s.mode,
     s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
     s.pendingRenameItemId,
-    s.sorter,
-    s.sortType,
     s.isTransitioning,
   ]);
-
-  const isExplorerMode = mode === 'explorer';
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
 
@@ -128,46 +123,7 @@ const ListView = memo(function ListView() {
     [pushDockFileList, sourceSetId, currentFolderId, spaceId],
   );
 
-  const queryParams = useMemo(
-    () =>
-      buildExplorerQueryParams({
-        category,
-        currentFolderSlug,
-        sourceSetId,
-        sorter,
-        sortType,
-        spaceId,
-      }),
-    [category, currentFolderSlug, sourceSetId, sorter, sortType, spaceId],
-  );
-
-  const { hasResolvedData, isLoading, items: resourceList } = useVisibleResources(
-    queryParams,
-    isExplorerMode,
-  );
   const { hasMore, loadMoreResources } = useFileStore();
-
-  // Map ContentItem[] to FileListItem[] for compatibility
-  const rawData = useMemo(
-    () =>
-      resourceList?.map<FileListItemType>((item) => ({
-        ...item,
-        chunkCount: item.chunkCount ?? null,
-        chunkingError: item.chunkingError ?? null,
-        chunkingStatus: (item.chunkingStatus ?? null) as AsyncTaskStatus | null,
-        embeddingError: item.embeddingError ?? null,
-        embeddingStatus: (item.embeddingStatus ?? null) as AsyncTaskStatus | null,
-        finishEmbedding: item.finishEmbedding ?? false,
-        url: item.url ?? '',
-      })) ?? [],
-    [resourceList],
-  );
-
-  // Sort data using current sort settings
-  const data = useMemo(
-    () => sortFileList(rawData, sorter, sortType) || [],
-    [rawData, sorter, sortType],
-  );
 
   const dataLength = data.length;
   const effectiveIsLoading = isLoading ?? false;
@@ -177,7 +133,7 @@ const ListView = memo(function ListView() {
     (((!hasResolvedData && dataLength === 0) || effectiveIsLoading) && dataLength === 0) ||
     effectiveIsTransitioning;
 
-  const dataRef = useRef<FileListItemType[]>(data);
+  const dataRef = useRef<ExplorerItem[]>(data);
 
   useEffect(() => {
     dataRef.current = data;

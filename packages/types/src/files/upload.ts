@@ -32,6 +32,7 @@ export interface UploadFileItem {
    * AbortController to cancel the upload
    */
   abortController?: AbortController;
+  createdAt?: Date;
   /**
    * base64 data, it will use in other data
    */
@@ -52,6 +53,9 @@ export interface UploadFileItem {
    * it will use in the file preview before send the message
    */
   previewUrl?: string;
+  parentId?: string | null;
+  sourceSetId?: string;
+  spaceId?: string;
   status: FileUploadStatus;
   tasks?: FileParsingTask;
   uploadState?: FileUploadState;

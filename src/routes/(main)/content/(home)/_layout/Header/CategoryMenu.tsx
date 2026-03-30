@@ -144,6 +144,7 @@ const CategoryMenu = memo(() => {
   const getCategoryUrl = (value: FilesTabs) => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
+    nextParams.delete('files');
 
     if (value === FilesTabs.Home) {
       nextParams.delete('category');

@@ -14,6 +14,7 @@ import { useUserMemoryStore } from '@/store/userMemory';
 import EditableModal from '../features/EditableModal';
 import FilterBar from '../features/FilterBar';
 import Loading from '../features/Loading';
+import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
 import ActivityRightPanel from './features/ActivityRightPanel';
@@ -40,6 +41,8 @@ const ActivitiesArea = memo(() => {
     { label: t('filter.sort.createdAt'), value: 'capturedAt' },
     { label: t('filter.sort.startsAt'), value: 'startsAt' },
   ];
+
+  useResetDetailSelection('activityId', [searchValue, sortValue]);
 
   const apiSort = sortValue === 'capturedAt' ? undefined : (sortValue as 'startsAt');
 

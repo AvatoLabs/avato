@@ -504,15 +504,19 @@ export class CrudActionImpl {
         onData: (document) => {
           if (!document || !pageId) return;
 
-          // Auto-sync to documents array via internal dispatch
           const { documents } = this.#get();
-          if (documents?.some((doc) => doc.id === pageId)) {
+          const hasExistingPage = documents?.some((doc) => doc.id === pageId);
+
+          if (hasExistingPage) {
             this.#get().internal_dispatchDocuments({
               document,
               id: pageId,
               type: 'updateDocument',
             });
+            return;
           }
+
+          this.#get().internal_dispatchDocuments({ document, type: 'addDocument' });
         },
         revalidateOnFocus: true,
       },

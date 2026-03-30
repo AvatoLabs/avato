@@ -2,6 +2,7 @@
 
 import { Flexbox } from '@lobehub/ui';
 import { MoreHorizontal } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -17,13 +18,17 @@ import Item from './Item';
 const PageList = () => {
   const { t } = useTranslation(['file', 'common']);
   const pageKind = usePageKind();
+  const filteredDocumentsSelector = useMemo(
+    () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
+    [pageKind],
+  );
 
-  const [filteredDocuments, hasMore, isLoadingMore, openAllPagesDrawer] = usePageStore((s) => [
-    pageSelectors.getFilteredDocumentsLimitedByKind(pageKind)(s),
-    pageSelectors.hasMoreFilteredDocumentsByKind(pageKind)(s),
-    pageSelectors.isLoadingMoreDocuments(s),
-    s.openAllPagesDrawer,
-  ]);
+  const [{ displayed: filteredDocuments, hasMore }, isLoadingMore, openAllPagesDrawer] =
+    usePageStore((s) => [
+      filteredDocumentsSelector(s),
+      pageSelectors.isLoadingMoreDocuments(s),
+      s.openAllPagesDrawer,
+    ]);
 
   return (
     <Flexbox gap={1}>

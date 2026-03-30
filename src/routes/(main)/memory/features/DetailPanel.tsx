@@ -9,11 +9,12 @@ import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton
 
 interface DetailPanelProps extends FlexboxProps {
   header?: NavHeaderProps;
+  onExpandChange?: (expand: boolean) => void;
 }
 
-const DetailPanel = memo<DetailPanelProps>(({ children, style, header, ...rest }) => {
+const DetailPanel = memo<DetailPanelProps>(({ children, style, header, onExpandChange, ...rest }) => {
   return (
-    <RightPanel defaultWidth={480} maxWidth={640} minWidth={300}>
+    <RightPanel defaultWidth={480} maxWidth={640} minWidth={300} onExpandChange={onExpandChange}>
       <NavHeader
         {...header}
         left={

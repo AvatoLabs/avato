@@ -14,10 +14,9 @@ import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { contentService } from '@/services/content';
 import { useGlobalStore } from '@/store/global';
 import { INITIAL_STATUS } from '@/store/global/initialState';
-import type { AsyncTaskStatus } from '@/types/asyncTask';
-import type { FileListItem } from '@/types/files';
 
 import EmptyState from '../EmptyState';
+import { mapContentItemsToExplorerItems } from './items';
 import FileListItemComponent from './ListView/ListItem';
 import MasonryItemWrapper from './MasonryView/MasonryItem/MasonryItemWrapper';
 import { getExplorerCategoryFilter } from './queryParams';
@@ -66,20 +65,7 @@ const SearchResultsOverlay = memo(() => {
     },
   );
 
-  const data: FileListItem[] | undefined = useMemo(
-    () =>
-      rawData?.map((item) => ({
-        ...item,
-        chunkCount: item.chunkCount ?? null,
-        chunkingError: item.chunkingError ?? null,
-        chunkingStatus: (item.chunkingStatus ?? null) as AsyncTaskStatus | null,
-        embeddingError: item.embeddingError ?? null,
-        embeddingStatus: (item.embeddingStatus ?? null) as AsyncTaskStatus | null,
-        finishEmbedding: item.finishEmbedding ?? false,
-        url: item.url ?? '',
-      })),
-    [rawData],
-  );
+  const data = useMemo(() => (rawData ? mapContentItemsToExplorerItems(rawData) : undefined), [rawData]);
 
   const masonryContext = useMemo(
     () => ({

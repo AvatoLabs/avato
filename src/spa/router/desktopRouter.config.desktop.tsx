@@ -247,7 +247,15 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: <ResourceHomePage />,
+                path: 'spaces/:spaceId/item/:fileId',
+              },
+              {
+                element: <ResourceHomePage />,
                 path: 'spaces/:spaceId/:slug',
+              },
+              {
+                element: <ResourceHomePage />,
+                path: 'spaces/:spaceId/:slug/item/:fileId',
               },
               {
                 element: <ResourceSpaceTrashPage />,
@@ -260,6 +268,14 @@ export const desktopRoutes: RouteObject[] = [
               {
                 element: <ResourceHomePage />,
                 path: ':slug',
+              },
+              {
+                element: <ResourceHomePage />,
+                path: 'item/:fileId',
+              },
+              {
+                element: <ResourceHomePage />,
+                path: ':slug/item/:fileId',
               },
             ],
             element: <ResourceHomeLayout />,
@@ -278,6 +294,14 @@ export const desktopRoutes: RouteObject[] = [
                 element: <ContentSourceSetSlugPage />,
                 path: ':slug',
               },
+              {
+                element: <ContentSourceSetPage />,
+                path: 'item/:fileId',
+              },
+              {
+                element: <ContentSourceSetSlugPage />,
+                path: ':slug/item/:fileId',
+              },
             ],
             element: <ContentSourceSetLayout />,
             path: 'source-sets/:id',
@@ -295,6 +319,14 @@ export const desktopRoutes: RouteObject[] = [
               {
                 element: <ContentSourceSetSlugPage />,
                 path: ':slug',
+              },
+              {
+                element: <ContentSourceSetPage />,
+                path: 'item/:fileId',
+              },
+              {
+                element: <ContentSourceSetSlugPage />,
+                path: ':slug/item/:fileId',
               },
             ],
             element: <ContentSourceSetLayout />,

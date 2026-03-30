@@ -5,10 +5,11 @@ import { type DocumentItem } from '@lobechat/database/schemas';
 import { Flexbox } from '@lobehub/ui';
 import { createStaticStyles, useTheme } from 'antd-style';
 import { memo, useCallback, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import DragUploadZone from '@/components/DragUploadZone';
 import { PageEditor } from '@/features/PageEditor';
+import { stripContentItemPath } from '@/features/ResourceSpaces';
 import dynamic from '@/libs/next/dynamic';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
@@ -91,7 +92,8 @@ export type ContentManagerMode = 'doc' | 'editor' | 'explorer';
  */
 const ContentManager = memo(() => {
   const theme = useTheme();
-  const [, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [
     mode,
     currentViewItemId,
@@ -165,14 +167,14 @@ const ContentManager = memo(() => {
   const handleBack = () => {
     setMode('explorer');
     setCurrentViewItemId(undefined);
-    // Remove the file query parameter from URL
-    setSearchParams(
-      (prev) => {
-        prev.delete('file');
-        return prev;
-      },
-      { replace: true },
-    );
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.delete('file');
+    nextParams.delete('files');
+
+    const nextPath = stripContentItemPath(location.pathname);
+    const nextSearch = nextParams.toString();
+    navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
+
     // Reset document title to default
     document.title = BRANDING_NAME;
   };

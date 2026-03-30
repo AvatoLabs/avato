@@ -15,6 +15,7 @@ import { type TypesEnum } from '@/types/userMemory';
 import EditableModal from '../features/EditableModal';
 import Loading from '../features/Loading';
 import { SCROLL_PARENT_ID } from '../features/TimeLineView/useScrollParent';
+import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
 import IdentityRightPanel from './features/IdentityRightPanel';
@@ -37,11 +38,13 @@ const IdentitiesArea = memo(() => {
   const useFetchIdentities = useUserMemoryStore((s) => s.useFetchIdentities);
   const resetIdentitiesList = useUserMemoryStore((s) => s.resetIdentitiesList);
 
+  useResetDetailSelection('identityId', [searchValue, typeFilter]);
+
   // Reset list when search or type filter changes
   useEffect(() => {
     const types = typeFilter === 'all' ? undefined : [typeFilter as TypesEnum];
     resetIdentitiesList({ q: searchValue || undefined, types });
-  }, [searchValue, typeFilter]);
+  }, [searchValue, typeFilter, resetIdentitiesList]);
 
   // Call SWR hook to fetch data
   const { isLoading } = useFetchIdentities({

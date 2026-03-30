@@ -4,15 +4,44 @@ import { DEFAULT_PAGE_KIND, getPageKindFromDocument, type PageKind } from '@/uti
 
 import { type PageState } from '../../initialState';
 
+interface FilteredDocumentsSnapshot {
+  count: number;
+  displayed: LobeDocument[];
+  hasMore: boolean;
+  items: LobeDocument[];
+}
+
 /**
  * Check if documents are still loading (undefined means not yet loaded)
  */
 const isDocumentsLoading = (s: PageState): boolean => s.documents === undefined;
 
+const EMPTY_DOCUMENTS: LobeDocument[] = [];
+const filteredDocumentsCache = new WeakMap<LobeDocument[], Map<string, LobeDocument[]>>();
+const filteredDocumentsSnapshotCache = new WeakMap<
+  LobeDocument[],
+  Map<number, FilteredDocumentsSnapshot>
+>();
+
+const getFilteredDocumentsCacheKey = (
+  pageKind: PageKind,
+  searchKeywords: string,
+  showOnlyPagesWithoutSourceSet: boolean,
+) => `${pageKind}|${showOnlyPagesWithoutSourceSet ? 1 : 0}|${searchKeywords.trim().toLowerCase()}`;
+
 const filterDocuments = (s: PageState, pageKind: PageKind = DEFAULT_PAGE_KIND): LobeDocument[] => {
-  const docs = s.documents ?? [];
+  const docs = s.documents ?? EMPTY_DOCUMENTS;
 
   const { searchKeywords, showOnlyPagesWithoutSourceSet } = s;
+  const cacheKey = getFilteredDocumentsCacheKey(
+    pageKind,
+    searchKeywords,
+    showOnlyPagesWithoutSourceSet,
+  );
+  const cache = filteredDocumentsCache.get(docs);
+  const cachedResult = cache?.get(cacheKey);
+
+  if (cachedResult) return cachedResult;
 
   let result = docs;
 
@@ -37,36 +66,53 @@ const filterDocuments = (s: PageState, pageKind: PageKind = DEFAULT_PAGE_KIND): 
   }
 
   // Sort by creation date (newest first)
-  return [...result].sort((a: LobeDocument, b: LobeDocument) => {
+  const sortedDocuments = [...result].sort((a: LobeDocument, b: LobeDocument) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return dateB - dateA;
   });
+
+  if (cache) {
+    cache.set(cacheKey, sortedDocuments);
+  } else {
+    filteredDocumentsCache.set(docs, new Map([[cacheKey, sortedDocuments]]));
+  }
+
+  return sortedDocuments;
 };
 
-const getFilteredDocuments = (s: PageState): LobeDocument[] => {
-  return filterDocuments(s);
-};
+const getFilteredDocumentsSnapshot = (
+  items: LobeDocument[],
+  pageSize: number,
+): FilteredDocumentsSnapshot => {
+  const cache = filteredDocumentsSnapshotCache.get(items);
+  const cachedResult = cache?.get(pageSize);
 
-const getFilteredDocumentsByKind =
-  (pageKind: PageKind) =>
-  (s: PageState): LobeDocument[] => {
-    return filterDocuments(s, pageKind);
+  if (cachedResult) return cachedResult;
+
+  const snapshot = {
+    count: items.length,
+    displayed: items.slice(0, pageSize),
+    hasMore: items.length > pageSize,
+    items,
   };
 
-// Limited filtered documents for sidebar display
-const getFilteredDocumentsLimited = (s: PageState): LobeDocument[] => {
-  const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-  const allDocs = getFilteredDocuments(s);
-  return allDocs.slice(0, pageSize);
+  if (cache) {
+    cache.set(pageSize, snapshot);
+  } else {
+    filteredDocumentsSnapshotCache.set(items, new Map([[pageSize, snapshot]]));
+  }
+
+  return snapshot;
 };
 
-const getFilteredDocumentsLimitedByKind =
+const getFilteredDocumentsSnapshotByKind =
   (pageKind: PageKind) =>
-  (s: PageState): LobeDocument[] => {
+  (s: PageState): FilteredDocumentsSnapshot => {
     const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-    const allDocs = filterDocuments(s, pageKind);
-    return allDocs.slice(0, pageSize);
+    const items = filterDocuments(s, pageKind);
+
+    return getFilteredDocumentsSnapshot(items, pageSize);
   };
 
 const getDocumentById = (docId: string | undefined) => (s: PageState) => {
@@ -82,44 +128,11 @@ const isLoadingMoreDocuments = (s: PageState): boolean => s.isLoadingMoreDocumen
 
 const documentsTotal = (s: PageState): number => s.documentsTotal;
 
-// Check if filtered documents have more than displayed
-const hasMoreFilteredDocuments = (s: PageState): boolean => {
-  const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-  const allDocs = getFilteredDocuments(s);
-  return allDocs.length > pageSize;
-};
-
-const hasMoreFilteredDocumentsByKind =
-  (pageKind: PageKind) =>
-  (s: PageState): boolean => {
-    const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-    const allDocs = filterDocuments(s, pageKind);
-    return allDocs.length > pageSize;
-  };
-
-// Get total count of filtered documents
-const filteredDocumentsCount = (s: PageState): number => {
-  return getFilteredDocuments(s).length;
-};
-
-const filteredDocumentsCountByKind =
-  (pageKind: PageKind) =>
-  (s: PageState): number => {
-    return filterDocuments(s, pageKind).length;
-  };
-
 export const listSelectors = {
   documentsTotal,
-  filteredDocumentsCount,
-  filteredDocumentsCountByKind,
   getDocumentById,
-  getFilteredDocuments,
-  getFilteredDocumentsByKind,
-  getFilteredDocumentsLimited,
-  getFilteredDocumentsLimitedByKind,
+  getFilteredDocumentsSnapshotByKind,
   hasMoreDocuments,
-  hasMoreFilteredDocuments,
-  hasMoreFilteredDocumentsByKind,
   isDocumentsLoading,
   isLoadingMoreDocuments,
 };

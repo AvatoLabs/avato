@@ -119,7 +119,7 @@ vi.mock('@/features/ResourceSpaces', () => ({
       ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
       : `/content/source-sets/${sourceSetId}`,
   buildContentPreviewPath: (spaceId: string | null | undefined, fileId: string) =>
-    spaceId ? `/content/spaces/${spaceId}?file=${fileId}` : `/content?file=${fileId}`,
+    spaceId ? `/content/spaces/${spaceId}/item/${fileId}` : `/content/item/${fileId}`,
 }));
 
 describe('AgentSources', () => {

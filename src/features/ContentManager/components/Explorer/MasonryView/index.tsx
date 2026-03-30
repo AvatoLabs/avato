@@ -8,105 +8,52 @@ import { type UIEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useFolderPath } from '@/routes/(main)/content/features/hooks/useFolderPath';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
-import { sortFileList } from '@/routes/(main)/content/features/store/selectors';
 import { useFileStore } from '@/store/file';
-import { useVisibleResources } from '@/store/file/slices/content/hooks';
-import { type FileListItem } from '@/types/files';
 
 import EmptyState from '../../EmptyState';
-import { buildExplorerQueryParams } from '../queryParams';
+import { type ExplorerItem } from '../items';
 import { useMasonryColumnCount } from '../useMasonryColumnCount';
 import MasonryItemWrapper from './MasonryItem/MasonryItemWrapper';
 import MasonryViewSkeleton from './Skeleton';
 
-const MasonryView = memo(function MasonryView() {
+interface MasonryViewProps {
+  data: ExplorerItem[];
+  hasResolvedData: boolean;
+  isLoading: boolean;
+}
+
+const MasonryView = memo<MasonryViewProps>(function MasonryView({
+  data,
+  hasResolvedData,
+  isLoading,
+}) {
   // Access all state from Resource Manager store
   const [
     sourceSetId,
-    category,
-    mode,
     spaceId,
     selectedFileIds,
     setSelectedFileIds,
     storeIsMasonryReady,
-    sorter,
-    sortType,
     storeIsTransitioning,
     currentFolderId,
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
-    s.category,
-    s.mode,
     s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
     s.isMasonryReady,
-    s.sorter,
-    s.sortType,
     s.isTransitioning,
     s.currentFolderId,
   ]);
 
-  const isExplorerMode = mode === 'explorer';
-
   const { t } = useTranslation('file');
   const columnCount = useMasonryColumnCount();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const { currentFolderSlug } = useFolderPath();
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
-
-  const queryParams = useMemo(
-    () =>
-      buildExplorerQueryParams({
-        category,
-        currentFolderSlug,
-        sourceSetId,
-        sorter,
-        sortType,
-        spaceId,
-      }),
-    [category, currentFolderSlug, sourceSetId, sorter, sortType, spaceId],
-  );
-
-  const {
-    hasMore,
-    hasResolvedData,
-    isLoading,
-    items: resourceList,
-  } = useVisibleResources(queryParams, isExplorerMode);
   const loadMoreResources = useFileStore((s) => s.loadMoreResources);
-
-  // Map ContentItem[] to FileListItem[] for compatibility
-  const rawData = resourceList?.map(
-    (item): FileListItem => ({
-      chunkCount: item.chunkCount ?? null,
-      chunkingError: item.chunkingError ?? null,
-      chunkingStatus: (item.chunkingStatus as any) ?? null,
-      content: item.content,
-      createdAt: item.createdAt,
-      editorData: item.editorData,
-      embeddingError: item.embeddingError ?? null,
-      embeddingStatus: (item.embeddingStatus as any) ?? null,
-      fileId: item.fileId ?? null,
-      fileType: item.fileType,
-      finishEmbedding: item.finishEmbedding ?? false,
-      id: item.id,
-      metadata: item.metadata,
-      name: item.name,
-      parentId: item.parentId,
-      size: item.size,
-      slug: item.slug,
-      sourceType: item.sourceType,
-      updatedAt: item.updatedAt,
-      url: item.url ?? '',
-    }),
-  );
-
-  // Sort data using current sort settings
-  const data = sortFileList(rawData, sorter, sortType) || [];
+  const hasMore = useFileStore((s) => s.hasMore);
 
   const dataLength = data.length;
   const effectiveIsLoading = isLoading ?? false;
