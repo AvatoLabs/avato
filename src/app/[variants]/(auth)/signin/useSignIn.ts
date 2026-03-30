@@ -11,6 +11,7 @@ import { message } from '@/components/AntdStaticMethods';
 import { requestPasswordReset, signIn } from '@/libs/better-auth/auth-client';
 import { isBuiltinProvider, normalizeProviderId } from '@/libs/better-auth/utils/client';
 
+import { readJSONResponse } from '../../../../utils/client/readJSONResponse';
 import { useAuthServerConfigStore } from '../_layout/AuthServerConfigProvider';
 import { EMAIL_REGEX, USERNAME_REGEX } from './SignInEmailStep';
 
@@ -105,8 +106,15 @@ export const useSignIn = () => {
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });
-      const data: ResolveUsernameResponseData = await response.json();
-      if (!response.ok || !data.exists || !data.email) {
+      const { data, responseText } = await readJSONResponse<ResolveUsernameResponseData>(response);
+
+      if (!response.ok) {
+        console.error('Resolve username request failed:', response.status, responseText);
+        message.error(t('betterAuth.signin.error'));
+        return null;
+      }
+
+      if (!data || !data.exists || !data.email) {
         message.error(t('betterAuth.errors.usernameNotRegistered'));
         return null;
       }
@@ -130,7 +138,13 @@ export const useSignIn = () => {
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       });
-      const data: CheckUserResponseData = await response.json();
+      const { data, responseText } = await readJSONResponse<CheckUserResponseData>(response);
+
+      if (!response.ok || !data) {
+        console.error('Check user request failed:', response.status, responseText);
+        message.error(t('betterAuth.signin.error'));
+        return;
+      }
 
       if (!data.exists) {
         if (identifierType === 'username') {

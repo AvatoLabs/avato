@@ -10,6 +10,17 @@ import { getOIDCProvider } from '@/server/services/oidc/oidcProvider';
 
 const log = debug('lobe-oidc:route'); // Create a debug instance with a namespace
 
+const shouldReturnJSONError = (req: NextRequest, pathname: string) => {
+  const accept = req.headers.get('accept') || '';
+
+  if (accept.includes('application/json')) return true;
+  if (req.method !== 'GET') return true;
+  if (pathname.includes('/.well-known/')) return true;
+  if (pathname.endsWith('/jwks')) return true;
+
+  return false;
+};
+
 const handler = async (req: NextRequest) => {
   const requestUrl = new URL(req.url);
   log(`Received ${req.method.toUpperCase()} request: %s %s`, req.method, req.url);
@@ -86,7 +97,19 @@ const handler = async (req: NextRequest) => {
     });
   } catch (error) {
     log(`Error handling OIDC ${req.method} request: %O`, error); // Log method in error
-    return new NextResponse(`Internal Server Error: ${(error as Error).message}`, { status: 500 });
+    const message = (error as Error).message;
+
+    if (shouldReturnJSONError(req, requestUrl.pathname)) {
+      return NextResponse.json(
+        {
+          error: 'internal_server_error',
+          message,
+        },
+        { status: 500 },
+      );
+    }
+
+    return new NextResponse(`Internal Server Error: ${message}`, { status: 500 });
   }
 };
 
