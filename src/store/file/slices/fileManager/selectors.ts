@@ -38,8 +38,24 @@ const isUploadingFiles = (s: FilesStoreState) =>
 
 const overviewUploadingStatus = (s: FilesStoreState): FileUploadStatus => {
   if (s.dockUploadFileList.length === 0) return 'pending';
-  if (s.dockUploadFileList.some((file) => uploadStatusArray.has(file.status))) {
+
+  if (s.dockUploadFileList.some((file) => file.status === 'uploading' || file.status === 'pending')) {
     return 'uploading';
+  }
+
+  if (s.dockUploadFileList.some((file) => file.status === 'processing')) {
+    return 'processing';
+  }
+
+  if (s.dockUploadFileList.some((file) => file.status === 'error')) {
+    return 'error';
+  }
+
+  if (
+    s.dockUploadFileList.every((file) => file.status === 'cancelled') &&
+    s.dockUploadFileList.length > 0
+  ) {
+    return 'cancelled';
   }
 
   return 'success';

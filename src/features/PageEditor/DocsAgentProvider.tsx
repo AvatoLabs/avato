@@ -18,9 +18,10 @@ import { shouldSyncDocsAgentToUserDefault } from '@/utils/docsAgentModel';
 
 interface DocsAgentProviderProps {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
-export const DocsAgentProvider = memo<DocsAgentProviderProps>(({ children }) => {
+export const DocsAgentProvider = memo<DocsAgentProviderProps>(({ children, fallback }) => {
   const [useInitBuiltinAgent, updateAgentConfigById] = useAgentStore((s) => [
     s.useInitBuiltinAgent,
     s.updateAgentConfigById,
@@ -86,7 +87,9 @@ export const DocsAgentProvider = memo<DocsAgentProviderProps>(({ children }) => 
   // Get operation state for reactive updates
   const operationState = useOperationState(context);
 
-  if (!docsAgentId || shouldSyncDocsAgent) return <Loading debugId="DocsAgentProvider" />;
+  if (!docsAgentId || shouldSyncDocsAgent) {
+    return fallback || <Loading debugId="DocsAgentProvider" />;
+  }
 
   return (
     <ConversationProvider

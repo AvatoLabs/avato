@@ -166,10 +166,13 @@ const ContentManager = memo(() => {
     setMode('explorer');
     setCurrentViewItemId(undefined);
     // Remove the file query parameter from URL
-    setSearchParams((prev) => {
-      prev.delete('file');
-      return prev;
-    });
+    setSearchParams(
+      (prev) => {
+        prev.delete('file');
+        return prev;
+      },
+      { replace: true },
+    );
     // Reset document title to default
     document.title = BRANDING_NAME;
   };

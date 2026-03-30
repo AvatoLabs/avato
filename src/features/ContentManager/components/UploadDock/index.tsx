@@ -64,7 +64,10 @@ const UploadDock = memo(() => {
     fileManagerSelectors.overviewUploadingStatus,
     isEqual,
   );
-  const isUploading = overviewUploadingStatus === 'uploading';
+  const isBusy =
+    overviewUploadingStatus === 'pending' ||
+    overviewUploadingStatus === 'uploading' ||
+    overviewUploadingStatus === 'processing';
 
   const icon = useMemo(() => {
     switch (overviewUploadingStatus) {
@@ -85,8 +88,8 @@ const UploadDock = memo(() => {
 
   useEffect(() => {
     if (show) return;
-    if (isUploading) setShow(true);
-  }, [isUploading, show]);
+    if (isBusy) setShow(true);
+  }, [isBusy, show]);
 
   if (count === 0 || !show) return;
 
@@ -126,7 +129,7 @@ const UploadDock = memo(() => {
           {t(`uploadDock.uploadStatus.${overviewUploadingStatus}`)} ·{' '}
           {t('uploadDock.totalCount', { count })}
         </Flexbox>
-        {!isUploading && (
+        {!isBusy && (
           <ActionIcon
             icon={RESOURCE_ENTRY_ICONS.close}
             onClick={(e) => {

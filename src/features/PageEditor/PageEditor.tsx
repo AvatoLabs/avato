@@ -167,7 +167,6 @@ const PageEditorCanvas = memo<PageEditorCanvasProps>(
               <DiffAllToolbar documentId={documentId} editor={editor} />
             )}
           </Flexbox>
-          <Copilot />
         </Flexbox>
       </>
     );
@@ -218,11 +217,12 @@ export const PageEditor: FC<PageEditorProps> = ({
         onSave={onSave}
         onTitleChange={onTitleChange}
       >
-        <DocsAgentProvider>
-          <PageEditorCanvas
-            allowHorizontalScroll={allowHorizontalScroll}
-            contentMinWidth={contentMinWidth}
-          />
+        <PageEditorCanvas
+          allowHorizontalScroll={allowHorizontalScroll}
+          contentMinWidth={contentMinWidth}
+        />
+        <DocsAgentProvider fallback={<Copilot loading />}>
+          <Copilot />
         </DocsAgentProvider>
       </PageEditorProvider>
     </EditorProvider>
