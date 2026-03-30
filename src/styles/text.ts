@@ -1,4 +1,4 @@
-import { createStaticStyles, css, cx } from 'antd-style';
+import { createStaticStyles, css, cssVar, cx } from 'antd-style';
 
 export const lineEllipsis = (line: number) =>
   cx(css`
@@ -35,7 +35,7 @@ export const inspectorTextStyles = createStaticStyles(({ css, cssVar }) => ({
  * - primary: default blue highlight
  * - info: info blue highlight
  * - warning: warning yellow highlight
- * - gold: gold highlight (for page-agent etc.)
+ * - gold: gold highlight (for docs-agent etc.)
  */
 export const highlightTextStyles = createStaticStyles(({ css, cssVar }) => {
   const highlightBase = (highlightColor: string) => css`
@@ -58,3 +58,14 @@ export const highlightTextStyles = createStaticStyles(({ css, cssVar }) => {
     warning: highlightBase(cssVar.colorWarningBg),
   };
 });
+
+/**
+ * Theme-aligned text selection background.
+ * Uses semantic theme tokens so custom primary colors propagate automatically.
+ */
+export const themedSelectionCss = (selector = '&') => `
+  ${selector}::selection {
+    background: ${cssVar.colorPrimaryBgHover};
+    color: ${cssVar.colorTextLightSolid};
+  }
+`;

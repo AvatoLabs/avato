@@ -1,4 +1,4 @@
-import { type KnowledgeItem, KnowledgeType } from '@lobechat/types';
+import { type AgentSourceItem, AgentSourceKind } from '@lobechat/types';
 import debug from 'debug';
 import { z } from 'zod';
 
@@ -197,7 +197,7 @@ export const sessionRouter = router({
 
   getConversationFiles: sessionProcedure
     .input(conversationContextSchema)
-    .query(async ({ ctx, input }): Promise<KnowledgeItem[]> => {
+    .query(async ({ ctx, input }): Promise<AgentSourceItem[]> => {
       const sessionId = await resolveConversationFileSessionId(input, ctx.serverDB, ctx.userId);
 
       if (!sessionId) return [];
@@ -216,7 +216,7 @@ export const sessionRouter = router({
           fileType: file.fileType,
           id: file.id,
           name: file.name,
-          type: KnowledgeType.File,
+          type: AgentSourceKind.File,
         }))
         .sort(
           (a, b) =>

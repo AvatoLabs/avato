@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { describe, expect, it, vi } from 'vitest';
 import { read, utils } from 'xlsx';
 
 import {
   duplicateTableView,
   normalizeTableCellValue,
+  normalizeTableDocument,
   projectTableView,
   TABLE_DOCUMENT_VERSION,
   type TableDocumentState,
@@ -113,5 +115,147 @@ describe('tableDocument', () => {
     expect(table.views[1]?.fields[0]?.id).not.toBe('field_name');
     expect(table.views[1]?.records[0]?.id).not.toBe('record_1');
     expect(table.views[1]?.records[0]?.cells[table.views[1]!.fields[0]!.id]).toBe('Alpha');
+  });
+
+  it('round-trips single-column markdown tables without falling back to plain text rows', () => {
+    const table = normalizeTableDocument('| Name |\n| --- |\n| RealBug |');
+
+    expect(table.views[0]?.fields).toHaveLength(1);
+    expect(table.views[0]?.fields[0]?.name).toBe('Name');
+    expect(table.views[0]?.records[0]?.cells[table.views[0]!.fields[0]!.id]).toBe('RealBug');
+    expect(tableDocumentToMarkdown(table)).toContain('| RealBug |');
+  });
+
+  it('normalizes bugged auto-generated column names back to positional defaults', () => {
+    const markdown = [
+      '| Name | Column 2 | Column 6 | Column 1 | Column 3 | Column 4 | Column 5 |',
+      '| --- | --- | --- | --- | --- | --- | --- |',
+      '| Alpha | | | | | | |',
+    ].join('\n');
+
+    const table = normalizeTableDocument(markdown, {
+      activeViewId: 'view_1',
+      version: TABLE_DOCUMENT_VERSION,
+      views: [
+        {
+          fields: [
+            { id: 'field_1', name: 'Name', type: 'text', width: 260 },
+            { id: 'field_2', name: 'Column 2', type: 'text', width: 180 },
+            { id: 'field_3', name: 'Column 6', type: 'text', width: 180 },
+            { id: 'field_4', name: 'Column 1', type: 'text', width: 180 },
+            { id: 'field_5', name: 'Column 3', type: 'text', width: 180 },
+            { id: 'field_6', name: 'Column 4', type: 'text', width: 180 },
+            { id: 'field_7', name: 'Column 5', type: 'text', width: 180 },
+          ],
+          filters: [],
+          hiddenFieldIds: [],
+          id: 'view_1',
+          name: 'Sheet 1',
+          records: [
+            {
+              cells: {
+                field_1: 'Alpha',
+                field_2: '',
+                field_3: '',
+                field_4: '',
+                field_5: '',
+                field_6: '',
+                field_7: '',
+              },
+              id: 'record_1',
+            },
+          ],
+          rowHeight: 'normal',
+          sorts: [],
+          type: 'grid',
+        },
+      ],
+    });
+
+    expect(table.views[0]?.fields.map((field) => field.name)).toEqual([
+      'Name',
+      'Column 2',
+      'Column 3',
+      'Column 4',
+      'Column 5',
+      'Column 6',
+      'Column 7',
+    ]);
+    expect(tableDocumentToMarkdown(table)).not.toContain('Column 1');
+  });
+
+  it('normalizes localized bugged auto-generated column names back to positional defaults', () => {
+    const translateSpy = vi.spyOn(i18n, 't').mockImplementation((key, options) => {
+      if (key === 'docEditor.table.defaultColumnName') {
+        return `列 ${String(options?.index ?? '')}`.trim();
+      }
+      if (key === 'docEditor.table.primaryColumnName') return '名称';
+      if (key === 'docEditor.table.sheetDefaultName') {
+        return `表 ${String(options?.index ?? '')}`.trim();
+      }
+      if (key === 'docEditor.table.untitledFieldName') return '未命名字段';
+
+      return String(options?.defaultValue ?? key);
+    });
+
+    try {
+      const markdown = [
+        '| 名称 | 列 2 | 列 6 | 列 1 | 列 3 | 列 4 | 列 5 |',
+        '| --- | --- | --- | --- | --- | --- | --- |',
+        '| Alpha | | | | | | |',
+      ].join('\n');
+
+      const table = normalizeTableDocument(markdown, {
+        activeViewId: 'view_1',
+        version: TABLE_DOCUMENT_VERSION,
+        views: [
+          {
+            fields: [
+              { id: 'field_1', name: '名称', type: 'text', width: 260 },
+              { id: 'field_2', name: '列 2', type: 'text', width: 180 },
+              { id: 'field_3', name: '列 6', type: 'text', width: 180 },
+              { id: 'field_4', name: '列 1', type: 'text', width: 180 },
+              { id: 'field_5', name: '列 3', type: 'text', width: 180 },
+              { id: 'field_6', name: '列 4', type: 'text', width: 180 },
+              { id: 'field_7', name: '列 5', type: 'text', width: 180 },
+            ],
+            filters: [],
+            hiddenFieldIds: [],
+            id: 'view_1',
+            name: '表 1',
+            records: [
+              {
+                cells: {
+                  field_1: 'Alpha',
+                  field_2: '',
+                  field_3: '',
+                  field_4: '',
+                  field_5: '',
+                  field_6: '',
+                  field_7: '',
+                },
+                id: 'record_1',
+              },
+            ],
+            rowHeight: 'normal',
+            sorts: [],
+            type: 'grid',
+          },
+        ],
+      });
+
+      expect(table.views[0]?.fields.map((field) => field.name)).toEqual([
+        '名称',
+        '列 2',
+        '列 3',
+        '列 4',
+        '列 5',
+        '列 6',
+        '列 7',
+      ]);
+      expect(tableDocumentToMarkdown(table)).not.toContain('列 1');
+    } finally {
+      translateSpy.mockRestore();
+    }
   });
 });

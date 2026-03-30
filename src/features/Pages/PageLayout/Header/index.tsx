@@ -1,13 +1,15 @@
 'use client';
 
-import { Flexbox, SearchBar, Text } from '@lobehub/ui';
+import { Flexbox, SearchBar, Tag, Text } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 import { usePageKind } from '@/features/Pages/usePageKind';
-import { pageSelectors, usePageStore } from '@/store/page';
-import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/page';
+import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { pageSelectors, usePageStore } from '@/store/docs';
+import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import Actions from '../Body/Actions';
 import AddButton from './AddButton';
@@ -18,6 +20,7 @@ const Header = memo(() => {
   const pageKind = usePageKind();
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const filteredDocumentsCount = usePageStore(pageSelectors.filteredDocumentsCountByKind(pageKind));
+  const spaceName = useSpaceName(getActiveWorkspaceSpaceId());
   const [searchKeywords, setSearchKeywords] = usePageStore((s) => [
     s.searchKeywords,
     s.setSearchKeywords,
@@ -31,6 +34,11 @@ const Header = memo(() => {
         titleTo={getPageRootPath(pageKind)}
       />
       <Flexbox gap={8} paddingBlock={'0 8px'} paddingInline={8}>
+        {spaceName && (
+          <Flexbox horizontal paddingInline={4}>
+            <Tag size={'small'}>{spaceName}</Tag>
+          </Flexbox>
+        )}
         <Nav />
         <SearchBar
           allowClear

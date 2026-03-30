@@ -10,8 +10,8 @@ import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { useGlobalStore } from '@/store/global';
+import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 import { isModifierClick } from '@/utils/navigation';
-import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/page';
 
 interface Item {
   icon: NavItemProps['icon'];

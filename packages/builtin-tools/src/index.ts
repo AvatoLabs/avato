@@ -2,17 +2,17 @@ import { AgentBuilderManifest } from '@lobechat/builtin-tool-agent-builder';
 import { AgentManagementManifest } from '@lobechat/builtin-tool-agent-management';
 import { CalculatorManifest } from '@lobechat/builtin-tool-calculator';
 import { CloudSandboxManifest } from '@lobechat/builtin-tool-cloud-sandbox';
+import { DocsAgentManifest } from '@lobechat/builtin-tool-docs-agent';
 import { GroupAgentBuilderManifest } from '@lobechat/builtin-tool-group-agent-builder';
 import { GroupManagementManifest } from '@lobechat/builtin-tool-group-management';
 import { GTDManifest } from '@lobechat/builtin-tool-gtd';
-import { KnowledgeBaseManifest } from '@lobechat/builtin-tool-knowledge-base';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { NotebookManifest } from '@lobechat/builtin-tool-notebook';
-import { PageAgentManifest } from '@lobechat/builtin-tool-page-agent';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
 import { SkillStoreManifest } from '@lobechat/builtin-tool-skill-store';
 import { SkillsManifest } from '@lobechat/builtin-tool-skills';
+import { SourceSetManifest } from '@lobechat/builtin-tool-source-set';
 import { LobeToolsManifest } from '@lobechat/builtin-tool-tools';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { isDesktop } from '@lobechat/const';
@@ -27,7 +27,7 @@ export const defaultToolIds = [
   SkillsManifest.identifier,
   SkillStoreManifest.identifier,
   WebBrowsingManifest.identifier,
-  KnowledgeBaseManifest.identifier,
+  SourceSetManifest.identifier,
   MemoryManifest.identifier,
 ];
 
@@ -79,15 +79,15 @@ export const builtinTools: LobeBuiltinTool[] = [
   },
   {
     hidden: true,
-    identifier: KnowledgeBaseManifest.identifier,
-    manifest: KnowledgeBaseManifest,
+    identifier: SourceSetManifest.identifier,
+    manifest: SourceSetManifest,
     type: 'builtin',
   },
   {
     discoverable: false,
     hidden: true,
-    identifier: PageAgentManifest.identifier,
-    manifest: PageAgentManifest,
+    identifier: DocsAgentManifest.identifier,
+    manifest: DocsAgentManifest,
     type: 'builtin',
   },
   {

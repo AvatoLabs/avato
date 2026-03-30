@@ -1,6 +1,7 @@
 import isEqual from 'fast-deep-equal';
 import { type SWRResponse } from 'swr';
 
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { fileService } from '@/services/file';
 import { topicService } from '@/services/topic';
@@ -70,10 +71,12 @@ export class RecentActionImpl {
   };
 
   useFetchRecentTopics = (isLogin: boolean | undefined): SWRResponse<RecentTopic[]> => {
+    const activeSpaceId = getActiveWorkspaceSpaceId();
+
     return useClientDataSWRWithSync<RecentTopic[]>(
       // Only fetch when login status is explicitly true (not null/undefined)
-      isLogin === true ? [FETCH_RECENT_TOPICS_KEY, isLogin] : null,
-      async () => topicService.getRecentTopics(12),
+      isLogin === true ? [FETCH_RECENT_TOPICS_KEY, isLogin, activeSpaceId ?? null] : null,
+      async () => topicService.getRecentTopics(12, activeSpaceId),
       {
         onData: (data) => {
           if (this.#get().isRecentTopicsInit && isEqual(this.#get().recentTopics, data)) return;

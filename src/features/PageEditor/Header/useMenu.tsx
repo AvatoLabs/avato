@@ -8,13 +8,13 @@ import { CopyPlus, Download, Link2, Maximize2, Trash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePageStore } from '@/store/docs';
 import { useDocumentStore } from '@/store/document';
 import { editorSelectors } from '@/store/document/slices/editor';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { usePageStore } from '@/store/page';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore, useStoreApi } from '../store';
 
@@ -82,10 +82,10 @@ export const useMenu = (): { menuItems: any[] } => {
     if (!documentId) return;
     try {
       await duplicateDocument(documentId);
-      message.success(t('pageEditor.duplicateSuccess'));
+      message.success(t('docEditor.duplicateSuccess'));
     } catch (error) {
       console.error('Failed to duplicate page:', error);
-      message.error(t('pageEditor.duplicateError'));
+      message.error(t('docEditor.duplicateError'));
     }
   }, [documentId, duplicateDocument, message, t]);
 
@@ -128,11 +128,11 @@ export const useMenu = (): { menuItems: any[] } => {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        message.success(t('pageEditor.exportSuccess'));
+        message.success(t('docEditor.exportSuccess'));
       }
     } catch (error) {
       console.error('Failed to export markdown:', error);
-      message.error(t('pageEditor.exportError'));
+      message.error(t('docEditor.exportError'));
     }
   }, [documentId, isTablePage, message, storeApi, t]);
 
@@ -160,11 +160,11 @@ export const useMenu = (): { menuItems: any[] } => {
         });
       } else {
         downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), fileName);
-        message.success(t('pageEditor.exportSuccess'));
+        message.success(t('docEditor.exportSuccess'));
       }
     } catch (error) {
       console.error('Failed to export csv:', error);
-      message.error(t('pageEditor.exportError'));
+      message.error(t('docEditor.exportError'));
     }
   }, [documentId, message, storeApi, t]);
 
@@ -193,11 +193,11 @@ export const useMenu = (): { menuItems: any[] } => {
         });
       } else {
         downloadBlob(new Blob([decodeBase64(base64Content)], { type: XLSX_MIME_TYPE }), fileName);
-        message.success(t('pageEditor.exportSuccess'));
+        message.success(t('docEditor.exportSuccess'));
       }
     } catch (error) {
       console.error('Failed to export xlsx:', error);
-      message.error(t('pageEditor.exportError'));
+      message.error(t('docEditor.exportError'));
     }
   }, [documentId, message, storeApi, t]);
 
@@ -206,24 +206,24 @@ export const useMenu = (): { menuItems: any[] } => {
       ? [
           {
             key: 'export-xlsx',
-            label: t('pageEditor.menu.export.xlsx'),
+            label: t('docEditor.menu.export.xlsx'),
             onClick: handleExportXlsx,
           },
           {
             key: 'export-csv',
-            label: t('pageEditor.menu.export.csv'),
+            label: t('docEditor.menu.export.csv'),
             onClick: handleExportCsv,
           },
           {
             key: 'export-markdown',
-            label: t('pageEditor.menu.export.markdown'),
+            label: t('docEditor.menu.export.markdown'),
             onClick: handleExportMarkdown,
           },
         ]
       : [
           {
             key: 'export-markdown',
-            label: t('pageEditor.menu.export.markdown'),
+            label: t('docEditor.menu.export.markdown'),
             onClick: handleExportMarkdown,
           },
         ];
@@ -253,7 +253,7 @@ export const useMenu = (): { menuItems: any[] } => {
       {
         icon: <Icon icon={Link2} />,
         key: 'copy-link',
-        label: t('pageEditor.menu.copyLink'),
+        label: t('docEditor.menu.copyLink'),
         onClick: () => {
           const state = storeApi.getState();
           state.handleCopyLink(t as any, message);
@@ -276,7 +276,7 @@ export const useMenu = (): { menuItems: any[] } => {
         children: exportItems,
         icon: <Icon icon={Download} />,
         key: 'export',
-        label: t('pageEditor.menu.export'),
+        label: t('docEditor.menu.export'),
       },
     ];
 
@@ -292,7 +292,7 @@ export const useMenu = (): { menuItems: any[] } => {
             <div style={{ color: cssVar.colorTextTertiary, fontSize: 12, lineHeight: 1.6 }}>
               <div>
                 {lastUpdatedTime
-                  ? t('pageEditor.editedAt', {
+                  ? t('docEditor.editedAt', {
                       time: dayjs(lastUpdatedTime).format('MMMM D, YYYY [at] h:mm A'),
                     })
                   : ''}

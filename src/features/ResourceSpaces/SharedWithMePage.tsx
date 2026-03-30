@@ -10,14 +10,14 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildResourceLibraryPath, buildResourcePreviewPath } from './paths';
+import { buildContentPreviewPath, buildSourceSetPath } from './paths';
 
 const SharedWithMePage = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
   const { data, isLoading } = useSWR(
     'resource-shared-with-me',
-    () => lambdaClient.resourceShare.listSharedWithMe.query(),
+    () => lambdaClient.contentShare.listSharedWithMe.query(),
     { revalidateOnFocus: false },
   );
   const items = (data ?? []).filter((item): item is NonNullable<typeof item> => !!item);
@@ -45,16 +45,16 @@ const SharedWithMePage = memo(() => {
         <Flexbox gap={12}>
           {items.map((item) => {
             const icon =
-              item.kind === 'knowledge_base'
+              item.kind === 'source_set'
                 ? LibraryIcon
                 : item.kind === 'document'
                   ? FolderOpenIcon
                   : FilesIcon;
 
             const targetPath =
-              item.kind === 'knowledge_base'
-                ? buildResourceLibraryPath(item.spaceId, item.localId)
-                : buildResourcePreviewPath(item.spaceId, item.localId);
+              item.kind === 'source_set'
+                ? buildSourceSetPath(item.spaceId, item.localId)
+                : buildContentPreviewPath(item.spaceId, item.localId);
 
             return (
               <Block
@@ -62,7 +62,7 @@ const SharedWithMePage = memo(() => {
                 horizontal
                 align={'center'}
                 gap={12}
-                key={item.resourceUid}
+                key={item.contentUid}
                 padding={16}
                 variant={'outlined'}
                 onClick={() => navigate(targetPath)}

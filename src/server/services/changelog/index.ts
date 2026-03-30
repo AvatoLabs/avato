@@ -5,7 +5,7 @@ import semver from 'semver';
 import urlJoin from 'url-join';
 
 import { FetchCacheTag } from '@/const/cacheControl';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { type ChangelogIndexItem } from '@/types/changelog';
 import { markdownToTxt } from '@/utils/markdownToTxt';
 

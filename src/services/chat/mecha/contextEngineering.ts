@@ -289,7 +289,7 @@ export const contextEngineering = async ({
 
   // Get enabled agent files with content and knowledge bases from agent store
   const agentFiles = agentSelectors.currentAgentFiles(agentStoreState);
-  const agentKnowledgeBases = agentSelectors.currentAgentKnowledgeBases(agentStoreState);
+  const agentSourceSets = agentSelectors.currentAgentSourceSets(agentStoreState);
 
   const fileContents = agentFiles
     .filter((file) => file.enabled && file.content)
@@ -315,9 +315,9 @@ export const contextEngineering = async ({
     }
   }
 
-  const knowledgeBases = agentKnowledgeBases
-    .filter((kb) => kb.enabled)
-    .map((kb) => ({ description: kb.description, id: kb.id, name: kb.name }));
+  const sourceSets = agentSourceSets
+    .filter((item) => item.enabled)
+    .map((item) => ({ description: item.description, id: item.id, name: item.name }));
 
   // Resolve user memories from cache only (no network requests) to avoid blocking sendMessage
   let userMemoryData: UserMemoryData | undefined;
@@ -424,14 +424,14 @@ export const contextEngineering = async ({
     const availablePlugins = [];
 
     // Builtin tools (use allMetaList to include hidden tools like web-browsing, cloud-sandbox, etc.)
-    // Exclude only truly internal tools (agent-management itself, agent-builder, page-agent)
+    // Exclude only truly internal tools (agent-management itself, agent-builder, docs-agent)
     const allBuiltinTools = builtinToolSelectors.allMetaList(toolState);
     const klavisIdentifiers = new Set(KLAVIS_SERVER_TYPES.map((t) => t.identifier));
     const INTERNAL_TOOLS = new Set([
       'lobe-agent-management', // Don't show agent-management in its own context
       'lobe-agent-builder', // Used for editing current agent, not for creating new agents
       'lobe-group-agent-builder', // Used for editing current group, not for creating new agents
-      'lobe-page-agent', // Page-editor specific tool
+      'lobe-docs-agent', // Page-editor specific tool
     ]);
 
     for (const tool of allBuiltinTools) {
@@ -516,7 +516,7 @@ export const contextEngineering = async ({
     knowledge: {
       conversationFileContents,
       fileContents,
-      knowledgeBases,
+      sourceSets,
     },
 
     // Messages

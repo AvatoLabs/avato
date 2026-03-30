@@ -13,10 +13,18 @@ interface GroupBlockProps extends Omit<FlexboxProps, 'title'> {
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   action: css`
-    opacity: 0;
-    transition: opacity ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+    transform: translateY(0);
+    opacity: 0.7;
+    transition:
+      opacity ${cssVar.motionDurationFast} ${cssVar.motionEaseOut},
+      transform ${cssVar.motionDurationFast} ${cssVar.motionEaseOut};
+
+    @media (hover: none) {
+      opacity: 1;
+    }
   `,
   actionVisible: css`
+    transform: translateY(-1px);
     opacity: 1;
   `,
 }));
@@ -28,6 +36,8 @@ const GroupBlock = memo<GroupBlockProps>(
     return (
       <Flexbox
         gap={14}
+        onBlur={() => setIsHovered(false)}
+        onFocus={() => setIsHovered(true)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         {...rest}

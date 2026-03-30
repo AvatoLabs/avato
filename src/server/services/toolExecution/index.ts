@@ -1,7 +1,4 @@
-import {
-  KnowledgeBaseApiName,
-  KnowledgeBaseIdentifier,
-} from '@lobechat/builtin-tool-knowledge-base';
+import { SourceSetApiName, SourceSetIdentifier } from '@lobechat/builtin-tool-source-set';
 import { type ChatToolPayload } from '@lobechat/types';
 import { safeParseJSON } from '@lobechat/utils';
 import debug from 'debug';
@@ -25,7 +22,7 @@ import {
 
 const log = debug('lobe-server:tool-execution-service');
 const MAX_MCP_RETRIES = 3;
-const KNOWLEDGE_BASE_READ_TOOL_RESULT_MAX_LENGTH = 100_000;
+const SOURCE_SET_READ_TOOL_RESULT_MAX_LENGTH = 100_000;
 
 interface ToolExecutionServiceDeps {
   builtinToolsExecutor: BuiltinToolsExecutor;
@@ -125,10 +122,10 @@ export class ToolExecutionService {
     if (context.toolResultMaxLength !== undefined) return context.toolResultMaxLength;
 
     if (
-      payload.identifier === KnowledgeBaseIdentifier &&
-      payload.apiName === KnowledgeBaseApiName.readKnowledge
+      payload.identifier === SourceSetIdentifier &&
+      payload.apiName === SourceSetApiName.readSourceFiles
     ) {
-      return KNOWLEDGE_BASE_READ_TOOL_RESULT_MAX_LENGTH;
+      return SOURCE_SET_READ_TOOL_RESULT_MAX_LENGTH;
     }
 
     return undefined;

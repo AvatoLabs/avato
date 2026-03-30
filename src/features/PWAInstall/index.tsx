@@ -14,7 +14,7 @@ const Install: any = dynamic(() => import('./Install'), {
 });
 
 const PWAInstall = memo(() => {
-  const { isPWA, isSupportInstallPWA } = usePlatform();
+  const { isMobile, isPWA, isSupportInstallPWA } = usePlatform();
   const isShowPWAGuide = useUserStore((s) => s.isShowPWAGuide);
   const hidePWAInstaller = useGlobalStore((s) => systemStatusSelectors.hidePWAInstaller(s));
   const [canInstallFromPWAInstallHandler, setCanInstallFromPWAInstallHandler] = useState<
@@ -32,6 +32,7 @@ const PWAInstall = memo(() => {
 
   if (
     isPWA ||
+    isMobile ||
     !isShowPWAGuide ||
     !isSupportInstallPWA ||
     hidePWAInstaller ||

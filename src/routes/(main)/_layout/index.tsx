@@ -22,7 +22,7 @@ import { usePlatform } from '@/hooks/usePlatform';
 import { MarketAuthProvider } from '@/layout/AuthProvider/MarketAuth';
 import CmdkLazy from '@/layout/GlobalProvider/CmdkLazy';
 import dynamic from '@/libs/next/dynamic';
-import { DndContextWrapper } from '@/routes/(main)/resource/features/DndContextWrapper';
+import { DndContextWrapper } from '@/routes/(main)/content/features/DndContextWrapper';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { HotkeyScopeEnum } from '@/types/hotkey';
 

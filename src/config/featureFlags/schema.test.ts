@@ -33,7 +33,7 @@ describe('FeatureFlagsSchema', () => {
       edit_agent: ['user-123'],
       create_session: true,
       dalle: false,
-      knowledge_base: ['user-456', 'user-789'],
+      source_set: ['user-456', 'user-789'],
     });
 
     expect(result.success).toBe(true);
@@ -105,7 +105,7 @@ describe('mapFeatureFlagsEnvToState', () => {
       ai_image: true,
       check_updates: true,
       welcome_suggest: true,
-      knowledge_base: false,
+      source_set: false,
       rag_eval: true,
       market: true,
       speech_to_text: true,
@@ -128,7 +128,7 @@ describe('mapFeatureFlagsEnvToState', () => {
       showChangelog: false,
       enableCheckUpdates: true,
       showWelcomeSuggest: true,
-      enableKnowledgeBase: false,
+      enableSourceSet: false,
       enableRAGEval: true,
       showMarket: true,
       enableSTT: true,
@@ -144,14 +144,14 @@ describe('mapFeatureFlagsEnvToState', () => {
       edit_agent: ['user-123', 'user-456'],
       create_session: ['user-789'],
       dalle: true,
-      knowledge_base: ['user-123'],
+      source_set: ['user-123'],
     };
 
     const mappedState = mapFeatureFlagsEnvToState(config, userId);
 
     expect(mappedState.isAgentEditable).toBe(true); // user-123 is in allowlist
 
-    expect(mappedState.enableKnowledgeBase).toBe(true); // user-123 is in allowlist
+    expect(mappedState.enableSourceSet).toBe(true); // user-123 is in allowlist
   });
 
   it('should return false for array flags when user ID is not in allowlist', () => {
@@ -185,7 +185,7 @@ describe('mapFeatureFlagsEnvToState', () => {
       create_session: true,
       dalle: false,
       ai_image: ['user-456'],
-      knowledge_base: ['user-123', 'user-789'],
+      source_set: ['user-123', 'user-789'],
       rag_eval: true,
     };
 
@@ -194,7 +194,7 @@ describe('mapFeatureFlagsEnvToState', () => {
     expect(mappedState.isAgentEditable).toBe(true);
 
     expect(mappedState.showAiImage).toBe(false);
-    expect(mappedState.enableKnowledgeBase).toBe(true);
+    expect(mappedState.enableSourceSet).toBe(true);
     expect(mappedState.enableRAGEval).toBe(true);
   });
 });

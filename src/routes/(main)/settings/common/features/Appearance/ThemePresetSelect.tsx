@@ -1,5 +1,5 @@
-import { type NeutralColors, type PrimaryColors, Text } from '@lobehub/ui';
-import { createStaticStyles, cx } from 'antd-style';
+import { Text } from '@lobehub/ui';
+import { createStaticStyles, cx, useThemeMode } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,12 +12,12 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 
-    min-width: 100px;
-    padding: 10px;
+    min-width: 72px;
+    padding: 8px;
     border: 1.5px solid ${cssVar.colorBorderSecondary};
-    border-radius: 14px;
+    border-radius: 12px;
 
     font: inherit;
     color: inherit;
@@ -40,8 +40,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   colorBar: css`
     overflow: hidden;
     display: flex;
-    height: 28px;
-    border-radius: 8px;
+    height: 12px;
+    border-radius: 999px;
   `,
   colorBarAccent: css`
     flex: 1.5;
@@ -55,11 +55,11 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   grid: css`
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
   `,
   label: css`
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     line-height: 1.4;
     color: ${cssVar.colorText};
@@ -76,8 +76,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 interface ThemePresetSelectProps {
   customPreview?: {
-    neutralColor?: NeutralColors;
-    primaryColor?: PrimaryColors;
+    neutralColor?: string;
+    primaryColor?: string;
   };
   onChange: (id: ThemePresetId) => void;
   value: ThemePresetId;
@@ -85,6 +85,7 @@ interface ThemePresetSelectProps {
 
 const ThemePresetSelect = memo<ThemePresetSelectProps>(({ customPreview, value, onChange }) => {
   const { t } = useTranslation('setting');
+  const { isDarkMode } = useThemeMode();
 
   return (
     <div className={styles.grid}>
@@ -92,6 +93,7 @@ const ThemePresetSelect = memo<ThemePresetSelectProps>(({ customPreview, value, 
         const presetPreview = getThemePresetPreview(
           preset.id,
           preset.id === 'custom' ? customPreview : undefined,
+          isDarkMode ? 'dark' : 'light',
         );
         const isSelected = value === preset.id;
 

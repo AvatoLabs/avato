@@ -14,10 +14,10 @@ import { type BuiltinAgentSliceAction } from './slices/builtin';
 import { createBuiltinAgentSlice } from './slices/builtin';
 import { type CronSliceAction } from './slices/cron';
 import { createCronSlice } from './slices/cron';
-import { type KnowledgeSliceAction } from './slices/knowledge';
-import { createKnowledgeSlice } from './slices/knowledge';
 import { type PluginSliceAction } from './slices/plugin';
 import { createPluginSlice } from './slices/plugin';
+import { type SourceSliceAction } from './slices/sources';
+import { createSourceSlice } from './slices/sources';
 
 //  ===============  aggregate createStoreFn ============ //
 
@@ -27,7 +27,7 @@ export interface AgentStore
     BotSliceAction,
     BuiltinAgentSliceAction,
     CronSliceAction,
-    KnowledgeSliceAction,
+    SourceSliceAction,
     PluginSliceAction,
     AgentStoreState {}
 
@@ -35,7 +35,7 @@ type AgentStoreAction = AgentSliceAction &
   BotSliceAction &
   BuiltinAgentSliceAction &
   CronSliceAction &
-  KnowledgeSliceAction &
+  SourceSliceAction &
   PluginSliceAction;
 
 const createStore: StateCreator<AgentStore, [['zustand/devtools', never]]> = (
@@ -47,7 +47,7 @@ const createStore: StateCreator<AgentStore, [['zustand/devtools', never]]> = (
     createBotSlice(...parameters),
     createBuiltinAgentSlice(...parameters),
     createCronSlice(...parameters),
-    createKnowledgeSlice(...parameters),
+    createSourceSlice(...parameters),
     createPluginSlice(...parameters),
   ]),
 });

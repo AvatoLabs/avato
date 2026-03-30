@@ -3,6 +3,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
+
 import {
   createMarkdownPreviewProps,
   extractMarkdownCodeBlock,
@@ -35,6 +37,7 @@ describe('createMarkdownPreviewProps', () => {
       enableMermaid: true,
       fontSize: 15,
       fullFeaturedCodeBlock: true,
+      remarkPluginsAhead: [...documentMarkdownRemarkPlugins],
     });
   });
 });
@@ -102,9 +105,9 @@ describe('isLikelyMermaidContent', () => {
   });
 
   it('recognizes mermaid blocks with init directives or comments', () => {
-    expect(
-      isLikelyMermaidContent('%%{init: { "theme": "dark" }}%%\nflowchart TD\nA-->B'),
-    ).toBe(true);
+    expect(isLikelyMermaidContent('%%{init: { "theme": "dark" }}%%\nflowchart TD\nA-->B')).toBe(
+      true,
+    );
     expect(isLikelyMermaidContent('%% comment\nsequenceDiagram\nA->>B: ping')).toBe(true);
   });
 });

@@ -62,7 +62,7 @@ const UploadSkillModal = memo<UploadSkillModalProps>(({ open, onOpenChange }) =>
 
   return (
     <Modal
-      destroyOnClose
+      destroyOnHidden
       closable={!loading}
       footer={null}
       mask={{ closable: !loading }}

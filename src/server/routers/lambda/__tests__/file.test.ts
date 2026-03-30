@@ -15,7 +15,7 @@ const mockTreeGuardAssertParentAssignment = vi.fn();
 const mockResourceModelEnsureOwnerPermission = vi.fn();
 const mockResourceModelEnsureResourceRegistry = vi
   .fn()
-  .mockResolvedValue({ resourceUid: 'res_test' });
+  .mockResolvedValue({ contentUid: 'res_test' });
 const mockResourceModelFindSpaceBlobByHash = vi.fn();
 const mockResourceModelUpsertSpaceBlob = vi.fn().mockResolvedValue({ id: 'blob_test' });
 const mockResourceModelGetSpaceMemberRole = vi.fn().mockResolvedValue('owner');
@@ -102,7 +102,7 @@ function createCallerWithCtx(partialCtx: any = {}) {
     },
     resourceModel: {
       ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
-      ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
+      ensureContentRegistry: mockResourceModelEnsureResourceRegistry,
       findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
       getSpaceMemberRole: mockResourceModelGetSpaceMemberRole,
       invalidateAuthzEpochsAfterRemoval: mockResourceModelInvalidateAuthzEpochsAfterRemoval,
@@ -111,7 +111,7 @@ function createCallerWithCtx(partialCtx: any = {}) {
     resolver: {
       requireDocument: mockResolverRequireDocument,
       requireFile: mockResolverRequireFile,
-      requireKnowledgeBase: mockResolverRequireKnowledgeBase,
+      requireSourceSet: mockResolverRequireKnowledgeBase,
     },
     spaceModel: {
       findAccessibleSpaceById: mockSpaceModelFindAccessibleSpaceById,
@@ -179,10 +179,10 @@ vi.mock('@/database/models/file', () => ({
   })),
 }));
 
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn(() => ({
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn(() => ({
     ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
-    ensureResourceRegistry: mockResourceModelEnsureResourceRegistry,
+    ensureContentRegistry: mockResourceModelEnsureResourceRegistry,
     findSpaceBlobByHash: mockResourceModelFindSpaceBlobByHash,
     getSpaceMemberRole: mockResourceModelGetSpaceMemberRole,
     invalidateAuthzEpochsAfterRemoval: mockResourceModelInvalidateAuthzEpochsAfterRemoval,
@@ -212,6 +212,7 @@ vi.mock('@/server/services/file', () => ({
 const mockKnowledgeRepoQuery = vi.fn().mockResolvedValue([]);
 const mockKnowledgeRepoQueryRecent = vi.fn().mockResolvedValue([]);
 const mockDocumentModelFindBySlug = vi.fn();
+const mockDocumentModelFindBySlugInSpace = vi.fn();
 
 vi.mock('@/database/repositories/knowledge', () => ({
   KnowledgeRepo: vi.fn(() => ({
@@ -223,14 +224,15 @@ vi.mock('@/database/repositories/knowledge', () => ({
 vi.mock('@/database/models/document', () => ({
   DocumentModel: vi.fn(() => ({
     findBySlug: mockDocumentModelFindBySlug,
+    findBySlugInSpace: mockDocumentModelFindBySlugInSpace,
   })),
 }));
 
-vi.mock('@/server/services/resource', () => ({
+vi.mock('@/server/services/content', () => ({
   AuthorizedResourceResolver: vi.fn(() => ({
     requireDocument: mockResolverRequireDocument,
     requireFile: mockResolverRequireFile,
-    requireKnowledgeBase: mockResolverRequireKnowledgeBase,
+    requireSourceSet: mockResolverRequireKnowledgeBase,
   })),
   ResourceAuthorizer: vi.fn(() => ({
     assertCapability: mockResourceAuthorizerAssertCapability,
@@ -282,6 +284,7 @@ describe('fileRouter', () => {
       clientId: null,
       chunkTaskId: null,
       embeddingTaskId: null,
+      spaceId: 'spc_test',
     };
 
     // Set default mock for getFileMetadata (security fix for GHSA-wrrr-8jcv-wjf5)
@@ -289,12 +292,13 @@ describe('fileRouter', () => {
       contentLength: 100,
       contentType: 'text/plain',
     });
-    mockResourceModelEnsureResourceRegistry.mockResolvedValue({ resourceUid: 'res_test' });
+    mockResourceModelEnsureResourceRegistry.mockResolvedValue({ contentUid: 'res_test' });
     mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
     mockResourceModelGetSpaceMemberRole.mockResolvedValue('owner');
     mockResourceModelUpsertSpaceBlob.mockResolvedValue({ id: 'blob_test' });
     mockFileModelFindExistingByBlobAndContext.mockResolvedValue(undefined);
     mockDocumentModelFindBySlug.mockResolvedValue(undefined);
+    mockDocumentModelFindBySlugInSpace.mockResolvedValue(undefined);
     mockResolverRequireFile.mockResolvedValue(mockFile);
     mockResolverRequireKnowledgeBase.mockResolvedValue({ id: 'kb_test', spaceId: 'spc_test' });
     mockSpaceModelFindAccessibleSpaceById.mockResolvedValue(undefined);
@@ -354,7 +358,7 @@ describe('fileRouter', () => {
       const result = await caller.createFile({
         hash: 'test-hash',
         fileType: 'text/plain',
-        knowledgeBaseId: 'kb_test',
+        sourceSetId: 'kb_test',
         metadata: {},
         name: 'test.txt',
         size: 100,
@@ -496,6 +500,45 @@ describe('fileRouter', () => {
         }),
       ).rejects.toThrow('File size cannot be negative');
     });
+
+    it('should resolve parent slugs within the provided space when creating a file', async () => {
+      mockDocumentModelFindBySlugInSpace.mockResolvedValue({ id: 'folder-in-space' });
+      mockResolverRequireDocument.mockResolvedValue({
+        id: 'folder-in-space',
+        spaceId: 'spc_shared',
+      });
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_shared',
+        membershipRole: 'editor',
+      });
+
+      await caller.createFile({
+        hash: 'test-hash',
+        fileType: 'text/plain',
+        metadata: {},
+        name: 'test.txt',
+        parentId: 'shared-folder',
+        size: 100,
+        spaceId: 'spc_shared',
+        url: 'files/test.txt',
+      });
+
+      expect(mockDocumentModelFindBySlugInSpace).toHaveBeenCalledWith(
+        'shared-folder',
+        'spc_shared',
+      );
+      expect(mockTreeGuardAssertParentAssignment).toHaveBeenCalledWith({
+        currentSpaceId: 'spc_shared',
+        parentId: 'folder-in-space',
+      });
+      expect(mockFileModelCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parentId: 'folder-in-space',
+          spaceId: 'spc_shared',
+        }),
+        false,
+      );
+    });
   });
 
   describe('findById', () => {
@@ -589,7 +632,7 @@ describe('fileRouter', () => {
 
       await expect(
         caller.getKnowledgeItems({
-          knowledgeBaseId: 'kb_shared',
+          sourceSetId: 'kb_shared',
           spaceId: 'spc_shared',
         }),
       ).resolves.toEqual({
@@ -600,7 +643,7 @@ describe('fileRouter', () => {
       expect(mockResolverRequireKnowledgeBase).toHaveBeenCalledWith('kb_shared', 'read_content');
       expect(mockKnowledgeRepoQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          knowledgeBaseId: 'kb_shared',
+          sourceSetId: 'kb_shared',
           limit: 51,
           spaceId: 'spc_shared',
         }),
@@ -682,6 +725,27 @@ describe('fileRouter', () => {
     });
   });
 
+  describe('updateFile', () => {
+    it('should resolve parent slugs within the current file space when moving a file', async () => {
+      mockDocumentModelFindBySlugInSpace.mockResolvedValue({ id: 'folder-in-space' });
+
+      await caller.updateFile({
+        id: 'test-id',
+        parentId: 'shared-folder',
+      });
+
+      expect(mockResolverRequireFile).toHaveBeenCalledWith('test-id', 'move');
+      expect(mockDocumentModelFindBySlugInSpace).toHaveBeenCalledWith('shared-folder', 'spc_test');
+      expect(mockTreeGuardAssertParentAssignment).toHaveBeenCalledWith({
+        currentSpaceId: 'spc_test',
+        parentId: 'folder-in-space',
+      });
+      expect(mockFileModelUpdate).toHaveBeenCalledWith('test-id', {
+        parentId: 'folder-in-space',
+      });
+    });
+  });
+
   describe('removeFile', () => {
     it('should do nothing when file not found', async () => {
       ctx.fileModel.softDeleteAny.mockResolvedValue(null);
@@ -704,7 +768,12 @@ describe('fileRouter', () => {
 
   describe('restoreFile', () => {
     it('should restore a soft-deleted file', async () => {
-      const deletedFile = { ...mockFile, deletedAt: new Date(), resourceUid: 'res_test', spaceId: 'spc_test' };
+      const deletedFile = {
+        ...mockFile,
+        deletedAt: new Date(),
+        contentUid: 'res_test',
+        spaceId: 'spc_test',
+      };
       ctx.fileModel.findByIdAny
         .mockResolvedValueOnce(deletedFile)
         .mockResolvedValueOnce({ ...deletedFile, deletedAt: null });
@@ -713,7 +782,7 @@ describe('fileRouter', () => {
 
       expect(ctx.fileModel.updateAny).toHaveBeenCalledWith('test-id', { deletedAt: null });
       expect(ctx.resourceModel.invalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
-        { resourceUid: 'res_test', spaceId: 'spc_test' },
+        { contentUid: 'res_test', spaceId: 'spc_test' },
       ]);
       expect(result).toMatchObject({ id: 'test-id' });
     });

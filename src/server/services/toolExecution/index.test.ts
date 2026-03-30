@@ -1,7 +1,4 @@
-import {
-  KnowledgeBaseApiName,
-  KnowledgeBaseIdentifier,
-} from '@lobechat/builtin-tool-knowledge-base';
+import { SourceSetApiName, SourceSetIdentifier } from '@lobechat/builtin-tool-source-set';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ToolExecutionService } from './index';
@@ -70,7 +67,7 @@ describe('ToolExecutionService', () => {
     );
   });
 
-  it('should allow larger default output for knowledge base read tool results', async () => {
+  it('should allow larger default output for source set read tool results', async () => {
     const content = 'a'.repeat(30_000);
     const builtinToolsExecutor = {
       execute: vi.fn().mockResolvedValue({
@@ -93,10 +90,10 @@ describe('ToolExecutionService', () => {
 
     const result = await service.executeTool(
       {
-        apiName: KnowledgeBaseApiName.readKnowledge,
+        apiName: SourceSetApiName.readSourceFiles,
         arguments: '{"fileIds":["file-1"]}',
         id: 'tool-call-2',
-        identifier: KnowledgeBaseIdentifier,
+        identifier: SourceSetIdentifier,
         type: 'builtin',
       } as any,
       {

@@ -945,6 +945,8 @@ export interface FileListItem {
   chunkingError: any | null;
   chunkingStatus?: string | null;
   content?: string | null;
+  contentRole?: 'owner' | 'editor' | 'viewer' | null;
+  contentUid?: string | null;
   createdAt: string;
   editorData?: Record<string, any> | null;
   embeddingError: any | null;
@@ -956,8 +958,6 @@ export interface FileListItem {
   metadata?: Record<string, any> | null;
   name: string;
   parentId?: string | null;
-  resourceRole?: 'owner' | 'editor' | 'viewer' | null;
-  resourceUid?: string | null;
   size: number;
   slug?: string | null;
   sourceType: 'file' | 'document';
@@ -967,12 +967,12 @@ export interface FileListItem {
   userId?: string;
 }
 
-export interface KnowledgeBaseItem {
+export interface SourceSetItem {
   avatar?: string | null;
+  contentUid?: string | null;
   description?: string | null;
   id: string;
   name: string;
-  resourceUid?: string | null;
   spaceId?: string | null;
   type?: string | null;
 }

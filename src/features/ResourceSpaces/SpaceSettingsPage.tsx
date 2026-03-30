@@ -22,7 +22,7 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildResourceRootPath } from './paths';
+import { buildContentRootPath } from './paths';
 
 const SpaceSettingsPage = memo(() => {
   const { t } = useTranslation('file');
@@ -173,7 +173,7 @@ const SpaceSettingsPage = memo(() => {
       okButtonProps: { danger: true },
       onOk: async () => {
         await lambdaClient.space.deleteSpace.mutate({ id: spaceId });
-        navigate('/resource');
+        navigate('/content');
       },
       title: t('space.settings.deleteConfirm'),
     });
@@ -315,7 +315,7 @@ const SpaceSettingsPage = memo(() => {
         </Block>
       )}
 
-      <Button onClick={() => navigate(buildResourceRootPath(space.id))}>
+      <Button onClick={() => navigate(buildContentRootPath(space.id))}>
         {t('space.settings.back')}
       </Button>
     </Flexbox>

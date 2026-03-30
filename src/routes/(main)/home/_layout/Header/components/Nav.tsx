@@ -4,7 +4,7 @@ import { Flexbox, Tag } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
@@ -59,6 +59,12 @@ const Nav = memo(() => {
         url: '/',
       },
       {
+        icon: APP_ENTRY_ICONS.page,
+        key: 'docs',
+        title: t('tab.pages'),
+        url: '/docs',
+      },
+      {
         badge: 'beta',
         icon: APP_ENTRY_ICONS.studio,
         key: SidebarTabKey.Studio,
@@ -67,16 +73,10 @@ const Nav = memo(() => {
         url: '/studio',
       },
       {
-        icon: APP_ENTRY_ICONS.page,
-        key: SidebarTabKey.Pages,
-        title: t('tab.pages'),
-        url: '/page',
-      },
-      {
         icon: APP_ENTRY_ICONS.resource,
-        key: SidebarTabKey.Resource,
+        key: 'content',
         title: t('tab.resource'),
-        url: '/resource',
+        url: '/content',
       },
       {
         icon: APP_ENTRY_ICONS.memory,
@@ -144,27 +144,21 @@ const Nav = memo(() => {
     if (!item.url) return content;
 
     return (
-      <Link
+      <NavItem
+        active={tab === item.key}
+        extra={extra}
+        hidden={item.hidden}
+        href={item.url}
+        icon={item.icon}
         key={item.key}
-        to={item.url}
+        style={{ marginTop: mt }}
+        title={item.title}
         onClick={(e) => {
           if (isModifierClick(e)) return;
-          e.preventDefault();
           item?.onClick?.();
-          if (item.url) {
-            navigate(item.url);
-          }
+          navigate(item.url);
         }}
-      >
-        <NavItem
-          active={tab === item.key}
-          extra={extra}
-          hidden={item.hidden}
-          icon={item.icon}
-          style={{ marginTop: mt }}
-          title={item.title}
-        />
-      </Link>
+      />
     );
   };
 

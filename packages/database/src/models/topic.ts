@@ -30,6 +30,7 @@ export interface CreateTopicParams {
   messages?: string[];
   metadata?: ChatTopicMetadata;
   sessionId?: string | null;
+  spaceId?: string | null;
   tagId?: string | null;
   title?: string;
   trigger?: string | null;
@@ -57,6 +58,7 @@ interface QueryTopicParams {
    */
   isInbox?: boolean;
   pageSize?: number;
+  spaceId?: string | null;
   tagId?: string | null;
 }
 
@@ -83,6 +85,7 @@ export class TopicModel {
     pageSize = 9999,
     groupId,
     isInbox,
+    spaceId,
     tagId,
   }: QueryTopicParams = {}) => {
     const offset = current * pageSize;
@@ -90,6 +93,7 @@ export class TopicModel {
       excludeTriggers && excludeTriggers.length > 0
         ? or(isNull(topics.trigger), not(inArray(topics.trigger, excludeTriggers)))
         : undefined;
+    const spaceCondition = spaceId ? eq(topics.spaceId, spaceId) : undefined;
     const tagCondition = tagId ? eq(topics.tagId, tagId) : undefined;
 
     // If groupId is provided, query topics by groupId directly
@@ -98,6 +102,7 @@ export class TopicModel {
         eq(topics.userId, this.userId),
         eq(topics.groupId, groupId),
         excludeTriggerCondition,
+        spaceCondition,
         tagCondition,
       );
 
@@ -109,6 +114,7 @@ export class TopicModel {
             historySummary: topics.historySummary,
             id: topics.id,
             metadata: topics.metadata,
+            spaceId: topics.spaceId,
             tagId: topics.tagId,
             title: topics.title,
             updatedAt: topics.updatedAt,
@@ -173,6 +179,7 @@ export class TopicModel {
             historySummary: topics.historySummary,
             id: topics.id,
             metadata: topics.metadata,
+            spaceId: topics.spaceId,
             tagId: topics.tagId,
             title: topics.title,
             updatedAt: topics.updatedAt,
@@ -183,6 +190,7 @@ export class TopicModel {
               eq(topics.userId, this.userId),
               agentCondition,
               excludeTriggerCondition,
+              spaceCondition,
               tagCondition,
             ),
           )
@@ -197,6 +205,7 @@ export class TopicModel {
               eq(topics.userId, this.userId),
               agentCondition,
               excludeTriggerCondition,
+              spaceCondition,
               tagCondition,
             ),
           ),
@@ -210,6 +219,7 @@ export class TopicModel {
       eq(topics.userId, this.userId),
       this.matchContainer(containerId),
       excludeTriggerCondition,
+      spaceCondition,
       tagCondition,
     );
 
@@ -222,6 +232,7 @@ export class TopicModel {
           historySummary: topics.historySummary,
           id: topics.id,
           metadata: topics.metadata,
+          spaceId: topics.spaceId,
           sessionId: topics.sessionId,
           tagId: topics.tagId,
           title: topics.title,
@@ -264,11 +275,13 @@ export class TopicModel {
   queryByKeyword = async (
     keyword: string,
     containerId?: string | null,
+    spaceId?: string | null,
     tagId?: string | null,
   ): Promise<TopicItem[]> => {
     if (!keyword) return [];
 
     const keywordLowerCase = keyword.toLowerCase();
+    const spaceCondition = spaceId ? eq(topics.spaceId, spaceId) : undefined;
     const tagCondition = tagId ? eq(topics.tagId, tagId) : undefined;
 
     // Query topics matching by title
@@ -277,6 +290,7 @@ export class TopicModel {
       where: and(
         eq(topics.userId, this.userId),
         this.matchContainer(containerId),
+        spaceCondition,
         tagCondition,
         ilike(topics.title, `%${keywordLowerCase}%`),
       ),
@@ -293,6 +307,7 @@ export class TopicModel {
           ilike(messages.content, `%${keywordLowerCase}%`),
           eq(topics.userId, this.userId),
           this.matchContainer(containerId),
+          spaceCondition,
           tagCondition,
         ),
       )
@@ -309,7 +324,12 @@ export class TopicModel {
 
     const topicsByMessages = await this.db.query.topics.findMany({
       orderBy: [desc(topics.updatedAt)],
-      where: and(eq(topics.userId, this.userId), inArray(topics.id, topicIds), tagCondition),
+      where: and(
+        eq(topics.userId, this.userId),
+        inArray(topics.id, topicIds),
+        spaceCondition,
+        tagCondition,
+      ),
     });
 
     // Merge results and deduplicate
@@ -332,6 +352,7 @@ export class TopicModel {
     containerId?: string | null;
     endDate?: string;
     range?: [string, string];
+    spaceId?: string | null;
     startDate?: string;
   }): Promise<number> => {
     // Build agent-specific condition if agentId is provided
@@ -367,6 +388,7 @@ export class TopicModel {
           eq(topics.userId, this.userId),
           agentCondition,
           params?.containerId ? this.matchContainer(params.containerId) : undefined,
+          params?.spaceId ? eq(topics.spaceId, params.spaceId) : undefined,
           params?.range
             ? genRangeWhere(params.range, topics.createdAt, (date) => date.toDate())
             : undefined,
@@ -406,13 +428,14 @@ export class TopicModel {
    * - For group topics: includes topics with groupId
    * - For inbox: includes topics with slug='inbox'
    */
-  queryRecent = async (limit: number = 12) => {
+  queryRecent = async (limit: number = 12, spaceId?: string | null) => {
     const result = await this.db
       .select({
         agentId: topics.agentId,
         groupId: topics.groupId,
         id: topics.id,
         sessionId: topics.sessionId,
+        spaceId: topics.spaceId,
         tagId: topics.tagId,
         title: topics.title,
         updatedAt: topics.updatedAt,
@@ -422,6 +445,7 @@ export class TopicModel {
       .where(
         and(
           eq(topics.userId, this.userId),
+          spaceId ? eq(topics.spaceId, spaceId) : undefined,
           or(
             // Group topics: has groupId
             not(isNull(topics.groupId)),
@@ -454,6 +478,7 @@ export class TopicModel {
         groupId: params.groupId || null,
         id,
         sessionId: params.sessionId || null,
+        spaceId: params.spaceId || null,
         tagId: params.tagId || null,
         userId: this.userId,
       };
@@ -486,6 +511,7 @@ export class TopicModel {
             groupId: params.sessionId ? null : params.groupId,
             id: params.id || this.genId(),
             sessionId: params.groupId ? null : params.sessionId,
+            spaceId: params.spaceId || null,
             tagId: params.tagId || null,
             title: params.title,
             trigger: params.trigger,

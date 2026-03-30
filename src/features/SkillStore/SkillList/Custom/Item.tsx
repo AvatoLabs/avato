@@ -104,7 +104,7 @@ const Item = memo<ItemProps>(({ identifier, title, description, avatar }) => {
               onClick={() => setConfigOpen(true)}
             />
             <DropdownMenu
-              nativeButton={false}
+              nativeButton
               placement="bottomRight"
               items={[
                 {

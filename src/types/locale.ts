@@ -1,5 +1,5 @@
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 
-export type * from '@/locales/resources';
+export type * from '@/locales/contents';
 
 export type LocaleMode = Locales | 'auto';

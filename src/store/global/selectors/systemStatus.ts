@@ -30,7 +30,7 @@ const language = (s: GlobalState) => s.status.language || 'auto';
 const modelSwitchPanelGroupMode = (s: GlobalState) =>
   s.status.modelSwitchPanelGroupMode || 'byProvider';
 const modelSwitchPanelWidth = (s: GlobalState) => s.status.modelSwitchPanelWidth || 430;
-const pageAgentPanelWidth = (s: GlobalState) => s.status.pageAgentPanelWidth || 360;
+const docsAgentPanelWidth = (s: GlobalState) => s.status.docsAgentPanelWidth || 360;
 
 const showChatHeader = (s: GlobalState) => !s.status.zenMode;
 const inZenMode = (s: GlobalState) => s.status.zenMode;
@@ -95,7 +95,7 @@ export const systemStatusSelectors = {
   mobileShowTopic,
   modelSwitchPanelGroupMode,
   modelSwitchPanelWidth,
-  pageAgentPanelWidth,
+  docsAgentPanelWidth,
   pagePageSize,
   portalWidth,
   sessionGroupKeys,

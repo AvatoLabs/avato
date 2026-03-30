@@ -6,6 +6,7 @@ import { cssVar } from 'antd-style';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
 import { editorSelectors, useDocumentStore } from '@/store/document';
 
 import RichEditorCanvas from './EditorCanvas';
@@ -74,6 +75,11 @@ const ModeContent = memo<ModeContentProps>(({ documentId, editor, pageKind, view
       editor?.setDocument('markdown', value, { keepId: true });
       useDocumentStore.getState().handleContentChange();
     } catch (error) {
+      if (documentId) {
+        useDocumentStore.getState().syncExternalDocumentContent(documentId, { content: value });
+        return;
+      }
+
       console.error('[PageEditor] Failed to sync table source:', error);
     }
   };
@@ -115,7 +121,7 @@ const ModeContent = memo<ModeContentProps>(({ documentId, editor, pageKind, view
               flex={1}
               height={'100%'}
               language={'markdown'}
-              placeholder={t('pageEditor.editorPlaceholder')}
+              placeholder={t('docEditor.editorPlaceholder')}
               value={markdownValue}
               variant={'borderless'}
               styles={{
@@ -140,7 +146,9 @@ const ModeContent = memo<ModeContentProps>(({ documentId, editor, pageKind, view
                 overflow: 'auto',
               }}
             >
-              <Markdown>{markdownValue}</Markdown>
+              <Markdown remarkPluginsAhead={[...documentMarkdownRemarkPlugins]}>
+                {markdownValue}
+              </Markdown>
             </Flexbox>
           )}
         </Flexbox>

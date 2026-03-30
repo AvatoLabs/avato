@@ -5,15 +5,15 @@ import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 
 import { serverDBEnv } from '@/config/db';
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { DocumentSourceType, type LobeDocument } from '@/types/document';
 
 import { ChunkService } from '../chunk';
+import { AuthorizedResourceResolver, ContentAuthorizer, TreeGuard } from '../content';
 import { FileService } from '../file';
-import { AuthorizedResourceResolver, ResourceAuthorizer, TreeGuard } from '../resource';
 
 const log = debug('lobe-chat:service:document');
 
@@ -31,9 +31,9 @@ export class DocumentService {
   private chunkService: ChunkService;
   private fileService: FileService;
   private db: LobeChatDatabase;
-  private resourceModel: ResourceModel;
+  private contentModel: ContentModel;
   private resolver: AuthorizedResourceResolver;
-  private resourceAuthorizer: ResourceAuthorizer;
+  private contentAuthorizer: ContentAuthorizer;
   private spaceModel: SpaceModel;
   private treeGuard: TreeGuard;
 
@@ -44,24 +44,21 @@ export class DocumentService {
     this.chunkService = new ChunkService(db, userId);
     this.fileService = new FileService(db, userId);
     this.documentModel = new DocumentModel(db, userId);
-    this.resourceModel = new ResourceModel(db, userId);
+    this.contentModel = new ContentModel(db, userId);
     this.resolver = new AuthorizedResourceResolver(db, userId);
-    this.resourceAuthorizer = new ResourceAuthorizer(db, userId);
+    this.contentAuthorizer = new ContentAuthorizer(db, userId);
     this.spaceModel = new SpaceModel(db, userId);
     this.treeGuard = new TreeGuard(db, userId);
   }
 
   private resolveWriteSpaceId = async (params: {
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     parentId?: string;
     spaceId?: string;
   }) => {
-    if (params.knowledgeBaseId) {
-      const knowledgeBase = await this.resolver.requireKnowledgeBase(
-        params.knowledgeBaseId,
-        'create_child',
-      );
-      return knowledgeBase.spaceId || (await this.spaceModel.getOrCreatePersonalSpace()).id;
+    if (params.sourceSetId) {
+      const sourceSet = await this.resolver.requireSourceSet(params.sourceSetId, 'create_child');
+      return sourceSet.spaceId || (await this.spaceModel.getOrCreatePersonalSpace()).id;
     }
 
     if (params.parentId) {
@@ -92,7 +89,7 @@ export class DocumentService {
     content?: string;
     editorData: Record<string, any>;
     fileType?: string;
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     metadata?: Record<string, any>;
     parentId?: string;
     rawData?: string;
@@ -106,14 +103,14 @@ export class DocumentService {
       title,
       fileType = 'custom/document',
       metadata,
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       spaceId: inputSpaceId,
       slug,
     } = params;
 
     const spaceId = await this.resolveWriteSpaceId({
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       spaceId: inputSpaceId,
     });
@@ -129,14 +126,14 @@ export class DocumentService {
 
     let fileId: string | null = null;
 
-    // If creating in a knowledge base, create a corresponding file record
-    // BUT skip for folders - folders should only exist in the documents table
-    if (knowledgeBaseId && fileType !== 'custom/folder') {
+    // If creating inside a source set, create the corresponding mirror file.
+    // Folders stay document-only.
+    if (sourceSetId && fileType !== 'custom/folder') {
       const file = await this.fileModel.create(
         {
           fileType,
           metadata,
-          knowledgeBaseId,
+          sourceSetId,
           name: title,
           parentId,
           size: totalCharCount,
@@ -147,7 +144,7 @@ export class DocumentService {
       );
       fileId = file.id;
 
-      const fileRegistry = await this.resourceModel.ensureResourceRegistry({
+      const fileRegistry = await this.contentModel.ensureContentRegistry({
         createdBy: this.userId,
         kind: 'file',
         localId: file.id,
@@ -155,19 +152,19 @@ export class DocumentService {
       });
 
       await this.fileModel.update(file.id, {
-        resourceUid: fileRegistry.resourceUid,
+        contentUid: fileRegistry.contentUid,
         spaceId,
       } as any);
 
-      await this.resourceModel.ensureOwnerPermission({
-        resourceUid: fileRegistry.resourceUid,
+      await this.contentModel.ensureOwnerPermission({
+        contentUid: fileRegistry.contentUid,
         spaceId,
       });
     }
 
-    // Store knowledgeBaseId in metadata for folders (which don't have fileId)
+    // Preserve sourceSetId in folder metadata because folders do not have mirror files.
     const finalMetadata =
-      knowledgeBaseId && fileType === 'custom/folder' ? { ...metadata, knowledgeBaseId } : metadata;
+      sourceSetId && fileType === 'custom/folder' ? { ...metadata, sourceSetId } : metadata;
 
     const document = await this.documentModel.create({
       content,
@@ -175,7 +172,7 @@ export class DocumentService {
       fileId,
       fileType,
       filename: title,
-      knowledgeBaseId, // Set knowledge_base_id column for all document types
+      sourceSetId, // Set source_set_id column for all document types
       metadata: finalMetadata,
       pages: undefined,
       parentId,
@@ -194,7 +191,7 @@ export class DocumentService {
       });
     }
 
-    const registry = await this.resourceModel.ensureResourceRegistry({
+    const registry = await this.contentModel.ensureContentRegistry({
       createdBy: this.userId,
       kind: 'document',
       localId: document.id,
@@ -202,12 +199,12 @@ export class DocumentService {
     });
 
     await this.documentModel.update(document.id, {
-      resourceUid: registry.resourceUid,
+      contentUid: registry.contentUid,
       spaceId,
     } as any);
 
-    await this.resourceModel.ensureOwnerPermission({
-      resourceUid: registry.resourceUid,
+    await this.contentModel.ensureOwnerPermission({
+      contentUid: registry.contentUid,
       spaceId,
     });
 
@@ -223,7 +220,7 @@ export class DocumentService {
       content?: string;
       editorData: Record<string, any>;
       fileType?: string;
-      knowledgeBaseId?: string;
+      sourceSetId?: string;
       metadata?: Record<string, any>;
       parentId?: string;
       spaceId?: string;
@@ -243,12 +240,42 @@ export class DocumentService {
   async queryDocuments(params?: {
     current?: number;
     fileTypes?: string[];
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     pageSize?: number;
+    spaceId?: string;
     sourceTypes?: string[];
     trash?: boolean;
   }) {
-    return this.documentModel.query(params);
+    if (!params?.spaceId) {
+      return this.documentModel.query(params);
+    }
+
+    const candidateIds = await this.documentModel.queryIds({
+      fileTypes: params.fileTypes,
+      sourceSetId: params.sourceSetId,
+      sourceTypes: params.sourceTypes,
+      spaceId: params.spaceId,
+      trash: params.trash,
+    });
+    const visibleIds = await this.contentAuthorizer.filterVisibleDocumentIdsForList(candidateIds, {
+      documentIncludeDeleted: params.trash,
+    });
+    const current = params.current ?? 0;
+    const pageSize = params.pageSize ?? 9999;
+    const pagedIds = visibleIds.slice(current * pageSize, (current + 1) * pageSize);
+
+    if (pagedIds.length === 0) {
+      return { items: [], total: visibleIds.length };
+    }
+
+    const result = await this.documentModel.query({
+      ...params,
+      current: 0,
+      ids: pagedIds,
+      pageSize,
+    });
+
+    return { items: result.items, total: visibleIds.length };
   }
 
   /**
@@ -393,7 +420,7 @@ export class DocumentService {
 
     for (const id of dedupIds) {
       if (includeDeleted) {
-        await this.resourceAuthorizer.assertCapability({
+        await this.contentAuthorizer.assertCapability({
           capability: 'delete',
           documentIncludeDeleted: true,
           id,
@@ -409,23 +436,21 @@ export class DocumentService {
     });
     if (documentIds.length === 0) return;
 
-    const bumpEntries: Array<{ resourceUid?: string | null; spaceId?: string | null }> = [];
+    const bumpEntries: Array<{ contentUid?: string | null; spaceId?: string | null }> = [];
 
     if (fileIds.length > 0) {
       const fileRows = await this.db.query.files.findMany({
-        columns: { resourceUid: true, spaceId: true },
+        columns: { contentUid: true, spaceId: true },
         where: (fields, { inArray }) => inArray(fields.id, fileIds),
       });
-      bumpEntries.push(
-        ...fileRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })),
-      );
+      bumpEntries.push(...fileRows.map((r) => ({ contentUid: r.contentUid, spaceId: r.spaceId })));
     }
 
     const docRows = await this.db.query.documents.findMany({
-      columns: { resourceUid: true, spaceId: true },
+      columns: { contentUid: true, spaceId: true },
       where: (fields, { inArray }) => inArray(fields.id, documentIds),
     });
-    bumpEntries.push(...docRows.map((r) => ({ resourceUid: r.resourceUid, spaceId: r.spaceId })));
+    bumpEntries.push(...docRows.map((r) => ({ contentUid: r.contentUid, spaceId: r.spaceId })));
 
     // Soft delete or hard delete based on trash parameter
     if (trash) {
@@ -434,7 +459,7 @@ export class DocumentService {
       }
 
       await this.documentModel.deleteManyAny(documentIds);
-      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+      await this.contentModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
     } else {
       const removedFiles =
         fileIds.length > 0
@@ -443,7 +468,7 @@ export class DocumentService {
 
       // Hard delete: permanently remove from database
       await this.documentModel.hardDeleteManyAny(documentIds);
-      await this.resourceModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
+      await this.contentModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
 
       if (removedFiles.length > 0) {
         await this.fileService.deleteFiles(removedFiles.map((item) => item.url!).filter(Boolean));
@@ -468,7 +493,7 @@ export class DocumentService {
     if (dedupIds.length === 0) return [];
 
     for (const id of dedupIds) {
-      await this.resourceAuthorizer.assertCapability({
+      await this.contentAuthorizer.assertCapability({
         capability: 'delete',
         documentIncludeDeleted: true,
         id,
@@ -476,29 +501,34 @@ export class DocumentService {
       });
     }
 
+    const { documentIds, fileIds } = await this.collectDocumentsForDeletion(dedupIds, {
+      includeDeleted: true,
+    });
+
+    if (documentIds.length === 0) return [];
+
     const tombs = await this.db.query.documents.findMany({
       columns: {
         fileId: true,
         id: true,
-        resourceUid: true,
+        contentUid: true,
         spaceId: true,
       },
       where: (fields, { and, inArray, isNotNull }) =>
-        and(inArray(fields.id, dedupIds), isNotNull(fields.deletedAt)),
+        and(inArray(fields.id, documentIds), isNotNull(fields.deletedAt)),
     });
 
     if (tombs.length === 0) return [];
 
     await this.documentModel.restoreManyAny(tombs.map((item) => item.id));
 
-    const fileIds = [...new Set(tombs.map((item) => item.fileId).filter(Boolean) as string[])];
     const restoredFileRows =
       fileIds.length === 0
         ? []
         : await this.db.query.files.findMany({
             columns: {
               id: true,
-              resourceUid: true,
+              contentUid: true,
               spaceId: true,
             },
             where: (fields, { and, inArray, isNotNull }) =>
@@ -515,12 +545,14 @@ export class DocumentService {
       );
     }
 
-    await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
-      ...tombs.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
-      ...restoredFileRows.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
+    await this.contentModel.invalidateAuthzEpochsAfterRemoval([
+      ...tombs.map((item) => ({ contentUid: item.contentUid, spaceId: item.spaceId })),
+      ...restoredFileRows.map((item) => ({ contentUid: item.contentUid, spaceId: item.spaceId })),
     ]);
 
-    const restored = await Promise.all(tombs.map((item) => this.documentModel.findByIdAny(item.id)));
+    const restored = await Promise.all(
+      tombs.map((item) => this.documentModel.findByIdAny(item.id)),
+    );
 
     return restored.filter(Boolean);
   }
@@ -544,6 +576,7 @@ export class DocumentService {
     if (params.parentId !== undefined) {
       await this.treeGuard.assertParentAssignment({
         currentSpaceId: currentDocument.spaceId,
+        itemId: currentDocument.id,
         parentId: params.parentId || null,
       });
     }
@@ -592,14 +625,18 @@ export class DocumentService {
 
     if (params.parentId !== undefined) {
       const row = await this.documentModel.findByIdAny(id);
-      await this.resourceModel.invalidateAuthzEpochsAfterRemoval([
-        { resourceUid: row?.resourceUid, spaceId: row?.spaceId },
+      await this.contentModel.invalidateAuthzEpochsAfterRemoval([
+        { contentUid: row?.contentUid, spaceId: row?.spaceId },
       ]);
     }
 
     // If title was updated and this document has an associated file, update the file name too
     if (refreshedDocument?.fileId) {
-      if (params.title !== undefined || params.parentId !== undefined || params.content !== undefined) {
+      if (
+        params.title !== undefined ||
+        params.parentId !== undefined ||
+        params.content !== undefined
+      ) {
         const fileUpdates: any = {};
         if (params.title !== undefined) fileUpdates.name = params.title;
         if (params.parentId !== undefined) fileUpdates.parentId = params.parentId;
@@ -626,7 +663,7 @@ export class DocumentService {
   }
 
   /**
-   * Parse file and create a document for page editor (without page tags)
+   * Parse file and create a document for the doc editor (without doc tags)
    */
   async parseDocument(fileId: string): Promise<LobeDocument> {
     const { filePath, file, cleanup } = await this.fileService.downloadFileToLocal(
@@ -652,7 +689,7 @@ export class DocumentService {
       // Clean up content - remove <page> tags if present
       let cleanContent = fileDocument.content;
       if (cleanContent.includes('<page')) {
-        cleanContent = cleanContent.replaceAll(/<page[^>]*>([\S\s]*?)<\/page>/g, '$1').trim();
+        cleanContent = cleanContent.replaceAll(/<page[^>]*>([\S\s]*?)<\/docs>/g, '$1').trim();
       }
 
       const document = await this.documentModel.create({
@@ -671,7 +708,7 @@ export class DocumentService {
       });
 
       if (file.spaceId) {
-        const registry = await this.resourceModel.ensureResourceRegistry({
+        const registry = await this.contentModel.ensureContentRegistry({
           createdBy: this.userId,
           kind: 'document',
           localId: document.id,
@@ -679,12 +716,12 @@ export class DocumentService {
         });
 
         await this.documentModel.update(document.id, {
-          resourceUid: registry.resourceUid,
+          contentUid: registry.contentUid,
           spaceId: file.spaceId,
         } as any);
 
-        await this.resourceModel.ensureOwnerPermission({
-          resourceUid: registry.resourceUid,
+        await this.contentModel.ensureOwnerPermission({
+          contentUid: registry.contentUid,
           spaceId: file.spaceId,
         });
       }
@@ -740,7 +777,7 @@ export class DocumentService {
       });
 
       if (file.spaceId) {
-        const registry = await this.resourceModel.ensureResourceRegistry({
+        const registry = await this.contentModel.ensureContentRegistry({
           createdBy: this.userId,
           kind: 'document',
           localId: document.id,
@@ -748,12 +785,12 @@ export class DocumentService {
         });
 
         await this.documentModel.update(document.id, {
-          resourceUid: registry.resourceUid,
+          contentUid: registry.contentUid,
           spaceId: file.spaceId,
         } as any);
 
-        await this.resourceModel.ensureOwnerPermission({
-          resourceUid: registry.resourceUid,
+        await this.contentModel.ensureOwnerPermission({
+          contentUid: registry.contentUid,
           spaceId: file.spaceId,
         });
       }

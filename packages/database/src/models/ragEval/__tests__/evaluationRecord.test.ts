@@ -8,7 +8,7 @@ import {
   evalDatasets,
   evalEvaluation,
   evaluationRecords,
-  knowledgeBases,
+  sourceSets,
   users,
 } from '../../../schemas';
 import { EvaluationRecordModel } from '../evaluationRecord';
@@ -22,33 +22,30 @@ const recordModel = new EvaluationRecordModel(serverDB, userId);
 let datasetId: string;
 let evaluationId: string;
 let datasetRecordId: string;
-let knowledgeBaseId: string;
+let sourceSetId: string;
 
 beforeEach(async () => {
   await serverDB.delete(evaluationRecords);
   await serverDB.delete(evalDatasetRecords);
   await serverDB.delete(evalEvaluation);
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
 
-  const [kb] = await serverDB
-    .insert(knowledgeBases)
-    .values({ name: 'Test KB', userId })
-    .returning();
-  knowledgeBaseId = kb.id;
+  const [kb] = await serverDB.insert(sourceSets).values({ name: 'Test KB', userId }).returning();
+  sourceSetId = kb.id;
 
   const [dataset] = await serverDB
     .insert(evalDatasets)
-    .values({ knowledgeBaseId, name: 'Test Dataset', userId })
+    .values({ sourceSetId, name: 'Test Dataset', userId })
     .returning();
   datasetId = dataset.id;
 
   const [evaluation] = await serverDB
     .insert(evalEvaluation)
-    .values({ datasetId, knowledgeBaseId, name: 'Test Evaluation', userId })
+    .values({ datasetId, sourceSetId, name: 'Test Evaluation', userId })
     .returning();
   evaluationId = evaluation.id;
 
@@ -64,7 +61,7 @@ afterEach(async () => {
   await serverDB.delete(evalDatasetRecords);
   await serverDB.delete(evalEvaluation);
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 });
 

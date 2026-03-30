@@ -7,6 +7,7 @@ import { MobileChatService } from './index';
 const findBySessionIdMock = vi.hoisted(() => vi.fn());
 const findByIdOrSlugMock = vi.hoisted(() => vi.fn());
 const getSessionAssignedFileContentsMock = vi.hoisted(() => vi.fn());
+const findAccessibleSpaceByIdMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/database/models/agent', () => ({
   AgentModel: class AgentModel {
@@ -23,6 +24,12 @@ vi.mock('@/database/models/file', () => ({
 vi.mock('@/database/models/session', () => ({
   SessionModel: class SessionModel {
     findByIdOrSlug = findByIdOrSlugMock;
+  },
+}));
+
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: class SpaceModel {
+    findAccessibleSpaceById = findAccessibleSpaceByIdMock;
   },
 }));
 
@@ -90,5 +97,26 @@ describe('MobileChatService', () => {
     await expect(response.json()).resolves.toEqual({
       choices: [{ finish_reason: 'stop', message: { content: 'done', role: 'assistant' } }],
     });
+  });
+
+  it('should reject inaccessible payload spaceId before running chat flow', async () => {
+    findAccessibleSpaceByIdMock.mockResolvedValue(undefined);
+
+    const service = new MobileChatService({
+      modelRuntime: { chat: vi.fn() } as any,
+      provider: 'openai',
+      requestSignal: new AbortController().signal,
+      serverDB: {} as any,
+      userId: 'user-1',
+    });
+
+    await expect(
+      service.handleChat({
+        messages: [{ content: 'hi', role: 'user' } as any],
+        model: 'gpt-4o',
+        spaceId: 'spc_blocked',
+        stream: false,
+      } as any),
+    ).rejects.toThrow('SPACE_ACCESS_DENIED');
   });
 });

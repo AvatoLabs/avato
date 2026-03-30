@@ -42,7 +42,7 @@ const createServerVariableGenerators = (params: {
  *   systemRole: 'You are a helpful assistant',
  *   knowledge: {
  *     fileContents: [...],
- *     knowledgeBases: [...],
+ *     sourceSets: [...],
  *   },
  * });
  * ```
@@ -66,7 +66,7 @@ export const serverMessagesEngine = async ({
   discordContext,
   evalContext,
   agentManagementContext,
-  pageContentContext,
+  docContentContext,
   additionalVariables,
   userTimezone,
 }: ServerMessagesEngineParams): Promise<OpenAIChatMessage[]> => {
@@ -99,7 +99,7 @@ export const serverMessagesEngine = async ({
     knowledge: {
       conversationFileContents: knowledge?.conversationFileContents,
       fileContents: knowledge?.fileContents,
-      knowledgeBases: knowledge?.knowledgeBases,
+      sourceSets: knowledge?.sourceSets,
     },
 
     // Messages
@@ -142,7 +142,7 @@ export const serverMessagesEngine = async ({
     ...(discordContext && { discordContext }),
     ...(evalContext && { evalContext }),
     ...(agentManagementContext && { agentManagementContext }),
-    ...(pageContentContext && { pageContentContext }),
+    ...(docContentContext && { docContentContext }),
   });
 
   const result = await engine.process();

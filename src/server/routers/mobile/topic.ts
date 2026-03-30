@@ -1,5 +1,7 @@
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { SpaceModel } from '@/database/models/space';
 import { TopicModel } from '@/database/models/topic';
 import { getServerDB } from '@/database/server';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
@@ -10,9 +12,26 @@ const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
 
   return opts.next({
-    ctx: { topicModel: new TopicModel(ctx.serverDB, ctx.userId) },
+    ctx: {
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId),
+    },
   });
 });
+
+const assertAccessibleSpace = async (
+  ctx: {
+    spaceModel: SpaceModel;
+  },
+  spaceId?: string | null,
+) => {
+  if (!spaceId) return;
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(spaceId);
+  if (!space?.id) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  }
+};
 
 export const topicRouter = router({
   batchCreateTopics: topicProcedure
@@ -23,11 +42,20 @@ export const topicRouter = router({
           id: z.string().optional(),
           messages: z.array(z.string()).optional(),
           sessionId: z.string().optional(),
+          spaceId: z.string().nullable().optional(),
           title: z.string(),
         }),
       ),
     )
     .mutation(async ({ input, ctx }): Promise<BatchTaskResult> => {
+      await Promise.all(
+        [
+          ...new Set(
+            input.map((item) => item.spaceId).filter((spaceId): spaceId is string => !!spaceId),
+          ),
+        ].map((spaceId) => assertAccessibleSpace(ctx, spaceId)),
+      );
+
       const data = await ctx.topicModel.batchCreate(
         input.map((item) => ({
           ...item,
@@ -78,10 +106,13 @@ export const topicRouter = router({
         groupId: z.string().nullable().optional(),
         messages: z.array(z.string()).optional(),
         sessionId: z.string().nullable().optional(),
+        spaceId: z.string().nullable().optional(),
         title: z.string(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
+      await assertAccessibleSpace(ctx, input.spaceId);
+
       const data = await ctx.topicModel.create(input);
 
       return data.id;
@@ -98,6 +129,7 @@ export const topicRouter = router({
         containerId: z.string().nullable().optional(),
         current: z.number().optional(),
         pageSize: z.number().optional(),
+        spaceId: z.string().nullable().optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
@@ -133,10 +165,11 @@ export const topicRouter = router({
         groupId: z.string().nullable().optional(),
         keywords: z.string(),
         sessionId: z.string().nullable().optional(),
+        spaceId: z.string().nullable().optional(),
       }),
     )
     .query(async ({ input, ctx }) => {
-      return ctx.topicModel.queryByKeyword(input.keywords, input.sessionId);
+      return ctx.topicModel.queryByKeyword(input.keywords, input.sessionId, input.spaceId);
     }),
 
   updateTopic: topicProcedure

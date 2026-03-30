@@ -4015,7 +4015,7 @@ const MCPWorkflowStudio = () => {
       </div>
 
       <Modal
-        destroyOnClose
+        destroyOnHidden
         footer={null}
         open={commandPaletteOpen}
         title={t('mcpStudio.commandPalette.title')}
@@ -4056,7 +4056,7 @@ const MCPWorkflowStudio = () => {
       </Modal>
 
       <Modal
-        destroyOnClose
+        destroyOnHidden
         okButtonProps={{ loading: connectLoading }}
         okText={t('mcpStudio.connection.connect')}
         open={serverModalOpen}

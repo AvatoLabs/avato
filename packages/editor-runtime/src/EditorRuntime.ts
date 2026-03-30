@@ -1,4 +1,4 @@
-import type { PageContentContext } from '@lobechat/prompts';
+import type { DocContentContext } from '@lobechat/prompts';
 import type { IEditor } from '@lobehub/editor';
 import { LITEXML_APPLY_COMMAND, LITEXML_MODIFY_COMMAND } from '@lobehub/editor';
 import debug from 'debug';
@@ -6,10 +6,10 @@ import debug from 'debug';
 import type {
   EditTitleArgs,
   EditTitleRuntimeResult,
-  GetPageContentArgs,
-  GetPageContentRuntimeResult,
+  GetDocContentArgs,
+  GetDocContentRuntimeResult,
+  InitDocRuntimeResult,
   InitDocumentArgs,
-  InitPageRuntimeResult,
   ModifyNodesArgs,
   ModifyNodesRuntimeResult,
   ModifyOperationResult,
@@ -24,7 +24,7 @@ const log = debug('lobe:editor-runtime');
  * Handles the execution logic for editor operations including:
  * - Document initialization
  * - Title management
- * - Content retrieval
+ * - Doc content retrieval
  * - Node modifications (insert, modify, remove)
  * - Text replacement
  */
@@ -90,14 +90,14 @@ export class EditorRuntime {
    * Initialize document from Markdown content
    * @returns Raw result with nodeCount and extractedTitle
    */
-  async initPage(args: InitDocumentArgs): Promise<InitPageRuntimeResult> {
+  async initDoc(args: InitDocumentArgs): Promise<InitDocRuntimeResult> {
     const editor = this.getEditor();
 
     let markdown = args.markdown;
     let extractedTitle: string | undefined;
 
     // Check if markdown starts with a # title heading
-    const titleMatch = /^#\s+(.+)(?:\r?\n|$)/.exec(markdown);
+    const titleMatch = /^#\s+(\S.*)(?:\r?\n|$)/.exec(markdown);
     if (titleMatch) {
       extractedTitle = titleMatch[1].trim();
       // Remove the title line from markdown
@@ -122,7 +122,7 @@ export class EditorRuntime {
   // ==================== Metadata ====================
 
   /**
-   * Edit the page title
+   * Edit the doc title
    * @returns Raw result with newTitle and previousTitle
    */
   async editTitle(args: EditTitleArgs): Promise<EditTitleRuntimeResult> {
@@ -138,11 +138,11 @@ export class EditorRuntime {
   // ==================== Query & Read ====================
 
   /**
-   * Get the current page content and metadata
+   * Get the current doc content and metadata
    * @returns Raw result with document content and metadata
    */
-  async getPageContent(args: GetPageContentArgs): Promise<GetPageContentRuntimeResult> {
-    const context = this.getPageContentContext(args.format);
+  async getDocContent(args: GetDocContentArgs): Promise<GetDocContentRuntimeResult> {
+    const context = this.getDocContentContext(args.format);
 
     return {
       charCount: context.metadata.charCount,
@@ -155,18 +155,18 @@ export class EditorRuntime {
   }
 
   /**
-   * Get page content context for system prompt injection
+   * Get doc content context for system prompt injection
    */
-  getPageContentContext(format: 'xml' | 'markdown' | 'both' = 'both'): PageContentContext {
+  getDocContentContext(format: 'xml' | 'markdown' | 'both' = 'both'): DocContentContext {
     const editor = this.getEditor();
     const { getter: getTitleFn } = this.getTitleHandlers();
 
     const title = getTitleFn() || 'Untitled';
-    const pageXML = editor.getDocument('litexml') as unknown as string;
+    const docXML = editor.getDocument('litexml') as unknown as string;
 
-    log('Getting page content context, format:', format);
+    log('Getting doc content context, format:', format);
 
-    const context: PageContentContext = {
+    const context: DocContentContext = {
       metadata: { title },
     };
 
@@ -179,7 +179,7 @@ export class EditorRuntime {
     }
 
     if (format === 'xml' || format === 'both') {
-      context.xml = pageXML || '';
+      context.xml = docXML || '';
     }
 
     return context;
@@ -531,7 +531,7 @@ export class EditorRuntime {
 
         // Build the updated LiteXML for this node
         // Extract attributes from the original fullMatch
-        const attrMatch = /<\w+\s+([^>]*)>/.exec(node.fullMatch);
+        const attrMatch = /<\w+\s([^>]*)>/.exec(node.fullMatch);
         const attributes = attrMatch ? attrMatch[1] : `id="${node.id}"`;
 
         const updatedLitexml = `<${node.tagName} ${attributes}>${newContent}</${node.tagName}>`;

@@ -28,7 +28,7 @@ const app = new Hono();
  * - fileType: string (optional) - 文件类型过滤
  * - keyword: string (optional) - 搜索关键词
  * - userId: string (optional) - 用户ID，如果提供则获取指定用户文件
- * - knowledgeBaseId: string (optional) - 知识库ID，筛选属于指定知识库的文件
+ * - sourceSetId: string (optional) - 知识库ID，筛选属于指定知识库的文件
  * - updatedAtStart: string (optional) - 更新时间起始（ISO 8601格式，如：2024-01-01T00:00:00Z）
  * - updatedAtEnd: string (optional) - 更新时间结束（ISO 8601格式，如：2024-12-31T23:59:59Z）
  */
@@ -51,7 +51,7 @@ app.get(
  *
  * Form fields:
  * - file: File (required) - 要上传的文件
- * - knowledgeBaseId: string (optional) - 知识库ID
+ * - sourceSetId: string (optional) - 知识库ID
  * - agentId: string (optional) - Agent ID，优先解析为 sessionId 并关联文件
  * - sessionId: string (optional) - 会话ID，如果提供则创建文件和会话的关联关系
  * - skipCheckFileType: boolean (optional) - 是否跳过文件类型检查
@@ -117,7 +117,7 @@ app.get(
  *
  * Request body (JSON):
  * {
- *   "knowledgeBaseId": "kb-id" | null (optional) - 知识库ID，传 null 表示取消关联
+ *   "sourceSetId": "kb-id" | null (optional) - 知识库ID，传 null 表示取消关联
  * }
  */
 app.patch(
@@ -230,7 +230,7 @@ app.get(
  *
  * Form fields:
  * - files: File[] (required) - 要上传的文件列表
- * - knowledgeBaseId: string (optional) - 知识库ID
+ * - sourceSetId: string (optional) - 知识库ID
  * - agentId: string (optional) - Agent ID，优先解析为 sessionId 并关联文件
  * - sessionId: string (optional) - 会话ID，如果提供则创建文件和会话的关联关系
  * - skipCheckFileType: boolean (optional) - 是否跳过文件类型检查

@@ -4,21 +4,21 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { RESOURCE_ENTRY_ICONS } from '@/config/resourceIcons';
+import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
-import { buildResourceLibraryTrashPath, buildResourceTrashPath } from '@/features/ResourceSpaces';
+import { buildContentTrashPath, buildSourceSetTrashPath } from '@/features/ResourceSpaces';
 
 export const TrashNavItem = memo<{
-  knowledgeBaseId?: string;
+  sourceSetId?: string;
   spaceId?: string;
-}>(({ knowledgeBaseId, spaceId }) => {
+}>(({ sourceSetId, spaceId }) => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
   const location = useLocation();
 
-  const targetPath = knowledgeBaseId
-    ? buildResourceLibraryTrashPath(spaceId, knowledgeBaseId)
-    : buildResourceTrashPath(spaceId);
+  const targetPath = sourceSetId
+    ? buildSourceSetTrashPath(spaceId, sourceSetId)
+    : buildContentTrashPath(spaceId);
 
   return (
     <NavItem

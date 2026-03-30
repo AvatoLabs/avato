@@ -9,17 +9,17 @@ import { memo } from 'react';
 import { CONVERSATION_MIN_WIDTH } from '@/const/layoutTokens';
 import DiffAllToolbar from '@/features/EditorCanvas/DiffAllToolbar';
 import { useRegisterFilesHotkeys } from '@/hooks/useHotkeys';
+import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { usePageStore } from '@/store/page';
-import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/page';
+import { DEFAULT_PAGE_KIND, type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
 import { StyleSheet } from '@/utils/styles';
 
 import { PAGE_EDITOR_SCROLL_ROOT_ID } from './constants';
 import Copilot from './Copilot';
+import { DocsAgentProvider } from './DocsAgentProvider';
 import Header from './Header';
 import ModeContent from './ModeContent';
-import { PageAgentProvider } from './PageAgentProvider';
 import { PageEditorProvider } from './PageEditorProvider';
 import PageTitle from './PageTitle';
 import { usePageEditorStore } from './store';
@@ -70,7 +70,6 @@ interface PageEditorProps {
   allowHorizontalScroll?: boolean;
   contentMinWidth?: number;
   emoji?: string;
-  knowledgeBaseId?: string;
   onBack?: () => void;
   onDelete?: () => void;
   onDocumentIdChange?: (newId: string) => void;
@@ -79,6 +78,8 @@ interface PageEditorProps {
   onTitleChange?: (title: string) => void;
   pageId?: string;
   pageKind?: PageKind;
+  parentId?: string | null;
+  sourceSetId?: string;
   title?: string;
 }
 
@@ -183,13 +184,14 @@ export const PageEditor: FC<PageEditorProps> = ({
   contentMinWidth,
   pageId,
   pageKind = DEFAULT_PAGE_KIND,
-  knowledgeBaseId,
+  sourceSetId,
   onDocumentIdChange,
   onEmojiChange,
   onSave,
   onTitleChange,
   onBack,
   onDelete: onDeleteAfter,
+  parentId,
   title,
   emoji,
 }) => {
@@ -204,9 +206,10 @@ export const PageEditor: FC<PageEditorProps> = ({
     <EditorProvider>
       <PageEditorProvider
         emoji={emoji}
-        knowledgeBaseId={knowledgeBaseId}
         pageId={pageId}
         pageKind={pageKind}
+        parentId={parentId}
+        sourceSetId={sourceSetId}
         title={title}
         onBack={onBack}
         onDelete={handleDeleteNavigate}
@@ -215,12 +218,12 @@ export const PageEditor: FC<PageEditorProps> = ({
         onSave={onSave}
         onTitleChange={onTitleChange}
       >
-        <PageAgentProvider>
+        <DocsAgentProvider>
           <PageEditorCanvas
             allowHorizontalScroll={allowHorizontalScroll}
             contentMinWidth={contentMinWidth}
           />
-        </PageAgentProvider>
+        </DocsAgentProvider>
       </PageEditorProvider>
     </EditorProvider>
   );

@@ -128,7 +128,28 @@
   display: inline-block;
 }
 
-/* Launch CTA 样式在 index.tsx 的 createStyles 中，使用主题 colorPrimary / colorTextLightSolid */
+.startButton {
+  margin-top: 14px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 11px 20px;
+  min-width: 172px;
+  color: #fff;
+  background: linear-gradient(135deg, #6a5af9, #9a5aff 49%, #6cb8ff);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 22px rgb(89 98 255 / 35%);
+}
+
+.startButton:active {
+  transform: translateY(1px);
+}
+
+.startButton:hover {
+  filter: brightness(1.05);
+}
 
 .debug {
   display: flex;
@@ -181,6 +202,7 @@
 }
 
 @keyframes dots {
+
   0%,
   20% {
     content: '.';

@@ -21,7 +21,7 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type ExplainAccessResult, resourceShareApi } from '../../lib/api';
+import { contentShareApi, type ExplainAccessResult } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
@@ -166,13 +166,13 @@ export default function ResourceShareManageSheet({
     setMembersForbidden(false);
     setMembersFailed(false);
     try {
-      const a = await resourceShareApi.explainAccess({ id: target.id, kind: target.kind });
+      const a = await contentShareApi.explainContentAccess({ id: target.id, kind: target.kind });
       setAccess(a);
     } catch {
       setAccess(null);
     }
     try {
-      const l = await resourceShareApi.listResourceShareLinks({ id: target.id, kind: target.kind });
+      const l = await contentShareApi.listContentShareLinks({ id: target.id, kind: target.kind });
       setLinks((l ?? []) as ShareLinkRow[]);
     } catch (e) {
       setLinks([]);
@@ -180,7 +180,7 @@ export default function ResourceShareManageSheet({
       else setLinksFailed(true);
     }
     try {
-      const m = await resourceShareApi.listResourcePermissions({
+      const m = await contentShareApi.listContentPermissions({
         id: target.id,
         kind: target.kind,
       });
@@ -208,7 +208,7 @@ export default function ResourceShareManageSheet({
   const handleDisableLink = async (shareLinkId: string) => {
     setDisablingId(shareLinkId);
     try {
-      await resourceShareApi.disableResourceShareLink(shareLinkId);
+      await contentShareApi.disableContentShareLink(shareLinkId);
       haptics.success();
       await load();
     } catch {
@@ -232,7 +232,7 @@ export default function ResourceShareManageSheet({
   const handleRevoke = async (permissionId: string) => {
     setRevokingId(permissionId);
     try {
-      await resourceShareApi.revokeResourcePermission(permissionId);
+      await contentShareApi.revokeContentPermission(permissionId);
       haptics.success();
       await load();
     } catch {
@@ -263,7 +263,7 @@ export default function ResourceShareManageSheet({
     }
     setGranting(true);
     try {
-      await resourceShareApi.grantResourcePermission({
+      await contentShareApi.grantContentPermission({
         canReshare: grantRole === 'editor' && grantCanReshare,
         expiresAt,
         id: target.id,

@@ -27,6 +27,8 @@ const sourceType = (id: string) => (s: DocumentStore) => s.documents[id]?.source
 const lastUpdatedTime = (id: string) => (s: DocumentStore) =>
   s.documents[id]?.lastUpdatedTime?.toISOString();
 
+const spaceId = (id: string) => (s: DocumentStore) => s.documents[id]?.spaceId;
+
 // ===== Active Document Convenience Selectors =====
 
 const activeIsDirty = (s: DocumentStore) => {
@@ -103,6 +105,7 @@ export const editorSelectors = {
   isDirty,
   lastUpdatedTime,
   saveStatus,
+  spaceId,
   sourceType,
 
   // Editor

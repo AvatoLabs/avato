@@ -1,4 +1,3 @@
- 
 import { Center, Flexbox, Icon } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { FileImage, FileText, FileUpIcon } from 'lucide-react';
@@ -19,44 +18,57 @@ const styles = createStaticStyles(({ css, cssVar }) => {
       padding: calc(${cssVar.borderRadiusLG} + 4px);
       border-radius: 16px;
 
-      background: ${cssVar.geekblue};
+      background: color-mix(in srgb, ${cssVar.colorPrimary} 84%, ${cssVar.colorBgElevated});
+      box-shadow:
+        inset 0 1px 0 color-mix(in srgb, ${cssVar.colorTextLightSolid} 18%, transparent),
+        0 18px 42px -18px color-mix(in srgb, ${cssVar.colorPrimary} 32%, transparent);
     `,
     content: css`
       width: 100%;
       height: 100%;
       padding: 16px;
-      border: 1.5px dashed #fff;
+      border: 1.5px dashed
+        color-mix(in srgb, ${cssVar.colorTextLightSolid} 68%, ${cssVar.colorPrimary});
       border-radius: ${cssVar.borderRadiusLG};
     `,
     desc: css`
       font-size: 14px;
       line-height: 22px;
-      color: #fff;
+      color: ${cssVar.colorTextLightSolid};
     `,
     icon: css`
       border-radius: ${cssVar.borderRadiusLG};
-      color: color-mix(in srgb, ${cssVar.geekblue} 95%, black);
-      background: color-mix(in srgb, ${cssVar.geekblue} 38%, white);
+      color: ${cssVar.colorPrimary};
+      background: color-mix(in srgb, ${cssVar.colorBgContainer} 86%, ${cssVar.colorPrimary});
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorTextLightSolid} 12%, transparent);
     `,
     iconGroup: css`
       margin-block-start: -44px;
     `,
     iconLeft: css`
       transform: rotateZ(-20deg) translateX(10px);
+
       border-radius: ${cssVar.borderRadiusLG};
-      color: color-mix(in srgb, ${cssVar.geekblue} 95%, black);
-      background: color-mix(in srgb, ${cssVar.geekblue} 68%, white);
+
+      color: ${cssVar.colorPrimary};
+
+      background: color-mix(in srgb, ${cssVar.colorBgContainer} 80%, ${cssVar.colorPrimary});
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorTextLightSolid} 12%, transparent);
     `,
     iconRight: css`
       transform: rotateZ(20deg) translateX(-10px);
+
       border-radius: ${cssVar.borderRadiusLG};
-      color: color-mix(in srgb, ${cssVar.geekblue} 95%, black);
-      background: color-mix(in srgb, ${cssVar.geekblue} 68%, white);
+
+      color: ${cssVar.colorPrimary};
+
+      background: color-mix(in srgb, ${cssVar.colorBgContainer} 80%, ${cssVar.colorPrimary});
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, ${cssVar.colorTextLightSolid} 12%, transparent);
     `,
     title: css`
       font-size: 20px;
       font-weight: bold;
-      color: #fff;
+      color: ${cssVar.colorTextLightSolid};
     `,
     wrapper: css`
       position: fixed;

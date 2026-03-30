@@ -7,7 +7,7 @@ import {
   serializeTableMarkdown,
   tableSheetToCsv,
   tableSheetToXlsxBase64,
-} from './pageTable';
+} from './docsTable';
 
 describe('pageTable', () => {
   it('should create a notion-like starter markdown table', () => {

@@ -33,6 +33,23 @@ import CommunityListModelPage from '@/routes/(main)/community/(list)/model';
 import CommunityListModelLayout from '@/routes/(main)/community/(list)/model/_layout';
 import CommunityListPluginRedirectPage from '@/routes/(main)/community/(list)/plugin';
 import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider';
+import ResourceRootRedirectPage from '@/routes/(main)/content';
+import ResourceLayout from '@/routes/(main)/content/_layout';
+import ResourceHomePage from '@/routes/(main)/content/(home)';
+import ResourceHomeLayout from '@/routes/(main)/content/(home)/_layout';
+import ResourceSharedPage from '@/routes/(main)/content/shared';
+import ContentSourceSetPage from '@/routes/(main)/content/source-sets';
+import ContentSourceSetLayout from '@/routes/(main)/content/source-sets/_layout';
+import ContentSourceSetSlugPage from '@/routes/(main)/content/source-sets/[slug]';
+import ContentSourceSetTrashPage from '@/routes/(main)/content/source-sets/trash';
+import ResourceSpaceSettingsPage from '@/routes/(main)/content/spaces/[spaceId]/settings';
+import ResourceSpaceTrashPage from '@/routes/(main)/content/spaces/[spaceId]/trash';
+import ResourceTrashPage from '@/routes/(main)/content/trash';
+import PageIndexPage from '@/routes/(main)/docs';
+import DesktopPageLayout from '@/routes/(main)/docs/_layout';
+import PageDetailPage from '@/routes/(main)/docs/[id]';
+import PageTablePage from '@/routes/(main)/docs/table';
+import PageTableDetailPage from '@/routes/(main)/docs/table/[id]';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
 import GroupProfilePage from '@/routes/(main)/group/profile';
@@ -45,23 +62,6 @@ import MemoryContextsPage from '@/routes/(main)/memory/contexts';
 import MemoryExperiencesPage from '@/routes/(main)/memory/experiences';
 import MemoryIdentitiesPage from '@/routes/(main)/memory/identities';
 import MemoryPreferencesPage from '@/routes/(main)/memory/preferences';
-import PageIndexPage from '@/routes/(main)/page';
-import DesktopPageLayout from '@/routes/(main)/page/_layout';
-import PageDetailPage from '@/routes/(main)/page/[id]';
-import PageTablePage from '@/routes/(main)/page/table';
-import PageTableDetailPage from '@/routes/(main)/page/table/[id]';
-import ResourceRootRedirectPage from '@/routes/(main)/resource';
-import ResourceLayout from '@/routes/(main)/resource/_layout';
-import ResourceHomePage from '@/routes/(main)/resource/(home)';
-import ResourceHomeLayout from '@/routes/(main)/resource/(home)/_layout';
-import ResourceLibraryPage from '@/routes/(main)/resource/library';
-import ResourceLibraryLayout from '@/routes/(main)/resource/library/_layout';
-import ResourceLibrarySlugPage from '@/routes/(main)/resource/library/[slug]';
-import ResourceLibraryTrashPage from '@/routes/(main)/resource/library/trash';
-import ResourceSharedPage from '@/routes/(main)/resource/shared';
-import ResourceSpaceSettingsPage from '@/routes/(main)/resource/space/[spaceId]/settings';
-import ResourceSpaceTrashPage from '@/routes/(main)/resource/space/[spaceId]/trash';
-import ResourceTrashPage from '@/routes/(main)/resource/trash';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
@@ -243,15 +243,23 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: <ResourceHomePage />,
-                path: 'space/:spaceId',
+                path: 'spaces/:spaceId',
+              },
+              {
+                element: <ResourceHomePage />,
+                path: 'spaces/:spaceId/:slug',
               },
               {
                 element: <ResourceSpaceTrashPage />,
-                path: 'space/:spaceId/trash',
+                path: 'spaces/:spaceId/trash',
               },
               {
                 element: <ResourceSpaceSettingsPage />,
-                path: 'space/:spaceId/settings',
+                path: 'spaces/:spaceId/settings',
+              },
+              {
+                element: <ResourceHomePage />,
+                path: ':slug',
               },
             ],
             element: <ResourceHomeLayout />,
@@ -259,43 +267,43 @@ export const desktopRoutes: RouteObject[] = [
           {
             children: [
               {
-                element: <ResourceLibraryPage />,
+                element: <ContentSourceSetPage />,
                 index: true,
               },
               {
-                element: <ResourceLibraryTrashPage />,
+                element: <ContentSourceSetTrashPage />,
                 path: 'trash',
               },
               {
-                element: <ResourceLibrarySlugPage />,
+                element: <ContentSourceSetSlugPage />,
                 path: ':slug',
               },
             ],
-            element: <ResourceLibraryLayout />,
-            path: 'library/:id',
+            element: <ContentSourceSetLayout />,
+            path: 'source-sets/:id',
           },
           {
             children: [
               {
-                element: <ResourceLibraryPage />,
+                element: <ContentSourceSetPage />,
                 index: true,
               },
               {
-                element: <ResourceLibraryTrashPage />,
+                element: <ContentSourceSetTrashPage />,
                 path: 'trash',
               },
               {
-                element: <ResourceLibrarySlugPage />,
+                element: <ContentSourceSetSlugPage />,
                 path: ':slug',
               },
             ],
-            element: <ResourceLibraryLayout />,
-            path: 'space/:spaceId/library/:id',
+            element: <ContentSourceSetLayout />,
+            path: 'spaces/:spaceId/source-sets/:id',
           },
         ],
         element: <ResourceLayout />,
-        errorElement: <ErrorBoundary resetPath="/resource" />,
-        path: 'resource',
+        errorElement: <ErrorBoundary resetPath="/content" />,
+        path: 'content',
       },
 
       // Settings routes
@@ -425,8 +433,8 @@ export const desktopRoutes: RouteObject[] = [
           },
         ],
         element: <DesktopPageLayout />,
-        errorElement: <ErrorBoundary resetPath="/page" />,
-        path: 'page',
+        errorElement: <ErrorBoundary resetPath="/docs" />,
+        path: 'docs',
       },
 
       // Default route - home page (handled by persistent layout)

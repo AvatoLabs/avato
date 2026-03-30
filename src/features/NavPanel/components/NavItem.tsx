@@ -49,9 +49,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
 
     .${ACTION_CLASS_NAME} {
-      transform: translateX(2px);
+      transform: translateX(0);
       margin-inline-end: 2px;
-      opacity: 0.56;
+      opacity: 0.72;
       transition:
         opacity ${cssVar.motionDurationMid} ${cssVar.motionEaseOut},
         transform ${cssVar.motionDurationMid} ${cssVar.motionEaseOut};
@@ -220,15 +220,15 @@ const NavItem = memo<NavItemProps>(
         <Flexbox horizontal align={'center'} flex={1} gap={8} style={{ overflow: 'hidden' }}>
           {titlePrefix}
           <Text
-            color={labelColor}
             ellipsis
+            color={labelColor}
+            title={titleText}
             style={{
               flex: 1,
               fontSize: cssVar.fontSize,
               fontWeight: active ? 450 : 400,
               lineHeight: 1.3,
             }}
-            title={titleText}
           >
             {title}
           </Text>

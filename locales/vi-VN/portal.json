@@ -20,6 +20,6 @@
   "notebook.delete": "Xóa",
   "notebook.empty": "Chưa có trang nào. Các trang liên kết với Chủ đề này sẽ hiển thị tại đây.",
   "notebook.title": "Sổ tay",
-  "openInPageEditor": "Chỉnh sửa trong Trang",
+  "openInDocEditor": "Chỉnh sửa trong Trang",
   "title": "Không gian làm việc"
 }

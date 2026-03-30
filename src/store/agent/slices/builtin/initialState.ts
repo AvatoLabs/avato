@@ -1,7 +1,7 @@
 export interface BuiltinAgentSliceState {
   /**
    * Builtin agent id mapping { [slug]: agentId }
-   * Used to store IDs of builtin agents (page-agent, etc.)
+   * Used to store IDs of builtin agents (docs-agent, etc.)
    */
   builtinAgentIdMap: Record<string, string>;
 }

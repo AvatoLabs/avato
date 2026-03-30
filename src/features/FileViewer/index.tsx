@@ -3,6 +3,10 @@
 import { type CSSProperties } from 'react';
 import { memo } from 'react';
 
+import {
+  MARKDOWN_EXTENSIONS,
+  MARKDOWN_MIME_TYPES,
+} from '@/features/ContentManager/utils/isMarkdownContentFile';
 import { type FileListItem } from '@/types/files';
 
 import NotSupport from './NotSupport';
@@ -27,14 +31,7 @@ const IMAGE_MIME_TYPES = new Set([
 const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg'];
 const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/ogg', 'mp4', 'webm', 'ogg']);
 
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
-const MARKDOWN_MIME_TYPES = new Set([
-  'md',
-  'markdown',
-  'text/markdown',
-  'text/x-markdown',
-  'application/markdown',
-]);
+// MARKDOWN_EXTENSIONS and MARKDOWN_MIME_TYPES imported from @/features/ContentManager/utils/isMarkdownContentFile
 
 const CODE_EXTENSIONS = [
   // JavaScript/TypeScript
@@ -97,8 +94,7 @@ const CODE_EXTENSIONS = [
   '.clj',
   '.cljs',
   '.cljc',
-  // Markdown-like code
-  '.mdx',
+  // Note: .mdx moved to MARKDOWN_EXTENSIONS for proper handling
   // Other
   '.vim',
   '.graphql',
@@ -168,8 +164,7 @@ const CODE_MIME_TYPES = new Set([
   'toml',
   'sql',
   'text/x-sql',
-  // Markdown-like code
-  'mdx',
+  // Note: mdx moved to MARKDOWN_MIME_TYPES for proper handling
   // Other
   'graphql',
   'mermaid',
@@ -249,8 +244,8 @@ const matchesFileType = (
 
 interface FileViewerProps extends FileListItem {
   className?: string;
-  enablePageAgentContext?: boolean;
-  pageAgentContextKey?: string;
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   style?: CSSProperties;
 }
 
@@ -258,7 +253,7 @@ interface FileViewerProps extends FileListItem {
  * Preview any file type.
  */
 const FileViewer = memo<FileViewerProps>(
-  ({ enablePageAgentContext, id, pageAgentContextKey, style, fileType, url, name }) => {
+  ({ enableDocsAgentContext, id, docsAgentContextKey, style, fileType, url, name }) => {
     // PDF files
     if (fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf')) {
       return <PDFViewer fileId={id} url={url} />;
@@ -284,10 +279,10 @@ const FileViewer = memo<FileViewerProps>(
     if (matchesFileType(fileType, name, EXCEL_EXTENSIONS, EXCEL_MIME_TYPES)) {
       return (
         <ExcelViewer
-          enablePageAgentContext={enablePageAgentContext}
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
           fileId={id}
           fileName={name}
-          pageAgentContextKey={pageAgentContextKey}
           url={url}
         />
       );
@@ -302,10 +297,10 @@ const FileViewer = memo<FileViewerProps>(
     if (matchesFileType(fileType, name, MARKDOWN_EXTENSIONS, MARKDOWN_MIME_TYPES)) {
       return (
         <MarkdownViewer
-          enablePageAgentContext={enablePageAgentContext}
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
           fileId={id}
           fileName={name}
-          pageAgentContextKey={pageAgentContextKey}
           url={url}
         />
       );
@@ -315,10 +310,10 @@ const FileViewer = memo<FileViewerProps>(
     if (matchesFileType(fileType, name, CODE_EXTENSIONS, CODE_MIME_TYPES)) {
       return (
         <CodeViewer
-          enablePageAgentContext={enablePageAgentContext}
+          docsAgentContextKey={docsAgentContextKey}
+          enableDocsAgentContext={enableDocsAgentContext}
           fileId={id}
           fileName={name}
-          pageAgentContextKey={pageAgentContextKey}
           url={url}
         />
       );

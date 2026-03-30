@@ -12,9 +12,10 @@ import {
   files,
   filesToSessions,
   globalFiles,
-  knowledgeBaseFiles,
-  knowledgeBases,
   sessions,
+  sourceSetFiles,
+  sourceSets,
+  spaces,
   users,
 } from '../../schemas';
 import { agentSkills } from '../../schemas/agentSkill';
@@ -28,18 +29,23 @@ const userId = 'file-model-test-user-id';
 const fileModel = new FileModel(serverDB, userId);
 const documentModel = new DocumentModel(serverDB, userId);
 
-const knowledgeBase = { id: 'kb1', userId, name: 'knowledgeBase' };
+const sourceSet = { id: 'kb1', userId, name: 'sourceSet' };
 beforeEach(async () => {
   await serverDB.delete(agentSkills);
   await serverDB.delete(users);
   await serverDB.insert(users).values([{ id: userId }, { id: 'user2' }]);
-  await serverDB.insert(knowledgeBases).values(knowledgeBase);
+  await serverDB.insert(spaces).values([
+    { createdBy: userId, id: 'spc_file_a', kind: 'team', name: 'File Space A' },
+    { createdBy: userId, id: 'spc_file_b', kind: 'team', name: 'File Space B' },
+  ]);
+  await serverDB.insert(sourceSets).values(sourceSet);
 });
 
 afterEach(async () => {
   await serverDB.delete(agentSkills);
   await serverDB.delete(filesToSessions);
   await serverDB.delete(documents);
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
   await serverDB.delete(files);
   await serverDB.delete(globalFiles);
@@ -62,21 +68,21 @@ describe('FileModel', () => {
       expect(file).toMatchObject({ ...params, userId });
     });
 
-    it('should create a file with knowledgeBaseId', async () => {
+    it('should create a file with sourceSetId', async () => {
       const params = {
         name: 'test-file.txt',
         url: 'https://example.com/test-file.txt',
         size: 100,
         fileType: 'text/plain',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
       };
 
       const { id } = await fileModel.create(params);
 
-      const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-        where: eq(knowledgeBaseFiles.fileId, id),
+      const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+        where: eq(sourceSetFiles.fileId, id),
       });
-      expect(kbFile).toMatchObject({ fileId: id, knowledgeBaseId: 'kb1' });
+      expect(kbFile).toMatchObject({ fileId: id, sourceSetId: 'kb1' });
     });
 
     it('should create a new file with hash', async () => {
@@ -540,6 +546,34 @@ describe('FileModel', () => {
       expect(filteredFiles[0].name).toBe('document.pdf');
     });
 
+    it('should query files within the provided space', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'space-file-1',
+          name: 'space-a.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/space-a.txt',
+          userId: 'user2',
+        },
+        {
+          fileType: 'text/plain',
+          id: 'space-file-2',
+          name: 'space-b.txt',
+          size: 100,
+          spaceId: 'spc_file_b',
+          url: 'https://example.com/space-b.txt',
+          userId,
+        },
+      ]);
+
+      const result = await fileModel.query({ spaceId: 'spc_file_a' });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('space-file-1');
+    });
+
     it('should filter files by category', async () => {
       await serverDB.insert(files).values(sharedFileList);
 
@@ -633,24 +667,24 @@ describe('FileModel', () => {
           },
         ]);
         await serverDB
-          .insert(knowledgeBaseFiles)
-          .values([{ fileId: 'file1', knowledgeBaseId: 'kb1', userId }]);
+          .insert(sourceSetFiles)
+          .values([{ fileId: 'file1', sourceSetId: 'kb1', userId }]);
       });
 
       it('should query files in a specific knowledge base', async () => {
-        const result = await fileModel.query({ knowledgeBaseId: 'kb1' });
+        const result = await fileModel.query({ sourceSetId: 'kb1' });
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('file1');
       });
 
-      it('should exclude files in knowledge bases when showFilesInKnowledgeBase is false', async () => {
-        const result = await fileModel.query({ showFilesInKnowledgeBase: false });
+      it('should exclude files in knowledge bases when showFilesInSourceSet is false', async () => {
+        const result = await fileModel.query({ showFilesInSourceSet: false });
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('file2');
       });
 
-      it('should include all files when showFilesInKnowledgeBase is true', async () => {
-        const result = await fileModel.query({ showFilesInKnowledgeBase: true });
+      it('should include all files when showFilesInSourceSet is true', async () => {
+        const result = await fileModel.query({ showFilesInSourceSet: true });
         expect(result).toHaveLength(2);
       });
     });
@@ -983,34 +1017,34 @@ describe('FileModel', () => {
         expect(globalFile).toBeUndefined();
       });
 
-      it('should create file with knowledgeBase within transaction', async () => {
+      it('should create file with sourceSet within transaction', async () => {
         const params = {
           name: 'test-kb-file.txt',
           url: 'https://example.com/test-kb-file.txt',
           size: 100,
           fileType: 'text/plain',
-          knowledgeBaseId: 'kb1',
+          sourceSetId: 'kb1',
         };
 
         const result = await serverDB.transaction(async (trx) => {
           const { id } = await fileModel.create(params, false, trx);
 
           // 验证知识库文件关联已创建
-          const kbFile = await trx.query.knowledgeBaseFiles.findFirst({
-            where: eq(knowledgeBaseFiles.fileId, id),
+          const kbFile = await trx.query.sourceSetFiles.findFirst({
+            where: eq(sourceSetFiles.fileId, id),
           });
-          expect(kbFile).toMatchObject({ fileId: id, knowledgeBaseId: 'kb1', userId });
+          expect(kbFile).toMatchObject({ fileId: id, sourceSetId: 'kb1', userId });
 
           return { id };
         });
 
         // 事务提交后验证
-        const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-          where: eq(knowledgeBaseFiles.fileId, result.id),
+        const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+          where: eq(sourceSetFiles.fileId, result.id),
         });
         expect(kbFile).toMatchObject({
           fileId: result.id,
-          knowledgeBaseId: 'kb1',
+          sourceSetId: 'kb1',
           userId,
         });
       });
@@ -1211,7 +1245,7 @@ describe('FileModel', () => {
         {
           id: 'page-file',
           name: 'page.html',
-          url: 'https://example.com/page.html',
+          url: 'https://example.com/docs.html',
           size: 500,
           fileType: 'text/html',
           userId,
@@ -1233,7 +1267,7 @@ describe('FileModel', () => {
       expect(result[0].id).toBe('video-file');
     });
 
-    it('should filter website/page files correctly', async () => {
+    it('should filter website/docs files correctly', async () => {
       const result = await fileModel.query({ category: FilesTabs.Websites });
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('page-file');
@@ -1437,7 +1471,7 @@ describe('FileModel', () => {
         size: 100,
         fileType: 'text/plain',
         fileHash: 'kb-file-hash',
-        knowledgeBaseId: 'kb1',
+        sourceSetId: 'kb1',
       };
 
       const { id: fileId } = await fileModel.create(testFile, true);
@@ -1458,8 +1492,8 @@ describe('FileModel', () => {
         .values([{ chunkId, embeddings: testEmbedding, model: 'test-model', userId }]);
 
       // 验证文件确实在知识库中
-      const kbFile = await serverDB.query.knowledgeBaseFiles.findFirst({
-        where: eq(knowledgeBaseFiles.fileId, fileId),
+      const kbFile = await serverDB.query.sourceSetFiles.findFirst({
+        where: eq(sourceSetFiles.fileId, fileId),
       });
       expect(kbFile).toBeDefined();
 

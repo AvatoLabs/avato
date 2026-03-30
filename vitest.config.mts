@@ -1,4 +1,5 @@
 import { dirname, join, resolve } from 'node:path';
+
 import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -49,8 +50,15 @@ export default defineConfig({
       '@/utils/unzipFile': resolve(__dirname, './src/utils/unzipFile'),
       '@/utils/server': resolve(__dirname, './src/utils/server'),
       '@/utils/identifier': resolve(__dirname, './src/utils/identifier'),
+      '@/utils/docs': resolve(__dirname, './src/utils/docs'),
+      '@/utils/docsAgentModel': resolve(__dirname, './src/utils/docsAgentModel'),
+      '@/utils/docsDocument': resolve(__dirname, './src/utils/docsDocument'),
+      '@/utils/docsTable': resolve(__dirname, './src/utils/docsTable'),
       '@/utils/electron': resolve(__dirname, './src/utils/electron'),
       '@/utils/markdownToTxt': resolve(__dirname, './src/utils/markdownToTxt'),
+      '@/utils/navigation': resolve(__dirname, './src/utils/navigation.ts'),
+      '@/utils/tableDocument': resolve(__dirname, './src/utils/tableDocument'),
+      '@/utils/textLength': resolve(__dirname, './src/utils/textLength'),
       '@/utils/sanitizeFileName': resolve(__dirname, './src/utils/sanitizeFileName'),
       '@/utils': resolve(__dirname, './packages/utils/src'),
       '@/types': resolve(__dirname, './packages/types/src'),
@@ -58,7 +66,6 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
       '~test-utils': resolve(__dirname, './tests/utils.tsx'),
       'lru_map': resolve(__dirname, './tests/mocks/lru_map'),
-
     },
     coverage: {
       all: false,

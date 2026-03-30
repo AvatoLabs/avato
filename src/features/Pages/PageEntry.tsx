@@ -4,7 +4,7 @@ import { memo, Suspense } from 'react';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorerPlaceholder from '@/features/PageExplorer/PageExplorerPlaceholder';
-import { type PageKind } from '@/utils/page';
+import { type PageKind } from '@/utils/docs';
 
 import PageTitle from './PageTitle';
 

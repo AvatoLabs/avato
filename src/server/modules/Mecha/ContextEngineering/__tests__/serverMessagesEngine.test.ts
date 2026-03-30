@@ -112,7 +112,7 @@ describe('serverMessagesEngine', () => {
 
       const result = await serverMessagesEngine({
         knowledge: {
-          knowledgeBases: [
+          sourceSets: [
             {
               description: 'Test knowledge base',
               id: 'kb-1',

@@ -23,14 +23,14 @@ export const useControls = ({
   const agentId = useAgentId();
 
   const files = useAgentStore((s) => agentByIdSelectors.getAgentFilesById(agentId)(s), isEqual);
-  const knowledgeBases = useAgentStore(
-    (s) => agentByIdSelectors.getAgentKnowledgeBasesById(agentId)(s),
+  const sourceSets = useAgentStore(
+    (s) => agentByIdSelectors.getAgentSourceSetsById(agentId)(s),
     isEqual,
   );
 
-  const [toggleFile, toggleKnowledgeBase] = useAgentStore((s) => [
+  const [toggleFile, setSourceSetEnabled] = useAgentStore((s) => [
     s.toggleFile,
-    s.toggleKnowledgeBase,
+    s.setSourceSetEnabled,
   ]);
 
   const items: ItemType[] = [
@@ -54,8 +54,8 @@ export const useControls = ({
           ),
         })),
 
-        // then the knowledge bases
-        ...knowledgeBases.map((item) => ({
+        // then the source sets
+        ...sourceSets.map((item) => ({
           icon: <RepoIcon />,
           key: item.id,
           label: (
@@ -65,15 +65,15 @@ export const useControls = ({
               label={item.name}
               onUpdate={async (id, enabled) => {
                 setUpdating(true);
-                await toggleKnowledgeBase(id, enabled);
+                await setSourceSetEnabled(id, enabled);
                 setUpdating(false);
               }}
             />
           ),
         })),
       ],
-      key: 'relativeFilesOrLibraries',
-      label: t('knowledgeBase.relativeFilesOrLibraries'),
+      key: 'relatedSources',
+      label: t('sourceSet.relatedSources'),
       type: 'group',
     },
     {
@@ -82,8 +82,8 @@ export const useControls = ({
     {
       extra: <Icon icon={ArrowRight} />,
       icon: LibraryBig,
-      key: 'knowledge-base-store',
-      label: t('knowledgeBase.viewMore'),
+      key: 'source-set-store',
+      label: t('sourceSet.viewMore'),
       onClick: () => {
         setModalOpen(true);
       },

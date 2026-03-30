@@ -93,7 +93,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
     font-size: 11px;
     line-height: 1.4;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     text-overflow: ellipsis;
   `,
   title: css`

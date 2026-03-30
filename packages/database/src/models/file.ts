@@ -26,9 +26,9 @@ import {
   files,
   filesToSessions,
   globalFiles,
-  knowledgeBaseFiles,
   type NewFile,
   type NewGlobalFile,
+  sourceSetFiles,
 } from '../schemas';
 import { agentSkills } from '../schemas/agentSkill';
 import type { LobeChatDatabase, Transaction } from '../type';
@@ -59,7 +59,7 @@ export class FileModel {
   create = async (
     params: Omit<NewFile, 'id' | 'userId'> & {
       id?: string;
-      knowledgeBaseId?: string;
+      sourceSetId?: string;
       parentId?: string;
     },
     insertToGlobalFiles?: boolean,
@@ -87,10 +87,10 @@ export class FileModel {
 
       const item = result[0]!;
 
-      if (params.knowledgeBaseId) {
-        await tx.insert(knowledgeBaseFiles).values({
+      if (params.sourceSetId) {
+        await tx.insert(sourceSetFiles).values({
           fileId: item.id,
-          knowledgeBaseId: params.knowledgeBaseId,
+          sourceSetId: params.sourceSetId,
           userId: this.userId,
         });
       }
@@ -386,7 +386,7 @@ export class FileModel {
   findExistingByBlobAndContext = async ({
     blobId,
     fileType,
-    knowledgeBaseId,
+    sourceSetId,
     name,
     parentId,
     source,
@@ -394,7 +394,7 @@ export class FileModel {
   }: {
     blobId: string;
     fileType: string;
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     name: string;
     parentId?: string | null;
     source?: string | null;
@@ -411,16 +411,13 @@ export class FileModel {
       sql`${files.deletedAt} is null`,
     );
 
-    if (knowledgeBaseId) {
+    if (sourceSetId) {
       const [result] = await this.db
         .select({ file: files })
         .from(files)
         .innerJoin(
-          knowledgeBaseFiles,
-          and(
-            eq(files.id, knowledgeBaseFiles.fileId),
-            eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
-          ),
+          sourceSetFiles,
+          and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
         )
         .where(baseWhere)
         .limit(1);
@@ -436,9 +433,9 @@ export class FileModel {
           baseWhere,
           notExists(
             this.db
-              .select({ fileId: knowledgeBaseFiles.fileId })
-              .from(knowledgeBaseFiles)
-              .where(eq(knowledgeBaseFiles.fileId, files.id)),
+              .select({ fileId: sourceSetFiles.fileId })
+              .from(sourceSetFiles)
+              .where(eq(sourceSetFiles.fileId, files.id)),
           ),
         ),
       )
@@ -452,13 +449,14 @@ export class FileModel {
     q,
     sortType,
     sorter,
-    knowledgeBaseId,
-    showFilesInKnowledgeBase,
+    sourceSetId,
+    showFilesInSourceSet,
+    spaceId,
   }: QueryFileListParams = {}) => {
     // 1. Build where clause
     let whereClause = and(
       q ? ilike(files.name, `%${q}%`) : undefined,
-      eq(files.userId, this.userId),
+      spaceId ? eq(files.spaceId, spaceId) : eq(files.userId, this.userId),
     );
     if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
       const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
@@ -500,31 +498,25 @@ export class FileModel {
         id: files.id,
         name: files.name,
         size: files.size,
+        spaceId: files.spaceId,
         updatedAt: files.updatedAt,
         url: files.url,
       })
       .from(files);
 
-    // 4. Add knowledge base query if needed
-    if (knowledgeBaseId) {
-      // if knowledgeBaseId is provided, it means we are querying files in a knowledge-base
-
+    // 4. Scope to a source set when requested
+    if (sourceSetId) {
       // @ts-ignore
       query = query.innerJoin(
-        knowledgeBaseFiles,
-        and(
-          eq(files.id, knowledgeBaseFiles.fileId),
-          eq(knowledgeBaseFiles.knowledgeBaseId, knowledgeBaseId),
-        ),
+        sourceSetFiles,
+        and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
       );
     }
-    // 5. If we don't show files in knowledge base, exclude them
-    else if (!showFilesInKnowledgeBase) {
+    // 5. Otherwise exclude source-set files by default
+    else if (!showFilesInSourceSet) {
       whereClause = and(
         whereClause,
-        notExists(
-          this.db.select().from(knowledgeBaseFiles).where(eq(knowledgeBaseFiles.fileId, files.id)),
-        ),
+        notExists(this.db.select().from(sourceSetFiles).where(eq(sourceSetFiles.fileId, files.id))),
       );
     }
 
@@ -567,7 +559,7 @@ export class FileModel {
   };
 
   getConversationAvailableFiles = async () => {
-    const allFiles = await this.query({ showFilesInKnowledgeBase: true });
+    const allFiles = await this.query({ showFilesInSourceSet: true });
     const candidateFiles = allFiles.filter((file) => !file.fileType.startsWith('image'));
 
     if (candidateFiles.length === 0) return [];

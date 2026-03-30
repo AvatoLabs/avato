@@ -5,6 +5,7 @@ import 'react-data-grid/lib/styles.css';
 import { EDITOR_DEBOUNCE_TIME, EDITOR_MAX_WAIT } from '@lobechat/const';
 import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
 import {
+  AutoComplete,
   Button,
   Checkbox,
   Drawer,
@@ -50,8 +51,9 @@ import type {
 import { DataGrid } from 'react-data-grid';
 import { useTranslation } from 'react-i18next';
 
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { useDocumentStore } from '@/store/document';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { getDefaultTableColumnName } from '@/utils/docsTable';
 import {
   appendBlankTableView,
   createTableField,
@@ -179,7 +181,7 @@ const useStyles = createStyles(({ css, token }) => ({
     );
     --rdg-selection-color: ${cssVar.colorPrimary};
 
-    overflow: clip;
+    overflow: visible;
     border: 1px solid ${cssVar.colorBorderSecondary};
     border-radius: ${token.borderRadiusLG}px;
     background: ${cssVar.colorBgContainer};
@@ -350,6 +352,11 @@ interface TableCellEditorProps {
   selectOptions: string[];
 }
 
+interface TableMetadataSavePayload {
+  documentId: string;
+  metadata: Record<string, any>;
+}
+
 interface TranslateFn {
   (key: string, options?: Record<string, unknown>): string;
 }
@@ -358,6 +365,7 @@ const TableCellEditor = memo<TableCellEditorProps>(({ field, props, selectOption
   const rawValue = props.row.cells[field.id];
   const value =
     typeof rawValue === 'boolean' ? (rawValue ? 'true' : 'false') : String(rawValue ?? '');
+  const [draftValue, setDraftValue] = useState(value);
   const buildNextRow = (nextValue: string) => ({
     ...props.row,
     cells: {
@@ -366,20 +374,36 @@ const TableCellEditor = memo<TableCellEditorProps>(({ field, props, selectOption
     },
   });
 
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
   if (field.type === 'select') {
+    const commitDraftValue = (nextValue: string) => {
+      props.onRowChange(buildNextRow(nextValue), true);
+      props.onClose(true, true);
+    };
+
     return (
-      <Select
-        autoFocus
+      <AutoComplete
         options={selectOptions.map((option) => ({ label: option, value: option }))}
-        size={'small'}
         style={{ width: '100%' }}
-        value={value || undefined}
-        onBlur={() => props.onClose(true, false)}
-        onChange={(nextValue) => {
-          props.onRowChange(buildNextRow(nextValue), true);
-          props.onClose(true, true);
+        value={draftValue}
+        onChange={(nextValue) => setDraftValue(nextValue)}
+        onSelect={(nextValue) => {
+          setDraftValue(nextValue);
+          commitDraftValue(nextValue);
         }}
-      />
+      >
+        <Input
+          autoFocus
+          size={'small'}
+          value={draftValue}
+          onBlur={() => commitDraftValue(draftValue)}
+          onChange={(event) => setDraftValue(event.target.value)}
+          onPressEnter={() => commitDraftValue(draftValue)}
+        />
+      </AutoComplete>
     );
   }
 
@@ -411,9 +435,18 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
   const document = usePageStore((s) =>
     documentId ? pageSelectors.getDocumentById(documentId)(s) : undefined,
   );
+  const tableMetadata = document?.metadata?.table;
   const serializedTableMetadata = useMemo(
-    () => JSON.stringify(document?.metadata?.table ?? null),
-    [document?.metadata?.table],
+    () => JSON.stringify(tableMetadata ?? null),
+    [tableMetadata],
+  );
+  const shouldPreferMarkdownContent = useMemo(
+    () => shouldPreferMarkdownTableContent(markdownValue, tableMetadata),
+    [markdownValue, serializedTableMetadata, tableMetadata],
+  );
+  const shouldPreferDeferredMarkdownContent = useMemo(
+    () => shouldPreferMarkdownTableContent(deferredMarkdown, tableMetadata),
+    [deferredMarkdown, serializedTableMetadata, tableMetadata],
   );
 
   const [drawerRecordId, setDrawerRecordId] = useState<string>();
@@ -424,20 +457,21 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
   const [selectedFieldId, setSelectedFieldId] = useState<string>();
   const [selectedRecordId, setSelectedRecordId] = useState<string>();
   const [table, setTable] = useState(() =>
-    normalizeTableDocument(markdownValue, document?.metadata?.table),
+    normalizeTableDocument(markdownValue, tableMetadata, {
+      preferMarkdownContent: shouldPreferMarkdownContent,
+    }),
   );
 
-  const lastCommittedMarkdownRef = useRef(markdownValue);
   const lastCommittedTableRef = useRef(table);
+  const normalizedMetadataSyncKeyRef = useRef<string>();
+  const lastDocumentIdRef = useRef(documentId);
   const metadataSaveRef = useRef<ReturnType<typeof debounce> | undefined>(undefined);
 
   if (!metadataSaveRef.current) {
     metadataSaveRef.current = debounce(
-      async (nextMetadata: Record<string, any>) => {
-        if (!documentId) return;
-
+      async ({ documentId, metadata }: TableMetadataSavePayload) => {
         try {
-          await useDocumentStore.getState().performSave(documentId, { metadata: nextMetadata });
+          await useDocumentStore.getState().performSave(documentId, { metadata });
         } catch (error) {
           console.error('[TableSheet] Failed to save table metadata:', error);
         }
@@ -448,14 +482,31 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
   }
 
   useEffect(() => {
+    const previousDocumentId = lastDocumentIdRef.current;
+
+    if (previousDocumentId && previousDocumentId !== documentId) {
+      metadataSaveRef.current?.flush();
+      setDrawerRecordId(undefined);
+      setEditingFieldId(undefined);
+      setEditingFieldName('');
+      setEditingViewId(undefined);
+      setEditingViewName('');
+      setSelectedFieldId(undefined);
+      setSelectedRecordId(undefined);
+    }
+
+    lastDocumentIdRef.current = documentId;
+  }, [documentId]);
+
+  useEffect(() => {
     return () => {
       metadataSaveRef.current?.flush();
     };
   }, []);
 
   useEffect(() => {
-    const nextTable = normalizeTableDocument(deferredMarkdown, document?.metadata?.table, {
-      preferMarkdownContent: deferredMarkdown !== lastCommittedMarkdownRef.current,
+    const nextTable = normalizeTableDocument(deferredMarkdown, tableMetadata, {
+      preferMarkdownContent: shouldPreferDeferredMarkdownContent,
     });
 
     if (isEqual(nextTable, lastCommittedTableRef.current)) return;
@@ -464,7 +515,13 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
     startTransition(() => {
       setTable(nextTable);
     });
-  }, [deferredMarkdown, document?.id, document?.metadata?.table, serializedTableMetadata]);
+  }, [
+    deferredMarkdown,
+    document?.id,
+    serializedTableMetadata,
+    shouldPreferDeferredMarkdownContent,
+    tableMetadata,
+  ]);
 
   const projection = useMemo(() => projectTableView(table), [table]);
   const activeView = projection.view;
@@ -475,16 +532,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
     (field: TableField, index: number) =>
       field.width || (index === 0 ? PRIMARY_COLUMN_WIDTH : SECONDARY_COLUMN_WIDTH),
     [],
-  );
-  const gridWidth = useMemo(
-    () =>
-      ROW_INDEX_COLUMN_WIDTH +
-      projection.fields.reduce(
-        (total, field, index) => total + getRenderedColumnWidth(field, index),
-        0,
-      ) +
-      GRID_BORDER_WIDTH,
-    [getRenderedColumnWidth, projection.fields],
   );
   const gridHeight = useMemo(
     () => GRID_HEADER_HEIGHT + projection.records.length * rowHeight + GRID_BORDER_WIDTH,
@@ -532,31 +579,44 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
 
   const getNextFieldName = useCallback(() => {
     for (let index = 1; index <= activeFields.length + 1; index += 1) {
-      const name = translate('pageEditor.table.defaultColumnName', { index });
+      const name = getDefaultTableColumnName(index);
       if (!activeFields.some((field) => field.name === name)) {
         return name;
       }
     }
 
-    return translate('pageEditor.table.defaultColumnName', { index: activeFields.length + 1 });
-  }, [activeFields, translate]);
+    return getDefaultTableColumnName(activeFields.length + 1);
+  }, [activeFields]);
 
   const getNextSheetName = useCallback(() => {
     for (let index = 1; index <= table.views.length + 1; index += 1) {
-      const name = translate('pageEditor.table.sheetDefaultName', { index });
+      const name = translate('docEditor.table.sheetDefaultName', { index });
       if (!table.views.some((view) => view.name === name)) {
         return name;
       }
     }
 
-    return translate('pageEditor.table.sheetDefaultName', { index: table.views.length + 1 });
+    return translate('docEditor.table.sheetDefaultName', { index: table.views.length + 1 });
   }, [table.views, translate]);
 
   const commitTable = useCallback(
     (nextTable: TableDocumentState) => {
+      const nextMarkdown = tableDocumentToMarkdown(nextTable);
+
+      // Always update local state to ensure UI responsiveness
+      lastCommittedTableRef.current = nextTable;
+      startTransition(() => {
+        setTable(nextTable);
+      });
+
+      // Sync markdown content to parent
+      if (nextMarkdown !== markdownValue) {
+        onMarkdownCommit(nextMarkdown);
+      }
+
+      // Skip persistence if documentId is not available
       if (!documentId) return;
 
-      const nextMarkdown = tableDocumentToMarkdown(nextTable);
       const nextDocument = usePageStore
         .getState()
         .documents?.find((item) => item.id === documentId);
@@ -565,13 +625,6 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
         ...nextDocument?.metadata,
         table: nextTable,
       };
-
-      lastCommittedMarkdownRef.current = nextMarkdown;
-      lastCommittedTableRef.current = nextTable;
-
-      startTransition(() => {
-        setTable(nextTable);
-      });
 
       if (nextDocument) {
         usePageStore.getState().internal_dispatchDocuments({
@@ -588,14 +641,20 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
         });
       }
 
-      if (nextMarkdown !== markdownValue) {
-        onMarkdownCommit(nextMarkdown);
-      }
-
-      metadataSaveRef.current?.(nextMetadata);
+      metadataSaveRef.current?.({ documentId, metadata: nextMetadata });
     },
     [documentId, markdownValue, onMarkdownCommit],
   );
+
+  useEffect(() => {
+    if (!documentId || !document || isEqual(tableMetadata, table)) return;
+
+    const syncKey = `${documentId}::${serializedTableMetadata}`;
+    if (normalizedMetadataSyncKeyRef.current === syncKey) return;
+
+    normalizedMetadataSyncKeyRef.current = syncKey;
+    commitTable(table);
+  }, [commitTable, document, documentId, serializedTableMetadata, table, tableMetadata]);
 
   const updateActiveView = useCallback(
     (updater: (view: typeof activeView) => typeof activeView) => {
@@ -889,7 +948,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
               >
                 <Text className={styles.headerName}>{field.name}</Text>
                 <Text className={styles.headerMeta}>
-                  {translate(`pageEditor.table.fieldTypes.${field.type}`)}
+                  {translate(`docEditor.table.fieldTypes.${field.type}`)}
                 </Text>
               </Flexbox>
               <Dropdown
@@ -899,18 +958,18 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                     {
                       icon: <PencilLineIcon size={14} />,
                       key: 'rename',
-                      label: translate('pageEditor.table.renameColumnHint'),
+                      label: translate('docEditor.table.renameColumnHint'),
                       onClick: () => startFieldRename(field.id),
                     },
                     {
                       children: fieldTypeItems,
                       key: 'type',
-                      label: translate('pageEditor.table.changeFieldType'),
+                      label: translate('docEditor.table.changeFieldType'),
                     },
                     {
                       icon: <EyeOffIcon size={14} />,
                       key: 'hide',
-                      label: translate('pageEditor.table.hideField'),
+                      label: translate('docEditor.table.hideField'),
                       onClick: () =>
                         updateActiveView((view) => ({
                           ...view,
@@ -921,7 +980,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                       danger: true,
                       icon: <Trash2Icon size={14} />,
                       key: 'delete',
-                      label: translate('pageEditor.table.deleteColumn'),
+                      label: translate('docEditor.table.deleteColumn'),
                       onClick: () => handleDeleteField(field.id),
                     },
                   ],
@@ -1013,13 +1072,13 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 }))
               }
             >
-              {translate('pageEditor.table.removeRule')}
+              {translate('docEditor.table.removeRule')}
             </Button>
           </Flexbox>
         );
       })}
       <Button icon={<PlusIcon size={14} />} size={'small'} type={'text'} onClick={handleAddFilter}>
-        {translate('pageEditor.table.addFilter')}
+        {translate('docEditor.table.addFilter')}
       </Button>
     </Flexbox>
   );
@@ -1067,12 +1126,12 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
               }))
             }
           >
-            {translate('pageEditor.table.removeRule')}
+            {translate('docEditor.table.removeRule')}
           </Button>
         </Flexbox>
       ))}
       <Button icon={<PlusIcon size={14} />} size={'small'} type={'text'} onClick={handleAddSort}>
-        {translate('pageEditor.table.addSort')}
+        {translate('docEditor.table.addSort')}
       </Button>
     </Flexbox>
   );
@@ -1099,13 +1158,13 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
               <Text>{field.name}</Text>
             </Flexbox>
             <Tag className={styles.fieldTypeTag}>
-              {translate(`pageEditor.table.fieldTypes.${field.type}`)}
+              {translate(`docEditor.table.fieldTypes.${field.type}`)}
             </Tag>
           </Flexbox>
         );
       })}
       <Button icon={<PlusIcon size={14} />} size={'small'} type={'text'} onClick={handleAddField}>
-        {translate('pageEditor.table.addColumn')}
+        {translate('docEditor.table.addColumn')}
       </Button>
     </Flexbox>
   );
@@ -1114,18 +1173,18 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
     {
       icon: <PencilLineIcon size={14} />,
       key: 'rename',
-      label: translate('pageEditor.table.renameSheet'),
+      label: translate('docEditor.table.renameSheet'),
       onClick: () => startViewRename(activeView.id),
     },
     {
       icon: <PlusIcon size={14} />,
       key: 'duplicate',
-      label: translate('pageEditor.table.duplicateSheet'),
+      label: translate('docEditor.table.duplicateSheet'),
       onClick: () =>
         commitTable(
           duplicateTableView(
             table,
-            translate('pageEditor.table.sheetDuplicateName', { name: activeView.name }),
+            translate('docEditor.table.sheetDuplicateName', { name: activeView.name }),
           ),
         ),
     },
@@ -1134,7 +1193,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
       disabled: table.views.length === 1,
       icon: <Trash2Icon size={14} />,
       key: 'delete',
-      label: translate('pageEditor.table.deleteSheet'),
+      label: translate('docEditor.table.deleteSheet'),
       onClick: () => commitTable(removeTableView(table, activeView.id)),
     },
   ] satisfies MenuProps['items'];
@@ -1142,7 +1201,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
   return (
     <>
       <Flexbox gap={0} style={{ minHeight: 0 }} width={'100%'}>
-        <Flexbox style={{ maxWidth: '100%', width: gridWidth }}>
+        <Flexbox style={{ maxWidth: '100%', width: '100%' }}>
           <Flexbox className={styles.gridShell}>
             <Flexbox
               horizontal
@@ -1166,14 +1225,14 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                     />
                   ) : (
                     <Button
-                      className={cx(
-                        styles.viewButton,
-                        view.id === activeView.id && styles.viewButtonActive,
-                      )}
                       icon={<LayoutGridIcon size={14} />}
                       key={view.id}
                       size={'small'}
                       type={'text'}
+                      className={cx(
+                        styles.viewButton,
+                        view.id === activeView.id && styles.viewButtonActive,
+                      )}
                       onClick={() => commitTable(setActiveTableView(table, view.id))}
                     >
                       {view.name}
@@ -1184,7 +1243,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   className={styles.iconButton}
                   icon={PlusIcon}
                   size={16}
-                  title={translate('pageEditor.table.newSheet')}
+                  title={translate('docEditor.table.newSheet')}
                   onClick={() => commitTable(appendBlankTableView(table, getNextSheetName()))}
                 />
               </Flexbox>
@@ -1207,44 +1266,59 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 style={{ flex: 'none' }}
               >
                 <Text className={styles.meta} type={'secondary'}>
-                  {translate('pageEditor.table.columns', { count: projection.fields.length })}
+                  {translate('docEditor.table.columns', { count: projection.fields.length })}
                 </Text>
                 <div className={styles.metaDivider} />
                 <Text className={styles.meta} type={'secondary'}>
-                  {translate('pageEditor.table.rows', { count: projection.records.length })}
+                  {translate('docEditor.table.rows', { count: projection.records.length })}
                 </Text>
               </Flexbox>
 
               <Flexbox horizontal align={'center'} gap={8} style={{ flex: 'none' }}>
-                <Popover content={filterPanel} placement={'bottomRight'} trigger={'click'}>
+                <Popover
+                  nativeButton
+                  content={filterPanel}
+                  placement={'bottomRight'}
+                  trigger={'click'}
+                >
                   <Button
                     className={styles.toolbarButton}
                     icon={<FilterIcon size={14} />}
                     size={'small'}
                   >
-                    {translate('pageEditor.table.filters')}
+                    {translate('docEditor.table.filters')}
                     {activeView.filters.length > 0 ? ` · ${activeView.filters.length}` : ''}
                   </Button>
                 </Popover>
 
-                <Popover content={sortPanel} placement={'bottomRight'} trigger={'click'}>
+                <Popover
+                  nativeButton
+                  content={sortPanel}
+                  placement={'bottomRight'}
+                  trigger={'click'}
+                >
                   <Button
                     className={styles.toolbarButton}
                     icon={<ArrowDownWideNarrowIcon size={14} />}
                     size={'small'}
                   >
-                    {translate('pageEditor.table.sorts')}
+                    {translate('docEditor.table.sorts')}
                     {activeView.sorts.length > 0 ? ` · ${activeView.sorts.length}` : ''}
                   </Button>
                 </Popover>
 
-                <Popover content={fieldPanel} placement={'bottomRight'} trigger={'click'}>
+                <Popover
+                  nativeButton
+                  content={fieldPanel}
+                  placement={'bottomRight'}
+                  trigger={'click'}
+                >
                   <Button
                     className={styles.toolbarButton}
                     icon={<Columns3Icon size={14} />}
                     size={'small'}
                   >
-                    {translate('pageEditor.table.fields')}
+                    {translate('docEditor.table.fields')}
                   </Button>
                 </Popover>
 
@@ -1267,7 +1341,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   size={'small'}
                   onClick={handleAddField}
                 >
-                  {translate('pageEditor.table.addColumn')}
+                  {translate('docEditor.table.addColumn')}
                 </Button>
 
                 <ActionIcon
@@ -1275,7 +1349,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   disabled={!selectedFieldId}
                   icon={PencilLineIcon}
                   size={16}
-                  title={translate('pageEditor.table.renameColumnHint')}
+                  title={translate('docEditor.table.renameColumnHint')}
                   onClick={() => selectedFieldId && startFieldRename(selectedFieldId)}
                 />
                 <ActionIcon
@@ -1283,7 +1357,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   disabled={!selectedRecordId || activeRecords.length === 1}
                   icon={Trash2Icon}
                   size={16}
-                  title={translate('pageEditor.table.deleteRow')}
+                  title={translate('docEditor.table.deleteRow')}
                   onClick={handleDeleteRecord}
                 />
                 <ActionIcon
@@ -1291,7 +1365,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   disabled={!selectedFieldId || activeFields.length === 1}
                   icon={EyeOffIcon}
                   size={16}
-                  title={translate('pageEditor.table.hideField')}
+                  title={translate('docEditor.table.hideField')}
                   onClick={() =>
                     selectedFieldId &&
                     updateActiveView((view) => ({
@@ -1307,7 +1381,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                   disabled={!selectedFieldId || activeFields.length === 1}
                   icon={Trash2Icon}
                   size={16}
-                  title={translate('pageEditor.table.deleteColumn')}
+                  title={translate('docEditor.table.deleteColumn')}
                   onClick={() => selectedFieldId && handleDeleteField(selectedFieldId)}
                 />
               </Flexbox>
@@ -1362,7 +1436,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 type={'text'}
                 onClick={handleAddRecord}
               >
-                {translate('pageEditor.table.addRow')}
+                {translate('docEditor.table.addRow')}
               </Button>
             </Flexbox>
           </Flexbox>
@@ -1372,14 +1446,14 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
       <Drawer
         destroyOnHidden
         open={!!drawerRecordId}
-        title={getRecordTitle(table, activeRecord) || translate('pageEditor.table.recordDetail')}
-        width={420}
+        size={420}
+        title={getRecordTitle(table, activeRecord) || translate('docEditor.table.recordDetail')}
         onClose={() => setDrawerRecordId(undefined)}
       >
         <Flexbox gap={8}>
           <Text type={'secondary'}>
             {primaryField
-              ? translate('pageEditor.table.primaryField', { name: primaryField.name })
+              ? translate('docEditor.table.primaryField', { name: primaryField.name })
               : ''}
           </Text>
           {activeRecord &&
@@ -1388,7 +1462,7 @@ const TableSheet = memo<TableSheetProps>(({ markdownValue, onMarkdownCommit }) =
                 <div className={styles.drawerFieldMeta}>
                   <Text strong>{field.name}</Text>
                   <Tag className={styles.fieldTypeTag}>
-                    {translate(`pageEditor.table.fieldTypes.${field.type}`)}
+                    {translate(`docEditor.table.fieldTypes.${field.type}`)}
                   </Tag>
                 </div>
                 {renderDrawerFieldControl(
@@ -1423,21 +1497,23 @@ const renderDrawerFieldControl = (
         onChange={(event) => onChange(record.id, field, event.target.checked)}
       >
         {Boolean(value)
-          ? translate('pageEditor.table.boolean.true')
-          : translate('pageEditor.table.boolean.false')}
+          ? translate('docEditor.table.boolean.true')
+          : translate('docEditor.table.boolean.false')}
       </Checkbox>
     );
   }
 
   if (field.type === 'select') {
     return (
-      <Select
+      <AutoComplete
         allowClear
         options={options.map((option) => ({ label: option, value: option }))}
         style={{ width: '100%' }}
         value={value || undefined}
         onChange={(nextValue) => onChange(record.id, field, nextValue || '')}
-      />
+      >
+        <Input />
+      </AutoComplete>
     );
   }
 
@@ -1467,7 +1543,7 @@ const renderFieldValue = (
   if (!value) {
     return (
       <span className={cx(styles.cellValue, styles.emptyValue)}>
-        {translate('pageEditor.table.emptyValue')}
+        {translate('docEditor.table.emptyValue')}
       </span>
     );
   }
@@ -1487,7 +1563,7 @@ const getFieldTypeItems = (translate: TranslateFn, onSelect: (fieldType: TableFi
   (['text', 'number', 'date', 'select', 'checkbox', 'url'] as TableFieldType[]).map(
     (fieldType) => ({
       key: fieldType,
-      label: translate(`pageEditor.table.fieldTypes.${fieldType}`),
+      label: translate(`docEditor.table.fieldTypes.${fieldType}`),
       onClick: () => onSelect(fieldType),
     }),
   );
@@ -1495,44 +1571,53 @@ const getFieldTypeItems = (translate: TranslateFn, onSelect: (fieldType: TableFi
 const getFilterOperatorOptions = (fieldType: TableFieldType, translate: TranslateFn) => {
   if (fieldType === 'checkbox') {
     return [
-      { label: translate('pageEditor.table.filterOperators.equals'), value: 'equals' },
-      { label: translate('pageEditor.table.filterOperators.notEquals'), value: 'notEquals' },
+      { label: translate('docEditor.table.filterOperators.equals'), value: 'equals' },
+      { label: translate('docEditor.table.filterOperators.notEquals'), value: 'notEquals' },
     ];
   }
 
   if (fieldType === 'number' || fieldType === 'date') {
     return [
-      { label: translate('pageEditor.table.filterOperators.equals'), value: 'equals' },
-      { label: translate('pageEditor.table.filterOperators.greaterThan'), value: 'greaterThan' },
-      { label: translate('pageEditor.table.filterOperators.lessThan'), value: 'lessThan' },
-      { label: translate('pageEditor.table.filterOperators.isEmpty'), value: 'isEmpty' },
-      { label: translate('pageEditor.table.filterOperators.isNotEmpty'), value: 'isNotEmpty' },
+      { label: translate('docEditor.table.filterOperators.equals'), value: 'equals' },
+      { label: translate('docEditor.table.filterOperators.greaterThan'), value: 'greaterThan' },
+      { label: translate('docEditor.table.filterOperators.lessThan'), value: 'lessThan' },
+      { label: translate('docEditor.table.filterOperators.isEmpty'), value: 'isEmpty' },
+      { label: translate('docEditor.table.filterOperators.isNotEmpty'), value: 'isNotEmpty' },
     ];
   }
 
   return [
-    { label: translate('pageEditor.table.filterOperators.contains'), value: 'contains' },
-    { label: translate('pageEditor.table.filterOperators.equals'), value: 'equals' },
-    { label: translate('pageEditor.table.filterOperators.notEquals'), value: 'notEquals' },
-    { label: translate('pageEditor.table.filterOperators.isEmpty'), value: 'isEmpty' },
-    { label: translate('pageEditor.table.filterOperators.isNotEmpty'), value: 'isNotEmpty' },
+    { label: translate('docEditor.table.filterOperators.contains'), value: 'contains' },
+    { label: translate('docEditor.table.filterOperators.equals'), value: 'equals' },
+    { label: translate('docEditor.table.filterOperators.notEquals'), value: 'notEquals' },
+    { label: translate('docEditor.table.filterOperators.isEmpty'), value: 'isEmpty' },
+    { label: translate('docEditor.table.filterOperators.isNotEmpty'), value: 'isNotEmpty' },
   ];
 };
 
 const getRowHeightOptions = (translate: TranslateFn) => [
-  { label: translate('pageEditor.table.rowHeights.compact'), value: 'compact' },
-  { label: translate('pageEditor.table.rowHeights.normal'), value: 'normal' },
-  { label: translate('pageEditor.table.rowHeights.comfortable'), value: 'comfortable' },
+  { label: translate('docEditor.table.rowHeights.compact'), value: 'compact' },
+  { label: translate('docEditor.table.rowHeights.normal'), value: 'normal' },
+  { label: translate('docEditor.table.rowHeights.comfortable'), value: 'comfortable' },
 ];
 
 const getSortDirectionOptions = (translate: TranslateFn) => [
-  { label: translate('pageEditor.table.sortDirections.asc'), value: 'asc' },
-  { label: translate('pageEditor.table.sortDirections.desc'), value: 'desc' },
+  { label: translate('docEditor.table.sortDirections.asc'), value: 'asc' },
+  { label: translate('docEditor.table.sortDirections.desc'), value: 'desc' },
 ];
 
 const normalizeFieldValue = (fieldType: TableFieldType, value: unknown): TableCellValue => {
   return normalizeTableCellValue(value, fieldType);
 };
+
+const normalizeMarkdownForComparison = (markdown?: string | null) =>
+  tableDocumentToMarkdown(normalizeTableDocument(markdown, undefined));
+
+const normalizeMetadataTableForComparison = (rawValue?: unknown) =>
+  tableDocumentToMarkdown(normalizeTableDocument(undefined, rawValue));
+
+const shouldPreferMarkdownTableContent = (markdown?: string | null, rawValue?: unknown) =>
+  normalizeMarkdownForComparison(markdown) !== normalizeMetadataTableForComparison(rawValue);
 
 const renderFilterValueInput = (
   field: TableField | undefined,
@@ -1548,8 +1633,8 @@ const renderFilterValueInput = (
         size={'small'}
         value={filter.value}
         options={[
-          { label: translate('pageEditor.table.boolean.true'), value: 'true' },
-          { label: translate('pageEditor.table.boolean.false'), value: 'false' },
+          { label: translate('docEditor.table.boolean.true'), value: 'true' },
+          { label: translate('docEditor.table.boolean.false'), value: 'false' },
         ]}
         onChange={(value) => onChange(value)}
       />

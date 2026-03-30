@@ -29,7 +29,7 @@ const styles = createStaticStyles(({ css }) => ({
 export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActionsProps['items'] => {
   const { t } = useTranslation('common');
   const addSelectionContext = useFileStore((s) => s.addChatContextSelection);
-  const pageId = usePageEditorStore((s) => s.documentId);
+  const docId = usePageEditorStore((s) => s.documentId);
 
   return useMemo(() => {
     if (!editor) return [];
@@ -65,9 +65,9 @@ export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActions
               // Store action handles deduplication
               addSelectionContext({
                 content,
+                docId,
                 format,
                 id: `selection-${nanoid(6)}`,
-                pageId,
                 preview,
                 title: 'Selection',
                 type: 'text',
@@ -100,5 +100,5 @@ export const useAskCopilotItem = (editor: IEditor | undefined): ChatInputActions
         onClick: () => {},
       },
     ];
-  }, [addSelectionContext, editor, pageId, t]);
+  }, [addSelectionContext, docId, editor, t]);
 };

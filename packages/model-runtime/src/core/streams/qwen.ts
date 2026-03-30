@@ -2,7 +2,7 @@ import type OpenAI from 'openai';
 import type {
   ChatCompletionContentPart,
   ChatCompletionContentPartText,
-} from 'openai/resources/index.mjs';
+} from 'openai/contents/index.mjs';
 import type { Stream } from 'openai/streaming';
 
 import type { ChatStreamCallbacks } from '../../types';

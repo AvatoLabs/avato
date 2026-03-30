@@ -7,7 +7,7 @@ import Header from './Header';
 
 const Sidebar = memo(() => {
   return (
-    <NavPanelPortal navKey="discover">
+    <NavPanelPortal navKey="community">
       <SideBarLayout header={<Header />} />
     </NavPanelPortal>
   );

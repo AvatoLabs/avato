@@ -6,7 +6,7 @@ export const mainDir = join(__dirname);
 
 export const preloadDir = join(mainDir, '../preload');
 
-export const resourcesDir = join(mainDir, '../../resources');
+export const resourcesDir = join(mainDir, '../../contents');
 
 export const buildDir = join(mainDir, '../../build');
 

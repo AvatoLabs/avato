@@ -1,2 +1,2 @@
-export * from './pageContentContext';
-export * from './pageSelectionContext';
+export * from './docsContentContext';
+export * from './docSelectionContext';

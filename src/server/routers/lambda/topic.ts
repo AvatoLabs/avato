@@ -4,10 +4,12 @@ import {
   type RecentTopicGroupMember,
 } from '@lobechat/types';
 import { cleanObject } from '@lobechat/utils';
+import { TRPCError } from '@trpc/server';
 import { eq, inArray } from 'drizzle-orm';
 import { after } from 'next/server';
 import { z } from 'zod';
 
+import { SpaceModel } from '@/database/models/space';
 import { TopicModel } from '@/database/models/topic';
 import { TopicShareModel } from '@/database/models/topicShare';
 import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
@@ -31,6 +33,7 @@ const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   return opts.next({
     ctx: {
       agentMigrationRepo: new AgentMigrationRepo(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
       topicImporterRepo: new TopicImporterRepo(ctx.serverDB, ctx.userId),
       topicModel: new TopicModel(ctx.serverDB, ctx.userId),
       topicShareModel: new TopicShareModel(ctx.serverDB, ctx.userId),
@@ -66,6 +69,20 @@ const shouldScheduleAgentMigration = (key: string): boolean => {
   return true;
 };
 
+const assertAccessibleSpace = async (
+  ctx: {
+    spaceModel: SpaceModel;
+  },
+  spaceId?: string | null,
+) => {
+  if (!spaceId) return;
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(spaceId);
+  if (!space?.id) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  }
+};
+
 export const topicRouter = router({
   batchCreateTopics: topicProcedure
     .input(
@@ -75,6 +92,7 @@ export const topicRouter = router({
             favorite: z.boolean().optional(),
             id: z.string().optional(),
             messages: z.array(z.string()).optional(),
+            spaceId: z.string().nullable().optional(),
             tagId: z.string().nullable().optional(),
             title: z.string(),
           })
@@ -82,6 +100,14 @@ export const topicRouter = router({
       ),
     )
     .mutation(async ({ input, ctx }): Promise<BatchTaskResult> => {
+      await Promise.all(
+        [
+          ...new Set(
+            input.map((item) => item.spaceId).filter((spaceId): spaceId is string => !!spaceId),
+          ),
+        ].map((spaceId) => assertAccessibleSpace(ctx, spaceId)),
+      );
+
       // Resolve sessionId for each topic
       const resolvedTopics = await Promise.all(
         input.map(async (item) => {
@@ -145,6 +171,7 @@ export const topicRouter = router({
           containerId: z.string().nullable().optional(),
           endDate: z.string().optional(),
           range: z.tuple([z.string(), z.string()]).optional(),
+          spaceId: z.string().nullable().optional(),
           startDate: z.string().optional(),
         })
         .optional(),
@@ -160,12 +187,15 @@ export const topicRouter = router({
           favorite: z.boolean().optional(),
           groupId: z.string().nullable().optional(),
           messages: z.array(z.string()).optional(),
+          spaceId: z.string().nullable().optional(),
           tagId: z.string().nullable().optional(),
           title: z.string(),
         })
         .extend(basicContextSchema.shape),
     )
     .mutation(async ({ input, ctx }) => {
+      await assertAccessibleSpace(ctx, input.spaceId);
+
       const { agentId, ...rest } = input;
       const resolved = await resolveContext(
         { agentId, sessionId: rest.sessionId },
@@ -237,6 +267,7 @@ export const topicRouter = router({
         groupId: z.string().nullable().optional(),
         isInbox: z.boolean().optional(),
         pageSize: z.number().optional(),
+        spaceId: z.string().nullable().optional(),
         sessionId: z.string().nullable().optional(),
         tagId: z.string().nullable().optional(),
       }),
@@ -354,9 +385,16 @@ export const topicRouter = router({
   }),
 
   recentTopics: topicProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(
+      z
+        .object({
+          limit: z.number().optional(),
+          spaceId: z.string().nullable().optional(),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }): Promise<RecentTopic[]> => {
-      const recentTopics = await ctx.topicModel.queryRecent(input?.limit ?? 12);
+      const recentTopics = await ctx.topicModel.queryRecent(input?.limit ?? 12, input?.spaceId);
 
       // Separate agent topics and group topics
       const agentTopics = recentTopics.filter((t) => t.type === 'agent');
@@ -528,6 +566,7 @@ export const topicRouter = router({
         groupId: z.string().nullable().optional(),
         keywords: z.string(),
         sessionId: z.string().nullable().optional(),
+        spaceId: z.string().nullable().optional(),
         tagId: z.string().nullable().optional(),
       }),
     )
@@ -538,7 +577,12 @@ export const topicRouter = router({
         ctx.userId,
       );
 
-      return ctx.topicModel.queryByKeyword(input.keywords, resolved.sessionId, input.tagId);
+      return ctx.topicModel.queryByKeyword(
+        input.keywords,
+        resolved.sessionId,
+        input.spaceId,
+        input.tagId,
+      );
     }),
 
   /**

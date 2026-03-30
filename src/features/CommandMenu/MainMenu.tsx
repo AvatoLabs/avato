@@ -24,7 +24,7 @@ const MainMenu = memo(() => {
   const {
     handleCreateSession,
     handleCreateTopic,
-    handleCreateLibrary,
+    handleCreateSourceSet,
     handleCreatePage,
     handleNavigate,
     handleExternalLink,
@@ -76,10 +76,10 @@ const MainMenu = memo(() => {
         <CommandItem
           icon={<APP_ENTRY_ICONS.resource />}
           unpinned={menuContext !== 'resource'}
-          value="create new library"
-          onSelect={handleCreateLibrary}
+          value="create new source set"
+          onSelect={handleCreateSourceSet}
         >
-          {t('cmdk.newLibrary')}
+          {t('cmdk.newSourceSet')}
         </CommandItem>
 
         {menuContext !== 'settings' &&

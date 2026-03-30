@@ -34,7 +34,7 @@ const Project = memo<ProjectProps>(({ itemKey }) => {
           type={'secondary'}
           weight={600}
         >
-          {t('navPanel.library')}
+          {t('navPanel.sourceSet')}
         </Text>
       }
     >

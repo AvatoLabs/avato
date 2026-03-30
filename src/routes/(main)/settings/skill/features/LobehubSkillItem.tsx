@@ -234,6 +234,7 @@ const LobehubSkillItem = memo<LobehubSkillItemProps>(({ provider, server }) => {
 
     return (
       <DropdownMenu
+        nativeButton
         placement="bottomRight"
         items={[
           {

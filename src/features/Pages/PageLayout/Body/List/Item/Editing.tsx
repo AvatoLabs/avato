@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import EmojiPicker from '@/components/EmojiPicker';
 import { useIsDark } from '@/hooks/useIsDark';
+import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
-import { usePageStore } from '@/store/page';
 
 interface EditingProps {
   currentEmoji?: string;
@@ -79,7 +79,7 @@ const Editing = memo<EditingProps>(({ documentId, title, currentEmoji, toggleEdi
           <Input
             autoFocus
             defaultValue={title}
-            placeholder={t('pageEditor.titlePlaceholder')}
+            placeholder={t('docEditor.titlePlaceholder')}
             style={{ flex: 1 }}
             onChange={(e) => setNewTitle(e.target.value)}
             onPressEnter={() => {

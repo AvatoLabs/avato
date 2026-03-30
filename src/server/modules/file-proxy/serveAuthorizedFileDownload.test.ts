@@ -7,7 +7,7 @@ import { serveAuthorizedFileDownload } from './serveAuthorizedFileDownload';
 
 const mockGetAccessMatch = vi.fn();
 
-vi.mock('@/server/services/resource', () => ({
+vi.mock('@/server/services/content', () => ({
   ResourceAuthorizer: vi.fn().mockImplementation(() => ({
     getAccessMatch: mockGetAccessMatch,
   })),

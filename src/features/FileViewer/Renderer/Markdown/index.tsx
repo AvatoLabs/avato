@@ -9,7 +9,7 @@ import CircleLoading from '@/components/Loading/CircleLoading';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
-import { usePageAgentContextFallback } from '../../hooks/usePageAgentContextFallback';
+import { useDocsAgentContextFallback } from '../../hooks/useDocsAgentContextFallback';
 import { useTextFileLoader } from '../../hooks/useTextFileLoader';
 import { createMarkdownPreviewComponents } from './components';
 import { createMarkdownPreviewProps } from './utils';
@@ -58,15 +58,15 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 interface MarkdownViewerProps {
-  enablePageAgentContext?: boolean;
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   fileId: string;
   fileName?: string;
-  pageAgentContextKey?: string;
   url: string | null;
 }
 
 const MarkdownViewer = memo<MarkdownViewerProps>(
-  ({ enablePageAgentContext, fileId, fileName, pageAgentContextKey, url }) => {
+  ({ enableDocsAgentContext, fileId, fileName, docsAgentContextKey, url }) => {
     const { t } = useTranslation(['file', 'common']);
     const { fileData, loading, error } = useTextFileLoader(url);
     const { fontSize, highlighterTheme, mermaidTheme } = useUserStore(
@@ -90,9 +90,9 @@ const MarkdownViewer = memo<MarkdownViewerProps>(
       [highlighterTheme, mermaidTheme],
     );
 
-    usePageAgentContextFallback({
-      contextKey: pageAgentContextKey,
-      enabled: enablePageAgentContext,
+    useDocsAgentContextFallback({
+      contextKey: docsAgentContextKey,
+      enabled: enableDocsAgentContext,
       fileId,
       fileName,
       text: fileData,

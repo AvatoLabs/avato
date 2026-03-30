@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import type { AsyncTaskStatus } from '../asyncTask';
-import type { InheritMode, ResourceRole } from '../resource';
+import type { ContentRole, InheritMode } from '../content';
 
 export interface FileListItem {
   attachable?: boolean;
@@ -12,6 +12,8 @@ export interface FileListItem {
    * Text content of the document (for notes/documents)
    */
   content?: string | null;
+  contentRole?: ContentRole | null;
+  contentUid?: string | null;
   createdAt: Date;
   editorData?: Record<string, any> | null;
   embeddingError: any | null;
@@ -30,8 +32,6 @@ export interface FileListItem {
    * Parent folder ID (for folder hierarchy)
    */
   parentId?: string | null;
-  resourceRole?: ResourceRole | null;
-  resourceUid?: string | null;
   size: number;
   slug?: string | null;
   sourceType: string;
@@ -48,12 +48,12 @@ export enum SortType {
 export const QueryFileListSchema = z.object({
   attachableOnly: z.boolean().default(false),
   category: z.string().optional(),
-  knowledgeBaseId: z.string().optional(),
+  sourceSetId: z.string().optional(),
   limit: z.number().int().positive().default(50),
   offset: z.number().int().min(0).default(0),
   parentId: z.string().nullable().optional(),
   q: z.string().nullable().optional(),
-  showFilesInKnowledgeBase: z.boolean().default(false),
+  showFilesInSourceSet: z.boolean().default(false),
   spaceId: z.string().optional(),
   sortType: z.enum(['desc', 'asc']).optional(),
   sorter: z.enum(['createdAt', 'name', 'size']).optional(),
@@ -65,14 +65,14 @@ export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
 export interface QueryFileListParams {
   attachableOnly?: boolean;
   category?: string;
-  knowledgeBaseId?: string;
   limit?: number;
   offset?: number;
   parentId?: string | null;
   q?: string | null;
-  showFilesInKnowledgeBase?: boolean;
+  showFilesInSourceSet?: boolean;
   sorter?: string;
   sortType?: string;
+  sourceSetId?: string;
   spaceId?: string;
   trash?: boolean;
 }

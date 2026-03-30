@@ -250,6 +250,7 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
     if (server.status === KlavisServerStatus.CONNECTED) {
       return (
         <DropdownMenu
+          nativeButton
           placement="bottomRight"
           items={[
             {

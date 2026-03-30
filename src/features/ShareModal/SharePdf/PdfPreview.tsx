@@ -13,7 +13,7 @@ import { Document, Page } from '@/libs/pdfjs';
 
 import { containerStyles } from '../style';
 
-const styles = createStaticStyles(({ css }) => ({
+const styles = createStaticStyles(({ css, cssVar }) => ({
   containerWrapper: css`
     position: relative;
     width: 100%;
@@ -35,13 +35,20 @@ const styles = createStaticStyles(({ css }) => ({
 
     height: 100%;
 
-    color: #666;
+    color: ${cssVar.colorTextSecondary};
   `,
   expandButton: css`
     position: absolute;
     z-index: 1000;
     inset-block-start: 20px;
     inset-inline-end: 20px;
+
+    border: 1px solid ${cssVar.colorBorderSecondary};
+    border-radius: ${cssVar.borderRadiusLG};
+
+    background: color-mix(in srgb, ${cssVar.colorBgContainer} 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: ${cssVar.boxShadowSecondary};
   `,
   footerNavigation: css`
     position: absolute;
@@ -50,14 +57,14 @@ const styles = createStaticStyles(({ css }) => ({
     inset-inline: 0;
 
     padding: 12px;
-    border-block-start: 1px solid color-mix(in srgb, black 10%, transparent);
+    border-block-start: 1px solid ${cssVar.colorBorderSecondary};
 
-    background: color-mix(in srgb, white 90%, transparent);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, ${cssVar.colorBgContainer} 90%, transparent);
+    backdrop-filter: blur(12px);
   `,
   fullscreenButton: css`
-    border-color: white;
-    color: white;
+    border-color: color-mix(in srgb, white 14%, transparent);
+    color: rgb(255 255 255 / 92%);
   `,
   fullscreenContent: css`
     display: flex;
@@ -81,10 +88,12 @@ const styles = createStaticStyles(({ css }) => ({
 
     padding-block: 12px;
     padding-inline: 20px;
-    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, white 12%, transparent);
+    border-radius: ${cssVar.borderRadiusLG};
 
-    background: color-mix(in srgb, black 70%, transparent);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, ${cssVar.colorBgMask} 88%, transparent);
+    backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
   `,
   fullscreenPageInput: css`
     width: 60px;
@@ -105,7 +114,7 @@ const styles = createStaticStyles(({ css }) => ({
   `,
   loadingText: css`
     margin-block-start: 8px;
-    color: #666;
+    color: ${cssVar.colorTextSecondary};
   `,
   pageInput: css`
     width: 50px;
@@ -113,7 +122,7 @@ const styles = createStaticStyles(({ css }) => ({
   `,
   pageNumberText: css`
     font-size: 12px;
-    color: #666;
+    color: ${cssVar.colorTextTertiary};
   `,
   previewContainer: css`
     display: flex;

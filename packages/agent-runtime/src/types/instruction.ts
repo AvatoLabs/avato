@@ -15,7 +15,7 @@ import type { Cost, CostCalculationContext, Usage } from './usage';
 export interface AgentRuntimeContext {
   /**
    * Initial context captured at operation start
-   * Contains static state like initial page content that doesn't change during execution
+   * Contains static state like initial doc content that doesn't change during execution
    * Set once during initialization and passed through to Context Engine
    */
   initialContext?: RuntimeInitialContext;

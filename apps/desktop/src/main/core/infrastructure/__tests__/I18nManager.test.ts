@@ -49,7 +49,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 // Mock loadResources
-vi.mock('@/locales/resources', () => ({
+vi.mock('@/locales/contents', () => ({
   loadResources: mockLoadResources,
 }));
 

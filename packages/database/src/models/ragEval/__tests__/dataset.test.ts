@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../../core/getTestDB';
-import { evalDatasets, knowledgeBases, users } from '../../../schemas';
+import { evalDatasets, sourceSets, users } from '../../../schemas';
 import { EvalDatasetModel } from '../dataset';
 
 const serverDB = await getTestDB();
@@ -11,25 +11,22 @@ const userId = 'dataset-test-user';
 const userId2 = 'dataset-test-user-2';
 const datasetModel = new EvalDatasetModel(serverDB, userId);
 
-let knowledgeBaseId: string;
+let sourceSetId: string;
 
 beforeEach(async () => {
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
 
-  const [kb] = await serverDB
-    .insert(knowledgeBases)
-    .values({ name: 'Test KB', userId })
-    .returning();
-  knowledgeBaseId = kb.id;
+  const [kb] = await serverDB.insert(sourceSets).values({ name: 'Test KB', userId }).returning();
+  sourceSetId = kb.id;
 });
 
 afterEach(async () => {
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 });
 
@@ -37,19 +34,19 @@ describe('EvalDatasetModel', () => {
   describe('create', () => {
     it('should create a new dataset with userId', async () => {
       const result = await datasetModel.create({
-        knowledgeBaseId,
+        sourceSetId,
         name: 'Test Dataset',
       });
 
       expect(result).toBeDefined();
       expect(result.name).toBe('Test Dataset');
-      expect(result.knowledgeBaseId).toBe(knowledgeBaseId);
+      expect(result.sourceSetId).toBe(sourceSetId);
       expect(result.userId).toBe(userId);
     });
 
     it('should create dataset with description', async () => {
       const result = await datasetModel.create({
-        knowledgeBaseId,
+        sourceSetId,
         name: 'Dataset with desc',
         description: 'A test dataset description',
       });
@@ -62,7 +59,7 @@ describe('EvalDatasetModel', () => {
     it('should delete a dataset owned by the user', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Delete me', userId })
+        .values({ sourceSetId, name: 'Delete me', userId })
         .returning();
 
       await datasetModel.delete(dataset.id);
@@ -76,7 +73,7 @@ describe('EvalDatasetModel', () => {
     it('should not delete a dataset owned by another user', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Other dataset', userId: userId2 })
+        .values({ sourceSetId, name: 'Other dataset', userId: userId2 })
         .returning();
 
       await datasetModel.delete(dataset.id);
@@ -89,13 +86,13 @@ describe('EvalDatasetModel', () => {
   });
 
   describe('query', () => {
-    it('should query datasets by knowledgeBaseId for current user', async () => {
+    it('should query datasets by sourceSetId for current user', async () => {
       await serverDB.insert(evalDatasets).values([
-        { knowledgeBaseId, name: 'Dataset 1', userId },
-        { knowledgeBaseId, name: 'Dataset 2', userId },
+        { sourceSetId, name: 'Dataset 1', userId },
+        { sourceSetId, name: 'Dataset 2', userId },
       ]);
 
-      const results = await datasetModel.query(knowledgeBaseId);
+      const results = await datasetModel.query(sourceSetId);
 
       expect(results).toHaveLength(2);
       expect(results[0]).toHaveProperty('id');
@@ -107,33 +104,33 @@ describe('EvalDatasetModel', () => {
 
     it('should not return datasets from other users', async () => {
       await serverDB.insert(evalDatasets).values([
-        { knowledgeBaseId, name: 'My dataset', userId },
-        { knowledgeBaseId, name: 'Other dataset', userId: userId2 },
+        { sourceSetId, name: 'My dataset', userId },
+        { sourceSetId, name: 'Other dataset', userId: userId2 },
       ]);
 
-      const results = await datasetModel.query(knowledgeBaseId);
+      const results = await datasetModel.query(sourceSetId);
 
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('My dataset');
     });
 
-    it('should return empty array for non-existent knowledge base', async () => {
+    it('should return empty array for non-existent source set', async () => {
       const results = await datasetModel.query('non-existent');
       expect(results).toHaveLength(0);
     });
 
     it('should order results by createdAt desc', async () => {
-      const [d1] = await serverDB
+      await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'First', userId })
+        .values({ sourceSetId, name: 'First', userId })
         .returning();
 
-      const [d2] = await serverDB
+      await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Second', userId })
+        .values({ sourceSetId, name: 'Second', userId })
         .returning();
 
-      const results = await datasetModel.query(knowledgeBaseId);
+      const results = await datasetModel.query(sourceSetId);
 
       // Second should come first (desc order)
       expect(results).toHaveLength(2);
@@ -144,7 +141,7 @@ describe('EvalDatasetModel', () => {
     it('should find a dataset by id', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Find me', userId })
+        .values({ sourceSetId, name: 'Find me', userId })
         .returning();
 
       const result = await datasetModel.findById(dataset.id);
@@ -156,7 +153,7 @@ describe('EvalDatasetModel', () => {
     it('should not find dataset owned by another user', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Other', userId: userId2 })
+        .values({ sourceSetId, name: 'Other', userId: userId2 })
         .returning();
 
       const result = await datasetModel.findById(dataset.id);
@@ -173,7 +170,7 @@ describe('EvalDatasetModel', () => {
     it('should update a dataset owned by the user', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Original', userId })
+        .values({ sourceSetId, name: 'Original', userId })
         .returning();
 
       await datasetModel.update(dataset.id, {
@@ -191,7 +188,7 @@ describe('EvalDatasetModel', () => {
     it('should not update a dataset owned by another user', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Other', userId: userId2 })
+        .values({ sourceSetId, name: 'Other', userId: userId2 })
         .returning();
 
       await datasetModel.update(dataset.id, { name: 'Hacked' });
@@ -205,7 +202,7 @@ describe('EvalDatasetModel', () => {
     it('should update the updatedAt timestamp', async () => {
       const [dataset] = await serverDB
         .insert(evalDatasets)
-        .values({ knowledgeBaseId, name: 'Timestamp test', userId })
+        .values({ sourceSetId, name: 'Timestamp test', userId })
         .returning();
 
       const originalUpdatedAt = dataset.updatedAt;

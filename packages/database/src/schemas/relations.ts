@@ -2,7 +2,7 @@ import { relations } from 'drizzle-orm';
 import { index, pgTable, primaryKey, text, uuid, varchar } from 'drizzle-orm/pg-core';
 
 import { createdAt } from './_helpers';
-import { agents, agentsFiles, agentsKnowledgeBases } from './agent';
+import { agents, agentsFiles, agentsSourceSets } from './agent';
 import {
   agentEvalBenchmarks,
   agentEvalDatasets,
@@ -12,7 +12,7 @@ import {
 } from './agentEvals';
 import { asyncTasks } from './asyncTask';
 import { chatGroups, chatGroupsAgents } from './chatGroup';
-import { documents, files, knowledgeBases } from './file';
+import { documents, files, sourceSets } from './file';
 import { generationBatches, generations, generationTopics } from './generation';
 import { messageGroups, messages, messagesFiles, messageTranslates } from './message';
 import { chunks, documentChunks, unstructuredChunks } from './rag';
@@ -136,7 +136,7 @@ export const messagesRelations = relations(messages, ({ many, one }) => ({
 
 export const agentsRelations = relations(agents, ({ many }) => ({
   agentsToSessions: many(agentsToSessions),
-  knowledgeBases: many(agentsKnowledgeBases),
+  sourceSets: many(agentsSourceSets),
   files: many(agentsFiles),
   chatGroups: many(chatGroupsAgents),
 }));
@@ -163,13 +163,13 @@ export const filesToSessionsRelations = relations(filesToSessions, ({ one }) => 
   }),
 }));
 
-export const agentsKnowledgeBasesRelations = relations(agentsKnowledgeBases, ({ one }) => ({
-  knowledgeBase: one(knowledgeBases, {
-    fields: [agentsKnowledgeBases.knowledgeBaseId],
-    references: [knowledgeBases.id],
+export const agentsSourceSetsRelations = relations(agentsSourceSets, ({ one }) => ({
+  sourceSet: one(sourceSets, {
+    fields: [agentsSourceSets.sourceSetId],
+    references: [sourceSets.id],
   }),
   agent: one(agents, {
-    fields: [agentsKnowledgeBases.agentId],
+    fields: [agentsSourceSets.agentId],
     references: [agents.id],
   }),
 }));

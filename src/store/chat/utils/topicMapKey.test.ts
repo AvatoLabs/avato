@@ -18,6 +18,11 @@ describe('topicMapKey', () => {
       const result = topicMapKey({ agentId: 'agent-123', groupId: 'group-456' });
       expect(result).toBe('group_agent_group-456_agent-123');
     });
+
+    it('should append workspace scope when spaceId is provided', () => {
+      const result = topicMapKey({ agentId: 'agent-123', spaceId: 'spc-1' });
+      expect(result).toBe('agent_agent-123__space_spc-1');
+    });
   });
 
   describe('explicit scope override', () => {
@@ -93,6 +98,13 @@ describe('topicMapKey', () => {
       expect(agentKey).not.toBe(groupKey);
       expect(agentKey).not.toBe(groupAgentKey);
       expect(groupKey).not.toBe(groupAgentKey);
+    });
+
+    it('should produce different keys for different spaces', () => {
+      const keyInSpaceA = topicMapKey({ agentId: 'test', spaceId: 'space-a' });
+      const keyInSpaceB = topicMapKey({ agentId: 'test', spaceId: 'space-b' });
+
+      expect(keyInSpaceA).not.toBe(keyInSpaceB);
     });
   });
 });

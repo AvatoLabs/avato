@@ -85,8 +85,8 @@ vi.mock('@/database/models/file', () => ({
   })),
 }));
 
-vi.mock('@/database/models/resource', () => ({
-  ResourceModel: vi.fn(() => ({
+vi.mock('@/database/models/content', () => ({
+  ContentModel: vi.fn(() => ({
     invalidateAuthzEpochsAfterRemoval: vi.fn(),
   })),
 }));
@@ -97,7 +97,7 @@ vi.mock('@/server/services/file', () => ({
   })),
 }));
 
-vi.mock('@/server/services/resource', () => ({
+vi.mock('@/server/services/content', () => ({
   ResourceAuthorizer: vi.fn(() => ({
     assertCapability: mockResourceAuthorizerAssertCapability,
   })),

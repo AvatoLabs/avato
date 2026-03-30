@@ -15,19 +15,33 @@ import BusinessGlobalProvider from '@/business/client/BusinessGlobalProvider';
 import ErrorCapture from '@/components/Error';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { useGlobalStore } from '@/store/global';
-import { isChunkLoadError, notifyChunkError } from '@/utils/chunkError';
+import { isChunkLoadError, notifyChunkError, tryHardReloadForChunkError } from '@/utils/chunkError';
 
 async function importModule<T>(importFn: () => Promise<T>): Promise<T> {
   return importFn();
 }
 
-function resolveLazyModule<P>(module: { default: ComponentType<P> } | ComponentType<P>) {
+function resolveLazyModule<P>(
+  module: { default: ComponentType<P> } | ComponentType<P> | null | undefined,
+) {
+  if (!module) {
+    tryHardReloadForChunkError();
+    throw new Error('Dynamic import returned no module');
+  }
+
   if (typeof module === 'function') {
     return { default: module };
   }
-  if ('default' in module) {
+
+  if (typeof module === 'object' && 'default' in module) {
+    if (!module.default) {
+      tryHardReloadForChunkError();
+      throw new Error('Dynamic import returned an empty default export');
+    }
+
     return module as { default: ComponentType<P> };
   }
+
   return { default: module as unknown as ComponentType<P> };
 }
 

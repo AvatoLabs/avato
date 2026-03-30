@@ -4,7 +4,7 @@ import { memo, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import TipGuide from '@/components/TipGuide';
-import { AttachKnowledgeModal } from '@/features/LibraryModal';
+import { AttachSourceSetModal } from '@/features/SourceSetModal';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useUserStore } from '@/store/user';
 import { preferenceSelectors } from '@/store/user/selectors';
@@ -16,9 +16,9 @@ const enableKnowledge = true;
 
 const Knowledge = memo(() => {
   const { t } = useTranslation('chat');
-  const { enableKnowledgeBase } = useServerConfigStore(featureFlagsSelectors);
+  const { enableSourceSet } = useServerConfigStore(featureFlagsSelectors);
   const [showTip, updateGuideState] = useUserStore((s) => [
-    preferenceSelectors.showUploadFileInKnowledgeBaseTip(s),
+    preferenceSelectors.showUploadFileInSourceSetTip(s),
     s.updateGuideState,
   ]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,14 +26,14 @@ const Knowledge = memo(() => {
 
   const items = useControls({ setModalOpen, setUpdating });
 
-  if (!enableKnowledgeBase) return null;
+  if (!enableSourceSet) return null;
   if (!enableKnowledge)
     return (
       <Action
         disabled
         icon={LibraryBig}
         showTooltip={true}
-        title={t('knowledgeBase.disabled', { cloud: LOBE_CHAT_CLOUD })}
+        title={t('sourceSet.disabled', { cloud: LOBE_CHAT_CLOUD })}
       />
     );
 
@@ -42,7 +42,7 @@ const Knowledge = memo(() => {
       icon={LibraryBig}
       loading={updating}
       showTooltip={false}
-      title={t('knowledgeBase.title')}
+      title={t('sourceSet.title')}
       dropdown={{
         maxHeight: 500,
         maxWidth: 480,
@@ -53,14 +53,14 @@ const Knowledge = memo(() => {
   );
 
   return (
-    <Suspense fallback={<Action disabled icon={LibraryBig} title={t('knowledgeBase.title')} />}>
+    <Suspense fallback={<Action disabled icon={LibraryBig} title={t('sourceSet.title')} />}>
       {showTip ? (
         <TipGuide
           open={showTip}
           placement={'top'}
-          title={t('knowledgeBase.uploadGuide')}
+          title={t('sourceSet.uploadGuide')}
           onOpenChange={() => {
-            updateGuideState({ uploadFileInKnowledgeBase: false });
+            updateGuideState({ uploadFileInSourceSet: false });
           }}
         >
           {content}
@@ -68,7 +68,7 @@ const Knowledge = memo(() => {
       ) : (
         content
       )}
-      <AttachKnowledgeModal open={modalOpen} setOpen={setModalOpen} />
+      <AttachSourceSetModal open={modalOpen} setOpen={setModalOpen} />
     </Suspense>
   );
 });

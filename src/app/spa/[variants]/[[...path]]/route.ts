@@ -7,7 +7,7 @@ import { analyticsEnv } from '@/envs/analytics';
 import { appEnv } from '@/envs/app';
 import { fileEnv } from '@/envs/file';
 import { pythonEnv } from '@/envs/python';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { getServerGlobalConfig } from '@/server/globalConfig';
 import { translation } from '@/server/translation';
 import { serializeForHtml } from '@/server/utils/serializeForHtml';
@@ -39,6 +39,16 @@ export function generateStaticParams() {
 
 const isDev = process.env.NODE_ENV === 'development';
 const VITE_DEV_ORIGIN = 'http://localhost:9876';
+
+function normalizeSpaShellAssetUrls(html: string): string {
+  return html
+    .replaceAll('/spa/manifest.webmanifest', '/manifest.webmanifest')
+    .replaceAll('/spa/favicon-32x32.png', '/favicon-32x32.png')
+    .replaceAll('/spa/favicon-16x16.png', '/favicon-16x16.png')
+    .replaceAll('/spa/favicon-32x32-dark.png', '/favicon-32x32-dark.png')
+    .replaceAll('/spa/favicon-16x16-dark.png', '/favicon-16x16-dark.png')
+    .replaceAll('/spa/icons/', '/icons/');
+}
 
 async function rewriteViteAssetUrls(html: string): Promise<string> {
   const { parseHTML } = await import('linkedom');
@@ -215,6 +225,7 @@ export async function GET(
   };
 
   let html = await getTemplate(isMobile);
+  html = normalizeSpaShellAssetUrls(html);
 
   html = html.replace(
     /window\.__SERVER_CONFIG__\s*=\s*undefined;\s*\/\*\s*SERVER_CONFIG\s*\*\//,

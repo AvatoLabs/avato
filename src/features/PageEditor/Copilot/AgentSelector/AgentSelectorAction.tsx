@@ -45,22 +45,22 @@ const AgentSelectorAction = memo<AgentSelectorActionProps>(({ onAgentChange }) =
 
   const agents = useHomeStore(homeAgentListSelectors.allAgents);
   const isAgentListInit = useHomeStore(homeAgentListSelectors.isAgentListInit);
-  const pageAgentId = useAgentStore((s) => s.builtinAgentIdMap['page-agent']);
-  const pageAgentData = useAgentStore((s) => s.agentMap[pageAgentId || '']);
+  const docsAgentId = useAgentStore((s) => s.builtinAgentIdMap['docs-agent']);
+  const docsAgentData = useAgentStore((s) => s.agentMap[docsAgentId || '']);
 
   useFetchAgentList();
 
   const agentsWithBuiltin = useMemo(() => {
     // Page Copilot only supports selecting agent sessions, not group sessions.
     const availableAgents = agents.filter((agent) => agent.type === 'agent');
-    const hasPageAgent = availableAgents.some((agent) => agent.id === pageAgentId);
+    const hasDocsAgent = availableAgents.some((agent) => agent.id === docsAgentId);
 
-    if (pageAgentId && !hasPageAgent) {
+    if (docsAgentId && !hasDocsAgent) {
       return [
         {
-          avatar: pageAgentData?.avatar || null,
-          description: pageAgentData?.description || null,
-          id: pageAgentId,
+          avatar: docsAgentData?.avatar || null,
+          description: docsAgentData?.description || null,
+          id: docsAgentId,
           pinned: false,
           title: t('builtinCopilot'),
           type: 'agent' as const,
@@ -71,7 +71,7 @@ const AgentSelectorAction = memo<AgentSelectorActionProps>(({ onAgentChange }) =
     }
 
     return availableAgents;
-  }, [agents, pageAgentId, pageAgentData, t]);
+  }, [agents, docsAgentId, docsAgentData, t]);
 
   const activeAgent = useMemo(
     () => agentsWithBuiltin.find((agent) => agent.id === agentId),
@@ -111,6 +111,7 @@ const AgentSelectorAction = memo<AgentSelectorActionProps>(({ onAgentChange }) =
 
   return (
     <Popover
+      nativeButton={false}
       open={open}
       placement="topLeft"
       trigger="click"

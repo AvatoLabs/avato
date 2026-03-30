@@ -81,6 +81,7 @@ const Actions = memo<ActionsProps>(({ identifier, type, isMCP }) => {
                 configureButton
               ))}
             <DropdownMenu
+              nativeButton
               placement="bottomRight"
               items={[
                 {

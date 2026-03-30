@@ -8,7 +8,7 @@ import { serverDBEnv } from '@/config/db';
 import { UserModel } from '@/database/models/user';
 import { appEnv } from '@/envs/app';
 import { getJWKS } from '@/libs/oidc-provider/jwt';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 import { DrizzleAdapter } from './adapter';
 import { defaultClaims, defaultClients, defaultScopes } from './config';

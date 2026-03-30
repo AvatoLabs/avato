@@ -8,6 +8,7 @@ import pMap from 'p-map';
 import { z } from 'zod';
 
 import { MessageModel } from '@/database/models/message';
+import { SpaceModel } from '@/database/models/space';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
@@ -245,11 +246,26 @@ const aiAgentProcedure = authedProcedure.use(serverDatabase).use(async (opts) =>
       aiAgentService: new AiAgentService(ctx.serverDB, ctx.userId),
       aiChatService: new AiChatService(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
       threadModel: new ThreadModel(ctx.serverDB, ctx.userId),
       topicModel: new TopicModel(ctx.serverDB, ctx.userId),
     },
   });
 });
+
+const assertAccessibleSpace = async (
+  ctx: {
+    spaceModel: SpaceModel;
+  },
+  spaceId?: string | null,
+) => {
+  if (!spaceId) return;
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(spaceId);
+  if (!space?.id) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  }
+};
 
 export const aiAgentRouter = router({
   /**
@@ -459,6 +475,8 @@ export const aiAgentRouter = router({
         });
       }
 
+      await assertAccessibleSpace(ctx, input.spaceId);
+
       // Generate runtime operation ID: agt_{timestamp}_{agentId}_{topicId}_{random}
       const timestamp = Date.now();
       const operationId = `agt_${timestamp}_${agentId || 'unknown'}_${topicId || 'none'}_${nanoid(8)}`;
@@ -529,6 +547,8 @@ export const aiAgentRouter = router({
     log('execAgent: identifier=%s, prompt=%s', agentId || slug, prompt.slice(0, 50));
 
     try {
+      await assertAccessibleSpace(ctx, appContext?.spaceId);
+
       return await ctx.aiAgentService.execAgent({
         agentId,
         appContext,
@@ -560,6 +580,16 @@ export const aiAgentRouter = router({
     const { tasks, parallel = true } = input;
 
     log('execAgents: %d tasks, parallel=%s', tasks.length, parallel);
+
+    await Promise.all(
+      [
+        ...new Set(
+          tasks
+            .map((task) => task.appContext?.spaceId)
+            .filter((spaceId): spaceId is string => !!spaceId),
+        ),
+      ].map((spaceId) => assertAccessibleSpace(ctx, spaceId)),
+    );
 
     type TaskResult = {
       autoStarted?: boolean;

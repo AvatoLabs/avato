@@ -1,4 +1,4 @@
-import { PageAgentIdentifier } from '@lobechat/builtin-tool-page-agent';
+import { DocsAgentIdentifier } from '@lobechat/builtin-tool-docs-agent';
 import { type UIChatMessage } from '@lobechat/types';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,7 @@ import * as toolEngineering from '@/helpers/toolEngineering';
 import { chatService } from '@/services/chat';
 import * as agentConfigResolver from '@/services/chat/mecha/agentConfigResolver';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
-import { pageAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-page-agent';
+import { docsAgentRuntime } from '@/store/tool/slices/builtin/executors/lobe-docs-agent';
 
 import { useChatStore } from '../../../../store';
 import {
@@ -330,7 +330,7 @@ describe('StreamingExecutor actions', () => {
     });
 
     // Note: RAG metadata functionality has been removed
-    // RAG is now handled by Knowledge Base Tools (searchKnowledgeBase and readKnowledge)
+    // RAG is now handled by Knowledge Base Tools (searchSourceSet and readSourceFiles)
   });
 
   describe('afterCompletion hooks', () => {
@@ -807,20 +807,20 @@ describe('StreamingExecutor actions', () => {
       vi.spyOn(agentConfigResolver, 'resolveAgentConfig').mockReturnValue({
         agentConfig: {
           ...createMockAgentConfig(),
-          plugins: [PageAgentIdentifier],
+          plugins: [DocsAgentIdentifier],
         },
         chatConfig: createMockChatConfig(),
         isBuiltinAgent: false,
-        plugins: [PageAgentIdentifier],
+        plugins: [DocsAgentIdentifier],
       });
       vi.spyOn(toolEngineering, 'createAgentToolsEngine').mockReturnValue({
         generateToolsDetailed: vi.fn().mockReturnValue({
           enabledManifests: [
             {
-              identifier: PageAgentIdentifier,
+              identifier: DocsAgentIdentifier,
             },
           ],
-          enabledToolIds: [PageAgentIdentifier],
+          enabledToolIds: [DocsAgentIdentifier],
           tools: [],
         }),
       } as any);
@@ -836,7 +836,7 @@ describe('StreamingExecutor actions', () => {
         topicId: TEST_IDS.TOPIC_ID,
       });
 
-      pageAgentRuntime.setScopedFallbackPageContentContext({
+      docsAgentRuntime.setScopedFallbackPageContentContext({
         context: {
           markdown: 'Only for topic A',
           metadata: { title: 'Topic A file' },
@@ -845,7 +845,7 @@ describe('StreamingExecutor actions', () => {
         contextKey: topicAKey,
         docId: 'file-a',
       });
-      pageAgentRuntime.setScopedFallbackPageContentContext({
+      docsAgentRuntime.setScopedFallbackPageContentContext({
         context: {
           markdown: 'Only for topic B',
           metadata: { title: 'Topic B file' },
@@ -882,8 +882,8 @@ describe('StreamingExecutor actions', () => {
           xml: '',
         });
       } finally {
-        pageAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicAKey });
-        pageAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicBKey });
+        docsAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicAKey });
+        docsAgentRuntime.setScopedFallbackPageContentContext({ contextKey: topicBKey });
       }
     });
 

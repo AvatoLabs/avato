@@ -1,6 +1,6 @@
-import { en, zhCn } from '@lobehub/ui/es/i18n/resources/index';
+import { en, zhCn } from '@lobehub/ui/i18n';
 
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 type UILocaleResources = Record<string, Record<string, string>>;
 

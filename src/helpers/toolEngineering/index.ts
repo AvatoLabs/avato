@@ -1,8 +1,8 @@
 /**
  * Tools Engineering - Unified tools processing using ToolsEngine
  */
-import { KnowledgeBaseManifest } from '@lobechat/builtin-tool-knowledge-base';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
+import { SourceSetManifest } from '@lobechat/builtin-tool-source-set';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { defaultToolIds } from '@lobechat/builtin-tools';
 import { isDesktop } from '@lobechat/const';
@@ -102,7 +102,7 @@ export const createAgentToolsEngine = (workingModel: WorkingModel) => {
         return undefined; // fall through to rules
       },
       rules: {
-        [KnowledgeBaseManifest.identifier]: agentSelectors.hasEnabledKnowledgeBases(agentState),
+        [SourceSetManifest.identifier]: agentSelectors.hasEnabledSourceSets(agentState),
         [MemoryManifest.identifier]: agentChatConfigSelectors.isMemoryToolEnabled(agentState),
         [WebBrowsingManifest.identifier]: searchConfig.useApplicationBuiltinSearchTool,
       },

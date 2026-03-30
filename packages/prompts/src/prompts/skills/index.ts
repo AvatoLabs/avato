@@ -1,4 +1,4 @@
-export { buildResourcesTreeText, resourcesTreePrompt } from './resourcesTree';
+export { buildContentTreeText, contentTreePrompt } from './contentTree';
 
 export interface SkillItem {
   description: string;

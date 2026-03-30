@@ -9,8 +9,8 @@ import {
 } from '@/types/files';
 
 interface CreateFileParams extends Omit<UploadFileParams, 'url'> {
-  knowledgeBaseId?: string;
   parentId?: string;
+  sourceSetId?: string;
   spaceId?: string;
   url: string;
 }
@@ -18,9 +18,9 @@ interface CreateFileParams extends Omit<UploadFileParams, 'url'> {
 export class FileService {
   createFile = async (
     params: UploadFileParams & { parentId?: string; spaceId?: string },
-    knowledgeBaseId?: string,
+    sourceSetId?: string,
   ): Promise<{ id: string; url: string }> => {
-    return lambdaClient.file.createFile.mutate({ ...params, knowledgeBaseId } as CreateFileParams);
+    return lambdaClient.file.createFile.mutate({ ...params, sourceSetId } as CreateFileParams);
   };
 
   getFile = async (id: string): Promise<FileItem> => {
@@ -89,9 +89,11 @@ export class FileService {
         fileType: doc.fileType || 'custom/document',
         finishEmbedding: false,
         id: doc.id,
+        sourceSetId: doc.sourceSetId ?? null,
         metadata: doc.metadata,
         name: doc.title || doc.filename || 'Untitled',
         parentId: doc.parentId,
+        spaceId: doc.spaceId ?? null,
         size: doc.totalCharCount || 0,
         slug: doc.slug,
         sourceType: 'document',
@@ -104,8 +106,8 @@ export class FileService {
     }
   };
 
-  getFolderBreadcrumb = async (slug: string) => {
-    return lambdaClient.document.getFolderBreadcrumb.query({ slug });
+  getFolderBreadcrumb = async (slug: string, spaceId?: string) => {
+    return lambdaClient.document.getFolderBreadcrumb.query(spaceId ? { slug, spaceId } : { slug });
   };
 
   checkFileHash = async (hash: string, spaceId?: string): Promise<CheckFileHashResult> => {

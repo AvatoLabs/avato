@@ -28,7 +28,7 @@ const ProfileEditor = memo(() => {
       {/* Identity Section: Avatar + Name + Description */}
       <IdentityCard />
 
-      {/* Capability Section: Model + Tools + Knowledge */}
+      {/* Capability Section: Model + Tools + Sources */}
       <CapabilityCard />
 
       {/* Prompt Editor Section */}

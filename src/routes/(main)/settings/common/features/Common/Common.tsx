@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { FORM_STYLE } from '@/const/layoutTokens';
 import { imageUrl } from '@/const/url';
 import { isDesktop } from '@/const/version';
-import { localeOptions } from '@/locales/resources';
+import { localeOptions } from '@/locales/contents';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useUserStore } from '@/store/user';

@@ -7,6 +7,7 @@ import {
   chatGroups,
   messages,
   sessions,
+  spaces,
   topics,
   users,
 } from '../../../schemas';
@@ -21,14 +22,20 @@ const topicModel = new TopicModel(serverDB, userId);
 
 describe('TopicModel - Query', () => {
   beforeEach(async () => {
+    await serverDB.delete(spaces);
     await serverDB.delete(users);
     await serverDB.transaction(async (tx) => {
       await tx.insert(users).values([{ id: userId }, { id: userId2 }]);
+      await tx.insert(spaces).values([
+        { createdBy: userId, id: 'spc_alpha', kind: 'team', name: 'Alpha Space' },
+        { createdBy: userId, id: 'spc_beta', kind: 'team', name: 'Beta Space' },
+      ]);
       await tx.insert(sessions).values({ id: sessionId, userId });
     });
   });
 
   afterEach(async () => {
+    await serverDB.delete(spaces);
     await serverDB.delete(users);
   });
 
@@ -186,6 +193,30 @@ describe('TopicModel - Query', () => {
 
       expect(result2).toHaveLength(1);
       expect(result2[0].id).toBe('topic1');
+    });
+
+    it('should query topics within the provided space', async () => {
+      await serverDB.insert(topics).values([
+        {
+          id: 'topic-space-alpha',
+          sessionId,
+          spaceId: 'spc_alpha',
+          title: 'Alpha Topic',
+          userId,
+        },
+        {
+          id: 'topic-space-beta',
+          sessionId,
+          spaceId: 'spc_beta',
+          title: 'Beta Topic',
+          userId,
+        },
+      ]);
+
+      const result = await topicModel.query({ containerId: sessionId, spaceId: 'spc_alpha' });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].id).toBe('topic-space-alpha');
     });
 
     it('should exclude topics with specified triggers via excludeTriggers', async () => {
@@ -938,6 +969,32 @@ describe('TopicModel - Query', () => {
       expect(result[0].id).toBe('topic1');
     });
 
+    it('should return topics matching keyword within the provided space', async () => {
+      await serverDB.transaction(async (tx) => {
+        await tx.insert(topics).values([
+          {
+            id: 'topic-space-search-alpha',
+            title: 'hello alpha',
+            sessionId,
+            spaceId: 'spc_alpha',
+            userId,
+          },
+          {
+            id: 'topic-space-search-beta',
+            title: 'hello beta',
+            sessionId,
+            spaceId: 'spc_beta',
+            userId,
+          },
+        ]);
+      });
+
+      const result = await topicModel.queryByKeyword('hello', sessionId, 'spc_alpha');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('topic-space-search-alpha');
+    });
+
     it('should return nothing if not match', async () => {
       await serverDB.insert(topics).values([
         { id: 'topic1', title: 'Hello world', userId },
@@ -978,6 +1035,41 @@ describe('TopicModel - Query', () => {
   });
 
   describe('queryRecent', () => {
+    it('should return recent topics only within the provided space', async () => {
+      await serverDB.transaction(async (tx) => {
+        await tx.insert(agents).values([
+          {
+            id: 'recent-space-agent',
+            userId,
+            title: 'Recent Space Agent',
+          },
+        ]);
+        await tx.insert(topics).values([
+          {
+            id: 'recent-topic-alpha',
+            title: 'Alpha Topic',
+            userId,
+            agentId: 'recent-space-agent',
+            spaceId: 'spc_alpha',
+            updatedAt: new Date('2023-03-01'),
+          },
+          {
+            id: 'recent-topic-beta',
+            title: 'Beta Topic',
+            userId,
+            agentId: 'recent-space-agent',
+            spaceId: 'spc_beta',
+            updatedAt: new Date('2023-04-01'),
+          },
+        ]);
+      });
+
+      const result = await topicModel.queryRecent(12, 'spc_alpha');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('recent-topic-alpha');
+    });
+
     it('should return recent topics with agentId and sessionId', async () => {
       await serverDB.transaction(async (tx) => {
         await tx.insert(agents).values([

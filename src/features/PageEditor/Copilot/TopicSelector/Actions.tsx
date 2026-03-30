@@ -12,7 +12,7 @@ const Actions = memo<ActionsProps>(({ dropdownMenu }) => {
     return null;
 
   return (
-    <DropdownMenu items={dropdownMenu}>
+    <DropdownMenu items={dropdownMenu} nativeButton={false}>
       <ActionIcon icon={MoreHorizontalIcon} size={'small'} />
     </DropdownMenu>
   );

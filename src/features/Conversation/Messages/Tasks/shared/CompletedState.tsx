@@ -44,8 +44,11 @@ interface MetricItemProps {
 export const MetricItem = memo<MetricItemProps>(({ icon, label, value }) => (
   <Tag
     icon={<Icon icon={icon} />}
-    style={{ color: cssVar.colorTextDescription, padding: 0 }}
     variant={'borderless'}
+    style={{
+      color: `color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%)`,
+      padding: 0,
+    }}
   >
     {value}
     {label}

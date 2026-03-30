@@ -67,7 +67,7 @@ const TokenTag = memo<TokenTagProps>(
           <Tooltip
             placement={placement}
             styles={{ root: { pointerEvents: 'none' } }}
-            title={t('assistants.withKnowledge')}
+            title={t('assistants.withSourceSet')}
           >
             <Tag icon={<Icon icon={BookTextIcon} />}>{knowledgeCount}</Tag>
           </Tooltip>

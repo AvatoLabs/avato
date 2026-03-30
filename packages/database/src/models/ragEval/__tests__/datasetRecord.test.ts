@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../../core/getTestDB';
-import { evalDatasetRecords, evalDatasets, files, knowledgeBases, users } from '../../../schemas';
+import { evalDatasetRecords, evalDatasets, files, sourceSets, users } from '../../../schemas';
 import { EvalDatasetRecordModel } from '../datasetRecord';
 
 const serverDB = await getTestDB();
@@ -12,26 +12,23 @@ const userId2 = 'dataset-record-test-user-2';
 const recordModel = new EvalDatasetRecordModel(serverDB, userId);
 
 let datasetId: string;
-let knowledgeBaseId: string;
+let sourceSetId: string;
 
 beforeEach(async () => {
   await serverDB.delete(evalDatasetRecords);
   await serverDB.delete(evalDatasets);
   await serverDB.delete(files);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
 
-  const [kb] = await serverDB
-    .insert(knowledgeBases)
-    .values({ name: 'Test KB', userId })
-    .returning();
-  knowledgeBaseId = kb.id;
+  const [kb] = await serverDB.insert(sourceSets).values({ name: 'Test KB', userId }).returning();
+  sourceSetId = kb.id;
 
   const [dataset] = await serverDB
     .insert(evalDatasets)
-    .values({ knowledgeBaseId, name: 'Test Dataset', userId })
+    .values({ sourceSetId, name: 'Test Dataset', userId })
     .returning();
   datasetId = dataset.id;
 });
@@ -40,7 +37,7 @@ afterEach(async () => {
   await serverDB.delete(evalDatasetRecords);
   await serverDB.delete(evalDatasets);
   await serverDB.delete(files);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 });
 

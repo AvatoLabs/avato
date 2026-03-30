@@ -5,12 +5,19 @@ import { getThemePresetPreview, resolveThemePreset } from './themePresets';
 
 describe('themePresets', () => {
   it('resolves matching preset colors to the preset id', () => {
-    expect(resolveThemePreset(undefined, undefined)).toBe('classic');
-    expect(resolveThemePreset('green', 'slate')).toBe('classic');
-    expect(resolveThemePreset('cyan', 'slate')).toBe('tide');
+    expect(resolveThemePreset(undefined, undefined)).toBe('obsidian');
+    expect(resolveThemePreset('green', 'slate')).toBe('forest');
+    expect(resolveThemePreset('blue', 'slate')).toBe('surge');
     expect(resolveThemePreset('volcano', 'slate')).toBe('ember');
     expect(resolveThemePreset('magenta', 'slate')).toBe('velvet');
     expect(resolveThemePreset('geekblue', 'slate')).toBe('midnight');
+    expect(resolveThemePreset('#000000', 'slate')).toBe('obsidian');
+  });
+
+  it('keeps legacy hex presets mapped to the renamed options', () => {
+    expect(resolveThemePreset('#16A34A', 'slate')).toBe('forest');
+    expect(resolveThemePreset('#00B8FF', 'slate')).toBe('surge');
+    expect(resolveThemePreset('cyan', 'slate')).toBe('surge');
   });
 
   it('falls back to custom when colors do not match a preset', () => {
@@ -26,6 +33,33 @@ describe('themePresets', () => {
     ).toEqual({
       accent: primaryColors.volcano,
       neutral: neutralColors.sand,
+    });
+  });
+
+  it('keeps saturated presets colorful and only inverts obsidian by appearance', () => {
+    expect(getThemePresetPreview('forest', undefined, 'light')).toEqual({
+      accent: primaryColors.green,
+      neutral: neutralColors.slate,
+    });
+    expect(getThemePresetPreview('forest', undefined, 'dark')).toEqual({
+      accent: primaryColors.green,
+      neutral: neutralColors.slate,
+    });
+    expect(getThemePresetPreview('surge', undefined, 'light')).toEqual({
+      accent: primaryColors.blue,
+      neutral: neutralColors.slate,
+    });
+    expect(getThemePresetPreview('surge', undefined, 'dark')).toEqual({
+      accent: primaryColors.blue,
+      neutral: neutralColors.slate,
+    });
+    expect(getThemePresetPreview('obsidian', undefined, 'light')).toEqual({
+      accent: '#000000',
+      neutral: neutralColors.slate,
+    });
+    expect(getThemePresetPreview('obsidian', undefined, 'dark')).toEqual({
+      accent: '#ffffff',
+      neutral: neutralColors.slate,
     });
   });
 });

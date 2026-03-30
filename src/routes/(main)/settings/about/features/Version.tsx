@@ -57,11 +57,15 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
     if (!isDesktop) {
       if (hasNewVersion) {
         return (
-          <a href={MANUAL_UPGRADE_URL} rel="noreferrer" style={{ flex: 1 }} target="_blank">
-            <Button block={mobile} type={'primary'}>
-              {t('upgradeVersion.action')}
-            </Button>
-          </a>
+          <Button
+            block={mobile}
+            href={MANUAL_UPGRADE_URL}
+            style={{ flex: 1 }}
+            target={'_blank'}
+            type={'primary'}
+          >
+            {t('upgradeVersion.action')}
+          </Button>
         );
       }
       return null;
@@ -154,9 +158,9 @@ const Version = memo<{ mobile?: boolean }>(({ mobile }) => {
         </Flexbox>
       </Flexbox>
       <Flexbox horizontal flex={mobile ? 1 : undefined} gap={8}>
-        <a href={CHANGELOG_URL} rel="noreferrer" style={{ flex: 1 }} target="_blank">
-          <Button block={mobile}>{t('changelog')}</Button>
-        </a>
+        <Button block={mobile} href={CHANGELOG_URL} style={{ flex: 1 }} target={'_blank'}>
+          {t('changelog')}
+        </Button>
         {renderUpdateButton()}
       </Flexbox>
     </Flexbox>

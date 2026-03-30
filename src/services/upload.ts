@@ -31,7 +31,6 @@ interface UploadFileToS3Options {
   /** @deprecated Ignored; storage keys are server-generated from upload sessions. */
   directory?: string;
   filename?: string;
-  knowledgeBaseId?: string;
   onNotSupported?: () => void;
   onProgress?: (status: FileUploadStatus, state: FileUploadState) => void;
   parentId?: string;
@@ -40,6 +39,7 @@ interface UploadFileToS3Options {
   /** Precomputed SHA-256 (hex) to avoid re-reading the file buffer. */
   sha256?: string;
   skipCheckFileType?: boolean;
+  sourceSetId?: string;
   spaceId?: string;
 }
 
@@ -136,7 +136,7 @@ class UploadService {
     {
       onProgress,
       abortController,
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       sha256: sha256Option,
       spaceId,
@@ -147,7 +147,7 @@ class UploadService {
     const prep = await lambdaClient.upload.prepareResourceUpload.mutate({
       filename: file.name,
       fileType: file.type || 'application/octet-stream',
-      knowledgeBaseId,
+      sourceSetId,
       parentId,
       sha256: sha256Hex,
       size: file.size,

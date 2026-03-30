@@ -7,12 +7,12 @@ import { useTranslation } from 'react-i18next';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { usePageKind } from '@/features/Pages/usePageKind';
-import { pageSelectors, usePageStore } from '@/store/page';
+import { pageSelectors, usePageStore } from '@/store/docs';
 
 import Item from './Item';
 
 /**
- * Show pages filtered by library
+ * Show pages filtered by source-set membership.
  */
 const PageList = () => {
   const { t } = useTranslation(['file', 'common']);

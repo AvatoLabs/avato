@@ -2,7 +2,15 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../../core/getTestDB';
-import { agents, messagePlugins, messages, sessions, topics, users } from '../../../schemas';
+import {
+  agents,
+  messagePlugins,
+  messages,
+  sessions,
+  spaces,
+  topics,
+  users,
+} from '../../../schemas';
 import type { LobeChatDatabase } from '../../../type';
 import type { CreateTopicParams } from '../../topic';
 import { TopicModel } from '../../topic';
@@ -15,14 +23,22 @@ const topicModel = new TopicModel(serverDB, userId);
 
 describe('TopicModel - Create', () => {
   beforeEach(async () => {
+    await serverDB.delete(spaces);
     await serverDB.delete(users);
     await serverDB.transaction(async (tx) => {
       await tx.insert(users).values([{ id: userId }, { id: userId2 }]);
+      await tx.insert(spaces).values({
+        createdBy: userId,
+        id: 'spc_test',
+        kind: 'team',
+        name: 'Test Space',
+      });
       await tx.insert(sessions).values({ id: sessionId, userId });
     });
   });
 
   afterEach(async () => {
+    await serverDB.delete(spaces);
     await serverDB.delete(users);
   });
 
@@ -50,6 +66,7 @@ describe('TopicModel - Create', () => {
         title: 'New Topic',
         favorite: true,
         sessionId,
+        spaceId: null,
         tagId: null,
         userId,
         historySummary: null,
@@ -109,6 +126,7 @@ describe('TopicModel - Create', () => {
         trigger: null,
         mode: null,
         sessionId,
+        spaceId: null,
         tagId: null,
         userId,
         createdAt: expect.any(Date),
@@ -139,6 +157,7 @@ describe('TopicModel - Create', () => {
       expect(createdTopic.title).toBe('Topic with Agent');
       expect(createdTopic.agentId).toBe('agent-for-topic');
       expect(createdTopic.sessionId).toBe(sessionId);
+      expect(createdTopic.spaceId).toBeNull();
 
       const dbTopic = await serverDB.select().from(topics).where(eq(topics.id, topicId));
       expect(dbTopic).toHaveLength(1);
@@ -160,6 +179,27 @@ describe('TopicModel - Create', () => {
 
       expect(createdTopic.agentId).toBe('agent-only');
       expect(createdTopic.sessionId).toBeNull();
+      expect(createdTopic.spaceId).toBeNull();
+    });
+
+    it('should create a new topic with explicit spaceId', async () => {
+      const topicId = 'topic-with-space';
+
+      const createdTopic = await topicModel.create(
+        {
+          favorite: false,
+          sessionId,
+          spaceId: 'spc_test',
+          title: 'Topic with Space',
+        },
+        topicId,
+      );
+
+      expect(createdTopic.spaceId).toBe('spc_test');
+
+      const dbTopic = await serverDB.select().from(topics).where(eq(topics.id, topicId));
+      expect(dbTopic).toHaveLength(1);
+      expect(dbTopic[0].spaceId).toBe('spc_test');
     });
   });
 
@@ -182,19 +222,33 @@ describe('TopicModel - Create', () => {
         title: 'Topic 1',
         favorite: true,
         sessionId,
+        spaceId: null,
         userId,
       });
       expect(createdTopics[1]).toMatchObject({
         title: 'Topic 2',
         favorite: false,
         sessionId,
+        spaceId: null,
         userId,
       });
 
       const items = await serverDB.select().from(topics).orderBy(asc(topics.title));
       expect(items).toHaveLength(2);
-      expect(items[0]).toMatchObject({ title: 'Topic 1', favorite: true, sessionId, userId });
-      expect(items[1]).toMatchObject({ title: 'Topic 2', favorite: false, sessionId, userId });
+      expect(items[0]).toMatchObject({
+        title: 'Topic 1',
+        favorite: true,
+        sessionId,
+        spaceId: null,
+        userId,
+      });
+      expect(items[1]).toMatchObject({
+        title: 'Topic 2',
+        favorite: false,
+        sessionId,
+        spaceId: null,
+        userId,
+      });
 
       const updatedMessages = await serverDB.select().from(messages).orderBy(asc(messages.id));
       expect(updatedMessages).toHaveLength(3);

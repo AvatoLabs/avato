@@ -126,6 +126,7 @@ export const sharedRollupOutput = {
 type Platform = 'web' | 'mobile' | 'desktop';
 
 const isDev = process.env.NODE_ENV !== 'production';
+const enableCodeInspector = process.env.ENABLE_CODE_INSPECTOR === '1';
 
 interface SharedRendererOptions {
   platform: Platform;
@@ -141,6 +142,7 @@ export function sharedRendererPlugins(options: SharedRendererOptions) {
     vitePlatformResolve(options.platform),
     defaultTsconfigPaths && tsconfigPaths({ projects: ['.'] }),
     isDev &&
+      enableCodeInspector &&
       codeInspectorPlugin({
         bundler: 'vite',
         exclude: [/\.(css|json)$/],

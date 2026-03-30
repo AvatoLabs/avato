@@ -7,20 +7,20 @@ import { checkFileStorageUsage } from '@/business/server/trpc-middlewares/lambda
 import { serverDBEnv } from '@/config/db';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
-import { ResourceModel } from '@/database/models/resource';
 import { SpaceModel } from '@/database/models/space';
 import { KnowledgeRepo } from '@/database/repositories/knowledge';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { FileService } from '@/server/services/file';
-import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import {
   AuthorizedResourceResolver,
-  ResourceAuthorizer,
+  ContentAuthorizer,
   TreeGuard,
-} from '@/server/services/resource';
+} from '@/server/services/content';
+import { FileService } from '@/server/services/file';
+import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
 import { type FileListItem } from '@/types/files';
 import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
@@ -53,8 +53,8 @@ const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
       fileService: new FileService(ctx.serverDB, ctx.userId),
       knowledgeRepo: new KnowledgeRepo(ctx.serverDB, ctx.userId),
       resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
-      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
       spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
       treeGuard: new TreeGuard(ctx.serverDB, ctx.userId),
     },
@@ -67,17 +67,14 @@ const resolveWriteSpaceId = async (
     spaceModel: SpaceModel;
   },
   params: {
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     parentId?: string | null;
     spaceId?: string;
   },
 ) => {
-  if (params.knowledgeBaseId) {
-    const knowledgeBase = await ctx.resolver.requireKnowledgeBase(
-      params.knowledgeBaseId,
-      'create_child',
-    );
-    return knowledgeBase.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  if (params.sourceSetId) {
+    const sourceSet = await ctx.resolver.requireSourceSet(params.sourceSetId, 'create_child');
+    return sourceSet.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
   }
 
   if (params.parentId) {
@@ -100,11 +97,40 @@ const resolveWriteSpaceId = async (
   return personalSpace.id;
 };
 
+const resolveParentDocumentId = async (
+  ctx: {
+    documentModel: DocumentModel;
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  params: {
+    sourceSetId?: string;
+    parentId?: string | null;
+    spaceId?: string;
+  },
+) => {
+  if (!params.parentId) return params.parentId;
+
+  let scopedSpaceId = params.spaceId;
+  if (!scopedSpaceId && params.sourceSetId) {
+    const sourceSet = await ctx.resolver.requireSourceSet(params.sourceSetId, 'create_child');
+    scopedSpaceId = sourceSet.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  }
+
+  if (scopedSpaceId) {
+    const scopedFolder = await ctx.documentModel.findBySlugInSpace(params.parentId, scopedSpaceId);
+    if (scopedFolder) return scopedFolder.id;
+  }
+
+  const docBySlug = await ctx.documentModel.findBySlug(params.parentId);
+  return docBySlug?.id || params.parentId;
+};
+
 const restoreDeletedFiles = async (
   ctx: {
     fileModel: FileModel;
-    resourceAuthorizer: ResourceAuthorizer;
-    resourceModel: ResourceModel;
+    contentAuthorizer: ContentAuthorizer;
+    contentModel: ContentModel;
   },
   ids: string[],
 ) => {
@@ -112,23 +138,23 @@ const restoreDeletedFiles = async (
   if (dedupIds.length === 0) return [];
 
   for (const id of dedupIds) {
-    await ctx.resourceAuthorizer.assertCapability({
+    await ctx.contentAuthorizer.assertCapability({
       capability: 'delete',
       id,
       kind: 'file',
     });
   }
 
-  const fileRows = (
-    await Promise.all(dedupIds.map((id) => ctx.fileModel.findByIdAny(id)))
-  ).filter((item): item is NonNullable<typeof item> => Boolean(item?.deletedAt));
+  const fileRows = (await Promise.all(dedupIds.map((id) => ctx.fileModel.findByIdAny(id)))).filter(
+    (item): item is NonNullable<typeof item> => Boolean(item?.deletedAt),
+  );
 
   if (fileRows.length === 0) return [];
 
   await Promise.all(fileRows.map((item) => ctx.fileModel.updateAny(item.id, { deletedAt: null })));
 
-  await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval(
-    fileRows.map((item) => ({ resourceUid: item.resourceUid, spaceId: item.spaceId })),
+  await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
+    fileRows.map((item) => ({ contentUid: item.contentUid, spaceId: item.spaceId })),
   );
 
   const restored = await Promise.all(fileRows.map((item) => ctx.fileModel.findByIdAny(item.id)));
@@ -147,7 +173,7 @@ export const fileRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const spaceId = await resolveWriteSpaceId(ctx, { spaceId: input.spaceId });
-      const blob = await ctx.resourceModel.findSpaceBlobByHash(spaceId, input.hash);
+      const blob = await ctx.contentModel.findSpaceBlobByHash(spaceId, input.hash);
 
       if (!blob) return { isExist: false };
 
@@ -177,17 +203,10 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Resolve parentId if it's a slug
-      let resolvedParentId = input.parentId;
-      if (input.parentId) {
-        const docBySlug = await ctx.documentModel.findBySlug(input.parentId);
-        if (docBySlug) {
-          resolvedParentId = docBySlug.id;
-        }
-      }
+      const resolvedParentId = await resolveParentDocumentId(ctx, input);
 
       const spaceId = await resolveWriteSpaceId(ctx, {
-        knowledgeBaseId: input.knowledgeBaseId,
+        sourceSetId: input.sourceSetId,
         parentId: resolvedParentId,
         spaceId: input.spaceId,
       });
@@ -234,7 +253,7 @@ export const fileRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'FILE_HASH_REQUIRED' });
       }
 
-      const blob = await ctx.resourceModel.upsertSpaceBlob({
+      const blob = await ctx.contentModel.upsertSpaceBlob({
         createdBy: ctx.userId,
         etag: undefined,
         fileType: actualFileType,
@@ -248,16 +267,16 @@ export const fileRouter = router({
       });
 
       const existingFile =
-        input.knowledgeBaseId || input.spaceId || resolvedParentId
+        input.sourceSetId || input.spaceId || resolvedParentId
           ? await ctx.fileModel.findExistingByBlobAndContext({
-            blobId: blob.id,
-            fileType: actualFileType,
-            knowledgeBaseId: input.knowledgeBaseId,
-            name: input.name,
-            parentId: resolvedParentId,
-            source: input.source,
-            spaceId,
-          })
+              blobId: blob.id,
+              fileType: actualFileType,
+              sourceSetId: input.sourceSetId,
+              name: input.name,
+              parentId: resolvedParentId,
+              source: input.source,
+              spaceId,
+            })
           : undefined;
 
       if (existingFile) {
@@ -271,7 +290,7 @@ export const fileRouter = router({
           blobId: blob.id,
           fileHash: null,
           fileType: actualFileType,
-          knowledgeBaseId: input.knowledgeBaseId,
+          sourceSetId: input.sourceSetId,
           metadata: input.metadata,
           name: input.name,
           parentId: resolvedParentId,
@@ -282,7 +301,7 @@ export const fileRouter = router({
         false,
       );
 
-      const registry = await ctx.resourceModel.ensureResourceRegistry({
+      const registry = await ctx.contentModel.ensureContentRegistry({
         createdBy: ctx.userId,
         kind: 'file',
         localId: id,
@@ -291,12 +310,12 @@ export const fileRouter = router({
 
       await ctx.fileModel.update(id, {
         blobId: blob.id,
-        resourceUid: registry.resourceUid,
+        contentUid: registry.contentUid,
         spaceId,
       } as any);
 
-      await ctx.resourceModel.ensureOwnerPermission({
-        resourceUid: registry.resourceUid,
+      await ctx.contentModel.ensureOwnerPermission({
+        contentUid: registry.contentUid,
         spaceId,
       });
 
@@ -309,7 +328,7 @@ export const fileRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'read_metadata',
         id: input.id,
         kind: 'file',
@@ -382,7 +401,7 @@ export const fileRouter = router({
     const fileList = await ctx.fileModel.query(input);
 
     const visibleIdSet = new Set(
-      await ctx.resourceAuthorizer.filterVisibleFileIdsForList(fileList.map((item) => item.id)),
+      await ctx.contentAuthorizer.filterVisibleFileIdsForList(fileList.map((item) => item.id)),
     );
     const visibleList = fileList.filter((item) => visibleIdSet.has(item.id));
 
@@ -434,18 +453,15 @@ export const fileRouter = router({
       if (!space?.id) {
         let scopedSpaceId: string | null | undefined;
 
-        if (input.knowledgeBaseId) {
-          const knowledgeBase = await ctx.resolver.requireKnowledgeBase(
-            input.knowledgeBaseId,
-            'read_content',
-          );
-          scopedSpaceId = knowledgeBase.spaceId;
+        if (input.sourceSetId) {
+          const sourceSet = await ctx.resolver.requireSourceSet(input.sourceSetId, 'read_content');
+          scopedSpaceId = sourceSet.spaceId;
         } else if (input.parentId) {
-          const folderBySlug = await ctx.documentModel.findBySlug(input.parentId);
-          const folder = await ctx.resolver.requireDocument(
-            folderBySlug?.id || input.parentId,
-            'read_content',
-          );
+          const resolvedParentId = await resolveParentDocumentId(ctx, {
+            parentId: input.parentId,
+            spaceId: input.spaceId,
+          });
+          const folder = await ctx.resolver.requireDocument(resolvedParentId!, 'read_content');
           scopedSpaceId = folder.spaceId;
         }
 
@@ -468,12 +484,13 @@ export const fileRouter = router({
     // Take only the requested number of items
     const itemsToProcess = hasMore ? knowledgeItems.slice(0, limit) : knowledgeItems;
 
-    // Filter out folders from Documents category when in Inbox (no knowledgeBaseId)
-    const filteredItems = !input.knowledgeBaseId && !input.trash
-      ? itemsToProcess.filter(
-        (item) => !(item.sourceType === 'document' && item.fileType === 'custom/folder'),
-      )
-      : itemsToProcess;
+    // Filter out folders from Documents category when in Inbox (no sourceSetId)
+    const filteredItems =
+      !input.sourceSetId && !input.trash
+        ? itemsToProcess.filter(
+            (item) => !(item.sourceType === 'document' && item.fileType === 'custom/folder'),
+          )
+        : itemsToProcess;
 
     const fileIdsInList = filteredItems
       .filter((item) => item.sourceType === 'file')
@@ -482,8 +499,8 @@ export const fileRouter = router({
       .filter((item) => item.sourceType === 'document')
       .map((item) => item.id);
     const [visibleFileIdList, visibleDocIdList] = await Promise.all([
-      ctx.resourceAuthorizer.filterVisibleFileIdsForList(fileIdsInList),
-      ctx.resourceAuthorizer.filterVisibleDocumentIdsForList(docIdsInList, {
+      ctx.contentAuthorizer.filterVisibleFileIdsForList(fileIdsInList),
+      ctx.contentAuthorizer.filterVisibleDocumentIdsForList(docIdsInList, {
         documentIncludeDeleted: input.trash,
       }),
     ]);
@@ -498,12 +515,12 @@ export const fileRouter = router({
 
     const attachableFileIds = input.attachableOnly
       ? new Set(
-        await ctx.fileModel.getConversationAttachableFileIds(
-          aclFiltered
-            .filter((item) => item.sourceType === 'file')
-            .map((item: any) => item.fileId || item.id),
-        ),
-      )
+          await ctx.fileModel.getConversationAttachableFileIds(
+            aclFiltered
+              .filter((item) => item.sourceType === 'file')
+              .map((item: any) => item.fileId || item.id),
+          ),
+        )
       : null;
 
     const scopedItems = aclFiltered.filter((item) => {
@@ -592,18 +609,18 @@ export const fileRouter = router({
         (item) => item.sourceType === 'file' && item.fileType !== 'custom/document',
       );
       const visibleFileIds = new Set(
-        await ctx.resourceAuthorizer.filterVisibleFileIdsForList(
-          fileCandidates.map((item) => item.id),
+        await ctx.contentAuthorizer.filterVisibleFileIdsForList(
+          fileCandidates.map((item) => item.fileId || item.id),
         ),
       );
       const fileItems = fileCandidates
-        .filter((item) => visibleFileIds.has(item.id))
+        .filter((item) => visibleFileIds.has(item.fileId || item.id))
         .slice(0, limit);
 
       if (fileItems.length === 0) return [];
 
       // Get file IDs for batch processing
-      const fileIds = fileItems.map((item) => item.id);
+      const fileIds = fileItems.map((item) => item.fileId || item.id);
       const chunksArray = await ctx.chunkModel.countByFileIds(fileIds);
       const chunks: Record<string, number> = {};
       for (const item of chunksArray) {
@@ -627,6 +644,7 @@ export const fileRouter = router({
       // Build result with task status
       const resultFiles: FileListItem[] = [];
       for (const item of fileItems) {
+        const actualFileId = item.fileId || item.id;
         const chunkTask = item.chunkTaskId
           ? chunkTasks.find((task) => task.id === item.chunkTaskId)
           : null;
@@ -636,15 +654,17 @@ export const fileRouter = router({
 
         resultFiles.push({
           ...item,
-          chunkCount: chunks[item.id] ?? 0,
+          chunkCount: chunks[actualFileId] ?? 0,
           chunkingError: chunkTask?.error ?? null,
           chunkingStatus: chunkTask?.status as AsyncTaskStatus,
           embeddingError: embeddingTask?.error ?? null,
           embeddingStatus: embeddingTask?.status as AsyncTaskStatus,
+          fileId: actualFileId,
           fileType: normalizeFileType(item.fileType, item.name),
           finishEmbedding: embeddingTask?.status === AsyncTaskStatus.Success,
+          id: actualFileId,
           sourceType: 'file' as const,
-          url: getFileProxyUrl(item.id),
+          url: getFileProxyUrl(actualFileId),
         } as FileListItem);
       }
 
@@ -660,7 +680,7 @@ export const fileRouter = router({
         (item) => item.sourceType === 'document' && item.fileType !== 'custom/folder',
       );
       const visibleDocIds = new Set(
-        await ctx.resourceAuthorizer.filterVisibleDocumentIdsForList(
+        await ctx.contentAuthorizer.filterVisibleDocumentIdsForList(
           pageCandidates.map((item) => item.id),
         ),
       );
@@ -670,20 +690,20 @@ export const fileRouter = router({
 
   removeAllFiles: fileProcedure.mutation(async ({ ctx }) => {
     const personalSpace = await ctx.spaceModel.getOrCreatePersonalSpace();
-    const role = await ctx.resourceModel.getSpaceMemberRole(personalSpace.id);
+    const role = await ctx.contentModel.getSpaceMemberRole(personalSpace.id);
     if (!role || role === 'viewer') {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'CLEAR_FILES_DENIED' });
     }
 
     const cleared = await ctx.fileModel.clear();
-    await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([{ spaceId: personalSpace.id }]);
+    await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([{ spaceId: personalSpace.id }]);
     return cleared;
   }),
 
   removeFile: fileProcedure
     .input(z.object({ id: z.string(), trash: z.boolean().optional() }))
     .mutation(async ({ input, ctx }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'delete',
         id: input.id,
         kind: 'file',
@@ -697,16 +717,16 @@ export const fileRouter = router({
         const file = await ctx.fileModel.softDeleteAny(input.id);
         if (!file) return;
 
-        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-          { resourceUid: file.resourceUid, spaceId: file.spaceId },
+        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
+          { contentUid: file.contentUid, spaceId: file.spaceId },
         ]);
       } else {
         // Hard delete: remove from database and S3
         const file = await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
         if (!file) return;
 
-        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-          { resourceUid: file.resourceUid, spaceId: file.spaceId },
+        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
+          { contentUid: file.contentUid, spaceId: file.spaceId },
         ]);
 
         // delete the file from S3 if it is not used by other files
@@ -722,7 +742,7 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'delete',
         id: input.id,
         kind: 'file',
@@ -743,7 +763,7 @@ export const fileRouter = router({
     .input(z.object({ ids: z.array(z.string()), trash: z.boolean().optional() }))
     .mutation(async ({ input, ctx }) => {
       for (const fid of input.ids) {
-        await ctx.resourceAuthorizer.assertCapability({
+        await ctx.contentAuthorizer.assertCapability({
           capability: 'delete',
           id: fid,
           kind: 'file',
@@ -767,8 +787,8 @@ export const fileRouter = router({
 
         if (!needToRemoveFileList || needToRemoveFileList.length === 0) return;
 
-        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval(
-          needToRemoveFileList.map((f) => ({ resourceUid: f.resourceUid, spaceId: f.spaceId })),
+        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
+          needToRemoveFileList.map((f) => ({ contentUid: f.contentUid, spaceId: f.spaceId })),
         );
 
         // remove from S3
@@ -806,19 +826,18 @@ export const fileRouter = router({
       const { id, name, parentId } = input;
 
       const updates: Record<string, unknown> = {};
+      let currentFile: Awaited<ReturnType<typeof ctx.resolver.requireFile>> | undefined;
 
       if (name !== undefined) {
         updates.name = name;
       }
 
       if (parentId !== undefined) {
-        let resolvedParentId: string | null | undefined = parentId;
-        if (parentId) {
-          const docBySlug = await ctx.documentModel.findBySlug(parentId);
-          if (docBySlug) {
-            resolvedParentId = docBySlug.id;
-          }
-        }
+        currentFile = await ctx.resolver.requireFile(id, 'move');
+        const resolvedParentId = await resolveParentDocumentId(ctx, {
+          parentId,
+          spaceId: currentFile.spaceId,
+        });
         updates.parentId = resolvedParentId;
       }
 
@@ -826,16 +845,15 @@ export const fileRouter = router({
         return { success: true };
       }
 
-      await ctx.resourceAuthorizer.assertCapability({
+      await ctx.contentAuthorizer.assertCapability({
         capability: 'move',
         id,
         kind: 'file',
       });
 
       if (parentId !== undefined) {
-        const fileRow = await ctx.resolver.requireFile(id, 'move');
         await ctx.treeGuard.assertParentAssignment({
-          currentSpaceId: fileRow.spaceId,
+          currentSpaceId: currentFile?.spaceId,
           parentId: updates.parentId as string | null | undefined,
         });
       }
@@ -844,8 +862,8 @@ export const fileRouter = router({
 
       if (parentId !== undefined) {
         const row = await ctx.fileModel.findByIdAny(id);
-        await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-          { resourceUid: row?.resourceUid, spaceId: row?.spaceId },
+        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
+          { contentUid: row?.contentUid, spaceId: row?.spaceId },
         ]);
       }
 

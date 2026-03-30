@@ -2,23 +2,25 @@ import { type NotebookDocument } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
-import { ResourceModel } from '@/database/models/resource';
+import { SpaceModel } from '@/database/models/space';
+import { TopicModel } from '@/database/models/topic';
 import { TopicDocumentModel } from '@/database/models/topicDocument';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { ResourceAuthorizer, type ResourceCapability } from '@/server/services/resource';
+import { ContentAuthorizer, type ContentCapability } from '@/server/services/content';
 
 const assertNotebookDocumentAccess = async (params: {
-  capability: ResourceCapability;
+  capability: ContentCapability;
   documentId: string;
   documentModel: DocumentModel;
-  resourceAuthorizer: ResourceAuthorizer;
+  contentAuthorizer: ContentAuthorizer;
   userId: string;
 }) => {
-  const { capability, documentId, documentModel, resourceAuthorizer, userId } = params;
+  const { capability, documentId, documentModel, contentAuthorizer, userId } = params;
 
-  const viaResource = await resourceAuthorizer.getAccessMatch({
+  const viaResource = await contentAuthorizer.getAccessMatch({
     capability,
     id: documentId,
     kind: 'document',
@@ -40,8 +42,10 @@ const notebookProcedure = authedProcedure.use(serverDatabase).use(async (opts) =
   return opts.next({
     ctx: {
       documentModel: new DocumentModel(ctx.serverDB, ctx.userId),
-      resourceAuthorizer: new ResourceAuthorizer(ctx.serverDB, ctx.userId),
-      resourceModel: new ResourceModel(ctx.serverDB, ctx.userId),
+      contentAuthorizer: new ContentAuthorizer(ctx.serverDB, ctx.userId),
+      contentModel: new ContentModel(ctx.serverDB, ctx.userId),
+      spaceModel: new SpaceModel(ctx.serverDB, ctx.userId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId),
       topicDocumentModel: new TopicDocumentModel(ctx.serverDB, ctx.userId),
     },
   });
@@ -65,17 +69,57 @@ export const notebookRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const topic = await ctx.topicModel.findById(input.topicId);
+
+      if (!topic) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'TOPIC_NOT_FOUND' });
+      }
+
+      let spaceId = topic.spaceId;
+      if (spaceId) {
+        const space = await ctx.spaceModel.findAccessibleSpaceById(spaceId);
+        if (!space?.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+        }
+
+        if (space.membershipRole === 'viewer') {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_WRITE_DENIED' });
+        }
+
+        spaceId = space.id;
+      } else {
+        spaceId = (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+      }
+
       // Create the document
       const document = await ctx.documentModel.create({
         content: input.content,
         description: input.description,
         fileType: input.type,
         metadata: input.metadata,
+        spaceId,
         source: input.source,
         sourceType: input.sourceType,
         title: input.title,
         totalCharCount: input.content.length,
         totalLineCount: input.content.split('\n').length,
+      });
+
+      const registry = await ctx.contentModel.ensureContentRegistry({
+        createdBy: ctx.userId,
+        kind: 'document',
+        localId: document.id,
+        spaceId,
+      });
+
+      await ctx.documentModel.updateAny(document.id, {
+        contentUid: registry.contentUid,
+        spaceId,
+      } as any);
+
+      await ctx.contentModel.ensureOwnerPermission({
+        contentUid: registry.contentUid,
+        spaceId,
       });
 
       // Associate with topic
@@ -84,7 +128,9 @@ export const notebookRouter = router({
         topicId: input.topicId,
       });
 
-      return document;
+      const createdDocument = await ctx.documentModel.findByIdAny(document.id);
+
+      return createdDocument || { ...document, contentUid: registry.contentUid, spaceId };
     }),
 
   deleteDocument: notebookProcedure
@@ -94,7 +140,7 @@ export const notebookRouter = router({
         capability: 'delete',
         documentId: input.id,
         documentModel: ctx.documentModel,
-        resourceAuthorizer: ctx.resourceAuthorizer,
+        contentAuthorizer: ctx.contentAuthorizer,
         userId: ctx.userId,
       });
 
@@ -103,8 +149,8 @@ export const notebookRouter = router({
       await ctx.topicDocumentModel.deleteByDocumentId(input.id);
       await ctx.documentModel.deleteManyAny([input.id]);
 
-      await ctx.resourceModel.invalidateAuthzEpochsAfterRemoval([
-        { resourceUid: row?.resourceUid, spaceId: row?.spaceId },
+      await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
+        { contentUid: row?.contentUid, spaceId: row?.spaceId },
       ]);
 
       return { success: true };
@@ -117,7 +163,7 @@ export const notebookRouter = router({
         capability: 'read_metadata',
         documentId: input.id,
         documentModel: ctx.documentModel,
-        resourceAuthorizer: ctx.resourceAuthorizer,
+        contentAuthorizer: ctx.contentAuthorizer,
         userId: ctx.userId,
       });
 
@@ -145,6 +191,7 @@ export const notebookRouter = router({
           fileType: doc.fileType,
           id: doc.id,
           metadata: doc.metadata,
+          spaceId: doc.spaceId,
           title: doc.title,
           totalCharCount: doc.totalCharCount,
           totalLineCount: doc.totalLineCount,
@@ -170,7 +217,7 @@ export const notebookRouter = router({
         capability: 'move',
         documentId: input.id,
         documentModel: ctx.documentModel,
-        resourceAuthorizer: ctx.resourceAuthorizer,
+        contentAuthorizer: ctx.contentAuthorizer,
         userId: ctx.userId,
       });
 

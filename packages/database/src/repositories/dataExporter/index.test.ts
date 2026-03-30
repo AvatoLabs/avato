@@ -3,16 +3,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { getTestDB } from '../../core/getTestDB';
 import {
   agents,
-  agentsKnowledgeBases,
+  agentsSourceSets,
   agentsToSessions,
   files,
   filesToSessions,
   globalFiles,
-  knowledgeBaseFiles,
-  knowledgeBases,
   messages,
   sessionGroups,
   sessions,
+  sourceSetFiles,
+  sourceSets,
   topics,
   users,
   userSettings,
@@ -33,7 +33,7 @@ describe('DataExporterRepos', () => {
     agentId: 'test-agent-id',
     topicId: 'test-topic-id',
     messageId: 'test-message-id',
-    knowledgeBaseId: 'test-kb-id',
+    sourceSetId: 'test-kb-id',
   };
 
   // 设置测试环境
@@ -132,23 +132,23 @@ describe('DataExporterRepos', () => {
       });
 
       // 知识库
-      await trx.insert(knowledgeBases).values({
-        id: testIds.knowledgeBaseId,
+      await trx.insert(sourceSets).values({
+        id: testIds.sourceSetId,
         name: 'Test Knowledge Base',
         userId: testIds.userId,
       });
 
       // 知识库文件
-      await trx.insert(knowledgeBaseFiles).values({
-        knowledgeBaseId: testIds.knowledgeBaseId,
+      await trx.insert(sourceSetFiles).values({
+        sourceSetId: testIds.sourceSetId,
         fileId: testIds.fileId,
         userId: testIds.userId,
       });
 
       // 代理知识库
-      await trx.insert(agentsKnowledgeBases).values({
+      await trx.insert(agentsSourceSets).values({
         agentId: testIds.agentId,
-        knowledgeBaseId: testIds.knowledgeBaseId,
+        sourceSetId: testIds.sourceSetId,
         userId: testIds.userId,
       });
     });
@@ -208,9 +208,9 @@ describe('DataExporterRepos', () => {
       expect(result.agents).toHaveLength(1);
       expect(result.agents[0]).toHaveProperty('id', testIds.agentId);
 
-      // expect(result).toHaveProperty('knowledgeBases');
-      // expect(result.knowledgeBases).toHaveLength(1);
-      // expect(result.knowledgeBases[0]).toHaveProperty('id', testIds.knowledgeBaseId);
+      // expect(result).toHaveProperty('sourceSets');
+      // expect(result.sourceSets).toHaveLength(1);
+      // expect(result.sourceSets[0]).toHaveProperty('id', testIds.sourceSetId);
 
       // 验证关联表导出结果
       // expect(result).toHaveProperty('globalFiles');
@@ -227,13 +227,13 @@ describe('DataExporterRepos', () => {
       // expect(result.filesToSessions[0]).toHaveProperty('fileId', testIds.fileId);
       // expect(result.filesToSessions[0]).toHaveProperty('sessionId', testIds.sessionId);
 
-      // expect(result).toHaveProperty('knowledgeBaseFiles');
-      // expect(result.knowledgeBaseFiles).toHaveLength(1);
-      // expect(result.knowledgeBaseFiles[0]).toHaveProperty(
-      //   'knowledgeBaseId',
-      //   testIds.knowledgeBaseId,
+      // expect(result).toHaveProperty('sourceSetFiles');
+      // expect(result.sourceSetFiles).toHaveLength(1);
+      // expect(result.sourceSetFiles[0]).toHaveProperty(
+      //   'sourceSetId',
+      //   testIds.sourceSetId,
       // );
-      // expect(result.knowledgeBaseFiles[0]).toHaveProperty('fileId', testIds.fileId);
+      // expect(result.sourceSetFiles[0]).toHaveProperty('fileId', testIds.fileId);
     });
 
     it('should handle empty database gracefully', async () => {

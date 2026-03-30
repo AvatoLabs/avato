@@ -20,6 +20,6 @@
   "notebook.delete": "Löschen",
   "notebook.empty": "Noch keine Seiten. Seiten, die mit diesem Thema verknüpft sind, erscheinen hier.",
   "notebook.title": "Notizbuch",
-  "openInPageEditor": "In Seite bearbeiten",
+  "openInDocEditor": "In Seite bearbeiten",
   "title": "Arbeitsbereich"
 }

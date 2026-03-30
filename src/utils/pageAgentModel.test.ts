@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isCompleteModelProviderConfig,
-  isLegacyPageAgentModelConfig,
+  isLegacyDocsAgentModelConfig,
   resolveModelProviderWithFallback,
-  shouldSyncPageAgentToUserDefault,
-} from './pageAgentModel';
+  shouldSyncDocsAgentToUserDefault,
+} from './docsAgentModel';
 
-describe('pageAgentModel', () => {
+describe('docsAgentModel', () => {
   it('should detect complete model/provider config', () => {
     expect(isCompleteModelProviderConfig({ model: 'kimi-2.5', provider: 'moonshot' })).toBe(true);
     expect(isCompleteModelProviderConfig({ model: 'kimi-2.5' })).toBe(false);
@@ -17,10 +17,10 @@ describe('pageAgentModel', () => {
   });
 
   it('should detect legacy page agent config', () => {
-    expect(isLegacyPageAgentModelConfig({ model: DEFAULT_MODEL, provider: DEFAULT_PROVIDER })).toBe(
+    expect(isLegacyDocsAgentModelConfig({ model: DEFAULT_MODEL, provider: DEFAULT_PROVIDER })).toBe(
       true,
     );
-    expect(isLegacyPageAgentModelConfig({ model: 'kimi-2.5', provider: 'moonshot' })).toBe(false);
+    expect(isLegacyDocsAgentModelConfig({ model: 'kimi-2.5', provider: 'moonshot' })).toBe(false);
   });
 
   it('should resolve model/provider with fallback', () => {
@@ -44,16 +44,16 @@ describe('pageAgentModel', () => {
   it('should sync page agent when config is missing or still on legacy defaults', () => {
     const userDefault = { model: 'kimi-2.5', provider: 'moonshot' };
 
-    expect(shouldSyncPageAgentToUserDefault(undefined, userDefault)).toBe(true);
+    expect(shouldSyncDocsAgentToUserDefault(undefined, userDefault)).toBe(true);
     expect(
-      shouldSyncPageAgentToUserDefault(
+      shouldSyncDocsAgentToUserDefault(
         { model: DEFAULT_MODEL, provider: DEFAULT_PROVIDER },
         userDefault,
       ),
     ).toBe(true);
-    expect(shouldSyncPageAgentToUserDefault(userDefault, userDefault)).toBe(false);
+    expect(shouldSyncDocsAgentToUserDefault(userDefault, userDefault)).toBe(false);
     expect(
-      shouldSyncPageAgentToUserDefault({ model: 'gpt-5', provider: 'openai' }, userDefault),
+      shouldSyncDocsAgentToUserDefault({ model: 'gpt-5', provider: 'openai' }, userDefault),
     ).toBe(false);
   });
 });

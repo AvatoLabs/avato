@@ -55,7 +55,6 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
   icon: css`
     border-radius: ${cssVar.borderRadiusLG}px;
-    color: ${cssVar.colorTextLightSolid};
   `,
   iconGroup: css`
     margin-block-start: -44px;
@@ -92,6 +91,7 @@ const NotSupportClient = () => {
           width={BLOCK_SIZE}
           style={{
             background: cssVar.purple,
+            color: '#ffffff',
             transform: 'rotateZ(-20deg) translateX(10px)',
           }}
         >
@@ -103,6 +103,7 @@ const NotSupportClient = () => {
           width={BLOCK_SIZE}
           style={{
             background: cssVar.gold,
+            color: '#141414',
             transform: 'translateY(-22px)',
             zIndex: 1,
           }}
@@ -115,6 +116,7 @@ const NotSupportClient = () => {
           width={BLOCK_SIZE}
           style={{
             background: cssVar.geekblue,
+            color: '#ffffff',
             transform: 'rotateZ(20deg) translateX(-10px)',
           }}
         >

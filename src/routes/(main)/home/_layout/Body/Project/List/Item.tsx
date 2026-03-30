@@ -2,28 +2,29 @@ import { BoxIcon } from 'lucide-react';
 import { memo, useCallback } from 'react';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
-import { useKnowledgeBaseStore } from '@/store/library';
+import { useSourceSetStore } from '@/store/sourceSet';
 
 import Actions from './Actions';
 import Editing from './Editing';
 import { useProjectItemDropdownMenu } from './useDropdownMenu';
 
 interface ProjectItemProps {
+  description?: string | null;
   id: string;
   name: string;
 }
 
-const ProjectItem = memo<ProjectItemProps>(({ id, name }) => {
-  const [editing, isLoading, isUpdating] = useKnowledgeBaseStore((s) => [
-    s.knowledgeBaseRenamingId === id,
-    s.knowledgeBaseLoadingIds.includes(id),
-    s.knowledgeBaseUpdatingId === id,
+const ProjectItem = memo<ProjectItemProps>(({ description, id, name }) => {
+  const [editing, isLoading, isUpdating] = useSourceSetStore((s) => [
+    s.sourceSetRenamingId === id,
+    s.sourceSetLoadingIds.includes(id),
+    s.sourceSetUpdatingId === id,
   ]);
 
   const toggleEditing = useCallback(
     (visible?: boolean) => {
-      useKnowledgeBaseStore.setState(
-        { knowledgeBaseRenamingId: visible ? id : null },
+      useSourceSetStore.setState(
+        { sourceSetRenamingId: visible ? id : null },
         false,
         'toggleEditing',
       );
@@ -32,7 +33,9 @@ const ProjectItem = memo<ProjectItemProps>(({ id, name }) => {
   );
 
   const dropdownMenu = useProjectItemDropdownMenu({
+    description,
     id,
+    name,
     toggleEditing,
   });
 

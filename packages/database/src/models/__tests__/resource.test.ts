@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getTestDB } from '../../core/getTestDB';
 import { spaces, users } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
+import { ContentModel } from '../content';
 import { FileModel } from '../file';
-import { ResourceModel } from '../resource';
 import { SpaceModel } from '../space';
 
 const serverDB: LobeChatDatabase = await getTestDB();
@@ -28,15 +28,15 @@ afterEach(async () => {
   await serverDB.delete(users).where(inArray(users.id, [viewerId, ownerId]));
 });
 
-describe('ResourceModel', () => {
+describe('ContentModel', () => {
   describe('listSharedWithMe', () => {
     it('should exclude resources created by the current user', async () => {
       const viewerFileModel = new FileModel(serverDB, viewerId);
-      const viewerResourceModel = new ResourceModel(serverDB, viewerId);
+      const viewerResourceModel = new ContentModel(serverDB, viewerId);
       const viewerSpaceModel = new SpaceModel(serverDB, viewerId);
 
       const ownerFileModel = new FileModel(serverDB, ownerId);
-      const ownerResourceModel = new ResourceModel(serverDB, ownerId);
+      const ownerResourceModel = new ContentModel(serverDB, ownerId);
       const ownerSpaceModel = new SpaceModel(serverDB, ownerId);
 
       const viewerSpace = await viewerSpaceModel.getOrCreatePersonalSpace();
@@ -52,14 +52,14 @@ describe('ResourceModel', () => {
         },
         false,
       );
-      const selfRegistry = await viewerResourceModel.ensureResourceRegistry({
+      const selfRegistry = await viewerResourceModel.ensureContentRegistry({
         createdBy: viewerId,
         kind: 'file',
         localId: selfFileId,
         spaceId: viewerSpace.id,
       });
       await viewerResourceModel.ensureOwnerPermission({
-        resourceUid: selfRegistry.resourceUid,
+        contentUid: selfRegistry.contentUid,
         spaceId: viewerSpace.id,
       });
 
@@ -73,21 +73,21 @@ describe('ResourceModel', () => {
         },
         false,
       );
-      const sharedRegistry = await ownerResourceModel.ensureResourceRegistry({
+      const sharedRegistry = await ownerResourceModel.ensureContentRegistry({
         createdBy: ownerId,
         kind: 'file',
         localId: sharedFileId,
         spaceId: ownerSpace.id,
       });
       await ownerResourceModel.ensureOwnerPermission({
-        resourceUid: sharedRegistry.resourceUid,
+        contentUid: sharedRegistry.contentUid,
         spaceId: ownerSpace.id,
       });
       await ownerResourceModel.grantPermission({
         canReshare: false,
         createdBy: ownerId,
         inheritsToChildren: true,
-        resourceUid: sharedRegistry.resourceUid,
+        contentUid: sharedRegistry.contentUid,
         role: 'viewer',
         spaceId: ownerSpace.id,
         subjectId: viewerId,
@@ -102,9 +102,9 @@ describe('ResourceModel', () => {
         kind: 'file',
         localId: sharedFileId,
         name: 'shared.txt',
-        resourceUid: sharedRegistry.resourceUid,
+        contentUid: sharedRegistry.contentUid,
       });
-      expect(items.find((item) => item.resourceUid === selfRegistry.resourceUid)).toBeUndefined();
+      expect(items.find((item) => item.contentUid === selfRegistry.contentUid)).toBeUndefined();
     });
   });
 });

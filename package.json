@@ -196,17 +196,17 @@
     "@lobechat/builtin-tool-agent-management": "workspace:*",
     "@lobechat/builtin-tool-calculator": "workspace:*",
     "@lobechat/builtin-tool-cloud-sandbox": "workspace:*",
+    "@lobechat/builtin-tool-docs-agent": "workspace:*",
     "@lobechat/builtin-tool-group-agent-builder": "workspace:*",
     "@lobechat/builtin-tool-group-management": "workspace:*",
     "@lobechat/builtin-tool-gtd": "workspace:*",
-    "@lobechat/builtin-tool-knowledge-base": "workspace:*",
     "@lobechat/builtin-tool-local-system": "workspace:*",
     "@lobechat/builtin-tool-memory": "workspace:*",
     "@lobechat/builtin-tool-notebook": "workspace:*",
-    "@lobechat/builtin-tool-page-agent": "workspace:*",
     "@lobechat/builtin-tool-remote-device": "workspace:*",
     "@lobechat/builtin-tool-skill-store": "workspace:*",
     "@lobechat/builtin-tool-skills": "workspace:*",
+    "@lobechat/builtin-tool-source-set": "workspace:*",
     "@lobechat/builtin-tool-tools": "workspace:*",
     "@lobechat/builtin-tool-web-browsing": "workspace:*",
     "@lobechat/builtin-tools": "workspace:*",
@@ -516,14 +516,9 @@
       "drizzle-orm": "^0.45.1"
     },
     "patchedDependencies": {
-      "@radix-ui/react-slot": "patches/@radix-ui__react-slot.patch",
-      "@base-ui/react": "patches/@base-ui__react.patch",
-      "@base-ui/utils": "patches/@base-ui__utils.patch",
+      "@lobehub/editor": "patches/@lobehub__editor.patch",
       "@lobehub/ui": "patches/@lobehub__ui.patch",
-      "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch",
-      "cmdk@1.1.1": "patches/cmdk@1.1.1.patch",
-      "framer-motion@12.38.0": "patches/framer-motion@12.38.0.patch",
-      "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
+      "@swagger-api/apidom-reference": "patches/@swagger-api__apidom-reference.patch"
     }
   }
 }

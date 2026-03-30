@@ -15,13 +15,13 @@ const Home: FC = () => {
     <Flexbox flex={1} height={'100%'} style={{ minHeight: 0, position: 'relative' }} width={'100%'}>
       {isHomeRoute && <PageTitle title="" />}
       <Flexbox
-        align={'center'}
+        align={'stretch'}
         flex={1}
-        justify={'center'}
-        style={{ minHeight: 0, overflowY: 'auto', paddingBlock: 32 }}
+        justify={'flex-start'}
+        style={{ minHeight: 0, overflowY: 'auto', paddingBlock: 24 }}
         width={'100%'}
       >
-        <WideScreenContainer minWidth={1280} paddingInline={20}>
+        <WideScreenContainer paddingInline={20}>
           <HomeContent />
         </WideScreenContainer>
       </Flexbox>

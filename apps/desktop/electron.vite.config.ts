@@ -58,7 +58,7 @@ export default defineConfig({
             }
 
             // Split i18n json resources by namespace (ns), not by locale.
-            // Example: ".../resources/locales/zh-CN/common.json?import" -> "locales-common"
+            // Example: ".../contents/locales/zh-CN/common.json?import" -> "locales-common"
             const normalizedId = id.replaceAll('\\', '/').split('?')[0];
             const match = normalizedId.match(/\/locales\/[^/]+\/([^/]+)\.json$/);
 

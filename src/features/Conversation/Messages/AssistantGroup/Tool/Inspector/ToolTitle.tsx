@@ -17,7 +17,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   apiName: css`
     font-family: ${cssVar.fontFamilyCode};
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
   paramKey: css`
     font-family: ${cssVar.fontFamilyCode};
@@ -27,7 +27,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
   paramValue: css`
     font-family: ${cssVar.fontFamilyCode};
     font-size: 12px;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
   `,
   root: css`
     overflow: hidden;
@@ -35,7 +35,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
 
-    color: ${cssVar.colorTextDescription};
+    color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
   `,
 }));
 

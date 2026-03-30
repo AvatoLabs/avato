@@ -6,27 +6,27 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
-import { resourceService } from '@/services/resource';
-import { revalidateResources } from '@/store/file/slices/resource/hooks';
-import { type ResourceItem } from '@/types/resource';
+import { contentService } from '@/services/content';
+import { revalidateResources } from '@/store/file/slices/content/hooks';
+import { type ContentItem } from '@/types/content';
 
 interface TrashContentProps {
   enabled?: boolean;
-  knowledgeBaseId?: string;
+  sourceSetId?: string;
   spaceId?: string;
   variant?: 'modal' | 'page';
 }
 
-const toResourceRef = (item: Pick<ResourceItem, 'id' | 'sourceType'>) => ({
+const toResourceRef = (item: Pick<ContentItem, 'id' | 'sourceType'>) => ({
   id: item.id,
   sourceType: item.sourceType,
 });
 
 export const TrashContent = memo<TrashContentProps>(
-  ({ enabled = true, knowledgeBaseId, spaceId, variant = 'page' }) => {
+  ({ enabled = true, sourceSetId, spaceId, variant = 'page' }) => {
     const { t } = useTranslation(['common', 'file']);
     const { message, modal } = App.useApp();
-    const [items, setItems] = useState<ResourceItem[]>([]);
+    const [items, setItems] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [deletingAll, setDeletingAll] = useState(false);
     const [deletingIds, setDeletingIds] = useState<string[]>([]);
@@ -43,11 +43,11 @@ export const TrashContent = memo<TrashContentProps>(
 
       setLoading(true);
       try {
-        const response = await resourceService.queryResources({
-          libraryId: knowledgeBaseId,
+        const response = await contentService.queryContentItems({
+          sourceSetId,
           limit: 200,
           offset: 0,
-          showFilesInKnowledgeBase: true,
+          showFilesInSourceSet: true,
           spaceId,
           trash: true,
         });
@@ -58,7 +58,7 @@ export const TrashContent = memo<TrashContentProps>(
       } finally {
         setLoading(false);
       }
-    }, [enabled, knowledgeBaseId, message, spaceId, t]);
+    }, [enabled, sourceSetId, message, spaceId, t]);
 
     useEffect(() => {
       void load();
@@ -69,10 +69,10 @@ export const TrashContent = memo<TrashContentProps>(
       await revalidateResources();
     };
 
-    const handleRestore = async (item: Pick<ResourceItem, 'id' | 'sourceType'>) => {
+    const handleRestore = async (item: Pick<ContentItem, 'id' | 'sourceType'>) => {
       setRestoringIds((prev) => [...prev, item.id]);
       try {
-        await resourceService.restoreResource(item);
+        await contentService.restoreContentItem(item);
         message.success(t('trash.restored', { ns: 'file' }));
         await refreshAfterMutation();
       } catch {
@@ -87,7 +87,7 @@ export const TrashContent = memo<TrashContentProps>(
 
       setRestoringAll(true);
       try {
-        await resourceService.restoreResources(items.map(toResourceRef));
+        await contentService.restoreContentItems(items.map(toResourceRef));
         message.success(t('trash.restoreAllDone', { ns: 'file' }));
         await refreshAfterMutation();
       } catch {
@@ -98,7 +98,7 @@ export const TrashContent = memo<TrashContentProps>(
     };
 
     const confirmPermanentDelete = (
-      resources: Array<Pick<ResourceItem, 'id' | 'sourceType'>>,
+      resources: Array<Pick<ContentItem, 'id' | 'sourceType'>>,
       options: {
         onFinally?: () => void;
         onStart?: () => void;
@@ -117,7 +117,7 @@ export const TrashContent = memo<TrashContentProps>(
         onOk: async () => {
           options.onStart?.();
           try {
-            await resourceService.deleteResources(
+            await contentService.deleteContentItems(
               resources.map((item) => item.id),
               false,
             );
@@ -132,7 +132,7 @@ export const TrashContent = memo<TrashContentProps>(
       });
     };
 
-    const handleDelete = (item: Pick<ResourceItem, 'id' | 'sourceType'>) => {
+    const handleDelete = (item: Pick<ContentItem, 'id' | 'sourceType'>) => {
       confirmPermanentDelete([item], {
         errorKey: 'trash.deleteError',
         onFinally: () => setDeletingIds((prev) => prev.filter((id) => id !== item.id)),
@@ -162,13 +162,15 @@ export const TrashContent = memo<TrashContentProps>(
           <Flexbox gap={4}>
             <Text as={'h2'}>{t('trash.title', { ns: 'file' })}</Text>
             <Text type={'secondary'}>
-              {t(knowledgeBaseId ? 'trash.hint' : 'trash.hintAll', { ns: 'file' })}
+              {t(sourceSetId ? 'trash.hint' : 'trash.hintAll', { ns: 'file' })}
             </Text>
           </Flexbox>
         )}
 
         {variant === 'modal' && (
-          <Text type="secondary">{t(knowledgeBaseId ? 'trash.hint' : 'trash.hintAll', { ns: 'file' })}</Text>
+          <Text type="secondary">
+            {t(sourceSetId ? 'trash.hint' : 'trash.hintAll', { ns: 'file' })}
+          </Text>
         )}
 
         <Flexbox horizontal align="center" gap={8} justify="space-between" wrap={'wrap'}>

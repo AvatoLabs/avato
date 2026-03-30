@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { aiChatService } from '@/services/aiChat';
+import { topicService } from '@/services/topic';
 import * as agentGroupStore from '@/store/agentGroup/store';
 import { messageMapKey } from '@/store/chat/utils/messageMapKey';
 import { getSessionStoreState } from '@/store/session';
@@ -21,6 +22,12 @@ vi.mock('@/libs/trpc/client', () => ({
         mutate: vi.fn().mockResolvedValue(undefined),
       },
     },
+  },
+}));
+
+vi.mock('@/services/topic', () => ({
+  topicService: {
+    updateTopic: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -512,12 +519,57 @@ describe('ConversationLifecycle actions', () => {
         // switchTopic should be called with the new topicId and clearNewKey option
         expect(switchTopicSpy).toHaveBeenCalledWith(newTopicId, {
           clearNewKey: true,
+          scope: undefined,
           skipRefreshMessage: true,
         });
 
         // After new topic creation, the _new key should be cleared
         const messagesInNewKey = useChatStore.getState().messagesMap[newKey];
         expect(messagesInNewKey ?? []).toHaveLength(0);
+      });
+
+      it('tags newly created doc topics with document metadata and preserves doc scope when switching', async () => {
+        const { result } = renderHook(() => useChatStore());
+        const newTopicId = 'doc-topic-id';
+        const switchTopicSpy = vi.spyOn(result.current, 'switchTopic');
+
+        vi.spyOn(aiChatService, 'sendMessageInServer').mockResolvedValue({
+          messages: [
+            createMockMessage({ id: 'doc-user-msg', role: 'user', topicId: newTopicId }),
+            createMockMessage({ id: 'doc-assistant-msg', role: 'assistant', topicId: newTopicId }),
+          ],
+          topics: { items: [{ id: newTopicId, metadata: {}, title: 'Doc Topic' }], total: 1 },
+          topicId: newTopicId,
+          isCreateNewTopic: true,
+          assistantMessageId: 'doc-assistant-msg',
+          userMessageId: 'doc-user-msg',
+        } as any);
+
+        await act(async () => {
+          await result.current.sendMessage({
+            message: TEST_CONTENT.USER_MESSAGE,
+            context: {
+              agentId: TEST_IDS.SESSION_ID,
+              metadata: { documentId: 'doc-1' },
+              scope: 'doc',
+              topicId: null,
+              threadId: null,
+            },
+          });
+        });
+
+        expect(topicService.updateTopic).toHaveBeenCalledWith(newTopicId, {
+          metadata: {
+            docContext: {
+              documentId: 'doc-1',
+            },
+          },
+        });
+        expect(switchTopicSpy).toHaveBeenCalledWith(newTopicId, {
+          clearNewKey: true,
+          scope: 'doc',
+          skipRefreshMessage: true,
+        });
       });
     });
   });

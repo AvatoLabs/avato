@@ -1,5 +1,6 @@
 import { t } from 'i18next';
 
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import {
   type ChatTopic,
   type ChatTopicSummary,
@@ -17,6 +18,7 @@ const currentTopicData = (s: ChatStoreState): TopicData | undefined => {
   const key = topicMapKey({
     agentId: s.activeAgentId,
     groupId: s.activeGroupId,
+    spaceId: getActiveWorkspaceSpaceId(),
   });
   return s.topicDataMap[key];
 };
@@ -55,7 +57,7 @@ const getTopicById =
 const getTopicsByAgentId =
   (agentId: string) =>
   (s: ChatStoreState): ChatTopic[] | undefined => {
-    const key = topicMapKey({ agentId });
+    const key = topicMapKey({ agentId, spaceId: getActiveWorkspaceSpaceId() });
     return s.topicDataMap[key]?.items;
   };
 

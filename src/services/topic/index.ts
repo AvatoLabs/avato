@@ -45,6 +45,7 @@ export class TopicService {
       groupId: params.groupId,
       isInbox: params.isInbox,
       pageSize: params.pageSize,
+      spaceId: params.spaceId,
     }) as any;
   };
 
@@ -57,6 +58,7 @@ export class TopicService {
     containerId?: string | null;
     endDate?: string;
     range?: [string, string];
+    spaceId?: string | null;
     startDate?: string;
   }): Promise<number> => {
     return lambdaClient.topic.countTopics.query(params);
@@ -66,15 +68,21 @@ export class TopicService {
     return lambdaClient.topic.rankTopics.query(limit);
   };
 
-  getRecentTopics = async (limit?: number): Promise<RecentTopic[]> => {
-    return lambdaClient.topic.recentTopics.query({ limit });
+  getRecentTopics = async (limit?: number, spaceId?: string | null): Promise<RecentTopic[]> => {
+    return lambdaClient.topic.recentTopics.query({ limit, spaceId });
   };
 
-  searchTopics = (keywords: string, agentId?: string, groupId?: string): Promise<ChatTopic[]> => {
+  searchTopics = (
+    keywords: string,
+    agentId?: string,
+    groupId?: string,
+    spaceId?: string | null,
+  ): Promise<ChatTopic[]> => {
     return lambdaClient.topic.searchTopics.query({
       agentId,
       groupId,
       keywords,
+      spaceId,
     }) as any;
   };
 

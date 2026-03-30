@@ -18,7 +18,7 @@ interface UseInitBuiltinAgentContext {
 
 /**
  * Builtin Agent Slice Actions
- * Handles initialization and management of builtin agents (page-agent, inbox, etc.)
+ * Handles initialization and management of builtin agents (docs-agent, inbox, etc.)
  */
 
 type Setter = StoreSetter<AgentStore>;

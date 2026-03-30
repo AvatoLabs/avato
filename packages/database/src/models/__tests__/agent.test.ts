@@ -8,13 +8,13 @@ import type { NewAgent } from '../../schemas';
 import {
   agents,
   agentsFiles,
-  agentsKnowledgeBases,
+  agentsSourceSets,
   agentsToSessions,
   documents,
   files,
-  knowledgeBases,
   sessionGroups,
   sessions,
+  sourceSets,
   users,
 } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
@@ -27,8 +27,8 @@ const userId2 = 'agent-model-test-user-id-2';
 const agentModel = new AgentModel(serverDB, userId);
 const agentModel2 = new AgentModel(serverDB, userId2);
 
-const knowledgeBase = { id: 'kb1', userId, name: 'knowledgeBase' };
-const knowledgeBase2 = { id: 'kb2', userId: userId2, name: 'knowledgeBase2' };
+const sourceSet = { id: 'kb1', userId, name: 'sourceSet' };
+const sourceSet2 = { id: 'kb2', userId: userId2, name: 'sourceSet2' };
 const fileList = [
   {
     id: '1',
@@ -62,7 +62,7 @@ const fileList2 = [
 beforeEach(async () => {
   await serverDB.delete(users);
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
-  await serverDB.insert(knowledgeBases).values([knowledgeBase, knowledgeBase2]);
+  await serverDB.insert(sourceSets).values([sourceSet, sourceSet2]);
   await serverDB.insert(files).values([...fileList, ...fileList2]);
 });
 
@@ -72,19 +72,17 @@ afterEach(async () => {
 
 describe('AgentModel', () => {
   describe('getAgentConfigById', () => {
-    it('should return agent config with assigned knowledge', async () => {
+    it('should return agent config with assigned sources', async () => {
       const agentId = 'test-agent-id';
       await serverDB.insert(agents).values({ id: agentId, userId });
-      await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId, knowledgeBaseId: 'kb1', userId });
+      await serverDB.insert(agentsSourceSets).values({ agentId, sourceSetId: 'kb1', userId });
       await serverDB.insert(agentsFiles).values({ agentId, fileId: '1', userId });
 
       const result = await agentModel.getAgentConfigById(agentId);
 
       expect(result).not.toBeNull();
       expect(result!.id).toBe(agentId);
-      expect(result!.knowledgeBases).toHaveLength(1);
+      expect(result!.sourceSets).toHaveLength(1);
       expect(result!.files).toHaveLength(1);
     });
 
@@ -174,8 +172,8 @@ describe('AgentModel', () => {
       // Create agent for user2 with knowledge
       await serverDB.insert(agents).values({ id: agentId, userId: userId2 });
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId, knowledgeBaseId: 'kb2', userId: userId2 });
+        .insert(agentsSourceSets)
+        .values({ agentId, sourceSetId: 'kb2', userId: userId2 });
       await serverDB.insert(agentsFiles).values({ agentId, fileId: '3', userId: userId2 });
 
       // Try to access with user1's model
@@ -253,15 +251,13 @@ describe('AgentModel', () => {
     it('should enrich agent with knowledge when found', async () => {
       const agentId = 'test-agent-with-knowledge';
       await serverDB.insert(agents).values({ id: agentId, userId });
-      await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId, knowledgeBaseId: 'kb1', userId });
+      await serverDB.insert(agentsSourceSets).values({ agentId, sourceSetId: 'kb1', userId });
       await serverDB.insert(agentsFiles).values({ agentId, fileId: '1', userId });
 
       const result = await agentModel.getAgentConfig(agentId);
 
       expect(result).toBeDefined();
-      expect(result?.knowledgeBases).toHaveLength(1);
+      expect(result?.sourceSets).toHaveLength(1);
       expect(result?.files).toHaveLength(1);
     });
   });
@@ -301,159 +297,159 @@ describe('AgentModel', () => {
     });
   });
 
-  describe('getAgentAssignedKnowledge', () => {
-    it('should return knowledge bases and files for the agent', async () => {
-      const agentId = 'test-agent-knowledge';
+  describe('getAgentAssignedSources', () => {
+    it('should return source sets and files for the agent', async () => {
+      const agentId = 'test-agent-sources';
       await serverDB.insert(agents).values({ id: agentId, userId });
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId, knowledgeBaseId: 'kb1', userId, enabled: true });
+        .insert(agentsSourceSets)
+        .values({ agentId, sourceSetId: 'kb1', userId, enabled: true });
       await serverDB.insert(agentsFiles).values({ agentId, fileId: '1', userId, enabled: true });
 
-      const result = await agentModel.getAgentAssignedKnowledge(agentId);
+      const result = await agentModel.getAgentAssignedSources(agentId);
 
-      expect(result.knowledgeBases).toHaveLength(1);
+      expect(result.sourceSets).toHaveLength(1);
       expect(result.files).toHaveLength(1);
     });
 
-    it('should not return knowledge from another user', async () => {
-      const agentId = 'test-agent-knowledge-other-user';
-      // Create agent with knowledge for user2
+    it('should not return sources from another user', async () => {
+      const agentId = 'test-agent-sources-other-user';
+      // Create agent with sources for user2
       await serverDB.insert(agents).values({ id: agentId, userId: userId2 });
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId, knowledgeBaseId: 'kb2', userId: userId2, enabled: true });
+        .insert(agentsSourceSets)
+        .values({ agentId, sourceSetId: 'kb2', userId: userId2, enabled: true });
       await serverDB
         .insert(agentsFiles)
         .values({ agentId, fileId: '3', userId: userId2, enabled: true });
 
       // Try to access with user1's model
-      const result = await agentModel.getAgentAssignedKnowledge(agentId);
+      const result = await agentModel.getAgentAssignedSources(agentId);
 
-      // Should return empty arrays since user1 cannot access user2's knowledge
-      expect(result.knowledgeBases).toHaveLength(0);
+      // Should return empty arrays since user1 cannot access user2's sources
+      expect(result.sourceSets).toHaveLength(0);
       expect(result.files).toHaveLength(0);
     });
 
-    it('should handle empty knowledge bases and files', async () => {
-      const agentId = 'test-agent-no-knowledge';
+    it('should handle empty source sets and files', async () => {
+      const agentId = 'test-agent-no-sources';
       await serverDB.insert(agents).values({ id: agentId, userId });
 
-      const result = await agentModel.getAgentAssignedKnowledge(agentId);
+      const result = await agentModel.getAgentAssignedSources(agentId);
 
-      expect(result.knowledgeBases).toHaveLength(0);
+      expect(result.sourceSets).toHaveLength(0);
       expect(result.files).toHaveLength(0);
     });
   });
 
-  describe('createAgentKnowledgeBase', () => {
-    it('should create a new agent knowledge base association with enabled=true by default', async () => {
+  describe('attachSourceSetToAgent', () => {
+    it('should create a new agent source-set association with enabled=true by default', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
         .returning()
         .then((res) => res[0]);
 
-      await agentModel.createAgentKnowledgeBase(agent.id, knowledgeBase.id);
+      await agentModel.attachSourceSetToAgent(agent.id, sourceSet.id);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       expect(result).toMatchObject({
         agentId: agent.id,
-        knowledgeBaseId: knowledgeBase.id,
+        sourceSetId: sourceSet.id,
         userId,
         enabled: true,
       });
     });
 
-    it('should create a new agent knowledge base association with enabled=false', async () => {
+    it('should create a new agent source-set association with enabled=false', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
         .returning()
         .then((res) => res[0]);
 
-      await agentModel.createAgentKnowledgeBase(agent.id, knowledgeBase.id, false);
+      await agentModel.attachSourceSetToAgent(agent.id, sourceSet.id, false);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       expect(result).toMatchObject({
         agentId: agent.id,
-        knowledgeBaseId: knowledgeBase.id,
+        sourceSetId: sourceSet.id,
         userId,
         enabled: false,
       });
     });
 
-    it('should re-enable an existing disabled knowledge base association', async () => {
+    it('should re-enable an existing disabled source-set association', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
         .returning()
         .then((res) => res[0]);
 
-      await serverDB.insert(agentsKnowledgeBases).values({
+      await serverDB.insert(agentsSourceSets).values({
         agentId: agent.id,
         enabled: false,
-        knowledgeBaseId: knowledgeBase.id,
+        sourceSetId: sourceSet.id,
         userId,
       });
 
-      await agentModel.createAgentKnowledgeBase(agent.id, knowledgeBase.id, true);
+      await agentModel.attachSourceSetToAgent(agent.id, sourceSet.id, true);
 
-      const results = await serverDB.query.agentsKnowledgeBases.findMany({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const results = await serverDB.query.agentsSourceSets.findMany({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
         agentId: agent.id,
         enabled: true,
-        knowledgeBaseId: knowledgeBase.id,
+        sourceSetId: sourceSet.id,
         userId,
       });
     });
   });
 
-  describe('deleteAgentKnowledgeBase', () => {
-    it('should delete an agent knowledge base association', async () => {
+  describe('detachSourceSetFromAgent', () => {
+    it('should delete an agent source-set association', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
         .returning()
         .then((res) => res[0]);
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: knowledgeBase.id, userId });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: sourceSet.id, userId });
 
-      await agentModel.deleteAgentKnowledgeBase(agent.id, knowledgeBase.id);
+      await agentModel.detachSourceSetFromAgent(agent.id, sourceSet.id);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       expect(result).toBeUndefined();
     });
 
-    it('should not delete another user agent knowledge base association', async () => {
+    it('should not delete another user agent source-set association', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
         .returning()
         .then((res) => res[0]);
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: knowledgeBase.id, userId });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: sourceSet.id, userId });
 
       // Try to delete with another user's model
-      await agentModel2.deleteAgentKnowledgeBase(agent.id, knowledgeBase.id);
+      await agentModel2.detachSourceSetFromAgent(agent.id, sourceSet.id);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       // Should still exist
@@ -461,8 +457,8 @@ describe('AgentModel', () => {
     });
   });
 
-  describe('toggleKnowledgeBase', () => {
-    it('should toggle the enabled status of an agent knowledge base association', async () => {
+  describe('setSourceSetEnabled', () => {
+    it('should toggle the enabled status of an agent source-set association', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
@@ -470,19 +466,19 @@ describe('AgentModel', () => {
         .then((res) => res[0]);
 
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: knowledgeBase.id, userId, enabled: true });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: sourceSet.id, userId, enabled: true });
 
-      await agentModel.toggleKnowledgeBase(agent.id, knowledgeBase.id, false);
+      await agentModel.setSourceSetEnabled(agent.id, sourceSet.id, false);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       expect(result?.enabled).toBe(false);
     });
 
-    it('should not toggle another user agent knowledge base association', async () => {
+    it('should not toggle another user agent source-set association', async () => {
       const agent = await serverDB
         .insert(agents)
         .values({ userId })
@@ -490,14 +486,14 @@ describe('AgentModel', () => {
         .then((res) => res[0]);
 
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: knowledgeBase.id, userId, enabled: true });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: sourceSet.id, userId, enabled: true });
 
       // Try to toggle with another user's model
-      await agentModel2.toggleKnowledgeBase(agent.id, knowledgeBase.id, false);
+      await agentModel2.setSourceSetEnabled(agent.id, sourceSet.id, false);
 
-      const result = await serverDB.query.agentsKnowledgeBases.findFirst({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      const result = await serverDB.query.agentsSourceSets.findFirst({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
 
       // Should still be enabled
@@ -874,7 +870,7 @@ describe('AgentModel', () => {
       expect(existingSession).toBeDefined();
     });
 
-    it('should delete agent files and knowledge bases associations', async () => {
+    it('should delete agent files and source-set associations', async () => {
       // Create agent with files and knowledge bases
       const [agent] = await serverDB
         .insert(agents)
@@ -882,8 +878,8 @@ describe('AgentModel', () => {
         .returning();
       await serverDB.insert(agentsFiles).values({ agentId: agent.id, fileId: '1', userId });
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: 'kb1', userId });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: 'kb1', userId });
 
       // Delete the agent
       await agentModel.delete(agent.id);
@@ -900,11 +896,11 @@ describe('AgentModel', () => {
       });
       expect(remainingFiles).toHaveLength(0);
 
-      // Verify agentsKnowledgeBases are deleted (cascade)
-      const remainingKBs = await serverDB.query.agentsKnowledgeBases.findMany({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      // Verify agentsSourceSets are deleted (cascade)
+      const remainingSourceSets = await serverDB.query.agentsSourceSets.findMany({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
-      expect(remainingKBs).toHaveLength(0);
+      expect(remainingSourceSets).toHaveLength(0);
     });
   });
 
@@ -1399,11 +1395,11 @@ describe('AgentModel', () => {
         expect(result).toBeNull();
       });
 
-      it('should create page-agent builtin agent', async () => {
-        const result = await agentModel.getBuiltinAgent('page-agent');
+      it('should create docs-agent builtin agent', async () => {
+        const result = await agentModel.getBuiltinAgent('docs-agent');
 
         expect(result).toBeDefined();
-        expect(result?.slug).toBe('page-agent');
+        expect(result?.slug).toBe('docs-agent');
         expect(result?.virtual).toBe(true);
       });
     });
@@ -1516,8 +1512,8 @@ describe('AgentModel', () => {
         .returning();
       await serverDB.insert(agentsFiles).values({ agentId: agent.id, fileId: '1', userId });
       await serverDB
-        .insert(agentsKnowledgeBases)
-        .values({ agentId: agent.id, knowledgeBaseId: 'kb1', userId });
+        .insert(agentsSourceSets)
+        .values({ agentId: agent.id, sourceSetId: 'kb1', userId });
 
       // Batch delete the agent
       await agentModel.batchDelete([agent.id]);
@@ -1534,11 +1530,11 @@ describe('AgentModel', () => {
       });
       expect(remainingFiles).toHaveLength(0);
 
-      // Verify agentsKnowledgeBases are deleted (cascade)
-      const remainingKBs = await serverDB.query.agentsKnowledgeBases.findMany({
-        where: eq(agentsKnowledgeBases.agentId, agent.id),
+      // Verify agentsSourceSets are deleted (cascade)
+      const remainingSourceSets = await serverDB.query.agentsSourceSets.findMany({
+        where: eq(agentsSourceSets.agentId, agent.id),
       });
-      expect(remainingKBs).toHaveLength(0);
+      expect(remainingSourceSets).toHaveLength(0);
     });
   });
 

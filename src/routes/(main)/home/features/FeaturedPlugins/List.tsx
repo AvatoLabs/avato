@@ -24,6 +24,7 @@ const FeaturedPluginsList = memo(() => {
       <GroupSkeleton
         height={RECENT_BLOCK_SIZE.PLUGIN.HEIGHT}
         rows={8}
+        variant={'plugin'}
         width={RECENT_BLOCK_SIZE.PLUGIN.WIDTH}
       />
     );

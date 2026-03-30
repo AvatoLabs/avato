@@ -2,11 +2,11 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { type FileItem } from '@lobechat/database/schemas';
 import debug from 'debug';
 
-import { ResourceModel } from '@/database/models/resource';
+import { ContentModel } from '@/database/models/content';
 import { getRedisConfig } from '@/envs/redis';
 import { initializeRedis, isRedisEnabled } from '@/libs/redis';
+import { ContentAuthorizer } from '@/server/services/content';
 import { FileService } from '@/server/services/file';
-import { ResourceAuthorizer } from '@/server/services/resource';
 
 const log = debug('lobe-file:proxy');
 
@@ -70,7 +70,7 @@ export async function serveAuthorizedFileDownload(
 
   const principalId = userId || 'anonymous';
   const cacheIdentity = shareToken ? `share:${shareToken}` : `user:${principalId}`;
-  const authorizer = new ResourceAuthorizer(db, principalId);
+  const authorizer = new ContentAuthorizer(db, principalId);
   const access = await authorizer.getAccessMatch({
     capability: 'download_blob',
     id: fileId,
@@ -88,7 +88,7 @@ export async function serveAuthorizedFileDownload(
   }
 
   try {
-    const accessEventModel = new ResourceModel(db, principalId);
+    const accessEventModel = new ContentModel(db, principalId);
     await accessEventModel.createAccessEvent({
       accessType: 'file_download',
       metadata: {
@@ -97,7 +97,7 @@ export async function serveAuthorizedFileDownload(
         matchedBy: access.matchedBy,
         via: shareToken ? 'share_link' : 'session',
       },
-      resourceUid: access.resourceUid,
+      contentUid: access.contentUid,
       shareLinkId,
       spaceId: access.spaceId,
       sourceIp: clientIpFromRequest(req) ?? null,

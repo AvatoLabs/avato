@@ -1,4 +1,4 @@
-import { Tray as ElectronTray, Menu, app, nativeImage } from 'electron';
+import { app, Menu, nativeImage, Tray as ElectronTray } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { App } from '../../App';
@@ -30,7 +30,7 @@ vi.mock('@/utils/logger', () => ({
 
 // Mock dir constants
 vi.mock('@/const/dir', () => ({
-  resourcesDir: '/mock/resources',
+  resourcesDir: '/mock/contents',
 }));
 
 describe('Tray', () => {
@@ -107,7 +107,7 @@ describe('Tray', () => {
         mockApp,
       );
 
-      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/resources/tray.png');
+      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/contents/tray.png');
       expect(ElectronTray).toHaveBeenCalled();
     });
   });
@@ -123,7 +123,7 @@ describe('Tray', () => {
         mockApp,
       );
 
-      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/resources/tray.png');
+      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/contents/tray.png');
       expect(ElectronTray).toHaveBeenCalled();
       expect(mockElectronTray.setToolTip).toHaveBeenCalledWith('Test Tray');
     });
@@ -327,7 +327,7 @@ describe('Tray', () => {
 
       tray.updateIcon('new-icon.png');
 
-      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/resources/new-icon.png');
+      expect(nativeImage.createFromPath).toHaveBeenCalledWith('/mock/contents/new-icon.png');
       expect(mockElectronTray.setImage).toHaveBeenCalledWith(newIcon);
       expect(tray.options.iconPath).toBe('new-icon.png');
     });

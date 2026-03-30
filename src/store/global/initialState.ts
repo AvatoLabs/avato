@@ -14,7 +14,7 @@ export enum SidebarTabKey {
   Knowledge = 'knowledge',
   Me = 'me',
   Memory = 'memory',
-  /** Route segment is `/page` */
+  /** Route segment is `/docs` */
   Pages = 'page',
   Resource = 'resource',
   Setting = 'settings',
@@ -24,12 +24,12 @@ export enum SidebarTabKey {
 
 export enum ChatSettingsTabs {
   Chat = 'chat',
-  Knowledge = 'knowledge',
   Meta = 'meta',
   Modal = 'modal',
   Opening = 'opening',
   Plugin = 'plugin',
   Prompt = 'prompt',
+  Sources = 'sources',
   TTS = 'tts',
 }
 
@@ -80,8 +80,17 @@ export interface SystemStatus {
    */
   agentPageSize?: number;
   chatInputHeight?: number;
+  /**
+   * Resource Manager column widths
+   */
+  contentManagerColumnWidths?: {
+    date: number;
+    name: number;
+    size: number;
+  };
   disabledModelProvidersSortType?: string;
   disabledModelsSortType?: string;
+  docsAgentPanelWidth?: number;
   expandInputActionbar?: boolean;
   // which sessionGroup should expand
   expandSessionGroupKeys: string[];
@@ -103,7 +112,6 @@ export interface SystemStatus {
    */
   isEnablePglite?: boolean;
   isShowCredit?: boolean;
-  knowledgeBaseModalViewMode?: 'list' | 'masonry';
   language?: LocaleMode;
   /**
    * Remember user's last selected image generation model
@@ -130,21 +138,12 @@ export interface SystemStatus {
    */
   modelSwitchPanelWidth?: number;
   noWideScreen?: boolean;
-  pageAgentPanelWidth?: number;
   /**
    * number of pages (documents) to display per page
    */
   pagePageSize?: number;
   portalWidth: number;
   readNotificationSlugs?: string[];
-  /**
-   * Resource Manager column widths
-   */
-  resourceManagerColumnWidths?: {
-    date: number;
-    name: number;
-    size: number;
-  };
   showCommandMenu?: boolean;
   showFilePanel?: boolean;
   showHotkeyHelper?: boolean;
@@ -155,6 +154,7 @@ export interface SystemStatus {
   showSystemRole?: boolean;
   showVideoPanel?: boolean;
   showVideoTopicPanel?: boolean;
+  sourceSetModalViewMode?: 'list' | 'masonry';
   systemRoleExpandedMap: Record<string, boolean>;
   /**
    * Whether to display tokens in short format
@@ -217,18 +217,18 @@ export const INITIAL_STATUS = {
   hideTopicSharePrivacyWarning: false,
   imagePanelWidth: 320,
   imageTopicPanelWidth: 80,
-  knowledgeBaseModalViewMode: 'list' as const,
+  sourceSetModalViewMode: 'list' as const,
   leftPanelCollapsed: false,
   leftPanelWidth: 320,
   mobileShowTopic: false,
   modelSwitchPanelGroupMode: 'byProvider',
   modelSwitchPanelWidth: 430,
   noWideScreen: true,
-  pageAgentPanelWidth: 360,
+  docsAgentPanelWidth: 360,
   pagePageSize: 20,
   portalWidth: 400,
   readNotificationSlugs: [],
-  resourceManagerColumnWidths: {
+  contentManagerColumnWidths: {
     date: 160,
     name: 574,
     size: 140,

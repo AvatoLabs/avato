@@ -72,16 +72,16 @@ export function getWorkspaceSubSidebarTitleMarginInlineStartPx(glass: boolean): 
 export const WORKSPACE_HOME_SIDEBAR_NAV_ROW_PADDING_INLINE_PX = 6;
 
 /** Home column — hero, composer, and lower modules share this grid */
-export const WORKSPACE_HOME_COLUMN_MAX_WIDTH_PX = 1120;
+export const WORKSPACE_HOME_COLUMN_MAX_WIDTH_PX = 1248;
 
-/** Composer emphasis — narrower than full column for focal weight */
-export const WORKSPACE_COMPOSER_MAX_WIDTH_PX = 920;
+/** Composer keeps pace with the wider home column on desktop */
+export const WORKSPACE_COMPOSER_MAX_WIDTH_PX = 1248;
 
 export const WORKSPACE_COMPOSER_MIN_HEIGHT_PX = 96;
 export const WORKSPACE_COMPOSER_RADIUS_PX = 16;
 
 /** Vertical rhythm between major home sections */
-export const WORKSPACE_HOME_SECTION_GAP_PX = 28;
+export const WORKSPACE_HOME_SECTION_GAP_PX = 22;
 
 /** Crisp easing (aligned with common “standard” curve) */
 export const WORKSPACE_EASE_STANDARD = 'cubic-bezier(0.4, 0, 0.2, 1)';

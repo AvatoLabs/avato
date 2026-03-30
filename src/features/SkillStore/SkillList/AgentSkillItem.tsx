@@ -106,7 +106,7 @@ const AgentSkillItem = memo<AgentSkillItemProps>(({ skill }) => {
               />
             )}
             <DropdownMenu
-              nativeButton={false}
+              nativeButton
               placement="bottomRight"
               items={[
                 ...(skill.zipFileHash

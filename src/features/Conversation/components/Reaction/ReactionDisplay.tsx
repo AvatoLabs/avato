@@ -18,7 +18,7 @@ const useStyles = createStyles(({ css, token }) => ({
   `,
   count: css`
     font-size: 12px;
-    color: ${token.colorTextSecondary};
+    color: color-mix(in srgb, ${token.colorTextSecondary} 78%, ${token.colorText} 22%);
   `,
   reactionTag: css`
     cursor: pointer;

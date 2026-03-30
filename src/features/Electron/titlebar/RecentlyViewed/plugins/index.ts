@@ -1,14 +1,14 @@
 import { agentPlugin } from './agentPlugin';
 import { agentTopicPlugin } from './agentTopicPlugin';
 import { communityPlugin } from './communityPlugin';
+import { resourcePlugin } from './contentPlugin';
+import { pagePlugin } from './docsPlugin';
 import { groupPlugin } from './groupPlugin';
 import { groupTopicPlugin } from './groupTopicPlugin';
 import { homePlugin } from './homePlugin';
 import { imagePlugin } from './imagePlugin';
 import { memoryPlugin } from './memoryPlugin';
-import { pagePlugin } from './pagePlugin';
 import { pluginRegistry } from './registry';
-import { resourcePlugin } from './resourcePlugin';
 import { settingsPlugin } from './settingsPlugin';
 
 export { pluginRegistry } from './registry';

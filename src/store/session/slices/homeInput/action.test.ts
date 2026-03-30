@@ -299,7 +299,7 @@ describe('HomeInputAction', () => {
         await result.current.sendAsWrite('Content');
       });
 
-      expect(mockNavigate).toHaveBeenCalledWith('/page/new-doc-id');
+      expect(mockNavigate).toHaveBeenCalledWith('/docs/new-doc-id');
     });
 
     it('should send message with page scope context', async () => {

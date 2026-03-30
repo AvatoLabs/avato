@@ -267,7 +267,11 @@ export class AgentActionImpl {
             });
             const opCtx = operation.context;
             if (opCtx.topicId && opCtx.agentId) {
-              const key = topicMapKey({ agentId: opCtx.agentId, groupId: opCtx.groupId });
+              const key = topicMapKey({
+                agentId: opCtx.agentId,
+                groupId: opCtx.groupId,
+                spaceId: opCtx.spaceId,
+              });
               const topicData = this.#get().topicDataMap[key];
               const topic = topicData?.items?.find((item) => item.id === opCtx.topicId);
               if (topic?.title) notificationTitle = topic.title;

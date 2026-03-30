@@ -8,9 +8,9 @@ import {
   aiModels,
   aiProviders,
   files,
-  knowledgeBases,
   messages,
   sessions,
+  sourceSets,
   topics,
 } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
@@ -252,13 +252,13 @@ export abstract class BaseService implements IBaseService {
           return target.targetUserId;
         }
 
-        // 查询 knowledgeBases 表
-        case !!target?.targetKnowledgeBaseId: {
-          const targetKnowledgeBase = await this.db.query.knowledgeBases.findFirst({
+        // 查询 sourceSets 表
+        case !!target?.targetSourceSetId: {
+          const targetSourceSet = await this.db.query.sourceSets.findFirst({
             columns: { userId: true },
-            where: eq(knowledgeBases.id, target.targetKnowledgeBaseId),
+            where: eq(sourceSets.id, target.targetSourceSetId),
           });
-          return targetKnowledgeBase?.userId;
+          return targetSourceSet?.userId;
         }
 
         // 查询 files 表
@@ -473,11 +473,11 @@ export abstract class BaseService implements IBaseService {
           userIds = targetInfoIds.targetUserIds;
           break;
         }
-        case !!targetInfoIds.targetKnowledgeBaseIds?.length: {
-          const knowledgeBaseList = await this.db.query.knowledgeBases.findMany({
-            where: inArray(knowledgeBases.id, targetInfoIds.targetKnowledgeBaseIds),
+        case !!targetInfoIds.targetSourceSetIds?.length: {
+          const sourceSetList = await this.db.query.sourceSets.findMany({
+            where: inArray(sourceSets.id, targetInfoIds.targetSourceSetIds),
           });
-          userIds = knowledgeBaseList.map((kb) => kb.userId);
+          userIds = sourceSetList.map((sourceSet) => sourceSet.userId);
           break;
         }
         case !!targetInfoIds.targetFileIds?.length: {

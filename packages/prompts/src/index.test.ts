@@ -5,7 +5,7 @@ import * as mainExports from './index';
 import * as prompts from './prompts';
 
 // Mock the problematic dependency
-vi.mock('@/locales/resources', () => ({
+vi.mock('@/locales/contents', () => ({
   supportLocales: ['en-US', 'zh-CN'],
 }));
 

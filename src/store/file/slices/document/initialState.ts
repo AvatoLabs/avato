@@ -3,6 +3,7 @@ import { type LobeDocument } from '@/types/document';
 export interface DocumentQueryFilter {
   fileTypes?: string[];
   sourceTypes?: string[];
+  spaceId?: string;
 }
 
 export interface DocumentState {

@@ -6,7 +6,7 @@ import {
   DEFAUTT_AGENT_TTS_CONFIG,
   INBOX_SESSION_ID,
 } from '@lobechat/const';
-import { KnowledgeType } from '@lobechat/types';
+import { AgentSourceKind } from '@lobechat/types';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentStoreState } from '@/store/agent/initialState';
@@ -216,13 +216,13 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('currentAgentKnowledgeBases', () => {
-    it('should return knowledge bases array', () => {
+  describe('currentAgentSourceSets', () => {
+    it('should return source-set array', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
-            knowledgeBases: [
+            sourceSets: [
               { enabled: true, id: 'kb-1', name: 'KB 1' },
               { enabled: false, id: 'kb-2', name: 'KB 2' },
             ],
@@ -230,16 +230,16 @@ describe('agentSelectors', () => {
         },
       });
 
-      expect(agentSelectors.currentAgentKnowledgeBases(state)).toHaveLength(2);
+      expect(agentSelectors.currentAgentSourceSets(state)).toHaveLength(2);
     });
 
-    it('should return empty array when no knowledge bases', () => {
+    it('should return empty array when no source sets', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: { 'agent-1': {} },
       });
 
-      expect(agentSelectors.currentAgentKnowledgeBases(state)).toEqual([]);
+      expect(agentSelectors.currentAgentSourceSets(state)).toEqual([]);
     });
   });
 
@@ -258,29 +258,37 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('currentEnabledKnowledge', () => {
-    it('should return only enabled knowledge items', () => {
+  describe('currentEnabledSources', () => {
+    it('should return only enabled source items', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
             files: [
-              { enabled: true, id: 'file-1', name: 'file1.txt', type: 'text/plain' },
+              {
+                enabled: true,
+                id: 'file-1',
+                name: 'file1.txt',
+                spaceId: 'space-1',
+                type: 'text/plain',
+              },
               { enabled: false, id: 'file-2', name: 'file2.txt', type: 'text/plain' },
             ],
-            knowledgeBases: [
-              { enabled: true, id: 'kb-1', name: 'KB 1' },
+            sourceSets: [
+              { enabled: true, id: 'kb-1', name: 'KB 1', spaceId: 'space-2' },
               { enabled: false, id: 'kb-2', name: 'KB 2' },
             ],
           } as any,
         },
       });
 
-      const enabledKnowledge = agentSelectors.currentEnabledKnowledge(state);
+      const enabledSources = agentSelectors.currentEnabledSources(state);
 
-      expect(enabledKnowledge).toHaveLength(2);
-      expect(enabledKnowledge[0].type).toBe(KnowledgeType.File);
-      expect(enabledKnowledge[1].type).toBe(KnowledgeType.KnowledgeBase);
+      expect(enabledSources).toHaveLength(2);
+      expect(enabledSources[0].type).toBe(AgentSourceKind.File);
+      expect(enabledSources[0].spaceId).toBe('space-1');
+      expect(enabledSources[1].type).toBe(AgentSourceKind.SourceSet);
+      expect(enabledSources[1].spaceId).toBe('space-2');
     });
   });
 
@@ -304,18 +312,18 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('hasKnowledge', () => {
-    it('should return true when has knowledge bases', () => {
+  describe('hasSources', () => {
+    it('should return true when source sets exist', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
-            knowledgeBases: [{ enabled: true, id: 'kb-1', name: 'KB' }],
+            sourceSets: [{ enabled: true, id: 'kb-1', name: 'KB' }],
           } as any,
         },
       });
 
-      expect(agentSelectors.hasKnowledge(state)).toBe(true);
+      expect(agentSelectors.hasSources(state)).toBe(true);
     });
 
     it('should return true when has files', () => {
@@ -328,16 +336,16 @@ describe('agentSelectors', () => {
         },
       });
 
-      expect(agentSelectors.hasKnowledge(state)).toBe(true);
+      expect(agentSelectors.hasSources(state)).toBe(true);
     });
 
-    it('should return false when no knowledge', () => {
+    it('should return false when no sources', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: { 'agent-1': {} },
       });
 
-      expect(agentSelectors.hasKnowledge(state)).toBe(false);
+      expect(agentSelectors.hasSources(state)).toBe(false);
     });
   });
 
@@ -369,8 +377,8 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('currentKnowledgeIds', () => {
-    it('should return enabled file and knowledge base IDs', () => {
+  describe('currentSourceIds', () => {
+    it('should return enabled file and source-set IDs', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
@@ -379,7 +387,7 @@ describe('agentSelectors', () => {
               { enabled: true, id: 'file-1', name: 'file1.txt', type: 'text/plain' },
               { enabled: false, id: 'file-2', name: 'file2.txt', type: 'text/plain' },
             ],
-            knowledgeBases: [
+            sourceSets: [
               { enabled: true, id: 'kb-1', name: 'KB 1' },
               { enabled: false, id: 'kb-2', name: 'KB 2' },
             ],
@@ -387,10 +395,10 @@ describe('agentSelectors', () => {
         },
       });
 
-      const ids = agentSelectors.currentKnowledgeIds(state);
+      const ids = agentSelectors.currentSourceIds(state);
 
       expect(ids.fileIds).toEqual(['file-1']);
-      expect(ids.knowledgeBaseIds).toEqual(['kb-1']);
+      expect(ids.sourceSetIds).toEqual(['kb-1']);
     });
   });
 
@@ -500,31 +508,31 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('hasEnabledKnowledgeBases', () => {
-    it('should return true when has enabled knowledge bases', () => {
+  describe('hasEnabledSourceSets', () => {
+    it('should return true when source sets are enabled', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
-            knowledgeBases: [{ enabled: true, id: 'kb-1', name: 'KB' }],
+            sourceSets: [{ enabled: true, id: 'kb-1', name: 'KB' }],
           } as any,
         },
       });
 
-      expect(agentSelectors.hasEnabledKnowledgeBases(state)).toBe(true);
+      expect(agentSelectors.hasEnabledSourceSets(state)).toBe(true);
     });
 
-    it('should return false when no knowledge bases enabled', () => {
+    it('should return false when no source sets are enabled', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
-            knowledgeBases: [{ enabled: false, id: 'kb-1', name: 'KB' }],
+            sourceSets: [{ enabled: false, id: 'kb-1', name: 'KB' }],
           } as any,
         },
       });
 
-      expect(agentSelectors.hasEnabledKnowledgeBases(state)).toBe(false);
+      expect(agentSelectors.hasEnabledSourceSets(state)).toBe(false);
     });
   });
 
@@ -578,7 +586,7 @@ describe('agentSelectors', () => {
     });
   });
 
-  describe('hasEnabledKnowledge', () => {
+  describe('hasEnabledSources', () => {
     it('should return true when has enabled files', () => {
       const state = createState({
         activeAgentId: 'agent-1',
@@ -589,20 +597,20 @@ describe('agentSelectors', () => {
         },
       });
 
-      expect(agentSelectors.hasEnabledKnowledge(state)).toBe(true);
+      expect(agentSelectors.hasEnabledSources(state)).toBe(true);
     });
 
-    it('should return true when has enabled knowledge bases', () => {
+    it('should return true when source sets are enabled', () => {
       const state = createState({
         activeAgentId: 'agent-1',
         agentMap: {
           'agent-1': {
-            knowledgeBases: [{ enabled: true, id: 'kb-1', name: 'KB' }],
+            sourceSets: [{ enabled: true, id: 'kb-1', name: 'KB' }],
           } as any,
         },
       });
 
-      expect(agentSelectors.hasEnabledKnowledge(state)).toBe(true);
+      expect(agentSelectors.hasEnabledSources(state)).toBe(true);
     });
 
     it('should return false when nothing enabled', () => {
@@ -611,12 +619,12 @@ describe('agentSelectors', () => {
         agentMap: {
           'agent-1': {
             files: [{ enabled: false, id: 'file-1', name: 'file.txt', type: 'text/plain' }],
-            knowledgeBases: [{ enabled: false, id: 'kb-1', name: 'KB' }],
+            sourceSets: [{ enabled: false, id: 'kb-1', name: 'KB' }],
           } as any,
         },
       });
 
-      expect(agentSelectors.hasEnabledKnowledge(state)).toBe(false);
+      expect(agentSelectors.hasEnabledSources(state)).toBe(false);
     });
   });
 

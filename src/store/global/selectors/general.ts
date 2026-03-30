@@ -1,5 +1,5 @@
 import { DEFAULT_LANG } from '@/const/locale';
-import { type Locales } from '@/locales/resources';
+import { type Locales } from '@/locales/contents';
 import { isOnServerSide } from '@/utils/env';
 
 import { type GlobalState } from '../initialState';

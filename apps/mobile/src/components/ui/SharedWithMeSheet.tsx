@@ -18,17 +18,17 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { resourceShareApi } from '../../lib/api';
+import { contentShareApi } from '../../lib/api';
 import { haptics } from '../../lib/haptics';
 import { useI18n } from '../../lib/i18n';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
 export interface SharedWithMeRow {
-  kind: 'document' | 'file' | 'knowledge_base';
+  contentUid?: string;
+  kind: 'document' | 'file' | 'source_set';
   localId: string;
   name: string;
-  resourceUid?: string;
   sharedExpiresAt?: string | Date | null;
   sharedRole?: 'editor' | 'owner' | 'viewer';
   spaceId?: string | null;
@@ -39,7 +39,7 @@ function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
   const o = raw as Record<string, unknown>;
   const kind = o.kind;
   const localId = o.localId;
-  if (kind !== 'file' && kind !== 'document' && kind !== 'knowledge_base') return null;
+  if (kind !== 'file' && kind !== 'document' && kind !== 'source_set') return null;
   if (typeof localId !== 'string') return null;
   const sr = o.sharedRole;
   const sharedRole = sr === 'editor' || sr === 'owner' || sr === 'viewer' ? sr : undefined;
@@ -50,7 +50,7 @@ function normalizeRow(raw: unknown, untitled: string): SharedWithMeRow | null {
     kind,
     localId,
     name: typeof o.name === 'string' ? o.name : untitled,
-    resourceUid: typeof o.resourceUid === 'string' ? o.resourceUid : undefined,
+    contentUid: typeof o.contentUid === 'string' ? o.contentUid : undefined,
     sharedExpiresAt,
     sharedRole,
     spaceId: typeof o.spaceId === 'string' ? o.spaceId : null,
@@ -73,11 +73,11 @@ function kindLabel(
   t: {
     resourceSharedKindDocument: string;
     resourceSharedKindFile: string;
-    resourceSharedKindLibrary: string;
+    resourceSharedKindSourceSet: string;
   },
 ) {
   if (kind === 'file') return t.resourceSharedKindFile;
-  if (kind === 'knowledge_base') return t.resourceSharedKindLibrary;
+  if (kind === 'source_set') return t.resourceSharedKindSourceSet;
   return t.resourceSharedKindDocument;
 }
 
@@ -114,7 +114,7 @@ export default function SharedWithMeSheet({ visible, onClose, onPick }: SharedWi
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const raw = await resourceShareApi.listSharedWithMe();
+      const raw = await contentShareApi.listSharedWithMe();
       const list = (Array.isArray(raw) ? raw : [])
         .map((item) => normalizeRow(item, t.resourceUntitled))
         .filter((r): r is SharedWithMeRow => r !== null);

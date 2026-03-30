@@ -9,10 +9,10 @@ export interface CreateDocumentParams {
   content?: string;
   editorData: string;
   fileType?: string;
-  knowledgeBaseId?: string;
   metadata?: Record<string, any>;
   parentId?: string;
   slug?: string;
+  sourceSetId?: string;
   spaceId?: string;
   title: string;
 }
@@ -39,8 +39,9 @@ export class DocumentService {
   async queryDocuments(params?: {
     current?: number;
     fileTypes?: string[];
-    knowledgeBaseId?: string;
+    sourceSetId?: string;
     pageSize?: number;
+    spaceId?: string;
     sourceTypes?: string[];
     trash?: boolean;
   }): Promise<{ items: DocumentItem[]; total: number }> {

@@ -16,18 +16,18 @@
 
 ## 执行摘要
 
-| 优先级 | 结论                                                                                                               | 状态       |
-| ------ | ------------------------------------------------------------------------------------------------------------------ | ---------- |
-| **P0** | 服务端 builtin runtime 注册表中没有 `lobe-knowledge-base`，服务端 Agent Runtime 走知识库工具会报 “not implemented” | 已确认     |
-| **P0** | `semanticSearch` 在无 `fileIds` 时，SQL 没有显式用户过滤；若不依赖 RLS 或其他上层边界，存在跨用户检索风险          | 条件性风险 |
-| **P1** | `semanticSearchForChat` 会先做 embedding，再解析最终文件范围；当范围为空时仍会产生无效 embedding 成本              | 已确认     |
-| **P1** | `semanticSearchForChat` 没走 `checkBudgetsUsage`，而 `semanticSearch` 走了，预算边界不一致                         | 已确认     |
-| **P1** | `topK` 同时被用作 “全局 chunk 数量上限” 和 “文件结果数量上限”，参数语义混乱                                        | 已确认     |
-| **P1** | 向量维度固定为 `1024`，且 `EmbeddingModel.bulkCreate` 冲突即跳过，模型切换后易静默保留旧向量                       | 已确认     |
-| **P1** | `KnowledgeBaseManifest` 默认 `topK=15`，客户端 / 服务端执行器默认 `topK=20`，工具契约不一致                        | 已确认     |
-| **P2** | 检索仍是单阶段向量 Top-K，缺少 rerank / 多样性控制，`TODO` 仍在主链路中                                            | 已确认     |
-| **P2** | `query` 参数在 `ChunkModel.semanticSearch*` 中没有参与 SQL 过滤，名称会误导调用方以为已有混合检索                  | 已确认     |
-| **P2** | 评测链 `chainAnswerWithContext` 允许较多通用知识补全，与线上知识库工具 “优先基于库内容回答” 的口径不完全一致       | 已确认     |
+| 优先级 | 结论                                                                                                           | 状态       |
+| ------ | -------------------------------------------------------------------------------------------------------------- | ---------- |
+| **P0** | 服务端 builtin runtime 注册表中没有 `lobe-source-set`，服务端 Agent Runtime 走知识库工具会报 “not implemented” | 已确认     |
+| **P0** | `semanticSearch` 在无 `fileIds` 时，SQL 没有显式用户过滤；若不依赖 RLS 或其他上层边界，存在跨用户检索风险      | 条件性风险 |
+| **P1** | `semanticSearchForChat` 会先做 embedding，再解析最终文件范围；当范围为空时仍会产生无效 embedding 成本          | 已确认     |
+| **P1** | `semanticSearchForChat` 没走 `checkBudgetsUsage`，而 `semanticSearch` 走了，预算边界不一致                     | 已确认     |
+| **P1** | `topK` 同时被用作 “全局 chunk 数量上限” 和 “文件结果数量上限”，参数语义混乱                                    | 已确认     |
+| **P1** | 向量维度固定为 `1024`，且 `EmbeddingModel.bulkCreate` 冲突即跳过，模型切换后易静默保留旧向量                   | 已确认     |
+| **P1** | `SourceSetManifest` 默认 `topK=15`，客户端 / 服务端执行器默认 `topK=20`，工具契约不一致                        | 已确认     |
+| **P2** | 检索仍是单阶段向量 Top-K，缺少 rerank / 多样性控制，`TODO` 仍在主链路中                                        | 已确认     |
+| **P2** | `query` 参数在 `ChunkModel.semanticSearch*` 中没有参与 SQL 过滤，名称会误导调用方以为已有混合检索              | 已确认     |
+| **P2** | 评测链 `chainAnswerWithContext` 允许较多通用知识补全，与线上知识库工具 “优先基于库内容回答” 的口径不完全一致   | 已确认     |
 
 ---
 
@@ -38,17 +38,17 @@
 当前状态很明确：
 
 - 客户端 builtin executor 已注册：`src/store/tool/slices/builtin/executors/index.ts`
-- 服务端 builtin runtime 注册表未注册 `lobe-knowledge-base`：`src/server/services/toolExecution/serverRuntimes/index.ts`
+- 服务端 builtin runtime 注册表未注册 `lobe-source-set`：`src/server/services/toolExecution/serverRuntimes/index.ts`
 - `BuiltinToolsExecutor` 在服务端会先检查 `hasServerRuntime(identifier)`：`src/server/services/toolExecution/builtin.ts`
 
 因此：
 
 - **客户端 Web 对话流** 可以走知识库工具
-- **服务端 Agent Runtime / 队列式执行** 走到该工具会直接报 `Builtin tool "lobe-knowledge-base" is not implemented`
+- **服务端 Agent Runtime / 队列式执行** 走到该工具会直接报 `Builtin tool "lobe-source-set" is not implemented`
 
 **落地建议**：
 
-1. 补齐 `KnowledgeBaseExecutionRuntime` 的注册与上下文接线。
+1. 补齐 `SourceSetExecutionRuntime` 的注册与上下文接线。
 2. 在补齐前，不要把知识库工具写成 “客户端与服务端都可用”。
 
 ### 2. `semanticSearchForChat` 会在空范围下白做 embedding（P1）
@@ -176,7 +176,7 @@
 
 因此：
 
-- `readKnowledge` 在服务端路径下并不能保证 “读到完整文件”
+- `readSourceFiles` 在服务端路径下并不能保证 “读到完整文件”
 - 更准确的说法应该是 “尽量读取完整文件，但服务端执行链会受工具结果长度上限约束”
 
 **落地建议**：把文案改准确，或为读取型工具单独定义更合适的返回策略。
@@ -213,11 +213,11 @@
 `KnowledgeInjector` 当前语义很明确：
 
 - Agent 绑定文件：直接全文注入
-- 知识库：只注入 “可搜索的知识库列表”，真正内容靠 `searchKnowledgeBase`
+- 知识库：只注入 “可搜索的知识库列表”，真正内容靠 `searchSourceSet`
 
 这不是 bug，但需要产品和文档明确：
 
-- “给 Agent 绑了文件” 不等于 “这些文件也会出现在 searchKnowledgeBase 范围内”
+- “给 Agent 绑了文件” 不等于 “这些文件也会出现在 searchSourceSet 范围内”
 
 ### 4. 评测链与线上工具链口径不完全一致（P2）
 
@@ -233,7 +233,7 @@
 
 ## 三、建议实施顺序
 
-1. 先补服务端 `lobe-knowledge-base` runtime，让客户端和服务端能力对齐。
+1. 先补服务端 `lobe-source-set` runtime，让客户端和服务端能力对齐。
 2. 让 `semanticSearchForChat` 先解析范围再做 embedding，并补预算中间件。
 3. 为检索 SQL 增加显式的用户隔离条件，不再把安全边界藏在外部前提里。
 4. 统一 `topK` 语义与默认值。

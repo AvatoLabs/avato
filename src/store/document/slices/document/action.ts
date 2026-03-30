@@ -29,7 +29,9 @@ export interface InitDocumentParams {
   documentId: string;
   editor?: IEditor;
   editorData?: unknown;
+  lastUpdatedTime?: Date | string | null;
   sourceType: DocumentSourceType;
+  spaceId?: string | null;
   topicId?: string;
 }
 
@@ -46,16 +48,6 @@ export interface UseFetchDocumentOptions {
    */
   editor?: IEditor;
   /**
-   * Source type for the document. Defaults to 'page'.
-   */
-  sourceType?: DocumentSourceType;
-  /**
-   * How fetched data should be synced back into the live document store.
-   * `once` is useful for editors that treat local state as the source of truth
-   * after the initial hydration.
-   */
-  syncPolicy?: 'always' | 'once';
-  /**
    * Whether to revalidate stale cache entries on mount. Defaults to true.
    */
   revalidateIfStale?: boolean;
@@ -67,6 +59,16 @@ export interface UseFetchDocumentOptions {
    * Whether to revalidate the document when the network reconnects. Defaults to true.
    */
   revalidateOnReconnect?: boolean;
+  /**
+   * Source type for the document. Defaults to 'page'.
+   */
+  sourceType?: DocumentSourceType;
+  /**
+   * How fetched data should be synced back into the live document store.
+   * `once` is useful for editors that treat local state as the source of truth
+   * after the initial hydration.
+   */
+  syncPolicy?: 'always' | 'once';
 }
 
 type Setter = StoreSetter<DocumentStore>;
@@ -148,7 +150,17 @@ export class DocumentActionImpl {
    * Content is loaded into editor via onEditorInit when Editor component is ready.
    */
   initDocumentWithEditor = (params: InitDocumentParams): void => {
-    const { documentId, sourceType, content, editorData, topicId, autoSave, editor } = params;
+    const {
+      documentId,
+      sourceType,
+      content,
+      editorData,
+      topicId,
+      autoSave,
+      editor,
+      lastUpdatedTime,
+      spaceId,
+    } = params;
 
     const { internal_dispatchDocument } = this.#get();
 
@@ -160,8 +172,10 @@ export class DocumentActionImpl {
         autoSave,
         content: content ?? undefined,
         editorData,
+        lastUpdatedTime: lastUpdatedTime ? new Date(lastUpdatedTime) : null,
         lastSavedContent: content ?? undefined,
         lastSavedEditorData: editorData,
+        spaceId,
         sourceType,
         topicId,
       },
@@ -244,6 +258,8 @@ export class DocumentActionImpl {
             documentId,
             editor,
             editorData: document.editorData,
+            lastUpdatedTime: document.updatedAt,
+            spaceId: document.spaceId,
             sourceType,
           });
         },

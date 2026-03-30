@@ -362,8 +362,8 @@ export class AiAgentService {
     );
 
     // 9. Create tools using Server AgentToolsEngine
-    const hasEnabledKnowledgeBases =
-      agentConfig.knowledgeBases?.some((kb: { enabled?: boolean | null }) => kb.enabled === true) ??
+    const hasEnabledSourceSets =
+      agentConfig.sourceSets?.some((item: { enabled?: boolean | null }) => item.enabled === true) ??
       false;
 
     // Build device context for ToolsEngine enableChecker
@@ -395,7 +395,7 @@ export class AiAgentService {
         ? { boundDeviceId, deviceOnline, gatewayConfigured: true }
         : undefined,
       globalMemoryEnabled,
-      hasEnabledKnowledgeBases,
+      hasEnabledSourceSets,
       model,
       provider,
     });
@@ -538,12 +538,12 @@ export class AiAgentService {
       }
 
       // Build availablePlugins from all plugin sources
-      // Exclude only truly internal tools (agent-management itself, agent-builder, page-agent)
+      // Exclude only truly internal tools (agent-management itself, agent-builder, docs-agent)
       const INTERNAL_TOOLS = new Set([
         'lobe-agent-management', // Don't show agent-management in its own context
         'lobe-agent-builder', // Used for editing current agent, not for creating new agents
         'lobe-group-agent-builder', // Used for editing current group, not for creating new agents
-        'lobe-page-agent', // Page-editor specific tool
+        'lobe-docs-agent', // Page-editor specific tool
       ]);
 
       const availablePlugins = [

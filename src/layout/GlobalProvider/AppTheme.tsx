@@ -19,6 +19,12 @@ import { getChatgptDarkSurfaceTokenOverrides } from '@/const/chatgptDarkSurfaces
 import { LOBE_THEME_NEUTRAL_COLOR, LOBE_THEME_PRIMARY_COLOR } from '@/const/theme';
 import { isDesktop } from '@/const/version';
 import { useIsDark } from '@/hooks/useIsDark';
+import {
+  resolveAppearanceThemeColors,
+  resolveSolidTextColor,
+  resolveThemeAppearance,
+  resolveThemeMode,
+} from '@/layout/GlobalProvider/themeShared';
 import { getUILocaleAndResources } from '@/libs/getUILocaleAndResources';
 import Image from '@/libs/next/Image';
 import { useGlobalStore } from '@/store/global';
@@ -88,8 +94,8 @@ export interface AppThemeProps {
   children?: ReactNode;
   customFontFamily?: string;
   customFontURL?: string;
-  defaultNeutralColor?: NeutralColors;
-  defaultPrimaryColor?: PrimaryColors;
+  defaultNeutralColor?: NeutralColors | string;
+  defaultPrimaryColor?: PrimaryColors | string;
   globalCDN?: boolean;
 }
 
@@ -166,27 +172,31 @@ const AppTheme = memo<AppThemeProps>(
       initialThemeSyncedRef.current = true;
     }, [isUserStateInit, themeMode, setTheme]);
 
-    const currentAppearence = isDark ? 'dark' : 'light';
+    const currentAppearence = useMemo(
+      () => resolveThemeAppearance({ isDark, themeMode }),
+      [isDark, themeMode],
+    );
 
-    /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). Must not use resolved appearance here — that breaks system mode + controlled appearance. */
-    const antdThemeMode = useMemo(() => {
-      switch (themeMode) {
-        case 'light': {
-          return 'light';
-        }
-        case 'dark': {
-          return 'dark';
-        }
-        case 'system':
-        default: {
-          return 'auto';
-        }
-      }
-    }, [themeMode]);
+    /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). */
+    const antdThemeMode = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
+    const resolvedThemeColors = useMemo(
+      () =>
+        resolveAppearanceThemeColors({
+          appearance: currentAppearence,
+          neutralColor: neutralColor ?? defaultNeutralColor,
+          primaryColor: primaryColor ?? defaultPrimaryColor,
+        }),
+      [currentAppearence, defaultNeutralColor, defaultPrimaryColor, neutralColor, primaryColor],
+    );
+    const solidTextColor = useMemo(
+      () => resolveSolidTextColor(resolvedThemeColors.primaryColor),
+      [resolvedThemeColors.primaryColor],
+    );
 
     const customToken = useCallback(
-      ({ isDarkMode }: CustomTokenParams) => getChatgptDarkSurfaceTokenOverrides(isDarkMode),
-      [],
+      ({ isDarkMode }: CustomTokenParams) =>
+        getChatgptDarkSurfaceTokenOverrides(isDarkMode, solidTextColor),
+      [solidTextColor],
     );
 
     return (
@@ -197,14 +207,14 @@ const AppTheme = memo<AppThemeProps>(
           customToken={customToken}
           themeMode={antdThemeMode}
           customTheme={{
-            neutralColor: neutralColor ?? defaultNeutralColor,
-            primaryColor: primaryColor ?? defaultPrimaryColor,
+            neutralColor: resolvedThemeColors.neutralColor as any,
+            primaryColor: resolvedThemeColors.primaryColor as any,
           }}
           theme={{
             cssVar: { key: 'lobe-vars' },
             token: {
-              /** @lobehub/ui dark 算法把 colorTextLightSolid 设成 colorBgLayout，主色实心按钮会黑字；必须写进 antd theme（customToken 进不了 ConfigProvider） */
-              ...(isDark ? { colorTextLightSolid: '#ffffff' } : {}),
+              // Keep solid primary surfaces legible across bright and dark accents.
+              colorTextLightSolid: solidTextColor,
               fontFamily: customFontFamily
                 ? `${customFontFamily},${antdTheme.fontFamily}`
                 : undefined,

@@ -286,7 +286,7 @@ describe('FileManagerActions', () => {
       expect(uploadSpy).toHaveBeenCalledWith({
         abortController: expect.any(AbortController),
         file: validFile,
-        knowledgeBaseId: undefined,
+        sourceSetId: undefined,
         onStatusUpdate: expect.any(Function),
         uploadId: expect.any(String),
       });
@@ -295,7 +295,7 @@ describe('FileManagerActions', () => {
       expect(parseSpy).toHaveBeenCalledWith(['file-1'], { skipExist: true });
     });
 
-    it('should upload files with knowledgeBaseId', async () => {
+    it('should upload files with sourceSetId', async () => {
       const { result } = renderHook(() => useStore());
 
       const file = new File(['content'], 'test.txt', { type: 'text/plain' });
@@ -313,7 +313,7 @@ describe('FileManagerActions', () => {
       expect(uploadSpy).toHaveBeenCalledWith({
         abortController: expect.any(AbortController),
         file,
-        knowledgeBaseId: 'kb-123',
+        sourceSetId: 'kb-123',
         onStatusUpdate: expect.any(Function),
         uploadId: expect.any(String),
       });

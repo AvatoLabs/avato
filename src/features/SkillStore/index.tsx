@@ -1,6 +1,7 @@
 'use client';
 
-import { createModal, LOBE_THEME_APP_ID } from '@lobehub/ui';
+import { LOBE_THEME_APP_ID } from '@lobehub/ui';
+import { createModal } from '@lobehub/ui/base-ui';
 import { t } from 'i18next';
 import { MemoryRouter } from 'react-router-dom';
 

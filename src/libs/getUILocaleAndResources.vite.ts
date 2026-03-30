@@ -1,4 +1,4 @@
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 
 type UILocaleResources = Record<string, Record<string, string>>;
 
@@ -24,7 +24,7 @@ const loadBusinessResources = async (locale: string): Promise<UILocaleResources 
 
 const loadLobeUIBuiltinResources = async (locale: string): Promise<UILocaleResources | null> => {
   try {
-    const { en, zhCn } = await import('@lobehub/ui/es/i18n/resources/index');
+    const { en, zhCn } = await import('@lobehub/ui/i18n');
 
     if (locale.startsWith('zh')) return zhCn as UILocaleResources;
     return en as UILocaleResources;

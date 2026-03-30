@@ -1,6 +1,7 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
+import { createStaticStyles } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +12,18 @@ interface ListProps {
   questions: QuestionItem[];
 }
 
+const styles = createStaticStyles(({ css }) => ({
+  grid: css`
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+
+    @media (width <= 768px) {
+      grid-template-columns: 1fr;
+    }
+  `,
+}));
+
 const List = memo<ListProps>(({ questions }) => {
   const { t } = useTranslation('suggestQuestions');
 
@@ -19,7 +32,7 @@ const List = memo<ListProps>(({ questions }) => {
   }
 
   return (
-    <Flexbox gap={12} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}>
+    <Flexbox className={styles.grid}>
       {questions.map((item) => {
         const prompt = t(item.promptKey as any);
         return (

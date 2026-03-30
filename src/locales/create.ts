@@ -6,7 +6,7 @@ import { isRtlLang } from 'rtl-detect';
 
 import { DEFAULT_LANG } from '@/const/locale';
 import { getDebugConfig } from '@/envs/debug';
-import { normalizeLocale } from '@/locales/resources';
+import { normalizeLocale } from '@/locales/contents';
 import { isOnServerSide } from '@/utils/env';
 import { unwrapESMModule } from '@/utils/esm/unwrapESMModule';
 

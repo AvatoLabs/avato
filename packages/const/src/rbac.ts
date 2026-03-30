@@ -1,5 +1,3 @@
-/* eslint-disable sort-keys-fix/sort-keys-fix  */
-
 /**
  * RBAC Permission Actions Definition
  * Defines all executable permission action types in the system
@@ -64,14 +62,14 @@ export const PERMISSION_ACTIONS = {
 
   FILE_UPLOAD: 'file:upload',
 
-  // ==================== Knowledge Base Management ====================
-  KNOWLEDGE_BASE_CREATE: 'knowledge_base:create',
+  // ==================== Source Set Management ====================
+  SOURCE_SET_CREATE: 'source_set:create',
 
-  KNOWLEDGE_BASE_DELETE: 'knowledge_base:delete',
+  SOURCE_SET_DELETE: 'source_set:delete',
 
-  KNOWLEDGE_BASE_READ: 'knowledge_base:read',
+  SOURCE_SET_READ: 'source_set:read',
 
-  KNOWLEDGE_BASE_UPDATE: 'knowledge_base:update',
+  SOURCE_SET_UPDATE: 'source_set:update',
 
   // ==================== Message Management ====================
   MESSAGE_CREATE: 'message:create',

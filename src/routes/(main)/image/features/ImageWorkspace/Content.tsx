@@ -37,7 +37,13 @@ const ImageWorkspaceContent = () => {
   if (!hasGenerations) return <EmptyState emptyHint={'topicEmpty'} />;
 
   return (
-    <Flexbox vertical flex={1} height={'100%'} style={{ minHeight: 0 }} width={'100%'}>
+    <Flexbox
+      direction={'vertical'}
+      flex={1}
+      height={'100%'}
+      style={{ minHeight: 0 }}
+      width={'100%'}
+    >
       <Flexbox
         horizontal
         align={'center'}

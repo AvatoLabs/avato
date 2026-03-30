@@ -1,8 +1,8 @@
 import { AGENT_BUILDER } from './agents/agent-builder';
+import { DOCS_AGENT } from './agents/docs-agent';
 import { GROUP_AGENT_BUILDER } from './agents/group-agent-builder';
 import { GROUP_SUPERVISOR } from './agents/group-supervisor';
 import { INBOX } from './agents/inbox';
-import { PAGE_AGENT } from './agents/page-agent';
 import type { BuiltinAgentDefinition, BuiltinAgentSlug, RuntimeContext } from './types';
 import { BUILTIN_AGENT_SLUGS } from './types';
 
@@ -10,10 +10,10 @@ export * from './types';
 
 // Agent exports
 export { AGENT_BUILDER } from './agents/agent-builder';
+export { DOCS_AGENT } from './agents/docs-agent';
 export { GROUP_AGENT_BUILDER } from './agents/group-agent-builder';
 export { GROUP_SUPERVISOR } from './agents/group-supervisor';
 export { INBOX } from './agents/inbox';
-export { PAGE_AGENT } from './agents/page-agent';
 
 /**
  * All builtin agents indexed by slug
@@ -23,7 +23,7 @@ export const BUILTIN_AGENTS: Record<BuiltinAgentSlug, BuiltinAgentDefinition> = 
   [BUILTIN_AGENT_SLUGS.groupAgentBuilder]: GROUP_AGENT_BUILDER,
   [BUILTIN_AGENT_SLUGS.groupSupervisor]: GROUP_SUPERVISOR,
   [BUILTIN_AGENT_SLUGS.inbox]: INBOX,
-  [BUILTIN_AGENT_SLUGS.pageAgent]: PAGE_AGENT,
+  [BUILTIN_AGENT_SLUGS.docsAgent]: DOCS_AGENT,
 };
 
 /**

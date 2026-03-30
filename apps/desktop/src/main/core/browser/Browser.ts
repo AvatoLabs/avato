@@ -178,14 +178,12 @@ export default class Browser {
   }
 
   private initiateContentLoading(): void {
-    logger.debug(`[${this.identifier}] Initiating placeholder and URL loading sequence.`);
-    this.loadPlaceholder().then(() => {
-      this.loadUrl(this.options.path).catch((e) => {
-        logger.error(
-          `[${this.identifier}] Initial loadUrl error for path '${this.options.path}':`,
-          e,
-        );
-      });
+    logger.debug(`[${this.identifier}] Initiating URL loading sequence.`);
+    this.loadUrl(this.options.path).catch((e) => {
+      logger.error(
+        `[${this.identifier}] Initial loadUrl error for path '${this.options.path}':`,
+        e,
+      );
     });
   }
 

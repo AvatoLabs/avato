@@ -878,7 +878,7 @@ describe('GoogleGenerativeAIStream', () => {
                   {
                     image: {
                       imageUri: 'https://example.com/photo.jpg',
-                      sourceUri: 'https://example.com/page',
+                      sourceUri: 'https://example.com/docs',
                       title: 'Example Photo',
                       domain: 'example.com',
                     },
@@ -937,7 +937,7 @@ describe('GoogleGenerativeAIStream', () => {
               {
                 domain: 'example.com',
                 imageUri: 'https://example.com/photo.jpg',
-                sourceUri: 'https://example.com/page',
+                sourceUri: 'https://example.com/docs',
                 title: 'Example Photo',
               },
               {

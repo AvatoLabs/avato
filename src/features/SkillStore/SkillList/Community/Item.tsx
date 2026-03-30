@@ -82,7 +82,7 @@ const Item = memo<DiscoverMcpItem>(({ name, description, icon, identifier }) => 
     if (installed) {
       return (
         <DropdownMenu
-          nativeButton={false}
+          nativeButton
           placement="bottomRight"
           items={[
             {

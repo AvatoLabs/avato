@@ -18,10 +18,10 @@ describe('builtinAgentSelectors', () => {
   describe('getBuiltinAgentId', () => {
     it('should return agent id for a given slug', () => {
       const state = createState({
-        builtinAgentIdMap: { 'page-agent': 'page-agent-123' },
+        builtinAgentIdMap: { 'docs-agent': 'docs-agent-123' },
       });
 
-      expect(builtinAgentSelectors.getBuiltinAgentId('page-agent')(state)).toBe('page-agent-123');
+      expect(builtinAgentSelectors.getBuiltinAgentId('docs-agent')(state)).toBe('docs-agent-123');
     });
 
     it('should return undefined for non-existent slug', () => {
@@ -29,17 +29,17 @@ describe('builtinAgentSelectors', () => {
         builtinAgentIdMap: {},
       });
 
-      expect(builtinAgentSelectors.getBuiltinAgentId('page-agent')(state)).toBeUndefined();
+      expect(builtinAgentSelectors.getBuiltinAgentId('docs-agent')(state)).toBeUndefined();
     });
   });
 
   describe('isBuiltinAgentInit', () => {
     it('should return true when builtin agent exists', () => {
       const state = createState({
-        builtinAgentIdMap: { 'page-agent': 'page-agent-123' },
+        builtinAgentIdMap: { 'docs-agent': 'docs-agent-123' },
       });
 
-      expect(builtinAgentSelectors.isBuiltinAgentInit('page-agent')(state)).toBe(true);
+      expect(builtinAgentSelectors.isBuiltinAgentInit('docs-agent')(state)).toBe(true);
     });
 
     it('should return false when builtin agent does not exist', () => {
@@ -47,17 +47,17 @@ describe('builtinAgentSelectors', () => {
         builtinAgentIdMap: {},
       });
 
-      expect(builtinAgentSelectors.isBuiltinAgentInit('page-agent')(state)).toBe(false);
+      expect(builtinAgentSelectors.isBuiltinAgentInit('docs-agent')(state)).toBe(false);
     });
   });
 
-  describe('pageAgentId', () => {
+  describe('docsAgentId', () => {
     it('should return page agent id', () => {
       const state = createState({
-        builtinAgentIdMap: { [BUILTIN_AGENT_SLUGS.pageAgent]: 'page-agent-456' },
+        builtinAgentIdMap: { [BUILTIN_AGENT_SLUGS.docsAgent]: 'docs-agent-456' },
       });
 
-      expect(builtinAgentSelectors.pageAgentId(state)).toBe('page-agent-456');
+      expect(builtinAgentSelectors.docsAgentId(state)).toBe('docs-agent-456');
     });
 
     it('should return undefined when page agent not initialized', () => {
@@ -65,7 +65,7 @@ describe('builtinAgentSelectors', () => {
         builtinAgentIdMap: {},
       });
 
-      expect(builtinAgentSelectors.pageAgentId(state)).toBeUndefined();
+      expect(builtinAgentSelectors.docsAgentId(state)).toBeUndefined();
     });
   });
 

@@ -14,15 +14,15 @@ import {
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { ResourceShareKind } from '../../lib/api';
+import type { ContentShareKind } from '../../lib/api';
+import { shareResourceWithLink } from '../../lib/contentShareFlow';
 import { useI18n } from '../../lib/i18n';
-import { shareResourceWithLink } from '../../lib/resourceShareFlow';
 import { useThemeColors } from '../../theme/colors';
 import { enteringModalContent } from '../../theme/motion';
 
 export interface ResourceShareSheetTarget {
   id: string;
-  kind: ResourceShareKind;
+  kind: ContentShareKind;
   name: string;
 }
 

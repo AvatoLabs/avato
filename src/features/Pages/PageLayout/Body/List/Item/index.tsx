@@ -8,9 +8,9 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
-import { pageSelectors, usePageStore } from '@/store/page';
-import { getPageDetailPath, getPageKindFromDocument, TABLE_PAGE_KIND } from '@/utils/page';
+import { getPageDetailPath, getPageKindFromDocument, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import Actions from './Actions';
 import Editing from './Editing';

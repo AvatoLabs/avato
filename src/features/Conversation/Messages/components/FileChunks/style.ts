@@ -8,7 +8,7 @@ export const styles = createStaticStyles(({ css, cssVar }) => ({
 
     font-size: 12px;
     line-height: 12px;
-    color: ${cssVar.colorTextSecondary};
+    color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
 
     background: ${cssVar.colorFillSecondary};
   `,

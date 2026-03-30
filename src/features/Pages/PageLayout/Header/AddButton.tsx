@@ -6,8 +6,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePageKind } from '@/features/Pages/usePageKind';
-import { usePageStore } from '@/store/page';
-import { TABLE_PAGE_KIND } from '@/utils/page';
+import { usePageStore } from '@/store/docs';
+import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const AddButton = memo(() => {
   const { t } = useTranslation('file');

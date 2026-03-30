@@ -29,7 +29,7 @@ export interface CrawlErrorItem {
  * const xml = crawlResultsPrompt(results);
  * // Output:
  * // <crawlResults>
- * //   <page title="Page Title" url="https://example.com">...</page>
+ * //   <page title="Page Title" url="https://example.com">...</docs>
  * // </crawlResults>
  * ```
  */
@@ -74,7 +74,7 @@ export const crawlResultsPrompt = (results: Array<CrawlResultItem | CrawlErrorIt
       const attrString = attrs.join(' ');
       const content = item.content ? escapeXmlContent(item.content) : '';
 
-      return content ? `  <page ${attrString}>${content}</page>` : `  <page ${attrString} />`;
+      return content ? `  <page ${attrString}>${content}</docs>` : `  <page ${attrString} />`;
     })
     .join('\n');
 

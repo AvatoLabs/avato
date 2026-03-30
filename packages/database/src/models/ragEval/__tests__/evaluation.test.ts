@@ -7,7 +7,7 @@ import {
   evalDatasets,
   evalEvaluation,
   evaluationRecords,
-  knowledgeBases,
+  sourceSets,
   users,
 } from '../../../schemas';
 import { EvalEvaluationModel } from '../evaluation';
@@ -19,26 +19,23 @@ const userId2 = 'eval-test-user-2';
 const evalModel = new EvalEvaluationModel(serverDB, userId);
 
 let datasetId: string;
-let knowledgeBaseId: string;
+let sourceSetId: string;
 
 beforeEach(async () => {
   await serverDB.delete(evaluationRecords);
   await serverDB.delete(evalEvaluation);
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 
   await serverDB.insert(users).values([{ id: userId }, { id: userId2 }]);
 
-  const [kb] = await serverDB
-    .insert(knowledgeBases)
-    .values({ name: 'Test KB', userId })
-    .returning();
-  knowledgeBaseId = kb.id;
+  const [kb] = await serverDB.insert(sourceSets).values({ name: 'Test KB', userId }).returning();
+  sourceSetId = kb.id;
 
   const [dataset] = await serverDB
     .insert(evalDatasets)
-    .values({ knowledgeBaseId, name: 'Test Dataset', userId })
+    .values({ sourceSetId, name: 'Test Dataset', userId })
     .returning();
   datasetId = dataset.id;
 });
@@ -47,7 +44,7 @@ afterEach(async () => {
   await serverDB.delete(evaluationRecords);
   await serverDB.delete(evalEvaluation);
   await serverDB.delete(evalDatasets);
-  await serverDB.delete(knowledgeBases);
+  await serverDB.delete(sourceSets);
   await serverDB.delete(users);
 });
 
@@ -56,21 +53,21 @@ describe('EvalEvaluationModel', () => {
     it('should create a new evaluation with userId', async () => {
       const result = await evalModel.create({
         datasetId,
-        knowledgeBaseId,
+        sourceSetId,
         name: 'Test Evaluation',
       });
 
       expect(result).toBeDefined();
       expect(result.name).toBe('Test Evaluation');
       expect(result.datasetId).toBe(datasetId);
-      expect(result.knowledgeBaseId).toBe(knowledgeBaseId);
+      expect(result.sourceSetId).toBe(sourceSetId);
       expect(result.userId).toBe(userId);
     });
 
     it('should create evaluation with description', async () => {
       const result = await evalModel.create({
         datasetId,
-        knowledgeBaseId,
+        sourceSetId,
         name: 'Eval with desc',
         description: 'A test evaluation',
       });
@@ -83,7 +80,7 @@ describe('EvalEvaluationModel', () => {
     it('should delete an evaluation owned by the user', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Delete me', userId })
+        .values({ datasetId, sourceSetId, name: 'Delete me', userId })
         .returning();
 
       await evalModel.delete(evaluation.id);
@@ -97,7 +94,7 @@ describe('EvalEvaluationModel', () => {
     it('should not delete an evaluation owned by another user', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Other eval', userId: userId2 })
+        .values({ datasetId, sourceSetId, name: 'Other eval', userId: userId2 })
         .returning();
 
       await evalModel.delete(evaluation.id);
@@ -109,11 +106,11 @@ describe('EvalEvaluationModel', () => {
     });
   });
 
-  describe('queryByKnowledgeBaseId', () => {
+  describe('queryBySourceSetId', () => {
     it('should query evaluations with dataset info and record stats', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Eval 1', userId })
+        .values({ datasetId, sourceSetId, name: 'Eval 1', userId })
         .returning();
 
       // Create a dataset record for the evaluation records to reference
@@ -140,7 +137,7 @@ describe('EvalEvaluationModel', () => {
         },
       ]);
 
-      const results = await evalModel.queryByKnowledgeBaseId(knowledgeBaseId);
+      const results = await evalModel.queryBySourceSetId(sourceSetId);
 
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('Eval 1');
@@ -152,10 +149,10 @@ describe('EvalEvaluationModel', () => {
     it('should return empty stats when no records exist', async () => {
       await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Empty eval', userId })
+        .values({ datasetId, sourceSetId, name: 'Empty eval', userId })
         .returning();
 
-      const results = await evalModel.queryByKnowledgeBaseId(knowledgeBaseId);
+      const results = await evalModel.queryBySourceSetId(sourceSetId);
 
       expect(results).toHaveLength(1);
       expect(results[0].recordsStats).toEqual({ success: 0, total: 0 });
@@ -163,18 +160,18 @@ describe('EvalEvaluationModel', () => {
 
     it('should only return evaluations for current user', async () => {
       await serverDB.insert(evalEvaluation).values([
-        { datasetId, knowledgeBaseId, name: 'My eval', userId },
-        { datasetId, knowledgeBaseId, name: 'Other eval', userId: userId2 },
+        { datasetId, sourceSetId, name: 'My eval', userId },
+        { datasetId, sourceSetId, name: 'Other eval', userId: userId2 },
       ]);
 
-      const results = await evalModel.queryByKnowledgeBaseId(knowledgeBaseId);
+      const results = await evalModel.queryBySourceSetId(sourceSetId);
 
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('My eval');
     });
 
-    it('should return empty array for non-existent knowledge base', async () => {
-      const results = await evalModel.queryByKnowledgeBaseId('non-existent');
+    it('should return empty array for non-existent source set', async () => {
+      const results = await evalModel.queryBySourceSetId('non-existent');
       expect(results).toHaveLength(0);
     });
   });
@@ -183,7 +180,7 @@ describe('EvalEvaluationModel', () => {
     it('should find an evaluation by id', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Find me', userId })
+        .values({ datasetId, sourceSetId, name: 'Find me', userId })
         .returning();
 
       const result = await evalModel.findById(evaluation.id);
@@ -195,7 +192,7 @@ describe('EvalEvaluationModel', () => {
     it('should not find evaluation owned by another user', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Other', userId: userId2 })
+        .values({ datasetId, sourceSetId, name: 'Other', userId: userId2 })
         .returning();
 
       const result = await evalModel.findById(evaluation.id);
@@ -212,7 +209,7 @@ describe('EvalEvaluationModel', () => {
     it('should update an evaluation owned by the user', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Original', userId })
+        .values({ datasetId, sourceSetId, name: 'Original', userId })
         .returning();
 
       await evalModel.update(evaluation.id, {
@@ -230,7 +227,7 @@ describe('EvalEvaluationModel', () => {
     it('should not update an evaluation owned by another user', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Other', userId: userId2 })
+        .values({ datasetId, sourceSetId, name: 'Other', userId: userId2 })
         .returning();
 
       await evalModel.update(evaluation.id, { name: 'Hacked' });
@@ -244,7 +241,7 @@ describe('EvalEvaluationModel', () => {
     it('should update status field', async () => {
       const [evaluation] = await serverDB
         .insert(evalEvaluation)
-        .values({ datasetId, knowledgeBaseId, name: 'Status test', userId })
+        .values({ datasetId, sourceSetId, name: 'Status test', userId })
         .returning();
 
       await evalModel.update(evaluation.id, { status: EvalEvaluationStatus.Success });

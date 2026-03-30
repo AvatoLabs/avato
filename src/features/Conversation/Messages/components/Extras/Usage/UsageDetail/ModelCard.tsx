@@ -19,11 +19,11 @@ export const styles = createStaticStyles(({ css, cssVar }) => {
     `,
     desc: css`
       line-height: 12px;
-      color: ${cssVar.colorTextDescription};
+      color: color-mix(in srgb, ${cssVar.colorTextDescription} 72%, ${cssVar.colorText} 28%);
     `,
     pricing: css`
       font-size: 12px;
-      color: ${cssVar.colorTextSecondary};
+      color: color-mix(in srgb, ${cssVar.colorTextSecondary} 78%, ${cssVar.colorText} 22%);
     `,
   };
 });

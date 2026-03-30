@@ -3,14 +3,11 @@ import { cssVar } from 'antd-style';
 import { memo } from 'react';
 
 import { DEFAULT_AVATAR } from '@/const/meta';
-import { useIsDark } from '@/hooks/useIsDark';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { type DiscoverAssistantItem } from '@/types/discover';
 
 const CommunityAgentItem = memo<DiscoverAssistantItem>(
   ({ title, avatar, backgroundColor, author, description }) => {
-    const isDarkMode = useIsDark();
-
     return (
       <Block
         clickable
@@ -21,6 +18,7 @@ const CommunityAgentItem = memo<DiscoverAssistantItem>(
         width={RECENT_BLOCK_SIZE.AGENT.WIDTH}
         style={{
           backgroundColor: cssVar.colorFillQuaternary,
+          border: `1px solid ${cssVar.colorBorderSecondary}`,
           borderRadius: cssVar.borderRadiusLG,
           overflow: 'hidden',
         }}
@@ -30,9 +28,9 @@ const CommunityAgentItem = memo<DiscoverAssistantItem>(
           padding={12}
           variant={'outlined'}
           style={{
-            backgroundColor: isDarkMode ? cssVar.colorFillQuaternary : cssVar.colorBgContainer,
+            background: `color-mix(in srgb, ${cssVar.colorBgContainer} 92%, ${cssVar.colorFillTertiary} 8%)`,
             borderRadius: cssVar.borderRadiusLG,
-            boxShadow: '0 4px 8px -2px rgba(0,0,0,.02)',
+            boxShadow: `inset 0 0 0 1px ${cssVar.colorBorderSecondary}`,
             overflow: 'hidden',
           }}
         >

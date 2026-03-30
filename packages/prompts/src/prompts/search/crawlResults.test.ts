@@ -20,7 +20,7 @@ describe('crawlResultsPrompt', () => {
     const xml = crawlResultsPrompt(results);
 
     expect(xml).toEqual(`<crawlResults>
-  <page url="https://example.com" title="Example Page">Page content here</page>
+  <page url="https://example.com" title="Example Page">Page content here</docs>
 </crawlResults>`);
   });
 
@@ -39,7 +39,7 @@ describe('crawlResultsPrompt', () => {
     const xml = crawlResultsPrompt(results);
 
     expect(xml).toEqual(`<crawlResults>
-  <page url="http://arxiv.org/abs/2509.09734v1" title="MCP-AgentBench: Evaluating Real-World Language Agent Performance" contentType="text" description="Abstract page for arXiv paper 2509.09734v1" length="10187">Full paper content...</page>
+  <page url="http://arxiv.org/abs/2509.09734v1" title="MCP-AgentBench: Evaluating Real-World Language Agent Performance" contentType="text" description="Abstract page for arXiv paper 2509.09734v1" length="10187">Full paper content...</docs>
 </crawlResults>`);
   });
 
@@ -103,7 +103,7 @@ describe('crawlResultsPrompt', () => {
     const xml = crawlResultsPrompt(results);
 
     expect(xml).toEqual(`<crawlResults>
-  <page url="https://example.com" title="Test">Content with &lt;html&gt; tags &amp; special chars</page>
+  <page url="https://example.com" title="Test">Content with &lt;html&gt; tags &amp; special chars</docs>
 </crawlResults>`);
   });
 
@@ -129,9 +129,9 @@ describe('crawlResultsPrompt', () => {
     const xml = crawlResultsPrompt(results);
 
     expect(xml).toEqual(`<crawlResults>
-  <page url="https://success1.com" title="First Page">First content</page>
+  <page url="https://success1.com" title="First Page">First content</docs>
   <error errorType="TimeoutError" errorMessage="Request timeout" url="https://failed.com" />
-  <page url="https://success2.com" title="Second Page">Second content</page>
+  <page url="https://success2.com" title="Second Page">Second content</docs>
 </crawlResults>`);
   });
 
@@ -166,7 +166,7 @@ describe('crawlResultsPrompt', () => {
     const xml = crawlResultsPrompt(results);
 
     expect(xml).toEqual(`<crawlResults>
-  <page url="http://arxiv.org/abs/2508.01780v1" title="LiveMCPBench: Can Agents Navigate an Ocean of MCP Tools?" contentType="text" description="Abstract page for arXiv paper 2508.01780v1" length="10512">With the rapid development of Model Context Protocol (MCP), the number of MCP servers has surpassed 10,000...</page>
+  <page url="http://arxiv.org/abs/2508.01780v1" title="LiveMCPBench: Can Agents Navigate an Ocean of MCP Tools?" contentType="text" description="Abstract page for arXiv paper 2508.01780v1" length="10512">With the rapid development of Model Context Protocol (MCP), the number of MCP servers has surpassed 10,000...</docs>
 </crawlResults>`);
   });
 });

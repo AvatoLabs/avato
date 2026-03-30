@@ -16,6 +16,7 @@ export const CHATGPT_DARK_SURFACE = {
 /** Maps ChatGPT-like neutrals onto antd semantic tokens (dark mode only). */
 export function getChatgptDarkSurfaceTokenOverrides(
   isDarkMode: boolean,
+  solidTextColor = '#ffffff',
 ): Partial<AliasToken> & { colorBgContainerSecondary?: string } {
   if (!isDarkMode) return {};
 
@@ -26,7 +27,7 @@ export function getChatgptDarkSurfaceTokenOverrides(
      * 仅作用于 antd-style 的 customToken（useTheme/cssVar）；antd 组件以 ConfigProvider 为准，须同时在
      * `AppTheme` / `AuthThemeLite` 的 `theme.token` 中设置；另见 `src/styles/antdOverride.ts` 全局兜底。
      */
-    colorTextLightSolid: '#ffffff',
+    colorTextLightSolid: solidTextColor,
     colorBgContainer: container,
     colorBgElevated: elevated,
     colorBgLayout: layout,

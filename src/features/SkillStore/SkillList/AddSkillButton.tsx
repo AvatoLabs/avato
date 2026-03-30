@@ -52,7 +52,7 @@ const AddSkillButton = () => {
       <ImportFromGithubModal open={showGithubModal} onOpenChange={setGithubModal} />
       <UploadSkillModal open={showUploadModal} onOpenChange={setUploadModal} />
       <DropdownMenu
-        nativeButton={false}
+        nativeButton
         placement="bottomRight"
         items={[
           {

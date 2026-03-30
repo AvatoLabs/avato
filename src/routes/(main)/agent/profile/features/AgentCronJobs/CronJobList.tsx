@@ -2,6 +2,7 @@
 
 import { ActionIcon, Flexbox, Icon } from '@lobehub/ui';
 import { Badge, List, Popconfirm, Switch, Typography } from 'antd';
+import { cssVar } from 'antd-style';
 import dayjs from 'dayjs';
 import { Calendar, Clock, Edit, Trash2 } from 'lucide-react';
 import { memo } from 'react';
@@ -10,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { type AgentCronJob } from '@/database/schemas/agentCronJob';
 
 import { useAgentCronJobs } from './hooks/useAgentCronJobs';
+import { getCronJobIntervalText, getCronJobStatusInfo } from './shared';
 
 const { Text, Paragraph } = Typography;
 
@@ -19,32 +21,6 @@ interface CronJobListProps {
   onDelete: (jobId: string) => void;
   onEdit: (jobId: string) => void;
 }
-
-const getIntervalText = (cronPattern: string) => {
-  const intervalMap: Record<string, string> = {
-    '*/30 * * * *': 'agentCronJobs.interval.30min',
-    '0 * * * *': 'agentCronJobs.interval.1hour',
-    '0 */12 * * *': 'agentCronJobs.interval.12hours',
-    '0 */2 * * *': 'agentCronJobs.interval.2hours',
-    '0 */6 * * *': 'agentCronJobs.interval.6hours',
-    '0 0 * * *': 'agentCronJobs.interval.daily',
-    '0 0 * * 0': 'agentCronJobs.interval.weekly',
-  };
-
-  return intervalMap[cronPattern] || cronPattern;
-};
-
-const getStatusInfo = (job: AgentCronJob) => {
-  if (!job.enabled) {
-    return { status: 'default' as const, text: 'agentCronJobs.status.disabled' };
-  }
-
-  if (job.remainingExecutions === 0) {
-    return { status: 'error' as const, text: 'agentCronJobs.status.depleted' };
-  }
-
-  return { status: 'success' as const, text: 'agentCronJobs.status.enabled' };
-};
 
 const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelete }) => {
   const { t } = useTranslation('setting');
@@ -59,8 +35,8 @@ const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelet
       dataSource={cronJobs}
       loading={loading}
       renderItem={(job) => {
-        const statusInfo = getStatusInfo(job);
-        const intervalText = getIntervalText(job.cronPattern);
+        const statusInfo = getCronJobStatusInfo(job);
+        const intervalText = getCronJobIntervalText(job.cronPattern);
 
         return (
           <List.Item
@@ -93,7 +69,8 @@ const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelet
                 <Flexbox gap={4}>
                   <Paragraph
                     ellipsis={{ rows: 2, tooltip: job.content }}
-                    style={{ color: '#666', fontSize: '12px', margin: 0 }}
+                    style={{ fontSize: '12px', margin: 0 }}
+                    type={'secondary'}
                   >
                     {job.content}
                   </Paragraph>
@@ -101,11 +78,13 @@ const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelet
                   <Flexbox horizontal gap={8} style={{ marginTop: 4 }}>
                     <Flexbox horizontal align="center" gap={4}>
                       <Icon icon={Clock} size={12} />
-                      <Text style={{ fontSize: '11px' }}>{t(intervalText as any)}</Text>
+                      <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
+                        {t(intervalText as any)}
+                      </Text>
                     </Flexbox>
 
                     {job.remainingExecutions !== null && (
-                      <Text style={{ fontSize: '11px' }}>
+                      <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
                         {t('agentCronJobs.remainingExecutions', { count: job.remainingExecutions })}
                       </Text>
                     )}
@@ -113,7 +92,7 @@ const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelet
                     {job.lastExecutedAt && (
                       <Flexbox horizontal align="center" gap={4}>
                         <Icon icon={Calendar} size={12} />
-                        <Text style={{ fontSize: '11px' }}>
+                        <Text style={{ color: cssVar.colorTextTertiary, fontSize: '11px' }}>
                           {dayjs(job.lastExecutedAt).format('MM/DD HH:mm')}
                         </Text>
                       </Flexbox>
@@ -122,8 +101,10 @@ const CronJobList = memo<CronJobListProps>(({ cronJobs, loading, onEdit, onDelet
                 </Flexbox>
               }
               title={
-                <Flexbox horizontal align="center" gap={8}>
-                  <span>{job.name}</span>
+                <Flexbox horizontal align="center" gap={8} style={{ minWidth: 0 }}>
+                  <Text ellipsis strong style={{ minWidth: 0 }}>
+                    {job.name}
+                  </Text>
                   <Badge status={statusInfo.status} text={t(statusInfo.text as any)} />
                 </Flexbox>
               }

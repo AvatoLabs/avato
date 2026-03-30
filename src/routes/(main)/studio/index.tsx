@@ -11,6 +11,8 @@ import WideScreenButton from '@/features/WideScreenContainer/WideScreenButton';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 
+import Sidebar from './Sidebar';
+
 const AvatoStudioPage = memo(() => {
   const { t } = useTranslation('common');
   const toggleWideScreen = useGlobalStore((s) => s.toggleWideScreen);
@@ -27,6 +29,7 @@ const AvatoStudioPage = memo(() => {
 
   return (
     <>
+      <Sidebar />
       <PageTitle title={t('tab.avatoStudio')} />
       <Flexbox height={'100%'} style={{ overflowY: 'auto', position: 'relative' }} width={'100%'}>
         <Flexbox

@@ -8,7 +8,7 @@ import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
-import { usePageAgentContextFallback } from '../../hooks/usePageAgentContextFallback';
+import { useDocsAgentContextFallback } from '../../hooks/useDocsAgentContextFallback';
 import { useTextFileLoader } from '../../hooks/useTextFileLoader';
 import { MermaidDiagramPanel } from '../Markdown/components';
 import { resolveCodeBlockLanguage } from '../Markdown/utils';
@@ -207,10 +207,10 @@ export const getLanguage = (fileName?: string): string => {
 };
 
 interface CodeViewerProps {
-  enablePageAgentContext?: boolean;
+  docsAgentContextKey?: string;
+  enableDocsAgentContext?: boolean;
   fileId: string;
   fileName?: string;
-  pageAgentContextKey?: string;
   url: string | null;
 }
 
@@ -218,14 +218,14 @@ interface CodeViewerProps {
  * Render any code file.
  */
 const CodeViewer = memo<CodeViewerProps>(
-  ({ enablePageAgentContext, fileId, url, fileName, pageAgentContextKey }) => {
+  ({ enableDocsAgentContext, fileId, url, fileName, docsAgentContextKey }) => {
     const { fileData, loading } = useTextFileLoader(url);
     const { mermaidTheme } = useUserStore(userGeneralSettingsSelectors.config);
     const language = resolveCodeBlockLanguage(getLanguage(fileName), fileData || '');
 
-    usePageAgentContextFallback({
-      contextKey: pageAgentContextKey,
-      enabled: enablePageAgentContext,
+    useDocsAgentContextFallback({
+      contextKey: docsAgentContextKey,
+      enabled: enableDocsAgentContext,
       fileId,
       fileName,
       text: fileData,

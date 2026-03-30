@@ -3,76 +3,75 @@ import { type Theme } from 'antd-style';
 import { css } from 'antd-style';
 import { rgba } from 'polished';
 
-const antdOverride = ({ token }: { prefixCls: string; token: Theme }) => css`
-  /**
-   * 暗色下「彩色实心」按钮字色：与 AppTheme / AuthThemeLite 的 theme.token.colorTextLightSolid 双保险。
-   * 含 primary、dangerous、success、warning 及 PresetColors（lime 等）；排除 color-default（用 solidTextColor 按亮度算字色）。
-   */
-  html[data-theme='dark']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
-      :disabled
-    ):not(.${token.prefixCls}-btn-disabled) {
-    color: #fff !important;
-  }
+const PRESET_BUTTON_COLORS = [
+  'red',
+  'orange',
+  'gold',
+  'yellow',
+  'lime',
+  'green',
+  'cyan',
+  'blue',
+  'geekblue',
+  'purple',
+  'magenta',
+  'volcano',
+] as const;
 
-  html[data-theme='dark']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
+const getSolidButtonColorOverride = (prefixCls: string, colorKey: string, foreground: string) => {
+  return css`
+    .${prefixCls}-btn.${prefixCls}-btn-variant-solid.${prefixCls}-btn-color-${colorKey}:not(
       :disabled
-    ):not(.${token.prefixCls}-btn-disabled)
-    .${token.prefixCls}icon,
-    html[data-theme='dark']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
-      :disabled
-    ):not(.${token.prefixCls}-btn-disabled)
-    svg {
-    color: #fff !important;
-  }
+    ):not(.${prefixCls}-btn-disabled) {
+      color: ${foreground} !important;
+    }
 
-  /**
-   * 亮色主题下：所有彩色实心按钮使用白色文字
-   */
-  html[data-theme='light']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
+    .${prefixCls}-btn.${prefixCls}-btn-variant-solid.${prefixCls}-btn-color-${colorKey}:not(
       :disabled
-    ):not(.${token.prefixCls}-btn-disabled) {
-    color: #fff !important;
-  }
+    ):not(.${prefixCls}-btn-disabled)
+      .${prefixCls}icon,
+      .${prefixCls}-btn.${prefixCls}-btn-variant-solid.${prefixCls}-btn-color-${colorKey}:not(
+      :disabled
+    ):not(.${prefixCls}-btn-disabled)
+      svg {
+      color: ${foreground} !important;
+    }
+  `;
+};
 
-  html[data-theme='light']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
-      :disabled
-    ):not(.${token.prefixCls}-btn-disabled)
-    .${token.prefixCls}icon,
-    html[data-theme='light']
-    .${token.prefixCls}-btn.${token.prefixCls}-btn-variant-solid:not(.${token.prefixCls}-btn-color-default):not(
-      :disabled
-    ):not(.${token.prefixCls}-btn-disabled)
-    svg {
-    color: #fff !important;
-  }
+const antdOverride = ({ token }: { prefixCls: string; token: Theme }) => {
+  const presetSolidButtonOverrides = PRESET_BUTTON_COLORS.map((colorKey) =>
+    getSolidButtonColorOverride(token.prefixCls, colorKey, '#fff'),
+  ).join('\n');
+
+  return css`
+    ${getSolidButtonColorOverride(token.prefixCls, 'primary', token.colorTextLightSolid)}
+    ${getSolidButtonColorOverride(token.prefixCls, 'dangerous', '#fff')}
+  ${presetSolidButtonOverrides}
 
   .${token.prefixCls}-popover {
-    z-index: 1100;
-  }
-
-  .${token.prefixCls}-menu-item-selected {
-    .${token.prefixCls}-menu-title-content {
-      color: ${token.colorText};
+      z-index: 1100;
     }
-  }
 
-  .${token.prefixCls}-modal-mask, .${token.prefixCls}-drawer-mask {
-    background: ${rgba(token.colorBgLayout, 0.5)} !important;
-    backdrop-filter: blur(2px);
-  }
-
-  ${isDesktop &&
-  css`
-    .${token.prefixCls}-modal-mask.${token.prefixCls}-modal-mask-blur {
-      background: ${rgba(token.colorBgLayout, 0.8)} !important;
-      backdrop-filter: none !important;
+    .${token.prefixCls}-menu-item-selected {
+      .${token.prefixCls}-menu-title-content {
+        color: ${token.colorText};
+      }
     }
-  `}
-`;
+
+    .${token.prefixCls}-modal-mask, .${token.prefixCls}-drawer-mask {
+      background: ${rgba(token.colorBgLayout, 0.5)} !important;
+      backdrop-filter: blur(2px);
+    }
+
+    ${isDesktop &&
+    css`
+      .${token.prefixCls}-modal-mask.${token.prefixCls}-modal-mask-blur {
+        background: ${rgba(token.colorBgLayout, 0.8)} !important;
+        backdrop-filter: none !important;
+      }
+    `}
+  `;
+};
 
 export default antdOverride;

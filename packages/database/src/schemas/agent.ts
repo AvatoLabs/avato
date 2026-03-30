@@ -19,13 +19,13 @@ import { z } from 'zod';
 
 import { idGenerator, randomSlug } from '../utils/idGenerator';
 import { timestamps } from './_helpers';
-import { files, knowledgeBases } from './file';
+import { files, sourceSets } from './file';
 import { sessionGroups } from './session';
 import { users } from './user';
 
 // Agent table is the main table for storing agents
 // agent is a model that represents the assistant that is created by the user
-// agent can have its own knowledge base and files
+// agent can have its own source sets and files
 
 export const agents = pgTable(
   'agents',
@@ -92,14 +92,14 @@ export const insertAgentSchema = createInsertSchema(agents, {
 export type NewAgent = typeof agents.$inferInsert;
 export type AgentItem = typeof agents.$inferSelect;
 
-export const agentsKnowledgeBases = pgTable(
-  'agents_knowledge_bases',
+export const agentsSourceSets = pgTable(
+  'agents_source_sets',
   {
     agentId: text('agent_id')
       .references(() => agents.id, { onDelete: 'cascade' })
       .notNull(),
-    knowledgeBaseId: text('knowledge_base_id')
-      .references(() => knowledgeBases.id, { onDelete: 'cascade' })
+    sourceSetId: text('source_set_id')
+      .references(() => sourceSets.id, { onDelete: 'cascade' })
       .notNull(),
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
@@ -109,10 +109,10 @@ export const agentsKnowledgeBases = pgTable(
     ...timestamps,
   },
   (t) => [
-    primaryKey({ columns: [t.agentId, t.knowledgeBaseId] }),
-    index('agents_knowledge_bases_agent_id_idx').on(t.agentId),
-    index('agents_knowledge_bases_knowledge_base_id_idx').on(t.knowledgeBaseId),
-    index('agents_knowledge_bases_user_id_idx').on(t.userId),
+    primaryKey({ columns: [t.agentId, t.sourceSetId] }),
+    index('agents_source_sets_agent_id_idx').on(t.agentId),
+    index('agents_source_sets_source_set_id_idx').on(t.sourceSetId),
+    index('agents_source_sets_user_id_idx').on(t.userId),
   ],
 );
 

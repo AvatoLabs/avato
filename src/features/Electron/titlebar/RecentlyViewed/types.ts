@@ -1,6 +1,6 @@
 import { type IconProps } from '@lobehub/ui';
 
-import { type PageKind } from '@/utils/page';
+import { type PageKind } from '@/utils/docs';
 
 // ======== Page Types ======== //
 

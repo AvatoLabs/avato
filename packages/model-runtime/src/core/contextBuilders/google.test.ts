@@ -1199,7 +1199,7 @@ describe('google contextBuilders', () => {
       });
     });
 
-    it('should handle oneOf with const values (like page-agent modifyNodes)', () => {
+    it('should handle oneOf with const values (like docs-agent modifyNodes)', () => {
       const tool: ChatCompletionTool = {
         function: {
           description: 'Modify nodes operation',

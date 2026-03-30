@@ -1,8 +1,8 @@
 // @vitest-environment node
-import { KnowledgeBaseManifest } from '@lobechat/builtin-tool-knowledge-base';
 import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { MemoryManifest } from '@lobechat/builtin-tool-memory';
 import { RemoteDeviceManifest } from '@lobechat/builtin-tool-remote-device';
+import { SourceSetManifest } from '@lobechat/builtin-tool-source-set';
 import { WebBrowsingManifest } from '@lobechat/builtin-tool-web-browsing';
 import { builtinTools } from '@lobechat/builtin-tools';
 import { ToolsEngine } from '@lobechat/context-engine';
@@ -241,40 +241,40 @@ describe('createServerAgentToolsEngine', () => {
     expect(result.enabledToolIds).not.toContain(WebBrowsingManifest.identifier);
   });
 
-  it('should enable KnowledgeBase when hasEnabledKnowledgeBases is true', () => {
+  it('should enable KnowledgeBase when hasEnabledSourceSets is true', () => {
     const context = createMockContext();
     const engine = createServerAgentToolsEngine(context, {
-      agentConfig: { plugins: [KnowledgeBaseManifest.identifier] },
+      agentConfig: { plugins: [SourceSetManifest.identifier] },
       model: 'gpt-4',
       provider: 'openai',
-      hasEnabledKnowledgeBases: true,
+      hasEnabledSourceSets: true,
     });
 
     const result = engine.generateToolsDetailed({
-      toolIds: [KnowledgeBaseManifest.identifier],
+      toolIds: [SourceSetManifest.identifier],
       model: 'gpt-4',
       provider: 'openai',
     });
 
-    expect(result.enabledToolIds).toContain(KnowledgeBaseManifest.identifier);
+    expect(result.enabledToolIds).toContain(SourceSetManifest.identifier);
   });
 
-  it('should disable KnowledgeBase when hasEnabledKnowledgeBases is false', () => {
+  it('should disable KnowledgeBase when hasEnabledSourceSets is false', () => {
     const context = createMockContext();
     const engine = createServerAgentToolsEngine(context, {
-      agentConfig: { plugins: [KnowledgeBaseManifest.identifier] },
+      agentConfig: { plugins: [SourceSetManifest.identifier] },
       model: 'gpt-4',
       provider: 'openai',
-      hasEnabledKnowledgeBases: false,
+      hasEnabledSourceSets: false,
     });
 
     const result = engine.generateToolsDetailed({
-      toolIds: [KnowledgeBaseManifest.identifier],
+      toolIds: [SourceSetManifest.identifier],
       model: 'gpt-4',
       provider: 'openai',
     });
 
-    expect(result.enabledToolIds).not.toContain(KnowledgeBaseManifest.identifier);
+    expect(result.enabledToolIds).not.toContain(SourceSetManifest.identifier);
   });
 
   it('should include default tools (WebBrowsing, KnowledgeBase)', () => {
@@ -286,7 +286,7 @@ describe('createServerAgentToolsEngine', () => {
       },
       model: 'gpt-4',
       provider: 'openai',
-      hasEnabledKnowledgeBases: true,
+      hasEnabledSourceSets: true,
     });
 
     const result = engine.generateToolsDetailed({
@@ -298,7 +298,7 @@ describe('createServerAgentToolsEngine', () => {
     // Should include default tools alongside user tools
     expect(result.enabledToolIds).toContain('test-plugin');
     expect(result.enabledToolIds).toContain(WebBrowsingManifest.identifier);
-    expect(result.enabledToolIds).toContain(KnowledgeBaseManifest.identifier);
+    expect(result.enabledToolIds).toContain(SourceSetManifest.identifier);
   });
 
   it('should return undefined tools when model does not support function calling', () => {

@@ -18,7 +18,11 @@ import {
   type ModelRuntime,
 } from '@lobechat/model-runtime';
 import { skillsPrompts } from '@lobechat/prompts';
-import { type ChatToolPayload, type MessageToolCall } from '@lobechat/types';
+import {
+  type ChatToolPayload,
+  type MessageToolCall,
+  type UserInterventionConfig,
+} from '@lobechat/types';
 import { LOBE_DEFAULT_MODEL_LIST } from 'model-bank';
 
 import { AgentModel } from '@/database/models/agent';
@@ -26,6 +30,7 @@ import { AgentSkillModel } from '@/database/models/agentSkill';
 import { FileModel } from '@/database/models/file';
 import { PluginModel } from '@/database/models/plugin';
 import { SessionModel } from '@/database/models/session';
+import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { type LobeChatDatabase } from '@/database/type';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
@@ -102,11 +107,11 @@ interface ConversationConfig {
   };
   files?: Array<{ content?: string | null; enabled?: boolean | null; id?: string; name?: string }>;
   id?: string;
-  knowledgeBases?: Array<{ enabled?: boolean | null; id?: string; name?: string }>;
   model?: string | null;
   plugins?: string[];
   provider?: string | null;
   slug?: string | null;
+  sourceSets?: Array<{ enabled?: boolean | null; id?: string; name?: string }>;
   systemRole?: string | null;
 }
 
@@ -524,6 +529,7 @@ export class MobileChatService {
   private readonly provider: string;
   private readonly requestSignal: AbortSignal;
   private readonly serverDB: LobeChatDatabase;
+  private readonly spaceModel: SpaceModel;
   private readonly userId: string;
 
   constructor(params: {
@@ -537,8 +543,18 @@ export class MobileChatService {
     this.provider = params.provider;
     this.requestSignal = params.requestSignal;
     this.serverDB = params.serverDB;
+    this.spaceModel = new SpaceModel(params.serverDB, params.userId);
     this.userId = params.userId;
   }
+
+  private assertAccessibleSpace = async (spaceId?: string | null) => {
+    if (!spaceId) return;
+
+    const space = await this.spaceModel.findAccessibleSpaceById(spaceId);
+    if (!space?.id) {
+      throw new Error('SPACE_ACCESS_DENIED');
+    }
+  };
 
   private resolveToolSet = async (params: {
     conversationConfig?: ConversationConfig;
@@ -797,7 +813,7 @@ export class MobileChatService {
                       fileId: file.id ?? '',
                       filename: file.name ?? '',
                     })),
-                  knowledgeBases: conversationConfig?.knowledgeBases
+                  sourceSets: conversationConfig?.sourceSets
                     ?.filter((kb) => kb.enabled === true)
                     .map((kb) => ({
                       id: kb.id ?? '',
@@ -846,7 +862,7 @@ export class MobileChatService {
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const { boundProcessContentBlocks, toolExecutionService } = this.createToolExecutionService();
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
@@ -933,7 +949,7 @@ export class MobileChatService {
             break;
           }
 
-          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          let userInterventionConfig: UserInterventionConfig | undefined;
           try {
             const userModel = new UserModel(this.serverDB, this.userId);
             const settings = await userModel.getUserSettings();
@@ -962,7 +978,7 @@ export class MobileChatService {
 
             for (const toolCall of toolsToExecute) {
               const execution = await toolExecutionService.executeTool(toolCall, {
-                knowledgeBaseIds,
+                sourceSetIds,
                 processContentBlocks:
                   toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
                 serverDB: this.serverDB,
@@ -1043,7 +1059,7 @@ export class MobileChatService {
 
           for (const toolCall of normalizedToolCalls) {
             const execution = await toolExecutionService.executeTool(toolCall, {
-              knowledgeBaseIds,
+              sourceSetIds,
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
@@ -1093,6 +1109,8 @@ export class MobileChatService {
   };
 
   handleChat = async (payload: MobileChatPayload, tracePayload?: TracePayload) => {
+    await this.assertAccessibleSpace(payload.spaceId);
+
     const conversationConfig = await readSessionConversationConfig(
       this.serverDB,
       this.userId,
@@ -1146,7 +1164,7 @@ export class MobileChatService {
       messages,
       ...(toolSet?.tools ? { tools: toolSet.tools } : {}),
     };
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
@@ -1260,7 +1278,7 @@ export class MobileChatService {
             `[webapi/chat] round ${round + 1}: model called ${normalizedToolCalls.length} tools: ${normalizedToolCalls.map((toolCall) => toolCall.apiName).join(', ')}`,
           );
 
-          let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+          let userInterventionConfig: UserInterventionConfig | undefined;
           try {
             const userModel = new UserModel(this.serverDB, this.userId);
             const settings = await userModel.getUserSettings();
@@ -1291,7 +1309,7 @@ export class MobileChatService {
                 `[webapi/chat] executing tool (auto): ${toolCall.identifier}:${toolCall.apiName}`,
               );
               const execution = await toolExecutionService.executeTool(toolCall, {
-                knowledgeBaseIds,
+                sourceSetIds,
                 processContentBlocks:
                   toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
                 serverDB: this.serverDB,
@@ -1368,7 +1386,7 @@ export class MobileChatService {
             );
 
             const execution = await toolExecutionService.executeTool(toolCall, {
-              knowledgeBaseIds,
+              sourceSetIds,
               processContentBlocks:
                 toolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
               serverDB: this.serverDB,
@@ -1505,6 +1523,8 @@ export class MobileChatService {
     resumeState: MobileInterventionResumeState;
   }) => {
     const { approvedToolCall, rejectedToolCall, payload, resumeState } = params;
+    await this.assertAccessibleSpace(payload.spaceId);
+
     const hasApprove = Boolean(approvedToolCall);
     const hasReject = Boolean(rejectedToolCall);
     if (hasApprove === hasReject) {
@@ -1518,7 +1538,7 @@ export class MobileChatService {
       this.userId,
       payload.sessionId,
     );
-    const knowledgeBaseIds = conversationConfig?.knowledgeBases
+    const sourceSetIds = conversationConfig?.sourceSets
       ?.filter((kb) => kb.enabled === true)
       .map((kb) => kb.id)
       .filter(Boolean) as string[] | undefined;
@@ -1529,7 +1549,7 @@ export class MobileChatService {
 
     if (approvedToolCall) {
       const execution = await toolExecutionService.executeTool(approvedToolCall, {
-        knowledgeBaseIds,
+        sourceSetIds,
         processContentBlocks:
           approvedToolCall.source === 'mcp' ? boundProcessContentBlocks : undefined,
         serverDB: this.serverDB,
@@ -1674,7 +1694,7 @@ export class MobileChatService {
         toolSet.manifestMap,
         toolSet.sourceMap,
       );
-      let userInterventionConfig: { allowList?: string[]; approvalMode: string } | undefined;
+      let userInterventionConfig: UserInterventionConfig | undefined;
       try {
         const userModel = new UserModel(this.serverDB, this.userId);
         const settings = await userModel.getUserSettings();
@@ -1700,7 +1720,7 @@ export class MobileChatService {
         const execEvents: MobileToolExecutionEvent[] = [];
         for (const tc of toExecute) {
           const ex = await toolExecutionService.executeTool(tc, {
-            knowledgeBaseIds,
+            sourceSetIds,
             processContentBlocks: tc.source === 'mcp' ? boundProcessContentBlocks : undefined,
             serverDB: this.serverDB,
             spaceId: payload.spaceId,

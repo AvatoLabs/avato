@@ -10,6 +10,7 @@ import useSWR from 'swr';
 import NotFound from '@/components/404';
 import { ProductLogo } from '@/components/Branding';
 import Loading from '@/components/Loading/BrandTextLoading';
+import { documentMarkdownRemarkPlugins } from '@/libs/markdown/remarkEncodedBreakTag';
 import { lambdaClient } from '@/libs/trpc/client';
 
 const PublicSharePage = memo(() => {
@@ -21,7 +22,7 @@ const PublicSharePage = memo(() => {
   const { data, error, isLoading } = useSWR(
     token ? ['public-resource-share', token, submittedPassword || ''] : null,
     () =>
-      lambdaClient.resourceShare.getSharedResourceByToken.query({
+      lambdaClient.contentShare.getSharedContentByToken.query({
         password: submittedPassword,
         token: token!,
       }),
@@ -113,7 +114,9 @@ const PublicSharePage = memo(() => {
           padding={20}
           style={{ border: '1px solid var(--ant-color-border-secondary)', borderRadius: 12 }}
         >
-          <Markdown>{data.content}</Markdown>
+          <Markdown remarkPluginsAhead={[...documentMarkdownRemarkPlugins]}>
+            {data.content}
+          </Markdown>
         </Flexbox>
       ) : (
         <Flexbox
