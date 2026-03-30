@@ -11,6 +11,7 @@ import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 
+import { usePageScope } from '../../usePageScope';
 import Actions from '../Body/Actions';
 import AddButton from './AddButton';
 import Nav from './Nav';
@@ -29,10 +30,8 @@ const Header = memo(() => {
     s.searchKeywords,
     s.setSearchKeywords,
   ]);
-  const [showOnlyPagesWithoutSourceSet, setShowOnlyPagesWithoutSourceSet] = usePageStore((s) => [
-    s.showOnlyPagesWithoutSourceSet,
-    s.setShowOnlyPagesWithoutSourceSet,
-  ]);
+  const showOnlyPagesWithoutSourceSet = usePageStore((s) => s.showOnlyPagesWithoutSourceSet);
+  const { setScope } = usePageScope();
 
   return (
     <>
@@ -53,7 +52,7 @@ const Header = memo(() => {
               size={'small'}
               style={{ cursor: 'pointer' }}
               variant={'filled'}
-              onClick={() => setShowOnlyPagesWithoutSourceSet(false)}
+              onClick={() => setScope('all')}
             >
               {t('pageList.filter.onlyUnassigned', { ns: 'file' })}
             </Tag>

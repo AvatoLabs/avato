@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePageKind } from '@/features/Pages/usePageKind';
+import { usePageScope } from '@/features/Pages/usePageScope';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
@@ -17,9 +18,9 @@ import { TABLE_PAGE_KIND } from '@/utils/docs';
 export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
   const pageKind = usePageKind();
+  const { scope, setScope } = usePageScope();
   const activeSpaceId = getActiveWorkspaceSpaceId();
-  const showOnlyPagesWithoutSourceSet = usePageStore((s) => s.showOnlyPagesWithoutSourceSet);
-  const setShowOnlyPagesWithoutSourceSet = usePageStore((s) => s.setShowOnlyPagesWithoutSourceSet);
+  const showOnlyPagesWithoutSourceSet = scope === 'unassigned';
   const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets = [] } = useFetchSourceSetList(activeSpaceId);
@@ -73,7 +74,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
         key: 'only-unassigned',
         label: t('pageList.filter.onlyUnassigned', { ns: 'file' }),
         onClick: () => {
-          setShowOnlyPagesWithoutSourceSet(!showOnlyPagesWithoutSourceSet);
+          setScope(showOnlyPagesWithoutSourceSet ? 'all' : 'unassigned');
         },
       },
       {
@@ -111,9 +112,9 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     pageKind,
     sourceSets,
     t,
-    setShowOnlyPagesWithoutSourceSet,
     showOnlyPagesWithoutSourceSet,
     pagePageSize,
+    setScope,
     updateSystemStatus,
   ]);
 };

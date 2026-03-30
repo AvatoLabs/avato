@@ -40,7 +40,7 @@ const resolveParentDocumentId = async (
     spaceId?: string;
   },
 ) => {
-  if (!params.parentId) return params.parentId;
+  if (!params.parentId) return params.parentId ?? undefined;
 
   let scopedSpaceId = params.spaceId;
   if (!scopedSpaceId && params.sourceSetId) {
@@ -80,7 +80,7 @@ export const documentRouter = router({
       return ctx.documentService.createDocument({
         ...input,
         editorData,
-        parentId: resolvedParentId,
+        parentId: resolvedParentId ?? undefined,
       });
     }),
 
@@ -114,7 +114,7 @@ export const documentRouter = router({
           return {
             ...doc,
             editorData,
-            parentId: resolvedParentId,
+            parentId: resolvedParentId ?? undefined,
           };
         }),
       );

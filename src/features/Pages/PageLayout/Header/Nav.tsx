@@ -4,7 +4,7 @@ import { Flexbox } from '@lobehub/ui';
 import { FileText, SearchIcon, Table2 } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -23,6 +23,7 @@ interface Item {
 
 const Nav = memo(() => {
   const pageKind = usePageKind();
+  const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation('common');
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
@@ -74,7 +75,7 @@ const Nav = memo(() => {
               if (isModifierClick(e)) return;
               e.preventDefault();
               item.onClick?.();
-              navigate(item.url!);
+              navigate(`${item.url!}${location.search}`);
             }}
           >
             <NavItem active={pageKind === item.key} icon={item.icon} title={item.title} />

@@ -302,13 +302,15 @@ export class CrudActionImpl {
   };
 
   navigateToPage = (pageId: string | null, pageKind?: PageKind): void => {
+    const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+
     if (!pageId) {
-      this.#get().navigate?.(getPageRootPath(pageKind));
+      this.#get().navigate?.(`${getPageRootPath(pageKind)}${currentSearch}`);
     } else {
       const document = this.#get().documents?.find((doc) => doc.id === pageId);
       const nextPageKind = pageKind || getPageKindFromDocument(document);
 
-      this.#get().navigate?.(getPageDetailPath(pageId, nextPageKind));
+      this.#get().navigate?.(`${getPageDetailPath(pageId, nextPageKind)}${currentSearch}`);
     }
   };
 

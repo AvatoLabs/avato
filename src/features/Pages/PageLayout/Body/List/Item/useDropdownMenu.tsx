@@ -4,7 +4,7 @@ import { App } from 'antd';
 import { CopyPlus, PanelTop, Pencil, Trash2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
@@ -23,12 +23,13 @@ export const useDropdownMenu = ({
 }: ActionProps): (() => MenuProps['items']) => {
   const { t } = useTranslation(['common', 'file']);
   const { message, modal } = App.useApp();
+  const location = useLocation();
   const navigate = useNavigate();
   const addTab = useElectronStore((s) => s.addTab);
   const removePage = usePageStore((s) => s.removePage);
   const duplicatePage = usePageStore((s) => s.duplicatePage);
   const document = usePageStore(pageSelectors.getDocumentById(pageId));
-  const href = getPageDetailPath(pageId, getPageKindFromDocument(document));
+  const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document))}${location.search}`;
 
   const handleDelete = useCallback(() => {
     modal.confirm({

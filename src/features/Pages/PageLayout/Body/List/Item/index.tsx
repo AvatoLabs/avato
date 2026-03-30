@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { type MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { isDesktop } from '@/const/version';
@@ -24,6 +25,7 @@ interface DocumentItemProps {
 
 const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const { t } = useTranslation('file');
+  const location = useLocation();
   const [editing, selectedPageId, document] = usePageStore((s) => {
     const doc = pageSelectors.getDocumentById(pageId)(s);
     return [s.renamingPageId === pageId, s.selectedPageId, doc] as const;
@@ -35,7 +37,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
   const active = selectedPageId === pageId;
   const pageKind = getPageKindFromDocument(document);
-  const href = getPageDetailPath(pageId, pageKind);
+  const href = `${getPageDetailPath(pageId, pageKind)}${location.search}`;
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(document?.sourceSetId || ''),
   );
