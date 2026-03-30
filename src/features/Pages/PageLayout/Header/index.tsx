@@ -26,6 +26,7 @@ const Header = memo(() => {
     [pageKind],
   );
   const { count: filteredDocumentsCount } = usePageStore(filteredDocumentsSelector);
+  const isDocumentsLoading = usePageStore(pageSelectors.isDocumentsLoading);
   const spaceName = useSpaceName(getActiveWorkspaceSpaceId());
   const [searchKeywords, setSearchKeywords] = usePageStore((s) => [
     s.searchKeywords,
@@ -88,10 +89,12 @@ const Header = memo(() => {
         />
         <Flexbox horizontal align={'center'} justify={'space-between'} paddingInline={4}>
           <Text fontSize={12} type={'secondary'}>
-            {t(isTablePage ? 'pageList.tableCount' : 'pageList.pageCount', {
-              count: filteredDocumentsCount,
-              ns: 'file',
-            })}
+            {isDocumentsLoading
+              ? ''
+              : t(isTablePage ? 'pageList.tableCount' : 'pageList.pageCount', {
+                  count: filteredDocumentsCount,
+                  ns: 'file',
+                })}
           </Text>
           <Actions />
         </Flexbox>

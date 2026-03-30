@@ -14,7 +14,7 @@ import { type LobeDocument } from '@/types/document';
 import Item from '../List/Item';
 
 interface ContentProps {
-  searchKeyword: string;
+  searchKeyword?: string;
 }
 
 const Content = memo<ContentProps>(({ searchKeyword }) => {
@@ -31,12 +31,13 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
     pageSelectors.isLoadingMoreDocuments(s),
     s.loadMoreDocuments,
   ]);
+  const globalSearchKeywords = usePageStore((s) => s.searchKeywords);
 
   const { items: allFilteredDocuments } = usePageStore(filteredDocumentsSelector);
 
-  // Filter by search keyword
+  // Optional client-side search for drawer-local filtering.
   const displayDocuments = useMemo(() => {
-    if (!searchKeyword.trim()) return allFilteredDocuments;
+    if (!searchKeyword?.trim()) return allFilteredDocuments;
 
     const keyword = searchKeyword.toLowerCase();
     return allFilteredDocuments.filter((doc: LobeDocument) => {
@@ -47,7 +48,7 @@ const Content = memo<ContentProps>(({ searchKeyword }) => {
   }, [allFilteredDocuments, searchKeyword]);
 
   const count = displayDocuments.length;
-  const isSearching = searchKeyword.trim().length > 0;
+  const isSearching = (searchKeyword ?? globalSearchKeywords).trim().length > 0;
 
   // Handle scroll - use findItemIndex (official pattern)
   const handleScroll = useCallback(async () => {

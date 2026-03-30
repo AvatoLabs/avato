@@ -108,7 +108,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
           />
         ) : (
           <Flexbox className={styles.content}>
-            <Content searchKeyword={searchKeywords} />
+            <Content />
           </Flexbox>
         )}
       </Flexbox>

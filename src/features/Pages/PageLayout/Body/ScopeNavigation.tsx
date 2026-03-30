@@ -41,13 +41,15 @@ const ScopeNavigation = memo(() => {
     () => pageSelectors.getScopeCountsByKind(pageKind),
     [pageKind],
   );
+  const isDocumentsLoading = usePageStore(pageSelectors.isDocumentsLoading);
   const { all, bySourceSet, unassigned } = usePageStore(scopeCountsSelector);
 
-  const renderCount = (count: number) => (
-    <Text className={styles.count} fontSize={12} type={'secondary'}>
-      {count}
-    </Text>
-  );
+  const renderCount = (count: number) =>
+    isDocumentsLoading ? undefined : (
+      <Text className={styles.count} fontSize={12} type={'secondary'}>
+        {count}
+      </Text>
+    );
 
   return (
     <Flexbox gap={4} paddingInline={4}>
