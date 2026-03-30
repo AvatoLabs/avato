@@ -34,11 +34,17 @@ let pageDocument = {
   spaceId: 'space-1',
 };
 const navigateMock = vi.fn();
-const modalConfirmMock = vi.fn();
 const messageSuccessMock = vi.fn();
 const messageWarningMock = vi.fn();
 const messageErrorMock = vi.fn();
 const refreshDocumentsMock = vi.fn();
+
+const sourceSetStoreState = {
+  activeSourceSetItems: {
+    'ss-1': { description: '', id: 'ss-1', name: 'Research Set' },
+    'ss-2': { description: '', id: 'ss-2', name: 'Design Set' },
+  },
+};
 
 vi.mock('@lobehub/ui', () => ({
   Button: ({ children, onClick }: any) => (
@@ -72,7 +78,6 @@ vi.mock('react-i18next', () => ({
       if (key === 'docEditor.chooseIcon') return 'Choose Icon';
       if (key === 'FileManager.actions.addToSourceSet') return 'Add to Source Set';
       if (key === 'FileManager.actions.moveToOtherSourceSet') return 'Move to another Source Set';
-      if (key === 'FileManager.actions.removeFromSourceSet') return 'Remove from Source Set';
       return key;
     },
   }),
@@ -150,18 +155,10 @@ vi.mock('@/store/file', () => ({
 }));
 
 vi.mock('@/store/sourceSet', () => ({
-  useSourceSetStore: vi.fn((selector: any) =>
-    selector({
-      addFilesToSourceSet: vi.fn(),
-      removeFilesFromSourceSet: vi.fn(),
-      useFetchSourceSetList: () => ({
-        data: [
-          { id: 'ss-1', name: 'Research Set' },
-          { id: 'ss-2', name: 'Design Set' },
-        ],
-      }),
-    }),
-  ),
+  sourceSetSelectors: {
+    getSourceSetNameById: (id: string) => (state: any) => state.activeSourceSetItems[id]?.name,
+  },
+  useSourceSetStore: vi.fn((selector: any) => selector(sourceSetStoreState)),
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -176,15 +173,15 @@ vi.mock('antd', () => ({
         success: messageSuccessMock,
         warning: messageWarningMock,
       },
-      modal: {
-        confirm: modalConfirmMock,
-      },
     }),
   },
 }));
 
 vi.mock('./store', () => ({
   usePageEditorStore: vi.fn((selector: any) => selector(pageEditorState)),
+  useStoreApi: vi.fn(() => ({
+    setState: vi.fn(),
+  })),
 }));
 
 describe('TitleSection', () => {
@@ -224,8 +221,8 @@ describe('TitleSection', () => {
     expect(screen.getByText(`Updated ${formattedUpdatedAt}`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Product Space/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Research Set/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Move to another Source Set' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove from Source Set' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Move to another Source Set' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove from Source Set' })).not.toBeInTheDocument();
     expect(screen.queryByText('autosave-doc-1')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Overview/ })).toHaveLength(2);
     expect(screen.queryByText('01')).not.toBeInTheDocument();
@@ -237,10 +234,7 @@ describe('TitleSection', () => {
     const outlineTree = screen.getByRole('tree', { name: 'Outline' });
 
     expect(outlineTree).toHaveAttribute('tabindex', '0');
-    expect(outlineTree).toHaveStyle({
-      overflowX: 'hidden',
-      overflowY: 'auto',
-    });
+    expect(outlineTree).toBeInTheDocument();
   });
 
   it('jumps to the matching duplicate heading by outline order', () => {

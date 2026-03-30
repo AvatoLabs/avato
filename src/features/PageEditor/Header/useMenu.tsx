@@ -8,12 +8,15 @@ import { CopyPlus, Download, Link2, Maximize2, Trash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { usePageStore } from '@/store/docs';
+import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { pageSelectors, usePageStore } from '@/store/docs';
+import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
 import { editorSelectors } from '@/store/document/slices/editor';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
+import { useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore, useStoreApi } from '../store';
@@ -55,20 +58,38 @@ const decodeBase64 = (value: string) => {
  * Action menu for the page editor.
  */
 export const useMenu = (): { menuItems: any[] } => {
-  const { t } = useTranslation(['file', 'common', 'chat']);
+  const { t } = useTranslation(['file', 'common', 'chat', 'components', 'sourceSet']);
   const { message, modal } = App.useApp();
   const storeApi = useStoreApi();
   const { lg = true } = useResponsive();
 
   const [documentId, pageKind] = usePageEditorStore((s) => [s.documentId, s.pageKind]);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
+  const pageDocument = usePageStore(pageSelectors.getDocumentById(documentId));
+  const [refreshDocuments, internalDispatchDocuments] = usePageStore((s) => [
+    s.refreshDocuments,
+    s.internal_dispatchDocuments,
+  ]);
+  const sourceSetId = pageDocument?.sourceSetId ?? undefined;
+  const spaceId = pageDocument?.spaceId ?? undefined;
 
   // Get lastUpdatedTime from DocumentStore
   const lastUpdatedTime = useDocumentStore((s) =>
     documentId ? editorSelectors.lastUpdatedTime(documentId)(s) : null,
   );
 
-  const duplicateDocument = useFileStore((s) => s.duplicateDocument);
+  const [duplicateDocument, moveContentItem] = useFileStore((s) => [
+    s.duplicateDocument,
+    s.moveContentItem,
+  ]);
+  const [addFilesToSourceSet, removeFilesFromSourceSet, useFetchSourceSetList] = useSourceSetStore(
+    (s) => [s.addFilesToSourceSet, s.removeFilesFromSourceSet, s.useFetchSourceSetList],
+  );
+  const { data: sourceSets = [] } = useFetchSourceSetList(spaceId);
+  const availableSourceSets = useMemo(
+    () => sourceSets.filter((item) => item.id !== sourceSetId),
+    [sourceSetId, sourceSets],
+  );
 
   const [wideScreen, toggleWideScreen] = useGlobalStore((s) => [
     systemStatusSelectors.wideScreen(s),
@@ -88,6 +109,90 @@ export const useMenu = (): { menuItems: any[] } => {
       message.error(t('docEditor.duplicateError'));
     }
   }, [documentId, duplicateDocument, message, t]);
+
+  const syncSourceAssignments = useCallback(
+    async (nextSourceSetId?: string) => {
+      if (documentId && pageDocument) {
+        internalDispatchDocuments({
+          document: {
+            ...pageDocument,
+            sourceSetId: nextSourceSetId ?? null,
+          },
+          id: documentId,
+          type: 'updateDocument',
+        });
+      }
+
+      storeApi.setState({ sourceSetId: nextSourceSetId }, false);
+
+      await Promise.all([refreshDocuments(), revalidatePageDocuments()]);
+    },
+    [documentId, internalDispatchDocuments, pageDocument, refreshDocuments, storeApi],
+  );
+
+  const handleAddToSourceSet = useCallback(
+    async (targetSourceSetId: string) => {
+      if (!documentId) return;
+
+      try {
+        await addFilesToSourceSet(targetSourceSetId, [documentId]);
+        await syncSourceAssignments(targetSourceSetId);
+        message.success(t('addToSourceSet.addSuccess', { count: 1, ns: 'sourceSet' }));
+      } catch (error: any) {
+        console.error(error);
+        const isDuplicateError =
+          error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
+
+        if (isDuplicateError) {
+          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
+        } else {
+          message.error(t('addToSourceSet.error', { ns: 'sourceSet' }));
+        }
+      }
+    },
+    [addFilesToSourceSet, documentId, message, syncSourceAssignments, t],
+  );
+
+  const handleMoveToSourceSet = useCallback(
+    async (targetSourceSetId: string) => {
+      if (!documentId || !sourceSetId) return;
+
+      try {
+        await removeFilesFromSourceSet(sourceSetId, [documentId]);
+        await moveContentItem(documentId, null);
+        await addFilesToSourceSet(targetSourceSetId, [documentId]);
+        await syncSourceAssignments(targetSourceSetId);
+        message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
+      } catch (error) {
+        console.error(error);
+        message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
+      }
+    },
+    [
+      addFilesToSourceSet,
+      documentId,
+      message,
+      moveContentItem,
+      removeFilesFromSourceSet,
+      sourceSetId,
+      syncSourceAssignments,
+      t,
+    ],
+  );
+
+  const handleRemoveFromSourceSet = useCallback(() => {
+    if (!documentId || !sourceSetId) return;
+
+    modal.confirm({
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await removeFilesFromSourceSet(sourceSetId, [documentId]);
+        await syncSourceAssignments(undefined);
+        message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
+      },
+      title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
+    });
+  }, [documentId, message, modal, removeFilesFromSourceSet, sourceSetId, syncSourceAssignments, t]);
 
   const handleExportMarkdown = useCallback(async () => {
     const state = storeApi.getState();
@@ -259,6 +364,50 @@ export const useMenu = (): { menuItems: any[] } => {
           state.handleCopyLink(t as any, message);
         },
       },
+      ...((sourceSetId || availableSourceSets.length > 0)
+        ? [
+            {
+              type: 'divider' as const,
+            },
+            ...(sourceSetId
+              ? [
+                  ...(availableSourceSets.length > 0
+                    ? [
+                        {
+                          children: availableSourceSets.map((sourceSet) => ({
+                            key: `move-to-source-set-${sourceSet.id}`,
+                            label: sourceSet.name,
+                            onClick: () => void handleMoveToSourceSet(sourceSet.id),
+                          })),
+                          icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
+                          key: 'move-to-source-set',
+                          label: t('FileManager.actions.moveToOtherSourceSet', {
+                            ns: 'components',
+                          }),
+                        },
+                      ]
+                    : []),
+                  {
+                    icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetRemove} />,
+                    key: 'remove-from-source-set',
+                    label: t('FileManager.actions.removeFromSourceSet', { ns: 'components' }),
+                    onClick: handleRemoveFromSourceSet,
+                  },
+                ]
+              : [
+                  {
+                    children: availableSourceSets.map((sourceSet) => ({
+                      key: `add-to-source-set-${sourceSet.id}`,
+                      label: sourceSet.name,
+                      onClick: () => void handleAddToSourceSet(sourceSet.id),
+                    })),
+                    icon: <Icon icon={RESOURCE_ENTRY_ICONS.sourceSetAdd} />,
+                    key: 'add-to-source-set',
+                    label: t('FileManager.actions.addToSourceSet', { ns: 'components' }),
+                  },
+                ]),
+          ]
+        : []),
       {
         danger: true,
         icon: <Icon icon={Trash2} />,
@@ -309,13 +458,18 @@ export const useMenu = (): { menuItems: any[] } => {
     t,
     message,
     modal,
+    sourceSetId,
+    availableSourceSets,
     wideScreen,
     toggleWideScreen,
     showViewModeSwitch,
+    handleAddToSourceSet,
     handleDuplicate,
     handleExportCsv,
     handleExportMarkdown,
     handleExportXlsx,
+    handleMoveToSourceSet,
+    handleRemoveFromSourceSet,
     isTablePage,
   ]);
 

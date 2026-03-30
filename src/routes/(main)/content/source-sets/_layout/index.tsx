@@ -10,7 +10,6 @@ import { Outlet, useParams } from 'react-router-dom';
 import MobileContentLayout from '@/components/server/MobileNavLayout';
 import { MOBILE_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import BackButton from '@/features/NavPanel/components/BackButton';
-import { SourceSetTrashButton } from '@/routes/(main)/content/features/SourceSetTrashButton';
 import RegisterHotkeys from '@/routes/(main)/content/source-sets/features/RegisterHotkeys';
 import SourceSetFolderDrawer from '@/routes/(main)/content/source-sets/features/SourceSetFolderDrawer';
 import { useSourceSetBackPath } from '@/routes/(main)/content/source-sets/features/useSourceSetBackPath';
@@ -18,6 +17,7 @@ import { useServerConfigStore } from '@/store/serverConfig';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { mobileHeaderSticky } from '@/styles/mobileHeader';
 
+import SourceSetActions from './Header/SourceSetActions';
 import Sidebar from './Sidebar';
 import { styles } from './style';
 
@@ -27,7 +27,7 @@ interface SourceSetMobileHeaderProps {
 
 const SourceSetMobileHeader: FC<SourceSetMobileHeaderProps> = ({ onFolderTreeClick }) => {
   const { t } = useTranslation(['components', 'file']);
-  const { id, spaceId } = useParams<{ id: string; spaceId?: string }>();
+  const { id } = useParams<{ id: string; spaceId?: string }>();
   const name = useSourceSetStore(sourceSetSelectors.getSourceSetNameById(id || ''));
   const backPath = useSourceSetBackPath();
 
@@ -52,7 +52,7 @@ const SourceSetMobileHeader: FC<SourceSetMobileHeaderProps> = ({ onFolderTreeCli
               onClick={onFolderTreeClick}
             />
           )}
-          <SourceSetTrashButton sourceSetId={id} spaceId={spaceId} />
+          <SourceSetActions size={MOBILE_HEADER_ICON_SIZE} />
         </Flexbox>
       }
     />

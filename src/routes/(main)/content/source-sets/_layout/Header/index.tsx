@@ -6,6 +6,7 @@ import { memo } from 'react';
 import BackButton from '@/features/NavPanel/components/BackButton';
 import { useSourceSetBackPath } from '@/routes/(main)/content/source-sets/features/useSourceSetBackPath';
 
+import SourceSetActions from './SourceSetActions';
 import SourceSetDescription from './SourceSetDescription';
 import SourceSetHeader from './SourceSetHeader';
 
@@ -24,6 +25,7 @@ const Header = memo(() => {
           }}
         />
         <SourceSetHeader />
+        <SourceSetActions />
       </Flexbox>
       <Flexbox paddingInline={4}>
         <SourceSetDescription />

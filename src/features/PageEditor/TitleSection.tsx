@@ -1,7 +1,6 @@
 'use client';
 
-import { Button, DropdownMenu, Flexbox, Icon, Tag, Text, TextArea } from '@lobehub/ui';
-import { App } from 'antd';
+import { Button, Flexbox, Icon, Tag, Text, TextArea } from '@lobehub/ui';
 import { createStyles, cssVar } from 'antd-style';
 import { FolderOpen, LibraryBig, ListTree, SmilePlus } from 'lucide-react';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -11,13 +10,11 @@ import { useNavigate } from 'react-router-dom';
 import EmojiPicker from '@/components/EmojiPicker';
 import { buildContentRootPath, buildSourceSetPath, useSpaceName } from '@/features/ResourceSpaces';
 import { pageSelectors, usePageStore } from '@/store/docs';
-import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
 import { editorSelectors } from '@/store/document/slices/editor';
-import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
-import { useSourceSetStore } from '@/store/sourceSet';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { themedSelectionCss } from '@/styles';
 import { truncateByWeightedLength } from '@/utils/textLength';
 
@@ -27,7 +24,7 @@ import {
   extractDocumentOutline,
   normalizeHeadingText,
 } from './documentInsights';
-import { usePageEditorStore, useStoreApi } from './store';
+import { usePageEditorStore } from './store';
 
 const useStyles = createStyles(({ css, token }) => ({
   chooseEmojiButton: css`
@@ -270,11 +267,9 @@ const formatUpdatedAt = (value: Date | string, locale?: string) => {
 };
 
 const TitleSection = memo(() => {
-  const { t } = useTranslation(['common', 'components', 'file', 'sourceSet']);
+  const { t } = useTranslation(['common', 'file']);
   const { styles, cx } = useStyles();
-  const { message, modal } = App.useApp();
   const navigate = useNavigate();
-  const pageEditorStoreApi = useStoreApi();
   const locale = useGlobalStore(globalGeneralSelectors.currentLanguage);
 
   const [documentId, emoji, title, setEmoji, setTitle, handleTitleSubmit] = usePageEditorStore(
@@ -286,17 +281,11 @@ const TitleSection = memo(() => {
     documentId ? editorSelectors.lastUpdatedTime(documentId)(s) : undefined,
   ]);
   const pageDocument = usePageStore(pageSelectors.getDocumentById(documentId));
-  const refreshDocuments = usePageStore((s) => s.refreshDocuments);
-  const internalDispatchDocuments = usePageStore((s) => s.internal_dispatchDocuments);
-  const moveContentItem = useFileStore((s) => s.moveContentItem);
-  const [addFilesToSourceSet, removeFilesFromSourceSet, useFetchSourceSetList] = useSourceSetStore(
-    (s) => [s.addFilesToSourceSet, s.removeFilesFromSourceSet, s.useFetchSourceSetList],
-  );
 
   const spaceId = pageDocument?.spaceId ?? undefined;
   const sourceSetId = pageDocument?.sourceSetId ?? undefined;
   const spaceName = useSpaceName(spaceId);
-  const { data: sourceSets = [] } = useFetchSourceSetList(spaceId ?? undefined);
+  const sourceSetName = useSourceSetStore(sourceSetSelectors.getSourceSetNameById(sourceSetId || ''));
 
   const [isHoveringTitle, setIsHoveringTitle] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -307,120 +296,8 @@ const TitleSection = memo(() => {
     () => (lastUpdatedTime ? formatUpdatedAt(lastUpdatedTime, locale) : ''),
     [lastUpdatedTime, locale],
   );
-  const currentSourceSet = useMemo(
-    () => sourceSets.find((item) => item.id === sourceSetId),
-    [sourceSetId, sourceSets],
-  );
-  const availableSourceSets = useMemo(
-    () => sourceSets.filter((item) => item.id !== sourceSetId),
-    [sourceSetId, sourceSets],
-  );
   const resolvedSpaceLabel = spaceName || spaceId;
-  const resolvedSourceSetLabel = currentSourceSet?.name || sourceSetId;
-
-  const syncSourceAssignments = useCallback(
-    async (nextSourceSetId?: string) => {
-      if (documentId && pageDocument) {
-        internalDispatchDocuments({
-          document: {
-            ...pageDocument,
-            sourceSetId: nextSourceSetId ?? null,
-          },
-          id: documentId,
-          type: 'updateDocument',
-        });
-      }
-
-      pageEditorStoreApi.setState({ sourceSetId: nextSourceSetId }, false);
-
-      await Promise.all([refreshDocuments(), revalidatePageDocuments()]);
-    },
-    [documentId, internalDispatchDocuments, pageDocument, pageEditorStoreApi, refreshDocuments],
-  );
-
-  const handleAddToSourceSet = useCallback(
-    async (targetSourceSetId: string) => {
-      if (!documentId) return;
-
-      try {
-        await addFilesToSourceSet(targetSourceSetId, [documentId]);
-        await syncSourceAssignments(targetSourceSetId);
-        message.success(t('addToSourceSet.addSuccess', { count: 1, ns: 'sourceSet' }));
-      } catch (error: any) {
-        console.error(error);
-        const isDuplicateError =
-          error?.data?.code === 'CONFLICT' || error?.message === 'FILE_ALREADY_IN_KNOWLEDGE_BASE';
-
-        if (isDuplicateError) {
-          message.warning(t('addToSourceSet.alreadyExists', { ns: 'sourceSet' }));
-        } else {
-          message.error(t('addToSourceSet.error', { ns: 'sourceSet' }));
-        }
-      }
-    },
-    [addFilesToSourceSet, documentId, message, syncSourceAssignments, t],
-  );
-
-  const handleMoveToSourceSet = useCallback(
-    async (targetSourceSetId: string) => {
-      if (!documentId || !sourceSetId) return;
-
-      try {
-        await removeFilesFromSourceSet(sourceSetId, [documentId]);
-        await moveContentItem(documentId, null);
-        await addFilesToSourceSet(targetSourceSetId, [documentId]);
-        await syncSourceAssignments(targetSourceSetId);
-        message.success(t('moveToSourceSet.success', { ns: 'sourceSet' }));
-      } catch (error) {
-        console.error(error);
-        message.error(t('moveToSourceSet.error', { ns: 'sourceSet' }));
-      }
-    },
-    [
-      addFilesToSourceSet,
-      documentId,
-      message,
-      moveContentItem,
-      removeFilesFromSourceSet,
-      sourceSetId,
-      syncSourceAssignments,
-      t,
-    ],
-  );
-
-  const handleRemoveFromSourceSet = useCallback(() => {
-    if (!documentId || !sourceSetId) return;
-
-    modal.confirm({
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        await removeFilesFromSourceSet(sourceSetId, [documentId]);
-        await syncSourceAssignments(undefined);
-        message.success(t('FileManager.actions.removeFromSourceSetSuccess', { ns: 'components' }));
-      },
-      title: t('FileManager.actions.confirmRemoveFromSourceSet', { count: 1, ns: 'components' }),
-    });
-  }, [documentId, message, modal, removeFilesFromSourceSet, sourceSetId, syncSourceAssignments, t]);
-
-  const addToSourceSetItems = useMemo(
-    () =>
-      availableSourceSets.map((item) => ({
-        key: `add-to-source-set-${item.id}`,
-        label: item.name,
-        onClick: () => void handleAddToSourceSet(item.id),
-      })),
-    [availableSourceSets, handleAddToSourceSet],
-  );
-
-  const moveToSourceSetItems = useMemo(
-    () =>
-      availableSourceSets.map((item) => ({
-        key: `move-to-source-set-${item.id}`,
-        label: item.name,
-        onClick: () => void handleMoveToSourceSet(item.id),
-      })),
-    [availableSourceSets, handleMoveToSourceSet],
-  );
+  const resolvedSourceSetLabel = sourceSetName || sourceSetId;
 
   const jumpToHeading = useCallback((headingText: string, matchIndex: number = 0) => {
     const root = globalThis.document.getElementById(PAGE_EDITOR_SCROLL_ROOT_ID);
@@ -535,7 +412,7 @@ const TitleSection = memo(() => {
             </Tag>
           )}
         </Flexbox>
-        {(resolvedSpaceLabel || resolvedSourceSetLabel || addToSourceSetItems.length > 0) && (
+        {(resolvedSpaceLabel || resolvedSourceSetLabel) && (
           <Flexbox
             horizontal
             align={'center'}
@@ -561,25 +438,6 @@ const TitleSection = memo(() => {
                 <Icon icon={LibraryBig} size={15} />
                 <span>{resolvedSourceSetLabel}</span>
               </button>
-            )}
-            {!sourceSetId && addToSourceSetItems.length > 0 && (
-              <DropdownMenu nativeButton items={addToSourceSetItems} placement={'bottomLeft'}>
-                <Button size={'small'} type={'default'}>
-                  {t('FileManager.actions.addToSourceSet', { ns: 'components' })}
-                </Button>
-              </DropdownMenu>
-            )}
-            {sourceSetId && moveToSourceSetItems.length > 0 && (
-              <DropdownMenu nativeButton items={moveToSourceSetItems} placement={'bottomLeft'}>
-                <Button size={'small'} type={'default'}>
-                  {t('FileManager.actions.moveToOtherSourceSet', { ns: 'components' })}
-                </Button>
-              </DropdownMenu>
-            )}
-            {sourceSetId && (
-              <Button danger size={'small'} type={'default'} onClick={handleRemoveFromSourceSet}>
-                {t('FileManager.actions.removeFromSourceSet', { ns: 'components' })}
-              </Button>
             )}
           </Flexbox>
         )}
