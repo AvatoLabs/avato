@@ -4,7 +4,6 @@ import { type LobeDocument } from '@/types/document';
 
 export interface PageQueryFilter {
   fileTypes?: string[];
-  sourceSetId?: string;
   sourceTypes?: string[];
   spaceId?: string;
 }
@@ -21,7 +20,7 @@ export interface PageState {
    */
   currentPage: number;
   /**
-   * Filter to show only pages assigned to a specific source set
+   * Active source-set scope for client-side filtering inside the docs workspace
    */
   currentSourceSetScopeId: string | null;
   /**
@@ -49,7 +48,7 @@ export interface PageState {
   isLoadingMoreDocuments: boolean;
   navigate?: NavigateFunction;
   /**
-   * Filters used in the last query
+   * Filters used to fetch the current workspace document collection
    */
   queryFilter?: PageQueryFilter;
 
