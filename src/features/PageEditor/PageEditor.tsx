@@ -3,7 +3,7 @@
 import { EditorProvider } from '@lobehub/editor/react';
 import { Flexbox } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import { memo } from 'react';
 
 import { CONVERSATION_MIN_WIDTH } from '@/const/layoutTokens';
@@ -86,10 +86,11 @@ interface PageEditorProps {
 interface PageEditorCanvasProps {
   allowHorizontalScroll?: boolean;
   contentMinWidth?: number;
+  rightPanel?: ReactNode;
 }
 
 const PageEditorCanvas = memo<PageEditorCanvasProps>(
-  ({ allowHorizontalScroll = false, contentMinWidth }) => {
+  ({ allowHorizontalScroll = false, contentMinWidth, rightPanel }) => {
     const [documentId, editor, pageKind, viewMode] = usePageEditorStore((s) => [
       s.documentId,
       s.editor,
@@ -167,6 +168,7 @@ const PageEditorCanvas = memo<PageEditorCanvasProps>(
               <DiffAllToolbar documentId={documentId} editor={editor} />
             )}
           </Flexbox>
+          {rightPanel}
         </Flexbox>
       </>
     );
@@ -220,10 +222,12 @@ export const PageEditor: FC<PageEditorProps> = ({
         <PageEditorCanvas
           allowHorizontalScroll={allowHorizontalScroll}
           contentMinWidth={contentMinWidth}
+          rightPanel={
+            <DocsAgentProvider fallback={<Copilot loading />}>
+              <Copilot />
+            </DocsAgentProvider>
+          }
         />
-        <DocsAgentProvider fallback={<Copilot loading />}>
-          <Copilot />
-        </DocsAgentProvider>
       </PageEditorProvider>
     </EditorProvider>
   );
