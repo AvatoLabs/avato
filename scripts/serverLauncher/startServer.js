@@ -182,7 +182,8 @@ const runServer = async () => {
   console.log('🌐 DNS Server:', dns.getServers());
   console.log('-------------------------------------');
 
-  if (process.env.DATABASE_DRIVER) {
+  // Docker/self-hosted deployments often only provide DATABASE_URL.
+  if (process.env.DATABASE_DRIVER || process.env.DATABASE_URL) {
     try {
       await fs.access(DB_MIGRATION_SCRIPT_PATH);
 
