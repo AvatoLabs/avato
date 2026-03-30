@@ -68,3 +68,18 @@ index fe79a40549ba245b942eed30d8c1f21ca342c9d7..f95aeb7770cc8449f6e61e6372d8cb0d
          // 使用 displayMode 渲染块级公式
          displayMode: node instanceof MathBlockNode,
          throwOnError: false
+       });
+     }
+   }, [node.code]);
+diff --git a/es/plugins/codemirror-block/react/CodemirrorNode.js b/es/plugins/codemirror-block/react/CodemirrorNode.js
+index 56cde25f66cc85b4c25dc1f1c11c80fc5dc41651..c42bd0241f052c55691c3302057c4fe6b5cdb96d 100644
+--- a/es/plugins/codemirror-block/react/CodemirrorNode.js
++++ b/es/plugins/codemirror-block/react/CodemirrorNode.js
+@@ -184,7 +184,6 @@ var ReactCodemirrorNode = function ReactCodemirrorNode(_ref) {
+           theme: 'default',
+           value: node.code
+         });
+-        console.info(instance);
+         instance.view.dispatch({
+           effects: instance.optionHelper.theme.reconfigure(instance.view.constructor.theme(lobeTheme, {
+             dark: false

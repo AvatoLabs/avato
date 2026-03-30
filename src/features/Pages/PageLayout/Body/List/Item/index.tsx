@@ -109,7 +109,6 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
     return (
       <Tag
-        bordered={false}
         size={'small'}
         variant={document?.sourceSetId ? 'filled' : 'outlined'}
         style={{
