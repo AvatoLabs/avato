@@ -107,9 +107,14 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
     return (
       <Tag
+        bordered={false}
         size={'small'}
-        style={{ flexShrink: 0, margin: 0 }}
         variant={document?.sourceSetId ? 'filled' : 'outlined'}
+        style={{
+          flexShrink: 0,
+          margin: 0,
+          opacity: document?.sourceSetId ? 1 : 0.72,
+        }}
       >
         {ownershipLabel}
       </Tag>

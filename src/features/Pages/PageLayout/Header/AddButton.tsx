@@ -1,7 +1,8 @@
 'use client';
 
-import { ActionIcon, DropdownMenu, Icon, type MenuProps } from '@lobehub/ui';
-import { FileText, FolderOpen, SquarePenIcon, Table2 } from 'lucide-react';
+import { ActionIcon, DropdownMenu, Flexbox, Icon, type MenuProps } from '@lobehub/ui';
+import { createStaticStyles } from 'antd-style';
+import { ChevronDownIcon, FileText, FolderOpen, SquarePenIcon, Table2 } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +11,15 @@ import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { usePageStore } from '@/store/docs';
 import { useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
+
+const styles = createStaticStyles(({ css }) => ({
+  buttonGroup: css`
+    gap: 0;
+  `,
+  menuButton: css`
+    margin-inline-start: 2px;
+  `,
+}));
 
 const AddButton = memo(() => {
   const { t } = useTranslation('file');
@@ -59,7 +69,7 @@ const AddButton = memo(() => {
   }, [handleNewDocument, pageKind, sourceSets, t]);
 
   return (
-    <DropdownMenu items={items}>
+    <Flexbox horizontal className={styles.buttonGroup}>
       <ActionIcon
         icon={SquarePenIcon}
         title={t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton')}
@@ -67,8 +77,20 @@ const AddButton = memo(() => {
           blockSize: 32,
           size: 18,
         }}
+        onClick={() => handleNewDocument()}
       />
-    </DropdownMenu>
+      <DropdownMenu items={items} placement={'bottomRight'}>
+        <ActionIcon
+          className={styles.menuButton}
+          icon={ChevronDownIcon}
+          title={t('pageList.createInSourceSet')}
+          size={{
+            blockSize: 32,
+            size: 16,
+          }}
+        />
+      </DropdownMenu>
+    </Flexbox>
   );
 });
 
