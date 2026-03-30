@@ -9,6 +9,7 @@ import { usePageKind } from '@/features/Pages/usePageKind';
 import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageScope } from '../../usePageScope';
@@ -30,8 +31,30 @@ const Header = memo(() => {
     s.searchKeywords,
     s.setSearchKeywords,
   ]);
-  const showOnlyPagesWithoutSourceSet = usePageStore((s) => s.showOnlyPagesWithoutSourceSet);
-  const { setScope } = usePageScope();
+  const { scope, setScope, sourceSetId } = usePageScope();
+  const sourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
+  );
+
+  const activeScopeTag = useMemo(() => {
+    if (scope === 'all') return null;
+
+    const label =
+      scope === 'unassigned'
+        ? t('pageList.filter.onlyUnassigned', { ns: 'file' })
+        : sourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' });
+
+    return (
+      <Tag
+        size={'small'}
+        style={{ cursor: 'pointer' }}
+        variant={'filled'}
+        onClick={() => setScope('all')}
+      >
+        {label}
+      </Tag>
+    );
+  }, [scope, setScope, sourceSetName, t]);
 
   return (
     <>
@@ -46,16 +69,9 @@ const Header = memo(() => {
             <Tag size={'small'}>{spaceName}</Tag>
           </Flexbox>
         )}
-        {showOnlyPagesWithoutSourceSet && (
+        {activeScopeTag && (
           <Flexbox horizontal paddingInline={4}>
-            <Tag
-              size={'small'}
-              style={{ cursor: 'pointer' }}
-              variant={'filled'}
-              onClick={() => setScope('all')}
-            >
-              {t('pageList.filter.onlyUnassigned', { ns: 'file' })}
-            </Tag>
+            {activeScopeTag}
           </Flexbox>
         )}
         <Nav />

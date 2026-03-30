@@ -4,6 +4,7 @@ import { type LobeDocument } from '@/types/document';
 
 export interface PageQueryFilter {
   fileTypes?: string[];
+  sourceSetId?: string;
   sourceTypes?: string[];
   spaceId?: string;
 }
@@ -19,6 +20,10 @@ export interface PageState {
    * Current page number (0-based) for pagination
    */
   currentPage: number;
+  /**
+   * Filter to show only pages assigned to a specific source set
+   */
+  currentSourceSetScopeId: string | null;
   /**
    * Server documents fetched from document service
    * undefined means not yet loaded (loading state)
@@ -37,11 +42,11 @@ export interface PageState {
    * Whether currently creating a new page
    */
   isCreatingNew: boolean;
+
   /**
    * Loading state for pagination (load more)
    */
   isLoadingMoreDocuments: boolean;
-
   navigate?: NavigateFunction;
   /**
    * Filters used in the last query
@@ -85,6 +90,7 @@ export const initialState: PageState = {
   isLoadingMoreDocuments: false,
 
   queryFilter: undefined,
+  currentSourceSetScopeId: null,
 
   renamingPageId: null,
   searchKeywords: '',

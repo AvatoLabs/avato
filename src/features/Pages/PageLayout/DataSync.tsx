@@ -1,14 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { usePageStore } from '@/store/docs';
 
-import { getPageScopeFromSearch } from '../usePageScope';
+import { getPageScopeFromSearch, getSourceSetIdFromPageScope } from '../usePageScope';
 
 const DataSync = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const setShowOnlyPagesWithoutSourceSet = usePageStore((s) => s.setShowOnlyPagesWithoutSourceSet);
+  const [setCurrentSourceSetScopeId, setShowOnlyPagesWithoutSourceSet] = usePageStore((s) => [
+    s.setCurrentSourceSetScopeId,
+    s.setShowOnlyPagesWithoutSourceSet,
+  ]);
 
   useEffect(() => {
     usePageStore.setState({ navigate });
@@ -18,9 +21,11 @@ const DataSync = () => {
     };
   }, [navigate]);
 
-  useEffect(() => {
-    setShowOnlyPagesWithoutSourceSet(getPageScopeFromSearch(location.search) === 'unassigned');
-  }, [location.search, setShowOnlyPagesWithoutSourceSet]);
+  useLayoutEffect(() => {
+    const scope = getPageScopeFromSearch(location.search);
+    setCurrentSourceSetScopeId(getSourceSetIdFromPageScope(scope));
+    setShowOnlyPagesWithoutSourceSet(scope === 'unassigned');
+  }, [location.search, setCurrentSourceSetScopeId, setShowOnlyPagesWithoutSourceSet]);
 
   return null;
 };

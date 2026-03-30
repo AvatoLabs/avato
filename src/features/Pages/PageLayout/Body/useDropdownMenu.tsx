@@ -12,17 +12,20 @@ import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
-import { useSourceSetStore } from '@/store/sourceSet';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
   const pageKind = usePageKind();
-  const { scope, setScope } = usePageScope();
+  const { scope, setScope, sourceSetId: currentSourceSetScopeId } = usePageScope();
   const activeSpaceId = getActiveWorkspaceSpaceId();
   const showOnlyPagesWithoutSourceSet = scope === 'unassigned';
   const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
+  const currentSourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(currentSourceSetScopeId || ''),
+  );
   const { data: sourceSets = [] } = useFetchSourceSetList(activeSpaceId);
 
   const [pagePageSize, updateSystemStatus] = useGlobalStore((s) => [
@@ -89,17 +92,25 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     ];
 
     if (sourceSets.length > 0) {
+      const createDefaultLabel = currentSourceSetScopeId
+        ? `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${currentSourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' })}`
+        : `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${t('pageList.sourceSet.unassigned', { ns: 'file' })}`;
+
       items.unshift({
         icon: <Icon icon={pageKind === TABLE_PAGE_KIND ? Table2 : FileText} />,
         key: 'create-default',
-        label: `${t(pageKind === TABLE_PAGE_KIND ? 'header.newTableButton' : 'header.newPageButton', { ns: 'file' })} · ${t('pageList.sourceSet.unassigned', { ns: 'file' })}`,
+        label: createDefaultLabel,
         onClick: () => {
           if (pageKind === TABLE_PAGE_KIND) {
-            void createNewTable(t('pageList.tableUntitled', { ns: 'file' }));
+            void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
+              sourceSetId: currentSourceSetScopeId || undefined,
+            });
             return;
           }
 
-          void createNewPage(t('pageList.untitled', { ns: 'file' }));
+          void createNewPage(t('pageList.untitled', { ns: 'file' }), {
+            sourceSetId: currentSourceSetScopeId || undefined,
+          });
         },
       });
     }
@@ -109,6 +120,8 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     createNewPage,
     createNewTable,
     handleCreateInSourceSet,
+    currentSourceSetName,
+    currentSourceSetScopeId,
     pageKind,
     sourceSets,
     t,

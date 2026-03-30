@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorerPlaceholder from '@/features/PageExplorer/PageExplorerPlaceholder';
+import SourceSetSurfaceNav from '@/features/SourceSetSurfaceNav';
 import { pageSelectors, usePageStore } from '@/store/docs';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import Content from './PageLayout/Body/AllPagesDrawer/Content';
@@ -32,6 +34,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
   const { t } = useTranslation(['common', 'file']);
   const { styles } = useStyles();
   const { scope } = usePageScope();
+  const currentSourceSetScopeId = usePageStore((s) => s.currentSourceSetScopeId);
   const filteredDocumentsSelector = useMemo(
     () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
     [pageKind],
@@ -42,14 +45,21 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
   const searchKeywords = usePageStore((s) => s.searchKeywords);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const isSearching = searchKeywords.trim().length > 0;
+  const scopedSourceSet = useSourceSetStore(
+    sourceSetSelectors.getSourceSetById(currentSourceSetScopeId || ''),
+  );
 
   const scopeLabel = useMemo(() => {
     if (scope === 'unassigned') {
       return t('pageList.filter.onlyUnassigned', { ns: 'file' });
     }
 
+    if (currentSourceSetScopeId) {
+      return scopedSourceSet?.name || t('pageList.sourceSet.assigned', { ns: 'file' });
+    }
+
     return t(isTablePage ? 'pageList.tableTitle' : 'pageList.title', { ns: 'file' });
-  }, [isTablePage, scope, t]);
+  }, [currentSourceSetScopeId, isTablePage, scope, scopedSourceSet?.name, t]);
 
   if (isLoading) {
     return <Loading debugId="PagesWorkspace" />;
@@ -59,6 +69,13 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
     <>
       <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
         <Flexbox gap={8}>
+          {currentSourceSetScopeId && (
+            <SourceSetSurfaceNav
+              activeSurface={'docs'}
+              sourceSetId={currentSourceSetScopeId}
+              spaceId={scopedSourceSet?.spaceId}
+            />
+          )}
           <Flexbox horizontal align={'center'} gap={8}>
             <Text as={'h2'} fontSize={24} style={{ margin: 0 }} weight={600}>
               {scopeLabel}
@@ -68,13 +85,19 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
                 {t('pageList.sourceSet.unassigned', { ns: 'file' })}
               </Tag>
             )}
+            {currentSourceSetScopeId && (
+              <Tag size={'small'} variant={'filled'}>
+                {t('sourceSet.title', { ns: 'file' })}
+              </Tag>
+            )}
           </Flexbox>
-          <Text type={'secondary'}>
-            {t('pageList.pageCount', { count, ns: 'file' })}
-          </Text>
+          <Text type={'secondary'}>{t('pageList.pageCount', { count, ns: 'file' })}</Text>
         </Flexbox>
         {count === 0 && !isSearching ? (
-          <PageExplorerPlaceholder pageKind={pageKind} />
+          <PageExplorerPlaceholder
+            pageKind={pageKind}
+            sourceSetId={currentSourceSetScopeId || undefined}
+          />
         ) : (
           <Flexbox className={styles.content}>
             <Content searchKeyword={searchKeywords} />

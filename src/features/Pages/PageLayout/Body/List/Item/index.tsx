@@ -26,9 +26,21 @@ interface DocumentItemProps {
 const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const { t } = useTranslation('file');
   const location = useLocation();
-  const [editing, selectedPageId, document] = usePageStore((s) => {
+  const [
+    currentSourceSetScopeId,
+    editing,
+    selectedPageId,
+    document,
+    showOnlyPagesWithoutSourceSet,
+  ] = usePageStore((s) => {
     const doc = pageSelectors.getDocumentById(pageId)(s);
-    return [s.renamingPageId === pageId, s.selectedPageId, doc] as const;
+    return [
+      s.currentSourceSetScopeId,
+      s.renamingPageId === pageId,
+      s.selectedPageId,
+      doc,
+      s.showOnlyPagesWithoutSourceSet,
+    ] as const;
   });
 
   const selectPage = usePageStore((s) => s.selectPage);
@@ -103,6 +115,8 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
   const dropdownMenu = useDropdownMenu({ pageId, toggleEditing });
   const ownershipTag = useMemo(() => {
+    if (currentSourceSetScopeId || showOnlyPagesWithoutSourceSet) return undefined;
+
     const ownershipLabel = document?.sourceSetId
       ? sourceSetName || t('pageList.sourceSet.assigned')
       : t('pageList.sourceSet.unassigned');
@@ -120,7 +134,13 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
         {ownershipLabel}
       </Tag>
     );
-  }, [document?.sourceSetId, sourceSetName, t]);
+  }, [
+    currentSourceSetScopeId,
+    document?.sourceSetId,
+    showOnlyPagesWithoutSourceSet,
+    sourceSetName,
+    t,
+  ]);
 
   return (
     <>

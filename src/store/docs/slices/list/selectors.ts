@@ -25,16 +25,19 @@ const filteredDocumentsSnapshotCache = new WeakMap<
 
 const getFilteredDocumentsCacheKey = (
   pageKind: PageKind,
+  currentSourceSetScopeId: string | null,
   searchKeywords: string,
   showOnlyPagesWithoutSourceSet: boolean,
-) => `${pageKind}|${showOnlyPagesWithoutSourceSet ? 1 : 0}|${searchKeywords.trim().toLowerCase()}`;
+) =>
+  `${pageKind}|${currentSourceSetScopeId ?? 'all'}|${showOnlyPagesWithoutSourceSet ? 1 : 0}|${searchKeywords.trim().toLowerCase()}`;
 
 const filterDocuments = (s: PageState, pageKind: PageKind = DEFAULT_PAGE_KIND): LobeDocument[] => {
   const docs = s.documents ?? EMPTY_DOCUMENTS;
 
-  const { searchKeywords, showOnlyPagesWithoutSourceSet } = s;
+  const { currentSourceSetScopeId, searchKeywords, showOnlyPagesWithoutSourceSet } = s;
   const cacheKey = getFilteredDocumentsCacheKey(
     pageKind,
+    currentSourceSetScopeId,
     searchKeywords,
     showOnlyPagesWithoutSourceSet,
   );
@@ -47,6 +50,10 @@ const filterDocuments = (s: PageState, pageKind: PageKind = DEFAULT_PAGE_KIND): 
 
   // Filter by page kind
   result = result.filter((doc: LobeDocument) => getPageKindFromDocument(doc) === pageKind);
+
+  if (currentSourceSetScopeId) {
+    result = result.filter((doc: LobeDocument) => doc.sourceSetId === currentSourceSetScopeId);
+  }
 
   // Filter by source-set membership
   if (showOnlyPagesWithoutSourceSet) {

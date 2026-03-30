@@ -1,5 +1,6 @@
 'use client';
 
+import { Flexbox } from '@lobehub/ui';
 import { memo, useLayoutEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -7,6 +8,7 @@ import NotFound from '@/components/404';
 import NProgress from '@/components/NProgress';
 import ContentManager from '@/features/ContentManager';
 import { buildSourceSetPath } from '@/features/ResourceSpaces';
+import SourceSetSurfaceNav from '@/features/SourceSetSurfaceNav';
 import Container from '@/routes/(main)/content/source-sets/features/Container';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
@@ -50,7 +52,18 @@ const MainContent = memo(() => {
 
   if (!isLoading && !data) return <NotFound />;
 
-  return <ContentManager />;
+  return (
+    <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
+      <SourceSetSurfaceNav
+        activeSurface={'files'}
+        sourceSetId={sourceSetId!}
+        spaceId={data?.spaceId}
+      />
+      <Flexbox flex={1} style={{ minHeight: 0 }}>
+        <ContentManager />
+      </Flexbox>
+    </Flexbox>
+  );
 });
 
 MainContent.displayName = 'SourceSetMainContent';

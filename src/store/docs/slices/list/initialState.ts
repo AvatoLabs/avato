@@ -4,6 +4,7 @@ import { type PageQueryFilter } from '../../initialState';
 
 export interface ListState {
   currentPage: number;
+  currentSourceSetScopeId: string | null;
   documents: LobeDocument[];
   documentsTotal: number;
   hasMoreDocuments: boolean;
@@ -16,6 +17,7 @@ export interface ListState {
 }
 
 export const initialListState: ListState = {
+  currentSourceSetScopeId: null,
   currentPage: 0,
   documents: [],
   documentsTotal: 0,

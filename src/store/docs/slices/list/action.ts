@@ -31,17 +31,22 @@ interface PageDocumentQueryResult {
   total: number;
 }
 
-const buildPageQueryFilter = (): PageQueryFilter => {
+const buildPageQueryFilter = (sourceSetId?: string | null): PageQueryFilter => {
   const activeSpaceId = getActiveWorkspaceSpaceId();
 
   return {
     fileTypes: Array.from(ALLOWED_PAGE_FILE_TYPES),
+    ...(sourceSetId ? { sourceSetId } : {}),
     ...(activeSpaceId ? { spaceId: activeSpaceId } : {}),
     sourceTypes: Array.from(ALLOWED_PAGE_SOURCE_TYPES),
   };
 };
 
-const getPageDocumentsSwrKey = (spaceId?: string) => [PAGE_DOCUMENTS_SWR_KEY, spaceId ?? 'all'];
+const getPageDocumentsSwrKey = (spaceId?: string, sourceSetId?: string | null) => [
+  PAGE_DOCUMENTS_SWR_KEY,
+  spaceId ?? 'all',
+  sourceSetId ?? 'all',
+];
 
 export const removePageDocumentsFromCache = async (ids: string[]) => {
   if (ids.length === 0) return;
@@ -88,7 +93,7 @@ export class ListActionImpl {
   fetchDocuments = async (): Promise<void> => {
     try {
       const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-      const queryFilters = buildPageQueryFilter();
+      const queryFilters = buildPageQueryFilter(this.#get().currentSourceSetScopeId);
 
       const result = await documentService.queryDocuments({
         current: 0,
@@ -182,14 +187,19 @@ export class ListActionImpl {
     );
   };
 
+  setCurrentSourceSetScopeId = (sourceSetId: string | null): void => {
+    this.#set({ currentSourceSetScopeId: sourceSetId }, false, n('setCurrentSourceSetScopeId'));
+  };
+
   useFetchDocuments = (): SWRResponse<PageDocumentQueryResult> => {
     const activeSpaceId = getActiveWorkspaceSpaceId();
+    const currentSourceSetScopeId = this.#get().currentSourceSetScopeId;
 
     return useClientDataSWRWithSync<PageDocumentQueryResult>(
-      getPageDocumentsSwrKey(activeSpaceId),
+      getPageDocumentsSwrKey(activeSpaceId, currentSourceSetScopeId),
       async () => {
         const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-        const queryFilters = buildPageQueryFilter();
+        const queryFilters = buildPageQueryFilter(currentSourceSetScopeId);
 
         const result = await documentService.queryDocuments({
           current: 0,
@@ -221,7 +231,7 @@ export class ListActionImpl {
               currentPage: 0,
               documentsTotal: data.total,
               hasMoreDocuments: hasMore,
-              queryFilter: buildPageQueryFilter(),
+              queryFilter: buildPageQueryFilter(currentSourceSetScopeId),
             },
             false,
             n('useFetchDocuments/onData'),
