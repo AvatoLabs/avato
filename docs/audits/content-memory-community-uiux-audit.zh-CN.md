@@ -20,6 +20,7 @@
 | **P1** | 共享 sidebar 返回按钮默认走浏览器历史，而不是父级路由，导致 `community / memory / pages` 经常回到 “上一个操作页”        | 已确认 |
 | **P1** | `content` 列表在 SWR 成功后会整页覆盖 store，上传后文件可见性不稳定，容易出现 “刚出来又消失”                            | 已确认 |
 | **P1** | 上传 dock、文件列表 skeleton、处理中轮询是三套互不协调的状态机，loading 反馈割裂                                        | 已确认 |
+| **P1** | `content` 子页不是独立子路由，而是 `?file=` + 本地 `mode` 的 overlay，导航语义与历史栈先天不稳定                        | 已确认 |
 | **P1** | `ContentManager` 在子页打开后仍常驻渲染 explorer，并继续 URL 同步、列表计算和任务轮询                                   | 已确认 |
 | **P1** | `DocsAgentProvider` 阻塞 `PageEditor` 首屏，文档内容可见性被 AI 初始化链路卡住                                          | 已确认 |
 | **P2** | `content` 与 `pages` 列表都存在明显重复派生、重复排序和重复首屏请求后的回流计算                                         | 已确认 |
@@ -94,7 +95,36 @@
 - `src/features/ContentManager/components/Explorer/index.tsx:31-99`
 - `src/features/ContentManager/components/Explorer/useCheckTaskStatus.ts:17-28`
 
-### 5. 文件列表在 SWR 成功后会整页覆盖 store，导致 “loaded 后又丢失”（P1）
+### 5. `content` 详情不是独立路由，而是 query param + 本地 mode 驱动的 overlay（P1）
+
+当前 `content` 打开文件 / 文档的实现，不是进入一个明确的子路由，而是：
+
+1. 在当前列表页上写入 `?file=...`
+2. 同时更新本地 store 里的 `mode` 和 `currentViewItemId`
+3. 用 overlay 把 explorer 盖住
+
+并且 `useContentManagerUrlSync()` 明确把 store 定义成 source of truth，URL 只是 “bookmark sync”。\
+这会直接带来几个问题：
+
+- 文件详情不是一等导航状态，而是页面内部模式切换
+- 历史栈和 UI 层级不是同一套语义
+- 深链进入时还要靠 `useInitFileCheck()` 异步推断应该进 `editor` 还是 `doc`
+- 打开文件时大量使用 `{ replace: true }`，关闭时又是 push，前进 / 后退行为天然不对称
+
+这也是为什么 “返回上一层” 在这块很难稳定成立，因为这里根本没有一个真正清晰的 “上一层子路由”。
+
+**证据**：
+
+- `src/features/ContentManager/index.tsx:88-107`
+- `src/features/ContentManager/index.tsx:165-175`
+- `src/features/ContentManager/hooks/useOpenFileDocument.ts:19-37`
+- `src/features/ContentManager/components/Explorer/hooks/useFileItemClick.ts:73-110`
+- `src/routes/(main)/content/features/hooks/useContentManagerUrlSync.ts:7-10`
+- `src/routes/(main)/content/features/hooks/useContentManagerUrlSync.ts:32-63`
+- `src/routes/(main)/content/features/hooks/useInitFileCheck.ts:10-14`
+- `src/routes/(main)/content/features/hooks/useInitFileCheck.ts:28-78`
+
+### 6. 文件列表在 SWR 成功后会整页覆盖 store，导致 “loaded 后又丢失”（P1）
 
 `useFetchResources()` 固定请求 `offset: 0`；一旦成功，`syncResourceStore()` 会把 `resourceList`、`resourceMap`、`offset` 无条件重置为当前首屏结果。\
 这会直接冲掉：
@@ -111,7 +141,7 @@
 - `src/store/file/slices/content/hooks.ts:72-90`
 - `src/store/file/slices/content/action.ts:491-518`
 
-### 6. 上传完成后列表没有即时并入逻辑，只能赌统一 refresh 成功（P1）
+### 7. 上传完成后列表没有即时并入逻辑，只能赌统一 refresh 成功（P1）
 
 上传链路当前是：
 
@@ -128,7 +158,7 @@
 - `src/store/file/slices/fileManager/action.ts:294-311`
 - `src/store/file/slices/content/hooks.ts:62-67`
 
-### 7. loading 动画、上传 dock、列表真实状态完全脱节（P1）
+### 8. loading 动画、上传 dock、列表真实状态完全脱节（P1）
 
 当前至少存在三套互不协调的状态机：
 
@@ -149,7 +179,7 @@
 - `src/store/file/slices/fileManager/action.ts:294-305`
 - `src/features/ContentManager/components/UploadDock/index.tsx:54-139`
 
-### 8. UploadDock 聚合状态本身就不准确（P2）
+### 9. UploadDock 聚合状态本身就不准确（P2）
 
 `overviewUploadingStatus()` 只会返回 `pending / uploading / success`，不会返回 `error`；而且把 `processing` 也归进 `uploading`。\
 这会导致：
@@ -164,7 +194,7 @@
 - `src/store/file/slices/fileManager/selectors.ts:39-46`
 - `src/features/ContentManager/components/UploadDock/index.tsx:67-82`
 
-### 9. `PageEditor` 首屏被 Docs Agent 初始化链路阻塞（P1）
+### 10. `PageEditor` 首屏被 Docs Agent 初始化链路阻塞（P1）
 
 `PageEditor` 整体被 `DocsAgentProvider` 包裹，而 provider 在 docs agent 未准备好或还需同步默认模型时，会直接返回 loading。\
 这意味着文档内容本身的可见性，被串到了 AI 侧初始化链路上。与此同时，`Copilot` 也默认一起挂载。
@@ -182,7 +212,7 @@
 - `src/features/PageEditor/DocsAgentProvider.tsx:45-61`
 - `src/features/PageEditor/DocsAgentProvider.tsx:89-102`
 
-### 10. 列表派生与排序存在重复 CPU pass，放大 revalidate 抖动（P2）
+### 11. 列表派生与排序存在重复 CPU pass，放大 revalidate 抖动（P2）
 
 `Explorer` 已经先做了一次 `ContentItem -> FileListItem` 映射和排序；`MasonryView` 又重复做一遍；搜索浮层命中时还会再做一套单独映射。\
 同类问题在 `pages` 侧栏也存在：`filterDocuments()` 每次都会 `filter + sort`，Header、列表、抽屉各自订阅自己的 selector，导致一次搜索或重命名会触发多次 O (n log n) 派生。
@@ -251,6 +281,17 @@
 ### 3. `Pages` 首屏卡顿里，Copilot 的实际成本占比
 
 代码已证明 `DocsAgentProvider` 会阻塞首屏，但 `Copilot` 自身挂载成本有多大，还需要 profiler 或火焰图验证，避免过度归因。
+
+### 4. 编辑器 header 返回是否会绕过未保存保护
+
+`PageEditor` 的未保存保护是通过 `useBlocker` 和 `beforeunload` 实现的，而 header 左上角返回按钮直接调用上层 `onBack`。\
+在 `content` 场景里，这个 `onBack` 还会先改本地 `mode`，再改 query param。是否会出现 “UI 已退出编辑态，但 blocker 拦下了 URL 导航” 的不一致，需要实机验证。
+
+**相关代码**：
+
+- `src/features/EditorCanvas/UnsavedChangesGuard.tsx`
+- `src/features/PageEditor/Header/index.tsx`
+- `src/features/ContentManager/index.tsx:165-175`
 
 ---
 
