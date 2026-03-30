@@ -26,6 +26,7 @@ const MasonryView = memo(function MasonryView() {
   const [
     sourceSetId,
     category,
+    mode,
     spaceId,
     selectedFileIds,
     setSelectedFileIds,
@@ -37,6 +38,7 @@ const MasonryView = memo(function MasonryView() {
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.category,
+    s.mode,
     s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
@@ -46,6 +48,8 @@ const MasonryView = memo(function MasonryView() {
     s.isTransitioning,
     s.currentFolderId,
   ]);
+
+  const isExplorerMode = mode === 'explorer';
 
   const { t } = useTranslation('file');
   const columnCount = useMasonryColumnCount();
@@ -72,7 +76,7 @@ const MasonryView = memo(function MasonryView() {
     hasResolvedData,
     isLoading,
     items: resourceList,
-  } = useVisibleResources(queryParams);
+  } = useVisibleResources(queryParams, isExplorerMode);
   const loadMoreResources = useFileStore((s) => s.loadMoreResources);
 
   // Map ContentItem[] to FileListItem[] for compatibility

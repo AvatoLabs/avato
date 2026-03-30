@@ -29,13 +29,11 @@ import { useContentExplorer } from './useContentExplorer';
  * So we depend on context, not props.
  */
 const ResourceExplorer = memo(() => {
-  // Sync store state with URL query parameters
-  useContentManagerUrlSync();
-
   // Get state from Resource Manager store
   const [
     sourceSetId,
     category,
+    mode,
     viewMode,
     searchQuery,
     setSelectedFileIds,
@@ -45,6 +43,7 @@ const ResourceExplorer = memo(() => {
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.category,
+    s.mode,
     s.viewMode,
     s.searchQuery,
     s.setSelectedFileIds,
@@ -52,6 +51,11 @@ const ResourceExplorer = memo(() => {
     s.sortType,
     s.spaceId,
   ]);
+
+  const isExplorerMode = mode === 'explorer';
+
+  // Sync store state with URL query parameters
+  useContentManagerUrlSync(isExplorerMode);
 
   // searchQuery is still subscribed above for selection-clearing effect below
 
@@ -73,7 +77,10 @@ const ResourceExplorer = memo(() => {
   );
 
   // Use SWR for data fetching with automatic caching and revalidation
-  const { hasResolvedData, isLoading, isValidating, items } = useVisibleResources(queryParams);
+  const { hasResolvedData, isLoading, isValidating, items } = useVisibleResources(
+    queryParams,
+    isExplorerMode,
+  );
 
   // Map ContentItem[] to FileListItem[] for compatibility
   // TODO: Eventually update all consumers to use ContentItem directly
@@ -93,7 +100,7 @@ const ResourceExplorer = memo(() => {
   const data = sortFileList(rawData, sorter, sortType) || [];
 
   // Check task status
-  useCheckTaskStatus(data);
+  useCheckTaskStatus(data, isExplorerMode);
 
   // Initialize folder/file navigation effects (still need hook for complex effects)
   useContentExplorer({ category, sourceSetId });

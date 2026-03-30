@@ -8,7 +8,7 @@ import { SortType } from '@/types/files';
  * Hook to sync ContentManager store state with URL query parameters.
  * Store is the source of truth, URL is synced for bookmarking
  */
-export const useContentManagerUrlSync = () => {
+export const useContentManagerUrlSync = (enabled: boolean = true) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [sorter, sortType, viewMode, setSorter, setSortType, setViewMode] = useContentManagerStore(
@@ -17,6 +17,8 @@ export const useContentManagerUrlSync = () => {
 
   // Initialize store from URL when searchParams change (URL → Store, e.g. bookmark or back navigation)
   useEffect(() => {
+    if (!enabled) return;
+
     const sorterParam = (searchParams.get('sorter') || 'createdAt') as
       | 'name'
       | 'createdAt'
@@ -27,10 +29,12 @@ export const useContentManagerUrlSync = () => {
     setSorter(sorterParam);
     setSortType(sortTypeParam);
     setViewMode(viewParam);
-  }, [searchParams, setSorter, setSortType, setViewMode]);
+  }, [enabled, searchParams, setSorter, setSortType, setViewMode]);
 
   // Sync store changes to URL (Store → URL)
   useEffect(() => {
+    if (!enabled) return;
+
     setSearchParams(
       (prev) => {
         const newParams = new URLSearchParams(prev);
@@ -60,5 +64,5 @@ export const useContentManagerUrlSync = () => {
       },
       { replace: true },
     ); // Use replace to avoid polluting history
-  }, [sorter, sortType, viewMode, setSearchParams]);
+  }, [enabled, sorter, sortType, viewMode, setSearchParams]);
 };

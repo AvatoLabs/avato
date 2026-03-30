@@ -27,13 +27,9 @@ const SWR_RESOURCE_SEARCH = 'SWR_RESOURCE_SEARCH';
 
 const SearchResultsOverlay = memo(() => {
   const { t } = useTranslation(['components', 'file']);
-  const [searchQuery, sourceSetId, category, spaceId, viewMode] = useContentManagerStore((s) => [
-    s.searchQuery,
-    s.sourceSetId,
-    s.category,
-    s.spaceId,
-    s.viewMode,
-  ]);
+  const [searchQuery, sourceSetId, category, spaceId, viewMode, mode] = useContentManagerStore(
+    (s) => [s.searchQuery, s.sourceSetId, s.category, s.spaceId, s.viewMode, s.mode],
+  );
 
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
 
@@ -42,7 +38,7 @@ const SearchResultsOverlay = memo(() => {
   );
   const columnCount = useMasonryColumnCount();
 
-  const isActive = !!searchQuery && searchQuery.length > 0;
+  const isActive = mode === 'explorer' && !!searchQuery && searchQuery.length > 0;
 
   const { data: rawData, isLoading } = useClientDataSWR(
     isActive

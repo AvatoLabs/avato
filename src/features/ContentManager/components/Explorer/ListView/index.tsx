@@ -67,6 +67,7 @@ const ListView = memo(function ListView() {
   const [
     sourceSetId,
     category,
+    mode,
     spaceId,
     selectFileIds,
     setSelectedFileIds,
@@ -77,6 +78,7 @@ const ListView = memo(function ListView() {
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.category,
+    s.mode,
     s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
@@ -85,6 +87,8 @@ const ListView = memo(function ListView() {
     s.sortType,
     s.isTransitioning,
   ]);
+
+  const isExplorerMode = mode === 'explorer';
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
 
@@ -137,7 +141,10 @@ const ListView = memo(function ListView() {
     [category, currentFolderSlug, sourceSetId, sorter, sortType, spaceId],
   );
 
-  const { hasResolvedData, isLoading, items: resourceList } = useVisibleResources(queryParams);
+  const { hasResolvedData, isLoading, items: resourceList } = useVisibleResources(
+    queryParams,
+    isExplorerMode,
+  );
   const { hasMore, loadMoreResources } = useFileStore();
 
   // Map ContentItem[] to FileListItem[] for compatibility

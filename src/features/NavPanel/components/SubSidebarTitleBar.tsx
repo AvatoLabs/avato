@@ -32,7 +32,7 @@ export interface SubSidebarTitleBarProps {
 
 /** 子侧栏顶栏：返回首页 + 分区标题，避免子路由无法回到主导航 */
 const SubSidebarTitleBar = memo<SubSidebarTitleBarProps>(
-  ({ backUseHistory = true, backTo = '/', right, title, titleTo }) => {
+  ({ backUseHistory = false, backTo = '/', right, title, titleTo }) => {
     const { t } = useTranslation('common');
     const glass = useGlassNavVisual();
     const titleMarginStart = getWorkspaceSubSidebarTitleMarginInlineStartPx(glass);

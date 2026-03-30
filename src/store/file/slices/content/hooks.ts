@@ -18,6 +18,27 @@ interface ResourceQueryResponse {
 
 const buildResourceMap = (items: ContentItem[]) => new Map(items.map((item) => [item.id, item]));
 
+const mergeActiveResourceList = (
+  incomingItems: ContentItem[],
+  existingItems: ContentItem[],
+  offset: number,
+) => {
+  const incomingIds = new Set(incomingItems.map((item) => item.id));
+  const optimisticItems = existingItems.filter(
+    (item) => item._optimistic && !incomingIds.has(item.id),
+  );
+  const persistedItems = existingItems.filter((item) => !item._optimistic);
+  const preservedTail =
+    offset > incomingItems.length
+      ? persistedItems.slice(incomingItems.length).filter((item) => !incomingIds.has(item.id))
+      : [];
+
+  return {
+    items: [...optimisticItems, ...incomingItems, ...preservedTail],
+    offset: offset > incomingItems.length ? offset : incomingItems.length,
+  };
+};
+
 export const isSameResourceQueryParams = (
   left?: ContentQueryParams | null,
   right?: ContentQueryParams | null,
@@ -28,14 +49,19 @@ const syncResourceStore = (
   data: ResourceQueryResponse,
   actionName: string,
 ) => {
-  const { hasMore, resourceList, resourceMap, total } = useFileStore.getState();
-  const newResourceMap = buildResourceMap(data.items);
+  const { hasMore, offset, queryParams, resourceList, resourceMap, total } = useFileStore.getState();
+  const isActiveQuery = isSameResourceQueryParams(queryParams, params);
+  const nextState = isActiveQuery
+    ? mergeActiveResourceList(data.items, resourceList, offset)
+    : { items: data.items, offset: data.items.length };
+  const newResourceMap = buildResourceMap(nextState.items);
 
   if (
-    isSameResourceQueryParams(useFileStore.getState().queryParams, params) &&
-    isEqual(data.items, resourceList) &&
+    isActiveQuery &&
+    isEqual(nextState.items, resourceList) &&
     isEqual(newResourceMap, resourceMap) &&
     hasMore === data.hasMore &&
+    offset === nextState.offset &&
     total === data.total
   ) {
     return;
@@ -44,9 +70,9 @@ const syncResourceStore = (
   useFileStore.setState(
     {
       hasMore: data.hasMore,
-      offset: data.items.length,
+      offset: nextState.offset,
       queryParams: params,
-      resourceList: data.items,
+      resourceList: nextState.items,
       resourceMap: newResourceMap,
       total: data.total,
     },
