@@ -3,7 +3,7 @@
 import { Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { FileText, FolderOpen, Inbox, Table2 } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -11,6 +11,7 @@ import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
@@ -22,6 +23,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     font-weight: 500;
     color: ${cssVar.colorTextDescription};
   `,
+  count: css`
+    min-width: 16px;
+    text-align: end;
+  `,
 }));
 
 const ScopeNavigation = memo(() => {
@@ -32,19 +37,34 @@ const ScopeNavigation = memo(() => {
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets = [], isLoading } = useFetchSourceSetList(activeSpaceId);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
+  const scopeCountsSelector = useMemo(
+    () => pageSelectors.getScopeCountsByKind(pageKind),
+    [pageKind],
+  );
+  const { all, bySourceSet, unassigned } = usePageStore(scopeCountsSelector);
+
+  const renderCount = (count: number) => (
+    <Text className={styles.count} fontSize={12} type={'secondary'}>
+      {count}
+    </Text>
+  );
 
   return (
     <Flexbox gap={4} paddingInline={4}>
       <NavItem
         active={scope === 'all'}
+        extra={renderCount(all)}
         icon={isTablePage ? Table2 : FileText}
-        title={t(isTablePage ? 'pageList.tableTitle' : 'pageList.title', { ns: 'file' })}
+        title={t(isTablePage ? 'pageList.scope.allTables' : 'pageList.scope.allDocs', {
+          ns: 'file',
+        })}
         onClick={() => setScope('all')}
       />
       <NavItem
         active={scope === 'unassigned'}
+        extra={renderCount(unassigned)}
         icon={Inbox}
-        title={t('pageList.filter.onlyUnassigned', { ns: 'file' })}
+        title={t('pageList.scope.inbox', { ns: 'file' })}
         onClick={() => setScope('unassigned')}
       />
 
@@ -58,6 +78,7 @@ const ScopeNavigation = memo(() => {
         sourceSets.map((sourceSet) => (
           <NavItem
             active={activeSourceSetId === sourceSet.id}
+            extra={renderCount(bySourceSet[sourceSet.id] ?? 0)}
             icon={FolderOpen}
             key={sourceSet.id}
             title={sourceSet.name}

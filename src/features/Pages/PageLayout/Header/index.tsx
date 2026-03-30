@@ -41,7 +41,7 @@ const Header = memo(() => {
 
     const label =
       scope === 'unassigned'
-        ? t('pageList.filter.onlyUnassigned', { ns: 'file' })
+        ? t('pageList.scope.inbox', { ns: 'file' })
         : sourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' });
 
     return (
@@ -88,7 +88,10 @@ const Header = memo(() => {
         />
         <Flexbox horizontal align={'center'} justify={'space-between'} paddingInline={4}>
           <Text fontSize={12} type={'secondary'}>
-            {t('pageList.pageCount', { count: filteredDocumentsCount, ns: 'file' })}
+            {t(isTablePage ? 'pageList.tableCount' : 'pageList.pageCount', {
+              count: filteredDocumentsCount,
+              ns: 'file',
+            })}
           </Text>
           <Actions />
         </Flexbox>

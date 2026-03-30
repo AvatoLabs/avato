@@ -51,7 +51,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
 
   const scopeLabel = useMemo(() => {
     if (scope === 'unassigned') {
-      return t('pageList.filter.onlyUnassigned', { ns: 'file' });
+      return t('pageList.scope.inbox', { ns: 'file' });
     }
 
     if (currentSourceSetScopeId) {
@@ -60,6 +60,11 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
 
     return t(isTablePage ? 'pageList.tableTitle' : 'pageList.title', { ns: 'file' });
   }, [currentSourceSetScopeId, isTablePage, scope, scopedSourceSet?.name, t]);
+
+  const countLabel = t(isTablePage ? 'pageList.tableCount' : 'pageList.pageCount', {
+    count,
+    ns: 'file',
+  });
 
   if (isLoading) {
     return <Loading debugId="PagesWorkspace" />;
@@ -82,7 +87,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
             </Text>
             {scope === 'unassigned' && (
               <Tag size={'small'} variant={'filled'}>
-                {t('pageList.sourceSet.unassigned', { ns: 'file' })}
+                {t('pageList.scope.inbox', { ns: 'file' })}
               </Tag>
             )}
             {currentSourceSetScopeId && (
@@ -91,7 +96,10 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
               </Tag>
             )}
           </Flexbox>
-          <Text type={'secondary'}>{t('pageList.pageCount', { count, ns: 'file' })}</Text>
+          {currentSourceSetScopeId && scopedSourceSet?.description && (
+            <Text type={'secondary'}>{scopedSourceSet.description}</Text>
+          )}
+          <Text type={'secondary'}>{countLabel}</Text>
         </Flexbox>
         {count === 0 && !isSearching ? (
           <PageExplorerPlaceholder

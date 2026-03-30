@@ -11,6 +11,12 @@ interface FilteredDocumentsSnapshot {
   items: LobeDocument[];
 }
 
+interface PageScopeCounts {
+  all: number;
+  bySourceSet: Record<string, number>;
+  unassigned: number;
+}
+
 /**
  * Check if documents are still loading (undefined means not yet loaded)
  */
@@ -22,6 +28,7 @@ const filteredDocumentsSnapshotCache = new WeakMap<
   LobeDocument[],
   Map<number, FilteredDocumentsSnapshot>
 >();
+const pageScopeCountsCache = new WeakMap<LobeDocument[], Map<PageKind, PageScopeCounts>>();
 
 const getFilteredDocumentsCacheKey = (
   pageKind: PageKind,
@@ -122,6 +129,43 @@ const getFilteredDocumentsSnapshotByKind =
     return getFilteredDocumentsSnapshot(items, pageSize);
   };
 
+const getScopeCountsByKind =
+  (pageKind: PageKind) =>
+  (s: PageState): PageScopeCounts => {
+    const docs = s.documents ?? EMPTY_DOCUMENTS;
+    const cache = pageScopeCountsCache.get(docs);
+    const cachedResult = cache?.get(pageKind);
+
+    if (cachedResult) return cachedResult;
+
+    const counts: PageScopeCounts = {
+      all: 0,
+      bySourceSet: {},
+      unassigned: 0,
+    };
+
+    for (const doc of docs) {
+      if (getPageKindFromDocument(doc) !== pageKind) continue;
+
+      counts.all += 1;
+
+      if (!doc.sourceSetId) {
+        counts.unassigned += 1;
+        continue;
+      }
+
+      counts.bySourceSet[doc.sourceSetId] = (counts.bySourceSet[doc.sourceSetId] || 0) + 1;
+    }
+
+    if (cache) {
+      cache.set(pageKind, counts);
+    } else {
+      pageScopeCountsCache.set(docs, new Map([[pageKind, counts]]));
+    }
+
+    return counts;
+  };
+
 const getDocumentById = (docId: string | undefined) => (s: PageState) => {
   if (!docId) return undefined;
 
@@ -139,6 +183,7 @@ export const listSelectors = {
   documentsTotal,
   getDocumentById,
   getFilteredDocumentsSnapshotByKind,
+  getScopeCountsByKind,
   hasMoreDocuments,
   isDocumentsLoading,
   isLoadingMoreDocuments,

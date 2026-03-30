@@ -1,6 +1,6 @@
 'use client';
 
-import { Flexbox } from '@lobehub/ui';
+import { Flexbox, Text } from '@lobehub/ui';
 import { memo, useLayoutEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -54,11 +54,14 @@ const MainContent = memo(() => {
 
   return (
     <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
-      <SourceSetSurfaceNav
-        activeSurface={'files'}
-        sourceSetId={sourceSetId!}
-        spaceId={data?.spaceId}
-      />
+      <Flexbox gap={4}>
+        <SourceSetSurfaceNav
+          activeSurface={'files'}
+          sourceSetId={sourceSetId!}
+          spaceId={data?.spaceId}
+        />
+        {data?.description && <Text type={'secondary'}>{data.description}</Text>}
+      </Flexbox>
       <Flexbox flex={1} style={{ minHeight: 0 }}>
         <ContentManager />
       </Flexbox>
