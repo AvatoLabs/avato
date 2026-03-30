@@ -19,7 +19,12 @@ import { getChatgptDarkSurfaceTokenOverrides } from '@/const/chatgptDarkSurfaces
 import { LOBE_THEME_NEUTRAL_COLOR, LOBE_THEME_PRIMARY_COLOR } from '@/const/theme';
 import { isDesktop } from '@/const/version';
 import { useIsDark } from '@/hooks/useIsDark';
-import { resolveSolidTextColor, resolveThemeMode } from '@/layout/GlobalProvider/themeShared';
+import {
+  resolveAppearanceThemeColors,
+  resolveSolidTextColor,
+  resolveThemeAppearance,
+  resolveThemeMode,
+} from '@/layout/GlobalProvider/themeShared';
 import { getUILocaleAndResources } from '@/libs/getUILocaleAndResources';
 import Image from '@/libs/next/Image';
 import { useGlobalStore } from '@/store/global';
@@ -89,8 +94,8 @@ export interface AppThemeProps {
   children?: ReactNode;
   customFontFamily?: string;
   customFontURL?: string;
-  defaultNeutralColor?: NeutralColors;
-  defaultPrimaryColor?: PrimaryColors;
+  defaultNeutralColor?: NeutralColors | string;
+  defaultPrimaryColor?: PrimaryColors | string;
   globalCDN?: boolean;
 }
 
@@ -167,13 +172,25 @@ const AppTheme = memo<AppThemeProps>(
       initialThemeSyncedRef.current = true;
     }, [isUserStateInit, themeMode, setTheme]);
 
-    const currentAppearence = isDark ? 'dark' : 'light';
+    const currentAppearence = useMemo(
+      () => resolveThemeAppearance({ isDark, themeMode }),
+      [isDark, themeMode],
+    );
 
     /** antd-style ThemeSwitcher uses light | dark | auto (auto = follow system). */
     const antdThemeMode = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
+    const resolvedThemeColors = useMemo(
+      () =>
+        resolveAppearanceThemeColors({
+          appearance: currentAppearence,
+          neutralColor: neutralColor ?? defaultNeutralColor,
+          primaryColor: primaryColor ?? defaultPrimaryColor,
+        }),
+      [currentAppearence, defaultNeutralColor, defaultPrimaryColor, neutralColor, primaryColor],
+    );
     const solidTextColor = useMemo(
-      () => resolveSolidTextColor(primaryColor, defaultPrimaryColor),
-      [defaultPrimaryColor, primaryColor],
+      () => resolveSolidTextColor(resolvedThemeColors.primaryColor),
+      [resolvedThemeColors.primaryColor],
     );
 
     const customToken = useCallback(
@@ -190,8 +207,8 @@ const AppTheme = memo<AppThemeProps>(
           customToken={customToken}
           themeMode={antdThemeMode}
           customTheme={{
-            neutralColor: neutralColor ?? defaultNeutralColor,
-            primaryColor: primaryColor ?? defaultPrimaryColor,
+            neutralColor: resolvedThemeColors.neutralColor as any,
+            primaryColor: resolvedThemeColors.primaryColor as any,
           }}
           theme={{
             cssVar: { key: 'lobe-vars' },

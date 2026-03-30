@@ -1,19 +1,15 @@
 'use client';
 
-import {
-  Block,
-  Flexbox,
-  type NeutralColors,
-  type PrimaryColors,
-  Text,
-  ThemeProvider,
-} from '@lobehub/ui';
+import { Block, Flexbox, Text, ThemeProvider } from '@lobehub/ui';
 import { createStaticStyles, type CustomTokenParams, useTheme } from 'antd-style';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getChatgptDarkSurfaceTokenOverrides } from '@/const/chatgptDarkSurfaces';
-import { resolveSolidTextColor } from '@/layout/GlobalProvider/themeShared';
+import {
+  resolveAppearanceThemeColors,
+  resolveSolidTextColor,
+} from '@/layout/GlobalProvider/themeShared';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
@@ -268,53 +264,51 @@ SceneCanvas.displayName = 'AppearancePreviewScene';
 
 const Preview = memo(() => {
   const [primaryColor, neutralColor] = useUserStore((s) => [
-    userGeneralSettingsSelectors.primaryColor(s) as PrimaryColors | undefined,
-    userGeneralSettingsSelectors.neutralColor(s) as NeutralColors | undefined,
+    userGeneralSettingsSelectors.primaryColor(s) as string | undefined,
+    userGeneralSettingsSelectors.neutralColor(s) as string | undefined,
   ]);
   const { t } = useTranslation('setting');
-
-  const solidTextColor = useMemo(() => resolveSolidTextColor(primaryColor), [primaryColor]);
-
-  const customToken = useCallback(
-    ({ isDarkMode }: CustomTokenParams) =>
-      getChatgptDarkSurfaceTokenOverrides(isDarkMode, solidTextColor),
-    [solidTextColor],
-  );
-
-  const customTheme = useMemo(
+  const previewThemes = useMemo(
     () => ({
-      neutralColor,
-      primaryColor,
+      dark: resolveAppearanceThemeColors({ appearance: 'dark', neutralColor, primaryColor }),
+      light: resolveAppearanceThemeColors({ appearance: 'light', neutralColor, primaryColor }),
     }),
     [neutralColor, primaryColor],
   );
 
   return (
     <div className={styles.container}>
-      {(['light', 'dark'] as const).map((scheme) => (
-        <ThemeProvider
-          appearance={scheme}
-          customTheme={customTheme}
-          customToken={customToken}
-          key={scheme}
-          themeMode={scheme}
-          theme={{
-            cssVar: { key: `appearance-preview-${scheme}` },
-            token: {
-              colorTextLightSolid: solidTextColor,
-            },
-          }}
-        >
-          <SceneCanvas
-            scheme={scheme}
-            title={
-              scheme === 'light'
-                ? t('settingCommon.themeMode.light')
-                : t('settingCommon.themeMode.dark')
+      {(['light', 'dark'] as const).map((scheme) => {
+        const customTheme = previewThemes[scheme];
+        const solidTextColor = resolveSolidTextColor(customTheme.primaryColor);
+
+        return (
+          <ThemeProvider
+            appearance={scheme}
+            customTheme={customTheme as any}
+            key={scheme}
+            themeMode={scheme}
+            customToken={({ isDarkMode }: CustomTokenParams) =>
+              getChatgptDarkSurfaceTokenOverrides(isDarkMode, solidTextColor)
             }
-          />
-        </ThemeProvider>
-      ))}
+            theme={{
+              cssVar: { key: `appearance-preview-${scheme}` },
+              token: {
+                colorTextLightSolid: solidTextColor,
+              },
+            }}
+          >
+            <SceneCanvas
+              scheme={scheme}
+              title={
+                scheme === 'light'
+                  ? t('settingCommon.themeMode.light')
+                  : t('settingCommon.themeMode.dark')
+              }
+            />
+          </ThemeProvider>
+        );
+      })}
     </div>
   );
 });

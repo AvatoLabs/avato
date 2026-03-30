@@ -17,13 +17,14 @@ import NextThemeProvider from '@/layout/GlobalProvider/NextThemeProvider';
 import QueryProvider from '@/layout/GlobalProvider/Query';
 import ServerVersionOutdatedAlert from '@/layout/GlobalProvider/ServerVersionOutdatedAlert';
 import StoreInitialization from '@/layout/GlobalProvider/StoreInitialization';
+import { OBSIDIAN_THEME_PRIMARY } from '@/layout/GlobalProvider/themeShared';
 import { ServerConfigStoreProvider } from '@/store/serverConfig/Provider';
 import type { SPAServerConfig } from '@/types/spaServerConfig';
 
 import Locale from './Locale';
 
-/** Default accent: saturated green (ChatGPT-like), neutral slate — not Morandi primary scale. */
-const DEFAULT_THEME_PRIMARY: PrimaryColors = 'green';
+/** Default accent: obsidian mono preset, neutral slate. */
+const DEFAULT_THEME_PRIMARY = OBSIDIAN_THEME_PRIMARY as PrimaryColors;
 const DEFAULT_THEME_NEUTRAL: NeutralColors = 'slate';
 
 const ModalHost = lazy(() => import('@lobehub/ui/base-ui').then((m) => ({ default: m.ModalHost })));

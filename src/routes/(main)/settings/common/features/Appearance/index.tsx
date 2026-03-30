@@ -5,7 +5,7 @@ import { Form, Icon, Skeleton } from '@lobehub/ui';
 import { Segmented } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { Ban, Gauge, Loader2Icon, Mouse, Waves } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FORM_STYLE } from '@/const/layoutTokens';
@@ -31,22 +31,23 @@ const Appearance = memo(() => {
   const [loading, setLoading] = useState(false);
   const [presetOverride, setPresetOverride] = useState<ThemePresetId | undefined>();
 
-  if (!isUserStateInit) return <Skeleton active paragraph={{ rows: 5 }} title={false} />;
-
   const currentPrimaryColor = normalizeThemeColor(general.primaryColor);
   const currentNeutralColor = normalizeThemeColor(general.neutralColor);
   const resolvedPreset = resolveThemePreset(currentPrimaryColor, currentNeutralColor);
   const currentPreset = presetOverride ?? resolvedPreset;
   const isCustomPreset = currentPreset === 'custom';
 
-  const updateTheme = async (value: Pick<UserGeneralConfig, 'neutralColor' | 'primaryColor'>) => {
-    setLoading(true);
-    try {
-      await setSettings({ general: value });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const updateTheme = useCallback(
+    async (value: Pick<UserGeneralConfig, 'neutralColor' | 'primaryColor'>) => {
+      setLoading(true);
+      try {
+        await setSettings({ general: value });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [setSettings],
+  );
 
   const handlePresetChange = async (presetId: ThemePresetId) => {
     if (presetId === 'custom') {
@@ -59,10 +60,30 @@ const Appearance = memo(() => {
 
     setPresetOverride(undefined);
     await updateTheme({
-      neutralColor: serializeThemeColor(preset.neutralColor),
-      primaryColor: serializeThemeColor(preset.primaryColor),
+      neutralColor: serializeThemeColor(preset.neutralColor) as any,
+      primaryColor: serializeThemeColor(preset.primaryColor) as any,
     });
   };
+
+  useEffect(() => {
+    const preset = getThemePreset(resolvedPreset);
+
+    if (!preset || preset.isCustom || preset.id === 'obsidian') return;
+
+    const usesLegacyPrimaryColor = !!preset.legacyPrimaryColors?.some(
+      (value) => normalizeThemeColor(value) === currentPrimaryColor,
+    );
+    const usesPresetNeutralColor = normalizeThemeColor(preset.neutralColor) === currentNeutralColor;
+
+    if (!usesLegacyPrimaryColor || !usesPresetNeutralColor) return;
+
+    void updateTheme({
+      neutralColor: serializeThemeColor(preset.neutralColor) as any,
+      primaryColor: serializeThemeColor(preset.primaryColor) as any,
+    });
+  }, [currentNeutralColor, currentPrimaryColor, resolvedPreset, updateTheme]);
+
+  if (!isUserStateInit) return <Skeleton active paragraph={{ rows: 5 }} title={false} />;
 
   const theme: FormGroupItemType = {
     children: [

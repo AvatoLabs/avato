@@ -1,12 +1,11 @@
 import { SendButton as Send } from '@lobehub/editor/react';
-import { createStyles } from 'antd-style';
+import { createStyles, useTheme } from 'antd-style';
 import isEqual from 'fast-deep-equal';
 import { ArrowUp } from 'lucide-react';
 import { memo, useMemo } from 'react';
 
 import { selectors, useChatInputStore } from '../store';
 
-/** 主色发送键：跟随主题 colorPrimary，字与图标用按背景对比度校正后的 colorTextLightSolid */
 const useStyles = createStyles(({ css, token }) => ({
   primarySendIcon: css`
     &.ant-btn-primary:not(.ant-btn-disabled),
@@ -49,7 +48,8 @@ const SendButton = memo(() => {
   const { generating, disabled } = useChatInputStore(selectors.sendButtonProps, isEqual);
   const [send, handleStop] = useChatInputStore((s) => [s.handleSendButton, s.handleStop]);
 
-  const { styles, cx, theme } = useStyles();
+  const theme = useTheme();
+  const { styles, cx } = useStyles();
   const chatgptIcon = useMemo(() => {
     const px = size ? Math.round(size * 0.5) : 18;
     return <ArrowUp aria-hidden color={theme.colorTextLightSolid} size={px} strokeWidth={2.75} />;

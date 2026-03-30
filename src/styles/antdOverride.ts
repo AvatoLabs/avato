@@ -3,8 +3,6 @@ import { type Theme } from 'antd-style';
 import { css } from 'antd-style';
 import { rgba } from 'polished';
 
-import { getContrastingTextColor } from '../utils/contrast';
-
 const PRESET_BUTTON_COLORS = [
   'red',
   'orange',
@@ -20,14 +18,12 @@ const PRESET_BUTTON_COLORS = [
   'volcano',
 ] as const;
 
-const getSolidButtonColorOverride = (prefixCls: string, colorKey: string, background: string) => {
-  const solidTextColor = getContrastingTextColor(background);
-
+const getSolidButtonColorOverride = (prefixCls: string, colorKey: string, foreground: string) => {
   return css`
     .${prefixCls}-btn.${prefixCls}-btn-variant-solid.${prefixCls}-btn-color-${colorKey}:not(
       :disabled
     ):not(.${prefixCls}-btn-disabled) {
-      color: ${solidTextColor} !important;
+      color: ${foreground} !important;
     }
 
     .${prefixCls}-btn.${prefixCls}-btn-variant-solid.${prefixCls}-btn-color-${colorKey}:not(
@@ -38,23 +34,19 @@ const getSolidButtonColorOverride = (prefixCls: string, colorKey: string, backgr
       :disabled
     ):not(.${prefixCls}-btn-disabled)
       svg {
-      color: ${solidTextColor} !important;
+      color: ${foreground} !important;
     }
   `;
 };
 
 const antdOverride = ({ token }: { prefixCls: string; token: Theme }) => {
   const presetSolidButtonOverrides = PRESET_BUTTON_COLORS.map((colorKey) =>
-    getSolidButtonColorOverride(
-      token.prefixCls,
-      colorKey,
-      token[`${colorKey}6` as keyof Theme] as string,
-    ),
+    getSolidButtonColorOverride(token.prefixCls, colorKey, '#fff'),
   ).join('\n');
 
   return css`
-    ${getSolidButtonColorOverride(token.prefixCls, 'primary', token.colorPrimary)}
-    ${getSolidButtonColorOverride(token.prefixCls, 'dangerous', token.colorError)}
+    ${getSolidButtonColorOverride(token.prefixCls, 'primary', token.colorTextLightSolid)}
+    ${getSolidButtonColorOverride(token.prefixCls, 'dangerous', '#fff')}
   ${presetSolidButtonOverrides}
 
   .${token.prefixCls}-popover {
