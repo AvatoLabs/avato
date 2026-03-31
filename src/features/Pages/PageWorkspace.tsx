@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorerPlaceholder from '@/features/PageExplorer/PageExplorerPlaceholder';
-import SourceSetSurfaceNav from '@/features/SourceSetSurfaceNav';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
@@ -74,13 +73,6 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
     <>
       <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
         <Flexbox gap={8}>
-          {currentSourceSetScopeId && (
-            <SourceSetSurfaceNav
-              activeSurface={'docs'}
-              sourceSetId={currentSourceSetScopeId}
-              spaceId={scopedSourceSet?.spaceId}
-            />
-          )}
           <Flexbox horizontal align={'center'} gap={8}>
             <Text as={'h2'} fontSize={24} style={{ margin: 0 }} weight={600}>
               {scopeLabel}
