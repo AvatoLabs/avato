@@ -27,12 +27,13 @@ const Header = memo(() => {
   );
   const { count: filteredDocumentsCount } = usePageStore(filteredDocumentsSelector);
   const isDocumentsLoading = usePageStore(pageSelectors.isDocumentsLoading);
-  const spaceName = useSpaceName(getActiveWorkspaceSpaceId());
   const [searchKeywords, setSearchKeywords] = usePageStore((s) => [
     s.searchKeywords,
     s.setSearchKeywords,
   ]);
   const { scope, setScope, sourceSetId } = usePageScope();
+  const scopedSourceSet = useSourceSetStore(sourceSetSelectors.getSourceSetById(sourceSetId || ''));
+  const spaceName = useSpaceName(scopedSourceSet?.spaceId ?? getActiveWorkspaceSpaceId());
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
   );

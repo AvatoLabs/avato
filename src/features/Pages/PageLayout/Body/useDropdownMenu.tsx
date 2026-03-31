@@ -7,7 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePageKind } from '@/features/Pages/usePageKind';
-import { usePageScope } from '@/features/Pages/usePageScope';
+import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
@@ -19,13 +19,16 @@ export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
   const pageKind = usePageKind();
   const { scope, setScope, sourceSetId: currentSourceSetScopeId } = usePageScope();
-  const activeSpaceId = getActiveWorkspaceSpaceId();
   const showOnlyPagesWithoutSourceSet = scope === 'unassigned';
   const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
+  const currentSourceSet = useSourceSetStore(
+    sourceSetSelectors.getSourceSetById(currentSourceSetScopeId || ''),
+  );
   const currentSourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(currentSourceSetScopeId || ''),
   );
+  const activeSpaceId = currentSourceSet?.spaceId ?? getActiveWorkspaceSpaceId();
   const { data: sourceSets = [] } = useFetchSourceSetList(activeSpaceId);
 
   const [pagePageSize, updateSystemStatus] = useGlobalStore((s) => [
@@ -70,6 +73,21 @@ export const useDropdownMenu = (): MenuProps['items'] => {
               label: t('pageList.createInSourceSet', { ns: 'file' }),
             },
             { type: 'divider' as const },
+          ]
+        : []),
+      ...(sourceSets.length > 0
+        ? [
+            {
+              children: sourceSets.map((item) => ({
+                icon: currentSourceSetScopeId === item.id ? <Icon icon={LucideCheck} /> : <div />,
+                key: `scope-source-set-${item.id}`,
+                label: item.name,
+                onClick: () => setScope(createSourceSetPageScope(item.id)),
+              })),
+              icon: <Icon icon={FolderOpen} />,
+              key: 'scope-by-source-set',
+              label: t('pageList.scope.bySourceSet', { ns: 'file' }),
+            },
           ]
         : []),
       {

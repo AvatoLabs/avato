@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+
+import { getPageKindFromPathname, getPageRootPath } from '@/utils/docs';
 
 const PAGE_SCOPE_SOURCE_SET_PREFIX = 'source-set:';
 
@@ -56,6 +58,8 @@ export const buildPageScopeSearch = (
 };
 
 export const usePageScope = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const scope = useMemo(() => normalizePageScope(searchParams.get('scope')), [searchParams]);
@@ -63,11 +67,21 @@ export const usePageScope = () => {
 
   const setScope = useCallback(
     (nextScope: PageScope) => {
-      setSearchParams(new URLSearchParams(buildPageScopeSearch(nextScope, searchParams)), {
-        replace: true,
-      });
+      const nextSearch = buildPageScopeSearch(nextScope, searchParams);
+      const rootPath = getPageRootPath(getPageKindFromPathname(location.pathname));
+      const isRootPath = location.pathname === rootPath || location.pathname === `${rootPath}/`;
+
+      if (isRootPath) {
+        setSearchParams(new URLSearchParams(nextSearch), {
+          replace: true,
+        });
+
+        return;
+      }
+
+      navigate(`${rootPath}${nextSearch}`, { replace: true });
     },
-    [searchParams, setSearchParams],
+    [location.pathname, navigate, searchParams, setSearchParams],
   );
 
   return { scope, setScope, sourceSetId };

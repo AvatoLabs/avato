@@ -100,6 +100,9 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
             <Text type={'secondary'}>{scopedSourceSet.description}</Text>
           )}
           <Text type={'secondary'}>{countLabel}</Text>
+          {scope === 'unassigned' && (
+            <Text type={'secondary'}>{t('pageList.scope.inboxHint', { ns: 'file' })}</Text>
+          )}
         </Flexbox>
         {count === 0 && !isSearching ? (
           <PageExplorerPlaceholder

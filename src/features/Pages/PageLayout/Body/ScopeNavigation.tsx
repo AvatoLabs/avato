@@ -12,7 +12,7 @@ import { usePageKind } from '@/features/Pages/usePageKind';
 import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
-import { useSourceSetStore } from '@/store/sourceSet';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -32,8 +32,11 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 const ScopeNavigation = memo(() => {
   const { t } = useTranslation(['common', 'file']);
   const pageKind = usePageKind();
-  const activeSpaceId = getActiveWorkspaceSpaceId();
   const { scope, setScope, sourceSetId: activeSourceSetId } = usePageScope();
+  const scopedSourceSet = useSourceSetStore(
+    sourceSetSelectors.getSourceSetById(activeSourceSetId || ''),
+  );
+  const activeSpaceId = scopedSourceSet?.spaceId ?? getActiveWorkspaceSpaceId();
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets = [], isLoading } = useFetchSourceSetList(activeSpaceId);
   const isTablePage = pageKind === TABLE_PAGE_KIND;

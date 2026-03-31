@@ -333,42 +333,9 @@ export const useMenu = (): { menuItems: any[] } => {
           },
         ];
 
-    const items: DropdownItem[] = [
-      ...(showViewModeSwitch
+    const sourceSetMenuItems: DropdownItem[] =
+      sourceSetId || availableSourceSets.length > 0
         ? [
-            {
-              checked: wideScreen,
-              icon: <Icon icon={Maximize2} />,
-              key: 'full-width',
-              label: t('viewMode.fullWidth', { ns: 'chat' }),
-              onCheckedChange: toggleWideScreen,
-              type: 'switch' as const,
-            },
-            {
-              type: 'divider' as const,
-            },
-          ]
-        : []),
-      {
-        icon: <Icon icon={CopyPlus} />,
-        key: 'duplicate',
-        label: t('pageList.duplicate'),
-        onClick: handleDuplicate,
-      },
-      {
-        icon: <Icon icon={Link2} />,
-        key: 'copy-link',
-        label: t('docEditor.menu.copyLink'),
-        onClick: () => {
-          const state = storeApi.getState();
-          state.handleCopyLink(t as any, message);
-        },
-      },
-      ...((sourceSetId || availableSourceSets.length > 0)
-        ? [
-            {
-              type: 'divider' as const,
-            },
             ...(sourceSetId
               ? [
                   ...(availableSourceSets.length > 0
@@ -406,6 +373,50 @@ export const useMenu = (): { menuItems: any[] } => {
                     label: t('FileManager.actions.addToSourceSet', { ns: 'components' }),
                   },
                 ]),
+          ]
+        : [];
+
+    const items: DropdownItem[] = [
+      ...(showViewModeSwitch
+        ? [
+            {
+              checked: wideScreen,
+              icon: <Icon icon={Maximize2} />,
+              key: 'full-width',
+              label: t('viewMode.fullWidth', { ns: 'chat' }),
+              onCheckedChange: toggleWideScreen,
+              type: 'switch' as const,
+            },
+            {
+              type: 'divider' as const,
+            },
+          ]
+        : []),
+      ...(!sourceSetId
+        ? [
+            ...sourceSetMenuItems,
+            ...(sourceSetMenuItems.length ? [{ type: 'divider' as const }] : []),
+          ]
+        : []),
+      {
+        icon: <Icon icon={CopyPlus} />,
+        key: 'duplicate',
+        label: t('pageList.duplicate'),
+        onClick: handleDuplicate,
+      },
+      {
+        icon: <Icon icon={Link2} />,
+        key: 'copy-link',
+        label: t('docEditor.menu.copyLink'),
+        onClick: () => {
+          const state = storeApi.getState();
+          state.handleCopyLink(t as any, message);
+        },
+      },
+      ...(sourceSetId
+        ? [
+            ...(sourceSetMenuItems.length ? [{ type: 'divider' as const }] : []),
+            ...sourceSetMenuItems,
           ]
         : []),
       {
