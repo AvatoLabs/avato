@@ -38,12 +38,9 @@ const Header = memo(() => {
   );
 
   const activeScopeTag = useMemo(() => {
-    if (scope === 'all') return null;
+    if (scope === 'all' || scope === 'unassigned') return null;
 
-    const label =
-      scope === 'unassigned'
-        ? t('pageList.scope.inbox', { ns: 'file' })
-        : sourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' });
+    const label = sourceSetName || t('pageList.sourceSet.assigned', { ns: 'file' });
 
     return (
       <Tag
