@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
+import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { App } from 'antd';
 import { cssVar } from 'antd-style';
 import { memo } from 'react';
@@ -8,9 +8,10 @@ import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavHeader from '@/features/NavHeader';
+import { SpaceSurfaceTitle } from '@/features/ResourceSpaces';
 import CategoryMenu from '@/routes/(main)/content/(home)/_layout/Header/CategoryMenu';
 import { useFolderPath } from '@/routes/(main)/content/features/hooks/useFolderPath';
-import { useContentManagerStore } from '@/routes/(main)/content/features/store';
+import { selectors, useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useServerConfigStore } from '@/store/serverConfig';
 
 import AddButton from '../../Header/AddButton';
@@ -29,19 +30,22 @@ const Header = memo(() => {
   const { currentFolderSlug } = useFolderPath();
 
   // Get state and actions from store
-  const [sourceSetId, category, onActionClick, selectFileIds] = useContentManagerStore((s) => [
-    s.sourceSetId,
-    s.category,
-    s.onActionClick,
-    s.selectedFileIds,
-  ]);
+  const [sourceSetId, currentViewItemId, onActionClick, selectFileIds, spaceId] =
+    useContentManagerStore((s) => [
+      s.sourceSetId,
+      s.currentViewItemId,
+      s.onActionClick,
+      s.selectedFileIds,
+      s.spaceId,
+    ]);
+  const currentFile = useContentManagerStore(selectors.getCurrentFile);
   const selectCount = selectFileIds.length;
   const isMultiSelected = selectCount > 1;
   const isMobile = useServerConfigStore((s) => s.isMobile);
   const showCategoryFilter = !sourceSetId && !isMultiSelected;
 
-  // Scope-first navigation lives in the sidebar. Content types are secondary filters,
-  // so the desktop home view renders them here instead of inside the sidebar.
+  // Scope-first navigation lives in the sidebar. The header shows workspace-aware
+  // breadcrumb context once users drill into a file, folder, or source set.
   const leftContent = isMultiSelected ? (
     <Flexbox horizontal align={'center'} gap={8} style={{ marginLeft: 0 }}>
       {sourceSetId ? (
@@ -92,17 +96,18 @@ const Header = memo(() => {
     </Flexbox>
   ) : !sourceSetId ? (
     <Flexbox horizontal align={'center'} gap={8} style={{ minWidth: 0 }}>
-      {currentFolderSlug ? (
-        <Breadcrumb category={category} />
+      {currentFolderSlug || currentViewItemId ? (
+        <Breadcrumb fileName={currentFile?.name} />
       ) : (
-        <Text ellipsis style={{ maxWidth: 280 }} type={'secondary'} weight={600}>
-          {t('spaceContent.title', { defaultValue: 'Content', ns: 'file' })}
-        </Text>
+        <SpaceSurfaceTitle
+          spaceId={spaceId}
+          surfaceLabel={t('tab.files', { defaultValue: 'Files', ns: 'common' })}
+        />
       )}
     </Flexbox>
   ) : (
     <Flexbox style={{ marginLeft: 8 }}>
-      <Breadcrumb category={category} sourceSetId={sourceSetId} />
+      <Breadcrumb fileName={currentViewItemId ? currentFile?.name : undefined} />
     </Flexbox>
   );
 

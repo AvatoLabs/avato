@@ -1,8 +1,10 @@
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { documentService } from '@/services/document';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
 import { type SessionStore } from '@/store/session/store';
 import { type StoreSetter } from '@/store/types';
+import { getPageDetailPath } from '@/utils/docs';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { type StarterMode } from './initialState';
@@ -88,13 +90,16 @@ export class HomeInputActionImpl {
       // 1. Create new Document
       const newDoc = await documentService.createDocument({
         editorData: '',
+        spaceId: getActiveWorkspaceSpaceId(),
         title: message?.slice(0, 50) || 'Untitled',
       });
 
       // 2. Navigate to Page
       const navigate = useGlobalStore.getState().navigate;
       if (navigate) {
-        navigate(`/docs/${newDoc.id}`);
+        navigate(
+          getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? getActiveWorkspaceSpaceId()),
+        );
       }
 
       // 3. Send message with document scope context

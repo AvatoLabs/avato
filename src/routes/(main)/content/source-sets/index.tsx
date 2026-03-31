@@ -10,6 +10,7 @@ import ContentManager from '@/features/ContentManager';
 import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import SourceSetSurfaceNav from '@/features/SourceSetSurfaceNav';
 import Container from '@/routes/(main)/content/source-sets/features/Container';
+import { useServerConfigStore } from '@/store/serverConfig';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
 import { useSourceSetItem } from '../features/hooks/useSourceSetItem';
@@ -19,6 +20,7 @@ const MainContent = memo(() => {
   const { id: sourceSetId, spaceId } = useParams<{ id: string; spaceId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useServerConfigStore((s) => s.isMobile);
   const [setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
     s.setSourceSetId,
     s.setSpaceId,
@@ -55,11 +57,13 @@ const MainContent = memo(() => {
   return (
     <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
       <Flexbox gap={4}>
-        <SourceSetSurfaceNav
-          activeSurface={'files'}
-          sourceSetId={sourceSetId!}
-          spaceId={spaceId ?? data?.spaceId}
-        />
+        {!isMobile && (
+          <SourceSetSurfaceNav
+            activeSurface={'files'}
+            sourceSetId={sourceSetId!}
+            spaceId={spaceId ?? data?.spaceId}
+          />
+        )}
         {data?.description && <Text type={'secondary'}>{data.description}</Text>}
       </Flexbox>
       <Flexbox flex={1} style={{ minHeight: 0 }}>

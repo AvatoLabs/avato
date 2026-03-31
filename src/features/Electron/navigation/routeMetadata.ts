@@ -106,6 +106,16 @@ const routePatterns: RoutePattern[] = [
   // Resource/Knowledge routes
   {
     icon: resourceIcon,
+    test: (p) => /^\/spaces\/[^/]+\/source-sets(?:\/|$)/.test(p),
+    titleKey: 'navigation.sourceSet',
+  },
+  {
+    icon: resourceIcon,
+    test: (p) => /^\/spaces\/[^/]+\/(?:files|settings|members)(?:\/|$)/.test(p),
+    titleKey: 'navigation.resources',
+  },
+  {
+    icon: resourceIcon,
     test: (p) => p.startsWith('/content/source-sets'),
     titleKey: 'navigation.sourceSet',
   },
@@ -157,6 +167,17 @@ const routePatterns: RoutePattern[] = [
   },
 
   // Page routes - use dynamic title for specific page names
+  {
+    icon: pageIcon,
+    test: (p) => /^\/spaces\/[^/]+\/docs(?:\/table)?\/[^/]+(?:\/|$)/.test(p),
+    titleKey: 'navigation.page',
+    useDynamicTitle: true,
+  },
+  {
+    icon: pageIcon,
+    test: (p) => /^\/spaces\/[^/]+\/docs(?:\/table)?(?:\/|$)/.test(p),
+    titleKey: 'navigation.pages',
+  },
   {
     icon: pageIcon,
     test: (p) => p.startsWith('/docs/'),

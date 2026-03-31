@@ -2,12 +2,12 @@
 
 import { memo } from 'react';
 
-import { PageEntry } from '@/features/Pages';
+import PageRouteRedirect from '@/features/Pages/PageRouteRedirect';
 
-const PageTableSpacePage = memo(() => {
-  return <PageEntry pageKind="table" />;
+const PageTableSpaceRedirectPage = memo(() => {
+  return <PageRouteRedirect pageKind="table" />;
 });
 
-PageTableSpacePage.displayName = 'PageTableSpacePage';
+PageTableSpaceRedirectPage.displayName = 'PageTableSpaceRedirectPage';
 
-export default PageTableSpacePage;
+export default PageTableSpaceRedirectPage;

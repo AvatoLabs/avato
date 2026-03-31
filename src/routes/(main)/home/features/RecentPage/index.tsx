@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useInitRecentPage } from '@/hooks/useInitRecentPage';
-import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { homeRecentSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
-import { FilesTabs } from '@/types/files';
+import { getPageRootPath } from '@/utils/docs';
 
 import GroupBlock from '../components/GroupBlock';
 import GroupSkeleton from '../components/GroupSkeleton';
@@ -22,7 +22,6 @@ import RecentPageList from './List';
 const RecentPage = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
-  const setCategory = useContentManagerStore((s) => s.setCategory);
   const recentPages = useHomeStore(homeRecentSelectors.recentPages);
   const isInit = useHomeStore(homeRecentSelectors.isRecentPagesInit);
   const { isRevalidating } = useInitRecentPage();
@@ -45,8 +44,7 @@ const RecentPage = memo(() => {
                 key: 'all-documents',
                 label: t('menu.openDocs', { defaultValue: 'Open Docs' }),
                 onClick: () => {
-                  setCategory(FilesTabs.Documents);
-                  navigate('/content');
+                  navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId()));
                 },
               },
             ]}

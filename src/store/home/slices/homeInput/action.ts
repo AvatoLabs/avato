@@ -1,5 +1,6 @@
 import { type NavigateFunction } from 'react-router-dom';
 
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { chatGroupService } from '@/services/chatGroup';
 import { documentService } from '@/services/document';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
@@ -9,6 +10,7 @@ import { type HomeStore } from '@/store/home/store';
 import { type StoreSetter } from '@/store/types';
 import { settingsSelectors } from '@/store/user/selectors';
 import { useUserStore } from '@/store/user/store';
+import { getPageDetailPath } from '@/utils/docs';
 import { resolveModelProviderWithFallback } from '@/utils/docsAgentModel';
 import { setNamespace } from '@/utils/storeDebug';
 
@@ -179,13 +181,16 @@ export class HomeInputActionImpl {
       const newDoc = await documentService.createDocument({
         editorData: '{}',
         fileType: 'custom/document',
+        spaceId: getActiveWorkspaceSpaceId(),
         title: message?.slice(0, 50) || 'Untitled',
       });
 
       // 3. Navigate to Page
       const { navigate } = this.#get();
       if (navigate) {
-        navigate(`/docs/${newDoc.id}`);
+        navigate(
+          getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? getActiveWorkspaceSpaceId()),
+        );
       }
 
       // 4. Update docsAgent's model config and send initial message

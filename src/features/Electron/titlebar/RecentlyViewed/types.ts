@@ -56,6 +56,7 @@ export interface CommunityParams {
 
 export interface ResourceParams {
   section?: string;
+  spaceId?: string;
 }
 
 export interface MemoryParams {

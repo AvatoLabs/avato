@@ -275,6 +275,173 @@ export const desktopRoutes: RouteObject[] = [
       {
         children: [
           {
+            element: dynamicElement(
+              () => import('@/routes/(main)/spaces/[spaceId]'),
+              'Desktop > Space > Redirect',
+            ),
+            index: true,
+          },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/docs'),
+                  'Desktop > Space > Docs',
+                ),
+                index: true,
+              },
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs/table'),
+                      'Desktop > Space > Docs > Table',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs/table/[id]'),
+                      'Desktop > Space > Docs > Table > Detail',
+                    ),
+                    path: ':id',
+                  },
+                ],
+                path: 'table',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/docs/[id]'),
+                  'Desktop > Space > Docs > Detail',
+                ),
+                path: ':id',
+              },
+            ],
+            element: dynamicLayout(
+              () => import('@/routes/(main)/docs/_layout'),
+              'Desktop > Space > Docs > Layout',
+            ),
+            errorElement: <ErrorBoundary resetPath="/docs" />,
+            path: 'docs',
+          },
+          {
+            children: [
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Item',
+                    ),
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Folder',
+                    ),
+                    path: ':slug',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Desktop > Space > Files > Folder > Item',
+                    ),
+                    path: ':slug/item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/spaces/[spaceId]/trash'),
+                      'Desktop > Space > Files > Trash',
+                    ),
+                    path: 'trash',
+                  },
+                ],
+                element: dynamicLayout(
+                  () => import('@/routes/(main)/content/(home)/_layout'),
+                  'Desktop > Space > Files > Layout',
+                ),
+                path: 'files',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
+                  'Desktop > Space > Settings',
+                ),
+                path: 'settings',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/spaces/[spaceId]/members'),
+                  'Desktop > Space > Members',
+                ),
+                path: 'members',
+              },
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets'),
+                      'Desktop > Space > Source Set',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/trash'),
+                      'Desktop > Space > Source Set > Trash',
+                    ),
+                    path: 'trash',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/[slug]'),
+                      'Desktop > Space > Source Set > Slug',
+                    ),
+                    path: ':slug',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets'),
+                      'Desktop > Space > Source Set > Item',
+                    ),
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/[slug]'),
+                      'Desktop > Space > Source Set > Slug > Item',
+                    ),
+                    path: ':slug/item/:fileId',
+                  },
+                ],
+                element: dynamicLayout(
+                  () => import('@/routes/(main)/content/source-sets/_layout'),
+                  'Desktop > Space > Source Set > Layout',
+                ),
+                path: 'source-sets/:id',
+              },
+            ],
+            element: dynamicLayout(
+              () => import('@/routes/(main)/content/_layout'),
+              'Desktop > Space > Layout',
+            ),
+          },
+        ],
+        path: 'spaces/:spaceId',
+      },
+
+      // Legacy resource routes
+      {
+        children: [
+          {
             children: [
               {
                 element: dynamicElement(
@@ -604,7 +771,7 @@ export const desktopRoutes: RouteObject[] = [
 
       ...BusinessDesktopRoutesWithMainLayout,
 
-      // Pages routes
+      // Legacy page routes
       {
         children: [
           {
@@ -676,10 +843,6 @@ export const desktopRoutes: RouteObject[] = [
             path: 'spaces/:spaceId',
           },
         ],
-        element: dynamicLayout(
-          () => import('@/routes/(main)/docs/_layout'),
-          'Desktop > Page > Layout',
-        ),
         errorElement: <ErrorBoundary resetPath="/docs" />,
         path: 'docs',
       },

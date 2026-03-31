@@ -1,5 +1,4 @@
-import { Flexbox, Skeleton } from '@lobehub/ui';
-import { createStaticStyles, cx } from 'antd-style';
+import { Skeleton } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,40 +8,17 @@ import {
   buildContentRootPath,
   buildSourceSetFolderPath,
   buildSourceSetPath,
+  buildSpaceRootPath,
+  SurfaceBreadcrumb,
 } from '@/features/ResourceSpaces';
+import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
 import { useFolderPath } from '@/routes/(main)/content/features/hooks/useFolderPath';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useFileStore } from '@/store/file';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
-import { FilesTabs } from '@/types/files';
-
-const styles = createStaticStyles(({ css, cssVar }) => ({
-  breadcrumb: css`
-    font-size: 14px;
-    color: ${cssVar.colorTextSecondary};
-  `,
-  breadcrumbItem: css`
-    cursor: pointer;
-    transition: color ${cssVar.motionDurationSlow};
-
-    &:hover {
-      color: ${cssVar.colorText};
-    }
-  `,
-  currentItem: css`
-    font-weight: 500;
-    color: ${cssVar.colorText};
-  `,
-  separator: css`
-    margin-inline: 8px;
-    color: ${cssVar.colorTextQuaternary};
-  `,
-}));
 
 interface BreadcrumbProps {
-  category?: string;
   fileName?: string;
-  sourceSetId?: string;
 }
 
 interface FolderCrumb {
@@ -51,8 +27,8 @@ interface FolderCrumb {
   slug: string;
 }
 
-const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
-  const { t } = useTranslation('file');
+const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
+  const { t } = useTranslation(['common', 'file']);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { currentFolderSlug, sourceSetId: currentSourceSetId } = useFolderPath();
@@ -67,12 +43,7 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(rootSourceSetId || ''),
   );
-  const categoryLabel =
-    category === FilesTabs.Documents
-      ? t('tab.docs', { defaultValue: 'Docs' })
-      : category && category !== FilesTabs.All && category !== FilesTabs.Home
-        ? t(`tab.${category as FilesTabs}` as any)
-        : t('tab.all', { defaultValue: 'All' });
+  const spaceName = useSpaceName(spaceId);
 
   // Fetch folder breadcrumb chain from backend
   const useFetchFolderBreadcrumb = useFileStore((s) => s.useFetchFolderBreadcrumb);
@@ -83,20 +54,35 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
     return null;
   }
 
-  const handleNavigate = (slug: string | null) => {
+  const clearViewAndSelection = () => {
     // If navigating while viewing a file, reset the file view mode
     if (fileName) {
       setMode('explorer');
       setCurrentViewItemId(undefined);
     }
+  };
 
-    // Preserve existing query parameters (view and sort preferences)
+  const buildPreservedQueryString = () => {
     const newParams = new URLSearchParams(searchParams);
-    // Remove 'file' parameter when navigating away
     newParams.delete('file');
     newParams.delete('files');
 
-    const queryString = newParams.toString();
+    return newParams.toString();
+  };
+
+  const handleSpaceNavigate = () => {
+    clearViewAndSelection();
+
+    const queryString = buildPreservedQueryString();
+    const basePath = buildSpaceRootPath(spaceId);
+
+    navigate(queryString ? `${basePath}?${queryString}` : basePath);
+  };
+
+  const handleSectionNavigate = (slug: string | null) => {
+    clearViewAndSelection();
+
+    const queryString = buildPreservedQueryString();
     const basePath = rootSourceSetId
       ? slug
         ? buildSourceSetFolderPath(spaceId, rootSourceSetId, slug)
@@ -109,51 +95,45 @@ const Breadcrumb = memo<BreadcrumbProps>(({ category, fileName }) => {
   };
 
   const isAtRoot = folderChain.length === 0 && !fileName;
-  const isRootClickable = folderChain.length > 0 || fileName;
-  const rootLabel = rootSourceSetId ? sourceSetName : categoryLabel;
-
-  return (
-    <Flexbox horizontal align={'center'} className={styles.breadcrumb} gap={0}>
-      <span
-        className={cx(styles.breadcrumbItem, isAtRoot && styles.currentItem)}
-        style={{ cursor: isRootClickable ? 'pointer' : 'default' }}
-        onClick={() => isRootClickable && handleNavigate(null)}
-      >
-        {rootLabel ||
-          (rootSourceSetId ? (
+  const isSectionClickable = folderChain.length > 0 || fileName;
+  const resolvedSpaceLabel = spaceName || t('space.sectionTitle', { ns: 'file' });
+  const segments = [
+    {
+      key: 'space',
+      label: resolvedSpaceLabel,
+      onClick: handleSpaceNavigate,
+    },
+    {
+      current: isAtRoot,
+      key: rootSourceSetId ? 'source-set' : 'files',
+      label: rootSourceSetId
+        ? sourceSetName || (
             <Skeleton.Button active size="small" style={{ height: 14, minWidth: 80, width: 80 }} />
-          ) : null)}
-      </span>
+          )
+        : t('tab.files', { ns: 'common' }),
+      onClick: isSectionClickable ? () => handleSectionNavigate(null) : undefined,
+    },
+    ...folderChain.map((folder: FolderCrumb, index: number) => ({
+      current: index === folderChain.length - 1 && !fileName,
+      key: folder.id,
+      label: folder.name,
+      onClick:
+        index === folderChain.length - 1 && !fileName
+          ? undefined
+          : () => handleSectionNavigate(folder.slug),
+    })),
+    ...(fileName
+      ? [
+          {
+            current: true,
+            key: 'current-file',
+            label: fileName,
+          },
+        ]
+      : []),
+  ];
 
-      {folderChain.map((folder: FolderCrumb, index: number) => {
-        const isLast = index === folderChain.length - 1 && !fileName;
-        return (
-          <Flexbox horizontal align={'center'} gap={0} key={folder.id}>
-            <span className={styles.separator}>/</span>
-            <span
-              className={cx(styles.breadcrumbItem, isLast && styles.currentItem)}
-              style={{ cursor: isLast ? 'default' : 'pointer' }}
-              onClick={() => !isLast && handleNavigate(folder.slug)}
-            >
-              {folder.name}
-            </span>
-          </Flexbox>
-        );
-      })}
-
-      {fileName && (
-        <Flexbox horizontal align={'center'} gap={0}>
-          <span className={styles.separator}>/</span>
-          <span
-            className={cx(styles.breadcrumbItem, styles.currentItem)}
-            style={{ cursor: 'default' }}
-          >
-            {fileName}
-          </span>
-        </Flexbox>
-      )}
-    </Flexbox>
-  );
+  return <SurfaceBreadcrumb segments={segments} />;
 });
 
 Breadcrumb.displayName = 'Breadcrumb';

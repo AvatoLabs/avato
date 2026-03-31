@@ -1,20 +1,13 @@
 'use client';
 
-import { ActionIcon, Button, Flexbox, Icon, Modal, Text } from '@lobehub/ui';
+import { Button, Flexbox, Icon, Modal, Text } from '@lobehub/ui';
 import { createModal } from '@lobehub/ui/base-ui';
 import { ChatHeader } from '@lobehub/ui/mobile';
-import {
-  ChevronDownIcon,
-  HouseIcon,
-  PlusIcon,
-  Settings2Icon,
-  Share2Icon,
-  Users2Icon,
-} from 'lucide-react';
+import { ChevronDownIcon, PlusIcon, Share2Icon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import useSWR from 'swr';
+import { useSWRConfig } from 'swr';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -22,16 +15,15 @@ import {
   buildContentRootPath,
   buildContentTrashPath,
   buildSharedContentPath,
-  buildSpaceSettingsPath,
+  SpaceList,
+  useSpaceName,
 } from '@/features/ResourceSpaces';
+import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
 import { CreateSpaceForm } from '@/features/ResourceSpaces/SpaceSection';
-import { lambdaClient } from '@/libs/trpc/client';
 import { SourceSetTrashButton } from '@/routes/(main)/content/features/SourceSetTrashButton';
 import { mobileHeaderSticky } from '@/styles/mobileHeader';
 
 import CategoryMenu from './Header/CategoryMenu';
-
-const SPACE_LIST_KEY = 'content-space-list';
 
 const ResourceMobileHeader = memo(() => {
   const { t } = useTranslation(['common', 'file']);
@@ -39,25 +31,18 @@ const ResourceMobileHeader = memo(() => {
   const location = useLocation();
   const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-
-  const {
-    data: spaces,
-    isLoading,
-    mutate,
-  } = useSWR(SPACE_LIST_KEY, () => lambdaClient.space.listSpaces.query(), {
-    revalidateOnFocus: false,
-  });
+  const { mutate } = useSWRConfig();
+  const currentSpaceName = useSpaceName(currentSpaceId);
 
   const isOnShared = location.pathname === buildSharedContentPath();
   const isOnTrash = location.pathname === buildContentTrashPath(currentSpaceId);
-  const currentSpace = spaces?.find((s) => s.id === currentSpaceId);
 
   const handleCreateSpace = useCallback(() => {
     createModal({
       children: (
         <CreateSpaceForm
           onCreated={(spaceId) => {
-            void mutate();
+            void mutate(SPACE_LIST_KEY);
             navigate(buildContentRootPath(spaceId));
             setWorkspaceOpen(false);
           }}
@@ -79,7 +64,7 @@ const ResourceMobileHeader = memo(() => {
       <Text ellipsis fontSize={16} weight={500}>
         {isOnShared
           ? t('shared.title', { ns: 'file' })
-          : currentSpace?.name || (isLoading ? '...' : t('tab.resource'))}
+          : currentSpaceName || t('space.sectionTitle', { ns: 'file' })}
       </Text>
       <Icon icon={ChevronDownIcon} size={16} />
     </Flexbox>
@@ -123,38 +108,13 @@ const ResourceMobileHeader = memo(() => {
               setWorkspaceOpen(false);
             }}
           />
-          {spaces?.map((space) => {
-            const active = currentSpaceId === space.id && !location.pathname.endsWith('/settings');
-            const isCurrentSettings =
-              currentSpaceId === space.id && location.pathname.endsWith('/settings');
-            return (
-              <Flexbox horizontal align={'center'} justify={'space-between'} key={space.id}>
-                <NavItem
-                  active={active}
-                  icon={space.kind === 'personal' ? HouseIcon : Users2Icon}
-                  style={{ flex: 1 }}
-                  title={space.name}
-                  onClick={() => {
-                    navigate(buildContentRootPath(space.id));
-                    setWorkspaceOpen(false);
-                  }}
-                />
-                {space.kind === 'team' && (
-                  <ActionIcon
-                    active={isCurrentSettings}
-                    icon={Settings2Icon}
-                    size={'small'}
-                    title={t('space.settings.title', { ns: 'file' })}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(buildSpaceSettingsPath(space.id));
-                      setWorkspaceOpen(false);
-                    }}
-                  />
-                )}
-              </Flexbox>
-            );
-          })}
+          <SpaceList
+            currentSpaceId={currentSpaceId}
+            onSelectSpace={(spaceId) => {
+              navigate(buildContentRootPath(spaceId));
+              setWorkspaceOpen(false);
+            }}
+          />
           <Flexbox paddingBlock={8} paddingInline={4}>
             <Button block icon={<Icon icon={PlusIcon} />} onClick={handleCreateSpace}>
               {t('space.create.title', { ns: 'file' })}

@@ -2,19 +2,16 @@
 
 import { AccordionItem, ActionIcon, Button, Flexbox, Input, Text, TextArea } from '@lobehub/ui';
 import { createModal, useModalContext } from '@lobehub/ui/base-ui';
-import { HouseIcon, PlusIcon, Settings2Icon, Users2Icon } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import useSWR from 'swr';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useSWRConfig } from 'swr';
 
-import NavItem from '@/features/NavPanel/components/NavItem';
-import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildContentRootPath, buildSpaceSettingsPath } from './paths';
-
-const SPACE_LIST_KEY = 'resource-space-list';
+import { buildContentRootPath } from './paths';
+import SpaceList, { SPACE_LIST_KEY } from './SpaceList';
 
 interface CreateSpaceFormProps {
   onCreated: (spaceId: string) => void;
@@ -76,22 +73,16 @@ CreateSpaceForm.displayName = 'CreateSpaceForm';
 
 const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
-  const location = useLocation();
   const navigate = useNavigate();
   const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
-
-  const { data, isLoading, mutate } = useSWR(
-    SPACE_LIST_KEY,
-    () => lambdaClient.space.listSpaces.query(),
-    { revalidateOnFocus: false },
-  );
+  const { mutate } = useSWRConfig();
 
   const handleCreateSpace = useCallback(() => {
     createModal({
       children: (
         <CreateSpaceForm
           onCreated={(spaceId) => {
-            void mutate();
+            void mutate(SPACE_LIST_KEY);
             navigate(buildContentRootPath(spaceId));
           }}
         />
@@ -121,42 +112,12 @@ const SpaceSection = memo<{ itemKey: string }>(({ itemKey }) => {
         </Text>
       }
     >
-      {isLoading ? (
-        <SkeletonList paddingInline={4} rows={4} />
-      ) : (
-        <Flexbox gap={1} paddingInline={4}>
-          {data?.map((space) => {
-            const active = currentSpaceId === space.id && !location.pathname.endsWith('/settings');
-            const isCurrentSettings =
-              currentSpaceId === space.id && location.pathname.endsWith('/settings');
-
-            return (
-              <NavItem
-                active={active}
-                icon={space.kind === 'personal' ? HouseIcon : Users2Icon}
-                key={space.id}
-                title={space.name}
-                extra={
-                  space.kind === 'team' ? (
-                    <ActionIcon
-                      active={isCurrentSettings}
-                      icon={Settings2Icon}
-                      size={'small'}
-                      title={t('space.settings.title')}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        navigate(buildSpaceSettingsPath(space.id));
-                      }}
-                    />
-                  ) : undefined
-                }
-                onClick={() => navigate(buildContentRootPath(space.id))}
-              />
-            );
-          })}
-        </Flexbox>
-      )}
+      <Flexbox gap={1} paddingInline={4}>
+        <SpaceList
+          currentSpaceId={currentSpaceId}
+          onSelectSpace={(spaceId) => navigate(buildContentRootPath(spaceId))}
+        />
+      </Flexbox>
     </AccordionItem>
   );
 });

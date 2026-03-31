@@ -10,10 +10,13 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
+import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
 import { SidebarTabKey } from '@/store/global/initialState';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
+import { getPageRootPath } from '@/utils/docs';
 import { isModifierClick } from '@/utils/navigation';
 
 interface Item {
@@ -33,6 +36,7 @@ const Nav = memo(() => {
   const { t } = useTranslation('common');
   const { t: tHome } = useTranslation('home');
   const { t: tSetting } = useTranslation('setting');
+  const activeSpaceId = getActiveWorkspaceSpaceId();
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
 
@@ -62,7 +66,7 @@ const Nav = memo(() => {
         icon: APP_ENTRY_ICONS.page,
         key: 'docs',
         title: t('tab.pages'),
-        url: '/docs',
+        url: getPageRootPath('doc', activeSpaceId),
       },
       {
         badge: 'beta',
@@ -76,7 +80,7 @@ const Nav = memo(() => {
         icon: APP_ENTRY_ICONS.resource,
         key: 'content',
         title: t('tab.resource'),
-        url: '/content',
+        url: buildContentRootPath(activeSpaceId),
       },
       {
         icon: APP_ENTRY_ICONS.memory,
@@ -107,7 +111,7 @@ const Nav = memo(() => {
         url: '/community',
       },
     ],
-    [showAiImage, showMarket, t],
+    [activeSpaceId, showAiImage, showMarket, t],
   );
 
   const newBadge = (
@@ -142,13 +146,14 @@ const Nav = memo(() => {
       />
     );
     if (!item.url) return content;
+    const url = item.url;
 
     return (
       <NavItem
         active={tab === item.key}
         extra={extra}
         hidden={item.hidden}
-        href={item.url}
+        href={url}
         icon={item.icon}
         key={item.key}
         style={{ marginTop: mt }}
@@ -156,7 +161,7 @@ const Nav = memo(() => {
         onClick={(e) => {
           if (isModifierClick(e)) return;
           item?.onClick?.();
-          navigate(item.url);
+          navigate(url);
         }}
       />
     );

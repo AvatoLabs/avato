@@ -43,6 +43,18 @@ const CONTEXT_CONFIGS: ContextConfig[] = [
   },
   {
     captureSubPath: true,
+    matcher: /^\/spaces\/[^/]+\/(?:files|source-sets|settings|members)(?:\/([^/]+))?/,
+    name: 'Resource',
+    type: 'resource',
+  },
+  {
+    captureSubPath: true,
+    matcher: /^\/spaces\/[^/]+\/docs(?:\/([^/]+))?/,
+    name: 'Page',
+    type: 'page',
+  },
+  {
+    captureSubPath: true,
     matcher: /^\/content(?:\/([^/]+))?/,
     name: 'Resource',
     type: 'resource',

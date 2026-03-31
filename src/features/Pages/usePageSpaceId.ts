@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { usePageStore } from '@/store/docs';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 
@@ -15,7 +14,7 @@ export const usePageSpaceId = () => {
   );
 
   return useMemo(
-    () => routeSpaceId ?? scopedSourceSet?.spaceId ?? getActiveWorkspaceSpaceId(),
+    () => routeSpaceId ?? scopedSourceSet?.spaceId ?? undefined,
     [routeSpaceId, scopedSourceSet?.spaceId],
   );
 };

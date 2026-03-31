@@ -9,6 +9,7 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
@@ -46,10 +47,11 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const selectPage = usePageStore((s) => s.selectPage);
   const setRenamingPageId = usePageStore((s) => s.setRenamingPageId);
   const addTab = useElectronStore((s) => s.addTab);
+  const pageSpaceId = usePageSpaceId();
 
   const active = selectedPageId === pageId;
   const pageKind = getPageKindFromDocument(document);
-  const href = `${getPageDetailPath(pageId, pageKind, document?.spaceId)}${location.search}`;
+  const href = `${getPageDetailPath(pageId, pageKind, document?.spaceId ?? pageSpaceId)}${location.search}`;
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(document?.sourceSetId || ''),
   );

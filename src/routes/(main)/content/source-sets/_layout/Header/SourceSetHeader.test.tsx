@@ -70,6 +70,7 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
+    useParams: () => ({ id: 'ss-1', spaceId: 'spc_1' }),
   };
 });
 
@@ -83,8 +84,9 @@ vi.mock('@/config/contentIcons', () => ({
 vi.mock('@/features/ResourceSpaces', () => ({
   buildSourceSetPath: (spaceId: string | null | undefined, sourceSetId: string) =>
     spaceId
-      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
+      ? `/spaces/${spaceId}/source-sets/${sourceSetId}`
       : `/content/source-sets/${sourceSetId}`,
+  useSpaceName: () => 'Team Alpha',
 }));
 
 vi.mock('@/routes/(main)/content/features/DndContextWrapper', () => ({
@@ -125,20 +127,20 @@ describe('SourceSetHeader', () => {
   it('navigates to the space-scoped source-set route when the header is clicked', () => {
     render(
       <MemoryRouter>
-        <SourceSetHeader id="ss-1" />
+        <SourceSetHeader />
       </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByTestId('source-set-header-root'));
 
     expect(mockSetMode).toHaveBeenCalledWith('explorer');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/spaces/spc_1/source-sets/ss-1');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/source-sets/ss-1');
   });
 
   it('keeps space context when switching source sets from the dropdown', () => {
     render(
       <MemoryRouter>
-        <SourceSetHeader id="ss-1" />
+        <SourceSetHeader />
       </MemoryRouter>,
     );
 
@@ -150,6 +152,6 @@ describe('SourceSetHeader', () => {
 
     expect(mockSetSourceSetId).toHaveBeenCalledWith('ss-2');
     expect(mockSetMode).toHaveBeenCalledWith('explorer');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/spaces/spc_1/source-sets/ss-2');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/source-sets/ss-2');
   });
 });

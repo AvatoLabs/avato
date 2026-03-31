@@ -43,7 +43,7 @@ export const useDropdownMenu = ({
   const sourceSetId = document?.sourceSetId ?? undefined;
   const sourceSetSpaceId = document?.spaceId ?? pageSpaceId ?? getActiveWorkspaceSpaceId();
   const { data: sourceSets = [] } = useFetchSourceSetList(sourceSetSpaceId);
-  const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document), document?.spaceId)}${location.search}`;
+  const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document), document?.spaceId ?? pageSpaceId)}${location.search}`;
   const availableSourceSets = useMemo(
     () => sourceSets.filter((item) => item.id !== sourceSetId),
     [sourceSetId, sourceSets],

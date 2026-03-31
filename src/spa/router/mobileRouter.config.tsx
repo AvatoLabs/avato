@@ -232,6 +232,215 @@ export const mobileRoutes: RouteObject[] = [
         path: 'settings',
       },
 
+      // Space-first workspace routes
+      {
+        children: [
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/spaces/[spaceId]'),
+              'Mobile > Space > Redirect',
+            ),
+            index: true,
+          },
+          {
+            children: [
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs'),
+                      'Mobile > Space > Docs',
+                    ),
+                    index: true,
+                  },
+                  {
+                    children: [
+                      {
+                        element: dynamicElement(
+                          () => import('@/routes/(main)/spaces/[spaceId]/docs/table'),
+                          'Mobile > Space > Docs > Table',
+                        ),
+                        index: true,
+                      },
+                      {
+                        element: dynamicElement(
+                          () => import('@/routes/(main)/spaces/[spaceId]/docs/table/[id]'),
+                          'Mobile > Space > Docs > Table > Detail',
+                        ),
+                        path: ':id',
+                      },
+                    ],
+                    path: 'table',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/spaces/[spaceId]/docs/[id]'),
+                      'Mobile > Space > Docs > Detail',
+                    ),
+                    path: ':id',
+                  },
+                ],
+                element: dynamicLayout(
+                  () => import('@/routes/(main)/docs/_layout'),
+                  'Mobile > Space > Docs > Layout',
+                ),
+                errorElement: <ErrorBoundary resetPath="/docs" />,
+                path: 'docs',
+              },
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Mobile > Space > Files',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Mobile > Space > Files > Item',
+                    ),
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Mobile > Space > Files > Folder',
+                    ),
+                    path: ':slug',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/(home)'),
+                      'Mobile > Space > Files > Folder > Item',
+                    ),
+                    path: ':slug/item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/spaces/[spaceId]/trash'),
+                      'Mobile > Space > Files > Trash',
+                    ),
+                    path: 'trash',
+                  },
+                ],
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/(home)/_layout'),
+                  'Mobile > Space > Files > Layout',
+                ),
+                path: 'files',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
+                  'Mobile > Space > Settings',
+                ),
+                path: 'settings',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/spaces/[spaceId]/members'),
+                  'Mobile > Space > Members',
+                ),
+                path: 'members',
+              },
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets'),
+                      'Mobile > Space > Source Set',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/trash'),
+                      'Mobile > Space > Source Set > Trash',
+                    ),
+                    path: 'trash',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/[slug]'),
+                      'Mobile > Space > Source Set > Slug',
+                    ),
+                    path: ':slug',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets'),
+                      'Mobile > Space > Source Set > Item',
+                    ),
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/content/source-sets/[slug]'),
+                      'Mobile > Space > Source Set > Slug > Item',
+                    ),
+                    path: ':slug/item/:fileId',
+                  },
+                ],
+                element: dynamicElement(
+                  () => import('@/routes/(main)/content/source-sets/_layout'),
+                  'Mobile > Space > Source Set > Layout',
+                ),
+                path: 'source-sets/:id',
+              },
+            ],
+            element: dynamicElement(
+              () => import('@/routes/(main)/content/_layout'),
+              'Mobile > Space > Layout',
+            ),
+          },
+        ],
+        path: 'spaces/:spaceId',
+      },
+
+      // Legacy docs routes
+      {
+        children: [
+          {
+            element: dynamicElement(() => import('@/routes/(main)/docs'), 'Mobile > Docs'),
+            index: true,
+          },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/docs/table'),
+                  'Mobile > Docs > Table',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/docs/table/[id]'),
+                  'Mobile > Docs > Table > Detail',
+                ),
+                path: ':id',
+              },
+            ],
+            path: 'table',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/docs/[id]'),
+              'Mobile > Docs > Detail',
+            ),
+            path: ':id',
+          },
+        ],
+        element: dynamicLayout(
+          () => import('@/routes/(main)/docs/_layout'),
+          'Mobile > Docs > Layout',
+        ),
+        errorElement: <ErrorBoundary resetPath="/docs" />,
+        path: 'docs',
+      },
+
       // Resource routes (Files & Knowledge Base)
       {
         children: [

@@ -1,5 +1,11 @@
+export const buildSpaceRootPath = (spaceId?: string | null) =>
+  spaceId ? `/spaces/${spaceId}` : '/content';
+
 export const buildContentRootPath = (spaceId?: string | null) =>
-  spaceId ? `/content/spaces/${spaceId}` : '/content';
+  spaceId ? `${buildSpaceRootPath(spaceId)}/files` : '/content';
+
+export const buildSourceSetsRootPath = (spaceId?: string | null) =>
+  spaceId ? `${buildSpaceRootPath(spaceId)}/source-sets` : '/content/source-sets';
 
 const normalizeContentPath = (path: string) => {
   if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
@@ -20,7 +26,7 @@ export const buildContentFolderPath = (spaceId: string | null | undefined, folde
 
 export const buildSourceSetPath = (spaceId: string | null | undefined, sourceSetId: string) =>
   spaceId
-    ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
+    ? `${buildSourceSetsRootPath(spaceId)}/${sourceSetId}`
     : `/content/source-sets/${sourceSetId}`;
 
 export const buildSourceSetFolderPath = (
@@ -44,11 +50,14 @@ export const buildContentPreviewPath = (
 export const buildSharedContentPath = () => '/content/shared';
 
 export const buildContentTrashPath = (spaceId?: string | null) =>
-  spaceId ? `/content/spaces/${spaceId}/trash` : '/content/trash';
+  spaceId ? `${buildContentRootPath(spaceId)}/trash` : '/content/trash';
 
 export const buildSourceSetTrashPath = (spaceId: string | null | undefined, sourceSetId: string) =>
   `${buildSourceSetPath(spaceId, sourceSetId)}/trash`;
 
-export const buildSpaceSettingsPath = (spaceId: string) => `/content/spaces/${spaceId}/settings`;
+export const buildSpaceSettingsPath = (spaceId: string) =>
+  `${buildSpaceRootPath(spaceId)}/settings`;
+
+export const buildSpaceMembersPath = (spaceId: string) => `${buildSpaceRootPath(spaceId)}/members`;
 
 export const buildPublicContentSharePath = (token: string) => `/share/r/${token}`;

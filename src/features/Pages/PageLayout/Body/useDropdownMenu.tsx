@@ -43,7 +43,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
 
         void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
           sourceSetId,
-          spaceId: targetSourceSet?.spaceId,
+          spaceId: targetSourceSet?.spaceId ?? undefined,
         });
         return;
       }
@@ -52,7 +52,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
 
       void createNewPage(t('pageList.untitled', { ns: 'file' }), {
         sourceSetId,
-        spaceId: targetSourceSet?.spaceId,
+        spaceId: targetSourceSet?.spaceId ?? undefined,
       });
     },
     [createNewPage, createNewTable, pageKind, sourceSets, t],

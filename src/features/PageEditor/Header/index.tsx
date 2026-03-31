@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Avatar, DropdownMenu, Icon, Segmented, Text } from '@lobehub/ui';
+import { ActionIcon, DropdownMenu, Icon, Segmented } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { ArrowLeftIcon, Code2, Eye, MoreHorizontal, SquarePen, Table2Icon } from 'lucide-react';
 import { memo } from 'react';
@@ -18,17 +18,13 @@ import { useMenu } from './useMenu';
 
 const Header = memo(() => {
   const { t } = useTranslation('file');
-  const [documentId, emoji, pageKind, title, parentId, onBack, setViewMode, viewMode] =
-    usePageEditorStore((s) => [
-      s.documentId,
-      s.emoji,
-      s.pageKind,
-      s.title,
-      s.parentId,
-      s.onBack,
-      s.setViewMode,
-      s.viewMode,
-    ]);
+  const [documentId, onBack, pageKind, setViewMode, viewMode] = usePageEditorStore((s) => [
+    s.documentId,
+    s.onBack,
+    s.pageKind,
+    s.setViewMode,
+    s.viewMode,
+  ]);
   const { menuItems } = useMenu();
   const isTablePage = pageKind === TABLE_PAGE_KIND;
 
@@ -37,20 +33,7 @@ const Header = memo(() => {
       left={
         <>
           {onBack && <ActionIcon icon={ArrowLeftIcon} onClick={onBack} />}
-          {parentId && <Breadcrumb />}
-          {!parentId && (
-            <>
-              {emoji && <Avatar avatar={emoji} shape={'square'} size={28} />}
-              <Text
-                ellipsis
-                style={{ marginLeft: 4, maxWidth: 240 }}
-                type={'secondary'}
-                weight={600}
-              >
-                {title || t('docEditor.titlePlaceholder')}
-              </Text>
-            </>
-          )}
+          {documentId && <Breadcrumb />}
           {documentId && <AutoSaveHint documentId={documentId} style={{ marginLeft: 6 }} />}
         </>
       }

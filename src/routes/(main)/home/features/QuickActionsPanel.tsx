@@ -8,10 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useChatStore } from '@/store/chat';
 import { useHomeStore } from '@/store/home/store';
 import { FilesTabs } from '@/types/files';
+import { getPageRootPath } from '@/utils/docs';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   eyebrow: css`
@@ -244,7 +246,7 @@ const QuickActionsPanel = memo(() => {
       kind: 'utility',
       onClick: () => {
         setCategory(FilesTabs.Documents);
-        navigate('/content');
+        navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId()));
       },
       title: t('workspace.quickActions.newDoc'),
     },

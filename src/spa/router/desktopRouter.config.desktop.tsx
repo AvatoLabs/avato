@@ -42,6 +42,7 @@ import ContentSourceSetPage from '@/routes/(main)/content/source-sets';
 import ContentSourceSetLayout from '@/routes/(main)/content/source-sets/_layout';
 import ContentSourceSetSlugPage from '@/routes/(main)/content/source-sets/[slug]';
 import ContentSourceSetTrashPage from '@/routes/(main)/content/source-sets/trash';
+import ResourceSpaceMembersPage from '@/routes/(main)/content/spaces/[spaceId]/members';
 import ResourceSpaceSettingsPage from '@/routes/(main)/content/spaces/[spaceId]/settings';
 import ResourceSpaceTrashPage from '@/routes/(main)/content/spaces/[spaceId]/trash';
 import ResourceTrashPage from '@/routes/(main)/content/trash';
@@ -69,6 +70,11 @@ import MemoryPreferencesPage from '@/routes/(main)/memory/preferences';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
+import SpaceIndexPage from '@/routes/(main)/spaces/[spaceId]';
+import SpaceDocsPage from '@/routes/(main)/spaces/[spaceId]/docs';
+import SpaceDocDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/[id]';
+import SpaceTablePage from '@/routes/(main)/spaces/[spaceId]/docs/table';
+import SpaceTableDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/table/[id]';
 import StudioPage from '@/routes/(main)/studio';
 import VideoPage from '@/routes/(main)/video';
 import DesktopVideoLayout from '@/routes/(main)/video/_layout';
@@ -228,7 +234,111 @@ export const desktopRoutes: RouteObject[] = [
         path: 'community',
       },
 
-      // Resource routes
+      // Space-first workspace routes
+      {
+        children: [
+          {
+            element: <SpaceIndexPage />,
+            index: true,
+          },
+          {
+            children: [
+              {
+                element: <SpaceDocsPage />,
+                index: true,
+              },
+              {
+                children: [
+                  {
+                    element: <SpaceTablePage />,
+                    index: true,
+                  },
+                  {
+                    element: <SpaceTableDetailPage />,
+                    path: ':id',
+                  },
+                ],
+                path: 'table',
+              },
+              {
+                element: <SpaceDocDetailPage />,
+                path: ':id',
+              },
+            ],
+            element: <DesktopPageLayout />,
+            errorElement: <ErrorBoundary resetPath="/docs" />,
+            path: 'docs',
+          },
+          {
+            children: [
+              {
+                children: [
+                  {
+                    element: <ResourceHomePage />,
+                    index: true,
+                  },
+                  {
+                    element: <ResourceHomePage />,
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: <ResourceHomePage />,
+                    path: ':slug',
+                  },
+                  {
+                    element: <ResourceHomePage />,
+                    path: ':slug/item/:fileId',
+                  },
+                  {
+                    element: <ResourceSpaceTrashPage />,
+                    path: 'trash',
+                  },
+                ],
+                element: <ResourceHomeLayout />,
+                path: 'files',
+              },
+              {
+                element: <ResourceSpaceSettingsPage />,
+                path: 'settings',
+              },
+              {
+                element: <ResourceSpaceMembersPage />,
+                path: 'members',
+              },
+              {
+                children: [
+                  {
+                    element: <ContentSourceSetPage />,
+                    index: true,
+                  },
+                  {
+                    element: <ContentSourceSetTrashPage />,
+                    path: 'trash',
+                  },
+                  {
+                    element: <ContentSourceSetSlugPage />,
+                    path: ':slug',
+                  },
+                  {
+                    element: <ContentSourceSetPage />,
+                    path: 'item/:fileId',
+                  },
+                  {
+                    element: <ContentSourceSetSlugPage />,
+                    path: ':slug/item/:fileId',
+                  },
+                ],
+                element: <ContentSourceSetLayout />,
+                path: 'source-sets/:id',
+              },
+            ],
+            element: <ResourceLayout />,
+          },
+        ],
+        path: 'spaces/:spaceId',
+      },
+
+      // Legacy resource routes
       {
         children: [
           {
@@ -443,7 +553,7 @@ export const desktopRoutes: RouteObject[] = [
 
       ...BusinessDesktopRoutesWithMainLayout,
 
-      // Pages routes
+      // Legacy page routes
       {
         children: [
           {
@@ -494,7 +604,6 @@ export const desktopRoutes: RouteObject[] = [
             path: 'spaces/:spaceId',
           },
         ],
-        element: <DesktopPageLayout />,
         errorElement: <ErrorBoundary resetPath="/docs" />,
         path: 'docs',
       },

@@ -10,6 +10,7 @@ import { Outlet, useParams } from 'react-router-dom';
 import MobileContentLayout from '@/components/server/MobileNavLayout';
 import { MOBILE_HEADER_ICON_SIZE } from '@/const/layoutTokens';
 import BackButton from '@/features/NavPanel/components/BackButton';
+import { useSpaceName } from '@/features/ResourceSpaces';
 import RegisterHotkeys from '@/routes/(main)/content/source-sets/features/RegisterHotkeys';
 import SourceSetFolderDrawer from '@/routes/(main)/content/source-sets/features/SourceSetFolderDrawer';
 import { useSourceSetBackPath } from '@/routes/(main)/content/source-sets/features/useSourceSetBackPath';
@@ -27,8 +28,9 @@ interface SourceSetMobileHeaderProps {
 
 const SourceSetMobileHeader: FC<SourceSetMobileHeaderProps> = ({ onFolderTreeClick }) => {
   const { t } = useTranslation(['components', 'file']);
-  const { id } = useParams<{ id: string; spaceId?: string }>();
+  const { id, spaceId } = useParams<{ id: string; spaceId?: string }>();
   const name = useSourceSetStore(sourceSetSelectors.getSourceSetNameById(id || ''));
+  const spaceName = useSpaceName(spaceId);
   const backPath = useSourceSetBackPath();
 
   return (
@@ -37,9 +39,17 @@ const SourceSetMobileHeader: FC<SourceSetMobileHeaderProps> = ({ onFolderTreeCli
       left={
         <Flexbox align={'center'} gap={8} style={{ minWidth: 0 }}>
           <BackButton size={MOBILE_HEADER_ICON_SIZE} to={backPath} useHistory={false} />
-          <Text ellipsis fontSize={16} weight={500}>
-            {name || '...'}
-          </Text>
+          <Flexbox horizontal align={'center'} gap={6} style={{ minWidth: 0 }}>
+            <Text ellipsis fontSize={16} style={{ maxWidth: 120 }} type={'secondary'} weight={500}>
+              {spaceName || t('space.sectionTitle', { ns: 'file' })}
+            </Text>
+            <Text fontSize={14} type={'secondary'}>
+              /
+            </Text>
+            <Text ellipsis fontSize={16} style={{ minWidth: 0 }} weight={500}>
+              {name || '...'}
+            </Text>
+          </Flexbox>
         </Flexbox>
       }
       right={

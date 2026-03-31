@@ -1,52 +1,44 @@
-import { Flexbox } from '@lobehub/ui';
-import { createStaticStyles, cx } from 'antd-style';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
+import {
+  buildSpaceRootPath,
+  SurfaceBreadcrumb,
+  type SurfaceBreadcrumbSegment,
+  useSpaceName,
+} from '@/features/ResourceSpaces';
+import { pageSelectors, usePageStore } from '@/store/docs';
 import { useFileStore } from '@/store/file';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
+import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore } from '../store';
-
-const styles = createStaticStyles(({ css, cssVar }) => ({
-  breadcrumb: css`
-    font-size: 14px;
-    color: ${cssVar.colorTextSecondary};
-  `,
-  breadcrumbItem: css`
-    cursor: pointer;
-    transition: color ${cssVar.motionDurationSlow};
-
-    &:hover {
-      color: ${cssVar.colorText};
-    }
-  `,
-  currentItem: css`
-    font-weight: 500;
-    color: ${cssVar.colorText};
-  `,
-  separator: css`
-    margin-inline: 8px;
-    color: ${cssVar.colorTextQuaternary};
-  `,
-}));
 
 interface FolderCrumb {
   id: string;
   name: string;
-  slug: string;
 }
 
 const Breadcrumb = memo(() => {
   const { t } = useTranslation('file');
+  const navigate = useNavigate();
 
-  const title = usePageEditorStore((s) => s.title);
-  const sourceSetId = usePageEditorStore((s) => s.sourceSetId);
-  const parentId = usePageEditorStore((s) => s.parentId);
+  const [documentId, pageKind, title, sourceSetId, parentId] = usePageEditorStore((s) => [
+    s.documentId,
+    s.pageKind,
+    s.title,
+    s.sourceSetId,
+    s.parentId,
+  ]);
+  const pageDocument = usePageStore(pageSelectors.getDocumentById(documentId));
+  const spaceId = pageDocument?.spaceId ?? undefined;
 
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
   );
+  const spaceName = useSpaceName(spaceId);
 
   // Fetch the parent folder to get its slug
   const useFetchKnowledgeItem = useFileStore((s) => s.useFetchKnowledgeItem);
@@ -59,41 +51,66 @@ const Breadcrumb = memo(() => {
     parentFolder?.spaceId ?? undefined,
   );
 
-  // If no parent folder data yet, don't render
-  if (!parentFolder || !parentId) {
-    return null;
-  }
-
   const documentTitle = title || t('docEditor.titlePlaceholder');
-
-  return (
-    <Flexbox horizontal align={'center'} className={styles.breadcrumb} flex={1} gap={0}>
-      {/* Source set root */}
-      {sourceSetId && (
-        <>
-          <span className={styles.breadcrumbItem} style={{ cursor: 'default' }}>
-            {sourceSetName || 'Source Set'}
-          </span>
-          <span className={styles.separator}>/</span>
-        </>
-      )}
-
-      {/* Folder chain */}
-      {folderChain.map((folder: FolderCrumb) => (
-        <Flexbox horizontal align={'center'} gap={0} key={folder.id}>
-          <span className={styles.breadcrumbItem} style={{ cursor: 'default' }}>
-            {folder.name}
-          </span>
-          <span className={styles.separator}>/</span>
-        </Flexbox>
-      ))}
-
-      {/* Current document title */}
-      <span className={cx(styles.breadcrumbItem, styles.currentItem)} style={{ cursor: 'default' }}>
-        {documentTitle}
-      </span>
-    </Flexbox>
+  const resolvedSpaceLabel = spaceName || spaceId || t('space.sectionTitle');
+  const surfaceLabel =
+    pageKind === TABLE_PAGE_KIND
+      ? t('tab.table', { defaultValue: 'Tables' })
+      : t('tab.pages', { defaultValue: 'Docs' });
+  const docsRootPath = getPageRootPath(pageKind, spaceId);
+  const scopedDocsSearch =
+    sourceSetId && buildPageScopeSearch(createSourceSetPageScope(sourceSetId));
+  const docsPath = scopedDocsSearch ? `${docsRootPath}${scopedDocsSearch}` : docsRootPath;
+  const segments = useMemo<SurfaceBreadcrumbSegment[]>(
+    () => [
+      ...(spaceId
+        ? [
+            {
+              key: 'space',
+              label: resolvedSpaceLabel,
+              onClick: () => navigate(buildSpaceRootPath(spaceId)),
+            },
+          ]
+        : []),
+      {
+        key: 'docs',
+        label: surfaceLabel,
+        onClick: spaceId ? () => navigate(docsPath) : undefined,
+      },
+      ...(sourceSetId
+        ? [
+            {
+              key: 'source-set',
+              label: sourceSetName || t('sourceSet.title'),
+              onClick: spaceId ? () => navigate(docsPath) : undefined,
+            },
+          ]
+        : []),
+      ...folderChain.map((folder: FolderCrumb) => ({
+        key: folder.id,
+        label: folder.name,
+      })),
+      {
+        current: true,
+        key: 'current-document',
+        label: documentTitle,
+      },
+    ],
+    [
+      docsPath,
+      documentTitle,
+      folderChain,
+      navigate,
+      resolvedSpaceLabel,
+      sourceSetId,
+      sourceSetName,
+      spaceId,
+      surfaceLabel,
+      t,
+    ],
   );
+
+  return <SurfaceBreadcrumb segments={segments} />;
 });
 
 Breadcrumb.displayName = 'Breadcrumb';

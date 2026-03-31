@@ -7,7 +7,8 @@ import { type PageParams, type PageReference, type ResolvedPageData } from '../t
 import { type PluginContext, type RecentlyViewedPlugin } from './types';
 import { createPageReference } from './types';
 
-const PAGE_PATH_REGEX = /^\/docs(?:\/spaces\/([^/]+))?(?:\/(table))?\/([^/?]+)$/;
+const PAGE_PATH_REGEX =
+  /^\/(?:spaces\/([^/]+)\/docs(?:\/(table))?\/([^/?]+)|docs(?:\/spaces\/([^/]+))?(?:\/(table))?\/([^/?]+))$/;
 
 const pageIcon = getRouteById('page')?.icon || FileText;
 
@@ -40,7 +41,18 @@ export const pagePlugin: RecentlyViewedPlugin<'page'> = {
     const match = pathname.match(PAGE_PATH_REGEX);
     if (!match) return null;
 
-    const [, spaceId, tableSegment, pageId] = match;
+    const [
+      ,
+      canonicalSpaceId,
+      canonicalTableSegment,
+      canonicalPageId,
+      legacySpaceId,
+      legacyTableSegment,
+      legacyPageId,
+    ] = match;
+    const spaceId = canonicalSpaceId || legacySpaceId;
+    const tableSegment = canonicalTableSegment || legacyTableSegment;
+    const pageId = canonicalPageId || legacyPageId;
     const params: PageParams = {
       pageId,
       pageKind: tableSegment === TABLE_PAGE_KIND ? TABLE_PAGE_KIND : undefined,

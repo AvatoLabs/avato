@@ -14,8 +14,8 @@ import { chatPortalSelectors } from '@/store/chat/selectors';
 import { notebookSelectors } from '@/store/notebook/selectors';
 import { useNotebookStore } from '@/store/notebook/store';
 import { oneLineEllipsis } from '@/styles';
+import { getPageDetailPath } from '@/utils/docs';
 import { isPageEntryFileType } from '@/utils/docsDocument';
-import { standardizeIdentifier } from '@/utils/identifier';
 
 import AutoSaveHint from './AutoSaveHint';
 
@@ -50,7 +50,7 @@ const Header = () => {
         });
       }
 
-      navigate(`/docs/${standardizeIdentifier(documentId)}`);
+      navigate(getPageDetailPath(documentId, 'doc', spaceId));
     } finally {
       setLoading(false);
     }

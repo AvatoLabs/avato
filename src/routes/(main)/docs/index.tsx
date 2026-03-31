@@ -2,16 +2,12 @@
 
 import { memo } from 'react';
 
-import { PageEntry } from '@/features/Pages';
+import PageRouteRedirect from '@/features/Pages/PageRouteRedirect';
 
-/**
- * Pages route - dedicated page for managing documents/docss
- * This is extracted from the /content route to have its own dedicated space
- */
-const PagesPage = memo(() => {
-  return <PageEntry pageKind="doc" />;
+const PagesRedirectPage = memo(() => {
+  return <PageRouteRedirect pageKind="doc" />;
 });
 
-PagesPage.displayName = 'PagesPage';
+PagesRedirectPage.displayName = 'PagesRedirectPage';
 
-export default PagesPage;
+export default PagesRedirectPage;

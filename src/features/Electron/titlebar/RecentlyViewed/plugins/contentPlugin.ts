@@ -1,6 +1,11 @@
 import { Database } from 'lucide-react';
 
 import { getRouteById } from '@/config/routes';
+import {
+  buildContentRootPath,
+  buildSpaceMembersPath,
+  buildSpaceSettingsPath,
+} from '@/features/ResourceSpaces';
 
 import { type PageReference, type ResolvedPageData, type ResourceParams } from '../types';
 import { type PluginContext, type RecentlyViewedPlugin } from './types';
@@ -8,7 +13,8 @@ import { createPageReference } from './types';
 
 const resourceIcon = getRouteById('resource')?.icon || Database;
 
-const RESOURCE_PATH_REGEX = /^\/content(\/([^/?]+))?$/;
+const RESOURCE_PATH_REGEX =
+  /^\/(?:content(\/([^/?]+))?|spaces\/([^/]+)\/(files|settings|members)(?:\/([^/?]+))?)$/;
 
 // Section to title key mapping
 const sectionTitleKeys: Record<string, string> = {
@@ -20,13 +26,25 @@ export const resourcePlugin: RecentlyViewedPlugin<'resource'> = {
     return true; // Static page always exists
   },
   generateId(reference: PageReference<'resource'>): string {
-    const { section } = reference.params;
-    return section ? `resource:${section}` : 'resource';
+    const { section, spaceId } = reference.params;
+
+    if (spaceId && section) return `resource:${spaceId}:${section}`;
+    if (spaceId) return `resource:${spaceId}`;
+    if (section) return `resource:${section}`;
+
+    return 'resource';
   },
 
   generateUrl(reference: PageReference<'resource'>): string {
-    const { section } = reference.params;
-    return section ? `/content/${section}` : '/content';
+    const { section, spaceId } = reference.params;
+
+    if (!spaceId) {
+      return section ? `/content/${section}` : '/content';
+    }
+
+    if (section === 'settings') return buildSpaceSettingsPath(spaceId);
+    if (section === 'members') return buildSpaceMembersPath(spaceId);
+    return buildContentRootPath(spaceId);
   },
 
   getDefaultIcon() {
@@ -41,8 +59,11 @@ export const resourcePlugin: RecentlyViewedPlugin<'resource'> = {
     const match = pathname.match(RESOURCE_PATH_REGEX);
     if (!match) return null;
 
-    const section = match[2];
-    const params: ResourceParams = section ? { section } : {};
+    const legacySection = match[2];
+    const spaceId = match[3];
+    const canonicalSection = match[4];
+    const section = legacySection || canonicalSection;
+    const params: ResourceParams = section ? { section, spaceId } : spaceId ? { spaceId } : {};
     const id = this.generateId({ params } as PageReference<'resource'>);
 
     return createPageReference('resource', params, id);

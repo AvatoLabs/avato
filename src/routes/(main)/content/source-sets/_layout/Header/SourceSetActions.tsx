@@ -1,7 +1,12 @@
 'use client';
 
-import { type DropdownItem } from '@lobehub/ui';
-import { ActionIcon, DropdownMenu, Icon } from '@lobehub/ui';
+import {
+  ActionIcon,
+  type ActionIconProps,
+  type DropdownItem,
+  DropdownMenu,
+  Icon,
+} from '@lobehub/ui';
 import { App } from 'antd';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +21,7 @@ import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 
 interface SourceSetActionsProps {
-  size?: number | { blockSize?: number; size?: number };
+  size?: ActionIconProps['size'];
 }
 
 const SourceSetActions = memo<SourceSetActionsProps>(({ size = 'small' as const }) => {

@@ -332,10 +332,25 @@ export default {
   'space.create.descriptionPlaceholder': 'What is this space for?',
   'space.create.namePlaceholder': 'Team Space name',
   'space.create.title': 'New Team Space',
+  'space.home.badges.personal': 'Personal Space',
+  'space.home.badges.team': 'Team Space',
+  'space.home.cards.docs.description': 'Write, edit, and organize documents in this workspace.',
+  'space.home.cards.files.description': 'Browse uploads, folders, and shared assets.',
+  'space.home.cards.members.description':
+    'Manage who can access and collaborate in this workspace.',
+  'space.home.cards.settings.description':
+    'Rename the workspace and adjust collaboration settings.',
+  'space.home.cards.sourceSets.description': 'Group documents and files into focused source sets.',
+  'space.home.description.personalFallback':
+    'Use this personal workspace to keep documents, files, and source sets organized.',
+  'space.home.description.teamFallback':
+    'Use this team workspace to organize shared documents, files, source sets, and collaborators.',
   'space.members.add': 'Add Member',
   'space.members.added': 'Member added',
   'space.members.remove': 'Remove',
   'space.members.removeConfirm': 'Remove this member from the space?',
+  'space.members.personalSubtitle': 'Personal spaces do not have a shared member list.',
+  'space.members.teamSubtitle': 'Manage who can access and collaborate in this space.',
   'space.members.title': 'Members',
   'space.members.transfer': 'Transfer Ownership',
   'space.members.transferConfirm': 'Transfer ownership to this member?',
@@ -354,6 +369,7 @@ export default {
   'space.settings.delete': 'Delete Space',
   'space.settings.deleteConfirm': 'Delete this team space?',
   'space.settings.details': 'Space Details',
+  'space.settings.namePlaceholder': 'Space name',
   'space.settings.personalSubtitle': 'Personal spaces are private shells for your own content.',
   'space.settings.readOnly': 'You can view this space, but only owners or admins can change it.',
   'space.settings.save': 'Save Changes',

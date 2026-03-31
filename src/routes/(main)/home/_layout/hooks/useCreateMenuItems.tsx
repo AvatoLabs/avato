@@ -9,6 +9,7 @@ import useSWRMutation from 'swr/mutation';
 import { useGroupTemplates } from '@/components/ChatGroupWizard/templates';
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { DEFAULT_CHAT_GROUP_CHAT_CONFIG } from '@/const/settings';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type CreateAgentParams } from '@/services/agent';
 import { type GroupMemberConfig } from '@/services/chatGroup';
 import { chatGroupService } from '@/services/chatGroup';
@@ -16,6 +17,7 @@ import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { usePageStore } from '@/store/docs';
 import { useHomeStore } from '@/store/home/store';
+import { getPageDetailPath } from '@/utils/docs';
 
 interface CreateAgentOptions {
   groupId?: string;
@@ -261,9 +263,11 @@ export const useCreateMenuItems = () => {
    */
   const createPage = useCallback(async () => {
     const untitledTitle = tFile('pageList.untitled');
+    const activeSpaceId = getActiveWorkspaceSpaceId();
+
     try {
-      const newPageId = await createNewPage(untitledTitle);
-      navigate(`/docs/${newPageId}`);
+      const newPageId = await createNewPage(untitledTitle, { spaceId: activeSpaceId });
+      navigate(getPageDetailPath(newPageId, 'doc', activeSpaceId));
     } catch (error) {
       console.error('Failed to create page:', error);
       message.error(tFile('pageList.createFailed'));
