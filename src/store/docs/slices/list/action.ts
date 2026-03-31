@@ -32,8 +32,8 @@ interface PageDocumentQueryResult {
 
 const WORKSPACE_PAGE_FETCH_LIMIT = 9999;
 
-const buildPageQueryFilter = (): PageQueryFilter => {
-  const activeSpaceId = getActiveWorkspaceSpaceId();
+const buildPageQueryFilter = (spaceId?: string): PageQueryFilter => {
+  const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
 
   return {
     fileTypes: Array.from(ALLOWED_PAGE_FILE_TYPES),
@@ -86,9 +86,9 @@ export class ListActionImpl {
     this.#get = get;
   }
 
-  fetchDocuments = async (): Promise<void> => {
+  fetchDocuments = async (spaceId?: string): Promise<void> => {
     try {
-      const queryFilters = buildPageQueryFilter();
+      const queryFilters = buildPageQueryFilter(spaceId);
 
       const result = await documentService.queryDocuments({
         current: 0,
@@ -186,13 +186,13 @@ export class ListActionImpl {
     this.#set({ currentSourceSetScopeId: sourceSetId }, false, n('setCurrentSourceSetScopeId'));
   };
 
-  useFetchDocuments = (): SWRResponse<PageDocumentQueryResult> => {
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+  useFetchDocuments = (spaceId?: string): SWRResponse<PageDocumentQueryResult> => {
+    const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
 
     return useClientDataSWRWithSync<PageDocumentQueryResult>(
       getPageDocumentsSwrKey(activeSpaceId),
       async () => {
-        const queryFilters = buildPageQueryFilter();
+        const queryFilters = buildPageQueryFilter(activeSpaceId);
 
         const result = await documentService.queryDocuments({
           current: 0,
@@ -224,7 +224,7 @@ export class ListActionImpl {
               currentPage: 0,
               documentsTotal: data.total,
               hasMoreDocuments: hasMore,
-              queryFilter: buildPageQueryFilter(),
+              queryFilter: buildPageQueryFilter(activeSpaceId),
             },
             false,
             n('useFetchDocuments/onData'),

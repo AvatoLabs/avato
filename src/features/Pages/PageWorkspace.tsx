@@ -108,6 +108,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
           <PageExplorerPlaceholder
             pageKind={pageKind}
             sourceSetId={currentSourceSetScopeId || undefined}
+            spaceId={scopedSourceSet?.spaceId}
           />
         ) : (
           <Flexbox className={styles.content}>

@@ -108,10 +108,11 @@ interface PageExplorerPlaceholderProps {
   hasPages?: boolean;
   pageKind?: PageKind;
   sourceSetId?: string;
+  spaceId?: string;
 }
 
 const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
-  ({ hasPages = false, sourceSetId, pageKind = DEFAULT_PAGE_KIND }) => {
+  ({ hasPages = false, sourceSetId, spaceId, pageKind = DEFAULT_PAGE_KIND }) => {
     const { t } = useTranslation(['file', 'common']);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,18 +137,18 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
 
     const handleCreateDocument = async (content: string, title: string) => {
       if (isTablePage) {
-        await createNewTable(title, { sourceSetId });
+        await createNewTable(title, { sourceSetId, spaceId });
         return;
       }
 
       if (!content) {
         // For empty pages, use createNewPage which handles optimistic updates
-        await createNewPage(title, { sourceSetId });
+        await createNewPage(title, { sourceSetId, spaceId });
         return;
       }
 
       // For markdown uploads with content, use optimistic pattern similar to createNewPage
-      const tempPageId = createOptimisticPage(title, pageKind, sourceSetId);
+      const tempPageId = createOptimisticPage(title, pageKind, sourceSetId, spaceId);
       // Set selected page to temp ID immediately (with URL update disabled for temp IDs)
       setSelectedPageId(tempPageId, false);
 
@@ -156,6 +157,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
           content,
           sourceSetId,
           pageKind,
+          spaceId,
           title,
         });
 
@@ -211,7 +213,7 @@ const PageExplorerPlaceholder = memo<PageExplorerPlaceholderProps>(
           const fileName = file.name.replace(/\.(pdf|docx)$/i, '');
 
           // Create optimistic document but don't select it yet
-          const tempPageId = createOptimisticPage(fileName, pageKind, sourceSetId);
+          const tempPageId = createOptimisticPage(fileName, pageKind, sourceSetId, spaceId);
 
           try {
             // Upload file to server

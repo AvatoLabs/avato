@@ -39,13 +39,23 @@ export const useDropdownMenu = (): MenuProps['items'] => {
   const handleCreateInSourceSet = useCallback(
     (sourceSetId: string) => {
       if (pageKind === TABLE_PAGE_KIND) {
-        void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), { sourceSetId });
+        const targetSourceSet = sourceSets.find((item) => item.id === sourceSetId);
+
+        void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
+          sourceSetId,
+          spaceId: targetSourceSet?.spaceId,
+        });
         return;
       }
 
-      void createNewPage(t('pageList.untitled', { ns: 'file' }), { sourceSetId });
+      const targetSourceSet = sourceSets.find((item) => item.id === sourceSetId);
+
+      void createNewPage(t('pageList.untitled', { ns: 'file' }), {
+        sourceSetId,
+        spaceId: targetSourceSet?.spaceId,
+      });
     },
-    [createNewPage, createNewTable, pageKind, t],
+    [createNewPage, createNewTable, pageKind, sourceSets, t],
   );
 
   return useMemo(() => {
@@ -122,12 +132,14 @@ export const useDropdownMenu = (): MenuProps['items'] => {
           if (pageKind === TABLE_PAGE_KIND) {
             void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
               sourceSetId: currentSourceSetScopeId || undefined,
+              spaceId: currentSourceSet?.spaceId,
             });
             return;
           }
 
           void createNewPage(t('pageList.untitled', { ns: 'file' }), {
             sourceSetId: currentSourceSetScopeId || undefined,
+            spaceId: currentSourceSet?.spaceId,
           });
         },
       });
@@ -138,6 +150,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     createNewPage,
     createNewTable,
     handleCreateInSourceSet,
+    currentSourceSet,
     currentSourceSetName,
     currentSourceSetScopeId,
     pageKind,

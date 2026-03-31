@@ -8,22 +8,30 @@ import { useTranslation } from 'react-i18next';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { usePageScope } from '@/features/Pages/usePageScope';
 import { usePageStore } from '@/store/docs';
+import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
 const AddButton = memo(() => {
   const { t } = useTranslation('file');
   const pageKind = usePageKind();
   const { sourceSetId } = usePageScope();
+  const scopedSourceSet = useSourceSetStore(sourceSetSelectors.getSourceSetById(sourceSetId || ''));
 
   const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
 
   const handleNewDocument = () => {
     if (pageKind === TABLE_PAGE_KIND) {
-      void createNewTable(t('pageList.tableUntitled'), { sourceSetId: sourceSetId || undefined });
+      void createNewTable(t('pageList.tableUntitled'), {
+        sourceSetId: sourceSetId || undefined,
+        spaceId: scopedSourceSet?.spaceId,
+      });
       return;
     }
 
-    void createNewPage(t('pageList.untitled'), { sourceSetId: sourceSetId || undefined });
+    void createNewPage(t('pageList.untitled'), {
+      sourceSetId: sourceSetId || undefined,
+      spaceId: scopedSourceSet?.spaceId,
+    });
   };
 
   return (

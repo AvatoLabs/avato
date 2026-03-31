@@ -38,6 +38,7 @@ export interface PageUpdateParams {
 
 interface CreatePageOptions {
   sourceSetId?: string;
+  spaceId?: string;
 }
 
 type Setter = StoreSetter<PageStore>;
@@ -60,10 +61,10 @@ export class CrudActionImpl {
     options: CreatePageOptions = {},
   ): Promise<string> => {
     const { createOptimisticPage, createPage, replaceTempPageWithReal } = this.#get();
-    const { sourceSetId } = options;
+    const { sourceSetId, spaceId } = options;
 
     // Create optimistic page immediately
-    const tempPageId = createOptimisticPage(title, pageKind, sourceSetId);
+    const tempPageId = createOptimisticPage(title, pageKind, sourceSetId, spaceId);
     this.#set(
       { isCreatingNew: true, selectedPageId: tempPageId },
       false,
@@ -85,6 +86,7 @@ export class CrudActionImpl {
       const newPage = await createPage({
         content,
         pageKind,
+        spaceId,
         sourceSetId,
         table: defaultTable,
         title,
@@ -151,11 +153,12 @@ export class CrudActionImpl {
     title: string = 'Untitled',
     pageKind: PageKind = DEFAULT_PAGE_KIND,
     sourceSetId?: string,
+    spaceId?: string,
   ): string => {
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-page-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const now = new Date();
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
 
     const newPage: LobeDocument = {
       content:
@@ -208,17 +211,19 @@ export class CrudActionImpl {
     sourceSetId,
     parentId,
     pageKind = DEFAULT_PAGE_KIND,
+    spaceId,
     table,
   }: {
     content?: string;
     sourceSetId?: string;
     parentId?: string;
     pageKind?: PageKind;
+    spaceId?: string;
     table?: ReturnType<typeof createDefaultTableDocument>;
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
 
     const newPage = await documentService.createDocument({
       content,
