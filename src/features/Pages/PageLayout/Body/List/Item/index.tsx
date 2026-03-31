@@ -49,7 +49,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
   const active = selectedPageId === pageId;
   const pageKind = getPageKindFromDocument(document);
-  const href = `${getPageDetailPath(pageId, pageKind)}${location.search}`;
+  const href = `${getPageDetailPath(pageId, pageKind, document?.spaceId)}${location.search}`;
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(document?.sourceSetId || ''),
   );

@@ -58,7 +58,7 @@ const MainContent = memo(() => {
         <SourceSetSurfaceNav
           activeSurface={'files'}
           sourceSetId={sourceSetId!}
-          spaceId={data?.spaceId}
+          spaceId={spaceId ?? data?.spaceId}
         />
         {data?.description && <Text type={'secondary'}>{data.description}</Text>}
       </Flexbox>

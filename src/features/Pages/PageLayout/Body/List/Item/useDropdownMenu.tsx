@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
@@ -30,6 +31,7 @@ export const useDropdownMenu = ({
   const location = useLocation();
   const navigate = useNavigate();
   const addTab = useElectronStore((s) => s.addTab);
+  const pageSpaceId = usePageSpaceId();
   const moveContentItem = useFileStore((s) => s.moveContentItem);
   const removePage = usePageStore((s) => s.removePage);
   const duplicatePage = usePageStore((s) => s.duplicatePage);
@@ -39,9 +41,9 @@ export const useDropdownMenu = ({
     (s) => [s.addFilesToSourceSet, s.removeFilesFromSourceSet, s.useFetchSourceSetList],
   );
   const sourceSetId = document?.sourceSetId ?? undefined;
-  const sourceSetSpaceId = document?.spaceId ?? getActiveWorkspaceSpaceId();
+  const sourceSetSpaceId = document?.spaceId ?? pageSpaceId ?? getActiveWorkspaceSpaceId();
   const { data: sourceSets = [] } = useFetchSourceSetList(sourceSetSpaceId);
-  const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document))}${location.search}`;
+  const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document), document?.spaceId)}${location.search}`;
   const availableSourceSets = useMemo(
     () => sourceSets.filter((item) => item.id !== sourceSetId),
     [sourceSetId, sourceSets],

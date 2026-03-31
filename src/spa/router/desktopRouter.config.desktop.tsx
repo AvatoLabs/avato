@@ -48,6 +48,10 @@ import ResourceTrashPage from '@/routes/(main)/content/trash';
 import PageIndexPage from '@/routes/(main)/docs';
 import DesktopPageLayout from '@/routes/(main)/docs/_layout';
 import PageDetailPage from '@/routes/(main)/docs/[id]';
+import PageSpacePage from '@/routes/(main)/docs/spaces/[spaceId]';
+import PageSpaceDetailPage from '@/routes/(main)/docs/spaces/[spaceId]/[id]';
+import PageTableSpacePage from '@/routes/(main)/docs/spaces/[spaceId]/table';
+import PageTableSpaceDetailPage from '@/routes/(main)/docs/spaces/[spaceId]/table/[id]';
 import PageTablePage from '@/routes/(main)/docs/table';
 import PageTableDetailPage from '@/routes/(main)/docs/table/[id]';
 import GroupPage from '@/routes/(main)/group';
@@ -462,6 +466,32 @@ export const desktopRoutes: RouteObject[] = [
           {
             element: <PageDetailPage />,
             path: ':id',
+          },
+          {
+            children: [
+              {
+                element: <PageSpacePage />,
+                index: true,
+              },
+              {
+                children: [
+                  {
+                    element: <PageTableSpacePage />,
+                    index: true,
+                  },
+                  {
+                    element: <PageTableSpaceDetailPage />,
+                    path: ':id',
+                  },
+                ],
+                path: 'table',
+              },
+              {
+                element: <PageSpaceDetailPage />,
+                path: ':id',
+              },
+            ],
+            path: 'spaces/:spaceId',
           },
         ],
         element: <DesktopPageLayout />,

@@ -9,6 +9,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { usePageKind } from '@/features/Pages/usePageKind';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { useGlobalStore } from '@/store/global';
 import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 import { isModifierClick } from '@/utils/navigation';
@@ -27,6 +28,7 @@ const Nav = memo(() => {
   const navigate = useNavigate();
   const { t } = useTranslation('common');
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
+  const pageSpaceId = usePageSpaceId();
 
   const items: Item[] = useMemo(
     () => [
@@ -40,16 +42,16 @@ const Nav = memo(() => {
         icon: FileText,
         key: 'doc',
         title: t('tab.pages'),
-        url: getPageRootPath(),
+        url: getPageRootPath(undefined, pageSpaceId),
       },
       {
         icon: Table2,
         key: 'table',
         title: t('tab.table'),
-        url: getPageRootPath(TABLE_PAGE_KIND),
+        url: getPageRootPath(TABLE_PAGE_KIND, pageSpaceId),
       },
     ],
-    [t, toggleCommandMenu],
+    [pageSpaceId, t, toggleCommandMenu],
   );
 
   return (

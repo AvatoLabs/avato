@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, DropdownMenu, Flexbox, Icon, type MenuProps, Tag, Text } from '@lobehub/ui';
+import { ActionIcon, DropdownMenu, Flexbox, Icon, type MenuProps, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles } from 'antd-style';
 import { FileText, FolderOpen, Inbox, Table2 } from 'lucide-react';
@@ -12,14 +12,10 @@ import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
-import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
-import {
-  getActiveWorkspaceSpaceId,
-  setActiveWorkspaceSpaceId,
-} from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
-import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
+import { useSourceSetStore } from '@/store/sourceSet';
 import { type SourceSetItem } from '@/types/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
 
@@ -41,16 +37,14 @@ interface SourceSetScopeItemProps {
   active: boolean;
   count?: ReactNode;
   onClick: () => void;
-  showSpaceTag?: boolean;
   sourceSet: SourceSetItem;
 }
 
 const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
-  ({ active, count, onClick, showSpaceTag, sourceSet }) => {
+  ({ active, count, onClick, sourceSet }) => {
     const { t } = useTranslation(['common', 'file', 'sourceSet']);
     const { modal } = App.useApp();
     const { open } = useCreateSourceSetModal();
-    const spaceName = useSpaceName(showSpaceTag ? sourceSet.spaceId : undefined);
     const removeSourceSet = useSourceSetStore((s) => s.removeSourceSet);
     const isLoading = useSourceSetStore((s) => s.sourceSetLoadingIds.includes(sourceSet.id));
 
@@ -115,17 +109,6 @@ const SourceSetScopeItem = memo<SourceSetScopeItemProps>(
             <ActionIcon icon={RESOURCE_ENTRY_ICONS.more} size={'small'} />
           </DropdownMenu>
         }
-        slots={
-          showSpaceTag && spaceName
-            ? {
-                titlePrefix: (
-                  <Tag size={'small'} variant={'outlined'}>
-                    {spaceName}
-                  </Tag>
-                ),
-              }
-            : undefined
-        }
         onClick={onClick}
       />
     );
@@ -137,13 +120,10 @@ SourceSetScopeItem.displayName = 'SourceSetScopeItem';
 const ScopeNavigation = memo(() => {
   const { t } = useTranslation(['common', 'file']);
   const pageKind = usePageKind();
+  const pageSpaceId = usePageSpaceId();
   const { scope, setScope, sourceSetId: activeSourceSetId } = usePageScope();
-  const scopedSourceSet = useSourceSetStore(
-    sourceSetSelectors.getSourceSetById(activeSourceSetId || ''),
-  );
-  const activeSpaceId = scopedSourceSet?.spaceId ?? getActiveWorkspaceSpaceId();
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
-  const { data: sourceSets = [], isLoading } = useFetchSourceSetList();
+  const { data: sourceSets = [], isLoading } = useFetchSourceSetList(pageSpaceId);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const scopeCountsSelector = useMemo(
     () => pageSelectors.getScopeCountsByKind(pageKind),
@@ -151,21 +131,9 @@ const ScopeNavigation = memo(() => {
   );
   const isDocumentsLoading = usePageStore(pageSelectors.isDocumentsLoading);
   const { all, bySourceSet, unassigned } = usePageStore(scopeCountsSelector);
-  const shouldShowSpaceTags = useMemo(
-    () => new Set(sourceSets.map((item) => item.spaceId).filter(Boolean)).size > 1,
-    [sourceSets],
-  );
   const sortedSourceSets = useMemo(
-    () =>
-      [...sourceSets].sort((left, right) => {
-        const leftInCurrentSpace = left.spaceId === activeSpaceId;
-        const rightInCurrentSpace = right.spaceId === activeSpaceId;
-
-        if (leftInCurrentSpace !== rightInCurrentSpace) return leftInCurrentSpace ? -1 : 1;
-
-        return left.name.localeCompare(right.name);
-      }),
-    [activeSpaceId, sourceSets],
+    () => [...sourceSets].sort((left, right) => left.name.localeCompare(right.name)),
+    [sourceSets],
   );
 
   const renderCount = (count: number) =>
@@ -204,21 +172,11 @@ const ScopeNavigation = memo(() => {
         sortedSourceSets.map((sourceSet) => (
           <SourceSetScopeItem
             active={activeSourceSetId === sourceSet.id}
+            count={renderCount(bySourceSet[sourceSet.id] ?? 0)}
             key={sourceSet.id}
             sourceSet={sourceSet}
-            count={
-              sourceSet.spaceId === activeSpaceId
-                ? renderCount(bySourceSet[sourceSet.id] ?? 0)
-                : undefined
-            }
-            showSpaceTag={Boolean(
-              sourceSet.spaceId &&
-              shouldShowSpaceTags &&
-              (!activeSpaceId || sourceSet.spaceId !== activeSpaceId),
-            )}
             onClick={() => {
-              setActiveWorkspaceSpaceId(sourceSet.spaceId || undefined);
-              setScope(createSourceSetPageScope(sourceSet.id));
+              setScope(createSourceSetPageScope(sourceSet.id), { spaceId: sourceSet.spaceId });
             }}
           />
         ))

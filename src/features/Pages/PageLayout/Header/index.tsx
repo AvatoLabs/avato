@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
 import { usePageKind } from '@/features/Pages/usePageKind';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { useSpaceName } from '@/features/ResourceSpaces/useSpaceName';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
@@ -31,9 +31,10 @@ const Header = memo(() => {
     s.searchKeywords,
     s.setSearchKeywords,
   ]);
+  const pageSpaceId = usePageSpaceId();
   const { scope, setScope, sourceSetId } = usePageScope();
   const scopedSourceSet = useSourceSetStore(sourceSetSelectors.getSourceSetById(sourceSetId || ''));
-  const spaceName = useSpaceName(scopedSourceSet?.spaceId ?? getActiveWorkspaceSpaceId());
+  const spaceName = useSpaceName(scopedSourceSet?.spaceId ?? pageSpaceId);
   const sourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
   );
@@ -60,7 +61,7 @@ const Header = memo(() => {
       <SubSidebarTitleBar
         right={<AddButton />}
         title={t(isTablePage ? 'tab.table' : 'tab.pages')}
-        titleTo={getPageRootPath(pageKind)}
+        titleTo={getPageRootPath(pageKind, pageSpaceId)}
       />
       <Flexbox gap={8} paddingBlock={'0 8px'} paddingInline={8}>
         {spaceName && (

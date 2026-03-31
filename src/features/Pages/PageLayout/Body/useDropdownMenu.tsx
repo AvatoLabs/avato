@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { usePageStore } from '@/store/docs';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
@@ -18,6 +18,7 @@ import { TABLE_PAGE_KIND } from '@/utils/docs';
 export const useDropdownMenu = (): MenuProps['items'] => {
   const { t } = useTranslation();
   const pageKind = usePageKind();
+  const pageSpaceId = usePageSpaceId();
   const { scope, setScope, sourceSetId: currentSourceSetScopeId } = usePageScope();
   const showOnlyPagesWithoutSourceSet = scope === 'unassigned';
   const [createNewPage, createNewTable] = usePageStore((s) => [s.createNewPage, s.createNewTable]);
@@ -28,8 +29,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
   const currentSourceSetName = useSourceSetStore(
     sourceSetSelectors.getSourceSetNameById(currentSourceSetScopeId || ''),
   );
-  const activeSpaceId = currentSourceSet?.spaceId ?? getActiveWorkspaceSpaceId();
-  const { data: sourceSets = [] } = useFetchSourceSetList(activeSpaceId);
+  const { data: sourceSets = [] } = useFetchSourceSetList(pageSpaceId);
 
   const [pagePageSize, updateSystemStatus] = useGlobalStore((s) => [
     systemStatusSelectors.pagePageSize(s),
@@ -92,7 +92,10 @@ export const useDropdownMenu = (): MenuProps['items'] => {
                 icon: currentSourceSetScopeId === item.id ? <Icon icon={LucideCheck} /> : <div />,
                 key: `scope-source-set-${item.id}`,
                 label: item.name,
-                onClick: () => setScope(createSourceSetPageScope(item.id)),
+                onClick: () =>
+                  setScope(createSourceSetPageScope(item.id), {
+                    spaceId: item.spaceId,
+                  }),
               })),
               icon: <Icon icon={FolderOpen} />,
               key: 'scope-by-source-set',
@@ -132,14 +135,14 @@ export const useDropdownMenu = (): MenuProps['items'] => {
           if (pageKind === TABLE_PAGE_KIND) {
             void createNewTable(t('pageList.tableUntitled', { ns: 'file' }), {
               sourceSetId: currentSourceSetScopeId || undefined,
-              spaceId: currentSourceSet?.spaceId,
+              spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
             });
             return;
           }
 
           void createNewPage(t('pageList.untitled', { ns: 'file' }), {
             sourceSetId: currentSourceSetScopeId || undefined,
-            spaceId: currentSourceSet?.spaceId,
+            spaceId: currentSourceSet?.spaceId ?? pageSpaceId,
           });
         },
       });
@@ -153,6 +156,7 @@ export const useDropdownMenu = (): MenuProps['items'] => {
     currentSourceSet,
     currentSourceSetName,
     currentSourceSetScopeId,
+    pageSpaceId,
     pageKind,
     sourceSets,
     t,

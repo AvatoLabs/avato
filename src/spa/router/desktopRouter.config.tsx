@@ -637,6 +637,44 @@ export const desktopRoutes: RouteObject[] = [
             ),
             path: ':id',
           },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/docs/spaces/[spaceId]'),
+                  'Desktop > Page > Space',
+                ),
+                index: true,
+              },
+              {
+                children: [
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/docs/spaces/[spaceId]/table'),
+                      'Desktop > Page > Space > Table',
+                    ),
+                    index: true,
+                  },
+                  {
+                    element: dynamicElement(
+                      () => import('@/routes/(main)/docs/spaces/[spaceId]/table/[id]'),
+                      'Desktop > Page > Space > Table > Detail',
+                    ),
+                    path: ':id',
+                  },
+                ],
+                path: 'table',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/docs/spaces/[spaceId]/[id]'),
+                  'Desktop > Page > Space > Detail',
+                ),
+                path: ':id',
+              },
+            ],
+            path: 'spaces/:spaceId',
+          },
         ],
         element: dynamicLayout(
           () => import('@/routes/(main)/docs/_layout'),

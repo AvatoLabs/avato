@@ -104,7 +104,13 @@ const SearchResults = memo<SearchResultsProps>(
         }
         case 'page': {
           const document = listSelectors.getDocumentById(result.id)(usePageStore.getState());
-          navigate(getPageDetailPath(result.id, getPageKindFromDocument(document)));
+          navigate(
+            getPageDetailPath(
+              result.id,
+              getPageKindFromDocument(document),
+              result.spaceId ?? document?.spaceId,
+            ),
+          );
           break;
         }
         case 'mcp': {

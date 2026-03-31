@@ -43,6 +43,7 @@ export interface GroupTopicParams {
 export interface PageParams {
   pageId: string;
   pageKind?: PageKind;
+  spaceId?: string;
 }
 
 export interface SettingsParams {

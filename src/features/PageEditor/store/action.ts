@@ -83,7 +83,11 @@ export const store: (initState?: Partial<State>) => StateCreator<Store> =
             : '';
 
         const document = usePageStore.getState().documents?.find((doc) => doc.id === documentId);
-        const pagePath = getPageDetailPath(documentId, getPageKindFromDocument(document));
+        const pagePath = getPageDetailPath(
+          documentId,
+          getPageKindFromDocument(document),
+          document?.spaceId,
+        );
         const url = `${window.location.origin}${spaBase}${pagePath}`;
 
         navigator.clipboard.writeText(url);

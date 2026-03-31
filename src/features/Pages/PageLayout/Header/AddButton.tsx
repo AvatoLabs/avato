@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { usePageScope } from '@/features/Pages/usePageScope';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { usePageStore } from '@/store/docs';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
@@ -14,6 +15,7 @@ import { TABLE_PAGE_KIND } from '@/utils/docs';
 const AddButton = memo(() => {
   const { t } = useTranslation('file');
   const pageKind = usePageKind();
+  const pageSpaceId = usePageSpaceId();
   const { sourceSetId } = usePageScope();
   const scopedSourceSet = useSourceSetStore(sourceSetSelectors.getSourceSetById(sourceSetId || ''));
 
@@ -23,14 +25,14 @@ const AddButton = memo(() => {
     if (pageKind === TABLE_PAGE_KIND) {
       void createNewTable(t('pageList.tableUntitled'), {
         sourceSetId: sourceSetId || undefined,
-        spaceId: scopedSourceSet?.spaceId,
+        spaceId: scopedSourceSet?.spaceId ?? pageSpaceId,
       });
       return;
     }
 
     void createNewPage(t('pageList.untitled'), {
       sourceSetId: sourceSetId || undefined,
-      spaceId: scopedSourceSet?.spaceId,
+      spaceId: scopedSourceSet?.spaceId ?? pageSpaceId,
     });
   };
 

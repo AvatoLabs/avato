@@ -12,6 +12,7 @@ import {
   getPageDetailPath,
   getPageKindFromDocument,
   getPageRootPath,
+  getPageSpaceIdFromPathname,
   type PageKind,
   TABLE_PAGE_KIND,
 } from '@/utils/docs';
@@ -27,6 +28,12 @@ const DEFAULT_TABLE_COLUMNS = 5;
 const DEFAULT_TABLE_ROWS = 8;
 const getDefaultTableSheetName = () =>
   i18n.t('docEditor.table.sheetDefaultName', { index: 1, ns: 'file' });
+
+const getCurrentPageSpaceId = () => {
+  if (typeof window === 'undefined') return undefined;
+
+  return getPageSpaceIdFromPathname(window.location.pathname);
+};
 
 /**
  * Page update parameters - flattened for easier use
@@ -135,7 +142,7 @@ export class CrudActionImpl {
         false,
         n(`createNewDocument/${pageKind}/error`),
       );
-      this.#get().navigate?.(getPageRootPath(pageKind));
+      this.#get().navigate?.(getPageRootPath(pageKind, spaceId ?? getCurrentPageSpaceId()));
 
       throw error;
     }
@@ -308,14 +315,18 @@ export class CrudActionImpl {
 
   navigateToPage = (pageId: string | null, pageKind?: PageKind): void => {
     const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+    const currentSpaceId = getCurrentPageSpaceId();
 
     if (!pageId) {
-      this.#get().navigate?.(`${getPageRootPath(pageKind)}${currentSearch}`);
+      this.#get().navigate?.(`${getPageRootPath(pageKind, currentSpaceId)}${currentSearch}`);
     } else {
       const document = this.#get().documents?.find((doc) => doc.id === pageId);
       const nextPageKind = pageKind || getPageKindFromDocument(document);
+      const nextSpaceId = document?.spaceId ?? currentSpaceId;
 
-      this.#get().navigate?.(`${getPageDetailPath(pageId, nextPageKind)}${currentSearch}`);
+      this.#get().navigate?.(
+        `${getPageDetailPath(pageId, nextPageKind, nextSpaceId)}${currentSearch}`,
+      );
     }
   };
 

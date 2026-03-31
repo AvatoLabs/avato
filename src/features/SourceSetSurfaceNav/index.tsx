@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
 import { buildSourceSetPath } from '@/features/ResourceSpaces';
+import { getPageRootPath } from '@/utils/docs';
 
 interface SourceSetSurfaceNavProps {
   activeSurface: 'docs' | 'files';
@@ -20,7 +21,9 @@ const SourceSetSurfaceNav = memo<SourceSetSurfaceNavProps>(
     const { t } = useTranslation('common');
     const navigate = useNavigate();
 
-    const docsPath = `/docs${buildPageScopeSearch(createSourceSetPageScope(sourceSetId))}`;
+    const docsPath = `${getPageRootPath(undefined, spaceId)}${buildPageScopeSearch(
+      createSourceSetPageScope(sourceSetId),
+    )}`;
     const filesPath = buildSourceSetPath(spaceId, sourceSetId);
 
     const options = useMemo(

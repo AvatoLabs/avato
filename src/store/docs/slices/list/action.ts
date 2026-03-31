@@ -167,7 +167,7 @@ export class ListActionImpl {
   };
 
   refreshDocuments = async (): Promise<void> => {
-    await this.#get().fetchDocuments();
+    await this.#get().fetchDocuments(this.#get().queryFilter?.spaceId);
   };
 
   setSearchKeywords = (keywords: string): void => {

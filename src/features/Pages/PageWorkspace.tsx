@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import PageExplorerPlaceholder from '@/features/PageExplorer/PageExplorerPlaceholder';
+import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { type PageKind, TABLE_PAGE_KIND } from '@/utils/docs';
@@ -33,6 +34,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
   const { t } = useTranslation(['common', 'file']);
   const { styles } = useStyles();
   const { scope } = usePageScope();
+  const pageSpaceId = usePageSpaceId();
   const currentSourceSetScopeId = usePageStore((s) => s.currentSourceSetScopeId);
   const filteredDocumentsSelector = useMemo(
     () => pageSelectors.getFilteredDocumentsSnapshotByKind(pageKind),
@@ -100,7 +102,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
           <PageExplorerPlaceholder
             pageKind={pageKind}
             sourceSetId={currentSourceSetScopeId || undefined}
-            spaceId={scopedSourceSet?.spaceId}
+            spaceId={scopedSourceSet?.spaceId ?? pageSpaceId}
           />
         ) : (
           <Flexbox className={styles.content}>

@@ -2,7 +2,9 @@ import { createStarterTableMarkdown } from '@/utils/docsTable';
 import { standardizeIdentifier } from '@/utils/identifier';
 
 const DOC_PAGE_ROOT = '/docs';
-const TABLE_PAGE_ROOT = '/docs/table';
+const DOC_SPACE_ROOT_SEGMENT = '/docs/spaces/';
+const TABLE_PAGE_SPACE_PATTERN = /^\/docs(?:\/spaces\/[^/]+)?\/table(?:\/|$)/;
+const PAGE_SPACE_PATH_PATTERN = /^\/docs\/spaces\/([^/]+)(?:\/|$)/;
 
 export type PageKind = 'doc' | 'table';
 
@@ -20,19 +22,31 @@ export const getPageKindFromDocument = (
 };
 
 export const getPageKindFromPathname = (pathname: string): PageKind => {
-  return pathname.startsWith(TABLE_PAGE_ROOT) ? TABLE_PAGE_KIND : DEFAULT_PAGE_KIND;
+  return TABLE_PAGE_SPACE_PATTERN.test(pathname) ? TABLE_PAGE_KIND : DEFAULT_PAGE_KIND;
 };
 
-export const getPageRootPath = (pageKind: PageKind = DEFAULT_PAGE_KIND): string => {
-  return pageKind === TABLE_PAGE_KIND ? TABLE_PAGE_ROOT : DOC_PAGE_ROOT;
+export const getPageSpaceIdFromPathname = (pathname: string): string | undefined => {
+  const match = pathname.match(PAGE_SPACE_PATH_PATTERN);
+
+  return match?.[1];
+};
+
+export const getPageRootPath = (
+  pageKind: PageKind = DEFAULT_PAGE_KIND,
+  spaceId?: string | null,
+): string => {
+  const docsRoot = spaceId ? `${DOC_SPACE_ROOT_SEGMENT}${spaceId}` : DOC_PAGE_ROOT;
+
+  return pageKind === TABLE_PAGE_KIND ? `${docsRoot}/table` : docsRoot;
 };
 
 export const getPageDetailPath = (
   pageId: string,
   pageKind: PageKind = DEFAULT_PAGE_KIND,
+  spaceId?: string | null,
 ): string => {
   const identifier = standardizeIdentifier(pageId);
-  const rootPath = getPageRootPath(pageKind);
+  const rootPath = getPageRootPath(pageKind, spaceId);
 
   return `${rootPath}/${identifier}`;
 };

@@ -27,7 +27,11 @@ const RecentPageList = memo(() => {
   }
 
   return documents.map((document) => {
-    const pageUrl = getPageDetailPath(document.id, getPageKindFromDocument(document));
+    const pageUrl = getPageDetailPath(
+      document.id,
+      getPageKindFromDocument(document),
+      document.spaceId,
+    );
 
     return (
       <Link
