@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useSourceSetStore } from '@/store/sourceSet';
@@ -83,10 +82,7 @@ const SourceSetListSection = memo(() => {
   const { open } = useCreateSourceSetModal();
 
   const handleCreate = () => {
-    open({
-      onSuccess: (id) => navigate(buildSourceSetPath(spaceId, id)),
-      spaceId,
-    });
+    open({ spaceId });
   };
 
   if (isLoading || !sourceSets?.length) {

@@ -1,10 +1,8 @@
 import { AccordionItem, ActionIcon, Text } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 
@@ -12,18 +10,12 @@ import SourceSetList from './SourceSetList';
 
 const SidebarBody = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
-  const navigate = useNavigate();
   const spaceId = useContentManagerStore((s) => s.spaceId);
 
   const { open } = useCreateSourceSetModal();
 
   const handleCreate = () => {
-    open({
-      onSuccess: (id) => {
-        navigate(buildSourceSetPath(spaceId, id));
-      },
-      spaceId,
-    });
+    open({ spaceId });
   };
 
   return (

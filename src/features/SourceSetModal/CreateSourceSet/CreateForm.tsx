@@ -2,7 +2,6 @@ import { Button, Flexbox, Input, TextArea } from '@lobehub/ui';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useSourceSetStore } from '@/store/sourceSet';
 
 interface CreateFormProps {
@@ -37,13 +36,8 @@ const CreateForm = memo<CreateFormProps>(({ id, initialValues, onClose, onSucces
       } else {
         const newId = await createSourceSet(values);
         setLoading(false);
-
-        if (onSuccess) {
-          onSuccess(newId);
-          onClose?.();
-        } else {
-          window.location.href = buildSourceSetPath(spaceId, newId);
-        }
+        onSuccess?.(newId);
+        onClose?.();
       }
     } catch (e) {
       console.error(e);

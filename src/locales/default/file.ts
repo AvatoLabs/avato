@@ -356,6 +356,7 @@ export default {
   'space.members.transferConfirm': 'Transfer ownership to this member?',
   'space.members.userNotFound': 'No existing user was found for that username.',
   'space.members.usernamePlaceholder': 'Find an existing user by username',
+  'space.personal.title': 'My Space',
   'space.roles.admin': 'Admin',
   'space.roles.editor': 'Editor',
   'space.roles.owner': 'Owner',

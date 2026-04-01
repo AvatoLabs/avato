@@ -8,6 +8,7 @@ import { memo, type ReactNode, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import EmptyNavItem from '@/features/NavPanel/components/EmptyNavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { usePageKind } from '@/features/Pages/usePageKind';
@@ -124,6 +125,7 @@ const ScopeNavigation = memo(() => {
   const { scope, setScope, sourceSetId: activeSourceSetId } = usePageScope();
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets = [], isLoading } = useFetchSourceSetList(pageSpaceId);
+  const { open: openCreateSourceSetModal } = useCreateSourceSetModal();
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const scopeCountsSelector = useMemo(
     () => pageSelectors.getScopeCountsByKind(pageKind),
@@ -162,12 +164,19 @@ const ScopeNavigation = memo(() => {
         onClick={() => setScope('unassigned')}
       />
 
-      {(isLoading || sourceSets.length > 0) && (
+      {pageSpaceId && (
         <Text className={styles.sectionTitle}>{t('sourceSet.title', { ns: 'file' })}</Text>
       )}
 
       {isLoading ? (
         <SkeletonList rows={4} />
+      ) : sortedSourceSets.length === 0 ? (
+        pageSpaceId ? (
+          <EmptyNavItem
+            title={t('sourceSet.new', { ns: 'file' })}
+            onClick={() => openCreateSourceSetModal({ spaceId: pageSpaceId })}
+          />
+        ) : null
       ) : (
         sortedSourceSets.map((sourceSet) => (
           <SourceSetScopeItem

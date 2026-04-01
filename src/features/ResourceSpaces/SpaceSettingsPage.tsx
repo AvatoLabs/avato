@@ -9,14 +9,19 @@ import useSWR from 'swr';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 
 import { buildSpaceRootPath } from './paths';
+import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 const SpaceSettingsPage = memo(() => {
   const { t } = useTranslation('file');
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const { spaceId } = useParams<{ spaceId: string }>();
+  const username = useUserStore(userProfileSelectors.username);
+  const fullName = useUserStore(userProfileSelectors.fullName);
   const [description, setDescription] = useState('');
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -36,9 +41,9 @@ const SpaceSettingsPage = memo(() => {
 
   useEffect(() => {
     if (!space) return;
-    setName(space.name);
+    setName(resolveSpaceDisplayName(space, t, { fullName, username }) || '');
     setDescription(space.description || '');
-  }, [space]);
+  }, [fullName, space, t, username]);
 
   const refresh = async () => {
     await mutateSpace();

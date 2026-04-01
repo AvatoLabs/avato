@@ -10,6 +10,8 @@ import useSWR from 'swr';
 
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 import { getPageRootPath } from '@/utils/docs';
 
 import {
@@ -18,6 +20,7 @@ import {
   buildSpaceMembersPath,
   buildSpaceSettingsPath,
 } from './paths';
+import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 const useStyles = createStyles(({ css, token }) => ({
   card: css`
@@ -73,6 +76,8 @@ const SpaceHomePage = memo(() => {
   const { t } = useTranslation(['common', 'file']);
   const { styles } = useStyles();
   const { spaceId } = useParams<{ spaceId?: string }>();
+  const username = useUserStore(userProfileSelectors.username);
+  const fullName = useUserStore(userProfileSelectors.fullName);
 
   const { data: space, isLoading } = useSWR(
     spaceId ? ['space', spaceId] : null,
@@ -85,6 +90,7 @@ const SpaceHomePage = memo(() => {
   if (!space) return null;
 
   const isTeamSpace = space.kind === 'team';
+  const displayName = resolveSpaceDisplayName(space, t, { fullName, username });
   const cards = [
     {
       description: t('space.home.cards.docs.description', { ns: 'file' }),
@@ -128,7 +134,7 @@ const SpaceHomePage = memo(() => {
       <Flexbox gap={10}>
         <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
           <Text as={'h1'} className={styles.title} fontSize={32} style={{ margin: 0 }} weight={700}>
-            {space.name}
+            {displayName}
           </Text>
           <Tag size={'small'} variant={'filled'}>
             {t(isTeamSpace ? 'space.home.badges.team' : 'space.home.badges.personal', {

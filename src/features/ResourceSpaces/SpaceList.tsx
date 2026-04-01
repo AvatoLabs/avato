@@ -10,8 +10,11 @@ import useSWR from 'swr';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { lambdaClient } from '@/libs/trpc/client';
+import { useUserStore } from '@/store/user';
+import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 
 import { buildSpaceSettingsPath } from './paths';
+import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 export const SPACE_LIST_KEY = 'resource-space-list';
 
@@ -24,6 +27,8 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
   const { t } = useTranslation('file');
   const location = useLocation();
   const navigate = useNavigate();
+  const username = useUserStore(userProfileSelectors.username);
+  const fullName = useUserStore(userProfileSelectors.fullName);
 
   const { data: spaces, isLoading } = useSWR(
     SPACE_LIST_KEY,
@@ -38,13 +43,14 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
   return spaces?.map((space) => {
     const isCurrentSettings =
       currentSpaceId === space.id && location.pathname.endsWith('/settings');
+    const displayName = resolveSpaceDisplayName(space, t, { fullName, username });
 
     return (
       <NavItem
         active={currentSpaceId === space.id}
         icon={space.kind === 'personal' ? HouseIcon : Users2Icon}
         key={space.id}
-        title={space.name}
+        title={displayName}
         extra={
           space.kind === 'team' ? (
             <ActionIcon

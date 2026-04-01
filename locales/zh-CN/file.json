@@ -335,6 +335,7 @@
   "space.members.transferConfirm": "确认将空间所有权转移给该成员？",
   "space.members.userNotFound": "未找到该用户名对应的现有用户。",
   "space.members.usernamePlaceholder": "按用户名查找现有用户",
+  "space.personal.title": "我的空间",
   "space.quickAccessTitle": "快捷入口",
   "space.roles.admin": "管理员",
   "space.roles.editor": "编辑者",

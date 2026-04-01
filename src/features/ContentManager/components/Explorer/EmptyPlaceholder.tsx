@@ -3,10 +3,8 @@ import { Upload } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useFileStore } from '@/store/file';
@@ -108,7 +106,6 @@ const EmptyPlaceholder = memo(() => {
   const isMobile = useServerConfigStore((s) => s.isMobile);
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
-  const navigate = useNavigate();
 
   const [sourceSetId, spaceId] = useContentManagerStore((s) => [s.sourceSetId, s.spaceId]);
 
@@ -132,10 +129,7 @@ const EmptyPlaceholder = memo(() => {
             className={cx(styles.card, styles.cardButton)}
             type="button"
             onClick={() => {
-              open({
-                onSuccess: (id) => navigate(buildSourceSetPath(spaceId, id)),
-                spaceId,
-              });
+              open({ spaceId });
             }}
           >
             <Flexbox className={styles.cardContent}>

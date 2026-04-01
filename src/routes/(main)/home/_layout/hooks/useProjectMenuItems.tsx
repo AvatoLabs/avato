@@ -3,7 +3,6 @@ import { type ItemType } from 'antd/es/menu/interface';
 import { BoxIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 
@@ -13,19 +12,14 @@ import { useCreateSourceSetModal } from '@/features/SourceSetModal';
  */
 export const useProjectMenuItems = () => {
   const { t } = useTranslation('sourceSet');
-  const navigate = useNavigate();
   const { open } = useCreateSourceSetModal();
 
   /**
    * Create knowledge base action
    */
   const createProject = useCallback(() => {
-    open({
-      onSuccess: (id) => {
-        navigate(`/knowledge/bases/${id}`);
-      },
-    });
-  }, [open, navigate]);
+    open();
+  }, [open]);
 
   const createProjectMenuItem = useCallback(
     (): ItemType => ({

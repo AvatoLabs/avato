@@ -186,6 +186,10 @@
 
 不要把现有个人记忆直接包装成团队空间模块，否则会把隐私边界和协作边界搅乱。
 
+团队记忆的详细方案，单独见：
+
+- `/Users/arthur/RustroverProjects/lobehub/docs/development/space-first-team-memory-plan.zh-CN.md`
+
 ### 4. `Chat / Agent` 的定位
 
 `Chat / Agent` 会话是 LobeHub 的核心功能，但**当前阶段不应被草率并入 `space` 内**。

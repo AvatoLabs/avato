@@ -6,10 +6,8 @@ import { cssVar } from 'antd-style';
 import { FolderKanban, Plus } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useSourceSetStore } from '@/store/sourceSet';
@@ -25,17 +23,10 @@ const SourceSetList = memo(() => {
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data, isLoading } = useFetchSourceSetList(spaceId);
 
-  const navigate = useNavigate();
-
   const { open } = useCreateSourceSetModal();
 
   const handleCreate = () => {
-    open({
-      onSuccess: (id) => {
-        navigate(buildSourceSetPath(spaceId, id));
-      },
-      spaceId,
-    });
+    open({ spaceId });
   };
 
   if (isLoading) return <SkeletonList avatarSize={20} paddingInline={4} rows={4} />;

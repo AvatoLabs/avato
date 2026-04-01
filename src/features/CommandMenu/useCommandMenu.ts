@@ -6,9 +6,7 @@ import useSWR from 'swr';
 
 import { isDesktop } from '@/const/version';
 import { type SearchResult } from '@/database/repositories/search';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useGroupWizard } from '@/layout/GlobalProvider/GroupWizardProvider';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useCreateMenuItems } from '@/routes/(main)/home/_layout/hooks';
@@ -189,12 +187,8 @@ export const useCommandMenu = () => {
 
   const handleCreateSourceSet = useCallback(() => {
     onClose();
-    openCreateSourceSetModal({
-      onSuccess: (id) => {
-        navigate(buildSourceSetPath(getActiveWorkspaceSpaceId(), id));
-      },
-    });
-  }, [onClose, openCreateSourceSetModal, navigate]);
+    openCreateSourceSetModal();
+  }, [onClose, openCreateSourceSetModal]);
 
   const handleCreatePage = useCallback(async () => {
     await createPage();
