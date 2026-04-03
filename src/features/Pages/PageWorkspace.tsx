@@ -1,6 +1,6 @@
 'use client';
 
-import { Flexbox, Tag, Text } from '@lobehub/ui';
+import { Flexbox, Text } from '@lobehub/ui';
 import { createStyles } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -52,7 +52,7 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
 
   const scopeLabel = useMemo(() => {
     if (scope === 'unassigned') {
-      return t('pageList.scope.inbox', { ns: 'file' });
+      return t('pageList.scope.unassigned', { ns: 'file' });
     }
 
     if (currentSourceSetScopeId) {
@@ -79,23 +79,13 @@ const PageWorkspace = memo<PageWorkspaceProps>(({ pageKind }) => {
             <Text as={'h2'} fontSize={24} style={{ margin: 0 }} weight={600}>
               {scopeLabel}
             </Text>
-            {scope === 'unassigned' && (
-              <Tag size={'small'} variant={'filled'}>
-                {t('pageList.scope.inbox', { ns: 'file' })}
-              </Tag>
-            )}
-            {currentSourceSetScopeId && (
-              <Tag size={'small'} variant={'filled'}>
-                {t('sourceSet.title', { ns: 'file' })}
-              </Tag>
-            )}
           </Flexbox>
           {currentSourceSetScopeId && scopedSourceSet?.description && (
             <Text type={'secondary'}>{scopedSourceSet.description}</Text>
           )}
           <Text type={'secondary'}>{countLabel}</Text>
           {scope === 'unassigned' && (
-            <Text type={'secondary'}>{t('pageList.scope.inboxHint', { ns: 'file' })}</Text>
+            <Text type={'secondary'}>{t('pageList.scope.unassignedHint', { ns: 'file' })}</Text>
           )}
         </Flexbox>
         {count === 0 && !isSearching ? (

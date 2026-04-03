@@ -3,7 +3,7 @@
 import { ActionIcon, DropdownMenu, Flexbox, Icon, type MenuProps, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles } from 'antd-style';
-import { FileText, FolderOpen, Inbox, Table2 } from 'lucide-react';
+import { FileText, FolderOpen, Table2 } from 'lucide-react';
 import { memo, type ReactNode, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +14,7 @@ import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { usePageKind } from '@/features/Pages/usePageKind';
 import { createSourceSetPageScope, usePageScope } from '@/features/Pages/usePageScope';
 import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
+import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useSourceSetStore } from '@/store/sourceSet';
@@ -126,6 +127,7 @@ const ScopeNavigation = memo(() => {
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets = [], isLoading } = useFetchSourceSetList(pageSpaceId);
   const { open: openCreateSourceSetModal } = useCreateSourceSetModal();
+  const { space } = useSpaceItem(pageSpaceId);
   const isTablePage = pageKind === TABLE_PAGE_KIND;
   const scopeCountsSelector = useMemo(
     () => pageSelectors.getScopeCountsByKind(pageKind),
@@ -137,6 +139,8 @@ const ScopeNavigation = memo(() => {
     () => [...sourceSets].sort((left, right) => left.name.localeCompare(right.name)),
     [sourceSets],
   );
+  const shouldShowUnassignedScope =
+    scope === 'unassigned' || (space?.kind === 'personal' && unassigned > 0);
 
   const renderCount = (count: number) =>
     isDocumentsLoading ? undefined : (
@@ -155,13 +159,6 @@ const ScopeNavigation = memo(() => {
           ns: 'file',
         })}
         onClick={() => setScope('all')}
-      />
-      <NavItem
-        active={scope === 'unassigned'}
-        extra={renderCount(unassigned)}
-        icon={Inbox}
-        title={t('pageList.scope.inbox', { ns: 'file' })}
-        onClick={() => setScope('unassigned')}
       />
 
       {pageSpaceId && (
@@ -189,6 +186,16 @@ const ScopeNavigation = memo(() => {
             }}
           />
         ))
+      )}
+
+      {shouldShowUnassignedScope && (
+        <NavItem
+          active={scope === 'unassigned'}
+          extra={renderCount(unassigned)}
+          icon={RESOURCE_ENTRY_ICONS.folder}
+          title={t('pageList.scope.unassigned', { ns: 'file' })}
+          onClick={() => setScope('unassigned')}
+        />
       )}
     </Flexbox>
   );
