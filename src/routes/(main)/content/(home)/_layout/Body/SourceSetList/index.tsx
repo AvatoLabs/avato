@@ -6,6 +6,7 @@ import { cssVar } from 'antd-style';
 import { FolderKanban, Plus } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
@@ -19,6 +20,7 @@ import Item from './Item';
  */
 const SourceSetList = memo(() => {
   const { t } = useTranslation(['file', 'sourceSet']);
+  const { id: activeSourceSetId } = useParams<{ id?: string }>();
   const spaceId = useContentManagerStore((s) => s.spaceId);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data, isLoading } = useFetchSourceSetList(spaceId);
@@ -56,6 +58,7 @@ const SourceSetList = memo(() => {
     <Flexbox gap={1} paddingInline={4}>
       {data?.map((item) => (
         <Item
+          active={activeSourceSetId === item.id}
           description={item.description}
           id={item.id}
           key={item.id}

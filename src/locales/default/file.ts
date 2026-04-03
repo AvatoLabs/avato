@@ -232,6 +232,8 @@ export default {
   'preview.markdownLoadError': 'Failed to load Markdown preview',
   'preview.unsupportedFileAndContact':
     'This file format is not currently supported for online preview. If you have a request for previewing, feel free to <1>contact us</1>.',
+  'fileScope.all': 'All Files',
+  'fileScope.unassigned': 'Unassigned',
   'resource': 'Content',
   'searchFilePlaceholder': 'Search Files',
   'searchPagePlaceholder': 'Search Docs',

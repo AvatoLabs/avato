@@ -126,6 +126,8 @@
   "emptyState.files.uploadAction": "上传文件",
   "emptyState.search.description": "尝试调整搜索关键词",
   "emptyState.search.title": "未找到匹配内容",
+  "fileScope.all": "全部文件",
+  "fileScope.unassigned": "未归类",
   "header.actions.builtInBlockList.filtered": "已过滤 {{ignored}} 个文件（共 {{total}} 个文件）",
   "header.actions.connect": "连接…",
   "header.actions.createFolderError": "创建文件夹失败",

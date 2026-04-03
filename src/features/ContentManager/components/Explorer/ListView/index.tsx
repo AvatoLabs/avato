@@ -19,7 +19,6 @@ import {
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { INITIAL_STATUS } from '@/store/global/initialState';
-import { FilesTabs } from '@/types/files';
 
 import EmptyState from '../../EmptyState';
 import { type ExplorerItem } from '../items';
@@ -69,7 +68,6 @@ interface ListViewProps {
 const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, isLoading }) {
   const [
     sourceSetId,
-    category,
     spaceId,
     selectFileIds,
     setSelectedFileIds,
@@ -77,7 +75,6 @@ const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, 
     storeIsTransitioning,
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
-    s.category,
     s.spaceId,
     s.selectedFileIds,
     s.setSelectedFileIds,
@@ -381,9 +378,7 @@ const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, 
                   count: selectFileIds.length,
                   ns: 'components',
                 })
-              : category === FilesTabs.Documents
-                ? t('shared.kind.document', { defaultValue: 'Document', ns: 'file' })
-                : t('FileManager.title.title')}
+              : t('FileManager.title.title')}
             <ColumnResizeHandle
               column="name"
               currentWidth={columnWidths.name}

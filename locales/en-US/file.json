@@ -110,6 +110,8 @@
   "docEditor.updatedAt": "Updated {{time}}",
   "docEditor.wordCount": "{{wordCount}} words",
   "empty": "No files or folders have been uploaded yet.",
+  "fileScope.all": "All Files",
+  "fileScope.unassigned": "Unassigned",
   "header.actions.builtInBlockList.filtered": "{{ignored}} files filtered (out of {{total}} total)",
   "header.actions.connect": "Connect...",
   "header.actions.createFolderError": "Failed to create folder",

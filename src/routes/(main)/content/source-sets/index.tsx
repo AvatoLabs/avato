@@ -1,6 +1,5 @@
 'use client';
 
-import { Flexbox, Text } from '@lobehub/ui';
 import { memo, useLayoutEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -8,80 +7,55 @@ import NotFound from '@/components/404';
 import NProgress from '@/components/NProgress';
 import ContentManager from '@/features/ContentManager';
 import { buildSourceSetPath } from '@/features/ResourceSpaces';
-import SourceSetSurfaceNav from '@/features/SourceSetSurfaceNav';
-import Container from '@/routes/(main)/content/source-sets/features/Container';
-import { useServerConfigStore } from '@/store/serverConfig';
+import { FilesTabs } from '@/types/files';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
 import { useSourceSetItem } from '../features/hooks/useSourceSetItem';
 import { useContentManagerStore } from '../features/store';
 
-const MainContent = memo(() => {
+const SourceSetPage = memo(() => {
   const { id: sourceSetId, spaceId } = useParams<{ id: string; spaceId?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = useServerConfigStore((s) => s.isMobile);
-  const [setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
+  const [setCategory, setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
+    s.setCategory,
     s.setSourceSetId,
     s.setSpaceId,
   ]);
 
-  // Load source-set data.
   const { data, isLoading } = useSourceSetItem(sourceSetId || '');
 
-  // Sync sourceSetId from URL params using useLayoutEffect
-  // useLayoutEffect runs synchronously before browser paint, ensuring state is set
-  // before Explorer component renders and computes query parameters
-  // IMPORTANT: Only depend on sourceSetId and location.pathname, NOT currentSourceSetId to avoid feedback loop
   useLayoutEffect(() => {
     const isOnSourceSetRoute = location.pathname.includes('/source-sets/');
-    if (isOnSourceSetRoute) {
-      setSourceSetId(sourceSetId);
-      setSpaceId(spaceId || data?.spaceId || undefined);
-    }
-  }, [data?.spaceId, sourceSetId, location.pathname, setSourceSetId, setSpaceId, spaceId]);
+    if (!isOnSourceSetRoute) return;
+
+    setCategory(FilesTabs.Home);
+    setSourceSetId(sourceSetId);
+    setSpaceId(spaceId || data?.spaceId || undefined);
+  }, [
+    data?.spaceId,
+    location.pathname,
+    setCategory,
+    setSourceSetId,
+    setSpaceId,
+    sourceSetId,
+    spaceId,
+  ]);
 
   useLayoutEffect(() => {
-    if (!sourceSetId) return;
+    if (!sourceSetId || spaceId || !data?.spaceId) return;
 
-    if (!spaceId && data?.spaceId) {
-      navigate(buildSourceSetPath(data.spaceId, sourceSetId), { replace: true });
-    }
-  }, [data?.spaceId, sourceSetId, navigate, spaceId]);
+    navigate(buildSourceSetPath(data.spaceId, sourceSetId), { replace: true });
+  }, [data?.spaceId, navigate, sourceSetId, spaceId]);
 
-  // Sync file view mode from URL
   useInitFileCheck();
 
   if (!isLoading && !data) return <NotFound />;
 
   return (
-    <Flexbox flex={1} gap={16} padding={24} style={{ minHeight: 0 }}>
-      <Flexbox gap={4}>
-        {!isMobile && (
-          <SourceSetSurfaceNav
-            activeSurface={'files'}
-            sourceSetId={sourceSetId!}
-            spaceId={spaceId ?? data?.spaceId}
-          />
-        )}
-        {data?.description && <Text type={'secondary'}>{data.description}</Text>}
-      </Flexbox>
-      <Flexbox flex={1} style={{ minHeight: 0 }}>
-        <ContentManager />
-      </Flexbox>
-    </Flexbox>
-  );
-});
-
-MainContent.displayName = 'SourceSetMainContent';
-
-const SourceSetPage = memo(() => {
-  return (
     <>
       <NProgress />
-      <Container>
-        <MainContent />
-      </Container>
+      <ContentManager />
     </>
   );
 });

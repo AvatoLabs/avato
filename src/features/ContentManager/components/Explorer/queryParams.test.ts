@@ -23,6 +23,7 @@ describe('buildExplorerQueryParams', () => {
     const params = buildExplorerQueryParams({
       category: FilesTabs.Home,
       currentFolderSlug: 'folder-slug',
+      scope: 'all',
       sorter: 'createdAt',
       sortType: SortType.Desc,
       spaceId: 'spc_1',
@@ -30,6 +31,21 @@ describe('buildExplorerQueryParams', () => {
 
     expect(params.category).toBe(FilesTabs.Home);
     expect(params.parentId).toBe('folder-slug');
+    expect(params.showFilesInSourceSet).toBe(true);
+  });
+
+  it('uses the unassigned scope for personal space root files', () => {
+    const params = buildExplorerQueryParams({
+      category: FilesTabs.Home,
+      scope: 'unassigned',
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.category).toBe(FilesTabs.Home);
+    expect(params.parentId).toBe(null);
+    expect(params.showFilesInSourceSet).toBe(false);
   });
 
   it('disables category filters inside source sets while keeping folder scope', () => {

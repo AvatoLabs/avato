@@ -42,7 +42,6 @@ vi.mock('react-i18next', () => ({
       (
         {
           'tab.all': 'All',
-          'tab.docs': 'Docs',
           'tab.images': 'Images',
           'tab.audios': 'Audio',
           'tab.videos': 'Video',
@@ -63,7 +62,7 @@ vi.mock('@/config/contentIcons', () => ({
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentRootPath: (spaceId?: string) => (spaceId ? `/content/spaces/${spaceId}` : '/content'),
+  buildContentRootPath: (spaceId?: string) => (spaceId ? `/spaces/${spaceId}/files` : '/content'),
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({
@@ -90,10 +89,10 @@ const LocationDisplay = () => {
 describe('CategoryMenu', () => {
   it('preserves current sort and view params when switching filters', () => {
     render(
-      <MemoryRouter initialEntries={['/content/spaces/spc_1?view=masonry&sorter=name']}>
+      <MemoryRouter initialEntries={['/spaces/spc_1/files?view=masonry&sorter=name']}>
         <Routes>
           <Route
-            path="/content/spaces/:spaceId"
+            path="/spaces/:spaceId/files"
             element={
               <>
                 <CategoryMenu />
@@ -105,13 +104,13 @@ describe('CategoryMenu', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Docs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Images' }));
 
     const location = screen.getByTestId('location').textContent || '';
     const params = new URLSearchParams(location.split('?')[1]);
 
-    expect(location.startsWith('/content/spaces/spc_1?')).toBe(true);
-    expect(params.get('category')).toBe('documents');
+    expect(location.startsWith('/spaces/spc_1/files?')).toBe(true);
+    expect(params.get('category')).toBe('images');
     expect(params.get('view')).toBe('masonry');
     expect(params.get('sorter')).toBe('name');
     expect(mockSetMode).toHaveBeenCalledWith('explorer');
@@ -120,11 +119,11 @@ describe('CategoryMenu', () => {
   it('clears the category param when returning to the all-content filter', () => {
     render(
       <MemoryRouter
-        initialEntries={['/content/spaces/spc_1?category=images&view=masonry&sorter=name']}
+        initialEntries={['/spaces/spc_1/files?category=images&view=masonry&sorter=name']}
       >
         <Routes>
           <Route
-            path="/content/spaces/:spaceId"
+            path="/spaces/:spaceId/files"
             element={
               <>
                 <CategoryMenu />
@@ -141,7 +140,7 @@ describe('CategoryMenu', () => {
     const location = screen.getByTestId('location').textContent || '';
     const params = new URLSearchParams(location.split('?')[1]);
 
-    expect(location.startsWith('/content/spaces/spc_1?')).toBe(true);
+    expect(location.startsWith('/spaces/spc_1/files?')).toBe(true);
     expect(params.has('category')).toBe(false);
     expect(params.get('view')).toBe('masonry');
     expect(params.get('sorter')).toBe('name');

@@ -50,9 +50,11 @@ export const useFileItemClick = ({
       newParams.delete('files');
 
       const queryString = newParams.toString();
-      const basePath = sourceSetId
-        ? buildSourceSetFolderPath(spaceId, sourceSetId, folderSlug)
-        : buildContentFolderPath(spaceId, folderSlug);
+      const isSourceSetRoute = location.pathname.includes('/source-sets/');
+      const basePath =
+        isSourceSetRoute && sourceSetId
+          ? buildSourceSetFolderPath(spaceId, sourceSetId, folderSlug)
+          : buildContentFolderPath(spaceId, folderSlug);
       navigate(queryString ? `${basePath}?${queryString}` : basePath);
       return;
     }

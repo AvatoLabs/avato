@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 
 import { message } from '@/components/AntdStaticMethods';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -52,58 +51,15 @@ const AddButton = ({ compact }: AddButtonProps) => {
   const fileUploadInputRef = useRef<HTMLInputElement>(null);
   const folderUploadInputRef = useRef<HTMLInputElement>(null);
 
-  const [
-    sourceSetId,
-    category,
-    currentFolderId,
-    spaceId,
-    setCategory,
-    setCurrentViewItemId,
-    setMode,
-    setPendingRenameItemId,
-  ] = useContentManagerStore((s) => [
-    s.sourceSetId,
-    s.category,
-    s.currentFolderId,
-    s.spaceId,
-    s.setCategory,
-    s.setCurrentViewItemId,
-    s.setMode,
-    s.setPendingRenameItemId,
-  ]);
-
-  const handleOpenPageEditor = useCallback(async () => {
-    // Navigate to "Home" category first if not already there
-    if (category !== FilesTabs.Home) {
-      setCategory(FilesTabs.Home);
-    }
-
-    // Create a new doc and wait for server sync so the editor can load it.
-    const untitledTitle = t('pageList.untitled');
-    const realId = await createContentItemAndSync({
-      content: '',
-      fileType: 'custom/document',
-      sourceSetId,
-      parentId: currentFolderId ?? undefined,
-      spaceId,
-      sourceType: 'document',
-      title: untitledTitle,
-    });
-
-    // Switch to doc mode with the real ID.
-    setCurrentViewItemId(realId);
-    setMode('doc');
-  }, [
-    category,
-    createContentItemAndSync,
-    currentFolderId,
-    sourceSetId,
-    setCategory,
-    setCurrentViewItemId,
-    setMode,
-    spaceId,
-    t,
-  ]);
+  const [sourceSetId, category, currentFolderId, spaceId, setCategory, setPendingRenameItemId] =
+    useContentManagerStore((s) => [
+      s.sourceSetId,
+      s.category,
+      s.currentFolderId,
+      s.spaceId,
+      s.setCategory,
+      s.setPendingRenameItemId,
+    ]);
 
   const handleCreateFolder = useCallback(async () => {
     // Navigate to "Home" category first if not already there
@@ -201,12 +157,6 @@ const AddButton = ({ compact }: AddButtonProps) => {
 
   const items = useMemo<MenuProps['items']>(
     () => [
-      {
-        icon: <Icon icon={ACTION_ENTRY_ICONS.createPage} />,
-        key: 'create-note',
-        label: t('header.actions.newDoc', { defaultValue: 'New Doc' }),
-        onClick: handleOpenPageEditor,
-      },
       ...(sourceSetId
         ? [
             {
@@ -215,11 +165,11 @@ const AddButton = ({ compact }: AddButtonProps) => {
               label: t('header.actions.newFolder'),
               onClick: handleCreateFolder,
             },
+            {
+              type: 'divider',
+            },
           ]
         : []),
-      {
-        type: 'divider',
-      },
       {
         icon: <Icon icon={RESOURCE_ENTRY_ICONS.fileUpload} />,
         key: 'upload-file',
@@ -233,14 +183,7 @@ const AddButton = ({ compact }: AddButtonProps) => {
         onClick: openFolderUploadDialog,
       },
     ],
-    [
-      handleCreateFolder,
-      handleOpenPageEditor,
-      sourceSetId,
-      openFileUploadDialog,
-      openFolderUploadDialog,
-      t,
-    ],
+    [handleCreateFolder, sourceSetId, openFileUploadDialog, openFolderUploadDialog, t],
   );
 
   const trigger = useCompact ? (

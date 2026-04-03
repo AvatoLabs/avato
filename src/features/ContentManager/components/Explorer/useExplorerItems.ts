@@ -8,8 +8,8 @@ import { type SortType } from '@/types/files';
 
 import {
   buildPendingUploadExplorerItems,
-  mapContentItemsToExplorerItems,
   type ExplorerItem,
+  mapContentItemsToExplorerItems,
 } from './items';
 
 interface UseExplorerItemsOptions {
@@ -29,7 +29,10 @@ export const useExplorerItems = ({
   const dockUploadFileList = useFileStore(fileManagerSelectors.dockFileList);
 
   const data = useMemo<ExplorerItem[]>(() => {
-    const visibleItems = resources.items ?? [];
+    const visibleItems =
+      resources.items?.filter(
+        (item) => !(item.sourceType === 'document' && item.fileType === 'custom/document'),
+      ) ?? [];
     const pendingItems = buildPendingUploadExplorerItems(dockUploadFileList, params, visibleItems);
     const mergedItems = [...pendingItems, ...mapContentItemsToExplorerItems(visibleItems)];
 

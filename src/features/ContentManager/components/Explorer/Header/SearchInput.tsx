@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
-import { FilesTabs } from '@/types/files';
 
 const SearchInput = memo(() => {
   const { t } = useTranslation(['components', 'file']);
@@ -16,14 +15,14 @@ const SearchInput = memo(() => {
   const [showIcon, setShowIcon] = useState(true);
   const [localQuery, setLocalQuery] = useState('');
   const inputRef = useRef<any>(null);
-  const [category, setSearchQuery] = useContentManagerStore((s) => [s.category, s.setSearchQuery]);
+  const setSearchQuery = useContentManagerStore((s) => s.setSearchQuery);
 
   const debouncedQuery = useDebounce(localQuery, { wait: 350 });
 
-  const placeholder =
-    category === FilesTabs.Documents
-      ? t('searchPagePlaceholder', { defaultValue: 'Search Docs', ns: 'file' })
-      : t('FileManager.search.placeholder', { defaultValue: 'Search Files', ns: 'components' });
+  const placeholder = t('FileManager.search.placeholder', {
+    defaultValue: 'Search Files',
+    ns: 'components',
+  });
 
   useEffect(() => {
     if (!expanded) return;

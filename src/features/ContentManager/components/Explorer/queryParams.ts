@@ -4,6 +4,7 @@ import { type FilesTabs, type SortType } from '@/types/files';
 interface BuildExplorerQueryParamsOptions {
   category?: FilesTabs;
   currentFolderSlug?: string | null;
+  scope?: 'all' | 'unassigned';
   sorter?: 'createdAt' | 'name' | 'size';
   sortType?: SortType;
   sourceSetId?: string;
@@ -19,6 +20,7 @@ export const isSpaceLevelContentFilter = (category?: FilesTabs) =>
 export const buildExplorerQueryParams = ({
   category,
   currentFolderSlug,
+  scope = 'all',
   sourceSetId,
   sorter,
   sortType,
@@ -27,7 +29,7 @@ export const buildExplorerQueryParams = ({
   category: getExplorerCategoryFilter(category, sourceSetId),
   parentId:
     !sourceSetId && isSpaceLevelContentFilter(category) ? undefined : currentFolderSlug || null,
-  showFilesInSourceSet: false,
+  showFilesInSourceSet: sourceSetId ? false : scope === 'all',
   sourceSetId,
   spaceId,
   sortType,

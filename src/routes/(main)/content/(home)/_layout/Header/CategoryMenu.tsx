@@ -98,16 +98,6 @@ const CategoryMenu = memo(() => {
         value: FilesTabs.Home,
       },
       {
-        key: FilesTabs.Documents,
-        label: (
-          <span className={styles.option}>
-            <Icon icon={RESOURCE_ENTRY_ICONS.documents} size={14} />
-            {t('tab.docs', { defaultValue: 'Docs' })}
-          </span>
-        ),
-        value: FilesTabs.Documents,
-      },
-      {
         key: FilesTabs.Images,
         label: (
           <span className={styles.option}>

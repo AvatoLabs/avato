@@ -9,10 +9,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
-import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useChatStore } from '@/store/chat';
 import { useHomeStore } from '@/store/home/store';
-import { FilesTabs } from '@/types/files';
 import { getPageRootPath } from '@/utils/docs';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -209,7 +207,6 @@ const QuickActionsPanel = memo(() => {
     s.clearInputMode,
   ]);
   const mainInputEditor = useChatStore((s) => s.mainInputEditor);
-  const setCategory = useContentManagerStore((s) => s.setCategory);
 
   const modeActions: ModeQuickAction[] = [
     {
@@ -244,10 +241,7 @@ const QuickActionsPanel = memo(() => {
       icon: FileTextIcon,
       key: 'documents',
       kind: 'utility',
-      onClick: () => {
-        setCategory(FilesTabs.Documents);
-        navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId()));
-      },
+      onClick: () => navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId())),
       title: t('workspace.quickActions.newDoc'),
     },
     {

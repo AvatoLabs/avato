@@ -10,9 +10,11 @@ import QuickAccessSection from '@/features/ResourceSpaces/QuickAccessSection';
 import SpaceSection from '@/features/ResourceSpaces/SpaceSection';
 
 import SidebarBody from './Body';
+import FileScopeSection from './FileScopeSection';
 import Header from './Header';
 
 export enum GroupKey {
+  FileScope = 'file-scope',
   QuickAccess = 'quick-access',
   SourceSet = 'source-set',
   Space = 'space',
@@ -28,11 +30,17 @@ const Sidebar = memo(() => {
         body={
           <Flexbox paddingBlock={8} paddingInline={4}>
             <Accordion
-              defaultExpandedKeys={[GroupKey.QuickAccess, GroupKey.Space, GroupKey.SourceSet]}
               gap={8}
+              defaultExpandedKeys={[
+                GroupKey.QuickAccess,
+                GroupKey.Space,
+                GroupKey.FileScope,
+                GroupKey.SourceSet,
+              ]}
             >
               <QuickAccessSection itemKey={GroupKey.QuickAccess} />
               <SpaceSection itemKey={GroupKey.Space} />
+              {spaceId && <FileScopeSection itemKey={GroupKey.FileScope} />}
               {spaceId && <SidebarBody itemKey={GroupKey.SourceSet} />}
             </Accordion>
           </Flexbox>

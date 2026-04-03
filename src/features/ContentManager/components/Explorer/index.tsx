@@ -8,6 +8,7 @@ import { useFolderPath } from '@/routes/(main)/content/features/hooks/useFolderP
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useServerConfigStore } from '@/store/serverConfig';
 
+import { useFileScope } from '../../useFileScope';
 import SourceSetListSection from '../SourceSetListSection';
 import EmptyPlaceholder from './EmptyPlaceholder';
 import Header from './Header';
@@ -15,9 +16,9 @@ import ListView from './ListView';
 import MasonryView from './MasonryView';
 import { buildExplorerQueryParams } from './queryParams';
 import SearchResultsOverlay from './SearchResultsOverlay';
-import { useExplorerItems } from './useExplorerItems';
 import { useCheckTaskStatus } from './useCheckTaskStatus';
 import { useContentExplorer } from './useContentExplorer';
+import { useExplorerItems } from './useExplorerItems';
 
 /**
  * Explore content items inside a source set or space view.
@@ -50,6 +51,7 @@ const ResourceExplorer = memo(() => {
     s.sortType,
     s.spaceId,
   ]);
+  const { scope } = useFileScope(spaceId);
 
   const isExplorerMode = mode === 'explorer';
 
@@ -66,12 +68,13 @@ const ResourceExplorer = memo(() => {
       buildExplorerQueryParams({
         category,
         currentFolderSlug,
+        scope,
         sourceSetId,
         sorter,
         sortType,
         spaceId,
       }),
-    [category, currentFolderSlug, sourceSetId, sorter, sortType, spaceId],
+    [category, currentFolderSlug, scope, sourceSetId, sorter, sortType, spaceId],
   );
 
   const { data, hasResolvedData, isLoading, isValidating } = useExplorerItems({
