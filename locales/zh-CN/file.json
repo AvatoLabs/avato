@@ -322,7 +322,7 @@
   "space.home.cards.files.description": "浏览上传的文件、文件夹与共享资产。",
   "space.home.cards.members.description": "管理谁可以访问并协作这个工作区。",
   "space.home.cards.settings.description": "重命名工作区并调整协作设置。",
-  "space.home.cards.sourceSets.description": "把文档与文件归入聚焦的资料集。",
+  "space.home.cards.sourceSets.description": "在文件与文档工作面中浏览和管理资料集。",
   "space.home.description.personalFallback": "用这个个人工作区整理你的文档、文件与资料集。",
   "space.home.description.teamFallback": "用这个团队工作区组织共享文档、文件、资料集与协作者。",
   "space.members.add": "添加成员",

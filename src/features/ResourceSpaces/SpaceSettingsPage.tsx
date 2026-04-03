@@ -85,7 +85,7 @@ const SpaceSettingsPage = memo(() => {
       okButtonProps: { danger: true },
       onOk: async () => {
         await lambdaClient.space.deleteSpace.mutate({ id: spaceId });
-        navigate('/content');
+        navigate('/');
       },
       title: t('space.settings.deleteConfirm'),
     });

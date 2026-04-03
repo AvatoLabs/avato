@@ -342,7 +342,8 @@ export default {
     'Manage who can access and collaborate in this workspace.',
   'space.home.cards.settings.description':
     'Rename the workspace and adjust collaboration settings.',
-  'space.home.cards.sourceSets.description': 'Group documents and files into focused source sets.',
+  'space.home.cards.sourceSets.description':
+    'Browse and manage source sets from the files and docs surfaces.',
   'space.home.description.personalFallback':
     'Use this personal workspace to keep documents, files, and source sets organized.',
   'space.home.description.teamFallback':

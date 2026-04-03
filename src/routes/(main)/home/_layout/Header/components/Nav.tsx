@@ -4,7 +4,7 @@ import { Flexbox, Tag } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
@@ -37,6 +37,8 @@ const Nav = memo(() => {
   const { t: tHome } = useTranslation('home');
   const { t: tSetting } = useTranslation('setting');
   const activeSpaceId = getActiveWorkspaceSpaceId();
+  const { spaceId: routeSpaceId } = useParams<{ spaceId?: string }>();
+  const resolvedSpaceId = routeSpaceId ?? activeSpaceId;
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
 
@@ -66,7 +68,7 @@ const Nav = memo(() => {
         icon: APP_ENTRY_ICONS.page,
         key: 'docs',
         title: t('tab.pages'),
-        url: getPageRootPath('doc', activeSpaceId),
+        url: getPageRootPath('doc', resolvedSpaceId),
       },
       {
         badge: 'beta',
@@ -80,7 +82,7 @@ const Nav = memo(() => {
         icon: APP_ENTRY_ICONS.resource,
         key: 'content',
         title: t('tab.resource'),
-        url: buildContentRootPath(activeSpaceId),
+        url: buildContentRootPath(resolvedSpaceId),
       },
       {
         icon: APP_ENTRY_ICONS.memory,
@@ -111,7 +113,7 @@ const Nav = memo(() => {
         url: '/community',
       },
     ],
-    [activeSpaceId, showAiImage, showMarket, t],
+    [resolvedSpaceId, showAiImage, showMarket, t],
   );
 
   const newBadge = (

@@ -70,11 +70,8 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
 
   const handleSpaceNavigate = () => {
     clearViewAndSelection();
-
-    const queryString = buildPreservedQueryString();
     const basePath = buildSpaceRootPath(spaceId);
-
-    navigate(queryString ? `${basePath}?${queryString}` : basePath);
+    navigate(basePath);
   };
 
   const handleSectionNavigate = (slug: string | null) => {

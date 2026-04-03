@@ -198,6 +198,8 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setCategory: (category) => {
+    if (get().category === category) return;
+
     set({ category });
   },
 
@@ -210,10 +212,14 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setFileListHasMore: (fileListHasMore) => {
+    if (get().fileListHasMore === fileListHasMore) return;
+
     set({ fileListHasMore });
   },
 
   setFileListOffset: (fileListOffset) => {
+    if (get().fileListOffset === fileListOffset) return;
+
     set({ fileListOffset });
   },
 
@@ -227,6 +233,7 @@ export const store: CreateStore = (publicState) => (set, get) => ({
 
   setSourceSetId: (sourceSetId) => {
     const prevId = get().sourceSetId;
+    if (prevId === sourceSetId) return;
 
     set({ sourceSetId });
 
@@ -259,6 +266,8 @@ export const store: CreateStore = (publicState) => (set, get) => ({
   },
 
   setSpaceId: (spaceId) => {
+    if (get().spaceId === spaceId) return;
+
     setActiveWorkspaceSpaceId(spaceId);
     set({ spaceId });
   },

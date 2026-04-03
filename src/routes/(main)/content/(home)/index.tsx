@@ -14,34 +14,51 @@ const ContentHomePage = memo(() => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const { spaceId } = useParams<{ spaceId?: string }>();
-  const [setCategory, setActiveSourceSetId, setSpaceId] = useContentManagerStore((s) => [
+  const [
+    category,
+    currentSourceSetId,
+    currentSpaceId,
+    setCategory,
+    setActiveSourceSetId,
+    setSpaceId,
+  ] = useContentManagerStore((s) => [
+    s.category,
+    s.sourceSetId,
+    s.spaceId,
     s.setCategory,
     s.setSourceSetId,
     s.setSpaceId,
   ]);
 
   const categoryParam = (searchParams.get('category') as FilesTabs) || FilesTabs.Home;
+  const isOnHomeRoute = !location.pathname.includes('/source-sets/');
+  const scopedSourceSetId = getSourceSetScopeId(getFileScope(searchParams)) ?? undefined;
+  const isRouteStateReady =
+    !isOnHomeRoute ||
+    (currentSpaceId === spaceId &&
+      currentSourceSetId === scopedSourceSetId &&
+      category === categoryParam);
 
   // Clear the active source set when on the home route.
   useLayoutEffect(() => {
-    const isOnHomeRoute = !location.pathname.includes('/source-sets/');
     if (isOnHomeRoute) {
-      setActiveSourceSetId(getSourceSetScopeId(getFileScope(searchParams)) ?? undefined);
+      setActiveSourceSetId(scopedSourceSetId);
       setSpaceId(spaceId);
     }
-  }, [location.pathname, searchParams, setActiveSourceSetId, setSpaceId, spaceId]);
+  }, [isOnHomeRoute, scopedSourceSetId, setActiveSourceSetId, setSpaceId, spaceId]);
 
   // Sync category from URL using useLayoutEffect
   // IMPORTANT: Only sync if we're actually on the home route (not transitioning to a source set)
   useLayoutEffect(() => {
-    const isOnHomeRoute = !location.pathname.includes('/source-sets/');
     if (isOnHomeRoute) {
       setCategory(categoryParam);
     }
-  }, [categoryParam, setCategory, location.pathname]);
+  }, [categoryParam, isOnHomeRoute, setCategory]);
 
   // Sync file view mode from URL
   useInitFileCheck();
+
+  if (!isRouteStateReady) return null;
 
   return <ContentManager />;
 });

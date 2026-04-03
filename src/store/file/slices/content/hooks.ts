@@ -49,7 +49,8 @@ const syncResourceStore = (
   data: ResourceQueryResponse,
   actionName: string,
 ) => {
-  const { hasMore, offset, queryParams, resourceList, resourceMap, total } = useFileStore.getState();
+  const { hasMore, offset, queryParams, resourceList, resourceMap, total } =
+    useFileStore.getState();
   const isActiveQuery = isSameResourceQueryParams(queryParams, params);
   const nextState = isActiveQuery
     ? mergeActiveResourceList(data.items, resourceList, offset)
@@ -114,7 +115,8 @@ export const useFetchResources = (params: ContentQueryParams | null, enable: any
 
         syncResourceStore(params, data, 'useFetchResources/success');
       },
-      revalidateOnFocus: true,
+      // Resource lists are large and already explicitly refreshed by scope/category changes.
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
     },
   );

@@ -174,6 +174,8 @@ export class ListActionImpl {
   };
 
   setShowOnlyPagesWithoutSourceSet = (show: boolean): void => {
+    if (this.#get().showOnlyPagesWithoutSourceSet === show) return;
+
     this.#set(
       { showOnlyPagesWithoutSourceSet: show },
       false,
@@ -182,6 +184,8 @@ export class ListActionImpl {
   };
 
   setCurrentSourceSetScopeId = (sourceSetId: string | null): void => {
+    if (this.#get().currentSourceSetScopeId === sourceSetId) return;
+
     this.#set({ currentSourceSetScopeId: sourceSetId }, false, n('setCurrentSourceSetScopeId'));
   };
 
@@ -229,7 +233,8 @@ export class ListActionImpl {
             n('useFetchDocuments/onData'),
           );
         },
-        revalidateOnFocus: true,
+        // Avoid refetching the entire workspace collection on every tab focus.
+        revalidateOnFocus: false,
       },
     );
   };

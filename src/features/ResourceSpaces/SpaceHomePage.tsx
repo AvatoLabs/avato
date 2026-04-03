@@ -14,12 +14,7 @@ import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 import { getPageRootPath } from '@/utils/docs';
 
-import {
-  buildContentRootPath,
-  buildSourceSetsRootPath,
-  buildSpaceMembersPath,
-  buildSpaceSettingsPath,
-} from './paths';
+import { buildContentRootPath, buildSpaceMembersPath, buildSpaceSettingsPath } from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -108,7 +103,7 @@ const SpaceHomePage = memo(() => {
     },
     {
       description: t('space.home.cards.sourceSets.description', { ns: 'file' }),
-      href: buildSourceSetsRootPath(spaceId),
+      href: buildContentRootPath(spaceId),
       icon: FolderKanban,
       key: 'source-sets',
       title: t('sourceSet.title', { ns: 'file' }),
