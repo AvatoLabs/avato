@@ -4,6 +4,7 @@ import { memo, useLayoutEffect } from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 
 import ContentManager from '@/features/ContentManager';
+import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
 import { FilesTabs } from '@/types/files';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
@@ -25,10 +26,10 @@ const ContentHomePage = memo(() => {
   useLayoutEffect(() => {
     const isOnHomeRoute = !location.pathname.includes('/source-sets/');
     if (isOnHomeRoute) {
-      setActiveSourceSetId(undefined);
+      setActiveSourceSetId(getSourceSetScopeId(getFileScope(searchParams)) ?? undefined);
       setSpaceId(spaceId);
     }
-  }, [location.pathname, setActiveSourceSetId, setSpaceId, spaceId]);
+  }, [location.pathname, searchParams, setActiveSourceSetId, setSpaceId, spaceId]);
 
   // Sync category from URL using useLayoutEffect
   // IMPORTANT: Only sync if we're actually on the home route (not transitioning to a source set)

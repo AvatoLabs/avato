@@ -2,13 +2,11 @@ import { Icon } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { type CSSProperties } from 'react';
 import React, { memo, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { buildSourceSetFileScope, useFileScope } from '@/features/ContentManager/useFileScope';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { useResourceShareModal } from '@/features/ResourceSharing';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
-import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useSourceSetStore } from '@/store/sourceSet';
 
 import Actions from './Actions';
@@ -27,8 +25,7 @@ interface SourceSetItemProps {
 
 const SourceSetItem = memo<SourceSetItemProps>(
   ({ id, name, description, active, style, className, spaceId }) => {
-    const setSourceSetId = useContentManagerStore((s) => s.setSourceSetId);
-    const navigate = useNavigate();
+    const { setScope } = useFileScope(spaceId);
     const { open: openShareModal } = useResourceShareModal();
 
     const [editing, isLoading] = useSourceSetStore((s) => [
@@ -49,10 +46,9 @@ const SourceSetItem = memo<SourceSetItemProps>(
 
     const handleClick = useCallback(() => {
       if (!editing) {
-        navigate(buildSourceSetPath(spaceId, id));
-        setSourceSetId(id);
+        setScope(buildSourceSetFileScope(id), spaceId);
       }
-    }, [editing, id, navigate, setSourceSetId, spaceId]);
+    }, [editing, id, setScope, spaceId]);
 
     const handleDoubleClick = useCallback(
       (e: React.MouseEvent) => {

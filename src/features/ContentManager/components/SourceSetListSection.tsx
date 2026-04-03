@@ -5,9 +5,9 @@ import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { PlusIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { buildSourceSetFileScope, useFileScope } from '@/features/ContentManager/useFileScope';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useSourceSetStore } from '@/store/sourceSet';
@@ -73,8 +73,8 @@ const styles = createStaticStyles(({ css }) => ({
  */
 const SourceSetListSection = memo(() => {
   const { t } = useTranslation(['file', 'components']);
-  const navigate = useNavigate();
   const spaceId = useContentManagerStore((s) => s.spaceId);
+  const { setScope } = useFileScope(spaceId);
 
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets, isLoading } = useFetchSourceSetList(spaceId);
@@ -117,7 +117,9 @@ const SourceSetListSection = memo(() => {
             key={sourceSet.id}
             title={sourceSet.name}
             type="button"
-            onClick={() => navigate(buildSourceSetPath(sourceSet.spaceId ?? spaceId, sourceSet.id))}
+            onClick={() =>
+              setScope(buildSourceSetFileScope(sourceSet.id), sourceSet.spaceId ?? spaceId)
+            }
           >
             <Icon aria-hidden icon={RESOURCE_ENTRY_ICONS.sourceSet} size={20} />
             <Text ellipsis fontSize={14} style={{ maxWidth: 100 }}>

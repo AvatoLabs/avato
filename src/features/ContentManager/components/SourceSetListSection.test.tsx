@@ -7,9 +7,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import SourceSetListSection from './SourceSetListSection';
 
-const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSourceSet = vi.hoisted(() => vi.fn());
 const mockUseFetchSourceSetList = vi.hoisted(() => vi.fn());
+const mockSetScope = vi.hoisted(() => vi.fn());
 
 vi.mock('@lobehub/ui', () => ({
   Flexbox: ({ children, className, style }: any) => (
@@ -53,15 +53,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
-
 vi.mock('@/config/contentIcons', () => ({
   RESOURCE_ENTRY_ICONS: {
     sourceSet: () => <span>sourceSet</span>,
@@ -74,9 +65,11 @@ vi.mock('@/features/SourceSetModal', () => ({
   }),
 }));
 
-vi.mock('@/features/ResourceSpaces', () => ({
-  buildSourceSetPath: (spaceId: string | undefined, id: string) =>
-    `/content/spaces/${spaceId}/source-sets/${id}`,
+vi.mock('@/features/ContentManager/useFileScope', () => ({
+  buildSourceSetFileScope: (id: string) => `source-set:${id}`,
+  useFileScope: () => ({
+    setScope: mockSetScope,
+  }),
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({
@@ -125,10 +118,7 @@ describe('SourceSetListSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /Docs/i }));
     fireEvent.click(screen.getByRole('button', { name: 'New Source Set' }));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/content/spaces/space-1/source-sets/ss-1');
-    expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({
-      onSuccess: expect.any(Function),
-      spaceId: 'space-1',
-    });
+    expect(mockSetScope).toHaveBeenCalledWith('source-set:ss-1', 'space-1');
+    expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });
 });

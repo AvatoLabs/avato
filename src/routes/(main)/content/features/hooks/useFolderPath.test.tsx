@@ -23,6 +23,8 @@ const renderRoute = (initialEntry: string) =>
         <Route element={<HookProbe />} path="/content/spaces/:spaceId/source-sets/:id/:slug" />
         <Route element={<HookProbe />} path="/content/spaces/:spaceId" />
         <Route element={<HookProbe />} path="/content/spaces/:spaceId/:slug" />
+        <Route element={<HookProbe />} path="/spaces/:spaceId/files" />
+        <Route element={<HookProbe />} path="/spaces/:spaceId/files/:slug" />
       </Routes>
     </MemoryRouter>,
   );
@@ -60,6 +62,18 @@ describe('useFolderPath', () => {
         currentFolderSlug: 'folder-a',
         isInKnowledgeBase: false,
         sourceSetId: null,
+      }),
+    );
+  });
+
+  it('recognizes source-set scope on the files route', () => {
+    renderRoute('/spaces/spc_1/files/folder-a?scope=source-set:ss_1');
+
+    expect(screen.getByTestId('folder-path')).toHaveTextContent(
+      JSON.stringify({
+        currentFolderSlug: 'folder-a',
+        isInKnowledgeBase: true,
+        sourceSetId: 'ss_1',
       }),
     );
   });

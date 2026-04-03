@@ -13,10 +13,11 @@ import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 
 const FileScopeSection = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation(['common', 'file']);
-  const { id: activeSourceSetId } = useParams<{ id?: string }>();
+  const { id: routeSourceSetId } = useParams<{ id?: string }>();
   const spaceId = useContentManagerStore((s) => s.spaceId);
-  const { scope, setScope } = useFileScope(spaceId);
+  const { scope, setScope, sourceSetId: scopedSourceSetId } = useFileScope(spaceId);
   const { space } = useSpaceItem(spaceId);
+  const activeSourceSetId = routeSourceSetId ?? scopedSourceSetId;
   const showUnassigned = scope === 'unassigned' || space?.kind === 'personal';
 
   return (

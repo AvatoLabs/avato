@@ -3,7 +3,7 @@
 import { Center, Checkbox, Flexbox } from '@lobehub/ui';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import debug from 'debug';
-import { FileIcon, FilePlus } from 'lucide-react';
+import { FileIcon } from 'lucide-react';
 import { type DragEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -463,11 +463,6 @@ const ListView = memo<ListViewProps>(function ListView({ data, hasResolvedData, 
                     };
                     input.click();
                   },
-                },
-                {
-                  icon: FilePlus,
-                  label: t('emptyState.files.createPageAction', { ns: 'file' }),
-                  type: 'dashed',
                 },
               ]}
             />

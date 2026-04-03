@@ -3,7 +3,7 @@
 import { Center } from '@lobehub/ui';
 import { VirtuosoMasonry } from '@virtuoso.dev/masonry';
 import { cssVar } from 'antd-style';
-import { FileIcon, FilePlus } from 'lucide-react';
+import { FileIcon } from 'lucide-react';
 import { type UIEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -137,11 +137,6 @@ const MasonryView = memo<MasonryViewProps>(function MasonryView({
             };
             input.click();
           },
-        },
-        {
-          icon: FilePlus,
-          label: t('emptyState.files.createPageAction'),
-          type: 'dashed',
         },
       ]}
     />

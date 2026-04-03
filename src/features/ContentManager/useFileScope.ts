@@ -5,12 +5,24 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { buildContentRootPath } from '@/features/ResourceSpaces';
 
-export type FileScope = 'all' | 'unassigned';
+export type FileScope = 'all' | 'unassigned' | `source-set:${string}`;
 
 const FILE_SCOPE_QUERY_KEY = 'scope';
 
-export const getFileScope = (searchParams: URLSearchParams): FileScope =>
-  searchParams.get(FILE_SCOPE_QUERY_KEY) === 'unassigned' ? 'unassigned' : 'all';
+export const buildSourceSetFileScope = (sourceSetId: string): FileScope =>
+  `source-set:${sourceSetId}`;
+
+export const getSourceSetScopeId = (scope: FileScope | string | null | undefined) =>
+  scope?.startsWith('source-set:') ? scope.slice('source-set:'.length) : null;
+
+export const getFileScope = (searchParams: URLSearchParams): FileScope => {
+  const scope = searchParams.get(FILE_SCOPE_QUERY_KEY);
+
+  if (scope === 'unassigned') return 'unassigned';
+  if (scope?.startsWith('source-set:')) return scope as FileScope;
+
+  return 'all';
+};
 
 export const buildFileScopeSearch = (
   scope: FileScope,
@@ -36,6 +48,7 @@ export const useFileScope = (spaceId?: string | null) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scope = getFileScope(searchParams);
+  const sourceSetId = getSourceSetScopeId(scope);
 
   const setScope = useCallback(
     (nextScope: FileScope, nextSpaceId?: string | null) => {
@@ -48,5 +61,5 @@ export const useFileScope = (spaceId?: string | null) => {
     [navigate, searchParams, spaceId],
   );
 
-  return { scope, setScope };
+  return { scope, setScope, sourceSetId };
 };

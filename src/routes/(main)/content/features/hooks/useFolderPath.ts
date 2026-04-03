@@ -1,4 +1,6 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+
+import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
 
 /**
  * Hook to extract folder slug from URL
@@ -11,10 +13,11 @@ import { useParams } from 'react-router-dom';
  * - /content -> { sourceSetId: null, currentFolderSlug: null, isInKnowledgeBase: false }
  */
 export const useFolderPath = () => {
+  const [searchParams] = useSearchParams();
   const params = useParams<{ id?: string; slug?: string }>();
 
   // Extract knowledge base ID from params
-  const sourceSetId = params.id || null;
+  const sourceSetId = params.id || getSourceSetScopeId(getFileScope(searchParams)) || null;
 
   // Determine if we're in a knowledge base context
   const isInKnowledgeBase = !!sourceSetId;

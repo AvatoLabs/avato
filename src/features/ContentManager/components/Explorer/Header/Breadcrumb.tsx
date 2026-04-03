@@ -6,8 +6,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   buildContentFolderPath,
   buildContentRootPath,
-  buildSourceSetFolderPath,
-  buildSourceSetPath,
   buildSpaceRootPath,
   SurfaceBreadcrumb,
 } from '@/features/ResourceSpaces';
@@ -83,13 +81,7 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
     clearViewAndSelection();
 
     const queryString = buildPreservedQueryString();
-    const basePath = rootSourceSetId
-      ? slug
-        ? buildSourceSetFolderPath(spaceId, rootSourceSetId, slug)
-        : buildSourceSetPath(spaceId, rootSourceSetId)
-      : slug
-        ? buildContentFolderPath(spaceId, slug)
-        : buildContentRootPath(spaceId);
+    const basePath = slug ? buildContentFolderPath(spaceId, slug) : buildContentRootPath(spaceId);
 
     navigate(queryString ? `${basePath}?${queryString}` : basePath);
   };

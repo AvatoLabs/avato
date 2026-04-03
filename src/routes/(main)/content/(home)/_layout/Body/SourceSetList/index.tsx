@@ -8,6 +8,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
+import { useFileScope } from '@/features/ContentManager/useFileScope';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
@@ -20,10 +21,12 @@ import Item from './Item';
  */
 const SourceSetList = memo(() => {
   const { t } = useTranslation(['file', 'sourceSet']);
-  const { id: activeSourceSetId } = useParams<{ id?: string }>();
+  const { id: routeSourceSetId } = useParams<{ id?: string }>();
   const spaceId = useContentManagerStore((s) => s.spaceId);
+  const { sourceSetId: scopedSourceSetId } = useFileScope(spaceId);
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data, isLoading } = useFetchSourceSetList(spaceId);
+  const activeSourceSetId = routeSourceSetId ?? scopedSourceSetId;
 
   const { open } = useCreateSourceSetModal();
 

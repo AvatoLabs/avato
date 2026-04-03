@@ -1,61 +1,63 @@
 'use client';
 
-import { memo, useLayoutEffect } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { memo, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import NotFound from '@/components/404';
 import NProgress from '@/components/NProgress';
-import ContentManager from '@/features/ContentManager';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
-import { FilesTabs } from '@/types/files';
+import {
+  buildFileScopeSearch,
+  buildSourceSetFileScope,
+} from '@/features/ContentManager/useFileScope';
+import {
+  buildContentFolderPath,
+  buildContentItemPath,
+  buildContentRootPath,
+} from '@/features/ResourceSpaces';
 
-import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
 import { useSourceSetItem } from '../features/hooks/useSourceSetItem';
-import { useContentManagerStore } from '../features/store';
 
 const SourceSetPage = memo(() => {
-  const { id: sourceSetId, spaceId } = useParams<{ id: string; spaceId?: string }>();
-  const location = useLocation();
+  const {
+    id: sourceSetId,
+    fileId,
+    slug,
+    spaceId,
+  } = useParams<{
+    fileId?: string;
+    id: string;
+    slug?: string;
+    spaceId?: string;
+  }>();
   const navigate = useNavigate();
-  const [setCategory, setSourceSetId, setSpaceId] = useContentManagerStore((s) => [
-    s.setCategory,
-    s.setSourceSetId,
-    s.setSpaceId,
-  ]);
+  const [searchParams] = useSearchParams();
 
   const { data, isLoading } = useSourceSetItem(sourceSetId || '');
 
-  useLayoutEffect(() => {
-    const isOnSourceSetRoute = location.pathname.includes('/source-sets/');
-    if (!isOnSourceSetRoute) return;
+  useEffect(() => {
+    if (!sourceSetId || !data?.spaceId) return;
 
-    setCategory(FilesTabs.Home);
-    setSourceSetId(sourceSetId);
-    setSpaceId(spaceId || data?.spaceId || undefined);
-  }, [
-    data?.spaceId,
-    location.pathname,
-    setCategory,
-    setSourceSetId,
-    setSpaceId,
-    sourceSetId,
-    spaceId,
-  ]);
+    const resolvedSpaceId = spaceId || data.spaceId;
+    const basePath = fileId
+      ? buildContentItemPath(
+          slug
+            ? buildContentFolderPath(resolvedSpaceId, slug)
+            : buildContentRootPath(resolvedSpaceId),
+          fileId,
+        )
+      : slug
+        ? buildContentFolderPath(resolvedSpaceId, slug)
+        : buildContentRootPath(resolvedSpaceId);
 
-  useLayoutEffect(() => {
-    if (!sourceSetId || spaceId || !data?.spaceId) return;
-
-    navigate(buildSourceSetPath(data.spaceId, sourceSetId), { replace: true });
-  }, [data?.spaceId, navigate, sourceSetId, spaceId]);
-
-  useInitFileCheck();
+    const nextSearch = buildFileScopeSearch(buildSourceSetFileScope(sourceSetId), searchParams);
+    navigate(`${basePath}${nextSearch}`, { replace: true });
+  }, [data?.spaceId, fileId, navigate, searchParams, slug, sourceSetId, spaceId]);
 
   if (!isLoading && !data) return <NotFound />;
 
   return (
     <>
       <NProgress />
-      <ContentManager />
     </>
   );
 });
