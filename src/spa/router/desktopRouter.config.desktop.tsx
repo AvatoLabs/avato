@@ -33,28 +33,15 @@ import CommunityListModelPage from '@/routes/(main)/community/(list)/model';
 import CommunityListModelLayout from '@/routes/(main)/community/(list)/model/_layout';
 import CommunityListPluginRedirectPage from '@/routes/(main)/community/(list)/plugin';
 import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider';
-import ResourceRootRedirectPage from '@/routes/(main)/content';
 import ResourceLayout from '@/routes/(main)/content/_layout';
 import ResourceHomePage from '@/routes/(main)/content/(home)';
 import ResourceHomeLayout from '@/routes/(main)/content/(home)/_layout';
 import ResourceSharedPage from '@/routes/(main)/content/shared';
-import ContentSourceSetPage from '@/routes/(main)/content/source-sets';
-import ContentSourceSetLayout from '@/routes/(main)/content/source-sets/_layout';
-import ContentSourceSetSlugPage from '@/routes/(main)/content/source-sets/[slug]';
-import ContentSourceSetTrashPage from '@/routes/(main)/content/source-sets/trash';
 import ResourceSpaceMembersPage from '@/routes/(main)/content/spaces/[spaceId]/members';
 import ResourceSpaceSettingsPage from '@/routes/(main)/content/spaces/[spaceId]/settings';
 import ResourceSpaceTrashPage from '@/routes/(main)/content/spaces/[spaceId]/trash';
 import ResourceTrashPage from '@/routes/(main)/content/trash';
-import PageIndexPage from '@/routes/(main)/docs';
 import DesktopPageLayout from '@/routes/(main)/docs/_layout';
-import PageDetailPage from '@/routes/(main)/docs/[id]';
-import PageSpacePage from '@/routes/(main)/docs/spaces/[spaceId]';
-import PageSpaceDetailPage from '@/routes/(main)/docs/spaces/[spaceId]/[id]';
-import PageTableSpacePage from '@/routes/(main)/docs/spaces/[spaceId]/table';
-import PageTableSpaceDetailPage from '@/routes/(main)/docs/spaces/[spaceId]/table/[id]';
-import PageTablePage from '@/routes/(main)/docs/table';
-import PageTableDetailPage from '@/routes/(main)/docs/table/[id]';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
 import GroupProfilePage from '@/routes/(main)/group/profile';
@@ -70,11 +57,13 @@ import MemoryPreferencesPage from '@/routes/(main)/memory/preferences';
 import SettingsTabPage from '@/routes/(main)/settings';
 import SettingsLayout from '@/routes/(main)/settings/_layout';
 import { ProviderDetailPage, ProviderLayout } from '@/routes/(main)/settings/provider';
+import SpacesRedirectPage from '@/routes/(main)/spaces';
 import SpaceIndexPage from '@/routes/(main)/spaces/[spaceId]';
 import SpaceDocsPage from '@/routes/(main)/spaces/[spaceId]/docs';
 import SpaceDocDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/[id]';
 import SpaceTablePage from '@/routes/(main)/spaces/[spaceId]/docs/table';
 import SpaceTableDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/table/[id]';
+import SpaceMemoryPage from '@/routes/(main)/spaces/[spaceId]/memory';
 import StudioPage from '@/routes/(main)/studio';
 import VideoPage from '@/routes/(main)/video';
 import DesktopVideoLayout from '@/routes/(main)/video/_layout';
@@ -238,6 +227,15 @@ export const desktopRoutes: RouteObject[] = [
       {
         children: [
           {
+            element: <SpacesRedirectPage />,
+            index: true,
+          },
+        ],
+        path: 'spaces',
+      },
+      {
+        children: [
+          {
             element: <SpaceIndexPage />,
             index: true,
           },
@@ -266,7 +264,7 @@ export const desktopRoutes: RouteObject[] = [
               },
             ],
             element: <DesktopPageLayout />,
-            errorElement: <ErrorBoundary resetPath="/docs" />,
+            errorElement: <ErrorBoundary resetPath="/spaces" />,
             path: 'docs',
           },
           {
@@ -298,38 +296,16 @@ export const desktopRoutes: RouteObject[] = [
                 path: 'files',
               },
               {
+                element: <SpaceMemoryPage />,
+                path: 'memory',
+              },
+              {
                 element: <ResourceSpaceSettingsPage />,
                 path: 'settings',
               },
               {
                 element: <ResourceSpaceMembersPage />,
                 path: 'members',
-              },
-              {
-                children: [
-                  {
-                    element: <ContentSourceSetPage />,
-                    index: true,
-                  },
-                  {
-                    element: <ContentSourceSetTrashPage />,
-                    path: 'trash',
-                  },
-                  {
-                    element: <ContentSourceSetSlugPage />,
-                    path: ':slug',
-                  },
-                  {
-                    element: <ContentSourceSetPage />,
-                    path: 'item/:fileId',
-                  },
-                  {
-                    element: <ContentSourceSetSlugPage />,
-                    path: ':slug/item/:fileId',
-                  },
-                ],
-                element: <ContentSourceSetLayout />,
-                path: 'source-sets/:id',
               },
             ],
             element: <ResourceLayout />,
@@ -338,118 +314,15 @@ export const desktopRoutes: RouteObject[] = [
         path: 'spaces/:spaceId',
       },
 
-      // Legacy resource routes
       {
-        children: [
-          {
-            element: <ResourceRootRedirectPage />,
-            index: true,
-          },
-          {
-            children: [
-              {
-                element: <ResourceSharedPage />,
-                path: 'shared',
-              },
-              {
-                element: <ResourceTrashPage />,
-                path: 'trash',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: 'spaces/:spaceId',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: 'spaces/:spaceId/item/:fileId',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: 'spaces/:spaceId/:slug',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: 'spaces/:spaceId/:slug/item/:fileId',
-              },
-              {
-                element: <ResourceSpaceTrashPage />,
-                path: 'spaces/:spaceId/trash',
-              },
-              {
-                element: <ResourceSpaceSettingsPage />,
-                path: 'spaces/:spaceId/settings',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: ':slug',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: 'item/:fileId',
-              },
-              {
-                element: <ResourceHomePage />,
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: <ResourceHomeLayout />,
-          },
-          {
-            children: [
-              {
-                element: <ContentSourceSetPage />,
-                index: true,
-              },
-              {
-                element: <ContentSourceSetTrashPage />,
-                path: 'trash',
-              },
-              {
-                element: <ContentSourceSetSlugPage />,
-                path: ':slug',
-              },
-              {
-                element: <ContentSourceSetPage />,
-                path: 'item/:fileId',
-              },
-              {
-                element: <ContentSourceSetSlugPage />,
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: <ContentSourceSetLayout />,
-            path: 'source-sets/:id',
-          },
-          {
-            children: [
-              {
-                element: <ContentSourceSetPage />,
-                index: true,
-              },
-              {
-                element: <ContentSourceSetTrashPage />,
-                path: 'trash',
-              },
-              {
-                element: <ContentSourceSetSlugPage />,
-                path: ':slug',
-              },
-              {
-                element: <ContentSourceSetPage />,
-                path: 'item/:fileId',
-              },
-              {
-                element: <ContentSourceSetSlugPage />,
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: <ContentSourceSetLayout />,
-            path: 'spaces/:spaceId/source-sets/:id',
-          },
-        ],
-        element: <ResourceLayout />,
-        errorElement: <ErrorBoundary resetPath="/content" />,
-        path: 'content',
+        element: <ResourceSharedPage />,
+        errorElement: <ErrorBoundary resetPath="/content/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: <ResourceTrashPage />,
+        errorElement: <ErrorBoundary resetPath="/content/trash" />,
+        path: 'content/trash',
       },
 
       // Settings routes
@@ -552,61 +425,6 @@ export const desktopRoutes: RouteObject[] = [
       },
 
       ...BusinessDesktopRoutesWithMainLayout,
-
-      // Legacy page routes
-      {
-        children: [
-          {
-            element: <PageIndexPage />,
-            index: true,
-          },
-          {
-            children: [
-              {
-                element: <PageTablePage />,
-                index: true,
-              },
-              {
-                element: <PageTableDetailPage />,
-                path: ':id',
-              },
-            ],
-            path: 'table',
-          },
-          {
-            element: <PageDetailPage />,
-            path: ':id',
-          },
-          {
-            children: [
-              {
-                element: <PageSpacePage />,
-                index: true,
-              },
-              {
-                children: [
-                  {
-                    element: <PageTableSpacePage />,
-                    index: true,
-                  },
-                  {
-                    element: <PageTableSpaceDetailPage />,
-                    path: ':id',
-                  },
-                ],
-                path: 'table',
-              },
-              {
-                element: <PageSpaceDetailPage />,
-                path: ':id',
-              },
-            ],
-            path: 'spaces/:spaceId',
-          },
-        ],
-        errorElement: <ErrorBoundary resetPath="/docs" />,
-        path: 'docs',
-      },
 
       // Default route - home page (handled by persistent layout)
       {

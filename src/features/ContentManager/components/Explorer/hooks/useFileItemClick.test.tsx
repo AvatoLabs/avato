@@ -23,16 +23,15 @@ let mockContentManagerState: MockContentManagerState = {
 
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({
-    pathname: '/content/source-sets/ss_1',
-    search: '?view=list',
+    pathname: '/spaces/spc_1/files',
+    search: '?scope=source-set:ss_1&view=list',
   }),
   useNavigate: () => mockNavigate,
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentItemPath: vi.fn((basePath: string, fileId: string) => `${basePath}/item/${fileId}`),
-  buildContentFolderPath: vi.fn(() => '/content/folder'),
-  buildSourceSetFolderPath: vi.fn(() => '/content/source-set/folder'),
+  buildFilesItemPath: vi.fn((basePath: string, fileId: string) => `${basePath}/item/${fileId}`),
+  buildFilesFolderPath: vi.fn(() => '/spaces/spc_1/files/folder'),
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({
@@ -78,9 +77,12 @@ describe('useFileItemClick', () => {
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_1');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
     expect(onOpen).toHaveBeenCalledWith('file_1');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/source-sets/ss_1/item/file_1?view=list', {
-      replace: true,
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/spc_1/files/item/file_1?scope=source-set%3Ass_1&view=list',
+      {
+        replace: true,
+      },
+    );
   });
 
   it('keeps document ids for page editor routes', async () => {
@@ -99,9 +101,12 @@ describe('useFileItemClick', () => {
 
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_1');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/source-sets/ss_1/item/docs_1?view=list', {
-      replace: true,
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/spc_1/files/item/docs_1?scope=source-set%3Ass_1&view=list',
+      {
+        replace: true,
+      },
+    );
   });
 
   it('prefers preview mode for file-backed entries even when the caller marks them as pages', async () => {
@@ -121,9 +126,12 @@ describe('useFileItemClick', () => {
 
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_1');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/source-sets/ss_1/item/file_1?view=list', {
-      replace: true,
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/spc_1/files/item/file_1?scope=source-set%3Ass_1&view=list',
+      {
+        replace: true,
+      },
+    );
   });
 
   it('resolves file-backed documents lazily when fileId is missing', async () => {
@@ -149,8 +157,11 @@ describe('useFileItemClick', () => {
     expect(mockGetDocumentById).toHaveBeenCalledWith('docs_9');
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('file_9');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('editor');
-    expect(mockNavigate).toHaveBeenCalledWith('/content/source-sets/ss_1/item/file_9?view=list', {
-      replace: true,
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/spc_1/files/item/file_9?scope=source-set%3Ass_1&view=list',
+      {
+        replace: true,
+      },
+    );
   });
 });

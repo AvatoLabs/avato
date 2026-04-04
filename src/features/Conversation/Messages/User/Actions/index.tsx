@@ -102,10 +102,12 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
       defaultActions.tts,
       defaultActions.translate,
       defaultActions.divider,
+      defaultActions.addToSpaceMemory,
+      defaultActions.divider,
       defaultActions.regenerate,
       defaultActions.del,
     ];
-    return [...base, ...extraMenuItems];
+    return [...base, ...extraMenuItems].filter(Boolean) as MessageActionItemOrDivider[];
   }, [
     actionsConfig?.menu,
     defaultActions.edit,
@@ -113,6 +115,7 @@ export const UserActionsBar = memo<UserActionsProps>(({ actionsConfig, id, data 
     defaultActions.divider,
     defaultActions.tts,
     defaultActions.translate,
+    defaultActions.addToSpaceMemory,
     defaultActions.regenerate,
     defaultActions.del,
     extraMenuItems,

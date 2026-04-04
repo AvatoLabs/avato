@@ -22,8 +22,6 @@ export const config = {
     '/content',
     '/content(.*)',
     '/profile(.*)',
-    '/docs',
-    '/docs(.*)',
     '/spaces',
     '/spaces(.*)',
     '/me',

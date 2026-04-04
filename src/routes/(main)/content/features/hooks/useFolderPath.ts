@@ -7,10 +7,10 @@ import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/use
  * Supports Google Drive-style slug-based folder navigation
  *
  * Example URLs:
- * - /content/source-sets/kb_123 -> { sourceSetId: 'kb_123', currentFolderSlug: null, isInKnowledgeBase: true }
- * - /content/source-sets/kb_123/folder-slug-1 -> { sourceSetId: 'kb_123', currentFolderSlug: 'folder-slug-1', isInKnowledgeBase: true }
- * - /content/spaces/spc_123/folder-slug-1 -> { sourceSetId: null, currentFolderSlug: 'folder-slug-1', isInKnowledgeBase: false }
- * - /content -> { sourceSetId: null, currentFolderSlug: null, isInKnowledgeBase: false }
+ * - /spaces/spc_123/files?scope=source-set:kb_123 -> { sourceSetId: 'kb_123', currentFolderSlug: null, isInKnowledgeBase: true }
+ * - /spaces/spc_123/files/folder-slug-1?scope=source-set:kb_123 -> { sourceSetId: 'kb_123', currentFolderSlug: 'folder-slug-1', isInKnowledgeBase: true }
+ * - /spaces/spc_123/files/folder-slug-1 -> { sourceSetId: null, currentFolderSlug: 'folder-slug-1', isInKnowledgeBase: false }
+ * - /spaces/spc_123/files -> { sourceSetId: null, currentFolderSlug: null, isInKnowledgeBase: false }
  */
 export const useFolderPath = () => {
   const [searchParams] = useSearchParams();

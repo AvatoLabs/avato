@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 
 export type FileScope = 'all' | 'unassigned' | `source-set:${string}`;
 
@@ -53,7 +53,7 @@ export const useFileScope = (spaceId?: string | null) => {
   const setScope = useCallback(
     (nextScope: FileScope, nextSpaceId?: string | null) => {
       const targetSpaceId = nextSpaceId ?? spaceId;
-      const basePath = buildContentRootPath(targetSpaceId);
+      const basePath = buildFilesRootPath(targetSpaceId);
       const nextSearch = buildFileScopeSearch(nextScope, searchParams);
 
       navigate(`${basePath}${nextSearch}`, { replace: true });

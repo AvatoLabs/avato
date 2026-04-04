@@ -92,12 +92,10 @@ vi.mock('@/features/ResourceSpaces/useSpaceName', () => ({
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentRootPath: (spaceId?: string | null) =>
-    spaceId ? `/content/spaces/${spaceId}` : '/content',
+  buildFilesRootPath: (spaceId?: string | null) =>
+    spaceId ? `/spaces/${spaceId}/files` : '/spaces',
   buildSourceSetPath: (spaceId: string | null | undefined, sourceSetId: string) =>
-    spaceId
-      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
-      : `/content/source-sets/${sourceSetId}`,
+    spaceId ? `/spaces/${spaceId}/files?scope=source-set:${sourceSetId}` : '/spaces',
   useSpaceName: vi.fn(() => 'Product Space'),
 }));
 
@@ -221,8 +219,12 @@ describe('TitleSection', () => {
     expect(screen.getByText(`Updated ${formattedUpdatedAt}`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Product Space/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Research Set/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Move to another Source Set' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Remove from Source Set' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Move to another Source Set' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove from Source Set' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('autosave-doc-1')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Overview/ })).toHaveLength(2);
     expect(screen.queryByText('01')).not.toBeInTheDocument();
@@ -268,6 +270,6 @@ describe('TitleSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Product Space/ }));
 
-    expect(navigateMock).toHaveBeenCalledWith('/content/spaces/space-1');
+    expect(navigateMock).toHaveBeenCalledWith('/spaces/space-1/docs');
   });
 });

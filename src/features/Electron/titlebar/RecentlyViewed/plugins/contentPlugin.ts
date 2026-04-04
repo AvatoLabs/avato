@@ -2,7 +2,7 @@ import { Database } from 'lucide-react';
 
 import { getRouteById } from '@/config/routes';
 import {
-  buildContentRootPath,
+  buildFilesRootPath,
   buildSpaceMembersPath,
   buildSpaceSettingsPath,
 } from '@/features/ResourceSpaces';
@@ -14,7 +14,7 @@ import { createPageReference } from './types';
 const resourceIcon = getRouteById('resource')?.icon || Database;
 
 const RESOURCE_PATH_REGEX =
-  /^\/(?:content(\/([^/?]+))?|spaces\/([^/]+)\/(files|settings|members)(?:\/([^/?]+))?)$/;
+  /^\/(?:content\/(shared|trash)|spaces\/([^/]+)\/(files|settings|members)(?:\/([^/?]+))?)$/;
 
 // Section to title key mapping
 const sectionTitleKeys: Record<string, string> = {
@@ -38,13 +38,11 @@ export const resourcePlugin: RecentlyViewedPlugin<'resource'> = {
   generateUrl(reference: PageReference<'resource'>): string {
     const { section, spaceId } = reference.params;
 
-    if (!spaceId) {
-      return section ? `/content/${section}` : '/content';
-    }
+    if (!spaceId) return `/content/${section}`;
 
     if (section === 'settings') return buildSpaceSettingsPath(spaceId);
     if (section === 'members') return buildSpaceMembersPath(spaceId);
-    return buildContentRootPath(spaceId);
+    return buildFilesRootPath(spaceId);
   },
 
   getDefaultIcon() {
@@ -59,11 +57,11 @@ export const resourcePlugin: RecentlyViewedPlugin<'resource'> = {
     const match = pathname.match(RESOURCE_PATH_REGEX);
     if (!match) return null;
 
-    const legacySection = match[2];
-    const spaceId = match[3];
-    const canonicalSection = match[4];
-    const section = legacySection || canonicalSection;
-    const params: ResourceParams = section ? { section, spaceId } : spaceId ? { spaceId } : {};
+    const legacyGlobalSection = match[1];
+    const spaceId = match[2];
+    const canonicalSection = match[3];
+    const section = legacyGlobalSection || canonicalSection;
+    const params: ResourceParams = section ? { section, spaceId } : { spaceId };
     const id = this.generateId({ params } as PageReference<'resource'>);
 
     return createPageReference('resource', params, id);

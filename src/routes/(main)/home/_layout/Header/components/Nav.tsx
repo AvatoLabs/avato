@@ -10,7 +10,7 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
-import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
@@ -82,7 +82,7 @@ const Nav = memo(() => {
         icon: APP_ENTRY_ICONS.resource,
         key: 'content',
         title: t('tab.resource'),
-        url: buildContentRootPath(resolvedSpaceId),
+        url: buildFilesRootPath(resolvedSpaceId),
       },
       {
         icon: APP_ENTRY_ICONS.memory,

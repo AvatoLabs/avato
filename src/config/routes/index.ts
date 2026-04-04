@@ -75,8 +75,8 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     id: 'resource',
     keywords: ['knowledge', 'files', 'library', 'documents'],
     keywordsKey: 'cmdk.keywords.resources',
-    path: '/content',
-    pathPrefix: '/content',
+    path: '/spaces',
+    pathPrefix: '/spaces',
   },
   {
     cmdkKey: 'cmdk.pages',
@@ -85,8 +85,8 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     id: 'page',
     keywords: ['documents', 'write', 'notes'],
     keywordsKey: 'cmdk.keywords.pages',
-    path: '/docs',
-    pathPrefix: '/docs',
+    path: '/spaces',
+    pathPrefix: '/spaces',
     useDynamicTitle: true,
   },
   {

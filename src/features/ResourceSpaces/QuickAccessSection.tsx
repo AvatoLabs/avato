@@ -9,7 +9,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { TrashNavItem } from '@/features/ResourceTrash';
 
-import { buildSharedContentPath } from './paths';
+import { buildSharedFilesPath } from './paths';
 
 const QuickAccessSection = memo<{ itemKey: string }>(({ itemKey }) => {
   const { t } = useTranslation('file');
@@ -30,10 +30,10 @@ const QuickAccessSection = memo<{ itemKey: string }>(({ itemKey }) => {
     >
       <Flexbox gap={1} paddingInline={4}>
         <NavItem
-          active={location.pathname === buildSharedContentPath()}
+          active={location.pathname === buildSharedFilesPath()}
           icon={Share2Icon}
           title={t('shared.title')}
-          onClick={() => navigate(buildSharedContentPath())}
+          onClick={() => navigate(buildSharedFilesPath())}
         />
         <TrashNavItem spaceId={currentSpaceId} />
       </Flexbox>

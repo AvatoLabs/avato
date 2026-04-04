@@ -55,7 +55,7 @@ export default {
   'clientDB.initing.migrating': 'Performing database migration...',
   'clientDB.initing.ready': 'Database is ready',
   'clientDB.modal.desc':
-    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like Content and Reference Sets.',
+    'Enable the next-generation client database. Persist chat data in your browser and unlock advanced features like Files and Reference Sets.',
   'clientDB.modal.enable': 'Enable Now',
   'clientDB.modal.features.sourceSet.desc':
     'Build reusable reference sets and let Agents read them with clear scope.',
@@ -131,7 +131,7 @@ export default {
   'cmdk.context.memory': 'Memory',
   'cmdk.context.page': 'Docs',
   'cmdk.context.painting': 'Painting',
-  'cmdk.context.resource': 'Content',
+  'cmdk.context.resource': 'Files',
   'cmdk.context.settings': 'Settings',
   'cmdk.discover': 'Discover',
   'cmdk.keyboard.ESC': 'ESC',
@@ -176,7 +176,7 @@ export default {
 
   'cmdk.keywords.referral': 'referral rewards invite bonus',
 
-  'cmdk.keywords.resources': 'content files reference sets documents',
+  'cmdk.keywords.resources': 'files folders source sets drive library',
 
   'cmdk.keywords.settings': 'settings preferences configuration options',
 
@@ -216,7 +216,7 @@ export default {
 
   'cmdk.painting': 'Artwork',
 
-  'cmdk.content': 'Content',
+  'cmdk.content': 'Files',
 
   'cmdk.search.agent': 'Agent',
 
@@ -488,7 +488,7 @@ export default {
   'tab.memory': 'Memory',
   'tab.pages': 'Documents',
   'tab.table': 'Tables',
-  'tab.resource': 'Content',
+  'tab.resource': 'Files',
   'tab.search': 'Search',
   'tab.setting': 'Settings',
   'tab.video': 'Video',

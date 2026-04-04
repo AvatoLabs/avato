@@ -1,25 +1,22 @@
 'use client';
 
 import { Button, Flexbox, Icon, Modal, Text } from '@lobehub/ui';
-import { createModal } from '@lobehub/ui/base-ui';
 import { ChatHeader } from '@lobehub/ui/mobile';
 import { ChevronDownIcon, PlusIcon, Share2Icon } from 'lucide-react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useSWRConfig } from 'swr';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import {
-  buildContentRootPath,
-  buildContentTrashPath,
-  buildSharedContentPath,
+  buildFilesRootPath,
+  buildFilesTrashPath,
+  buildSharedFilesPath,
   SpaceList,
   useSpaceName,
 } from '@/features/ResourceSpaces';
-import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
-import { CreateSpaceForm } from '@/features/ResourceSpaces/SpaceSection';
+import { useOpenCreateSpaceModal } from '@/features/ResourceSpaces/useOpenCreateSpaceModal';
 import { SourceSetTrashButton } from '@/routes/(main)/content/features/SourceSetTrashButton';
 import { mobileHeaderSticky } from '@/styles/mobileHeader';
 
@@ -31,28 +28,15 @@ const ResourceMobileHeader = memo(() => {
   const location = useLocation();
   const { spaceId: currentSpaceId } = useParams<{ spaceId?: string }>();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const { mutate } = useSWRConfig();
   const currentSpaceName = useSpaceName(currentSpaceId);
 
-  const isOnShared = location.pathname === buildSharedContentPath();
-  const isOnTrash = location.pathname === buildContentTrashPath(currentSpaceId);
+  const isOnShared = location.pathname === buildSharedFilesPath();
+  const isOnTrash = location.pathname === buildFilesTrashPath(currentSpaceId);
 
-  const handleCreateSpace = useCallback(() => {
-    createModal({
-      children: (
-        <CreateSpaceForm
-          onCreated={(spaceId) => {
-            void mutate(SPACE_LIST_KEY);
-            navigate(buildContentRootPath(spaceId));
-            setWorkspaceOpen(false);
-          }}
-        />
-      ),
-      footer: null,
-      title: t('space.create.title', { ns: 'file' }),
-      width: 420,
-    });
-  }, [mutate, navigate, t]);
+  const handleCreateSpace = useOpenCreateSpaceModal((spaceId) => {
+    navigate(buildFilesRootPath(spaceId));
+    setWorkspaceOpen(false);
+  });
 
   const leftContent = (
     <Flexbox
@@ -95,7 +79,7 @@ const ResourceMobileHeader = memo(() => {
             icon={Share2Icon}
             title={t('shared.title', { ns: 'file' })}
             onClick={() => {
-              navigate(buildSharedContentPath());
+              navigate(buildSharedFilesPath());
               setWorkspaceOpen(false);
             }}
           />
@@ -104,14 +88,14 @@ const ResourceMobileHeader = memo(() => {
             icon={RESOURCE_ENTRY_ICONS.trash}
             title={t('trash.title', { ns: 'file' })}
             onClick={() => {
-              navigate(buildContentTrashPath(currentSpaceId));
+              navigate(buildFilesTrashPath(currentSpaceId));
               setWorkspaceOpen(false);
             }}
           />
           <SpaceList
             currentSpaceId={currentSpaceId}
             onSelectSpace={(spaceId) => {
-              navigate(buildContentRootPath(spaceId));
+              navigate(buildFilesRootPath(spaceId));
               setWorkspaceOpen(false);
             }}
           />

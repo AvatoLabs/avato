@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { type FolderTreeItem } from '@/features/ContentManager/components/FolderTree';
 import FolderTree from '@/features/ContentManager/components/FolderTree';
-import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
+import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { fileService } from '@/services/file';
 import { useFileStore } from '@/store/file';
@@ -26,8 +26,8 @@ const MoveToFolderModal = memo<MoveToFolderModalProps>(({ open, onClose, fileId,
   const [folders, setFolders] = useState<FolderTreeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [loadedFolders, setLoadedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
+  const [loadedFolders, setLoadedFolders] = useState<Set<string>>(() => new Set());
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const [moveContentItem, createFolder] = useFileStore((s) => [s.moveContentItem, s.createFolder]);

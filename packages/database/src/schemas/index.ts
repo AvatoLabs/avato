@@ -19,6 +19,7 @@ export * from './ragEvals';
 export * from './rbac';
 export * from './relations';
 export * from './session';
+export * from './spaceMemory';
 export * from './tag';
 export * from './topic';
 export * from './user';

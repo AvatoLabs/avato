@@ -39,25 +39,25 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentFolderPath: (spaceId: string | null | undefined, folderSlug: string) =>
-    spaceId ? `/content/spaces/${spaceId}/${folderSlug}` : `/content/${folderSlug}`,
-  buildContentPreviewPath: (
+  buildFilesFolderPath: (spaceId: string | null | undefined, folderSlug: string) =>
+    spaceId ? `/spaces/${spaceId}/files/${folderSlug}` : `/spaces/${folderSlug}`,
+  buildFilesPreviewPath: (
     spaceId: string | null | undefined,
     fileId: string,
     sourceSetId?: string | null,
   ) =>
     sourceSetId
-      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}/item/${fileId}`
-      : `/content/spaces/${spaceId}/item/${fileId}`,
-  buildContentRootPath: (spaceId: string | null | undefined) =>
-    spaceId ? `/content/spaces/${spaceId}` : '/content',
+      ? `/spaces/${spaceId}/files/item/${fileId}?scope=source-set:${sourceSetId}`
+      : `/spaces/${spaceId}/files/item/${fileId}`,
+  buildFilesRootPath: (spaceId: string | null | undefined) =>
+    spaceId ? `/spaces/${spaceId}/files` : '/spaces',
   buildSourceSetFolderPath: (
     spaceId: string | null | undefined,
     sourceSetId: string,
     folderSlug: string,
-  ) => `/content/spaces/${spaceId}/source-sets/${sourceSetId}/${folderSlug}`,
+  ) => `/spaces/${spaceId}/files/${folderSlug}?scope=source-set:${sourceSetId}`,
   buildSourceSetPath: (spaceId: string | null | undefined, sourceSetId: string) =>
-    `/content/spaces/${spaceId}/source-sets/${sourceSetId}`,
+    `/spaces/${spaceId}/files?scope=source-set:${sourceSetId}`,
 }));
 
 vi.mock('@/store/docs', () => ({
@@ -77,7 +77,8 @@ vi.mock('@/utils/markdownToTxt', () => ({
 }));
 
 vi.mock('@/utils/docs', () => ({
-  getPageDetailPath: (id: string) => `/docs/${id}`,
+  getPageDetailPath: (id: string, _kind?: string, spaceId?: string) =>
+    `/spaces/${spaceId}/docs/${id}`,
   getPageKindFromDocument: () => 'page',
 }));
 
@@ -156,13 +157,13 @@ describe('SearchResults', () => {
     fireEvent.click(resultButtons[0]);
     expect(mockNavigate).toHaveBeenNthCalledWith(
       1,
-      '/content/spaces/spc_1/source-sets/ss-1/item/file-1',
+      '/spaces/spc_1/files/item/file-1?scope=source-set:ss-1',
     );
 
     fireEvent.click(resultButtons[1]);
-    expect(mockNavigate).toHaveBeenNthCalledWith(2, '/content/spaces/spc_1/design-docs');
+    expect(mockNavigate).toHaveBeenNthCalledWith(2, '/spaces/spc_1/files/design-docs');
 
     fireEvent.click(resultButtons[2]);
-    expect(mockNavigate).toHaveBeenNthCalledWith(3, '/content/spaces/spc_1/source-sets/ss-1');
+    expect(mockNavigate).toHaveBeenNthCalledWith(3, '/spaces/spc_1/files?scope=source-set:ss-1');
   });
 });

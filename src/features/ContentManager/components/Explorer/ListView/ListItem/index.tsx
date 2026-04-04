@@ -5,8 +5,8 @@ import {
   ContextMenuTrigger,
   Flexbox,
   Icon,
-  Text,
   stopPropagation,
+  Text,
 } from '@lobehub/ui';
 import { App, Input } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
@@ -19,7 +19,7 @@ import { shallow } from 'zustand/shallow';
 
 import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
+import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -33,10 +33,10 @@ import { type FileUploadStatus } from '@/types/files/upload';
 import { formatSize } from '@/utils/format';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 
-import { getInlineUploadStatusKey } from '../../items';
 import { useFileItemClick } from '../../hooks/useFileItemClick';
 import DropdownMenu from '../../ItemDropdown/DropdownMenu';
 import { useFileItemDropdown } from '../../ItemDropdown/useFileItemDropdown';
+import { getInlineUploadStatusKey } from '../../items';
 import ChunksBadge from './ChunkTag';
 import TruncatedFileName from './TruncatedFileName';
 
@@ -210,10 +210,9 @@ const FileListItem = memo<FileListItemProps>(
         ...resourceKind,
         isSupportedForChunking: !isChunkingUnsupported(fileType),
       };
-    }, [fileType, sourceType, metadata?.emoji, name]);
+    }, [fileType, metadata, name, sourceType]);
 
-    const { isSupportedForChunking, isPage, isFolder, isMarkdown, emoji, baseName, extension } =
-      computedValues;
+    const { isSupportedForChunking, isPage, isFolder, emoji, baseName, extension } = computedValues;
     const isInlineUpload = !!uploadStatus;
     const uploadStatusKey = getInlineUploadStatusKey(uploadStatus);
     const uploadStatusType =
@@ -472,6 +471,13 @@ const FileListItem = memo<FileListItemProps>(
                   ref={inputRef}
                   size="small"
                   style={{ flex: 1, maxWidth: 400 }}
+                  value={renamingValue}
+                  // Show extension hint for files
+                  suffix={
+                    !isFolder && !isPage && extension ? (
+                      <span style={{ color: cssVar.colorTextDescription }}>{extension}</span>
+                    ) : undefined
+                  }
                   onBlur={handleRenameConfirm}
                   onChange={(e) => setRenamingValue(e.target.value)}
                   onClick={stopPropagation}
@@ -485,13 +491,6 @@ const FileListItem = memo<FileListItemProps>(
                       handleRenameCancel();
                     }
                   }}
-                  value={renamingValue}
-                  // Show extension hint for files
-                  suffix={
-                    !isFolder && !isPage && extension ? (
-                      <span style={{ color: cssVar.colorTextDescription }}>{extension}</span>
-                    ) : undefined
-                  }
                 />
               ) : (
                 <TruncatedFileName
@@ -513,7 +512,9 @@ const FileListItem = memo<FileListItemProps>(
                   {t(uploadStatusKey, { ns: 'file' })}
                 </Text>
               ) : !isFolder && !isPage ? (
-                fileStoreState.isCreatingFileParseTask || isNull(chunkingStatus) || !chunkingStatus ? (
+                fileStoreState.isCreatingFileParseTask ||
+                isNull(chunkingStatus) ||
+                !chunkingStatus ? (
                   <div
                     className={fileStoreState.isCreatingFileParseTask ? undefined : styles.hover}
                     title={t(

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { FilesTabs } from '@/types/files';
@@ -83,7 +83,7 @@ const CategoryMenu = memo(() => {
   const [activeKey, setMode] = useContentManagerStore((s) => [s.category, s.setMode]);
   const isMobile = useServerConfigStore((s) => s.isMobile);
   const navigate = useNavigate();
-  const basePath = buildContentRootPath(spaceId);
+  const basePath = buildFilesRootPath(spaceId);
 
   const items = useMemo<SegmentedProps['options']>(
     () => [

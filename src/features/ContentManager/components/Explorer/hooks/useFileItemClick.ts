@@ -1,11 +1,7 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import {
-  buildContentFolderPath,
-  buildContentItemPath,
-  buildSourceSetFolderPath,
-} from '@/features/ResourceSpaces';
+import { buildFilesFolderPath, buildFilesItemPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
 
@@ -26,7 +22,6 @@ export const useFileItemClick = ({
   fileId,
   id,
   slug,
-  sourceSetId,
   isFolder,
   isPage,
   onOpen,
@@ -50,11 +45,7 @@ export const useFileItemClick = ({
       newParams.delete('files');
 
       const queryString = newParams.toString();
-      const isSourceSetRoute = location.pathname.includes('/source-sets/');
-      const basePath =
-        isSourceSetRoute && sourceSetId
-          ? buildSourceSetFolderPath(spaceId, sourceSetId, folderSlug)
-          : buildContentFolderPath(spaceId, folderSlug);
+      const basePath = buildFilesFolderPath(spaceId, folderSlug);
       navigate(queryString ? `${basePath}?${queryString}` : basePath);
       return;
     }
@@ -81,7 +72,7 @@ export const useFileItemClick = ({
       nextParams.delete('file');
       nextParams.delete('files');
 
-      const nextPath = buildContentItemPath(location.pathname, previewTargetId);
+      const nextPath = buildFilesItemPath(location.pathname, previewTargetId);
       const nextSearch = nextParams.toString();
       navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
       onOpen?.(previewTargetId);
@@ -93,7 +84,7 @@ export const useFileItemClick = ({
       nextParams.delete('file');
       nextParams.delete('files');
 
-      const nextPath = buildContentItemPath(location.pathname, id);
+      const nextPath = buildFilesItemPath(location.pathname, id);
       const nextSearch = nextParams.toString();
       navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
     } else {
@@ -104,7 +95,7 @@ export const useFileItemClick = ({
       nextParams.delete('file');
       nextParams.delete('files');
 
-      const nextPath = buildContentItemPath(location.pathname, previewTargetId);
+      const nextPath = buildFilesItemPath(location.pathname, previewTargetId);
       const nextSearch = nextParams.toString();
       navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
       // Call onOpen if provided for backwards compatibility
@@ -115,7 +106,6 @@ export const useFileItemClick = ({
     id,
     isFolder,
     isPage,
-    sourceSetId,
     location.pathname,
     location.search,
     navigate,

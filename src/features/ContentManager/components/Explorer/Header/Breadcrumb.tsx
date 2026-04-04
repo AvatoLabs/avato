@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
-  buildContentFolderPath,
-  buildContentRootPath,
+  buildFilesFolderPath,
+  buildFilesRootPath,
   buildSpaceRootPath,
   SurfaceBreadcrumb,
 } from '@/features/ResourceSpaces';
@@ -60,10 +60,11 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
     }
   };
 
-  const buildPreservedQueryString = () => {
+  const buildPreservedQueryString = (clearScope = false) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('file');
     newParams.delete('files');
+    if (clearScope) newParams.delete('scope');
 
     return newParams.toString();
   };
@@ -74,17 +75,29 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
     navigate(basePath);
   };
 
+  const handleFilesNavigate = () => {
+    clearViewAndSelection();
+
+    const queryString = buildPreservedQueryString(true);
+    const basePath = buildFilesRootPath(spaceId);
+
+    navigate(queryString ? `${basePath}?${queryString}` : basePath);
+  };
+
   const handleSectionNavigate = (slug: string | null) => {
     clearViewAndSelection();
 
     const queryString = buildPreservedQueryString();
-    const basePath = slug ? buildContentFolderPath(spaceId, slug) : buildContentRootPath(spaceId);
+    const basePath = slug ? buildFilesFolderPath(spaceId, slug) : buildFilesRootPath(spaceId);
 
     navigate(queryString ? `${basePath}?${queryString}` : basePath);
   };
 
   const isAtRoot = folderChain.length === 0 && !fileName;
-  const isSectionClickable = folderChain.length > 0 || fileName;
+  const isFilesRoot = !rootSourceSetId && isAtRoot;
+  const isFilesClickable = !!rootSourceSetId || folderChain.length > 0 || !!fileName;
+  const isSourceSetClickable =
+    (!!rootSourceSetId && (folderChain.length > 0 || !!fileName)) || false;
   const resolvedSpaceLabel = spaceName || t('space.sectionTitle', { ns: 'file' });
   const segments = [
     {
@@ -93,15 +106,27 @@ const Breadcrumb = memo<BreadcrumbProps>(({ fileName }) => {
       onClick: handleSpaceNavigate,
     },
     {
-      current: isAtRoot,
-      key: rootSourceSetId ? 'source-set' : 'files',
-      label: rootSourceSetId
-        ? sourceSetName || (
-            <Skeleton.Button active size="small" style={{ height: 14, minWidth: 80, width: 80 }} />
-          )
-        : t('tab.files', { ns: 'common' }),
-      onClick: isSectionClickable ? () => handleSectionNavigate(null) : undefined,
+      current: isFilesRoot,
+      key: 'files',
+      label: t('tab.files', { ns: 'common' }),
+      onClick: isFilesClickable ? handleFilesNavigate : undefined,
     },
+    ...(rootSourceSetId
+      ? [
+          {
+            current: isAtRoot,
+            key: 'source-set',
+            label: sourceSetName || (
+              <Skeleton.Button
+                active
+                size="small"
+                style={{ height: 14, minWidth: 80, width: 80 }}
+              />
+            ),
+            onClick: isSourceSetClickable ? () => handleSectionNavigate(null) : undefined,
+          },
+        ]
+      : []),
     ...folderChain.map((folder: FolderCrumb, index: number) => ({
       current: index === folderChain.length - 1 && !fileName,
       key: folder.id,

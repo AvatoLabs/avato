@@ -31,6 +31,7 @@ export * from './service';
 export * from './session';
 export * from './skill';
 export * from './sourceSet';
+export * from './spaceMemory';
 export * from './stepContext';
 export * from './tag';
 export * from './tool';

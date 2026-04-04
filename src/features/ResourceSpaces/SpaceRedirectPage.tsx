@@ -8,15 +8,14 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildContentRootPath } from './paths';
+import { buildSpaceRootPath } from './paths';
+import { SPACE_LIST_KEY } from './SpaceList';
 
 const SpaceRedirectPage = memo(() => {
   const location = useLocation();
-  const { data, isLoading } = useSWR(
-    'resource-space-list',
-    () => lambdaClient.space.listSpaces.query(),
-    { revalidateOnFocus: false },
-  );
+  const { data, isLoading } = useSWR(SPACE_LIST_KEY, () => lambdaClient.space.listSpaces.query(), {
+    revalidateOnFocus: false,
+  });
 
   if (isLoading || !data) {
     return (
@@ -33,7 +32,7 @@ const SpaceRedirectPage = memo(() => {
     return null;
   }
 
-  return <Navigate replace to={`${buildContentRootPath(targetSpace.id)}${location.search}`} />;
+  return <Navigate replace to={`${buildSpaceRootPath(targetSpace.id)}${location.search}`} />;
 });
 
 SpaceRedirectPage.displayName = 'SpaceRedirectPage';

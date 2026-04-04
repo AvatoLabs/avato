@@ -1,63 +1,67 @@
+export const buildSpacesRootPath = () => '/spaces';
+
 export const buildSpaceRootPath = (spaceId?: string | null) =>
-  spaceId ? `/spaces/${spaceId}` : '/content';
+  spaceId ? `/spaces/${spaceId}` : buildSpacesRootPath();
 
-export const buildContentRootPath = (spaceId?: string | null) =>
-  spaceId ? `${buildSpaceRootPath(spaceId)}/files` : '/content';
+export const buildFilesRootPath = (spaceId?: string | null) =>
+  spaceId ? `${buildSpaceRootPath(spaceId)}/files` : buildSpacesRootPath();
 
-export const buildSourceSetsRootPath = (spaceId?: string | null) =>
-  spaceId ? `${buildSpaceRootPath(spaceId)}/source-sets` : '/content/source-sets';
+const buildSourceSetScopeSearch = (sourceSetId: string) =>
+  `?scope=${encodeURIComponent(`source-set:${sourceSetId}`)}`;
 
-const normalizeContentPath = (path: string) => {
+const normalizeFilesPath = (path: string) => {
   if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
   return path;
 };
 
-export const stripContentItemPath = (pathname: string) => {
-  const normalizedPath = normalizeContentPath(pathname);
+export const stripFilesItemPath = (pathname: string) => {
+  const normalizedPath = normalizeFilesPath(pathname);
 
   return normalizedPath.replace(/\/item\/[^/]+$/, '') || '/';
 };
 
-export const buildContentItemPath = (basePath: string, fileId: string) =>
-  `${stripContentItemPath(normalizeContentPath(basePath))}/item/${encodeURIComponent(fileId)}`;
+export const buildFilesItemPath = (basePath: string, fileId: string) =>
+  `${stripFilesItemPath(normalizeFilesPath(basePath))}/item/${encodeURIComponent(fileId)}`;
 
-export const buildContentFolderPath = (spaceId: string | null | undefined, folderSlug: string) =>
-  `${buildContentRootPath(spaceId)}/${folderSlug}`;
+export const buildFilesFolderPath = (spaceId: string | null | undefined, folderSlug: string) =>
+  `${buildFilesRootPath(spaceId)}/${folderSlug}`;
 
 export const buildSourceSetPath = (spaceId: string | null | undefined, sourceSetId: string) =>
-  spaceId
-    ? `${buildSourceSetsRootPath(spaceId)}/${sourceSetId}`
-    : `/content/source-sets/${sourceSetId}`;
+  `${buildFilesRootPath(spaceId)}${buildSourceSetScopeSearch(sourceSetId)}`;
 
 export const buildSourceSetFolderPath = (
   spaceId: string | null | undefined,
   sourceSetId: string,
   folderSlug: string,
-) => `${buildSourceSetPath(spaceId, sourceSetId)}/${folderSlug}`;
+) => `${buildFilesFolderPath(spaceId, folderSlug)}${buildSourceSetScopeSearch(sourceSetId)}`;
 
-export const buildContentPreviewPath = (
+export const buildFilesPreviewPath = (
   spaceId: string | null | undefined,
   fileId: string,
   sourceSetId?: string | null,
 ) => {
-  const basePath = sourceSetId
-    ? buildSourceSetPath(spaceId, sourceSetId)
-    : buildContentRootPath(spaceId);
+  const previewPath = buildFilesItemPath(buildFilesRootPath(spaceId), fileId);
 
-  return buildContentItemPath(basePath, fileId);
+  return sourceSetId ? `${previewPath}${buildSourceSetScopeSearch(sourceSetId)}` : previewPath;
 };
 
-export const buildSharedContentPath = () => '/content/shared';
+export const buildSharedFilesPath = () => '/content/shared';
 
-export const buildContentTrashPath = (spaceId?: string | null) =>
-  spaceId ? `${buildContentRootPath(spaceId)}/trash` : '/content/trash';
+export const buildFilesTrashPath = (spaceId?: string | null) =>
+  spaceId ? `${buildFilesRootPath(spaceId)}/trash` : '/content/trash';
 
 export const buildSourceSetTrashPath = (spaceId: string | null | undefined, sourceSetId: string) =>
-  `${buildSourceSetPath(spaceId, sourceSetId)}/trash`;
+  `${buildFilesTrashPath(spaceId)}${buildSourceSetScopeSearch(sourceSetId)}`;
 
 export const buildSpaceSettingsPath = (spaceId: string) =>
   `${buildSpaceRootPath(spaceId)}/settings`;
 
 export const buildSpaceMembersPath = (spaceId: string) => `${buildSpaceRootPath(spaceId)}/members`;
+
+export const buildSpaceMemoryPath = (
+  spaceId: string,
+  section?: 'inbox' | 'playbooks' | 'policies' | 'published',
+) =>
+  `${buildSpaceRootPath(spaceId)}/memory${section ? `?section=${encodeURIComponent(section)}` : ''}`;
 
 export const buildPublicContentSharePath = (token: string) => `/share/r/${token}`;

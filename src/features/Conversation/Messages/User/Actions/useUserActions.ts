@@ -1,14 +1,18 @@
 import { type ActionIconGroupItemType } from '@lobehub/ui';
 import { copyToClipboard } from '@lobehub/ui';
 import { App } from 'antd';
-import { Copy, Edit, LanguagesIcon, Play, RotateCcw, Trash } from 'lucide-react';
+import { Copy, Edit, LanguagesIcon, LibraryBig, Play, RotateCcw, Trash } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
+import { useSpaceMemoryCandidateTargets } from '@/features/ResourceSpaces/useSpaceMemoryCandidateTargets';
+import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { localeOptions } from '@/locales/contents';
 import { type UIChatMessage } from '@/types/index';
 
 import { messageStateSelectors, useConversationStore } from '../../../store';
+import { buildSpaceMemoryMessageSourceTitle } from '../../Actions/spaceMemorySourcePreview';
 
 export interface ActionItem extends ActionIconGroupItemType {
   children?: Array<{ handleClick?: () => void; key: string; label: string }>;
@@ -16,6 +20,7 @@ export interface ActionItem extends ActionIconGroupItemType {
 }
 
 export interface UserActions {
+  addToSpaceMemory?: ActionItem;
   copy: ActionItem;
   del: ActionItem;
   divider: { type: 'divider' };
@@ -31,8 +36,12 @@ interface UseUserActionsParams {
 }
 
 export const useUserActions = ({ id, data }: UseUserActionsParams): UserActions => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'chat', 'file']);
   const { message } = App.useApp();
+  const activeSpaceId = getActiveWorkspaceSpaceId();
+  const { defaultSpaceId, teamSpaces } = useSpaceMemoryCandidateTargets(activeSpaceId);
+  const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
+  const sourceTitle = buildSpaceMemoryMessageSourceTitle(data.content);
 
   // Get state from ConversationStore
   const isRegenerating = useConversationStore(messageStateSelectors.isMessageRegenerating(id));
@@ -49,6 +58,21 @@ export const useUserActions = ({ id, data }: UseUserActionsParams): UserActions 
 
   return useMemo<UserActions>(
     () => ({
+      addToSpaceMemory:
+        teamSpaces.length > 0
+          ? {
+              handleClick: () =>
+                openCreateSpaceMemoryCandidateModal({
+                  defaultSummary: data.content,
+                  defaultTitle: sourceTitle,
+                  initialSpaceId: defaultSpaceId,
+                  sourceRefs: [{ id, kind: 'message', title: sourceTitle }],
+                }),
+              icon: LibraryBig,
+              key: 'addToSpaceMemory',
+              label: t('space.memory.actions.addFromSource', { ns: 'file' }),
+            }
+          : undefined,
       copy: {
         handleClick: async () => {
           await copyToClipboard(data.content);
@@ -107,14 +131,18 @@ export const useUserActions = ({ id, data }: UseUserActionsParams): UserActions 
     [
       t,
       id,
+      defaultSpaceId,
       data.content,
       data.error,
       isRegenerating,
+      teamSpaces.length,
       toggleMessageEditing,
       deleteMessage,
       regenerateUserMessage,
       translateMessage,
       ttsMessage,
+      openCreateSpaceMemoryCandidateModal,
+      sourceTitle,
       message,
     ],
   );

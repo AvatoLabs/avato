@@ -89,7 +89,7 @@ vi.mock('@/features/SourceSetModal', () => ({
 
 vi.mock('@/features/ResourceSpaces', () => ({
   buildSourceSetPath: (spaceId: string | undefined, id: string) =>
-    `/content/spaces/${spaceId}/source-sets/${id}`,
+    `/spaces/${spaceId}/files?scope=source-set:${id}`,
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({

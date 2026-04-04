@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import EmojiPicker from '@/components/EmojiPicker';
-import { buildContentRootPath, buildSourceSetPath, useSpaceName } from '@/features/ResourceSpaces';
+import { buildPageScopeSearch, createSourceSetPageScope } from '@/features/Pages/usePageScope';
+import { useSpaceName } from '@/features/ResourceSpaces';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useDocumentStore } from '@/store/document';
 import { editorSelectors } from '@/store/document/slices/editor';
@@ -16,6 +17,7 @@ import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { themedSelectionCss } from '@/styles';
+import { getPageKindFromDocument, getPageRootPath } from '@/utils/docs';
 import { truncateByWeightedLength } from '@/utils/textLength';
 
 import { PAGE_EDITOR_SCROLL_ROOT_ID } from './constants';
@@ -285,7 +287,9 @@ const TitleSection = memo(() => {
   const spaceId = pageDocument?.spaceId ?? undefined;
   const sourceSetId = pageDocument?.sourceSetId ?? undefined;
   const spaceName = useSpaceName(spaceId);
-  const sourceSetName = useSourceSetStore(sourceSetSelectors.getSourceSetNameById(sourceSetId || ''));
+  const sourceSetName = useSourceSetStore(
+    sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
+  );
 
   const [isHoveringTitle, setIsHoveringTitle] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -296,6 +300,12 @@ const TitleSection = memo(() => {
     () => (lastUpdatedTime ? formatUpdatedAt(lastUpdatedTime, locale) : ''),
     [lastUpdatedTime, locale],
   );
+  const pageKind = getPageKindFromDocument(pageDocument);
+  const docsRootPath = getPageRootPath(pageKind, spaceId);
+  const sourceSetDocsPath =
+    sourceSetId && spaceId
+      ? `${docsRootPath}${buildPageScopeSearch(createSourceSetPageScope(sourceSetId))}`
+      : docsRootPath;
   const resolvedSpaceLabel = spaceName || spaceId;
   const resolvedSourceSetLabel = sourceSetName || sourceSetId;
 
@@ -423,7 +433,7 @@ const TitleSection = memo(() => {
               <button
                 className={styles.ownershipChip}
                 type={'button'}
-                onClick={() => navigate(buildContentRootPath(spaceId))}
+                onClick={() => navigate(docsRootPath)}
               >
                 <Icon icon={FolderOpen} size={15} />
                 <span>{resolvedSpaceLabel}</span>
@@ -433,7 +443,7 @@ const TitleSection = memo(() => {
               <button
                 className={cx(styles.ownershipChip, styles.ownershipChipAccent)}
                 type={'button'}
-                onClick={() => navigate(buildSourceSetPath(spaceId, sourceSetId))}
+                onClick={() => navigate(sourceSetDocsPath)}
               >
                 <Icon icon={LibraryBig} size={15} />
                 <span>{resolvedSourceSetLabel}</span>

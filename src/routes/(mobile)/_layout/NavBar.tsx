@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { MOBILE_TABBAR_HEIGHT } from '@/const/layoutTokens';
-import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { SidebarTabKey } from '@/store/global/initialState';
@@ -71,7 +71,7 @@ const NavBar = memo(() => {
           ),
           key: 'content',
           onClick: () => {
-            navigate(buildContentRootPath(getActiveWorkspaceSpaceId()));
+            navigate(buildFilesRootPath(getActiveWorkspaceSpaceId()));
           },
           title: t('tab.resource'),
         },

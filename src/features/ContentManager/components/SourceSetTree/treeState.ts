@@ -3,7 +3,17 @@ import { fileService } from '@/services/file';
 import { useFileStore } from '@/store/file';
 import { type ContentItem } from '@/types/content';
 
-import { type TreeItem } from './types';
+interface TreeItem {
+  fileId?: string | null;
+  fileType?: string;
+  id: string;
+  isFolder: boolean;
+  metadata?: Record<string, any>;
+  name: string;
+  slug?: string | null;
+  sourceType?: string;
+  url?: string;
+}
 
 export const sortTreeItems = <T extends TreeItem>(items: T[]): T[] => {
   return [...items].sort((a, b) => {

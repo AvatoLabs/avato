@@ -10,27 +10,20 @@ import {
   useSpaceName,
 } from '@/features/ResourceSpaces';
 import { pageSelectors, usePageStore } from '@/store/docs';
-import { useFileStore } from '@/store/file';
 import { sourceSetSelectors, useSourceSetStore } from '@/store/sourceSet';
 import { getPageRootPath, TABLE_PAGE_KIND } from '@/utils/docs';
 
 import { usePageEditorStore } from '../store';
 
-interface FolderCrumb {
-  id: string;
-  name: string;
-}
-
 const Breadcrumb = memo(() => {
   const { t } = useTranslation('file');
   const navigate = useNavigate();
 
-  const [documentId, pageKind, title, sourceSetId, parentId] = usePageEditorStore((s) => [
+  const [documentId, pageKind, title, sourceSetId] = usePageEditorStore((s) => [
     s.documentId,
     s.pageKind,
     s.title,
     s.sourceSetId,
-    s.parentId,
   ]);
   const pageDocument = usePageStore(pageSelectors.getDocumentById(documentId));
   const spaceId = pageDocument?.spaceId ?? undefined;
@@ -39,17 +32,6 @@ const Breadcrumb = memo(() => {
     sourceSetSelectors.getSourceSetNameById(sourceSetId || ''),
   );
   const spaceName = useSpaceName(spaceId);
-
-  // Fetch the parent folder to get its slug
-  const useFetchKnowledgeItem = useFileStore((s) => s.useFetchKnowledgeItem);
-  const { data: parentFolder } = useFetchKnowledgeItem(parentId);
-
-  // Fetch folder breadcrumb chain from backend using parent folder's slug
-  const useFetchFolderBreadcrumb = useFileStore((s) => s.useFetchFolderBreadcrumb);
-  const { data: folderChain = [] } = useFetchFolderBreadcrumb(
-    parentFolder?.slug || null,
-    parentFolder?.spaceId ?? undefined,
-  );
 
   const documentTitle = title || t('docEditor.titlePlaceholder');
   const resolvedSpaceLabel = spaceName || spaceId || t('space.sectionTitle');
@@ -86,10 +68,6 @@ const Breadcrumb = memo(() => {
             },
           ]
         : []),
-      ...folderChain.map((folder: FolderCrumb) => ({
-        key: folder.id,
-        label: folder.name,
-      })),
       {
         current: true,
         key: 'current-document',
@@ -99,7 +77,6 @@ const Breadcrumb = memo(() => {
     [
       docsPath,
       documentTitle,
-      folderChain,
       navigate,
       resolvedSpaceLabel,
       sourceSetId,

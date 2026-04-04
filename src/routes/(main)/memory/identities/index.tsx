@@ -2,6 +2,7 @@ import { Flexbox, Icon, Tag } from '@lobehub/ui';
 import { BrainCircuitIcon } from 'lucide-react';
 import { type FC } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 import NavHeader from '@/features/NavHeader';
 import WideScreenContainer from '@/features/WideScreenContainer';
@@ -12,18 +13,16 @@ import MemoryAnalysis from '@/routes/(main)/memory/features/MemoryAnalysis';
 import { useUserMemoryStore } from '@/store/userMemory';
 import { type TypesEnum } from '@/types/userMemory';
 
-import EditableModal from '../features/EditableModal';
 import Loading from '../features/Loading';
 import { SCROLL_PARENT_ID } from '../features/TimeLineView/useScrollParent';
 import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
-import IdentityRightPanel from './features/IdentityRightPanel';
 import { type IdentityType } from './features/List';
 import List from './features/List';
 import SegmentedBar from './features/SegmentedBar';
 
-const IdentitiesArea = memo(() => {
+export const IdentitiesArea = memo(() => {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [searchValueRaw, setSearchValueRaw] = useQueryState('q', { clearOnDefault: true });
   const [typeFilterRaw, setTypeFilterRaw] = useQueryState('type', { clearOnDefault: true });
@@ -111,15 +110,11 @@ const IdentitiesArea = memo(() => {
 });
 
 const Identities: FC = () => {
-  return (
-    <>
-      <Flexbox horizontal height={'100%'} width={'100%'}>
-        <IdentitiesArea />
-        <IdentityRightPanel />
-      </Flexbox>
-      <EditableModal />
-    </>
-  );
+  const [searchParams] = useSearchParams();
+  const next = new URLSearchParams(searchParams);
+  next.set('focus', 'identities');
+
+  return <Navigate replace to={{ pathname: '/memory', search: `?${next.toString()}` }} />;
 };
 
 export default Identities;

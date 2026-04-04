@@ -63,12 +63,12 @@ describe('BackButton', () => {
 
     render(
       <MemoryRouter>
-        <BackButton title="back" to="/content/spaces/spc_1" useHistory={false} />
+        <BackButton title="back" to="/spaces/spc_1/files" useHistory={false} />
       </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole('button'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/content/spaces/spc_1');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/files');
   });
 });

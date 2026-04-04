@@ -9,7 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import DragUploadZone from '@/components/DragUploadZone';
 import { PageEditor } from '@/features/PageEditor';
-import { stripContentItemPath } from '@/features/ResourceSpaces';
+import { stripFilesItemPath } from '@/features/ResourceSpaces';
 import dynamic from '@/libs/next/dynamic';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
@@ -171,7 +171,7 @@ const ContentManager = memo(() => {
     nextParams.delete('file');
     nextParams.delete('files');
 
-    const nextPath = stripContentItemPath(location.pathname);
+    const nextPath = stripFilesItemPath(location.pathname);
     const nextSearch = nextParams.toString();
     navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
 

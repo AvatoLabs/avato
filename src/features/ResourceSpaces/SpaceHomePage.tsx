@@ -2,7 +2,7 @@
 
 import { Flexbox, Icon, Tag, Text } from '@lobehub/ui';
 import { createStyles } from 'antd-style';
-import { Files, FileText, FolderKanban, Settings2, Users2 } from 'lucide-react';
+import { BrainCircuitIcon, Files, FileText, FolderKanban, Settings2, Users2 } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -14,7 +14,12 @@ import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 import { getPageRootPath } from '@/utils/docs';
 
-import { buildContentRootPath, buildSpaceMembersPath, buildSpaceSettingsPath } from './paths';
+import {
+  buildFilesRootPath,
+  buildSpaceMembersPath,
+  buildSpaceMemoryPath,
+  buildSpaceSettingsPath,
+} from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 
 const useStyles = createStyles(({ css, token }) => ({
@@ -96,17 +101,29 @@ const SpaceHomePage = memo(() => {
     },
     {
       description: t('space.home.cards.files.description', { ns: 'file' }),
-      href: buildContentRootPath(spaceId),
+      href: buildFilesRootPath(spaceId),
       icon: Files,
       key: 'files',
       title: t('tab.files', { ns: 'common' }),
     },
     {
       description: t('space.home.cards.sourceSets.description', { ns: 'file' }),
-      href: buildContentRootPath(spaceId),
+      href: buildFilesRootPath(spaceId),
       icon: FolderKanban,
       key: 'source-sets',
       title: t('sourceSet.title', { ns: 'file' }),
+    },
+    {
+      description: t(
+        isTeamSpace
+          ? 'space.home.cards.memory.teamDescription'
+          : 'space.home.cards.memory.personalDescription',
+        { ns: 'file' },
+      ),
+      href: buildSpaceMemoryPath(spaceId),
+      icon: BrainCircuitIcon,
+      key: 'memory',
+      title: t('tab.memory', { ns: 'common' }),
     },
     {
       description: t('space.home.cards.members.description', { ns: 'file' }),

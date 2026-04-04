@@ -10,7 +10,7 @@ import useSWR from 'swr';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { lambdaClient } from '@/libs/trpc/client';
 
-import { buildContentPreviewPath, buildSourceSetPath } from './paths';
+import { buildFilesPreviewPath, buildSourceSetPath } from './paths';
 
 const SharedWithMePage = memo(() => {
   const { t } = useTranslation('file');
@@ -54,7 +54,7 @@ const SharedWithMePage = memo(() => {
             const targetPath =
               item.kind === 'source_set'
                 ? buildSourceSetPath(item.spaceId, item.localId)
-                : buildContentPreviewPath(item.spaceId, item.localId);
+                : buildFilesPreviewPath(item.spaceId, item.localId);
 
             return (
               <Block

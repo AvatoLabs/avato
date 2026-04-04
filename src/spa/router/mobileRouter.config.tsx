@@ -237,6 +237,18 @@ export const mobileRoutes: RouteObject[] = [
         children: [
           {
             element: dynamicElement(
+              () => import('@/routes/(main)/spaces'),
+              'Mobile > Spaces > Redirect',
+            ),
+            index: true,
+          },
+        ],
+        path: 'spaces',
+      },
+      {
+        children: [
+          {
+            element: dynamicElement(
               () => import('@/routes/(main)/spaces/[spaceId]'),
               'Mobile > Space > Redirect',
             ),
@@ -284,7 +296,7 @@ export const mobileRoutes: RouteObject[] = [
                   () => import('@/routes/(main)/docs/_layout'),
                   'Mobile > Space > Docs > Layout',
                 ),
-                errorElement: <ErrorBoundary resetPath="/docs" />,
+                errorElement: <ErrorBoundary resetPath="/spaces" />,
                 path: 'docs',
               },
               {
@@ -333,6 +345,13 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/memory'),
+                  'Mobile > Space > Memory',
+                ),
+                path: 'memory',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
                   'Mobile > Space > Settings',
                 ),
@@ -345,50 +364,6 @@ export const mobileRoutes: RouteObject[] = [
                 ),
                 path: 'members',
               },
-              {
-                children: [
-                  {
-                    element: dynamicElement(
-                      () => import('@/routes/(main)/content/source-sets'),
-                      'Mobile > Space > Source Set',
-                    ),
-                    index: true,
-                  },
-                  {
-                    element: dynamicElement(
-                      () => import('@/routes/(main)/content/source-sets/trash'),
-                      'Mobile > Space > Source Set > Trash',
-                    ),
-                    path: 'trash',
-                  },
-                  {
-                    element: dynamicElement(
-                      () => import('@/routes/(main)/content/source-sets/[slug]'),
-                      'Mobile > Space > Source Set > Slug',
-                    ),
-                    path: ':slug',
-                  },
-                  {
-                    element: dynamicElement(
-                      () => import('@/routes/(main)/content/source-sets'),
-                      'Mobile > Space > Source Set > Item',
-                    ),
-                    path: 'item/:fileId',
-                  },
-                  {
-                    element: dynamicElement(
-                      () => import('@/routes/(main)/content/source-sets/[slug]'),
-                      'Mobile > Space > Source Set > Slug > Item',
-                    ),
-                    path: ':slug/item/:fileId',
-                  },
-                ],
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/_layout'),
-                  'Mobile > Space > Source Set > Layout',
-                ),
-                path: 'source-sets/:id',
-              },
             ],
             element: dynamicElement(
               () => import('@/routes/(main)/content/_layout'),
@@ -399,238 +374,21 @@ export const mobileRoutes: RouteObject[] = [
         path: 'spaces/:spaceId',
       },
 
-      // Legacy docs routes
       {
-        children: [
-          {
-            element: dynamicElement(() => import('@/routes/(main)/docs'), 'Mobile > Docs'),
-            index: true,
-          },
-          {
-            children: [
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/docs/table'),
-                  'Mobile > Docs > Table',
-                ),
-                index: true,
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/docs/table/[id]'),
-                  'Mobile > Docs > Table > Detail',
-                ),
-                path: ':id',
-              },
-            ],
-            path: 'table',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/docs/[id]'),
-              'Mobile > Docs > Detail',
-            ),
-            path: ':id',
-          },
-        ],
-        element: dynamicLayout(
-          () => import('@/routes/(main)/docs/_layout'),
-          'Mobile > Docs > Layout',
-        ),
-        errorElement: <ErrorBoundary resetPath="/docs" />,
-        path: 'docs',
-      },
-
-      // Resource routes (Files & Knowledge Base)
-      {
-        children: [
-          {
-            children: [
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content'),
-                  'Mobile > Content > Redirect',
-                ),
-                index: true,
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/shared'),
-                  'Mobile > Content > Shared',
-                ),
-                path: 'shared',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/trash'),
-                  'Mobile > Content > Trash',
-                ),
-                path: 'trash',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Space Home',
-                ),
-                path: 'spaces/:spaceId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Space Home > Item',
-                ),
-                path: 'spaces/:spaceId/item/:fileId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Space Folder',
-                ),
-                path: 'spaces/:spaceId/:slug',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Space Folder > Item',
-                ),
-                path: 'spaces/:spaceId/:slug/item/:fileId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/trash'),
-                  'Mobile > Content > Space Trash',
-                ),
-                path: 'spaces/:spaceId/trash',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/spaces/[spaceId]/settings'),
-                  'Mobile > Content > Space Settings',
-                ),
-                path: 'spaces/:spaceId/settings',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Folder',
-                ),
-                path: ':slug',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Item',
-                ),
-                path: 'item/:fileId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/(home)'),
-                  'Mobile > Content > Folder > Item',
-                ),
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/content/(home)/_layout'),
-              'Mobile > Content > Home > Layout',
-            ),
-          },
-          {
-            children: [
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets'),
-                  'Mobile > Content > Source Set',
-                ),
-                index: true,
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/trash'),
-                  'Mobile > Content > Source Set > Trash',
-                ),
-                path: 'trash',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/[slug]'),
-                  'Mobile > Content > Source Set > Slug',
-                ),
-                path: ':slug',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets'),
-                  'Mobile > Content > Source Set > Item',
-                ),
-                path: 'item/:fileId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/[slug]'),
-                  'Mobile > Content > Source Set > Slug > Item',
-                ),
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/content/source-sets/_layout'),
-              'Mobile > Content > Source Set > Layout',
-            ),
-            path: 'source-sets/:id',
-          },
-          {
-            children: [
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets'),
-                  'Mobile > Content > Space Source Set',
-                ),
-                index: true,
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/trash'),
-                  'Mobile > Content > Space Source Set > Trash',
-                ),
-                path: 'trash',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/[slug]'),
-                  'Mobile > Content > Space Source Set > Slug',
-                ),
-                path: ':slug',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets'),
-                  'Mobile > Content > Space Source Set > Item',
-                ),
-                path: 'item/:fileId',
-              },
-              {
-                element: dynamicElement(
-                  () => import('@/routes/(main)/content/source-sets/[slug]'),
-                  'Mobile > Content > Space Source Set > Slug > Item',
-                ),
-                path: ':slug/item/:fileId',
-              },
-            ],
-            element: dynamicElement(
-              () => import('@/routes/(main)/content/source-sets/_layout'),
-              'Mobile > Content > Space Source Set > Layout',
-            ),
-            path: 'spaces/:spaceId/source-sets/:id',
-          },
-        ],
         element: dynamicElement(
-          () => import('@/routes/(main)/content/_layout'),
-          'Mobile > Content > Layout',
+          () => import('@/routes/(main)/content/shared'),
+          'Mobile > Files > Shared',
         ),
-        errorElement: <ErrorBoundary resetPath="/content" />,
-        path: 'content',
+        errorElement: <ErrorBoundary resetPath="/content/shared" />,
+        path: 'content/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/content/trash'),
+          'Mobile > Files > Trash',
+        ),
+        errorElement: <ErrorBoundary resetPath="/content/trash" />,
+        path: 'content/trash',
       },
 
       ...BusinessMobileRoutesWithMainLayout,

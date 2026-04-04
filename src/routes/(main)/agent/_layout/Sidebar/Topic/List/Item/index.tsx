@@ -115,6 +115,7 @@ const TopicItem = memo<TopicItemProps>(({ id, title, fav, active, threadId, meta
   const dropdownMenu = useTopicItemDropdownMenu({
     fav,
     id,
+    title,
     toggleEditing,
   });
 

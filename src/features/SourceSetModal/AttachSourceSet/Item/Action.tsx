@@ -3,7 +3,7 @@ import { CheckIcon, InfoIcon, MoreVerticalIcon, Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { buildContentPreviewPath, buildSourceSetPath } from '@/features/ResourceSpaces';
+import { buildFilesPreviewPath, buildSourceSetPath } from '@/features/ResourceSpaces';
 import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
@@ -103,7 +103,7 @@ const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
                   return;
                 }
 
-                window.open(buildContentPreviewPath(targetSpaceId, id));
+                window.open(buildFilesPreviewPath(targetSpaceId, id));
               },
             },
             {

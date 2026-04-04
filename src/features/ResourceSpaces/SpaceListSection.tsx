@@ -1,15 +1,14 @@
 'use client';
 
 import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
-import { createModal } from '@lobehub/ui/base-ui';
 import { createStaticStyles } from 'antd-style';
 import { PlusIcon } from 'lucide-react';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSWRConfig } from 'swr';
 
-import SpaceList, { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
-import { CreateSpaceForm } from '@/features/ResourceSpaces/SpaceSection';
+import SpaceList from '@/features/ResourceSpaces/SpaceList';
+
+import { useOpenCreateSpaceModal } from './useOpenCreateSpaceModal';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   sectionTitle: css`
@@ -33,23 +32,7 @@ interface SpaceListSectionProps {
 
 const SpaceListSection = memo<SpaceListSectionProps>(({ currentSpaceId, onSelectSpace }) => {
   const { t } = useTranslation('file');
-  const { mutate } = useSWRConfig();
-
-  const handleCreateSpace = useCallback(() => {
-    createModal({
-      children: (
-        <CreateSpaceForm
-          onCreated={(spaceId) => {
-            void mutate(SPACE_LIST_KEY);
-            onSelectSpace(spaceId);
-          }}
-        />
-      ),
-      footer: null,
-      title: t('space.create.title'),
-      width: 420,
-    });
-  }, [mutate, onSelectSpace, t]);
+  const handleCreateSpace = useOpenCreateSpaceModal(onSelectSpace);
 
   return (
     <Flexbox gap={4} paddingInline={4}>

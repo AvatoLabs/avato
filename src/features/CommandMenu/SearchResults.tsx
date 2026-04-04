@@ -19,9 +19,9 @@ import { useNavigate } from 'react-router-dom';
 
 import { type SearchResult } from '@/database/repositories/search';
 import {
-  buildContentFolderPath,
-  buildContentPreviewPath,
-  buildContentRootPath,
+  buildFilesFolderPath,
+  buildFilesPreviewPath,
+  buildFilesRootPath,
   buildSourceSetFolderPath,
   buildSourceSetPath,
 } from '@/features/ResourceSpaces';
@@ -80,7 +80,7 @@ const SearchResults = memo<SearchResultsProps>(
         }
         case 'file': {
           // Navigate to resource library with file parameter
-          const fileUrl = buildContentPreviewPath(result.spaceId, result.id, result.sourceSetId);
+          const fileUrl = buildFilesPreviewPath(result.spaceId, result.id, result.sourceSetId);
           console.info('[SearchResults] File navigation:', {
             fileDetails: result,
             url: fileUrl,
@@ -92,12 +92,12 @@ const SearchResults = memo<SearchResultsProps>(
           if (result.sourceSetId && result.slug) {
             navigate(buildSourceSetFolderPath(result.spaceId, result.sourceSetId, result.slug));
           } else if (result.slug) {
-            navigate(buildContentFolderPath(result.spaceId, result.slug));
+            navigate(buildFilesFolderPath(result.spaceId, result.slug));
           } else {
             navigate(
               result.sourceSetId
                 ? buildSourceSetPath(result.spaceId, result.sourceSetId)
-                : buildContentRootPath(result.spaceId),
+                : buildFilesRootPath(result.spaceId),
             );
           }
           break;

@@ -8,11 +8,11 @@ import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBa
 import Nav from './Nav';
 
 const Header = memo(() => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation('memory');
 
   return (
     <Fragment>
-      <SubSidebarTitleBar title={t('tab.memory')} titleTo="/memory" />
+      <SubSidebarTitleBar title={t('title')} titleTo="/memory" />
       <Nav />
     </Fragment>
   );

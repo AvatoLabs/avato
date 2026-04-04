@@ -62,7 +62,7 @@ vi.mock('@/config/contentIcons', () => ({
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentRootPath: (spaceId?: string) => (spaceId ? `/spaces/${spaceId}/files` : '/content'),
+  buildFilesRootPath: (spaceId?: string) => (spaceId ? `/spaces/${spaceId}/files` : '/spaces'),
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({

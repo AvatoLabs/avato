@@ -1,17 +1,9 @@
 import { createStarterTableMarkdown } from '@/utils/docsTable';
 import { standardizeIdentifier } from '@/utils/identifier';
 
-const DOC_PAGE_ROOT = '/docs';
 const DOC_SPACE_ROOT_SEGMENT = '/spaces/';
-const LEGACY_DOC_SPACE_ROOT_SEGMENT = '/docs/spaces/';
-const TABLE_PAGE_PATTERNS = [
-  /^\/spaces\/[^/]+\/docs\/table(?:\/|$)/,
-  /^\/docs(?:\/spaces\/[^/]+)?\/table(?:\/|$)/,
-];
-const PAGE_SPACE_PATH_PATTERNS = [
-  /^\/spaces\/([^/]+)\/docs(?:\/|$)/,
-  /^\/docs\/spaces\/([^/]+)(?:\/|$)/,
-];
+const TABLE_PAGE_PATTERNS = [/^\/spaces\/[^/]+\/docs\/table(?:\/|$)/];
+const PAGE_SPACE_PATH_PATTERNS = [/^\/spaces\/([^/]+)\/docs(?:\/|$)/];
 
 export type PageKind = 'doc' | 'table';
 
@@ -48,16 +40,9 @@ export const getPageRootPath = (
   pageKind: PageKind = DEFAULT_PAGE_KIND,
   spaceId?: string | null,
 ): string => {
-  const docsRoot = spaceId ? `${DOC_SPACE_ROOT_SEGMENT}${spaceId}/docs` : DOC_PAGE_ROOT;
+  if (!spaceId) return '/spaces';
 
-  return pageKind === TABLE_PAGE_KIND ? `${docsRoot}/table` : docsRoot;
-};
-
-export const getLegacyPageRootPath = (
-  pageKind: PageKind = DEFAULT_PAGE_KIND,
-  spaceId?: string | null,
-): string => {
-  const docsRoot = spaceId ? `${LEGACY_DOC_SPACE_ROOT_SEGMENT}${spaceId}` : DOC_PAGE_ROOT;
+  const docsRoot = `${DOC_SPACE_ROOT_SEGMENT}${spaceId}/docs`;
 
   return pageKind === TABLE_PAGE_KIND ? `${docsRoot}/table` : docsRoot;
 };
@@ -67,6 +52,8 @@ export const getPageDetailPath = (
   pageKind: PageKind = DEFAULT_PAGE_KIND,
   spaceId?: string | null,
 ): string => {
+  if (!spaceId) return '/spaces';
+
   const identifier = standardizeIdentifier(pageId);
   const rootPath = getPageRootPath(pageKind, spaceId);
 

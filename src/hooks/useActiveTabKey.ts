@@ -14,12 +14,8 @@ export const useActiveTabKey = () => {
     const surface = segments[2];
 
     if (surface === 'docs') return 'docs' as SidebarTabKey;
-    if (
-      surface === 'files' ||
-      surface === 'source-sets' ||
-      surface === 'settings' ||
-      surface === 'members'
-    ) {
+    if (surface === 'memory') return 'memory' as SidebarTabKey;
+    if (surface === 'files' || surface === 'settings' || surface === 'members') {
       return 'content' as SidebarTabKey;
     }
   }

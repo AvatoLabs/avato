@@ -9,8 +9,7 @@ import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
-
-const SPACE_LIST_KEY = 'resource-space-list';
+import { SPACE_LIST_KEY } from './SpaceList';
 
 export const useSpaceName = (spaceId?: string | null) => {
   const { t } = useTranslation('file');

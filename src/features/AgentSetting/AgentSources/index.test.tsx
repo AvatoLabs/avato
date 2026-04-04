@@ -112,14 +112,12 @@ vi.mock('@/features/SourceSetModal', () => ({
 vi.mock('@/features/ResourceSpaces', () => ({
   useSpaceName: (spaceId?: string | null) =>
     ({ 'space-1': 'My Space', 'space-2': 'Shared Space' })[spaceId || ''],
-  buildContentRootPath: (spaceId: string | null | undefined) =>
-    spaceId ? `/content/spaces/${spaceId}` : '/content',
+  buildFilesRootPath: (spaceId: string | null | undefined) =>
+    spaceId ? `/spaces/${spaceId}/files` : '/spaces',
   buildSourceSetPath: (spaceId: string | null | undefined, sourceSetId: string) =>
-    spaceId
-      ? `/content/spaces/${spaceId}/source-sets/${sourceSetId}`
-      : `/content/source-sets/${sourceSetId}`,
-  buildContentPreviewPath: (spaceId: string | null | undefined, fileId: string) =>
-    spaceId ? `/content/spaces/${spaceId}/item/${fileId}` : `/content/item/${fileId}`,
+    spaceId ? `/spaces/${spaceId}/files?scope=source-set:${sourceSetId}` : '/spaces',
+  buildFilesPreviewPath: (spaceId: string | null | undefined, fileId: string) =>
+    spaceId ? `/spaces/${spaceId}/files/item/${fileId}` : `/spaces/item/${fileId}`,
 }));
 
 describe('AgentSources', () => {
@@ -180,7 +178,7 @@ describe('AgentSources', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Content' }));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/content/spaces/space-1');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/files');
     expect(useAgentStore.getState().showAgentSetting).toBe(false);
     expect(useAgentStore.getState().activeAgentSettingTab).toBeUndefined();
   });

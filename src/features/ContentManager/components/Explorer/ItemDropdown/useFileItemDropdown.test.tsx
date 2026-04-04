@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFileItemDropdown } from './useFileItemDropdown';
 
 const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
-const mockSetSearchParams = vi.hoisted(() => vi.fn());
+const mockNavigate = vi.hoisted(() => vi.fn());
+const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
 
 interface MockContentManagerState {
   setCurrentViewItemId: ReturnType<typeof vi.fn>;
@@ -51,7 +52,11 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('react-router-dom', () => ({
-  useSearchParams: () => [new URLSearchParams(), mockSetSearchParams],
+  useLocation: () => ({
+    pathname: '/spaces/spc_1/files',
+    search: '',
+  }),
+  useNavigate: () => mockNavigate,
 }));
 
 vi.mock('@/config/contentIcons', () => ({
@@ -67,7 +72,7 @@ vi.mock('@/config/contentIcons', () => ({
   },
 }));
 
-vi.mock('@/features/ContentManager/components/SourceSetTree', () => ({
+vi.mock('@/features/ContentManager/components/SourceSetTree/treeState', () => ({
   clearTreeFolderCache: vi.fn(),
 }));
 
@@ -78,7 +83,23 @@ vi.mock('@/features/ResourceSharing', () => ({
 }));
 
 vi.mock('@/features/ResourceSpaces', () => ({
-  buildContentPreviewPath: vi.fn(() => '/content/preview'),
+  buildFilesItemPath: vi.fn((basePath: string, id: string) => `${basePath}/item/${id}`),
+  buildFilesPreviewPath: vi.fn(() => '/spaces/preview'),
+}));
+
+vi.mock('@/features/ResourceSpaces/useSpaceItem', () => ({
+  useSpaceItem: () => ({
+    space: {
+      id: 'spc_1',
+      kind: 'team',
+      membershipRole: 'editor',
+      name: 'Team Space',
+    },
+  }),
+}));
+
+vi.mock('@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal', () => ({
+  useOpenCreateSpaceMemoryCandidateModal: () => mockOpenCreateSpaceMemoryCandidateModal,
 }));
 
 vi.mock('@/hooks/useAppOrigin', () => ({
@@ -125,7 +146,8 @@ vi.mock('@/utils/client/downloadFile', () => ({
 describe('useFileItemDropdown', () => {
   beforeEach(() => {
     mockEnsureFileDocument.mockReset();
-    mockSetSearchParams.mockReset();
+    mockNavigate.mockReset();
+    mockOpenCreateSpaceMemoryCandidateModal.mockReset();
     mockMessage.error.mockReset();
     mockMessage.success.mockReset();
     mockMessage.warning.mockReset();
@@ -163,11 +185,9 @@ describe('useFileItemDropdown', () => {
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_converted_1');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
 
-    const updateQuery = mockSetSearchParams.mock.calls[0][0] as (
-      prev: URLSearchParams,
-    ) => URLSearchParams;
-
-    expect(updateQuery(new URLSearchParams()).get('file')).toBe('docs_converted_1');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/files/item/docs_converted_1', {
+      replace: true,
+    });
   });
 
   it('reuses the existing derived doc id for file-backed resource entries', async () => {
@@ -194,10 +214,38 @@ describe('useFileItemDropdown', () => {
     expect(mockContentManagerState.setCurrentViewItemId).toHaveBeenCalledWith('docs_existing_1');
     expect(mockContentManagerState.setMode).toHaveBeenCalledWith('doc');
 
-    const updateQuery = mockSetSearchParams.mock.calls[0][0] as (
-      prev: URLSearchParams,
-    ) => URLSearchParams;
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/spc_1/files/item/docs_existing_1', {
+      replace: true,
+    });
+  });
 
-    expect(updateQuery(new URLSearchParams()).get('file')).toBe('docs_existing_1');
+  it('offers an add-to-space-memory action with source refs', async () => {
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_1',
+        fileType: 'image/png',
+        filename: 'Poster.png',
+        id: 'file_1',
+        sourceSetId: 'sst_1',
+        url: '/poster.png',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'addToSpaceMemory');
+
+    expect(action?.label).toBe('space.memory.actions.addFromSource');
+
+    await act(async () => {
+      await action.onClick({ domEvent: { stopPropagation: vi.fn() } });
+    });
+
+    expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith({
+      defaultTitle: 'Poster.png',
+      sourceRefs: [
+        { id: 'file_1', kind: 'file', title: 'Poster.png' },
+        { id: 'sst_1', kind: 'source_set', title: undefined },
+      ],
+      spaceId: 'spc_1',
+    });
   });
 });

@@ -299,7 +299,7 @@ describe('HomeInputAction', () => {
         await result.current.sendAsWrite('Content');
       });
 
-      expect(mockNavigate).toHaveBeenCalledWith('/docs/new-doc-id');
+      expect(mockNavigate).toHaveBeenCalledWith('/spaces');
     });
 
     it('should send message with page scope context', async () => {
@@ -312,7 +312,7 @@ describe('HomeInputAction', () => {
       expect(mockSendMessage).toHaveBeenCalledWith({
         context: {
           agentId: 'new-doc-id',
-          scope: 'page',
+          scope: 'doc',
         },
         message: 'Content',
       });

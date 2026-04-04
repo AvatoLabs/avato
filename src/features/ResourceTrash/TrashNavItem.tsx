@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import NavItem from '@/features/NavPanel/components/NavItem';
-import { buildContentTrashPath, buildSourceSetTrashPath } from '@/features/ResourceSpaces';
+import { buildFilesTrashPath, buildSourceSetTrashPath } from '@/features/ResourceSpaces';
 
 export const TrashNavItem = memo<{
   sourceSetId?: string;
@@ -18,7 +18,7 @@ export const TrashNavItem = memo<{
 
   const targetPath = sourceSetId
     ? buildSourceSetTrashPath(spaceId, sourceSetId)
-    : buildContentTrashPath(spaceId);
+    : buildFilesTrashPath(spaceId);
 
   return (
     <NavItem

@@ -1,17 +1,21 @@
 import { copyToClipboard, createRawModal, Icon } from '@lobehub/ui';
 import { App } from 'antd';
 import { type ItemType } from 'antd/es/menu/interface';
+import { LibraryBig } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shallow } from 'zustand/shallow';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
+import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { PAGE_FILE_TYPE } from '@/features/ContentManager/constants';
 import { useOpenFileDocument } from '@/features/ContentManager/hooks/useOpenFileDocument';
 import { isMarkdownContentFile } from '@/features/ContentManager/utils/isMarkdownContentFile';
 import { useResourceShareModal } from '@/features/ResourceSharing';
-import { buildContentPreviewPath } from '@/features/ResourceSpaces';
+import { buildFilesPreviewPath } from '@/features/ResourceSpaces';
+import { canCreateSpaceMemory } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
+import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
+import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
@@ -55,6 +59,9 @@ export const useFileItemDropdown = ({
   const appOrigin = useAppOrigin();
   const { open: openShareModal } = useResourceShareModal();
   const spaceId = useContentManagerStore((s) => s.spaceId);
+  const { space } = useSpaceItem(spaceId);
+  const canAddToSpaceMemory = canCreateSpaceMemory(space);
+  const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
 
   const { deleteContentItem, moveContentItem, refreshFileList } = useFileStore(
     (s) => ({
@@ -72,6 +79,7 @@ export const useFileItemDropdown = ({
   // Only the first call fetches from server, subsequent calls use cache
   // The expensive menu computation is deferred until dropdown opens (menuItems is a function)
   const { data: libraries } = useFetchSourceSetList(spaceId);
+  const currentSourceSet = libraries?.find((item) => item.id === sourceSetId);
 
   const isInSourceSet = !!sourceSetId;
   const isFolder = fileType === 'custom/folder';
@@ -196,6 +204,28 @@ export const useFileItemDropdown = ({
     ) as ItemType[];
 
     const hasSourceSetActions = sourceSetActions.some(Boolean);
+    const memorySourceRefs = [
+      sourceType === 'document' || isPage
+        ? ({
+            id,
+            kind: 'document',
+            title: filename,
+          } as const)
+        : ({
+            id: fileId || id,
+            kind: 'file',
+            title: filename,
+          } as const),
+      ...(sourceSetId
+        ? [
+            {
+              id: sourceSetId,
+              kind: 'source_set' as const,
+              title: currentSourceSet?.name,
+            },
+          ]
+        : []),
+    ];
 
     return (
       [
@@ -203,6 +233,26 @@ export const useFileItemDropdown = ({
         hasSourceSetActions && {
           type: 'divider',
         },
+        canAddToSpaceMemory &&
+          !isFolder &&
+          spaceId && {
+            icon: <Icon icon={LibraryBig} />,
+            key: 'addToSpaceMemory',
+            label: t('space.memory.actions.addFromSource', { ns: 'file' }),
+            onClick: ({ domEvent }) => {
+              domEvent.stopPropagation();
+              openCreateSpaceMemoryCandidateModal({
+                defaultTitle: filename,
+                sourceRefs: memorySourceRefs,
+                spaceId,
+              });
+            },
+          },
+        canAddToSpaceMemory &&
+          !isFolder &&
+          spaceId && {
+            type: 'divider',
+          },
         isInSourceSet && {
           icon: <Icon icon={RESOURCE_ENTRY_ICONS.folderMove} />,
           key: 'moveToFolder',
@@ -263,7 +313,7 @@ export const useFileItemDropdown = ({
             // For pages, use the route path instead of the storage URL
             let urlToCopy = url;
             if (isPage) {
-              urlToCopy = `${appOrigin}${buildContentPreviewPath(spaceId, id, sourceSetId)}`;
+              urlToCopy = `${appOrigin}${buildFilesPreviewPath(spaceId, id, sourceSetId)}`;
             } else if (urlToCopy.startsWith('/')) {
               urlToCopy = new URL(urlToCopy, `${appOrigin}/`).href;
             }
@@ -352,8 +402,11 @@ export const useFileItemDropdown = ({
     ).filter(Boolean);
   }, [
     addFilesToSourceSet,
+    canAddToSpaceMemory,
     canOpenInDocumentEditor,
+    currentSourceSet?.name,
     deleteContentItem,
+    fileId,
     filename,
     id,
     isFolder,
@@ -366,6 +419,7 @@ export const useFileItemDropdown = ({
     modal,
     moveContentItem,
     openFileDocument,
+    openCreateSpaceMemoryCandidateModal,
     openShareModal,
     onRenameStart,
     refreshFileList,

@@ -4,11 +4,14 @@ import { Icon } from '@lobehub/ui';
 import { App } from 'antd';
 import { cssVar, useResponsive } from 'antd-style';
 import dayjs from 'dayjs';
-import { CopyPlus, Download, Link2, Maximize2, Trash2 } from 'lucide-react';
+import { CopyPlus, Download, LibraryBig, Link2, Maximize2, Trash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { canCreateSpaceMemory } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
+import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
+import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
@@ -72,6 +75,9 @@ export const useMenu = (): { menuItems: any[] } => {
   ]);
   const sourceSetId = pageDocument?.sourceSetId ?? undefined;
   const spaceId = pageDocument?.spaceId ?? undefined;
+  const { space } = useSpaceItem(spaceId);
+  const canAddToSpaceMemory = canCreateSpaceMemory(space);
+  const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
 
   // Get lastUpdatedTime from DocumentStore
   const lastUpdatedTime = useDocumentStore((s) =>
@@ -88,6 +94,10 @@ export const useMenu = (): { menuItems: any[] } => {
   const { data: sourceSets = [] } = useFetchSourceSetList(spaceId);
   const availableSourceSets = useMemo(
     () => sourceSets.filter((item) => item.id !== sourceSetId),
+    [sourceSetId, sourceSets],
+  );
+  const currentSourceSet = useMemo(
+    () => sourceSets.find((item) => item.id === sourceSetId),
     [sourceSetId, sourceSets],
   );
 
@@ -398,6 +408,39 @@ export const useMenu = (): { menuItems: any[] } => {
             ...(sourceSetMenuItems.length ? [{ type: 'divider' as const }] : []),
           ]
         : []),
+      ...(canAddToSpaceMemory && documentId && spaceId
+        ? [
+            {
+              icon: <Icon icon={LibraryBig} />,
+              key: 'add-to-space-memory',
+              label: t('space.memory.actions.addFromSource', { ns: 'file' }),
+              onClick: () =>
+                openCreateSpaceMemoryCandidateModal({
+                  defaultTitle: pageDocument?.title || t('pageList.untitled', { ns: 'file' }),
+                  sourceRefs: [
+                    {
+                      id: documentId,
+                      kind: 'document',
+                      title: pageDocument?.title || t('pageList.untitled', { ns: 'file' }),
+                    },
+                    ...(sourceSetId
+                      ? [
+                          {
+                            id: sourceSetId,
+                            kind: 'source_set' as const,
+                            title: currentSourceSet?.name,
+                          },
+                        ]
+                      : []),
+                  ],
+                  spaceId,
+                }),
+            },
+            {
+              type: 'divider' as const,
+            },
+          ]
+        : []),
       {
         icon: <Icon icon={CopyPlus} />,
         key: 'duplicate',
@@ -471,6 +514,9 @@ export const useMenu = (): { menuItems: any[] } => {
     modal,
     sourceSetId,
     availableSourceSets,
+    canAddToSpaceMemory,
+    currentSourceSet?.name,
+    documentId,
     wideScreen,
     toggleWideScreen,
     showViewModeSwitch,
@@ -482,6 +528,9 @@ export const useMenu = (): { menuItems: any[] } => {
     handleMoveToSourceSet,
     handleRemoveFromSourceSet,
     isTablePage,
+    openCreateSpaceMemoryCandidateModal,
+    pageDocument?.title,
+    spaceId,
   ]);
 
   return { menuItems };

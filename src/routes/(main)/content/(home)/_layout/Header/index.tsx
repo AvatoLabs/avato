@@ -5,12 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import SubSidebarTitleBar from '@/features/NavPanel/components/SubSidebarTitleBar';
-import { buildContentRootPath, SpaceSurfaceTitle } from '@/features/ResourceSpaces';
+import { buildFilesRootPath, SpaceSurfaceTitle } from '@/features/ResourceSpaces';
 
 const Header = memo(() => {
   const { t } = useTranslation(['common', 'file']);
   const { spaceId } = useParams<{ spaceId?: string }>();
-  const resourceRoot = buildContentRootPath(spaceId);
+  const resourceRoot = buildFilesRootPath(spaceId);
 
   return (
     <>

@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
-import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
+import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { useFileStore } from '@/store/file';
 
 import { useContentManagerStore } from './store';

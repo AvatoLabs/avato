@@ -3,6 +3,7 @@ import { CalendarClockIcon } from 'lucide-react';
 import { type FC } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 import NavHeader from '@/features/NavHeader';
 import WideScreenContainer from '@/features/WideScreenContainer';
@@ -11,16 +12,14 @@ import { useQueryState } from '@/hooks/useQueryParam';
 import { SCROLL_PARENT_ID } from '@/routes/(main)/memory/features/TimeLineView/useScrollParent';
 import { useUserMemoryStore } from '@/store/userMemory';
 
-import EditableModal from '../features/EditableModal';
 import FilterBar from '../features/FilterBar';
 import Loading from '../features/Loading';
 import { useResetDetailSelection } from '../features/useResetDetailSelection';
 import { type ViewMode } from '../features/ViewModeSwitcher';
 import ViewModeSwitcher from '../features/ViewModeSwitcher';
-import ActivityRightPanel from './features/ActivityRightPanel';
 import List from './features/List';
 
-const ActivitiesArea = memo(() => {
+export const ActivitiesArea = memo(() => {
   const { t } = useTranslation('memory');
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [searchValueRaw, setSearchValueRaw] = useQueryState('q', { clearOnDefault: true });
@@ -115,15 +114,11 @@ const ActivitiesArea = memo(() => {
 });
 
 const Activities: FC = () => {
-  return (
-    <>
-      <Flexbox horizontal height={'100%'} width={'100%'}>
-        <ActivitiesArea />
-        <ActivityRightPanel />
-      </Flexbox>
-      <EditableModal />
-    </>
-  );
+  const [searchParams] = useSearchParams();
+  const next = new URLSearchParams(searchParams);
+  next.set('focus', 'activities');
+
+  return <Navigate replace to={{ pathname: '/memory', search: `?${next.toString()}` }} />;
 };
 
 export default Activities;

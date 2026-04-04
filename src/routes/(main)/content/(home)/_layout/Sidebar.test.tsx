@@ -34,11 +34,11 @@ vi.mock('./Body', () => ({
 }));
 
 describe('ResourceHomeSidebar', () => {
-  it('renders quick access and spaces on the content root', () => {
+  it('renders quick access and spaces on the spaces root', () => {
     render(
-      <MemoryRouter initialEntries={['/content']}>
+      <MemoryRouter initialEntries={['/spaces']}>
         <Routes>
-          <Route element={<Sidebar />} path="/content" />
+          <Route element={<Sidebar />} path="/spaces" />
         </Routes>
       </MemoryRouter>,
     );
@@ -51,9 +51,9 @@ describe('ResourceHomeSidebar', () => {
 
   it('renders source sets when a space is active', () => {
     render(
-      <MemoryRouter initialEntries={['/content/spaces/spc_test']}>
+      <MemoryRouter initialEntries={['/spaces/spc_test/files']}>
         <Routes>
-          <Route element={<Sidebar />} path="/content/spaces/:spaceId" />
+          <Route element={<Sidebar />} path="/spaces/:spaceId/files" />
         </Routes>
       </MemoryRouter>,
     );

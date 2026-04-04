@@ -728,6 +728,13 @@
       "when": 1774684077367,
       "tag": "0103_content_schema_rename",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1775272671197,
+      "tag": "0104_add_space_memory_entries",
+      "breakpoints": true
     }
   ],
   "version": "6"

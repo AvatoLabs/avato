@@ -21,14 +21,14 @@ const MOBILE_NAV_ROUTES = new Set([
   '/community/plugin',
   '/community/model',
   '/community/provider',
-  '/content',
+  '/spaces',
   '/me',
 ]);
 
 const isResourceRoute = (pathname: string) =>
-  pathname === '/content' ||
-  pathname.startsWith('/content/') ||
-  /^\/spaces\/[^/]+\/(?:files|source-sets|settings|members)(?:\/|$)/.test(pathname);
+  pathname === '/content/shared' ||
+  pathname === '/content/trash' ||
+  /^\/spaces\/[^/]+\/(?:files|settings|members|memory)(?:\/|$)/.test(pathname);
 
 const MobileMainLayout: FC = () => {
   const { showCloudPromotion } = useServerConfigStore(featureFlagsSelectors);

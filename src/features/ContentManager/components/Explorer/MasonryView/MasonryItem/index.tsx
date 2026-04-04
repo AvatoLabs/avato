@@ -1,4 +1,4 @@
-import { Checkbox, Text, showContextMenu, stopPropagation } from '@lobehub/ui';
+import { Checkbox, showContextMenu, stopPropagation, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { shallow } from 'zustand/shallow';
 
 import InlineRename from '@/components/InlineRename';
-import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree';
+import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -18,10 +18,10 @@ import { useFileStore } from '@/store/file';
 import { type FileListItem } from '@/types/files';
 import { type FileUploadStatus } from '@/types/files/upload';
 
-import { getInlineUploadStatusKey } from '../../items';
 import { useFileItemClick } from '../../hooks/useFileItemClick';
 import DropdownMenu from '../../ItemDropdown/DropdownMenu';
 import { useFileItemDropdown } from '../../ItemDropdown/useFileItemDropdown';
+import { getInlineUploadStatusKey } from '../../items';
 import DefaultFileItem from './DefaultFileItem';
 import ImageFileItem from './ImageFileItem';
 import MarkdownFileItem from './MarkdownFileItem';
@@ -37,16 +37,7 @@ const IMAGE_TYPES = new Set([
   'image/svg+xml',
 ]);
 
-// Custom note file type
-const CUSTOM_NOTE_TYPE = 'custom/document';
 const MARKDOWN_PREVIEW_MAX_LENGTH = 4000;
-
-// Helper to check if it's a custom page that should be rendered
-// PDF and Office files should not be treated as pages even if they have fileType='custom/document'
-const isCustomPage = (fileType?: string, name?: string) => {
-  const result = resolveResourceKind({ fileType, name });
-  return result.isPage && fileType === CUSTOM_NOTE_TYPE;
-};
 
 // Helper function to extract text from editor's JSON format for preview
 const extractTextFromEditorJSON = (editorData: any): string => {

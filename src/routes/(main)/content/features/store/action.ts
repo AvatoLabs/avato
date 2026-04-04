@@ -1,7 +1,7 @@
 import { type StateCreator } from 'zustand/vanilla';
 
 import { type ContentManagerMode } from '@/features/ContentManager';
-import { buildContentRootPath } from '@/features/ResourceSpaces';
+import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type FilesTabs, type SortType } from '@/types/files';
 
@@ -187,11 +187,11 @@ export const store: CreateStore = (publicState) => (set, get) => ({
         await sourceSetStore.removeSourceSet(sourceSetId);
         // Clear tree cache before navigation
         const { clearTreeStateForSourceSet } =
-          await import('@/features/ContentManager/components/SourceSetTree');
+          await import('@/features/ContentManager/components/SourceSetTree/treeState');
         clearTreeStateForSourceSet(sourceSetId);
         // Navigate to resource home via SPA navigation
         const { useGlobalStore } = await import('@/store/global');
-        useGlobalStore.getState().navigate?.(buildContentRootPath(spaceId));
+        useGlobalStore.getState().navigate?.(buildFilesRootPath(spaceId));
         return;
       }
     }
@@ -245,7 +245,7 @@ export const store: CreateStore = (publicState) => (set, get) => ({
 
     // Clear tree cache when navigating back to home to prevent memory buildup.
     if (prevId && !sourceSetId) {
-      import('@/features/ContentManager/components/SourceSetTree').then(
+      import('@/features/ContentManager/components/SourceSetTree/treeState').then(
         ({ clearTreeStateForSourceSet }) => clearTreeStateForSourceSet(prevId),
       );
     }

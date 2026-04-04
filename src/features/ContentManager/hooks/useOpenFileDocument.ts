@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { buildContentItemPath } from '@/features/ResourceSpaces';
+import { buildFilesItemPath } from '@/features/ResourceSpaces';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { documentService } from '@/services/document';
 
@@ -27,7 +27,7 @@ export const useOpenFileDocument = ({ fileId, id }: UseOpenFileDocumentOptions) 
     nextParams.delete('file');
     nextParams.delete('files');
 
-    const nextPath = buildContentItemPath(location.pathname, documentId);
+    const nextPath = buildFilesItemPath(location.pathname, documentId);
     const nextSearch = nextParams.toString();
     navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });
 

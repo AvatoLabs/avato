@@ -47,6 +47,7 @@ import { sessionGroupRouter } from './sessionGroup';
 import { shareRouter } from './share';
 import { sourceSetRouter } from './sourceSet';
 import { spaceRouter } from './space';
+import { spaceMemoryRouter } from './spaceMemory';
 import { tagRouter } from './tag';
 import { threadRouter } from './thread';
 import { topicRouter } from './topic';
@@ -100,6 +101,7 @@ export const lambdaRouter = router({
   share: shareRouter,
   sourceSet: sourceSetRouter,
   space: spaceRouter,
+  spaceMemory: spaceMemoryRouter,
   thread: threadRouter,
   topic: topicRouter,
   upload: uploadRouter,

@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { buildContentItemPath } from '@/features/ResourceSpaces';
+import { buildFilesItemPath } from '@/features/ResourceSpaces';
 import { documentSelectors, useFileStore } from '@/store/file';
 
 import { useContentManagerStore } from '../store';
@@ -38,7 +38,7 @@ export const useInitFileCheck = () => {
     nextParams.delete('file');
     nextParams.delete('files');
 
-    const nextPath = buildContentItemPath(location.pathname, legacyFileId);
+    const nextPath = buildFilesItemPath(location.pathname, legacyFileId);
     const nextSearch = nextParams.toString();
 
     navigate(nextSearch ? `${nextPath}?${nextSearch}` : nextPath, { replace: true });

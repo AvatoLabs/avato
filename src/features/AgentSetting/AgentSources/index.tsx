@@ -11,8 +11,8 @@ import { useNavigate } from 'react-router-dom';
 
 import SourceIcon from '@/components/SourceIcon';
 import {
-  buildContentPreviewPath,
-  buildContentRootPath,
+  buildFilesPreviewPath,
+  buildFilesRootPath,
   buildSourceSetPath,
   useSpaceName,
 } from '@/features/ResourceSpaces';
@@ -243,7 +243,7 @@ const AgentSources = memo(() => {
       const path =
         item.type === AgentSourceKind.SourceSet
           ? buildSourceSetPath(item.spaceId, item.id)
-          : buildContentPreviewPath(item.spaceId, item.id);
+          : buildFilesPreviewPath(item.spaceId, item.id);
 
       closeAndNavigate(path);
     },
@@ -321,7 +321,7 @@ const AgentSources = memo(() => {
             </Button>
             <Button
               icon={FolderSearch2}
-              onClick={() => closeAndNavigate(buildContentRootPath(activeWorkspaceSpaceId))}
+              onClick={() => closeAndNavigate(buildFilesRootPath(activeWorkspaceSpaceId))}
             >
               {t('settingSources.actions.manage')}
             </Button>
