@@ -6,6 +6,37 @@
 
 ---
 
+## 0. 文档定位与统一关系
+
+这份文档不是记忆引擎实现细节文档，而是 **Space-First 架构下的团队记忆产品方案**。
+
+它回答的是：
+
+- `Personal Memory` 和 `Space Memory` 应该如何分层
+- 在 `space-first` 工作区里，memory 应该如何进入 IA、路由、UI 和 RBAC
+- 企业团队该如何理解 candidate / published /治理流
+
+与它配套的另外两份文档分别是：
+
+- [memory-v2-migration-blueprint.zh-CN.md](./memory-v2-migration-blueprint.zh-CN.md)
+  - 定义 canonical schema、candidate / published / history / recall 等内核机制
+- [long-memory-harness-interface-rfc.zh-CN.md](./long-memory-harness-interface-rfc.zh-CN.md)
+  - 定义未来自研长记忆 harness 的接口与边界
+
+统一后的关系必须固定为：
+
+1. `memory-v2` 决定 **系统真相与数据边界**
+2. `space-first team memory` 决定 **产品结构与用户体验**
+3. `harness RFC` 决定 **自动化编排如何接入，但不能拥有真相**
+
+一句话定义：
+
+> `Personal Memory` 解决“这个用户自己的长期记忆”；  
+> `Space Memory` 解决“这个团队在这个空间里的长期共享记忆”；  
+> `Harness` 只负责发现、提议、召回，不直接定义 canonical truth。
+
+---
+
 ## 一、执行摘要
 
 当前 LobeHub 的 `memory` 本质上还是一套 **user-memory** 系统：
@@ -35,6 +66,11 @@
 > 应该保留 `Personal Memory`，并新增一层真正的 `Space Memory`。  
 > 个人记忆属于 `space` 外；团队记忆属于某个 `space` 内。  
 > 自动化只负责产生候选记忆，团队共享的 canonical memory 默认必须经过治理。
+
+补一条必须明确的系统约束：
+
+> 未来即使引入自研长记忆 harness，`Space Memory` 的 canonical schema、状态机、RBAC 和审计边界也仍然由 LobeHub 掌握。  
+> harness 可以写 candidate，不能直接拥有 `published`。
 
 ---
 
@@ -122,6 +158,26 @@
 - 允许 agent 读取，有限度写入
 
 当前系统没有这一层。
+
+### 5. 当前还没有正式的 harness 分层
+
+今天的自动提取逻辑和记忆产品逻辑仍然耦合得比较紧：
+
+- 提取逻辑直接绑定在当前 user-memory 管线
+- recall 与 prompt 注入也仍然偏实现内聚
+- 没有一个明确的 `candidate contract / merge decision contract / recall contract`
+
+这意味着如果未来直接引入新的长记忆 harness，而不先定义接口边界，就会出现两个风险：
+
+1. harness 反向定义产品模型
+2. 不同 harness 对同一份团队记忆给出不一致的真相边界
+
+因此团队 memory 方案必须从一开始就预留：
+
+- harness 只产出 candidate
+- harness 不直接写 published
+- harness 不绕过 RBAC 和审计
+- harness 不拥有 UI 主导权
 
 ### 4. 和新 `space-first` 架构的错位
 
@@ -492,6 +548,15 @@ graph TD
 - curator 才能发布团队记忆
 
 这比“所有 agent 自动写共享记忆”安全得多。
+
+### 5. 对未来 harness 的产品约束
+
+从产品层看，未来的长记忆 harness 必须遵守四条规则：
+
+1. `Harness` 只负责发现和建议，不负责宣布真相
+2. `Space Memory` 的 UI 只展示 candidate / published / history，不展示 harness 内部实现术语
+3. 不同 harness 可以替换，但用户看到的记忆对象和状态机不能漂移
+4. `Source Set` 仍然只是来源和范围，不被 harness 抬升成第三个 memory 根
 
 ---
 

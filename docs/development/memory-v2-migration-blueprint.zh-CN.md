@@ -5,6 +5,87 @@
 
 ---
 
+## 0. 文档定位与统一关系
+
+这份文档是 **Memory V2 的技术主蓝图**，回答的是：
+
+- 记忆引擎应该如何重构
+- canonical schema 应该如何定义
+- candidate / published / history / recall 应该如何工作
+- 未来长记忆 harness 应该如何接入，而不破坏真相边界
+
+与之配套的另外两份文档分别是：
+
+- [space-first-team-memory-plan.zh-CN.md](./space-first-team-memory-plan.zh-CN.md)
+  - 负责 `Personal Memory / Space Memory` 的产品、UI、RBAC 与治理方案
+- [long-memory-harness-interface-rfc.zh-CN.md](./long-memory-harness-interface-rfc.zh-CN.md)
+  - 负责未来自研长记忆 harness 的接口、责任边界与替换约束
+
+统一后的关系应当固定为：
+
+1. **本文件** = 记忆系统内核与 canonical truth
+2. **Space-First Team Memory** = 产品层与工作区落地
+3. **Harness RFC** = 编排层与未来替换点
+
+一句话定义：
+
+> `Memory V2` 定义“什么是真的”；  
+> `Space-First Team Memory` 定义“用户如何使用”；  
+> `Harness RFC` 定义“自动化如何接入，但不能拥有真相”。
+
+---
+
+## 0.1 最终统一提案
+
+统一后的企业记忆方案不是单层 memory，也不是把今天的 `user memory` 直接扩成团队 memory。
+
+正确模型是三层：
+
+### A. Product Layer
+
+用户只看到两类长期记忆：
+
+- `Personal Memory`
+- `Space Memory`
+
+其中：
+
+- `Personal Memory` 属于 `space` 外
+- `Space Memory` 属于某个 `space` 内
+- `Source Set` 不是 memory 根，只是来源、标签与过滤维度
+
+### B. Canonical Memory Layer
+
+这一层必须由 LobeHub 自己掌握：
+
+- PostgreSQL 是唯一真相源
+- pgvector 只是召回加速层
+- `candidate` 与 `published` 必须分离
+- 每条团队记忆必须可追溯、可撤销、可审计
+
+### C. Harness Layer
+
+未来的长记忆 harness 只负责：
+
+- extract
+- normalize
+- dedup
+- merge decision
+- retrieval packaging
+
+它不负责：
+
+- 定义 canonical schema
+- 绕过 review 直接写 `published`
+- 替代产品层 scope / RBAC / audit 规则
+
+统一后的边界应当是：
+
+> harness 可以生成 candidate，不能直接拥有 canonical memory。  
+> canonical memory 可以被不同 harness 复用，但不被任何单一 harness 绑死。
+
+---
+
 ## 1. 决策摘要
 
 ### 1.1 主参照库
@@ -53,6 +134,7 @@
 - 借鉴 Mem0 的产品形态和关键机制
 - 继续使用 LobeHub 自己的 PostgreSQL + pgvector
 - 自己掌握 canonical schema、review、audit、scope 和权限
+- 预留未来自研 harness 的编排接口，但不把 canonical truth 交给 harness
 
 ---
 
@@ -103,7 +185,7 @@
 - 记忆不应该只有“用户”一个维度
 - 需要支持：
   - 用户级
-  - 工作区级
+  - 空间级
   - Agent 级
   - 未来如有必要，可增加会话级短期记忆
 
@@ -162,17 +244,17 @@
 
 `mem0` 很强，但并不应该整套复制：
 
-| `mem0` 能力 | 建议 |
-| --- | --- |
-| 统一 `Memory` facade | 应借鉴 |
-| facts -> ADD/UPDATE/DELETE merge 流程 | 应借鉴 |
-| history 机制 | 应借鉴 |
-| 多 scope filter | 应借鉴 |
-| graph store | V2 MVP 不做 |
-| procedural memory | V2 MVP 不做 |
-| Python SDK 直连产品核心 | 不采用 |
-| vector store 作为唯一真相源 | 不采用 |
-| categories 作为主 taxonomy | 不采用 |
+| `mem0` 能力                           | 建议        |
+| ------------------------------------- | ----------- |
+| 统一 `Memory` facade                  | 应借鉴      |
+| facts -> ADD/UPDATE/DELETE merge 流程 | 应借鉴      |
+| history 机制                          | 应借鉴      |
+| 多 scope filter                       | 应借鉴      |
+| graph store                           | V2 MVP 不做 |
+| procedural memory                     | V2 MVP 不做 |
+| Python SDK 直连产品核心               | 不采用      |
+| vector store 作为唯一真相源           | 不采用      |
+| categories 作为主 taxonomy            | 不采用      |
 
 结论：
 
@@ -337,7 +419,7 @@ flowchart TD
 发送消息时：
 
 1. 服务端从 canonical memory store 取当前用户可见的 active memories
-2. 基于 query / agent / workspace / tenant 做召回与 rerank
+2. 基于 query / agent / space / tenant 做召回与 rerank
 3. 选出少量高价值 memory 形成 `memory pack`
 4. 注入 prompt
 5. 记录本次 recall usage log
@@ -377,39 +459,39 @@ flowchart TD
 
 建议新增表：`memory_v2_entries`
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 主键 |
-| `tenant_id` | 租户 |
-| `user_id` | 用户 |
-| `workspace_id` | 工作区，可空 |
-| `agent_id` | Agent，可空 |
-| `scope` | `user / workspace / agent` |
-| `kind` | `profile / preference / instruction / business_context` |
-| `title` | 可选短标题 |
-| `content` | 主内容 |
-| `normalized_key` | 去重覆盖键，例如 `language_preference` |
-| `embedding` | pgvector 向量 |
-| `confidence` | 0~1 |
-| `state` | `active / disabled / archived / deleted` |
-| `is_pinned` | 是否固定注入 |
-| `source_type` | `auto / user / admin / import / legacy_migration` |
-| `source_message_id` | 来源消息 |
-| `source_topic_id` | 来源主题 |
-| `source_run_id` | 来源运行，可空 |
-| `created_by` | `auto / user / admin / system` |
-| `updated_by` | `auto / user / admin / system` |
-| `approved_at` | 审核通过时间 |
-| `last_used_at` | 最近被 recall 时间 |
-| `expires_at` | 可选过期时间 |
-| `metadata` | 扩展字段 |
-| `created_at` | 创建时间 |
-| `updated_at` | 更新时间 |
+| 字段                | 说明                                                    |
+| ------------------- | ------------------------------------------------------- |
+| `id`                | 主键                                                    |
+| `tenant_id`         | 租户                                                    |
+| `user_id`           | 用户                                                    |
+| `space_id`          | 空间，可空                                              |
+| `agent_id`          | Agent，可空                                             |
+| `scope`             | `user / space / agent`                                  |
+| `kind`              | `profile / preference / instruction / business_context` |
+| `title`             | 可选短标题                                              |
+| `content`           | 主内容                                                  |
+| `normalized_key`    | 去重覆盖键，例如 `language_preference`                  |
+| `embedding`         | pgvector 向量                                           |
+| `confidence`        | 0~1                                                     |
+| `state`             | `active / disabled / archived / deleted`                |
+| `is_pinned`         | 是否固定注入                                            |
+| `source_type`       | `auto / user / admin / import / legacy_migration`       |
+| `source_message_id` | 来源消息                                                |
+| `source_topic_id`   | 来源主题                                                |
+| `source_run_id`     | 来源运行，可空                                          |
+| `created_by`        | `auto / user / admin / system`                          |
+| `updated_by`        | `auto / user / admin / system`                          |
+| `approved_at`       | 审核通过时间                                            |
+| `last_used_at`      | 最近被 recall 时间                                      |
+| `expires_at`        | 可选过期时间                                            |
+| `metadata`          | 扩展字段                                                |
+| `created_at`        | 创建时间                                                |
+| `updated_at`        | 更新时间                                                |
 
 建议索引：
 
 - `(tenant_id, user_id, state, kind)`
-- `(tenant_id, workspace_id, state)`
+- `(tenant_id, space_id, state)`
 - `(tenant_id, agent_id, state)`
 - `normalized_key`
 - `embedding` HNSW index
@@ -425,28 +507,28 @@ flowchart TD
 - 支持规则回放
 - 支持 debug 和 prompt 调优
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 主键 |
-| `tenant_id` | 租户 |
-| `user_id` | 用户 |
-| `workspace_id` | 工作区，可空 |
-| `agent_id` | Agent，可空 |
-| `scope` | `user / workspace / agent` |
-| `kind` | 候选类别 |
-| `content` | 候选内容 |
-| `normalized_key` | 归一化键 |
-| `confidence` | 0~1 |
-| `decision` | `pending / accepted / rejected / auto_accepted / superseded` |
-| `reason` | 决策理由 |
-| `merge_target_id` | 如果合并进旧 memory，记录目标 entry |
-| `raw_context` | 生成候选时使用的上下文 |
-| `source_message_ids` | 来源消息集合 |
-| `extractor_version` | 抽取器版本 |
-| `metadata` | 扩展字段 |
-| `decided_at` | 决策时间 |
-| `decided_by` | `auto / user / admin / system` |
-| `created_at` | 创建时间 |
+| 字段                 | 说明                                                         |
+| -------------------- | ------------------------------------------------------------ |
+| `id`                 | 主键                                                         |
+| `tenant_id`          | 租户                                                         |
+| `user_id`            | 用户                                                         |
+| `space_id`           | 空间，可空                                                   |
+| `agent_id`           | Agent，可空                                                  |
+| `scope`              | `user / space / agent`                                       |
+| `kind`               | 候选类别                                                     |
+| `content`            | 候选内容                                                     |
+| `normalized_key`     | 归一化键                                                     |
+| `confidence`         | 0~1                                                          |
+| `decision`           | `pending / accepted / rejected / auto_accepted / superseded` |
+| `reason`             | 决策理由                                                     |
+| `merge_target_id`    | 如果合并进旧 memory，记录目标 entry                          |
+| `raw_context`        | 生成候选时使用的上下文                                       |
+| `source_message_ids` | 来源消息集合                                                 |
+| `extractor_version`  | 抽取器版本                                                   |
+| `metadata`           | 扩展字段                                                     |
+| `decided_at`         | 决策时间                                                     |
+| `decided_by`         | `auto / user / admin / system`                               |
+| `created_at`         | 创建时间                                                     |
 
 ### 6.4 History 表
 
@@ -484,19 +566,19 @@ flowchart TD
 - 记录哪些 memory 在聊天时被拿出来过
 - 支持后续排序、治理和运营调优
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 主键 |
-| `tenant_id` | 租户 |
-| `user_id` | 用户 |
-| `topic_id` | 对话主题 |
-| `message_id` | 触发召回的消息 |
-| `entry_id` | 被召回的 memory |
-| `rank` | 排名 |
-| `score` | 最终分数 |
-| `reason` | 召回原因 |
-| `injected` | 是否真正注入 prompt |
-| `created_at` | 创建时间 |
+| 字段         | 说明                |
+| ------------ | ------------------- |
+| `id`         | 主键                |
+| `tenant_id`  | 租户                |
+| `user_id`    | 用户                |
+| `topic_id`   | 对话主题            |
+| `message_id` | 触发召回的消息      |
+| `entry_id`   | 被召回的 memory     |
+| `rank`       | 排名                |
+| `score`      | 最终分数            |
+| `reason`     | 召回原因            |
+| `injected`   | 是否真正注入 prompt |
+| `created_at` | 创建时间            |
 
 这部分是借鉴 `OpenMemory` access log 思路，但更偏 prompt recall 观测。
 
@@ -522,7 +604,7 @@ flowchart TD
    - user
    - scope
    - agent
-   - workspace
+   - space
    - expires_at
 5. rerank
 6. 组装 memory pack
@@ -583,7 +665,7 @@ Memory V2 也应该采用同样的两阶段写入：
 
 - 最近 1 到 6 轮对话
 - 当前用户消息
-- 可选 Agent 名称 / workspace 元信息
+- 可选 Agent 名称 / space 元信息
 
 输出：
 
@@ -608,13 +690,13 @@ Memory V2 也应该采用同样的两阶段写入：
 
 建议的 merge 决策：
 
-| 情况 | 动作 |
-| --- | --- |
-| 高置信度且同 key 无旧值 | 自动新增 |
+| 情况                    | 动作                 |
+| ----------------------- | -------------------- |
+| 高置信度且同 key 无旧值 | 自动新增             |
 | 高置信度且同 key 有旧值 | 自动覆盖并写 history |
-| 中置信度 | 进入 `Suggested` |
-| 低置信度 | 丢弃 |
-| 敏感信息 | 丢弃或强制 review |
+| 中置信度                | 进入 `Suggested`     |
+| 低置信度                | 丢弃                 |
+| 敏感信息                | 丢弃或强制 review    |
 
 ### 8.4 自动写入规则
 
@@ -695,7 +777,7 @@ ToB 需要管理员控制：
 - 某类 memory 是否允许自动写入
 - memory 保留时长
 - 敏感词/敏感模式过滤
-- 是否允许 workspace 共享记忆
+- 是否允许 space 共享记忆
 - 是否允许 agent 级独立记忆
 
 ---
@@ -952,13 +1034,13 @@ V2 建议统一成：
 
 旧类型建议映射：
 
-| 旧类型 | V2 映射 | 说明 |
-| --- | --- | --- |
-| `identity` | `profile` | 可迁移 |
-| `preference` | `preference` 或 `instruction` | 可迁移 |
-| `context` | `business_context` | 仅迁长期稳定条目 |
-| `experience` | 通常不迁 | 多为短期或叙事性 |
-| `activity` | 通常不迁 | 多为任务态或临时过程 |
+| 旧类型       | V2 映射                       | 说明                 |
+| ------------ | ----------------------------- | -------------------- |
+| `identity`   | `profile`                     | 可迁移               |
+| `preference` | `preference` 或 `instruction` | 可迁移               |
+| `context`    | `business_context`            | 仅迁长期稳定条目     |
+| `experience` | 通常不迁                      | 多为短期或叙事性     |
+| `activity`   | 通常不迁                      | 多为任务态或临时过程 |
 
 ### 13.1 Persona 的处理
 

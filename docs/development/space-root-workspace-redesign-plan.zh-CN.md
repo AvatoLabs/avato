@@ -182,13 +182,14 @@
 建议分两层理解：
 
 - **当前 `Memory`**：默认是用户个人层能力，属于 `space` 外
-- **未来如需团队记忆**：应作为新的 `Space` 内能力单独设计，例如 `Team Memory`
+- **未来如需团队记忆**：应作为新的 `Space` 内能力单独设计，例如 `Space Memory`
 
 不要把现有个人记忆直接包装成团队空间模块，否则会把隐私边界和协作边界搅乱。
 
 团队记忆的详细方案，单独见：
 
 - `/Users/arthur/RustroverProjects/lobehub/docs/development/space-first-team-memory-plan.zh-CN.md`
+- `/Users/arthur/RustroverProjects/lobehub/docs/development/long-memory-harness-interface-rfc.zh-CN.md`
 
 ### 4. `Chat / Agent` 的定位
 
@@ -279,13 +280,13 @@
 
 这里借鉴的是它们的**工作区根心智**，而不是照抄视觉：
 
-- 先确定当前 workspace
-- 再进入该 workspace 内的文档、资料、成员和设置
-- 权限与分享先落在 workspace
+- 先确定当前 `space`
+- 再进入该 `space` 内的文档、资料、成员和设置
+- 权限与分享先落在 `space`
 
 LobeHub 不需要变成页面树产品，但必须承认：
 
-> **Workspace 比内容分类更高一级。**
+> **Space 比内容分类更高一级。**
 
 ---
 
@@ -804,7 +805,7 @@ Personal space 和 Team space 的 empty state 应有所区分。
 > **Space 是唯一的工作区根。**  
 > **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**  
 > **Source Set（资料集）是 Space 内的专题容器，也是唯一让 Docs 和 Files 同时出现的统一视图。**  
-> **Community、Personal Memory、Account 属于 Space 外模块。**  
+> **Chat / Agent、Community、Personal Memory、Account 属于 Space 外模块。**  
 > **Content 退到实现层，作为统一资源注册表存在，不再作为用户主语。**
 
 如果这一点不先收口，后面无论再补多少 sidebar、scope、source set 入口，都会继续在错误的顶层结构上修补，而不会得到一个真正可扩展的工作区产品。
