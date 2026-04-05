@@ -64,6 +64,12 @@ export class FileModel {
     });
   }
 
+  static async getFileByUrl(db: LobeChatDatabase, url: string): Promise<FileItem | undefined> {
+    return db.query.files.findFirst({
+      where: eq(files.url, url),
+    });
+  }
+
   create = async (
     params: Omit<NewFile, 'id' | 'userId'> & {
       id?: string;
@@ -133,6 +139,7 @@ export class FileModel {
 
   private buildFileListWhereClause = ({
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
@@ -174,7 +181,7 @@ export class FileModel {
     }
 
     const shouldJoinFileAssets = Boolean(
-      assetClassification || assetReviewStatus || assetUsagePolicy,
+      assetClassification || assetRightsOwner || assetReviewStatus || assetUsagePolicy,
     );
 
     if (assetClassification) {
@@ -205,6 +212,10 @@ export class FileModel {
               or(eq(fileAssets.usagePolicy, assetUsagePolicy), isNull(fileAssets.fileId)),
             )
           : and(whereClause, eq(fileAssets.usagePolicy, assetUsagePolicy));
+    }
+
+    if (assetRightsOwner) {
+      whereClause = and(whereClause, ilike(fileAssets.rightsOwner, `%${assetRightsOwner}%`));
     }
 
     return {
@@ -612,6 +623,7 @@ export class FileModel {
 
   query = async ({
     assetClassification,
+    assetRightsOwner,
     assetReviewStatus,
     assetUsagePolicy,
     category,
@@ -630,6 +642,7 @@ export class FileModel {
       whereClause,
     } = this.buildFileListWhereClause({
       assetClassification,
+      assetRightsOwner,
       assetReviewStatus,
       assetUsagePolicy,
       category,
@@ -691,6 +704,16 @@ export class FileModel {
   findByIds = async (ids: string[]) => {
     return this.db.query.files.findMany({
       where: and(inArray(files.id, ids), eq(files.userId, this.userId)),
+    });
+  };
+
+  findByUrls = async (urls: string[]) => {
+    const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
+
+    if (uniqueUrls.length === 0) return [];
+
+    return this.db.query.files.findMany({
+      where: and(inArray(files.url, uniqueUrls), eq(files.userId, this.userId)),
     });
   };
 

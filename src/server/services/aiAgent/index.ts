@@ -46,7 +46,7 @@ import { AgentService } from '@/server/services/agent';
 import { AgentRuntimeService } from '@/server/services/agentRuntime';
 import { type StepLifecycleCallbacks } from '@/server/services/agentRuntime/types';
 import { FileService } from '@/server/services/file';
-import { resolveProviderReadableFileReference } from '@/server/services/file/resolveProviderReadableFileReference';
+import { resolveRuntimeFileInput } from '@/server/services/file/resolveRuntimeFileInput';
 import { KlavisService } from '@/server/services/klavis';
 import { MarketService } from '@/server/services/market';
 import {
@@ -80,6 +80,8 @@ const buildSpaceMemoryRecallQuery = (parts: Array<string | null | undefined>) =>
     .filter((part): part is string => Boolean(part))
     .join('\n')
     .slice(-MAX_SPACE_MEMORY_RECALL_QUERY_LENGTH);
+
+const AI_AGENT_INPUT_STORAGE_SCOPE = 'ai-agent-inputs';
 
 /**
  * Format error for storage in thread metadata
@@ -205,6 +207,22 @@ export class AiAgentService {
     this.agentRuntimeService = new AgentRuntimeService(db, userId);
     this.marketService = new MarketService({ userInfo: { userId } });
     this.klavisService = new KlavisService({ db, userId });
+  }
+
+  private async resolveTargetSpaceIdForAgentInput(params: { spaceId?: string; topicId?: string }) {
+    if (params.spaceId) {
+      const explicitSpace = await new SpaceModel(this.db, this.userId).findAccessibleSpaceById(
+        params.spaceId,
+      );
+      if (explicitSpace?.id) return explicitSpace.id;
+    }
+
+    if (params.topicId) {
+      const topicSpaceId = (await this.topicModel.findById(params.topicId))?.spaceId;
+      if (topicSpaceId) return topicSpaceId;
+    }
+
+    return (await new SpaceModel(this.db, this.userId).getOrCreatePersonalSpace()).id;
   }
 
   /**
@@ -719,7 +737,7 @@ export class AiAgentService {
 
           if (storedFile.fileType?.startsWith('image/')) {
             try {
-              const providerReadable = await resolveProviderReadableFileReference({
+              const providerReadable = await resolveRuntimeFileInput({
                 db: this.db,
                 fileService,
                 url: `/f/${storedFile.id}`,
@@ -746,19 +764,31 @@ export class AiAgentService {
       }
 
       if (files && files.length > 0) {
+        const uploadSpaceId = await this.resolveTargetSpaceIdForAgentInput({
+          spaceId: appContext?.spaceId,
+          topicId,
+        });
+
         for (const file of files) {
           const ext = file.name?.split('.').pop() || 'bin';
-          const pathname = `files/${this.userId}/${nanoid()}/${file.name || `file.${ext}`}`;
+          const { key: pathname } = await fileService.createOpaqueUserBlobPath(
+            AI_AGENT_INPUT_STORAGE_SCOPE,
+            ext,
+            uploadSpaceId,
+          );
 
           try {
-            const result = await fileService.uploadFromUrl(file.url, pathname);
+            const result = await fileService.uploadFromUrl(file.url, pathname, {
+              name: file.name || `file.${ext}`,
+              spaceId: uploadSpaceId,
+            });
             fileIds.push(result.fileId);
 
             // Build imageList for vision-capable models
             const mimeType = file.mimeType || '';
             if (mimeType.startsWith('image/')) {
               try {
-                const providerReadable = await resolveProviderReadableFileReference({
+                const providerReadable = await resolveRuntimeFileInput({
                   db: this.db,
                   fileService,
                   url: result.url,

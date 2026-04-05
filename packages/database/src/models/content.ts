@@ -1,6 +1,6 @@
 import type { ContentKind, ContentRole } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import { and, asc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { sha256 } from 'js-sha256';
 
 import type {
@@ -184,6 +184,33 @@ export class ContentModel {
           eq(spaceBlobs.spaceId, spaceId),
           eq(spaceBlobs.sha256, hash),
           eq(spaceBlobs.status, 'ready'),
+        ),
+      )
+      .limit(1);
+
+    return blob;
+  };
+
+  findAccessibleSpaceBlobByStorageKey = async (
+    storageKey: string,
+    userId: string = this.userId,
+  ) => {
+    const [blob] = await this.db
+      .select({
+        id: spaceBlobs.id,
+        spaceId: spaceBlobs.spaceId,
+        status: spaceBlobs.status,
+        storageKey: spaceBlobs.storageKey,
+      })
+      .from(spaceBlobs)
+      .innerJoin(spaces, eq(spaceBlobs.spaceId, spaces.id))
+      .innerJoin(spaceMembers, eq(spaceBlobs.spaceId, spaceMembers.spaceId))
+      .where(
+        and(
+          eq(spaceBlobs.storageKey, storageKey),
+          eq(spaceBlobs.status, 'ready'),
+          eq(spaceMembers.userId, userId),
+          isNull(spaces.deletedAt),
         ),
       )
       .limit(1);
@@ -552,6 +579,98 @@ export class ContentModel {
       contentUid: params.contentUid ?? null,
       spaceId: params.spaceId ?? null,
     });
+  };
+
+  findLatestAuditLog = async (params: { actions?: string[]; contentUid: string }) => {
+    const filters = [eq(contentAuditLogs.contentUid, params.contentUid)];
+
+    if (params.actions && params.actions.length > 0) {
+      filters.push(inArray(contentAuditLogs.action, params.actions));
+    }
+
+    const [item] = await this.db
+      .select({
+        action: contentAuditLogs.action,
+        after: contentAuditLogs.after,
+        actorDisplayName: sql<
+          string | null
+        >`coalesce(${users.fullName}, ${users.username}, ${users.email}, ${users.id})`,
+        actorId: contentAuditLogs.actorId,
+        before: contentAuditLogs.before,
+        createdAt: contentAuditLogs.createdAt,
+        metadata: contentAuditLogs.metadata,
+      })
+      .from(contentAuditLogs)
+      .leftJoin(users, eq(contentAuditLogs.actorId, users.id))
+      .where(and(...filters))
+      .orderBy(desc(contentAuditLogs.createdAt))
+      .limit(1);
+
+    return item;
+  };
+
+  listAuditLogs = async (params: { actions?: string[]; contentUid: string; limit?: number }) => {
+    const filters = [eq(contentAuditLogs.contentUid, params.contentUid)];
+
+    if (params.actions && params.actions.length > 0) {
+      filters.push(inArray(contentAuditLogs.action, params.actions));
+    }
+
+    return this.db
+      .select({
+        action: contentAuditLogs.action,
+        after: contentAuditLogs.after,
+        actorDisplayName: sql<
+          string | null
+        >`coalesce(${users.fullName}, ${users.username}, ${users.email}, ${users.id})`,
+        actorId: contentAuditLogs.actorId,
+        before: contentAuditLogs.before,
+        createdAt: contentAuditLogs.createdAt,
+        metadata: contentAuditLogs.metadata,
+      })
+      .from(contentAuditLogs)
+      .leftJoin(users, eq(contentAuditLogs.actorId, users.id))
+      .where(and(...filters))
+      .orderBy(desc(contentAuditLogs.createdAt))
+      .limit(params.limit ?? 10);
+  };
+
+  findLatestAuditLogsByContentUids = async (params: {
+    actions?: string[];
+    contentUids: string[];
+  }) => {
+    if (params.contentUids.length === 0) return [];
+
+    const filters = [inArray(contentAuditLogs.contentUid, params.contentUids)];
+
+    if (params.actions && params.actions.length > 0) {
+      filters.push(inArray(contentAuditLogs.action, params.actions));
+    }
+
+    const rows = await this.db
+      .select({
+        action: contentAuditLogs.action,
+        actorDisplayName: sql<
+          string | null
+        >`coalesce(${users.fullName}, ${users.username}, ${users.email}, ${users.id})`,
+        actorId: contentAuditLogs.actorId,
+        contentUid: contentAuditLogs.contentUid,
+        createdAt: contentAuditLogs.createdAt,
+        metadata: contentAuditLogs.metadata,
+      })
+      .from(contentAuditLogs)
+      .leftJoin(users, eq(contentAuditLogs.actorId, users.id))
+      .where(and(...filters))
+      .orderBy(desc(contentAuditLogs.createdAt));
+
+    const latestByContentUid = new Map<string, (typeof rows)[number]>();
+
+    for (const row of rows) {
+      if (!row.contentUid || latestByContentUid.has(row.contentUid)) continue;
+      latestByContentUid.set(row.contentUid, row);
+    }
+
+    return [...latestByContentUid.values()];
   };
 
   createAccessEvent = async (params: {

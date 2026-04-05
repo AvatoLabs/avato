@@ -4,16 +4,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiAgentService } from '../index';
 
 const {
+  mockFindAccessibleSpaceById,
+  mockGetOrCreatePersonalSpace,
   mockMessageCreate,
   mockCreateOperation,
+  mockCreateOpaqueUserBlobPath,
   mockUploadFromUrl,
   mockFindFilesByIds,
-  mockResolveProviderReadableFileReference,
+  mockResolveRuntimeFileInput,
 } = vi.hoisted(() => ({
+  mockFindAccessibleSpaceById: vi.fn(),
+  mockGetOrCreatePersonalSpace: vi.fn(),
+  mockCreateOpaqueUserBlobPath: vi.fn(),
   mockCreateOperation: vi.fn(),
   mockFindFilesByIds: vi.fn(),
   mockMessageCreate: vi.fn(),
-  mockResolveProviderReadableFileReference: vi.fn(),
+  mockResolveRuntimeFileInput: vi.fn(),
   mockUploadFromUrl: vi.fn(),
 }));
 
@@ -52,6 +58,13 @@ vi.mock('@/database/models/file', () => ({
   })),
 }));
 
+vi.mock('@/database/models/space', () => ({
+  SpaceModel: vi.fn().mockImplementation(() => ({
+    findAccessibleSpaceById: mockFindAccessibleSpaceById,
+    getOrCreatePersonalSpace: mockGetOrCreatePersonalSpace,
+  })),
+}));
+
 vi.mock('@/server/services/agent', () => ({
   AgentService: vi.fn().mockImplementation(() => ({
     getAgentConfig: vi.fn().mockResolvedValue({
@@ -76,6 +89,7 @@ vi.mock('@/database/models/plugin', () => ({
 vi.mock('@/database/models/topic', () => ({
   TopicModel: vi.fn().mockImplementation(() => ({
     create: vi.fn().mockResolvedValue({ id: 'topic-1' }),
+    findById: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -107,12 +121,13 @@ vi.mock('@/server/services/klavis', () => ({
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn().mockImplementation(() => ({
+    createOpaqueUserBlobPath: mockCreateOpaqueUserBlobPath,
     uploadFromUrl: mockUploadFromUrl,
   })),
 }));
 
-vi.mock('@/server/services/file/resolveProviderReadableFileReference', () => ({
-  resolveProviderReadableFileReference: mockResolveProviderReadableFileReference,
+vi.mock('@/server/services/file/resolveRuntimeFileInput', () => ({
+  resolveRuntimeFileInput: mockResolveRuntimeFileInput,
 }));
 
 vi.mock('@/server/modules/Mecha', () => ({
@@ -156,6 +171,14 @@ describe('AiAgentService.execAgent - file upload handling', () => {
     process.env.APP_URL = 'https://app.lobehub.com';
     delete process.env.INTERNAL_APP_URL;
     mockFindFilesByIds.mockResolvedValue([]);
+    mockFindAccessibleSpaceById.mockResolvedValue(undefined);
+    mockGetOrCreatePersonalSpace.mockResolvedValue({ id: 'spc_personal_default' });
+    mockCreateOpaqueUserBlobPath.mockImplementation(
+      (scope: string, extension: string, spaceId?: string) => ({
+        key: `v2/spaces/${spaceId ?? 'spc_personal_default'}/blobs/${scope}/opaque.${extension}`,
+        spaceId: spaceId ?? 'spc_personal_default',
+      }),
+    );
     mockMessageCreate.mockResolvedValue({ id: 'msg-1' });
     mockCreateOperation.mockResolvedValue({
       autoStarted: true,
@@ -163,7 +186,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       operationId: 'op-123',
       success: true,
     });
-    mockResolveProviderReadableFileReference.mockResolvedValue({
+    mockResolveRuntimeFileInput.mockResolvedValue({
       fileId: 'file-img',
       key: 'files/test-user-id/xxx/screenshot.jpg',
       url: 'https://provider.example.com/file-img',
@@ -209,9 +232,18 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       });
 
       // Verify uploadFromUrl was called with the external URL
+      expect(mockCreateOpaqueUserBlobPath).toHaveBeenCalledWith(
+        'ai-agent-inputs',
+        'png',
+        'spc_personal_default',
+      );
       expect(mockUploadFromUrl).toHaveBeenCalledWith(
         'https://cdn.discordapp.com/attachments/123/456/photo.png',
-        expect.stringContaining('photo.png'),
+        'v2/spaces/spc_personal_default/blobs/ai-agent-inputs/opaque.png',
+        {
+          name: 'photo.png',
+          spaceId: 'spc_personal_default',
+        },
       );
 
       // Verify messageModel.create was called with files
@@ -254,13 +286,44 @@ describe('AiAgentService.execAgent - file upload handling', () => {
           url: 'https://provider.example.com/file-img',
         },
       ]);
-      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith({
+      expect(mockResolveRuntimeFileInput).toHaveBeenCalledWith({
         db: mockDb,
         fileService: expect.any(Object),
         url: 'https://app.lobehub.com/f/file-img',
         userId,
         via: 'ai_agent_input_image',
       });
+    });
+
+    it('should prefer explicit appContext spaceId for uploaded files', async () => {
+      mockFindAccessibleSpaceById.mockResolvedValue({ id: 'spc_team_ops' });
+      mockUploadFromUrl.mockResolvedValue({
+        fileId: 'file-img',
+        key: 'v2/spaces/spc_team_ops/blobs/ai-agent-inputs/opq_1.png',
+        url: 'https://app.lobehub.com/f/file-img',
+      });
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        appContext: { spaceId: 'spc_team_ops' } as any,
+        files: [
+          {
+            mimeType: 'image/png',
+            name: 'photo.png',
+            url: 'https://cdn.discordapp.com/attachments/123/456/photo.png',
+          },
+        ],
+        prompt: 'Describe this image',
+      });
+
+      expect(mockUploadFromUrl).toHaveBeenCalledWith(
+        'https://cdn.discordapp.com/attachments/123/456/photo.png',
+        'v2/spaces/spc_team_ops/blobs/ai-agent-inputs/opaque.png',
+        {
+          name: 'photo.png',
+          spaceId: 'spc_team_ops',
+        },
+      );
     });
 
     it('should not include imageList for non-image files', async () => {
@@ -334,7 +397,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
           url: 'https://provider.example.com/file-img',
         },
       ]);
-      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith({
+      expect(mockResolveRuntimeFileInput).toHaveBeenCalledWith({
         db: mockDb,
         fileService: expect.any(Object),
         url: '/f/file-existing',
@@ -351,7 +414,7 @@ describe('AiAgentService.execAgent - file upload handling', () => {
           name: 'diagram.png',
         },
       ]);
-      mockResolveProviderReadableFileReference.mockRejectedValueOnce(new Error('forbidden'));
+      mockResolveRuntimeFileInput.mockRejectedValueOnce(new Error('forbidden'));
 
       await service.execAgent({
         agentId: 'agent-1',
