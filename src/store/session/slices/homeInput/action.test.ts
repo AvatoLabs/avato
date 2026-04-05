@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { documentService } from '@/services/document';
 import { sessionService } from '@/services/session';
 import { useChatStore } from '@/store/chat';
@@ -39,6 +40,10 @@ describe('HomeInputAction', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setActiveWorkspaceSpaceId(undefined);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/');
+    }
 
     // Setup default mocks
     vi.mocked(useGlobalStore.getState).mockReturnValue({
@@ -61,6 +66,10 @@ describe('HomeInputAction', () => {
   });
 
   afterEach(() => {
+    setActiveWorkspaceSpaceId(undefined);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/');
+    }
     vi.restoreAllMocks();
   });
 
@@ -300,6 +309,24 @@ describe('HomeInputAction', () => {
       });
 
       expect(mockNavigate).toHaveBeenCalledWith('/spaces');
+    });
+
+    it('should prefer the current workspace route over the mutable hint', async () => {
+      setActiveWorkspaceSpaceId('space-hint');
+      window.history.replaceState({}, '', '/spaces/space-route/docs');
+
+      const { result } = renderHook(() => useSessionStore());
+
+      await act(async () => {
+        await result.current.sendAsWrite('Content');
+      });
+
+      expect(documentService.createDocument).toHaveBeenCalledWith({
+        editorData: '',
+        spaceId: 'space-route',
+        title: 'Content',
+      });
+      expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-route/docs/new-doc-id');
     });
 
     it('should send message with page scope context', async () => {

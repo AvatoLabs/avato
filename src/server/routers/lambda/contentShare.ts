@@ -148,7 +148,7 @@ export const contentShareRouter = router({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const contentModel = new ContentModel(ctx.serverDB, 'anonymous');
+      const contentModel = new ContentModel(ctx.serverDB, ctx.userId || 'anonymous');
       const access = await resolveContentShareAccess({
         contentModel,
         password: input.password,
@@ -167,6 +167,24 @@ export const contentShareRouter = router({
 
       const summary = await contentModel.getContentSummary(link.contentUid);
       if (!summary) throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+
+      try {
+        await contentModel.createAccessEvent({
+          accessType: 'share_view',
+          metadata: {
+            kind: summary.kind,
+            localId: summary.localId,
+            via: 'share_page',
+          },
+          contentUid: summary.contentUid,
+          shareLinkId: link.id,
+          spaceId: summary.spaceId,
+          sourceIp: ctx.clientIp ?? null,
+          userAgent: ctx.userAgent ?? null,
+        });
+      } catch (error) {
+        console.error('Failed to record shared content access event', error);
+      }
 
       if (summary.kind === 'document') {
         const document = await ctx.serverDB.query.documents.findFirst({
@@ -204,6 +222,85 @@ export const contentShareRouter = router({
         fileType: 'application/octet-stream',
         role: 'viewer' as const,
       };
+    }),
+
+  recordContentExport: shareProcedure
+    .input(
+      z.object({
+        format: z.enum(['markdown', 'csv', 'xlsx']),
+        id: z.string().optional(),
+        kind: z.enum(['document', 'file', 'source_set']).optional(),
+        contentUid: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const registry = await resolveTargetContent(ctx.contentModel, input);
+
+      await ctx.contentAuthorizer.assertCapability({
+        capability: 'preview_content',
+        contentUid: registry.contentUid,
+      });
+
+      await ctx.contentModel.createAccessEvent({
+        accessType: 'content_export',
+        metadata: {
+          format: input.format,
+          kind: registry.kind,
+          localId: registry.localId,
+          via: 'member_export',
+        },
+        contentUid: registry.contentUid,
+        spaceId: registry.spaceId,
+        sourceIp: ctx.clientIp ?? null,
+        userAgent: ctx.userAgent ?? null,
+      });
+
+      return { success: true };
+    }),
+
+  recordSharedContentExport: publicShareProcedure
+    .input(
+      z.object({
+        format: z.enum(['csv', 'xlsx']),
+        password: z.string().optional(),
+        token: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const contentModel = new ContentModel(ctx.serverDB, ctx.userId || 'anonymous');
+      const access = await resolveContentShareAccess({
+        contentModel,
+        password: input.password,
+        token: input.token,
+      });
+
+      if (access.status === 'missing_password') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'SHARE_PASSWORD_REQUIRED' });
+      }
+
+      if (access.status === 'not_found') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      }
+
+      const summary = await contentModel.getContentSummary(access.link.contentUid);
+      if (!summary) throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+
+      await contentModel.createAccessEvent({
+        accessType: 'share_export',
+        metadata: {
+          format: input.format,
+          kind: summary.kind,
+          localId: summary.localId,
+          via: 'share_page',
+        },
+        contentUid: summary.contentUid,
+        shareLinkId: access.link.id,
+        spaceId: summary.spaceId,
+        sourceIp: ctx.clientIp ?? null,
+        userAgent: ctx.userAgent ?? null,
+      });
+
+      return { success: true };
     }),
 
   grantContentPermission: shareProcedure

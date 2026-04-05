@@ -87,25 +87,27 @@ export async function serveAuthorizedFileDownload(
     return new Response('Forbidden', { status: 403 });
   }
 
-  try {
-    const accessEventModel = new ContentModel(db, principalId);
-    await accessEventModel.createAccessEvent({
-      accessType: 'file_download',
-      metadata: {
-        downloadVia,
-        fileId,
-        matchedBy: access.matchedBy,
-        via: shareToken ? 'share_link' : 'session',
-      },
-      contentUid: access.contentUid,
-      shareLinkId,
-      spaceId: access.spaceId,
-      sourceIp: clientIpFromRequest(req) ?? null,
-      userAgent: req.headers.get('user-agent') ?? null,
-    });
-  } catch (eventError) {
-    log('Failed to record file download access event: %O', eventError);
-  }
+  const recordDownloadAccessEvent = async () => {
+    try {
+      const accessEventModel = new ContentModel(db, principalId);
+      await accessEventModel.createAccessEvent({
+        accessType: shareToken ? 'share_download' : 'file_download',
+        metadata: {
+          downloadVia,
+          fileId,
+          matchedBy: access.matchedBy,
+          via: shareToken ? 'share_link' : 'session',
+        },
+        contentUid: access.contentUid,
+        shareLinkId,
+        spaceId: access.spaceId,
+        sourceIp: clientIpFromRequest(req) ?? null,
+        userAgent: req.headers.get('user-agent') ?? null,
+      });
+    } catch (eventError) {
+      log('Failed to record file download access event: %O', eventError);
+    }
+  };
 
   const redisConfig = getRedisConfig();
   const redisClient = isRedisEnabled(redisConfig) ? await initializeRedis(redisConfig) : null;
@@ -116,6 +118,7 @@ export async function serveAuthorizedFileDownload(
     const cached = cachedStr ? (JSON.parse(cachedStr) as CachedFileData) : null;
     if (cached?.redirectUrl) {
       log('Cache hit for file: %s', fileId);
+      await recordDownloadAccessEvent();
       return Response.redirect(cached.redirectUrl, 302);
     }
     log('Cache miss for file: %s', fileId);
@@ -162,6 +165,8 @@ export async function serveAuthorizedFileDownload(
     const acceptRanges = upstreamResponse.headers.get('accept-ranges');
     if (acceptRanges) headers.set('Accept-Ranges', acceptRanges);
 
+    await recordDownloadAccessEvent();
+
     return new Response(upstreamResponse.body, {
       headers,
       status: upstreamResponse.status,
@@ -174,6 +179,8 @@ export async function serveAuthorizedFileDownload(
     });
     log('Cached presigned URL for file: %s (TTL: %ds)', fileId, downloadPolicy.cacheTtlSeconds);
   }
+
+  await recordDownloadAccessEvent();
 
   return Response.redirect(redirectUrl, 302);
 }

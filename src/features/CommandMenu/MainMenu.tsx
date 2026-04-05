@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { ACTION_ENTRY_ICONS, APP_ENTRY_ICONS, SETTINGS_ENTRY_ICONS } from '@/config/entryIcons';
 import { getNavigableRoutes, getRouteById } from '@/config/routes';
 import { FEEDBACK } from '@/const/url';
-import { buildFilesRootPath } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { buildFilesRootPath, isWorkspaceFilesSurfacePath } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
 import { getPageRootPath } from '@/utils/docs';
 
@@ -23,7 +23,7 @@ const MainMenu = memo(() => {
   const { pathname, menuContext, setPages, pages } = useCommandMenuContext();
   const { t } = useTranslation('common');
   const { open: openFeedbackModal } = useFeedbackModal();
-  const activeSpaceId = getActiveWorkspaceSpaceId();
+  const activeSpaceId = resolveWorkspaceSpaceId();
 
   const {
     handleCreateSession,
@@ -128,9 +128,7 @@ const MainMenu = memo(() => {
                 : route.path;
           const isCurrentRoute =
             route.id === 'resource'
-              ? pathname?.startsWith('/content/shared') ||
-                pathname?.startsWith('/content/trash') ||
-                /^\/spaces\/[^/]+\/files(?:\/|$|\?)/.test(pathname || '')
+              ? isWorkspaceFilesSurfacePath(pathname, { includeLegacySpecialRoutes: true })
               : route.id === 'page'
                 ? /^\/spaces\/[^/]+\/docs(?:\/|$|\?)/.test(pathname || '')
                 : pathname?.startsWith(route.pathPrefix);

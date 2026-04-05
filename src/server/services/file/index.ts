@@ -230,6 +230,7 @@ export class FileService {
   /**
    * Create global file record only (no user file record)
    * Used for skill resources that should not appear in user's file list
+   * Always attempts insert with `onConflictDoNothing` to avoid existence pre-check side channels.
    *
    * @param params - File parameters
    * @returns fileHash for reference
@@ -241,20 +242,14 @@ export class FileService {
     size: number;
     url: string;
   }): Promise<{ fileHash: string }> {
-    // Check if hash already exists
-    const { isExist } = await this.fileModel.checkHash(params.fileHash);
-
-    // Only create if not exists
-    if (!isExist) {
-      await this.fileModel.createGlobalFile({
-        creator: this.userId,
-        fileType: params.fileType,
-        hashId: params.fileHash,
-        metadata: params.metadata,
-        size: params.size,
-        url: params.url,
-      });
-    }
+    await this.fileModel.createGlobalFile({
+      creator: this.userId,
+      fileType: params.fileType,
+      hashId: params.fileHash,
+      metadata: params.metadata,
+      size: params.size,
+      url: params.url,
+    });
 
     return { fileHash: params.fileHash };
   }

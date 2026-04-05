@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { buildFilesRootPath } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useInitRecentResource } from '@/hooks/useInitRecentResource';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { homeRecentSelectors } from '@/store/home/selectors';
@@ -28,6 +28,7 @@ const RecentResource = memo(() => {
   const recentResources = useHomeStore(homeRecentSelectors.recentResources);
   const isInit = useHomeStore(homeRecentSelectors.isRecentResourcesInit);
   const { isRevalidating } = useInitRecentResource();
+  const resolvedSpaceId = resolveWorkspaceSpaceId();
 
   // After loaded, if no data, don't render
   if (isInit && (!recentResources || recentResources.length === 0)) {
@@ -48,7 +49,7 @@ const RecentResource = memo(() => {
                 label: t('menu.openHome', { defaultValue: 'Open Home' }),
                 onClick: () => {
                   setCategory(FilesTabs.Home);
-                  navigate(buildFilesRootPath(getActiveWorkspaceSpaceId()));
+                  navigate(buildFilesRootPath(resolvedSpaceId));
                 },
               },
             ]}

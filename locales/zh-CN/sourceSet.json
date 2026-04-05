@@ -8,6 +8,8 @@
   "addToSourceSet.id.title": "目标资料集",
   "addToSourceSet.title": "添加到资料集",
   "addToSourceSet.totalFiles": "已选择 {{count}} 个文件",
+  "addToSourceSet.workspace": "工作区",
+  "addToSourceSet.workspaceHint": "优先显示来自 {{name}} 的资料集。",
   "createNew.confirm": "新建",
   "createNew.description.label": "资料集描述（可选）",
   "createNew.description.placeholder": "描述有助于模型理解这个资料集",

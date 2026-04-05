@@ -14,6 +14,7 @@ import { DocumentSourceType, type LobeDocument } from '@/types/document';
 import { ChunkService } from '../chunk';
 import { AuthorizedResourceResolver, ContentAuthorizer, TreeGuard } from '../content';
 import { FileService } from '../file';
+import { resolveRemovableStorageUrls } from '../file/removableStorageUrls';
 
 const log = debug('lobe-chat:service:document');
 
@@ -437,12 +438,19 @@ export class DocumentService {
     if (documentIds.length === 0) return;
 
     const bumpEntries: Array<{ contentUid?: string | null; spaceId?: string | null }> = [];
+    const fileRowsForCleanup: Array<{
+      contentUid?: string | null;
+      fileHash?: string | null;
+      spaceId?: string | null;
+      url?: string | null;
+    }> = [];
 
     if (fileIds.length > 0) {
       const fileRows = await this.db.query.files.findMany({
-        columns: { contentUid: true, spaceId: true },
+        columns: { contentUid: true, fileHash: true, spaceId: true, url: true },
         where: (fields, { inArray }) => inArray(fields.id, fileIds),
       });
+      fileRowsForCleanup.push(...fileRows);
       bumpEntries.push(...fileRows.map((r) => ({ contentUid: r.contentUid, spaceId: r.spaceId })));
     }
 
@@ -461,17 +469,22 @@ export class DocumentService {
       await this.documentModel.deleteManyAny(documentIds);
       await this.contentModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
     } else {
-      const removedFiles =
-        fileIds.length > 0
-          ? await this.fileModel.deleteManyAny(fileIds, serverDBEnv.REMOVE_GLOBAL_FILE)
-          : [];
+      if (fileIds.length > 0) {
+        await this.fileModel.deleteManyAny(fileIds, serverDBEnv.REMOVE_GLOBAL_FILE);
+      }
 
       // Hard delete: permanently remove from database
       await this.documentModel.hardDeleteManyAny(documentIds);
       await this.contentModel.invalidateAuthzEpochsAfterRemoval(bumpEntries);
 
-      if (removedFiles.length > 0) {
-        await this.fileService.deleteFiles(removedFiles.map((item) => item.url!).filter(Boolean));
+      const removableUrls = await resolveRemovableStorageUrls(
+        this.fileModel,
+        fileRowsForCleanup,
+        serverDBEnv.REMOVE_GLOBAL_FILE,
+      );
+
+      if (removableUrls.length > 0) {
+        await this.fileService.deleteFiles(removableUrls);
       }
     }
   }
@@ -645,8 +658,15 @@ export class DocumentService {
       }
 
       if (shouldReindexResource) {
+        const access = await this.contentAuthorizer.assertCapability({
+          capability: 'preview_content',
+          id: refreshedDocument.fileId,
+          kind: 'file',
+        });
         await this.fileModel.clearFileChunks([refreshedDocument.fileId]);
-        await this.chunkService.asyncParseFileToChunks(refreshedDocument.fileId, false);
+        await this.chunkService.asyncParseFileToChunks(refreshedDocument.fileId, false, {
+          contentGuardAuthzEpoch: access.authzEpoch,
+        });
       }
     }
 

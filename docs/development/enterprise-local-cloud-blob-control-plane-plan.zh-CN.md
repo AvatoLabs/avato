@@ -1,7 +1,7 @@
 # 企业本地云、文件资产与权限控制架构方案
 
 > 状态：Draft
-> 更新时间：2026-04-04（已同步首批 Blob / Share / Capability Policy、`file_assets` sidecar、首个 Files 资产治理 UI 与首版资产分类字段落地进展）
+> 更新时间：2026-04-05（已同步首批 Blob / Share / Capability Policy、`file_assets` sidecar、首个 Files 资产治理 UI、首版资产分类字段，以及首版 version /rendition typed surface 落地进展）
 > 适用范围：`Space / Files / Source Set / Docs / Assets / RBAC / ACL / Share / Audit`
 > 关联文档：
 >
@@ -11,19 +11,22 @@
 
 ---
 
-## 〇、当前落地进展（截至 2026-04-04）
+## 〇、当前落地进展（截至 2026-04-05）
 
 以下内容已经在主干代码中开始落地，用于和下文路线图对齐：
 
 - **Blob Provider 抽象已建立**：上传、下载 URL、对象元数据、字节读取、删除、服务端写入等能力，已经统一收口到 `BlobProvider`，而不再让业务代码直接散落依赖 `PrivateBlobS3 / FileS3`。
 - **Blob Plane 第一批调用方已迁移**：上传 session、同域上传、OpenAPI 文件 URL、skills、sandbox、market、用户头像、文件服务实现等路径，已经开始改走 `BlobProvider`。
 - **Download Policy 已抽离**：成员下载与分享下载的缓存 TTL / 预签名时效，已经从文件代理路由中抽成独立 helper。
-- **Share Policy 已抽离**：分享链接的过期时间、URL 构建、密码归一化、带密码分享校验，已经从 router / route 中抽成独立 helper。
+- **Share Policy 已抽离**：分享链接的过期时间、URL 构建、密码归一化、带密码分享校验，已经从 router /route 中抽成独立 helper。
 - **Capability Policy 已抽离**：`preview_content` 的 OR 规则、viewer 的 share-link 读取边界、以及 `owner / editor + canReshare` 的继续分享规则，已经从 `ContentAuthorizer` 中抽成可单测的显式 policy。
 - **`file_assets` sidecar 已建立**：`Files` 与未来 `Assets` 之间已经补上第一层边界，新增 `file_assets` 表与 `FileAssetModel`，用来承载 classification、review status、usage policy、rights owner 等资产治理字段，而不再继续把这类元数据塞进 `files.metadata`。
 - **Files 资产治理入口已接进现有详情面**：`FileDetail` 已经开始消费 `getFileAssetById / upsertFileAsset`，在现有文件详情弹窗里提供首批 `classification / review status / usage policy / rights owner` 治理字段，而不是另起一套孤立的 `Assets` 页面。
 - **Files 资产治理能力已切到动作级 policy**：文件资产不再只靠一个模糊的 `canManage` 开关；当前已经拆成 `canEditGovernance / canApprove / canArchive` 三个显式能力，默认 `editor` 只能编辑治理元数据，`owner / admin` 才能做批准和归档。
-- **首版资产分类字段已落地**：`file_assets.classification` 已作为正式字段进入 schema / migration / list contract / detail UI；当前先以轻量枚举承载首版企业分类能力，后续再继续拆更细的 `asset_classifications` 模型。
+- **首版资产分类字段已落地**：`file_assets.classification` 已作为正式字段进入 schema /migration/list contract /detail UI；当前先以轻量枚举承载首版企业分类能力，后续再继续拆更细的 `asset_classifications` 模型。
+- **首版资产版本 / 衍生版本 surface 已落地**：`file_assets.metadata` 已开始承载正式 typed 的 `version / renditions` contract，而不再只是完全自由的 JSON；`FileDetail` 也已接入 `Current Version / Derived From / Renditions` 首版治理入口，作为未来拆 `asset_versions / asset_renditions` 独立实体前的过渡层。
+- **衍生版本 label 已进入可编辑 UI**：`FileDetail` 现已支持为每个 rendition 记录可选 `label`，不再把 typed contract 降级成只有 `kind`；只读视图也会直接展示 `Preview · Homepage` 这类带标签的衍生版本摘要。
+- **compact list/card 已开始消费版本 /rendition summary**：Files 列表、masonry 卡片与首页 Recent 资源现在已经通过轻量 badge 消费 `assetVersionLabel` 与首个 rendition summary，不再把 typed `renditions` 永远困在详情页；同时 badge 顺序仍优先保留 `restricted/public` 这类更强治理信号。
 
 这说明：
 
@@ -33,13 +36,13 @@
 
 - 整体进度大致处于 **Phase 1 完成、Phase 2 部分完成、Phase 4 起步**。
 - `BlobProvider`、upload session、download/share/capability policy 与 `file_assets` sidecar 已经证明方案方向正确。
-- 但“企业本地云”的多 provider、加密元数据、保留策略、资产版本/渲染版本、正式 DAM 能力仍未开始或只做了字段占位。
+- 但 “企业本地云” 的多 provider、加密元数据、保留策略，以及 `asset_versions / asset_renditions / asset_classifications` 的独立实体化仍未开始或只完成首版 surface。
 
 ---
 
 ## 一、问题定义
 
-随着 `space-first` 模型落地，`Files` 已经从“全局内容页”收口成 `Space` 内的原始文件工作面。  
+随着 `space-first` 模型落地，`Files` 已经从 “全局内容页” 收口成 `Space` 内的原始文件工作面。\
 下一阶段如果要支持：
 
 - 企业级私有云盘
@@ -51,12 +54,12 @@
 
 就必须回答一个更大的问题：
 
-> 我们是否需要把现有 S3-based 架构替换成“更系统性的本地云”？
+> 我们是否需要把现有 S3-based 架构替换成 “更系统性的本地云”？
 
 本文结论很明确：
 
-> **不需要替换掉 S3-compatible object storage。**  
-> **需要替换掉的是“让对象存储承担业务模型”的做法。**
+> **不需要替换掉 S3-compatible object storage。**\
+> **需要替换掉的是 “让对象存储承担业务模型” 的做法。**
 
 也就是说：
 
@@ -96,9 +99,9 @@
 
 > **现有 S3-based 架构可以继续做 blob 底座，但不能继续被当成企业文件系统的主模型。**
 
-### 2. 未来要不要“本地云”
+### 2. 未来要不要 “本地云”
 
-要，但不是做一个“替代 S3 的业务架构”，而是做：
+要，但不是做一个 “替代 S3 的业务架构”，而是做：
 
 - 一个 **可插拔 Blob Provider 层**
 - 一个 **正式 Control Plane**
@@ -126,7 +129,7 @@ graph TD
 - multipart upload
 - object metadata/head
 - signed upload/download
-- versioning / retention / lock（后续）
+- versioning /retention/lock（后续）
 - encryption-at-rest（后续）
 
 这一层可以由：
@@ -171,11 +174,11 @@ graph TD
 
 也就是说：
 
-> Blob 负责“存东西”，Control Plane 负责“这是什么、谁能看、能否分享、何时过期、能否下载、如何审计”。
+> Blob 负责 “存东西”，Control Plane 负责 “这是什么、谁能看、能否分享、何时过期、能否下载、如何审计”。
 
 ### 4. Processing Plane
 
-企业文件与资产管理不能只有上传/下载，还必须有异步处理层：
+企业文件与资产管理不能只有上传 / 下载，还必须有异步处理层：
 
 - thumbnail / preview
 - PDF / Office / Markdown 转预览
@@ -188,7 +191,7 @@ graph TD
 
 ---
 
-## 四、为什么不能直接“替换掉 S3”
+## 四、为什么不能直接 “替换掉 S3”
 
 ### 1. 错误问题定义
 
@@ -211,7 +214,7 @@ graph TD
 
 ### 2. 直接改成本地文件系统的代价更差
 
-如果把“企业本地云”理解成：
+如果把 “企业本地云” 理解成：
 
 - 直接把业务结构映射到本地文件夹
 - 直接对磁盘路径做 ACL
@@ -220,15 +223,15 @@ graph TD
 会立刻带来这些问题：
 
 - 路径即权限，难以治理
-- 改名/移动成本高
+- 改名 / 移动成本高
 - 跨部署环境不一致
 - 审计困难
-- share / revoke 难以统一
+- share /revoke 难以统一
 - 对象预览、转码、加密、版本难以模块化
 
 所以：
 
-> **不该用“本地文件系统业务化”替代“对象存储 + 控制层”。**
+> **不该用 “本地文件系统业务化” 替代 “对象存储 + 控制层”。**
 
 ### 3. 企业私有化不等于放弃对象存储
 
@@ -244,11 +247,11 @@ graph TD
 
 ---
 
-## 五、未来“本地云”应该是什么
+## 五、未来 “本地云” 应该是什么
 
 ### 1. 本地云的正确定义
 
-在本项目里，“本地云”更合理的定义是：
+在本项目里，“本地云” 更合理的定义是：
 
 > **可私有部署、可自带对象存储、可自带密钥、可自带权限治理、可审计、可扩展处理流水线的统一企业文件与资产平台。**
 
@@ -294,7 +297,7 @@ graph TD
 - 基础分享
 - 与 `Source Set` 关联
 
-它不是正式 DAM，也不应该承载复杂品牌/版权/审批元数据。
+它不是正式 DAM，也不应该承载复杂品牌 / 版权 / 审批元数据。
 
 ### 2. `Docs`
 
@@ -316,6 +319,8 @@ graph TD
 - `file_assets.file_id` 绑定 `files.id`
 - 用 sidecar 承载 `classification / review_status / usage_policy / rights_owner / reviewed_by`
 - 这意味着 `Files` 仍然是原始文件对象，而 `Assets` 的治理字段已经有了独立落点
+- 当前已经补上首版 `version / renditions` typed surface
+- `version.label` 已开始进入 Files / Recent Resources 的 list /card badge，而不再只停留在详情页
 - 下一步才是继续往 `asset_versions / asset_renditions / asset_classifications` 这些更细的资产实体扩
 
 `Assets` 负责：
@@ -323,7 +328,7 @@ graph TD
 - 资产分类
 - 版本
 - 品牌素材
-- 权利/版权信息
+- 权利 / 版权信息
 - 使用限制
 - 审批流
 - 渲染版本
@@ -351,7 +356,7 @@ graph TD
 
 ### 1. 三层结构
 
-企业级治理不应该只靠一层“角色判断”。
+企业级治理不应该只靠一层 “角色判断”。
 
 正确结构是：
 
@@ -380,7 +385,7 @@ graph TD
 - 是否允许下载
 - 是否必须水印
 - 是否必须走审批
-- 是否受 retention / hold 约束
+- 是否受 retention /hold 约束
 
 一句话：
 
@@ -400,7 +405,7 @@ graph TD
 
 - `group`
 - `service_account`
-- 显式 deny / policy hook
+- 显式 deny /policy hook
 
 ---
 
@@ -428,7 +433,7 @@ graph TD
 中期：
 
 - 支持 `SSE-KMS`
-- 支持按 tenant / deployment 配置 KMS
+- 支持按 tenant /deployment 配置 KMS
 
 长期：
 
@@ -441,7 +446,7 @@ graph TD
 
 - 业务层自己做大文件自定义分片加密协议
 - 让前端直接决定 key hierarchy
-- 把“本地云”理解成“自己实现一套对象加密存储格式”
+- 把 “本地云” 理解成 “自己实现一套对象加密存储格式”
 
 那会极大拉高复杂度，而且不会直接提升产品价值。
 
@@ -492,7 +497,7 @@ graph TD
 
 - 保留 S3-compatible provider
 - 补正式 `BlobProvider` 抽象
-- 保证上传/下载/导出/预览全走统一 provider
+- 保证上传 / 下载 / 导出 / 预览全走统一 provider
 
 交付：
 
@@ -504,7 +509,7 @@ graph TD
 目标：
 
 - 正式化 `resource registry`
-- ACL / share / audit / trash / revoke cache 收口
+- ACL /share/audit /trash/revoke cache 收口
 - 强化 `space-first` 的访问控制
 
 交付：
@@ -532,6 +537,8 @@ graph TD
 当前进展：
 
 - `file_assets` 已作为第一层 sidecar 落地
+- 当前已落首版 `version / renditions` typed surface
+- `version.label` 已在列表 / 卡片面开始可见，Recent / Files 会优先露出 compact version badge
 - 下一步应继续拆 `asset_versions / asset_renditions / asset_classifications`
 
 ---
@@ -545,7 +552,7 @@ graph TD
 3. 把分享逻辑绑在对象 URL 上
 4. 把 `Files` 直接扩成万能 DAM
 5. 把 `Source Set` 变成第二套主要权限根
-6. 把“本地云”理解成“放弃 S3-compatible”
+6. 把 “本地云” 理解成 “放弃 S3-compatible”
 
 ---
 
@@ -556,9 +563,9 @@ graph TD
 1. **S3-compatible object storage 继续保留，只做 Blob Plane。**
 2. **企业级能力的核心不在存储替换，而在 Control Plane。**
 3. **Files 是原始文件云盘；Assets 才是未来软资产管理层。**
-4. **本地云的正确方向是“可私有部署的统一文件与资产平台”，不是“改成另一套存储协议”。**
+4. **本地云的正确方向是 “可私有部署的统一文件与资产平台”，不是 “改成另一套存储协议”。**
 
-如果未来必须在“先做 memory”与“先做企业本地云”之间排序，优先级仍然应该是：
+如果未来必须在 “先做 memory” 与 “先做企业本地云” 之间排序，优先级仍然应该是：
 
 - 先做 `Memory v2 / Space Memory / Harness`
 - 再补企业文件治理与资产层

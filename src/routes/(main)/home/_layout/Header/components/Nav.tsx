@@ -10,8 +10,8 @@ import { APP_ENTRY_ICONS } from '@/config/entryIcons';
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
 import { glassSidebarStyles } from '@/features/NavPanel/glassSidebar.styles';
-import { buildFilesRootPath } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { buildFilesRootPath, useSpaceName } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useActiveTabKey } from '@/hooks/useActiveTabKey';
 import { useGlobalStore } from '@/store/global';
 import { SidebarTabKey } from '@/store/global/initialState';
@@ -36,9 +36,9 @@ const Nav = memo(() => {
   const { t } = useTranslation('common');
   const { t: tHome } = useTranslation('home');
   const { t: tSetting } = useTranslation('setting');
-  const activeSpaceId = getActiveWorkspaceSpaceId();
   const { spaceId: routeSpaceId } = useParams<{ spaceId?: string }>();
-  const resolvedSpaceId = routeSpaceId ?? activeSpaceId;
+  const resolvedSpaceId = resolveWorkspaceSpaceId({ spaceId: routeSpaceId });
+  const spaceName = useSpaceName(resolvedSpaceId);
   const toggleCommandMenu = useGlobalStore((s) => s.toggleCommandMenu);
   const { showMarket, showAiImage } = useServerConfigStore(featureFlagsSelectors);
 
@@ -172,9 +172,16 @@ const Nav = memo(() => {
   return (
     <Flexbox gap={2} paddingBlock={'4px 0'} paddingInline={6}>
       {globalActions.map(renderItem)}
-      <span className={glassSidebarStyles.sectionLabel}>
-        {tHome('workspace.sidebar.section.navigation')}
-      </span>
+      <Flexbox horizontal align={'center'} gap={6} wrap={'wrap'}>
+        <span className={glassSidebarStyles.sectionLabel}>
+          {tHome('workspace.sidebar.section.navigation')}
+        </span>
+        {spaceName && (
+          <Tag bordered={false}>
+            {tHome('workspace.sidebar.currentWorkspace', { name: spaceName })}
+          </Tag>
+        )}
+      </Flexbox>
       {mainNav.map(renderItem)}
     </Flexbox>
   );

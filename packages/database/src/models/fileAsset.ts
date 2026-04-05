@@ -4,6 +4,7 @@ import type {
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
 } from '@lobechat/types';
+import { normalizeFileAssetMetadata } from '@lobechat/types';
 import { eq, inArray } from 'drizzle-orm';
 
 import { fileAssets } from '../schemas';
@@ -37,7 +38,7 @@ export class FileAssetModel {
         .where(eq(fileAssets.fileId, fileId))
         .limit(1);
 
-      return item;
+      return item ? { ...item, metadata: normalizeFileAssetMetadata(item.metadata) } : undefined;
     } catch (error) {
       if (this.isMissingFileAssetSchemaError(error)) return undefined;
       throw error;
@@ -49,7 +50,15 @@ export class FileAssetModel {
     if (dedupIds.length === 0) return [];
 
     try {
-      return await this.db.select().from(fileAssets).where(inArray(fileAssets.fileId, dedupIds));
+      const items = await this.db
+        .select()
+        .from(fileAssets)
+        .where(inArray(fileAssets.fileId, dedupIds));
+
+      return items.map((item) => ({
+        ...item,
+        metadata: normalizeFileAssetMetadata(item.metadata),
+      }));
     } catch (error) {
       if (this.isMissingFileAssetSchemaError(error)) return [];
       throw error;
@@ -68,9 +77,12 @@ export class FileAssetModel {
     spaceId: string;
     usagePolicy?: FileAssetUsagePolicy;
   }) => {
+    const normalizedMetadata =
+      params.metadata === undefined ? undefined : normalizeFileAssetMetadata(params.metadata);
+
     const updateSet = {
       ...(params.classification !== undefined ? { classification: params.classification } : {}),
-      ...(params.metadata !== undefined ? { metadata: params.metadata } : {}),
+      ...(params.metadata !== undefined ? { metadata: normalizedMetadata } : {}),
       ...(params.reviewedAt !== undefined ? { reviewedAt: params.reviewedAt } : {}),
       ...(params.reviewedBy !== undefined ? { reviewedBy: params.reviewedBy } : {}),
       ...(params.reviewStatus !== undefined ? { reviewStatus: params.reviewStatus } : {}),
@@ -85,7 +97,7 @@ export class FileAssetModel {
         classification: params.classification ?? 'general',
         createdBy: params.createdBy,
         fileId: params.fileId,
-        metadata: params.metadata ?? undefined,
+        metadata: normalizedMetadata ?? undefined,
         reviewedAt: params.reviewedAt ?? null,
         reviewedBy: params.reviewedBy ?? null,
         reviewStatus: params.reviewStatus ?? 'draft',
@@ -99,6 +111,9 @@ export class FileAssetModel {
       })
       .returning();
 
-    return item;
+    return {
+      ...item,
+      metadata: normalizeFileAssetMetadata(item.metadata),
+    };
   };
 }

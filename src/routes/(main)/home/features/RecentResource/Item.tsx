@@ -30,8 +30,13 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
   const isImage = IMAGE_FILE_TYPES.has(file.fileType);
   const assetBadges = buildFileAssetBadges({
     assetClassification: file.assetClassification,
+    compact: true,
+    assetPrimaryRenditionKind: file.assetPrimaryRenditionKind,
+    assetPrimaryRenditionLabel: file.assetPrimaryRenditionLabel,
     assetReviewStatus: file.assetReviewStatus,
+    assetRenditionCount: file.assetRenditionCount,
     assetUsagePolicy: file.assetUsagePolicy,
+    assetVersionLabel: file.assetVersionLabel,
     t,
   }).slice(0, 2);
 
@@ -45,6 +50,7 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
       style={{
         borderRadius: cssVar.borderRadiusLG,
         overflow: 'hidden',
+        transition: `transform ${cssVar.motionDurationMid}, box-shadow ${cssVar.motionDurationMid}`,
       }}
     >
       <Center
@@ -71,20 +77,32 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
       </Center>
 
       {/* File Info */}
-      <Flexbox flex={1} gap={6} justify={'space-between'} padding={12}>
-        <Text ellipsis fontSize={13} style={{ lineHeight: 1.4 }} weight={500}>
+      <Flexbox flex={1} gap={8} justify={'space-between'} padding={12}>
+        <Text
+          ellipsis={{ rows: 2 }}
+          fontSize={13}
+          style={{ lineHeight: 1.45, minHeight: 38, minWidth: 0 }}
+          title={file.name}
+          weight={500}
+        >
           {file.name}
         </Text>
         {assetBadges.length > 0 && (
-          <Flexbox horizontal gap={6} wrap={'wrap'}>
+          <Flexbox horizontal gap={4} wrap={'wrap'}>
             {assetBadges.map((badge) => (
-              <Tag color={badge.color} key={badge.key} size={'small'} variant={badge.variant}>
+              <Tag
+                color={badge.color}
+                key={badge.key}
+                size={'small'}
+                title={badge.title}
+                variant={badge.variant}
+              >
                 {badge.label}
               </Tag>
             ))}
           </Flexbox>
         )}
-        <Flexbox horizontal align={'center'} gap={8}>
+        <Flexbox horizontal align={'center'} gap={8} style={{ minHeight: 18 }}>
           <Time date={file.updatedAt} />
           <Text ellipsis fontSize={12} type={'secondary'}>
             {formatSize(file.size)}

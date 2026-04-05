@@ -434,8 +434,7 @@ describe('FileService', () => {
       mockFileModel.createGlobalFile = vi.fn();
     });
 
-    it('should create global file with metadata when hash does not exist', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: false });
+    it('should create global file with metadata without preflight hash checks', async () => {
       mockFileModel.createGlobalFile.mockResolvedValue([{ hashId: 'test-hash' }]);
 
       const result = await service.createGlobalFile({
@@ -451,6 +450,7 @@ describe('FileService', () => {
       });
 
       expect(result).toEqual({ fileHash: 'test-hash' });
+      expect(mockFileModel.checkHash).not.toHaveBeenCalled();
       expect(mockFileModel.createGlobalFile).toHaveBeenCalledWith({
         creator: mockUserId,
         fileType: 'text/markdown',
@@ -465,8 +465,8 @@ describe('FileService', () => {
       });
     });
 
-    it('should not create global file when hash already exists', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: true });
+    it('should still attempt createGlobalFile when hash may already exist', async () => {
+      mockFileModel.createGlobalFile.mockResolvedValue([]);
 
       const result = await service.createGlobalFile({
         fileHash: 'existing-hash',
@@ -476,11 +476,18 @@ describe('FileService', () => {
       });
 
       expect(result).toEqual({ fileHash: 'existing-hash' });
-      expect(mockFileModel.createGlobalFile).not.toHaveBeenCalled();
+      expect(mockFileModel.checkHash).not.toHaveBeenCalled();
+      expect(mockFileModel.createGlobalFile).toHaveBeenCalledWith({
+        creator: mockUserId,
+        fileType: 'text/plain',
+        hashId: 'existing-hash',
+        metadata: undefined,
+        size: 100,
+        url: 'some/path.txt',
+      });
     });
 
     it('should work without metadata', async () => {
-      mockFileModel.checkHash.mockResolvedValue({ isExist: false });
       mockFileModel.createGlobalFile.mockResolvedValue([{ hashId: 'test-hash' }]);
 
       await service.createGlobalFile({
@@ -490,6 +497,7 @@ describe('FileService', () => {
         url: 'some/path.txt',
       });
 
+      expect(mockFileModel.checkHash).not.toHaveBeenCalled();
       expect(mockFileModel.createGlobalFile).toHaveBeenCalledWith({
         creator: mockUserId,
         fileType: 'text/plain',

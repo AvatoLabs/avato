@@ -1,7 +1,6 @@
 import { createNanoId } from '@lobechat/utils';
 import { type SWRResponse } from 'swr';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { documentService } from '@/services/document';
 import { useGlobalStore } from '@/store/global';
@@ -11,6 +10,7 @@ import { DocumentSourceType } from '@/types/document';
 import { setNamespace } from '@/utils/storeDebug';
 
 import { isPageEntryFileType, PAGE_ENTRY_FILE_TYPES } from '../../../../utils/docsDocument';
+import { resolveFileStoreSpaceId } from '../../spaceId';
 import { type FileStore } from '../../store';
 import { type DocumentQueryFilter } from './initialState';
 
@@ -112,7 +112,9 @@ export class DocumentActionImpl {
 
   createOptimisticDocument = (title: string = 'Untitled'): string => {
     const { localDocumentMap } = this.#get();
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveFileStoreSpaceId({
+      queryFilterSpaceId: this.#get().documentQueryFilter?.spaceId,
+    });
 
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-document-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -166,7 +168,11 @@ export class DocumentActionImpl {
         duplicatedFrom: documentId,
       },
       parentId: sourcePage.parentId ?? undefined,
-      spaceId: sourcePage.spaceId ?? getActiveWorkspaceSpaceId(),
+      spaceId:
+        sourcePage.spaceId ??
+        resolveFileStoreSpaceId({
+          queryFilterSpaceId: this.#get().documentQueryFilter?.spaceId,
+        }),
       title: `${sourcePage.title} (Copy)`,
     });
 
@@ -250,7 +256,9 @@ export class DocumentActionImpl {
 
     try {
       const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-      const activeSpaceId = getActiveWorkspaceSpaceId();
+      const activeSpaceId = resolveFileStoreSpaceId({
+        queryFilterSpaceId: this.#get().documentQueryFilter?.spaceId,
+      });
       const queryFilters: DocumentQueryFilter | undefined = pageOnly
         ? {
             fileTypes: Array.from(ALLOWED_DOCUMENT_FILE_TYPES),
@@ -345,7 +353,9 @@ export class DocumentActionImpl {
 
     try {
       const pageSize = useGlobalStore.getState().status.pagePageSize || 20;
-      const activeSpaceId = getActiveWorkspaceSpaceId();
+      const activeSpaceId = resolveFileStoreSpaceId({
+        queryFilterSpaceId: documentQueryFilter?.spaceId,
+      });
       const queryParams = documentQueryFilter
         ? { current: nextPage, pageSize, ...documentQueryFilter }
         : activeSpaceId

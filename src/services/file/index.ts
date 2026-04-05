@@ -2,6 +2,7 @@ import { lambdaClient } from '@/libs/trpc/client';
 import {
   type CheckFileHashResult,
   type FileAssetClassification,
+  type FileAssetMetadata,
   type FileAssetState,
   type FileAssetUsagePolicy,
   type FileItem,
@@ -133,7 +134,7 @@ export class FileService {
     id: string,
     data: {
       classification?: FileAssetClassification;
-      metadata?: Record<string, unknown> | null;
+      metadata?: FileAssetMetadata | null;
       rightsOwner?: string | null;
       usagePolicy?: FileAssetUsagePolicy;
     },

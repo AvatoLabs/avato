@@ -8,6 +8,8 @@ export default {
   'addToSourceSet.id.title': 'Target Reference Set',
   'addToSourceSet.title': 'Add to Reference Set',
   'addToSourceSet.totalFiles': '{{count}} files selected',
+  'addToSourceSet.workspace': 'Workspace',
+  'addToSourceSet.workspaceHint': 'Showing reference sets from {{name}} first.',
   'moveToSourceSet.error': 'Failed to move file to Reference Set',
   'moveToSourceSet.success': 'File moved successfully',
   'createNew.confirm': 'Create New',

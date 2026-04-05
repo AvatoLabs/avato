@@ -106,8 +106,9 @@ vi.mock('@/features/ResourceSpaces', () => ({
     </button>
   ),
   buildFilesRootPath: (spaceId?: string | null) => `/spaces/${spaceId}/files`,
-  buildFilesTrashPath: (spaceId?: string | null) => `/spaces/${spaceId}/files/trash`,
-  buildSharedFilesPath: () => '/content/shared',
+  buildFilesTrashPath: (spaceId?: string | null) =>
+    spaceId ? `/spaces/${spaceId}/files/trash` : '/spaces/trash',
+  buildSharedFilesPath: () => '/spaces/shared',
   buildSpaceMemoryPath: (spaceId: string) => `/spaces/${spaceId}/memory`,
   useSpaceName: () => 'Ops Space',
 }));

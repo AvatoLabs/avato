@@ -20,6 +20,7 @@ export default {
   'workspace.sidebar.recentTopics': 'Recent topics',
   'workspace.sidebar.recentTopicsEmpty':
     'No recent topics yet. Start a chat and it will show up here.',
+  'workspace.sidebar.currentWorkspace': 'In {{name}}',
   'workspace.sidebar.groups': 'Groups',
   'workspace.sidebar.groupsEmpty': 'No groups yet. Click to create one.',
   'workspace.sidebar.section.navigation': 'Navigation',
@@ -29,8 +30,14 @@ export default {
   'workspace.quickActions.hint.agent': 'Build a custom assistant from your prompt.',
   'workspace.quickActions.hint.group': 'Spin up a coordinated team for the task.',
   'workspace.quickActions.hint.write': 'Turn the prompt into a working doc draft.',
+  'workspace.quickActions.hint.writeInWorkspace':
+    'Turn the prompt into a working doc draft in {{name}}.',
   'workspace.quickActions.hint.documents': 'Jump into your latest docs and files.',
+  'workspace.quickActions.hint.documentsInWorkspace':
+    'Open docs in {{name}} and keep the workspace context.',
   'workspace.quickActions.hint.community': 'Start from curated agents and MCP tools.',
+  'workspace.quickActions.scope.workspace': 'Workspace',
+  'workspace.quickActions.scope.inWorkspace': 'Actions open in {{name}} first.',
   'workspace.quickActions.title': 'Quick Actions',
   'workspace.status.mcp': 'MCP',
   'workspace.status.model': 'Model',

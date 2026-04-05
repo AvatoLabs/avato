@@ -9,7 +9,7 @@ import useSWRMutation from 'swr/mutation';
 import { useGroupTemplates } from '@/components/ChatGroupWizard/templates';
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
 import { DEFAULT_CHAT_GROUP_CHAT_CONFIG } from '@/const/settings';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { type CreateAgentParams } from '@/services/agent';
 import { type GroupMemberConfig } from '@/services/chatGroup';
 import { chatGroupService } from '@/services/chatGroup';
@@ -263,7 +263,7 @@ export const useCreateMenuItems = () => {
    */
   const createPage = useCallback(async () => {
     const untitledTitle = tFile('pageList.untitled');
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveWorkspaceSpaceId();
 
     try {
       const newPageId = await createNewPage(untitledTitle, { spaceId: activeSpaceId });

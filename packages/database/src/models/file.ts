@@ -106,7 +106,7 @@ export class FileModel {
   };
 
   createGlobalFile = async (file: Omit<NewGlobalFile, 'id' | 'userId'>) => {
-    return this.db.insert(globalFiles).values(file).returning();
+    return this.db.insert(globalFiles).values(file).onConflictDoNothing().returning();
   };
 
   checkHash = async (hash: string) => {
@@ -374,8 +374,38 @@ export class FileModel {
     return ids;
   };
 
-  clear = async () => {
-    return this.db.delete(files).where(eq(files.userId, this.userId));
+  clear = async (removeGlobalFile: boolean = true) => {
+    return this.db.transaction(async (trx) => {
+      const fileList = await trx.query.files.findMany({
+        where: eq(files.userId, this.userId),
+      });
+
+      if (fileList.length === 0) return [];
+
+      const fileIds = fileList.map((file) => file.id);
+      const hashList = Array.from(new Set(fileList.map((file) => file.fileHash!).filter(Boolean)));
+
+      await this.deleteFileChunks(trx as any, fileIds);
+      await trx.delete(files).where(eq(files.userId, this.userId));
+
+      if (!removeGlobalFile || hashList.length === 0) return fileList;
+
+      const remainingFiles = await trx
+        .select({
+          fileHash: files.fileHash,
+        })
+        .from(files)
+        .where(inArray(files.fileHash, hashList));
+
+      const usedHashes = new Set(remainingFiles.map((file) => file.fileHash));
+      const hashesToDelete = hashList.filter((hash) => !usedHashes.has(hash));
+
+      if (hashesToDelete.length > 0) {
+        await trx.delete(globalFiles).where(inArray(globalFiles.hashId, hashesToDelete));
+      }
+
+      return fileList;
+    });
   };
 
   clearFileChunks = async (fileIds: string[]) => {

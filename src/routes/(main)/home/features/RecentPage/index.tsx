@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useInitRecentPage } from '@/hooks/useInitRecentPage';
 import { homeRecentSelectors } from '@/store/home/selectors';
 import { useHomeStore } from '@/store/home/store';
@@ -25,6 +25,7 @@ const RecentPage = memo(() => {
   const recentPages = useHomeStore(homeRecentSelectors.recentPages);
   const isInit = useHomeStore(homeRecentSelectors.isRecentPagesInit);
   const { isRevalidating } = useInitRecentPage();
+  const resolvedSpaceId = resolveWorkspaceSpaceId();
 
   // After loaded, if no data, don't render
   if (isInit && (!recentPages || recentPages.length === 0)) {
@@ -44,7 +45,7 @@ const RecentPage = memo(() => {
                 key: 'all-documents',
                 label: t('menu.openDocs', { defaultValue: 'Open Docs' }),
                 onClick: () => {
-                  navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId()));
+                  navigate(getPageRootPath('doc', resolvedSpaceId));
                 },
               },
             ]}

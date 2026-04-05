@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAssistantActions } from './useAssistantActions';
 
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+let mockResolvedSpaceId = 'spc_team';
 let mockSpaceMemoryTargets = {
   defaultSpaceId: 'spc_team',
   isLoading: false,
@@ -41,7 +42,7 @@ vi.mock('@/features/ResourceSpaces/useSpaceMemoryCandidateTargets', () => ({
 }));
 
 vi.mock('@/helpers/activeWorkspaceSpace', () => ({
-  getActiveWorkspaceSpaceId: () => 'spc_team',
+  resolveWorkspaceSpaceId: () => mockResolvedSpaceId,
 }));
 
 vi.mock('@/locales/contents', () => ({
@@ -68,6 +69,7 @@ vi.mock('../../../store', () => ({
 describe('useAssistantActions', () => {
   beforeEach(() => {
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
+    mockResolvedSpaceId = 'spc_team';
     mockSpaceMemoryTargets = {
       defaultSpaceId: 'spc_team',
       isLoading: false,
@@ -128,5 +130,35 @@ describe('useAssistantActions', () => {
     );
 
     expect(result.current.addToSpaceMemory).toBeUndefined();
+  });
+
+  it('uses the resolved route workspace when picking writable targets', () => {
+    mockResolvedSpaceId = 'spc_route';
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: 'spc_route',
+      isLoading: false,
+      teamSpaces: [{ id: 'spc_route' }],
+    };
+
+    const { result } = renderHook(() =>
+      useAssistantActions({
+        data: {
+          content: 'Use the route workspace for this memory target.',
+          createdAt: Date.now(),
+          id: 'msg_2',
+          role: 'assistant',
+        } as any,
+        id: 'msg_2',
+        index: 0,
+      }),
+    );
+
+    result.current.addToSpaceMemory?.handleClick?.();
+
+    expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialSpaceId: 'spc_route',
+      }),
+    );
   });
 });

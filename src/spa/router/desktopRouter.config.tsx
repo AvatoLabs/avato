@@ -273,6 +273,22 @@ export const desktopRoutes: RouteObject[] = [
 
       // Resource routes
       {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/shared'),
+          'Desktop > Spaces > Shared',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'spaces/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/trash'),
+          'Desktop > Spaces > Trash',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'spaces/trash',
+      },
+      {
         children: [
           {
             element: dynamicElement(
@@ -423,17 +439,17 @@ export const desktopRoutes: RouteObject[] = [
       {
         element: dynamicElement(
           () => import('@/routes/(main)/content/shared'),
-          'Desktop > Files > Shared',
+          'Desktop > Files > Shared > Legacy Redirect',
         ),
-        errorElement: <ErrorBoundary resetPath="/content/shared" />,
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
         path: 'content/shared',
       },
       {
         element: dynamicElement(
           () => import('@/routes/(main)/content/trash'),
-          'Desktop > Files > Trash',
+          'Desktop > Files > Trash > Legacy Redirect',
         ),
-        errorElement: <ErrorBoundary resetPath="/content/trash" />,
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
         path: 'content/trash',
       },
 

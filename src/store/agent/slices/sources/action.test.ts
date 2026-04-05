@@ -36,6 +36,9 @@ vi.mock('swr', async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   setActiveWorkspaceSpaceId(undefined);
+  if (typeof window !== 'undefined') {
+    window.history.replaceState({}, '', '/');
+  }
   useAgentStore.setState({
     activeAgentId: undefined,
     agentMap: {},
@@ -47,6 +50,9 @@ beforeEach(() => {
 
 afterEach(() => {
   setActiveWorkspaceSpaceId(undefined);
+  if (typeof window !== 'undefined') {
+    window.history.replaceState({}, '', '/');
+  }
   vi.restoreAllMocks();
 });
 
@@ -316,6 +322,20 @@ describe('SourceSlice Actions', () => {
       await waitFor(() => expect(result.current.data).toEqual([]));
 
       expect(agentService.listAvailableSources).toHaveBeenCalledWith('agent-1', 'space-1');
+    });
+
+    it('should prefer the current workspace route over the mutable hint', async () => {
+      setActiveWorkspaceSpaceId('space-hint');
+      window.history.replaceState({}, '', '/spaces/space-route/files');
+      vi.mocked(agentService.listAvailableSources).mockResolvedValueOnce([]);
+
+      const { result } = renderHook(() => useAgentStore().useFetchAvailableSources('agent-1'), {
+        wrapper: withSWR,
+      });
+
+      await waitFor(() => expect(result.current.data).toEqual([]));
+
+      expect(agentService.listAvailableSources).toHaveBeenCalledWith('agent-1', 'space-route');
     });
   });
 });

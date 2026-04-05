@@ -211,9 +211,13 @@ export default {
   'settingSources.scope.agent': 'Agent scope',
   'settingSources.scope.conversation':
     'Conversation attachments only stay with the current session.',
+  'settingSources.scope.workspace': 'Workspace',
+  'settingSources.scope.workspaceHint': 'Open and attach sources from {{name}} first.',
   'settingSources.section.files': 'Files',
   'settingSources.section.sourceSets': 'Reference Sets',
   'settingSources.title': 'Long-term Sources',
+  'settingSources.emptyDescInWorkspace':
+    'Attach files or reference sets from {{name}} for long-term reuse across conversations.',
   'checking': 'Checking...',
   'checkingPermissions': 'Checking permissions...',
   'danger.clear.action': 'Clear Now',

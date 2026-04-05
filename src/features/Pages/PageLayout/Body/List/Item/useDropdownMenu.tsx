@@ -10,7 +10,7 @@ import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import { usePageSpaceId } from '@/features/Pages/usePageSpaceId';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { useElectronStore } from '@/store/electron';
 import { useFileStore } from '@/store/file';
@@ -41,7 +41,7 @@ export const useDropdownMenu = ({
     (s) => [s.addFilesToSourceSet, s.removeFilesFromSourceSet, s.useFetchSourceSetList],
   );
   const sourceSetId = document?.sourceSetId ?? undefined;
-  const sourceSetSpaceId = document?.spaceId ?? pageSpaceId ?? getActiveWorkspaceSpaceId();
+  const sourceSetSpaceId = resolveWorkspaceSpaceId({ spaceId: document?.spaceId ?? pageSpaceId });
   const { data: sourceSets = [] } = useFetchSourceSetList(sourceSetSpaceId);
   const href = `${getPageDetailPath(pageId, getPageKindFromDocument(document), document?.spaceId ?? pageSpaceId)}${location.search}`;
   const availableSourceSets = useMemo(

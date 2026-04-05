@@ -1,6 +1,6 @@
 # 资源树与分享能力安全工程方案
 
-> 复核时间：2026-03-21；**文档进展同步：2026-04-04（含 `BlobProvider`、`download/share/capability policy` 首批落地）**\
+> 复核时间：2026-03-21；**文档进展同步：2026-04-05（含 `BlobProvider`、`download/share/capability policy`、async worker `authz_epoch` 首批复验落地）**\
 > 范围：Resource / Knowledge Base / Page / File 相关能力，从 “单用户私有资源管理” 演进到 “每用户独立文件树 + 可分享” 的安全工程方案
 >
 > 术语说明：
@@ -15,7 +15,7 @@
 > - 当前最关键的风险不是 “目录没建在 S3”，而是 “访问控制没有收口”：`/f/:id` 按文件 ID 公开访问，`checkHash` 基于全局 `global_files` 跨用户去重，会泄露文件存在性，而且 parse /preview/search 也已经是实际 read surface。
 > - 推荐方案是 `Personal Space / Team Space + DB 资源树 + ACL + Space Scoped Blob Store`。目录树、分享关系、下载授权都由数据库和服务端控制，S3 key 只负责对象寻址。
 > - 如果目标是对齐飞书，不应该放弃 S3 作为对象存储，而应该放弃 “把 S3 当目录树、权限系统、分享系统” 的建模方式。
-> - 不建议一步到位重写成统一 `resource_nodes` 超表。第一阶段应保留 `documents/files` 双表，但补一个薄 `resource_registry`，给 ACL /share/audit /revoke cache 一个稳定锚点。
+> - 不建议一步到位重写成统一 `resource_nodes` 超表。第一阶段应保留 `documents/files` 双表，但补一个薄 `resource_registry`，给 ACL /share/audit/revoke cache 一个稳定锚点。
 > - Phase 0 不能只修 `/f/:id`，还要显式关闭私有资源的 public object /public domain 绕过路径，并把下载、预览、解析、检索统一收口到同一个 authorizer。
 > - 如果只补三样最关键的基础设施，优先级应是：`resource_registry`、`authz_epoch`、带状态机且强制 private-object 的 `space_blobs`。
 
@@ -26,7 +26,7 @@
 ### S3 与环境变量（第三轮审计对齐）
 
 - **`BlobProvider`**：已新增 `src/server/modules/BlobProvider/*`，作为统一 blob 抽象层；业务主链开始从直连 `PrivateBlobS3 / FileS3` 收口到 provider。
-- **`S3_SET_ACL`**（`src/envs/file.ts`）：**默认 `false`**，仅 **`process.env.S3_SET_ACL === '1'`** 时为 true（opt-in）。应用侧 **`FileS3` PutObject 不写对象 ACL**；该变量保留给历史/外部脚本读取，避免「未设置 env 却等价于允许 public-read 语义」的默认值陷阱。
+- **`S3_SET_ACL`**（`src/envs/file.ts`）：**默认 `false`**，仅 **`process.env.S3_SET_ACL === '1'`** 时为 true（opt-in）。应用侧 **`FileS3` PutObject 不写对象 ACL**；该变量保留给历史 / 外部脚本读取，避免「未设置 env 却等价于允许 public-read 语义」的默认值陷阱。
 - **对象 ACL 代码路径**：`FileS3` / 基类 **已移除** `setAcl`、`public-read` 上传参数（与审计结论一致）。
 
 ### 客户端上传（`prepareResourceUpload` 收口）
@@ -35,7 +35,7 @@
 - **同域回退**：`POST /api/file/upload-session`（`uploadSessionId` + `file`），服务端用 **`PrivateBlobS3.uploadBuffer`** 写入会话 **`storageKey`**，与预签名 PUT 同一私有桶契约。
 - **遗留 pathname 同域上传**：`POST /api/file/upload`（`pathname` + `file`，供旧客户端 / 移动端等）已改为 **`getPrivateBlobS3().uploadBuffer`**，与私有 blob 桶一致；**Web 主路径**仍应以 **`upload-session` + 会话 key** 为主。
 - **带进度上传**：`uploadWithProgress` 向 prepare 传入 **`knowledgeBaseId` / `parentId` / `spaceId` / `sha256`**，与写库 **`createFile`** 的空间上下文一致。
-- **对象 key 不含展示文件名**：`lambda/upload` 的 **`generateStorageKey`** 为 **`uploads/{spaceId}/{sessionId}/{nanoid}`**；展示名仍在会话 **`metadata.filename`** 与 **`files.name`**。客户端 **`FileMetadata.filename`** 使用 **`File.name`**，避免 UI 误用路径末段。
+- **对象 key 不含展示文件名**：`lambda/upload` 的 **`generateStorageKey`** 已切到 **`v2/spaces/{spaceId}/blobs/{sessionId}/{nanoid}`**；展示名仍在会话 **`metadata.filename`** 与 **`files.name`**。客户端 **`FileMetadata.filename`** 使用 **`File.name`**，避免 UI 误用路径末段。
 - **OpenAPI 公开上传**（`packages/openapi/.../file.service.ts`）：直传改为 **`getPrivateBlobS3().uploadBuffer`**，**`HeadObject`** 校验 **`contentLength === file.size`** 后再 **`upsertSpaceBlob`**（并写入 **`etag`**）；**`generateFileMetadata`** 路径末段为 **`nanoid()`**，**`metadata.filename`** 为用户 **`file.name`**。
 
 ### 授权与能力模型
@@ -62,6 +62,9 @@
 
 - **`ResourceModel.invalidateAuthzEpochsAfterRemoval`**：物理删除或同类变更后 bump 相关 **`resource_registry`** 与 **`spaces`** 的 epoch，便于下载缓存等依赖 `authz_epoch` 的路径失效。
 - **已串联的典型入口**（非穷举）：`DocumentService.deleteDocuments`、文档 **`parentId` 变更**；lambda / async **file** 删除与存储 **`NoSuchKey`** 后的删行；lambda **notebook** 删文档等（以仓库内对 `invalidateAuthzEpochsAfterRemoval` 的调用为准）。
+- **Async file worker 首批执行期复验已落地**：`chunk.createParseFileTask / createEmbeddingChunksTask` 现在会把创建任务时的 `preview_content authzEpoch` 写入 `async_tasks.metadata.contentGuard`；`async/file.parseFileToChunks / embeddingChunks` 在真正执行前会重新读取当前权限并比较 epoch，不一致则直接把任务标为错误，避免 “任务创建后资源授权已变化” 时继续解析或嵌入旧对象。旧任务没有 `contentGuard` 时仍按旧逻辑兼容执行。
+- **OpenAPI chunking 入口已对齐同一 contract**：`packages/openapi/.../FileUploadService.createChunkTask` 现在也会先校验 `preview_content` 并把 `authzEpoch` 传给 `ChunkService.asyncParseFileToChunks / asyncEmbeddingFileChunks`，避免 OpenAPI 路径绕开已有的 async worker 执行期复验。
+- **物理删除与存储清理语义已对齐一批入口**：lambda `file.removeFile / removeFiles / removeAllFiles`、`DocumentService.deleteDocuments(false)`、以及 OpenAPI `FileUploadService.deleteFile` 现都先删库、再仅删除真正 orphan 的存储对象；`REMOVE_GLOBAL_FILE=false` 时会保留仍由 `global_files` 托管的 hashed blob，不再把 “删除记录” 和 “可物理删对象” 混为一谈。
 
 ### `global_files`（CAS）按 hash 读字节与 ZIP URL
 
@@ -79,7 +82,7 @@
 - **不再调用 `checkHash`** 决定 `insertToGlobalFiles`；**始终** `create(..., true)`，依赖 **`global_files` 主键冲突即跳过**，避免预检侧信道。
 - **`space_blobs`**：未传 **`spaceId`** 时默认 **`getOrCreatePersonalSpace()`** 并写入文件行 **`spaceId`** + **`upsertSpaceBlob`**（`ready`）；显式 **`spaceId: null`** 则跳过个人空间解析与 blob 登记；传入具体 **`spaceId`** 时行为与 OpenAPI 一致。
 - **`quarantined`（最小闭环）**：**`upload.completeResourceUpload`** 在 S3 **Head 404/NoSuchKey** 或 **实际 size ≠ 会话 expectedSize** 时，若会话含 **`expectedSha256`**，则 **`ResourceModel.quarantineSpaceBlobAfterFailedVerify`** 写入 **`space_blobs.status=quarantined`**（已有 **`ready`** 同 hash 不降级）。**OpenAPI `uploadFile`** 在 PUT 后 HEAD **大小不一致**时同样隔离。**`findSpaceBlobByHash`** 仍只认 **`ready`**。通用 **`upsertSpaceBlob`** 对 **`quarantined`** 将 **`verifiedAt`** 置 **`null`**。
-- **沙盒 / Market 导出 / 服务端 Skills**：在能唯一解析时传入 **`spaceId`**——按话题关联 agent（含群聊多 agent）的**已启用知识库**推导单一 **`knowledge_bases.spaceId`**（`resolveSpaceIdForSandboxExport`）；**`tools.market.exportAndUploadFile`** 另支持可选 **`spaceId`**（须用户可访问）。**Web 客户端**：资源管理器 **`setSpaceId`** 同步 **`getActiveWorkspaceSpaceId`**（`src/helpers/activeWorkspaceSpace.ts`）。**`cloudSandboxService.exportAndUploadFile`**、**`agentRuntimeService.createOperation`**（`aiAgent.createOperation`）、**`aiAgentService.execAgentTask`** 在未显式传 **`spaceId` / `appContext.spaceId`** 时用其作为提示（服务端仍校验可访问性；KB 推导等为后备）。**`webapi/chat`**（`MobileChatPayload.spaceId`）在服务端工具循环里传入 **`ToolExecutionContext.spaceId`**。**CLI** `agent run` 支持 **`--space-id`** 或环境变量 **`LOBE_CLI_SPACE_ID`** 写入 **`execAgent.appContext.spaceId`**。**`execAgent` 的 `appContext.spaceId`** 与 **`createOperation` 的 `spaceId`** 进入 operation metadata，**`RuntimeExecutors`** 调用 **`executeTool`** 时注入 **`ToolExecutionContext.spaceId`**，与 Cloud Sandbox / Skills 的显式 Space 优先逻辑对齐。**`createGlobalFile`（技能 CAS）**仍走 **`checkHash`**，与用户上传路径分开迭代。
+- **沙盒 / Market 导出 / 服务端 Skills**：在能唯一解析时传入 **`spaceId`**—— 按话题关联 agent（含群聊多 agent）的**已启用知识库**推导单一 **`knowledge_bases.spaceId`**（`resolveSpaceIdForSandboxExport`）；**`tools.market.exportAndUploadFile`** 另支持可选 **`spaceId`**（须用户可访问）。**Web 客户端**：资源管理器 **`setSpaceId`** 同步 **`getActiveWorkspaceSpaceId`**（`src/helpers/activeWorkspaceSpace.ts`）。**`cloudSandboxService.exportAndUploadFile`**、**`agentRuntimeService.createOperation`**（`aiAgent.createOperation`）、**`aiAgentService.execAgentTask`** 在未显式传 **`spaceId` / `appContext.spaceId`** 时用其作为提示（服务端仍校验可访问性；KB 推导等为后备）。**`webapi/chat`**（`MobileChatPayload.spaceId`）在服务端工具循环里传入 **`ToolExecutionContext.spaceId`**。**CLI** `agent run` 支持 **`--space-id`** 或环境变量 **`LOBE_CLI_SPACE_ID`** 写入 **`execAgent.appContext.spaceId`**。**`execAgent` 的 `appContext.spaceId`** 与 **`createOperation` 的 `spaceId`** 进入 operation metadata，**`RuntimeExecutors`** 调用 **`executeTool`** 时注入 **`ToolExecutionContext.spaceId`**，与 Cloud Sandbox / Skills 的显式 Space 优先逻辑对齐。**`createGlobalFile`（技能 CAS）** 现也已改成无预检的 **`onConflictDoNothing`** 路径，不再通过 **`checkHash`** 先探测全局 hash 是否存在。
 
 ### Phase 4（`documents` 软删除与恢复，已部分落地）
 
@@ -94,20 +97,24 @@
 ### Phase 5（匿名链接与兼容，已部分落地）
 
 - **Token-first 文件下载**：`GET /share/f/:token`（可选 `?password=`）；**`GET /f/:id?token=…` 一律 307 重定向到 `/share/f/:token`**（仅保留 `password` query），避免在 URL 主路径暴露 `fileId`。单测见 `src/app/(backend)/f/[id]/route.test.ts`、`src/app/(backend)/share/f/[token]/route.test.ts`。
-- **统一失败形态**：带 **`shareToken`** 的下载在 **`serveAuthorizedFileDownload`** 鉴权失败时返回 **404**（与错误/撤销 token 一致），**不**再返回 **403**（减少与「资源不存在」的区分）。单测见 `src/server/modules/file-proxy/serveAuthorizedFileDownload.test.ts`。
+- **统一失败形态**：带 **`shareToken`** 的下载在 **`serveAuthorizedFileDownload`** 鉴权失败时返回 **404**（与错误 / 撤销 token 一致），**不**再返回 **403**（减少与「资源不存在」的区分）。单测见 `src/server/modules/file-proxy/serveAuthorizedFileDownload.test.ts`。
 - **公开页**：资源分享页仍为 **`/share/r/:token`**（SPA）；文件直链为 **`/share/f/:token`**（与 `createResourceShareLink` 返回的 `fileShareDownloadUrl` 一致）。
+- **公开分享访问事件**：`contentShare.getSharedContentByToken` 在成功返回 document /file/source_set 摘要时，现已写入 **`content_access_events(accessType=share_view)`**，并携带 `shareLinkId / contentUid / sourceIp / userAgent`；若访问者本身已登录，则保留 actor 身份，而不是一律记成匿名。
+- **公开分享下载事件**：`serveAuthorizedFileDownload` 在 share-token 下载真正放行后，现已把原本统一的 `file_download` 细分成 **`share_download`**，保留 `shareLinkId / matchedBy / sourceIp / userAgent`，便于区分匿名 / 外链下载与登录态文件下载。
+- **公开分享导出事件**：资源分享页对 table document 的 `CSV / XLSX` 导出，现会通过 `contentShare.recordSharedContentExport` 记入 **`content_access_events(accessType=share_export)`**；事件保留 `shareLinkId / format / kind / localId / sourceIp / userAgent`，且导出动作在审计写入失败时仍继续，以避免把访问日志故障升级成用户下载失败。
+- **成员侧文档导出事件**：Page Editor 的 `Markdown / CSV / XLSX` 导出，现会通过 `contentShare.recordContentExport` 记入 **`content_access_events(accessType=content_export)`**；事件保留 `format / kind / localId / sourceIp / userAgent`，并继续采用 best-effort 审计，不会因为日志写入失败阻断本地导出。
 - **`knowledge_bases.isPublic`**：schema 上已标 **`@deprecated`**，**不得**再作为授权依据；完全收敛到 ACL / 分享链接需后续删字段或迁移。
 
 ### 仍待办（与 §3.1、Phase 0～5 一致）
 
 - **`FileService.createFileRecord`**：默认已挂**个人空间** + **`space_blobs`**；若某类文件必须**不**绑定空间，可显式传 **`spaceId: null`**（慎用）。
-- **其余按原文推进**：Phase 3 **`v2/spaces/...` 存储 key**、Phase 4 **硬删除与 blob 延迟 GC**（Web 资料库/资源首页回收站与 **`0100` client_id 部分唯一**已落地；Notebook 侧仅提示至资源回收站）、**下线用户资源对 `global_files` 的依赖**、**`isPublic` 数据迁移**、异步 worker **执行时**对 **`authz_epoch`** 的强制复验等。
+- **其余按原文推进**：Phase 3 **`v2/spaces/...` 存储 key** 已在上传 session / 客户端 upload /import 链路起步，但旧对象与历史读路径仍需继续双读收口；Phase 4 **硬删除与 blob 延迟 GC**（Web 资料库 / 资源首页回收站与 **`0100` client_id 部分唯一**已落地；Notebook 侧仅提示至资源回收站）、**下线用户资源对 `global_files` 的依赖**、**`isPublic` 数据迁移**、以及把 `authz_epoch` 执行期复验继续扩到更多 async worker /processing surface。
 
 审计结论补充：
 
 - 当前大致位于 **Phase 2 到 Phase 5 的交叉阶段**，不是线性完成。
 - `spaces / registry / permissions / share links / token-first file download / trash restore` 都已经进入主链。
-- 但 `global_files` 彻底退场、存储 key 规范化、worker 执行期复验、以及部分历史公开语义清理还没有收尾。
+- 但 `global_files` 彻底退场、存储 key 规范化、worker 执行期复验全面铺开、以及部分历史公开语义清理还没有收尾。
 
 ## 一、现状审计
 
@@ -131,7 +138,7 @@
 | 跨用户去重              | `file.checkHash` 查询全局 `global_files`                                 | 能泄露 “某文件内容是否已存在于系统中”                         |
 | ACL 缺失                | 资源树没有 `viewer/editor/owner` 统一权限模型                            | 无法安全支持 “分享给某人 / 分享给团队 / 链接分享”             |
 | 共享模型割裂            | Topic 有 `topicShares`，资源没有对应模型                                 | 无法复用出 “像飞书一样” 的资源分享心智                        |
-| 派生读路径未统一收口    | parse /preview/chunk /semantic search 已经读到资源内容                   | 如果只修下载，仍会通过解析结果、预览、检索泄露内容            |
+| 派生读路径未统一收口    | parse /preview/chunk/semantic search 已经读到资源内容                    | 如果只修下载，仍会通过解析结果、预览、检索泄露内容            |
 
 ### 1.3 当前代码锚点
 
@@ -142,7 +149,7 @@
 - 资源统一查询：`packages/database/src/repositories/knowledge/index.ts`
 - 会话分享模型：`packages/database/src/models/topicShare.ts`
 - **统一资源授权（capability、`preview_content`、转授、`filterReadable*`）**：`src/server/services/resource/index.ts`
-- **删除/移动后 bump epoch**：`packages/database/src/models/resource.ts`（`invalidateAuthzEpochsAfterRemoval`）
+- **删除 / 移动后 bump epoch**：`packages/database/src/models/resource.ts`（`invalidateAuthzEpochsAfterRemoval`）
 - **全局 CAS 按 hash 访问控制**：`packages/database/src/models/file.ts`（`canAccessGlobalFileByHash`）
 - **按 hash 读字节（服务端）**：`src/server/services/file/index.ts`（`getFileContentByHash` / `getFileByteArrayByHash`）
 
@@ -204,7 +211,7 @@
 
 - 不接管正文、文件元数据、业务字段
 - 只承载稳定身份、所属 `space_id`、软删除态、授权版本
-- 给 ACL /share/audit /explain-access 提供统一目标
+- 给 ACL /share/audit/explain-access 提供统一目标
 
 结论：**不做完整 `resource_nodes` 超表，但建议引入薄 `resource_registry`。**
 
@@ -342,7 +349,7 @@ S3 仍然非常适合承载：
 - 现有 ResourceManager
 - 现有 Page / Document 编辑器
 - 现有 Knowledge Base 归档关系
-- 同时为 ACL /share/audit /revoke cache 提供稳定锚点
+- 同时为 ACL /share/audit/revoke cache 提供稳定锚点
 
 ### 4.3 权限模型
 
@@ -628,7 +635,7 @@ v2/spaces/<spaceId>/blobs/<blobId>
 ### 6.3 分享
 
 - 创建成员分享：要求 `owner`，或 `editor + can_reshare`
-- **Space 成员维度**：space `owner` / `admin` 可在空间内代为发起成员分享/链接管理；**space `editor`（仅成员身份）** 不能仅凭成员资格转授，仍须在目标资源上满足上一条（资源 `owner` 或资源级 `editor + can_reshare`，含继承）。
+- **Space 成员维度**：space `owner` / `admin` 可在空间内代为发起成员分享 / 链接管理；**space `editor`（仅成员身份）** 不能仅凭成员资格转授，仍须在目标资源上满足上一条（资源 `owner` 或资源级 `editor + can_reshare`，含继承）。
 - 创建链接分享：要求 `owner`，且在匿名分享阶段之前不下放给普通 `editor`
 - 撤销分享：同一授权链上的 `owner` 可撤销，并 bump 相关 `authz_epoch`
 
@@ -653,7 +660,7 @@ v2/spaces/<spaceId>/blobs/<blobId>
 2. 把 Redis 缓存命中移动到权限判断之后，缓存键改为 `principal/shareLink + fileId + authz_epoch`。
 3. 强制用户资源对象走 private bucket /private object，禁用 `public-read` 与 `S3_PUBLIC_DOMAIN` 直链回退。
 4. 停止用户资源使用跨用户 `checkHash` 快速路径。（**进展**：按 hash 读字节与技能 ZIP 预签名已要求 `canAccessGlobalFileByHash`；**OpenAPI `uploadFile`** 为 Space 内 `space_blobs` 去重；**`FileService.createFileRecord`** 已取消全局 `checkHash` 预检并支持 **`spaceId` → `upsertSpaceBlob`**，见 **§〇**。）
-5. 把 preview /parse/chunk /semantic search /provider read path 接到同一个 authorizer 入口。（**进展**：chunk、async file、document 解析与语义检索过滤已统一使用 **`preview_content`** 及 OR 规则，见 **§〇**；其余 provider / 导出等路径仍按清单收口。）
+5. 把 preview /parse/chunk/semantic search /provider read path 接到同一个 authorizer 入口。（**进展**：chunk、async file、document 解析与语义检索过滤已统一使用 **`preview_content`** 及 OR 规则，见 **§〇**；其余 provider / 导出等路径仍按清单收口。）
 6. 为 `/f/:id`、`checkHash`、preview、parse、search 补集成测试。
 
 验收标准：

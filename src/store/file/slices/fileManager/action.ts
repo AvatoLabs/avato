@@ -1,5 +1,6 @@
 import {
   type FileAssetClassification,
+  type FileAssetMetadata,
   type FileAssetState,
   type FileAssetUsagePolicy,
 } from '@lobechat/types';
@@ -605,7 +606,7 @@ export class FileManageActionImpl {
     id: string,
     data: {
       classification?: FileAssetClassification;
-      metadata?: Record<string, unknown> | null;
+      metadata?: FileAssetMetadata | null;
       rightsOwner?: string | null;
       usagePolicy?: FileAssetUsagePolicy;
     },

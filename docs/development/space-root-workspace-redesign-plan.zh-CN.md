@@ -1,26 +1,28 @@
 # Space 作为工作区根的产品与信息架构重构方案
 
-**状态**：当前 canonical 产品架构提案；截至 2026-04-04 已部分落地  
-**日期**：2026-04-04  
-**目标**：把 `space` 从“隐式默认容器”提升为产品一等根对象，重构 `docs / files / source set / team` 的前台语义与路由边界，让多 space / team space 的体验接近 Notion / 飞书式工作区。
+**状态**：当前 canonical 产品架构提案；截至 2026-04-05 已部分落地并继续收口 legacy route\
+**日期**：2026-04-05\
+**目标**：把 `space` 从 “隐式默认容器” 提升为产品一等根对象，重构 `docs / files / source set / team` 的前台语义与路由边界，让多 space /team space 的体验接近 Notion / 飞书式工作区。
 
 ---
 
-## 〇、当前落地进展（截至 2026-04-04）
+## 〇、当前落地进展（截至 2026-04-05）
 
-本方案对应的工程改造已经进入主链，但整体仍处于 **Phase 1 ~ Phase 3 之间**，还没有完成最终收口。
+本方案对应的工程改造已经进入主链，但整体仍处于 **Phase 1 \~ Phase 3 之间**，还没有完成最终收口。
 
 - **`/spaces/:spaceId/...` canonical routes 已建立**：`docs / files / memory / settings / members` 都已能以 space-scoped 路径直接访问。
 - **Docs 侧已开始承认 Space 是根**：文档列表侧栏、Header、Breadcrumb、详情页跳转都已显式携带 `spaceId`。
 - **Files 侧已基本成为 `space-first`**：空间列表、breadcrumb、文件树与 source set scope 都围绕当前 `spaceId` 工作。
 - **Space 首页与切换器已可用**：`/spaces` 会重定向到用户可访问空间；Space 首页也已经把 `Docs / Files / Memory / Members / Settings` 暴露为工作区入口。
-- **兼容层仍未清理完**：`/content/shared`、`/content/trash` 与部分 legacy query/path 仍保留，旧心智还没有完全退出。
-- **`activeWorkspaceSpaceId` 仍在作为提示状态存在**：它已经退化成 URL 之外的辅助 hint，但还没有从所有调用方彻底淡出。
+- **首页与设置侧入口开始显式表达当前 Workspace**：Home 左侧导航、Quick Actions、Recent Docs / Recent Files、Agent Sources，以及移动端资源入口、会话来源标签这些过去更依赖隐式默认空间的入口，已经开始显示或优先使用 “当前在哪个 Workspace 打开 / 管理资源” 的 route-aware 语义，避免用户只看到全局动作名词却不知道会落到哪个空间。
+- **Source Set / 创建动作 / 消息动作 / 命令面板也开始变成 route-aware Workspace UX**：`Attach Source Set`、`Add Files to Source Set` 这类 modal 现在会显式提示 “当前优先浏览哪个 Workspace”，跨空间的 source set 也会在列表和详情入口上显示来源工作区；同时 `Add to Space Memory` 的消息动作、topic 下拉菜单、Agent Profile 里的 inline sources、首页 `new page` 创建动作，以及 command menu 里的 `Docs / Resources` 导航，也已优先采用当前 route 的 `spaceId`，不再默认为旧 workspace hint。
+- **legacy `shared / trash` 入口已进一步退成 redirect**：`/spaces/shared` 与 `/spaces/trash` 现在已成为新的 canonical 入口；旧 `/content/shared`、`/content/trash` 仅保留 redirect 职责，router 的 error reset path 也已切到 `/spaces/*`，`MainMenu` 和移动端资源路由判断则已开始通过共享 helper 统一消费 canonical `/spaces/*` 语义。
+- **`activeWorkspaceSpaceId` 已进一步退化为 URL-first hint**：helper 现在会优先从当前 pathname 解析 `/spaces/:spaceId/...`，只有在拿不到 canonical route spaceId 时才回退到内存 hint；同时 Docs CRUD、FileStore 里的 document slice，`agent / aiAgent / agentRuntime / cloudSandbox` 这批高频 service 调用点，`agent sources / chat topic` 的容器 key，`SourceSetModal / command menu / create menu / page list / source tree` 这些 UI 与 tree surface，以及 `home input / recent topics` 这类首页入口，都已统一改成 `explicit spaceId -> current route -> store/query fallback -> hint` 的 shared resolver。当前 `src/` 里已基本只剩 helper 自己与测试仍直接引用 `activeWorkspaceSpaceId`。
 
 这意味着：
 
-> `Space` 作为工作区根已经被前台大面积承认，  
-> 但“旧 `content` 兼容层完全退场”和“所有旧路由仅保留 redirect”这两件事还没完成。
+> `Space` 作为工作区根已经被前台大面积承认，\
+> 但 “旧 `content` 兼容层完全退场” 和 “所有旧调用点都不再依赖 `activeWorkspaceSpaceId` hint” 这两件事还没完成。
 
 ---
 
@@ -37,15 +39,15 @@
 
 这会直接导致四类问题：
 
-1. 多 space 是“技术支持了，产品没承认”
-2. 个人空间被前端默认成“唯一真空间”
+1. 多 space 是 “技术支持了，产品没承认”
+2. 个人空间被前端默认成 “唯一真空间”
 3. 团队空间与成员角色没有变成可感知的 UI 事实
 4. `Docs / Files / Source Set` 的边界在语义和 UI 上长期互相污染
 
 这份方案的最终结论是：
 
-> **Space 是唯一的工作区根。**  
-> **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**  
+> **Space 是唯一的工作区根。**\
+> **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**\
 > **Source Set（资料集）是 Space 内的专题容器，也是 Docs 和 Files 共享的专题范围，不再成为第三套主页面。**
 > **Content 退到实现层，作为统一资源注册表存在，不再是用户主语。**
 
@@ -63,7 +65,7 @@
 结果是：
 
 - 一个用户在 A 空间浏览资料集，却可能在 B 空间里创建文档
-- 用户能访问多个 team space，但 UI 没有稳定表达“我现在在哪个空间”
+- 用户能访问多个 team space，但 UI 没有稳定表达 “我现在在哪个空间”
 - `Source Set` 被迫承担一部分本该由 `Space` 承担的组织职责
 
 ### 2. 现在真正的结构性缺口
@@ -86,9 +88,9 @@
 
 ### 3. 风险判断
 
-最大的风险不是“我们现在没有多 space”，而是：
+最大的风险不是 “我们现在没有多 space”，而是：
 
-> **系统底层已经进入多 space / team space 阶段，前台却还在用单空间时代的模块心智。**
+> **系统底层已经进入多 space /team space 阶段，前台却还在用单空间时代的模块心智。**
 
 如果继续在这个结构上补入口、补 sidebar、补 scope，只会不断加深局部修补和整体失真。
 
@@ -165,7 +167,7 @@
 - 文件
 - 资料集
 
-而不是“内容”。
+而不是 “内容”。
 
 ---
 
@@ -242,7 +244,7 @@
 - Personal Memory
 - Account / Global Settings
 
-这会比今天“所有模块并排在同一层”更清楚。
+这会比今天 “所有模块并排在同一层” 更清楚。
 
 ---
 
@@ -281,7 +283,7 @@
 - 当前空间名称
 - Space Switcher
 - 新建空间
-- 受邀/加入空间入口
+- 受邀 / 加入空间入口
 
 #### Space 内导航
 
@@ -414,7 +416,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 
 - 当前 `space`
 
-它不应该出现在“无空间上下文”的全局浮层里。
+它不应该出现在 “无空间上下文” 的全局浮层里。
 
 ### 4. 移动对象
 
@@ -437,7 +439,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - 在 `Docs` 中导入 `.md`：结果是文档
 - 在 `Files` 中上传 `.md`：结果是文件
 
-不要做“同一动作自动猜两种后果”的交互。
+不要做 “同一动作自动猜两种后果” 的交互。
 
 ---
 
@@ -458,7 +460,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 | 维度         | Docs（文档）           | Files（文件）        |
 | ------------ | ---------------------- | -------------------- |
 | 主要动作     | 创建、编辑、阅读       | 上传、下载、整理     |
-| 内容形态     | 富文本/Block 编辑器    | 文件 + 元数据        |
+| 内容形态     | 富文本 / Block 编辑器  | 文件 + 元数据        |
 | 默认组织方式 | 范围列表、时间、资料集 | 文件夹、资料集、类型 |
 | 核心心智     | 知识成果               | 原始资产             |
 
@@ -471,9 +473,9 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - 该资料集内的文档
 - 该资料集内的文件
 
-但这不代表 `Source Set` 应该升级成第三套独立页面系统，也不代表 `Docs` 页面应该出现“文档/文件 switcher”。
-`Docs` 页面默认只看文档。  
-`Files` 页面默认只看文件。  
+但这不代表 `Source Set` 应该升级成第三套独立页面系统，也不代表 `Docs` 页面应该出现 “文档 / 文件 switcher”。
+`Docs` 页面默认只看文档。\
+`Files` 页面默认只看文件。\
 `Source Set` 负责通过同一专题范围把两者联结起来。
 
 ### 4. `Files` 的筛选是视图状态，不是导航动作
@@ -487,12 +489,12 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - 如果用户当前在某个文件夹中，改变筛选时必须保留该文件夹上下文
 - 如果用户当前在文件预览中，改变筛选时可以退出预览态，但必须回到当前文件所属文件夹，而不是静默跳回 `Files` 根目录
 
-换句话说，`Files` 的筛选只应该改 query state，不应该把用户从当前浏览上下文中“弹回根视图”。
+换句话说，`Files` 的筛选只应该改 query state，不应该把用户从当前浏览上下文中 “弹回根视图”。
 
 实施前提：
 
 - 当前 Source Set 相关读取链路如果仍然只返回 files，不返回 documents，则这套跨类型专题范围无法真正落地
-- 因此前端改版前，必须先补齐 Source Set 的统一读取 API / overview 契约，使其能稳定返回 docs + files
+- 因此前端改版前，必须先补齐 Source Set 的统一读取 API /overview 契约，使其能稳定返回 docs + files
 
 ### 4. 来源关系，不等于版本绑定
 
@@ -510,7 +512,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 
 ### 1. 当前系统的真实状态
 
-当前系统不是没有团队能力，但远不能说“完备支持团队协作”。
+当前系统不是没有团队能力，但远不能说 “完备支持团队协作”。
 
 已经有的基础：
 
@@ -526,7 +528,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - 邀请流仍然过于原始
 - 前端没有稳定的角色反馈
 - 权限 UI 仍然依赖服务端最后一步拒绝
-- 用户无法稳定感知“我在这个空间里是谁”
+- 用户无法稳定感知 “我在这个空间里是谁”
 
 ### 2. 空间协作是第一边界
 
@@ -546,7 +548,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - user
 - space member
 - share link visitor
-- 后续可扩展 group / service account
+- 后续可扩展 group /service account
 
 #### 资源
 
@@ -588,7 +590,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 
 - `viewer` 不应一路点到提交才 403
 - `admin` 与 `owner` 的差异必须在成员和设置管理中可见
-- 分享动作必须区分“分享整个空间”和“分享某个内容”
+- 分享动作必须区分 “分享整个空间” 和 “分享某个内容”
 
 ---
 
@@ -617,7 +619,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 当前 Space / 资料集 / 当前资料集 / 文件
 ```
 
-### 2. 为什么 Docs 里不能再叫“文件夹”
+### 2. 为什么 Docs 里不能再叫 “文件夹”
 
 如果 `Docs` 页面展示的是文档层级，就应该使用文档语义：
 
@@ -625,7 +627,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 - 目录
 - 集合
 
-而不是继续借用 `Files` 的“文件夹”语言。
+而不是继续借用 `Files` 的 “文件夹” 语言。
 
 否则前面刚拆清的 `Docs / Files` 心智，又会在 breadcrumb 里重新糊掉。
 
@@ -647,7 +649,7 @@ LobeHub 不需要变成页面树产品，但必须承认：
 默认规则：
 
 - 普通搜索：只搜当前 `space`
-- 全局搜索：用户显式切换到“所有空间”
+- 全局搜索：用户显式切换到 “所有空间”
 
 不要默认跨所有 `space` 搜索。
 
@@ -709,7 +711,7 @@ Personal space 和 Team space 的 empty state 应有所区分。
 | 表单记录 | `form_record` | Records（新增）                   |
 | 流程归档 | `archive`     | Files 或 Archives（按复杂度决定） |
 
-不要为了“以后可能会有更多类型”，就提前把今天的 `Files` 改叫成抽象的 `Resources`。
+不要为了 “以后可能会有更多类型”，就提前把今天的 `Files` 改叫成抽象的 `Resources`。
 
 ---
 
@@ -719,7 +721,7 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 ### Phase 0：方案定稿
 
-本文档本身就是 Phase 0 的产出，不应继续停留在“待确认”状态。
+本文档本身就是 Phase 0 的产出，不应继续停留在 “待确认” 状态。
 
 目标：
 
@@ -752,7 +754,7 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 验收标准：
 
-- 用户在任意页面都知道“我现在在哪个空间”
+- 用户在任意页面都知道 “我现在在哪个空间”
 - 切换空间时保留当前工作面
 
 ### Phase 3：Docs / Files / Source Set 前台分层
@@ -789,14 +791,14 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 ### 1. 旧的默认空间如何迁移
 
-当前所谓“默认空间”不应该继续隐藏存在，而应该显式迁移为：
+当前所谓 “默认空间” 不应该继续隐藏存在，而应该显式迁移为：
 
 - `个人空间`
 
 迁移规则：
 
 1. 每个用户现有默认空间保留原 `spaceId`
-2. UI 上第一次明确把它显示成“个人空间”
+2. UI 上第一次明确把它显示成 “个人空间”
 3. 该空间下原有 docs/files/source sets 原地保留
 4. 之后允许继续新建更多 personal/team spaces
 
@@ -810,8 +812,8 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 不要一次把所有 UI 文案打碎重来，而是按顺序：
 
-1. 先让用户看到“空间”
-2. 再让用户看到“文档 / 文件 / 资料集”的边界
+1. 先让用户看到 “空间”
+2. 再让用户看到 “文档 / 文件 / 资料集” 的边界
 3. 最后再彻底淡化 `content`
 
 ---
@@ -833,10 +835,10 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 最终产品模型应该被定义成：
 
-> **Space 是唯一的工作区根。**  
-> **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**  
+> **Space 是唯一的工作区根。**\
+> **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**\
 > **Source Set（资料集）是 Space 内的专题容器，也是 Docs 和 Files 共享的专题范围，不再成为第三套主页面。**
-> **Chat / Agent、Community、Personal Memory、Account 属于 Space 外模块。**  
+> **Chat / Agent、Community、Personal Memory、Account 属于 Space 外模块。**\
 > **Content 退到实现层，作为统一资源注册表存在，不再作为用户主语。**
 
 如果这一点不先收口，后面无论再补多少 sidebar、scope、source set 入口，都会继续在错误的顶层结构上修补，而不会得到一个真正可扩展的工作区产品。

@@ -4,7 +4,7 @@ import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildFilesPreviewPath, buildSourceSetPath } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useAgentStore } from '@/store/agent/store';
 import { useChatStore } from '@/store/chat';
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -23,7 +23,7 @@ interface ActionsProps {
 
 const Actions = memo<ActionsProps>(({ id, type, enabled, scope, spaceId }) => {
   const { t } = useTranslation('chat');
-  const targetSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
+  const targetSpaceId = resolveWorkspaceSpaceId({ spaceId });
   const activeGroupId = useChatStore((s) => s.activeGroupId);
   const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const conversationFileContext = activeGroupId

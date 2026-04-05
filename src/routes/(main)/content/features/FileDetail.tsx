@@ -1,6 +1,13 @@
 'use client';
 
-import { type FileAssetClassification, type FileAssetUsagePolicy } from '@lobechat/types';
+import {
+  type FileAssetClassification,
+  type FileAssetMetadata,
+  type FileAssetRenditionInfo,
+  FileAssetRenditionKind,
+  type FileAssetUsagePolicy,
+  pickLegacyFileAssetMetadata,
+} from '@lobechat/types';
 import { ActionIcon, Button, Flexbox, Icon, Tag } from '@lobehub/ui';
 import { Descriptions, Divider, Input, Select } from 'antd';
 import dayjs from 'dayjs';
@@ -18,6 +25,17 @@ interface FileDetailProps extends FileListItem {
   showDownloadButton?: boolean;
   showTitle?: boolean;
 }
+
+const normalizeRenditionLabel = (value?: string | null) => {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+};
+
+const getRenditionFingerprint = (renditions: FileAssetRenditionInfo[]) =>
+  [...renditions]
+    .map(({ kind, label }) => `${kind}:${normalizeRenditionLabel(label) ?? ''}`)
+    .sort()
+    .join(',');
 
 const FileDetail = memo<FileDetailProps>((props) => {
   const {
@@ -48,12 +66,33 @@ const FileDetail = memo<FileDetailProps>((props) => {
     useState<FileAssetClassification>('general');
   const [draftUsagePolicy, setDraftUsagePolicy] = useState<FileAssetUsagePolicy>('internal');
   const [draftRightsOwner, setDraftRightsOwner] = useState('');
+  const [draftVersionLabel, setDraftVersionLabel] = useState('');
+  const [draftVersionVariantOf, setDraftVersionVariantOf] = useState('');
+  const [draftRenditions, setDraftRenditions] = useState<FileAssetRenditionInfo[]>([]);
 
   useEffect(() => {
     setDraftClassification(fileAsset?.classification ?? 'general');
     setDraftUsagePolicy(fileAsset?.usagePolicy ?? 'internal');
     setDraftRightsOwner(fileAsset?.rightsOwner ?? '');
-  }, [fileAsset?.classification, fileAsset?.rightsOwner, fileAsset?.usagePolicy, props.id]);
+    setDraftVersionLabel(fileAsset?.metadata?.version?.label ?? '');
+    setDraftVersionVariantOf(fileAsset?.metadata?.version?.variantOf ?? '');
+    setDraftRenditions(
+      (fileAsset?.metadata?.renditions ?? []).map((item) => ({
+        ...(normalizeRenditionLabel(item.label)
+          ? { label: normalizeRenditionLabel(item.label) }
+          : {}),
+        kind: item.kind as FileAssetRenditionKind,
+      })),
+    );
+  }, [
+    fileAsset?.classification,
+    fileAsset?.metadata?.renditions,
+    fileAsset?.metadata?.version?.label,
+    fileAsset?.metadata?.version?.variantOf,
+    fileAsset?.rightsOwner,
+    fileAsset?.usagePolicy,
+    props.id,
+  ]);
 
   const infoItems = [
     { children: name, key: 'name', label: t('detail.basic.filename') },
@@ -100,7 +139,18 @@ const FileDetail = memo<FileDetailProps>((props) => {
   const isAssetDirty =
     draftClassification !== (fileAsset?.classification ?? 'general') ||
     draftUsagePolicy !== (fileAsset?.usagePolicy ?? 'internal') ||
-    draftRightsOwner !== (fileAsset?.rightsOwner ?? '');
+    draftRightsOwner !== (fileAsset?.rightsOwner ?? '') ||
+    draftVersionLabel !== (fileAsset?.metadata?.version?.label ?? '') ||
+    draftVersionVariantOf !== (fileAsset?.metadata?.version?.variantOf ?? '') ||
+    getRenditionFingerprint(draftRenditions) !==
+      getRenditionFingerprint(
+        (fileAsset?.metadata?.renditions ?? []).map((item) => ({
+          ...(normalizeRenditionLabel(item.label)
+            ? { label: normalizeRenditionLabel(item.label) }
+            : {}),
+          kind: item.kind as FileAssetRenditionKind,
+        })),
+      );
 
   const assetLabels = useMemo(
     () => ({
@@ -117,6 +167,15 @@ const FileDetail = memo<FileDetailProps>((props) => {
         archived: t('detail.asset.reviewStatus.archived'),
         draft: t('detail.asset.reviewStatus.draft'),
       },
+      rendition: {
+        caption: t('detail.asset.rendition.caption'),
+        embedding: t('detail.asset.rendition.embedding'),
+        preview: t('detail.asset.rendition.preview'),
+        print: t('detail.asset.rendition.print'),
+        thumbnail: t('detail.asset.rendition.thumbnail'),
+        transcript: t('detail.asset.rendition.transcript'),
+        web: t('detail.asset.rendition.web'),
+      },
       usagePolicy: {
         internal: t('detail.asset.usagePolicy.internal'),
         public: t('detail.asset.usagePolicy.public'),
@@ -128,6 +187,68 @@ const FileDetail = memo<FileDetailProps>((props) => {
 
   const renderAssetValue = (value: string | null | undefined, fallback = t('detail.asset.none')) =>
     value || fallback;
+
+  const renderRenditionTags = (renditions: FileAssetRenditionInfo[]) => {
+    if (renditions.length === 0) return t('detail.asset.none');
+
+    return (
+      <Flexbox horizontal gap={8}>
+        {renditions.map((item) => (
+          <Tag key={`${item.kind}:${item.label ?? ''}`} variant={'filled'}>
+            {item.label
+              ? `${assetLabels.rendition[item.kind]} · ${item.label}`
+              : assetLabels.rendition[item.kind]}
+          </Tag>
+        ))}
+      </Flexbox>
+    );
+  };
+
+  const handleRenditionKindsChange = (value: FileAssetRenditionKind[]) => {
+    setDraftRenditions((current) =>
+      value.map((kind) => current.find((item) => item.kind === kind) ?? { kind }),
+    );
+  };
+
+  const handleRenditionLabelChange = (kind: FileAssetRenditionKind, label: string) => {
+    setDraftRenditions((current) =>
+      current.map((item) =>
+        item.kind === kind
+          ? {
+              ...(normalizeRenditionLabel(label) ? { label: normalizeRenditionLabel(label) } : {}),
+              kind: item.kind,
+            }
+          : item,
+      ),
+    );
+  };
+
+  const buildAssetMetadata = (): FileAssetMetadata | null => {
+    const nextMetadata: FileAssetMetadata = {
+      ...pickLegacyFileAssetMetadata(fileAsset?.metadata),
+      ...(fileAsset?.metadata?.custom ? { custom: fileAsset.metadata.custom } : {}),
+      ...(fileAsset?.metadata?.license ? { license: fileAsset.metadata.license } : {}),
+      ...(fileAsset?.metadata?.tags ? { tags: fileAsset.metadata.tags } : {}),
+    };
+
+    if (draftVersionLabel || draftVersionVariantOf) {
+      nextMetadata.version = {
+        ...(draftVersionLabel ? { label: draftVersionLabel } : {}),
+        ...(draftVersionVariantOf ? { variantOf: draftVersionVariantOf } : {}),
+      };
+    }
+
+    if (draftRenditions.length > 0) {
+      nextMetadata.renditions = draftRenditions.map((item) => ({
+        ...(normalizeRenditionLabel(item.label)
+          ? { label: normalizeRenditionLabel(item.label) }
+          : {}),
+        kind: item.kind,
+      }));
+    }
+
+    return Object.keys(nextMetadata).length > 0 ? nextMetadata : null;
+  };
 
   const assetStatusItems = [
     {
@@ -210,6 +331,71 @@ const FileDetail = memo<FileDetailProps>((props) => {
       key: 'rightsOwner',
       label: t('detail.asset.rightsOwner.label'),
     },
+    {
+      children: canEditGovernanceAsset ? (
+        <Input
+          aria-label={t('detail.asset.version.label')}
+          placeholder={t('detail.asset.version.placeholder')}
+          value={draftVersionLabel}
+          onChange={(event) => setDraftVersionLabel(event.target.value)}
+        />
+      ) : (
+        renderAssetValue(draftVersionLabel)
+      ),
+      key: 'version',
+      label: t('detail.asset.version.label'),
+    },
+    {
+      children: canEditGovernanceAsset ? (
+        <Input
+          allowClear
+          aria-label={t('detail.asset.version.variantOfLabel')}
+          placeholder={t('detail.asset.version.variantOfPlaceholder')}
+          value={draftVersionVariantOf}
+          onChange={(event) => setDraftVersionVariantOf(event.target.value)}
+        />
+      ) : (
+        renderAssetValue(draftVersionVariantOf)
+      ),
+      key: 'variantOf',
+      label: t('detail.asset.version.variantOfLabel'),
+    },
+    {
+      children: canEditGovernanceAsset ? (
+        <Flexbox gap={8}>
+          <Select
+            aria-label={t('detail.asset.rendition.label')}
+            mode={'multiple'}
+            placeholder={t('detail.asset.rendition.placeholder')}
+            value={draftRenditions.map((item) => item.kind)}
+            options={[
+              { label: assetLabels.rendition.preview, value: FileAssetRenditionKind.Preview },
+              { label: assetLabels.rendition.thumbnail, value: FileAssetRenditionKind.Thumbnail },
+              { label: assetLabels.rendition.web, value: FileAssetRenditionKind.Web },
+              { label: assetLabels.rendition.print, value: FileAssetRenditionKind.Print },
+              { label: assetLabels.rendition.transcript, value: FileAssetRenditionKind.Transcript },
+              { label: assetLabels.rendition.caption, value: FileAssetRenditionKind.Caption },
+              { label: assetLabels.rendition.embedding, value: FileAssetRenditionKind.Embedding },
+            ]}
+            onChange={(value) => handleRenditionKindsChange(value as FileAssetRenditionKind[])}
+          />
+          {draftRenditions.map((item) => (
+            <Input
+              allowClear
+              aria-label={`${t('detail.asset.rendition.label')}:${item.kind}`}
+              key={item.kind}
+              placeholder={t('detail.asset.rendition.labelPlaceholder')}
+              value={item.label ?? ''}
+              onChange={(event) => handleRenditionLabelChange(item.kind, event.target.value)}
+            />
+          ))}
+        </Flexbox>
+      ) : (
+        renderRenditionTags(draftRenditions)
+      ),
+      key: 'renditions',
+      label: t('detail.asset.rendition.label'),
+    },
   ];
 
   const handleSaveAsset = async () => {
@@ -217,6 +403,7 @@ const FileDetail = memo<FileDetailProps>((props) => {
       setIsSavingAsset(true);
       await updateFileAssetGovernance(props.id, {
         classification: draftClassification,
+        metadata: buildAssetMetadata(),
         rightsOwner: draftRightsOwner || null,
         usagePolicy: draftUsagePolicy,
       });

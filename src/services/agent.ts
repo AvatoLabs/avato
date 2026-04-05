@@ -1,7 +1,7 @@
 import { type AgentItem, type LobeAgentConfig, type MetaData } from '@lobechat/types';
 import { type PartialDeep } from 'type-fest';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { lambdaClient } from '@/libs/trpc/client';
 
 /**
@@ -150,7 +150,7 @@ class AgentService {
   listAvailableSources = async (agentId: string, spaceId?: string | null) => {
     return lambdaClient.agent.listAvailableSources.query({
       agentId,
-      spaceId: spaceId ?? getActiveWorkspaceSpaceId(),
+      spaceId: resolveWorkspaceSpaceId({ spaceId }),
     });
   };
 

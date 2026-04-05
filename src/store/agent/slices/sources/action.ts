@@ -1,7 +1,7 @@
 import { type AgentSourceItem } from '@lobechat/types';
 import { type SWRResponse } from 'swr';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { mutate, useClientDataSWR } from '@/libs/swr';
 import { agentService } from '@/services/agent';
 import { type StoreSetter } from '@/store/types';
@@ -53,7 +53,7 @@ export class SourceSliceActionImpl {
     await mutate([
       FETCH_AGENT_AVAILABLE_SOURCES_KEY,
       this.#get().activeAgentId,
-      getActiveWorkspaceSpaceId() ?? null,
+      resolveWorkspaceSpaceId() ?? null,
     ]);
   };
 
@@ -94,7 +94,7 @@ export class SourceSliceActionImpl {
   };
 
   useFetchAvailableSources = (agentId?: string): SWRResponse<AgentSourceItem[]> => {
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveWorkspaceSpaceId();
 
     return useClientDataSWR<AgentSourceItem[]>(
       agentId ? [FETCH_AGENT_AVAILABLE_SOURCES_KEY, agentId, activeSpaceId ?? null] : null,

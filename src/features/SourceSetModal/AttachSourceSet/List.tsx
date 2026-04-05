@@ -25,7 +25,8 @@ import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useSta
 import { useTranslation } from 'react-i18next';
 
 import SourceIcon from '@/components/SourceIcon';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { useSpaceName } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useClientDataSWR } from '@/libs/swr';
 import { fileService } from '@/services/file';
 import { agentSelectors } from '@/store/agent/selectors';
@@ -182,8 +183,22 @@ interface SourceItem {
   id: string;
   key: string;
   name: string;
+  spaceId?: string | null;
   type: 'all-files' | 'source-set';
 }
+
+const SourceWorkspaceBadge = memo(
+  ({ activeSpaceId, spaceId }: { activeSpaceId?: string; spaceId?: string | null }) => {
+    const { t } = useTranslation('chat');
+    const spaceName = useSpaceName(spaceId);
+
+    if (!spaceId || !spaceName || spaceId === activeSpaceId) return null;
+
+    return <Tag bordered={false}>{t('sourceSet.picker.sourceWorkspace', { name: spaceName })}</Tag>;
+  },
+);
+
+SourceWorkspaceBadge.displayName = 'SourceWorkspaceBadge';
 
 interface FileEntryRowProps {
   attached: boolean;
@@ -291,7 +306,8 @@ FileEntryRow.displayName = 'FileEntryRow';
 export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
   const { t } = useTranslation(['chat', 'file']);
   const isConversationScope = scope === 'conversation';
-  const activeWorkspaceSpaceId = getActiveWorkspaceSpaceId();
+  const activeWorkspaceSpaceId = resolveWorkspaceSpaceId();
+  const activeWorkspaceName = useSpaceName(activeWorkspaceSpaceId);
   const activeGroupId = useChatStore((s) => s.activeGroupId);
   const activeAgentId = useAgentStore((s) => s.activeAgentId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -358,6 +374,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
         id: item.id,
         key: `source-set:${item.id}`,
         name: item.name,
+        spaceId: item.spaceId,
         type: 'source-set' as const,
       })),
     ],
@@ -371,6 +388,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
       ? sourceSets.find((item) => item.id === selectedSource.id)
       : undefined;
   const targetSpaceId = selectedSourceSet?.spaceId ?? activeWorkspaceSpaceId;
+  const targetWorkspaceName = useSpaceName(targetSpaceId);
 
   useEffect(() => {
     if (!selectedSource) return;
@@ -632,9 +650,24 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
   return (
     <Flexbox horizontal className={styles.container}>
       <Flexbox className={styles.sourceSidebar} gap={12}>
-        <Text className={styles.panelTitle}>
-          {t(isConversationScope ? 'conversationFiles.picker.sources' : 'sourceSet.picker.sources')}
-        </Text>
+        <Flexbox gap={6}>
+          <Text className={styles.panelTitle}>
+            {t(
+              isConversationScope ? 'conversationFiles.picker.sources' : 'sourceSet.picker.sources',
+            )}
+          </Text>
+          {activeWorkspaceName && (
+            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+              <Tag bordered={false}>{t('sourceSet.picker.workspace', { ns: 'chat' })}</Tag>
+              <Text className={styles.sourceSecondary}>
+                {t('sourceSet.picker.workspaceHint', {
+                  name: activeWorkspaceName,
+                  ns: 'chat',
+                })}
+              </Text>
+            </Flexbox>
+          )}
+        </Flexbox>
 
         {sources.map((source) => {
           const selected = source.key === selectedSourceKey;
@@ -657,6 +690,10 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                   <Text ellipsis className={styles.sourceTitle}>
                     {source.name}
                   </Text>
+                  <SourceWorkspaceBadge
+                    activeSpaceId={activeWorkspaceSpaceId}
+                    spaceId={source.spaceId}
+                  />
                   {source.description && (
                     <Text className={styles.sourceSecondary} ellipsis={{ rows: 2 }}>
                       {source.description}
@@ -680,7 +717,7 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
             align={'center'}
             className={styles.titleRow}
             gap={12}
-            justify={folderStack.length > 0 ? 'space-between' : 'flex-end'}
+            justify={'space-between'}
           >
             <Flexbox horizontal align={'center'} className={styles.locationBar} gap={6}>
               {folderStack.length > 0 && (
@@ -701,6 +738,14 @@ export const List = memo<{ scope: SourceSetModalScope }>(({ scope }) => {
                     </Flexbox>
                   ))}
                 </>
+              )}
+              {targetWorkspaceName && targetSpaceId && targetSpaceId !== activeWorkspaceSpaceId && (
+                <Tag bordered={false}>
+                  {t('sourceSet.picker.sourceWorkspace', {
+                    name: targetWorkspaceName,
+                    ns: 'chat',
+                  })}
+                </Tag>
               )}
             </Flexbox>
 

@@ -18,7 +18,7 @@ import { isDesktop } from '@/const/version';
 import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
 import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
 import { useSpaceMemoryCandidateTargets } from '@/features/ResourceSpaces/useSpaceMemoryCandidateTargets';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useAgentStore } from '@/store/agent/store';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { useChatStore } from '@/store/chat';
@@ -39,7 +39,7 @@ export const useTopicItemDropdownMenu = ({
   const { t } = useTranslation(['topic', 'common', 'file']);
   const { modal } = App.useApp();
   const navigate = useNavigate();
-  const activeSpaceId = getActiveWorkspaceSpaceId();
+  const activeSpaceId = resolveWorkspaceSpaceId();
   const { defaultSpaceId } = useSpaceMemoryCandidateTargets(activeSpaceId);
   const canAddToSpaceMemory = Boolean(defaultSpaceId);
   const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();

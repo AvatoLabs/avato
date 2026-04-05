@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 import type { AsyncTaskStatus } from '../asyncTask';
 import type { ContentRole, InheritMode } from '../content';
-import type { FileAssetClassification, FileAssetReviewStatus, FileAssetUsagePolicy } from './asset';
+import type {
+  FileAssetClassification,
+  FileAssetRenditionKind,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from './asset';
 
 const fileAssetClassificationValues = [
   'brand',
@@ -17,8 +22,12 @@ const fileAssetUsagePolicyValues = ['internal', 'public', 'restricted'] as const
 
 export interface FileListItem {
   assetClassification?: FileAssetClassification | null;
+  assetPrimaryRenditionKind?: FileAssetRenditionKind | null;
+  assetPrimaryRenditionLabel?: string | null;
+  assetRenditionCount?: number | null;
   assetReviewStatus?: FileAssetReviewStatus | null;
   assetUsagePolicy?: FileAssetUsagePolicy | null;
+  assetVersionLabel?: string | null;
   attachable?: boolean;
   chunkCount: number | null;
   chunkingError: any | null;

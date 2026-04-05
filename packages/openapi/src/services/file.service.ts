@@ -29,6 +29,7 @@ import { ContentAuthorizer } from '@/server/services/content';
 import { clampFileUrlExpiresIn } from '@/server/services/content/downloadPolicy';
 import { DocumentService } from '@/server/services/document';
 import { FileService as CoreFileService } from '@/server/services/file';
+import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 import { nanoid } from '@/utils/uuid';
 
@@ -955,6 +956,13 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const access = await this.contentAuthorizer
+        .assertCapability({
+          capability: 'preview_content',
+          id: fileId,
+          kind: 'file',
+        })
+        .catch((error) => this.mapContentAccessError(error, '无权预览此文件'));
 
       if (isChunkingUnsupported(file.fileType)) {
         throw this.createBusinessError(`File type '${file.fileType}' does not support chunking`);
@@ -964,11 +972,15 @@ export class FileUploadService extends BaseService {
       const { ChunkService } = await import('@/server/services/chunk');
       const chunkService = new ChunkService(this.db, this.userId);
 
-      const chunkTaskId = await chunkService.asyncParseFileToChunks(fileId, req.skipExist);
+      const chunkTaskId = await chunkService.asyncParseFileToChunks(fileId, req.skipExist, {
+        contentGuardAuthzEpoch: access.authzEpoch,
+      });
 
       let embeddingTaskId: string | null | undefined = null;
       if (req.autoEmbedding) {
-        embeddingTaskId = await chunkService.asyncEmbeddingFileChunks(fileId);
+        embeddingTaskId = await chunkService.asyncEmbeddingFileChunks(fileId, {
+          contentGuardAuthzEpoch: access.authzEpoch,
+        });
       }
 
       this.log('info', 'Chunk task created', {
@@ -1043,14 +1055,21 @@ export class FileUploadService extends BaseService {
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
 
-      // 删除S3文件
-      await this.coreFileService.deleteFile(file.url);
-
       // 删除数据库记录及关联 chunks / global_files（权限已在上方校验）
       await this.fileModel.deleteAny(fileId, serverDBEnv.REMOVE_GLOBAL_FILE);
       await this.contentModel.invalidateAuthzEpochsAfterRemoval([
         { contentUid: file.contentUid, spaceId: file.spaceId },
       ]);
+
+      const removableUrls = await resolveRemovableStorageUrls(
+        this.fileModel,
+        [file],
+        serverDBEnv.REMOVE_GLOBAL_FILE,
+      );
+
+      if (removableUrls.length > 0) {
+        await this.coreFileService.deleteFile(removableUrls[0]!);
+      }
 
       this.log('info', 'File deleted successfully', { fileId, key: file.url });
 

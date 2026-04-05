@@ -36,11 +36,11 @@ import CommunityListProviderPage from '@/routes/(main)/community/(list)/provider
 import ResourceLayout from '@/routes/(main)/content/_layout';
 import ResourceHomePage from '@/routes/(main)/content/(home)';
 import ResourceHomeLayout from '@/routes/(main)/content/(home)/_layout';
-import ResourceSharedPage from '@/routes/(main)/content/shared';
+import LegacySharedFilesRedirectPage from '@/routes/(main)/content/shared';
 import ResourceSpaceMembersPage from '@/routes/(main)/content/spaces/[spaceId]/members';
 import ResourceSpaceSettingsPage from '@/routes/(main)/content/spaces/[spaceId]/settings';
 import ResourceSpaceTrashPage from '@/routes/(main)/content/spaces/[spaceId]/trash';
-import ResourceTrashPage from '@/routes/(main)/content/trash';
+import LegacyTrashRedirectPage from '@/routes/(main)/content/trash';
 import DesktopPageLayout from '@/routes/(main)/docs/_layout';
 import GroupPage from '@/routes/(main)/group';
 import DesktopGroupLayout from '@/routes/(main)/group/_layout';
@@ -64,6 +64,8 @@ import SpaceDocDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/[id]';
 import SpaceTablePage from '@/routes/(main)/spaces/[spaceId]/docs/table';
 import SpaceTableDetailPage from '@/routes/(main)/spaces/[spaceId]/docs/table/[id]';
 import SpaceMemoryPage from '@/routes/(main)/spaces/[spaceId]/memory';
+import SharedWithMePage from '@/routes/(main)/spaces/shared';
+import SpaceTrashRedirectPage from '@/routes/(main)/spaces/trash';
 import StudioPage from '@/routes/(main)/studio';
 import VideoPage from '@/routes/(main)/video';
 import DesktopVideoLayout from '@/routes/(main)/video/_layout';
@@ -77,6 +79,16 @@ export const desktopRoutes: RouteObject[] = [
   {
     children: [
       // Chat routes (agent)
+      {
+        element: <SharedWithMePage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'spaces/shared',
+      },
+      {
+        element: <SpaceTrashRedirectPage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'spaces/trash',
+      },
       {
         children: [
           {
@@ -319,13 +331,13 @@ export const desktopRoutes: RouteObject[] = [
       },
 
       {
-        element: <ResourceSharedPage />,
-        errorElement: <ErrorBoundary resetPath="/content/shared" />,
+        element: <LegacySharedFilesRedirectPage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
         path: 'content/shared',
       },
       {
-        element: <ResourceTrashPage />,
-        errorElement: <ErrorBoundary resetPath="/content/trash" />,
+        element: <LegacyTrashRedirectPage />,
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
         path: 'content/trash',
       },
 

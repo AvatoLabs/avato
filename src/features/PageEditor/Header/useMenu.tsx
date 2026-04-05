@@ -12,6 +12,7 @@ import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { canCreateSpaceMemory } from '@/features/ResourceSpaces/spaceMemoryCapabilities';
 import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
 import { useSpaceItem } from '@/features/ResourceSpaces/useSpaceItem';
+import { lambdaClient } from '@/libs/trpc/client';
 import { pageSelectors, usePageStore } from '@/store/docs';
 import { revalidatePageDocuments } from '@/store/docs/slices/list/action';
 import { useDocumentStore } from '@/store/document';
@@ -21,7 +22,12 @@ import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
-import { decodeBase64, downloadBlob, normalizeExportFileName, XLSX_MIME_TYPE } from '@/utils/documentExport';
+import {
+  decodeBase64,
+  downloadBlob,
+  normalizeExportFileName,
+  XLSX_MIME_TYPE,
+} from '@/utils/documentExport';
 
 import { usePageEditorStore, useStoreApi } from '../store';
 
@@ -179,6 +185,18 @@ export const useMenu = (): { menuItems: any[] } => {
     if (!editor) return;
 
     try {
+      if (documentId) {
+        try {
+          await lambdaClient.contentShare.recordContentExport.mutate({
+            format: 'markdown',
+            id: documentId,
+            kind: 'document',
+          });
+        } catch (error) {
+          console.error('Failed to record content export', error);
+        }
+      }
+
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
       let content = markdown;
 
@@ -226,6 +244,18 @@ export const useMenu = (): { menuItems: any[] } => {
     if (!editor) return;
 
     try {
+      if (documentId) {
+        try {
+          await lambdaClient.contentShare.recordContentExport.mutate({
+            format: 'csv',
+            id: documentId,
+            kind: 'document',
+          });
+        } catch (error) {
+          console.error('Failed to record content export', error);
+        }
+      }
+
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
       const document = documentId
         ? usePageStore.getState().documents?.find((item) => item.id === documentId)
@@ -258,6 +288,18 @@ export const useMenu = (): { menuItems: any[] } => {
     if (!editor) return;
 
     try {
+      if (documentId) {
+        try {
+          await lambdaClient.contentShare.recordContentExport.mutate({
+            format: 'xlsx',
+            id: documentId,
+            kind: 'document',
+          });
+        } catch (error) {
+          console.error('Failed to record content export', error);
+        }
+      }
+
       const markdown = (editor.getDocument('markdown') as unknown as string) || '';
       const document = documentId
         ? usePageStore.getState().documents?.find((item) => item.id === documentId)

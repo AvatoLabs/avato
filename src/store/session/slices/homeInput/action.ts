@@ -1,4 +1,4 @@
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { documentService } from '@/services/document';
 import { useChatStore } from '@/store/chat';
 import { useGlobalStore } from '@/store/global';
@@ -87,19 +87,19 @@ export class HomeInputActionImpl {
     this.#set({ homeInputLoading: true }, false, n('sendAsWrite/start'));
 
     try {
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
+
       // 1. Create new Document
       const newDoc = await documentService.createDocument({
         editorData: '',
-        spaceId: getActiveWorkspaceSpaceId(),
+        spaceId: resolvedSpaceId,
         title: message?.slice(0, 50) || 'Untitled',
       });
 
       // 2. Navigate to Page
       const navigate = useGlobalStore.getState().navigate;
       if (navigate) {
-        navigate(
-          getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? getActiveWorkspaceSpaceId()),
-        );
+        navigate(getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? resolvedSpaceId));
       }
 
       // 3. Send message with document scope context

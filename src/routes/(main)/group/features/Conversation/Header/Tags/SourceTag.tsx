@@ -7,7 +7,7 @@ import { memo } from 'react';
 
 import SourceIcon from '@/components/SourceIcon';
 import { useSpaceName } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { oneLineEllipsis } from '@/styles';
 import { type AgentSourceItem } from '@/types/sourceSet';
 
@@ -29,7 +29,7 @@ SourceLabel.displayName = 'SourceLabel';
 
 const SourceTag = memo<SourceTagProps>(({ data }) => {
   if (data.length === 0) return null;
-  const activeWorkspaceSpaceId = getActiveWorkspaceSpaceId();
+  const activeWorkspaceSpaceId = resolveWorkspaceSpaceId();
 
   const items: MenuProps['items'] = data.map((item) => ({
     icon: <SourceIcon fileType={item.fileType} name={item.name} type={item.type} />,

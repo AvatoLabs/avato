@@ -8,7 +8,7 @@ import useSWR from 'swr';
 
 import { message } from '@/components/AntdStaticMethods';
 import { LOADING_FLAT } from '@/const/message';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { mutate } from '@/libs/swr';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { topicService } from '@/services/topic';
@@ -39,7 +39,7 @@ const getTopicContainerKey = (params: {
   agentId?: string;
   groupId?: string;
   spaceId?: string | null;
-}) => topicMapKey({ ...params, spaceId: params.spaceId ?? getActiveWorkspaceSpaceId() });
+}) => topicMapKey({ ...params, spaceId: resolveWorkspaceSpaceId({ spaceId: params.spaceId }) });
 
 /**
  * Options for switchTopic action
@@ -106,7 +106,7 @@ export class ChatTopicActionImpl {
       title: t('defaultTitle', { ns: 'topic' }),
       messages: messages.map((m) => m.id),
       sessionId: sessionId || activeAgentId,
-      spaceId: getActiveWorkspaceSpaceId(),
+      spaceId: resolveWorkspaceSpaceId(),
     });
     this.#set({ creatingTopic: false }, false, n('creatingTopic/end'));
 
@@ -125,7 +125,7 @@ export class ChatTopicActionImpl {
       title: t('defaultTitle', { ns: 'topic' }),
       messages: messages.map((m) => m.id),
       sessionId: sessionId || activeAgentId,
-      spaceId: getActiveWorkspaceSpaceId(),
+      spaceId: resolveWorkspaceSpaceId(),
     });
 
     this.#get().internal_updateTopicLoading(topicId, true);
@@ -301,7 +301,7 @@ export class ChatTopicActionImpl {
     const pageSize = customPageSize || 20;
     const effectiveExcludeTriggers =
       excludeTriggers && excludeTriggers.length > 0 ? excludeTriggers : undefined;
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveWorkspaceSpaceId();
     // Use topicMapKey to generate the container key for topic data map
     const containerKey = getTopicContainerKey({ agentId, groupId, spaceId: activeSpaceId });
     const hasValidContainer = !!(groupId || agentId);
@@ -390,7 +390,7 @@ export class ChatTopicActionImpl {
 
   loadMoreTopics = async (): Promise<void> => {
     const { activeAgentId, activeGroupId, topicDataMap } = this.#get();
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveWorkspaceSpaceId();
     const key = getTopicContainerKey({
       agentId: activeAgentId,
       groupId: activeGroupId,
@@ -471,7 +471,7 @@ export class ChatTopicActionImpl {
       groupId?: string;
     } = {},
   ): SWRResponse<ChatTopic[]> => {
-    const activeSpaceId = getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolveWorkspaceSpaceId();
 
     return useSWR<ChatTopic[]>(
       keywords ? [SWR_USE_SEARCH_TOPIC, keywords, agentId, groupId, activeSpaceId ?? null] : null,

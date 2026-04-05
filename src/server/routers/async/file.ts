@@ -34,6 +34,14 @@ import { AsyncTaskError, AsyncTaskErrorType, AsyncTaskStatus } from '@/types/asy
 import { safeParseJSON } from '@/utils/safeParseJSON';
 import { sanitizeUTF8 } from '@/utils/sanitizeUTF8';
 
+interface AsyncTaskContentGuardMetadata {
+  contentGuard?: {
+    authzEpoch?: number | null;
+    capability?: 'preview_content';
+    fileId?: string;
+  };
+}
+
 const getEmbeddingErrorMessage = (error: any) => {
   const bodyMessage =
     typeof error?.body === 'string'
@@ -41,6 +49,13 @@ const getEmbeddingErrorMessage = (error: any) => {
       : error?.body?.message || error?.body?.detail || error?.error?.message;
 
   return bodyMessage || error?.message || error?.errorType || JSON.stringify(error);
+};
+
+const getAsyncTaskFailureMessage = (error: any) => {
+  const bodyMessage =
+    typeof error?.body === 'string' ? error.body : error?.body?.message || error?.body?.detail;
+
+  return bodyMessage || error?.message || error?.errorType || 'Unknown async task error';
 };
 
 const formatEmbeddingErrorMessage = (provider: string, model: string, error: any) =>
@@ -83,6 +98,40 @@ const categorizeEmbeddingError = (provider: string, model: string, error: any): 
   return new AsyncTaskError(AsyncTaskErrorType.EmbeddingError, message);
 };
 
+const getTaskContentGuard = (task: { metadata?: unknown } | null | undefined) =>
+  (task?.metadata as AsyncTaskContentGuardMetadata | undefined)?.contentGuard;
+
+const validateTaskContentGuard = async (params: {
+  contentAuthorizer: ContentAuthorizer;
+  fileId: string;
+  task: { metadata?: unknown } | null | undefined;
+}) => {
+  const access = await params.contentAuthorizer.assertCapability({
+    capability: 'preview_content',
+    id: params.fileId,
+    kind: 'file',
+  });
+  const guard = getTaskContentGuard(params.task);
+
+  if (!guard || typeof guard.authzEpoch !== 'number') return access;
+
+  if (guard.fileId && guard.fileId !== params.fileId) {
+    throw new AsyncTaskError(
+      AsyncTaskErrorType.ServerError,
+      'Async task file binding is stale. Please retry from the latest file view.',
+    );
+  }
+
+  if (guard.authzEpoch !== access.authzEpoch) {
+    throw new AsyncTaskError(
+      AsyncTaskErrorType.ServerError,
+      'Resource access changed after task creation. Please retry from the latest file view.',
+    );
+  }
+
+  return access;
+};
+
 const fileProcedure = asyncAuthedProcedure.use(async (opts) => {
   const { ctx } = opts;
 
@@ -111,12 +160,6 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.fileId,
-        kind: 'file',
-      });
-
       const file = await ctx.fileModel.findByIdAny(input.fileId);
 
       if (!file) {
@@ -131,6 +174,12 @@ export const fileRouter = router({
       if (!asyncTask) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Async Task not found' });
 
       try {
+        await validateTaskContentGuard({
+          contentAuthorizer: ctx.contentAuthorizer,
+          fileId: input.fileId,
+          task: asyncTask,
+        });
+
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
             reject(
@@ -217,7 +266,7 @@ export const fileRouter = router({
         });
 
         return {
-          message: `File ${file.name}(${input.taskId}) failed to embedding: ${(e as Error).message}`,
+          message: `File ${file.name}(${input.taskId}) failed to embedding: ${getAsyncTaskFailureMessage(e)}`,
           success: false,
         };
       }
@@ -231,12 +280,6 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
-        capability: 'preview_content',
-        id: input.fileId,
-        kind: 'file',
-      });
-
       const file = await ctx.fileModel.findByIdAny(input.fileId);
       if (!file) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'File not found' });
@@ -246,6 +289,12 @@ export const fileRouter = router({
       if (!asyncTask) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Async Task not found' });
 
       try {
+        const access = await validateTaskContentGuard({
+          contentAuthorizer: ctx.contentAuthorizer,
+          fileId: input.fileId,
+          task: asyncTask,
+        });
+
         let content: Uint8Array;
         try {
           content = await ctx.fileService.getFileByteArray(file.url);
@@ -322,7 +371,9 @@ export const fileRouter = router({
 
           // if enable auto embedding, trigger the embedding task
           if (fileEnv.CHUNKS_AUTO_EMBEDDING) {
-            await chunkService.asyncEmbeddingFileChunks(input.fileId);
+            await chunkService.asyncEmbeddingFileChunks(input.fileId, {
+              contentGuardAuthzEpoch: access.authzEpoch,
+            });
           }
 
           return { success: true };
@@ -343,7 +394,7 @@ export const fileRouter = router({
         });
 
         return {
-          message: `File ${file.name}(${input.taskId}) failed to chunking: ${(e as Error).message}`,
+          message: `File ${file.name}(${input.taskId}) failed to chunking: ${getAsyncTaskFailureMessage(e)}`,
           success: false,
         };
       }

@@ -1,6 +1,6 @@
 import { type NavigateFunction } from 'react-router-dom';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { chatGroupService } from '@/services/chatGroup';
 import { documentService } from '@/services/document';
 import { agentSelectors, builtinAgentSelectors } from '@/store/agent/selectors';
@@ -42,6 +42,7 @@ export class HomeInputActionImpl {
     try {
       const agentState = getAgentStoreState();
       const defaultAgentConfig = settingsSelectors.defaultAgentConfig(useUserStore.getState());
+      const resolvedSpaceId = resolveWorkspaceSpaceId();
 
       // 1. Get model/provider config from inbox agent
       const inboxAgentId = builtinAgentSelectors.inboxAgentId(agentState);
@@ -181,16 +182,14 @@ export class HomeInputActionImpl {
       const newDoc = await documentService.createDocument({
         editorData: '{}',
         fileType: 'custom/document',
-        spaceId: getActiveWorkspaceSpaceId(),
+        spaceId: resolvedSpaceId,
         title: message?.slice(0, 50) || 'Untitled',
       });
 
       // 3. Navigate to Page
       const { navigate } = this.#get();
       if (navigate) {
-        navigate(
-          getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? getActiveWorkspaceSpaceId()),
-        );
+        navigate(getPageDetailPath(newDoc.id, 'doc', newDoc.spaceId ?? resolvedSpaceId));
       }
 
       // 4. Update docsAgent's model config and send initial message

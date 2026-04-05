@@ -126,6 +126,7 @@ describe('DocumentService', () => {
     };
 
     mockFileModel = {
+      checkHash: vi.fn(),
       clearFileChunks: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
@@ -536,10 +537,15 @@ describe('DocumentService', () => {
         .mockResolvedValueOnce([{ contentUid: 'res_doc_1', spaceId: 'spc_test' }]);
 
       (mockDb.query as any).files.findMany.mockResolvedValueOnce([
-        { contentUid: 'res_file_1', spaceId: 'spc_test' },
+        {
+          contentUid: 'res_file_1',
+          fileHash: null,
+          spaceId: 'spc_test',
+          url: 'internal://document/doc-1',
+        },
       ]);
 
-      mockFileModel.deleteManyAny.mockResolvedValue([{ url: 'storage/file-1' }]);
+      mockFileModel.deleteManyAny.mockResolvedValue([]);
 
       await service.deleteDocuments(['doc-1'], false);
 
@@ -551,7 +557,29 @@ describe('DocumentService', () => {
       });
       expect(mockFileModel.deleteManyAny).toHaveBeenCalledWith(['file-1'], expect.any(Boolean));
       expect(mockDocumentModel.hardDeleteManyAny).toHaveBeenCalledWith(['doc-1']);
-      expect(mockFileService.deleteFiles).toHaveBeenCalledWith(['storage/file-1']);
+      expect(mockFileService.deleteFiles).toHaveBeenCalledWith(['internal://document/doc-1']);
+    });
+
+    it('should preserve hashed storage blobs when hard delete keeps global files', async () => {
+      (mockDb.query as any).documents.findMany
+        .mockResolvedValueOnce([{ fileId: 'file-1', fileType: 'custom/document', id: 'doc-1' }])
+        .mockResolvedValueOnce([{ contentUid: 'res_doc_1', spaceId: 'spc_test' }]);
+
+      (mockDb.query as any).files.findMany.mockResolvedValueOnce([
+        {
+          contentUid: 'res_file_1',
+          fileHash: 'hash-1',
+          spaceId: 'spc_test',
+          url: 'storage/shared.txt',
+        },
+      ]);
+
+      mockFileModel.deleteManyAny.mockResolvedValue([]);
+
+      await service.deleteDocuments(['doc-1'], false);
+
+      expect(mockFileService.deleteFiles).not.toHaveBeenCalled();
+      expect(mockFileModel.checkHash).not.toHaveBeenCalled();
     });
   });
 
@@ -652,14 +680,22 @@ describe('DocumentService', () => {
       mockFileModel.updateAny.mockResolvedValue(undefined);
       mockFileModel.clearFileChunks.mockResolvedValue([]);
       mockAsyncParseFileToChunks.mockResolvedValue('task-1');
+      mockAssertCapability.mockResolvedValue({ authzEpoch: 11 });
 
       await service.updateDocument('doc-1', { content: 'Updated\nContent' });
 
+      expect(mockAssertCapability).toHaveBeenCalledWith({
+        capability: 'preview_content',
+        id: 'file-1',
+        kind: 'file',
+      });
       expect(mockFileModel.updateAny).toHaveBeenCalledWith('file-1', {
         size: 'Updated\nContent'.length,
       });
       expect(mockFileModel.clearFileChunks).toHaveBeenCalledWith(['file-1']);
-      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false);
+      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false, {
+        contentGuardAuthzEpoch: 11,
+      });
     });
 
     it('should re-index associated file after editorData updates', async () => {
@@ -667,11 +703,19 @@ describe('DocumentService', () => {
       mockDocumentModel.findByIdAny.mockResolvedValue({ fileId: 'file-1', id: 'doc-1' });
       mockFileModel.clearFileChunks.mockResolvedValue([]);
       mockAsyncParseFileToChunks.mockResolvedValue('task-1');
+      mockAssertCapability.mockResolvedValue({ authzEpoch: 13 });
 
       await service.updateDocument('doc-1', { editorData: { blocks: [] } });
 
+      expect(mockAssertCapability).toHaveBeenCalledWith({
+        capability: 'preview_content',
+        id: 'file-1',
+        kind: 'file',
+      });
       expect(mockFileModel.clearFileChunks).toHaveBeenCalledWith(['file-1']);
-      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false);
+      expect(mockAsyncParseFileToChunks).toHaveBeenCalledWith('file-1', false, {
+        contentGuardAuthzEpoch: 13,
+      });
     });
 
     it('should sync parentId update to associated file', async () => {

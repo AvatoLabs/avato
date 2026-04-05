@@ -1,4 +1,8 @@
 export const buildSpacesRootPath = () => '/spaces';
+export const buildSpacesSharedPath = () => `${buildSpacesRootPath()}/shared`;
+export const buildSpacesTrashPath = () => `${buildSpacesRootPath()}/trash`;
+export const buildLegacySharedFilesPath = () => '/content/shared';
+export const buildLegacyFilesTrashPath = () => '/content/trash';
 
 export const buildSpaceRootPath = (spaceId?: string | null) =>
   spaceId ? `/spaces/${spaceId}` : buildSpacesRootPath();
@@ -12,6 +16,44 @@ const buildSourceSetScopeSearch = (sourceSetId: string) =>
 const normalizeFilesPath = (path: string) => {
   if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
   return path;
+};
+
+const normalizePathname = (pathname?: string | null) =>
+  pathname ? normalizeFilesPath(pathname) : undefined;
+
+export const isWorkspaceFilesSurfacePath = (
+  pathname?: string | null,
+  options?: { includeLegacySpecialRoutes?: boolean },
+) => {
+  const normalizedPath = normalizePathname(pathname);
+  if (!normalizedPath) return false;
+
+  if (
+    normalizedPath === buildSpacesSharedPath() ||
+    normalizedPath === buildSpacesTrashPath() ||
+    /^\/spaces\/[^/]+\/files(?:\/|$)/.test(normalizedPath)
+  ) {
+    return true;
+  }
+
+  if (!options?.includeLegacySpecialRoutes) return false;
+
+  return (
+    normalizedPath === buildLegacySharedFilesPath() ||
+    normalizedPath === buildLegacyFilesTrashPath()
+  );
+};
+
+export const isWorkspaceResourcePath = (
+  pathname?: string | null,
+  options?: { includeLegacySpecialRoutes?: boolean },
+) => {
+  const normalizedPath = normalizePathname(pathname);
+  if (!normalizedPath) return false;
+
+  if (isWorkspaceFilesSurfacePath(normalizedPath, options)) return true;
+
+  return /^\/spaces\/[^/]+\/(?:docs|settings|members|memory)(?:\/|$)/.test(normalizedPath);
 };
 
 export const stripFilesItemPath = (pathname: string) => {
@@ -45,10 +87,10 @@ export const buildFilesPreviewPath = (
   return sourceSetId ? `${previewPath}${buildSourceSetScopeSearch(sourceSetId)}` : previewPath;
 };
 
-export const buildSharedFilesPath = () => '/content/shared';
+export const buildSharedFilesPath = () => buildSpacesSharedPath();
 
 export const buildFilesTrashPath = (spaceId?: string | null) =>
-  spaceId ? `${buildFilesRootPath(spaceId)}/trash` : '/content/trash';
+  spaceId ? `${buildFilesRootPath(spaceId)}/trash` : buildSpacesTrashPath();
 
 export const buildSourceSetTrashPath = (spaceId: string | null | undefined, sourceSetId: string) =>
   `${buildFilesTrashPath(spaceId)}${buildSourceSetScopeSearch(sourceSetId)}`;

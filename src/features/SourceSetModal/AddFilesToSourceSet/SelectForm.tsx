@@ -1,12 +1,12 @@
-import { Block, Button, Flexbox, Form, MaterialFileTypeIcon, Select } from '@lobehub/ui';
+import { Block, Button, Flexbox, Form, MaterialFileTypeIcon, Select, Tag, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { memo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import RepoIcon from '@/components/LibIcon';
-import { buildSourceSetPath } from '@/features/ResourceSpaces';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { buildSourceSetPath, useSpaceName } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useSourceSetStore } from '@/store/sourceSet';
 
 interface CreateFormProps {
@@ -18,7 +18,8 @@ interface CreateFormProps {
 const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => {
   const { t } = useTranslation('sourceSet');
   const [loading, setLoading] = useState(false);
-  const activeWorkspaceSpaceId = getActiveWorkspaceSpaceId();
+  const activeWorkspaceSpaceId = resolveWorkspaceSpaceId();
+  const activeWorkspaceName = useSpaceName(activeWorkspaceSpaceId);
 
   const { message } = App.useApp();
   const [useFetchSourceSetList, addFilesToSourceSet] = useSourceSetStore((s) => [
@@ -72,6 +73,21 @@ const SelectForm = memo<CreateFormProps>(({ onClose, sourceSetId, fileIds }) => 
           ),
           noStyle: true,
         },
+        ...(activeWorkspaceName
+          ? [
+              {
+                children: (
+                  <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+                    <Tag bordered={false}>{t('addToSourceSet.workspace')}</Tag>
+                    <Text type={'secondary'}>
+                      {t('addToSourceSet.workspaceHint', { name: activeWorkspaceName })}
+                    </Text>
+                  </Flexbox>
+                ),
+                noStyle: true,
+              },
+            ]
+          : []),
         {
           children: (
             <Select

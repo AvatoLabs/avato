@@ -1,5 +1,6 @@
 import {
   FileAssetClassification,
+  FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
 } from '@lobechat/types';
@@ -27,6 +28,7 @@ import {
 } from '@/server/services/content';
 import { resolveFileAssetCapabilities } from '@/server/services/content/fileAssetPolicy';
 import { FileService } from '@/server/services/file';
+import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
 import { type FileListItem } from '@/types/files';
@@ -47,6 +49,34 @@ const normalizeFileType = (fileType?: string | null, name?: string | null): stri
 
   return fileType || 'application/octet-stream';
 };
+
+const fileAssetMetadataSchema = z
+  .object({
+    custom: z.record(z.string(), z.unknown()).optional(),
+    license: z.string().trim().optional(),
+    renditions: z
+      .array(
+        z.union([
+          z.nativeEnum(FileAssetRenditionKind),
+          z.object({
+            kind: z.nativeEnum(FileAssetRenditionKind),
+            label: z.string().trim().optional(),
+          }),
+        ]),
+      )
+      .optional(),
+    tags: z.array(z.string().trim()).optional(),
+    version: z
+      .object({
+        label: z.string().trim().optional(),
+        variantOf: z.string().trim().optional(),
+      })
+      .nullable()
+      .optional(),
+  })
+  .catchall(z.unknown())
+  .nullable()
+  .optional();
 
 const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
@@ -194,14 +224,23 @@ const buildFileAssetMap = async (ctx: { fileAssetModel: FileAssetModel }, fileId
   const assetRows = await ctx.fileAssetModel.findByFileIds(fileIds);
 
   return new Map(
-    assetRows.map((item) => [
-      item.fileId,
-      {
-        assetClassification: item.classification,
-        assetReviewStatus: item.reviewStatus,
-        assetUsagePolicy: item.usagePolicy,
-      },
-    ]),
+    assetRows.map((item) => {
+      const renditions = item.metadata?.renditions ?? [];
+      const primaryRendition = renditions[0];
+
+      return [
+        item.fileId,
+        {
+          assetClassification: item.classification,
+          assetPrimaryRenditionKind: primaryRendition?.kind ?? null,
+          assetPrimaryRenditionLabel: primaryRendition?.label ?? null,
+          assetReviewStatus: item.reviewStatus,
+          assetRenditionCount: renditions.length || null,
+          assetUsagePolicy: item.usagePolicy,
+          assetVersionLabel: item.metadata?.version?.label ?? null,
+        },
+      ];
+    }),
   );
 };
 
@@ -775,8 +814,23 @@ export const fileRouter = router({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'CLEAR_FILES_DENIED' });
     }
 
-    const cleared = await ctx.fileModel.clear();
-    await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([{ spaceId: personalSpace.id }]);
+    const cleared = await ctx.fileModel.clear(serverDBEnv.REMOVE_GLOBAL_FILE);
+    await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
+      cleared.map((file) => ({ contentUid: file.contentUid, spaceId: file.spaceId })),
+    );
+
+    const removableUrls = await resolveRemovableStorageUrls(
+      ctx.fileModel,
+      cleared,
+      serverDBEnv.REMOVE_GLOBAL_FILE,
+    );
+
+    if (removableUrls.length === 1) {
+      await ctx.fileService.deleteFile(removableUrls[0]!);
+    } else if (removableUrls.length > 1) {
+      await ctx.fileService.deleteFiles(removableUrls);
+    }
+
     return cleared;
   }),
 
@@ -802,15 +856,24 @@ export const fileRouter = router({
         ]);
       } else {
         // Hard delete: remove from database and S3
-        const file = await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
-        if (!file) return;
+        const existingFile = await ctx.fileModel.findByIdAny(input.id);
+        if (!existingFile) return;
+
+        await ctx.fileModel.deleteAny(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
 
         await ctx.contentModel.invalidateAuthzEpochsAfterRemoval([
-          { contentUid: file.contentUid, spaceId: file.spaceId },
+          { contentUid: existingFile.contentUid, spaceId: existingFile.spaceId },
         ]);
 
-        // delete the file from S3 if it is not used by other files
-        await ctx.fileService.deleteFile(file.url!);
+        const removableUrls = await resolveRemovableStorageUrls(
+          ctx.fileModel,
+          [existingFile],
+          serverDBEnv.REMOVE_GLOBAL_FILE,
+        );
+
+        if (removableUrls.length > 0) {
+          await ctx.fileService.deleteFile(removableUrls[0]!);
+        }
       }
     }),
 
@@ -860,19 +923,27 @@ export const fileRouter = router({
         // as the files are still in the database (just marked as deleted)
       } else {
         // Hard delete: remove from database and S3
-        const needToRemoveFileList = await ctx.fileModel.deleteManyAny(
-          input.ids,
+        const existingFiles = (
+          await Promise.all(input.ids.map((id) => ctx.fileModel.findByIdAny(id)))
+        ).filter(Boolean);
+
+        if (existingFiles.length === 0) return;
+
+        await ctx.fileModel.deleteManyAny(input.ids, serverDBEnv.REMOVE_GLOBAL_FILE);
+
+        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
+          existingFiles.map((f) => ({ contentUid: f.contentUid, spaceId: f.spaceId })),
+        );
+
+        const removableUrls = await resolveRemovableStorageUrls(
+          ctx.fileModel,
+          existingFiles,
           serverDBEnv.REMOVE_GLOBAL_FILE,
         );
 
-        if (!needToRemoveFileList || needToRemoveFileList.length === 0) return;
-
-        await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
-          needToRemoveFileList.map((f) => ({ contentUid: f.contentUid, spaceId: f.spaceId })),
-        );
-
-        // remove from S3
-        await ctx.fileService.deleteFiles(needToRemoveFileList.map((file) => file.url!));
+        if (removableUrls.length > 0) {
+          await ctx.fileService.deleteFiles(removableUrls);
+        }
       }
     }),
 
@@ -954,7 +1025,7 @@ export const fileRouter = router({
     .input(
       z.object({
         id: z.string(),
-        metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+        metadata: fileAssetMetadataSchema,
         rightsOwner: z.string().nullable().optional(),
         classification: z.nativeEnum(FileAssetClassification).optional(),
         usagePolicy: z.nativeEnum(FileAssetUsagePolicy).optional(),

@@ -154,8 +154,12 @@ const FileListItem = memo<FileListItemProps>(
     finishEmbedding,
     chunkCount,
     assetClassification,
+    assetPrimaryRenditionKind,
+    assetPrimaryRenditionLabel,
     assetReviewStatus,
+    assetRenditionCount,
     assetUsagePolicy,
+    assetVersionLabel,
     url,
     name,
     fileType,
@@ -290,8 +294,27 @@ const FileListItem = memo<FileListItemProps>(
     );
 
     const assetBadges = useMemo(
-      () => buildFileAssetBadges({ assetClassification, assetReviewStatus, assetUsagePolicy, t }),
-      [assetClassification, assetReviewStatus, assetUsagePolicy, t],
+      () =>
+        buildFileAssetBadges({
+          assetClassification,
+          assetPrimaryRenditionKind,
+          assetPrimaryRenditionLabel,
+          assetReviewStatus,
+          assetRenditionCount,
+          assetUsagePolicy,
+          assetVersionLabel,
+          t,
+        }),
+      [
+        assetClassification,
+        assetPrimaryRenditionKind,
+        assetPrimaryRenditionLabel,
+        assetReviewStatus,
+        assetRenditionCount,
+        assetUsagePolicy,
+        assetVersionLabel,
+        t,
+      ],
     );
 
     const handleRenameStart = useCallback(() => {
@@ -506,7 +529,13 @@ const FileListItem = memo<FileListItemProps>(
                 <Flexbox horizontal align={'center'} className={styles.name} gap={8}>
                   <TruncatedFileName name={name || t('file:pageList.untitled')} />
                   {assetBadges.map((badge) => (
-                    <Tag color={badge.color} key={badge.key} size={'small'} variant={badge.variant}>
+                    <Tag
+                      color={badge.color}
+                      key={badge.key}
+                      size={'small'}
+                      title={badge.title}
+                      variant={badge.variant}
+                    >
                       {badge.label}
                     </Tag>
                   ))}
@@ -595,8 +624,12 @@ const FileListItem = memo<FileListItemProps>(
       prevProps.embeddingStatus === nextProps.embeddingStatus &&
       prevProps.chunkCount === nextProps.chunkCount &&
       prevProps.assetClassification === nextProps.assetClassification &&
+      prevProps.assetPrimaryRenditionKind === nextProps.assetPrimaryRenditionKind &&
+      prevProps.assetPrimaryRenditionLabel === nextProps.assetPrimaryRenditionLabel &&
       prevProps.assetReviewStatus === nextProps.assetReviewStatus &&
+      prevProps.assetRenditionCount === nextProps.assetRenditionCount &&
       prevProps.assetUsagePolicy === nextProps.assetUsagePolicy &&
+      prevProps.assetVersionLabel === nextProps.assetVersionLabel &&
       prevProps.chunkingError === nextProps.chunkingError &&
       prevProps.embeddingError === nextProps.embeddingError &&
       prevProps.finishEmbedding === nextProps.finishEmbedding &&

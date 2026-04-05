@@ -18,7 +18,7 @@ import { HOUR } from '@/utils/units';
 const DEFAULT_UPLOAD_SESSION_EXPIRY_MS = HOUR;
 
 /** Storage key prefix for upload blobs */
-const UPLOAD_STORAGE_PREFIX = 'uploads/';
+const UPLOAD_STORAGE_PREFIX = 'v2/spaces/';
 
 /** Max file size: 500MB */
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
@@ -46,7 +46,7 @@ const uploadProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
  * session metadata and `files.name` after createFile.
  */
 const generateStorageKey = (spaceId: string, sessionId: string): string =>
-  `${UPLOAD_STORAGE_PREFIX}${spaceId}/${sessionId}/${nanoid()}`;
+  `${UPLOAD_STORAGE_PREFIX}${spaceId}/blobs/${sessionId}/${nanoid()}`;
 
 export const uploadRouter = router({
   /**

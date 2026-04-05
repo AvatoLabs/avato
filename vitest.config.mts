@@ -57,6 +57,7 @@ export default defineConfig({
       '@/utils/electron': resolve(__dirname, './src/utils/electron'),
       '@/utils/markdownToTxt': resolve(__dirname, './src/utils/markdownToTxt'),
       '@/utils/navigation': resolve(__dirname, './src/utils/navigation.ts'),
+      '@/utils/rbac': resolve(__dirname, './src/utils/rbac.ts'),
       '@/utils/tableDocument': resolve(__dirname, './src/utils/tableDocument'),
       '@/utils/textLength': resolve(__dirname, './src/utils/textLength'),
       '@/utils/sanitizeFileName': resolve(__dirname, './src/utils/sanitizeFileName'),

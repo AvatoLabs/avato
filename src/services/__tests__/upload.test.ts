@@ -34,7 +34,7 @@ vi.mock('js-sha256', () => ({
   }),
 }));
 
-const mockStorageKey = 'uploads/spc_test/sess_1/opq_upload_id';
+const mockStorageKey = 'v2/spaces/spc_test/blobs/sess_1/opq_upload_id';
 const mockSessionId = 'ups_sess_1';
 const mockPreSignUrl = 'https://example.com/presign';
 const UPLOAD_SESSION_ID_HEADER = 'x-lobe-upload-session-id';
@@ -89,7 +89,7 @@ describe('UploadService', () => {
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
         date: '1',
-        dirname: 'uploads/spc_test/sess_1',
+        dirname: 'v2/spaces/spc_test/blobs/sess_1',
         filename: 'test.png',
         path: mockStorageKey,
       });
@@ -191,7 +191,7 @@ describe('UploadService', () => {
         expiresAt: new Date().toISOString(),
         presignedUrl: mockPreSignUrl,
         sessionId: mockSessionId,
-        storageKey: 'uploads/spc_test/sess_1/opq_json',
+        storageKey: 'v2/spaces/spc_test/blobs/sess_1/opq_json',
       });
 
       const data = { key: 'value', number: 123 };
@@ -206,7 +206,7 @@ describe('UploadService', () => {
         expiresAt: new Date().toISOString(),
         presignedUrl: mockPreSignUrl,
         sessionId: mockSessionId,
-        storageKey: 'uploads/spc_test/sess_1/opq_custom',
+        storageKey: 'v2/spaces/spc_test/blobs/sess_1/opq_custom',
       });
 
       const data = { test: true };
@@ -253,7 +253,7 @@ describe('UploadService', () => {
 
       expect(result).toEqual({
         date: '1',
-        dirname: 'uploads/spc_test/sess_1',
+        dirname: 'v2/spaces/spc_test/blobs/sess_1',
         filename: 'test.png',
         path: mockStorageKey,
       });

@@ -1,6 +1,6 @@
 'use client';
 
-import { Block, Flexbox, Icon, Text } from '@lobehub/ui';
+import { Block, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
 import { createStaticStyles, cx } from 'antd-style';
 import { Blocks, FileTextIcon } from 'lucide-react';
 import { type ComponentType, memo } from 'react';
@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ACTION_ENTRY_ICONS } from '@/config/entryIcons';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { useSpaceName } from '@/features/ResourceSpaces';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useChatStore } from '@/store/chat';
 import { useHomeStore } from '@/store/home/store';
 import { getPageRootPath } from '@/utils/docs';
@@ -71,6 +72,11 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, ${cssVar.colorTextLightSolid} 16%, transparent),
       ${cssVar.boxShadowSecondary};
+  `,
+  contextHint: css`
+    font-size: 12px;
+    line-height: 1.5;
+    color: ${cssVar.colorTextDescription};
   `,
   chip: css`
     padding-inline: 8px;
@@ -200,6 +206,8 @@ interface UtilityQuickAction extends BaseAction {
 const QuickActionsPanel = memo(() => {
   const { t } = useTranslation('home');
   const navigate = useNavigate();
+  const resolvedSpaceId = resolveWorkspaceSpaceId();
+  const workspaceName = useSpaceName(resolvedSpaceId);
 
   const [inputActiveMode, setInputActiveMode, clearInputMode] = useHomeStore((s) => [
     s.inputActiveMode,
@@ -226,7 +234,9 @@ const QuickActionsPanel = memo(() => {
       title: t('starter.createGroup'),
     },
     {
-      footer: t('workspace.quickActions.hint.write'),
+      footer: workspaceName
+        ? t('workspace.quickActions.hint.writeInWorkspace', { name: workspaceName })
+        : t('workspace.quickActions.hint.write'),
       icon: ACTION_ENTRY_ICONS.write,
       key: 'write',
       kind: 'mode',
@@ -237,11 +247,13 @@ const QuickActionsPanel = memo(() => {
 
   const utilityActions: UtilityQuickAction[] = [
     {
-      footer: t('workspace.quickActions.hint.documents'),
+      footer: workspaceName
+        ? t('workspace.quickActions.hint.documentsInWorkspace', { name: workspaceName })
+        : t('workspace.quickActions.hint.documents'),
       icon: FileTextIcon,
       key: 'documents',
       kind: 'utility',
-      onClick: () => navigate(getPageRootPath('doc', getActiveWorkspaceSpaceId())),
+      onClick: () => navigate(getPageRootPath('doc', resolvedSpaceId)),
       title: t('workspace.quickActions.newDoc'),
     },
     {
@@ -256,7 +268,17 @@ const QuickActionsPanel = memo(() => {
 
   return (
     <Flexbox gap={10}>
-      <span className={styles.eyebrow}>{t('workspace.quickActions.title')}</span>
+      <Flexbox gap={6}>
+        <span className={styles.eyebrow}>{t('workspace.quickActions.title')}</span>
+        {workspaceName && (
+          <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+            <Tag bordered={false}>{t('workspace.quickActions.scope.workspace')}</Tag>
+            <span className={styles.contextHint}>
+              {t('workspace.quickActions.scope.inWorkspace', { name: workspaceName })}
+            </span>
+          </Flexbox>
+        )}
+      </Flexbox>
       <div className={styles.modeGrid}>
         {modeActions.map((action) => {
           const isActive = inputActiveMode === action.mode;

@@ -7,6 +7,7 @@ import { contentShareRouter } from '@/server/routers/lambda/contentShare';
 
 const mockAssertCanDelegateSharing = vi.fn();
 const mockAssertCapability = vi.fn();
+const mockCreateAccessEvent = vi.fn();
 const mockCreateAuditLog = vi.fn();
 const mockCreateShareLink = vi.fn();
 const mockFindContentRegistryByLocalId = vi.fn();
@@ -15,6 +16,7 @@ const mockResolveShareLinkByToken = vi.fn();
 
 vi.mock('@/database/models/content', () => ({
   ContentModel: vi.fn(() => ({
+    createAccessEvent: mockCreateAccessEvent,
     createAuditLog: mockCreateAuditLog,
     createShareLink: mockCreateShareLink,
     findContentRegistryByLocalId: mockFindContentRegistryByLocalId,
@@ -76,7 +78,9 @@ describe('contentShareRouter', () => {
     mockResolveShareLinkByToken.mockResolvedValue({
       contentUid: 'cnt_1',
       expiresAt: new Date('2026-04-20T00:00:00.000Z'),
+      id: 'shl_1',
       passwordHash: null,
+      spaceId: 'spc_1',
     });
     mockGetContentSummary.mockResolvedValue({
       contentUid: 'cnt_1',
@@ -162,7 +166,9 @@ describe('contentShareRouter', () => {
     mockResolveShareLinkByToken.mockResolvedValue({
       contentUid: 'cnt_1',
       expiresAt: new Date('2026-04-20T00:00:00.000Z'),
+      id: 'shl_1',
       passwordHash: null,
+      spaceId: 'spc_1',
     });
     mockGetContentSummary.mockResolvedValue({
       contentUid: 'cnt_1',
@@ -183,6 +189,19 @@ describe('contentShareRouter', () => {
       name: 'a.txt',
       role: 'viewer',
     });
+    expect(mockCreateAccessEvent).toHaveBeenCalledWith({
+      accessType: 'share_view',
+      contentUid: 'cnt_1',
+      metadata: {
+        kind: 'file',
+        localId: 'file_1',
+        via: 'share_page',
+      },
+      shareLinkId: 'shl_1',
+      sourceIp: null,
+      spaceId: 'spc_1',
+      userAgent: null,
+    });
   });
 
   it('requires the correct password for protected shares', async () => {
@@ -194,12 +213,93 @@ describe('contentShareRouter', () => {
     mockResolveShareLinkByToken.mockResolvedValue({
       contentUid: 'cnt_1',
       expiresAt: new Date('2026-04-20T00:00:00.000Z'),
+      id: 'shl_1',
       passwordHash: 'hashed-password',
+      spaceId: 'spc_1',
     });
     vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
 
     await expect(
       caller.getSharedContentByToken({ password: 'wrong', token: 'share_tok_1' }),
     ).rejects.toThrow(new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' }));
+    expect(mockCreateAccessEvent).not.toHaveBeenCalled();
+  });
+
+  it('records authenticated public share access with request metadata', async () => {
+    const caller = contentShareRouter.createCaller({
+      clientIp: '203.0.113.10',
+      serverDB: {} as any,
+      userAgent: 'Vitest',
+      userId: 'user-1',
+    } as any);
+
+    await caller.getSharedContentByToken({ token: 'share_tok_1' });
+
+    expect(mockCreateAccessEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        shareLinkId: 'shl_1',
+        sourceIp: '203.0.113.10',
+        userAgent: 'Vitest',
+      }),
+    );
+  });
+
+  it('records table export access for shared resources', async () => {
+    const caller = contentShareRouter.createCaller({
+      clientIp: '203.0.113.20',
+      serverDB: {} as any,
+      userAgent: 'Vitest Export',
+      userId: 'user-1',
+    } as any);
+
+    await caller.recordSharedContentExport({ format: 'csv', token: 'share_tok_1' });
+
+    expect(mockCreateAccessEvent).toHaveBeenCalledWith({
+      accessType: 'share_export',
+      contentUid: 'cnt_1',
+      metadata: {
+        format: 'csv',
+        kind: 'file',
+        localId: 'file_1',
+        via: 'share_page',
+      },
+      shareLinkId: 'shl_1',
+      sourceIp: '203.0.113.20',
+      spaceId: 'spc_1',
+      userAgent: 'Vitest Export',
+    });
+  });
+
+  it('records authenticated member exports for content resources', async () => {
+    const caller = contentShareRouter.createCaller({
+      clientIp: '203.0.113.30',
+      serverDB: {} as any,
+      userAgent: 'Vitest Member Export',
+      userId: 'user-1',
+    } as any);
+
+    await caller.recordContentExport({
+      format: 'markdown',
+      id: 'file_1',
+      kind: 'file',
+    });
+
+    expect(mockAssertCapability).toHaveBeenCalledWith({
+      capability: 'preview_content',
+      contentUid: 'cnt_1',
+    });
+    expect(mockCreateAccessEvent).toHaveBeenCalledWith({
+      accessType: 'content_export',
+      contentUid: 'cnt_1',
+      metadata: {
+        format: 'markdown',
+        kind: 'file',
+        localId: 'file_1',
+        via: 'member_export',
+      },
+      spaceId: 'spc_1',
+      sourceIp: '203.0.113.30',
+      userAgent: 'Vitest Member Export',
+    });
   });
 });

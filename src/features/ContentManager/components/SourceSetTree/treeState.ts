@@ -1,4 +1,4 @@
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { fileService } from '@/services/file';
 import { useFileStore } from '@/store/file';
 import { type ContentItem } from '@/types/content';
@@ -85,7 +85,7 @@ export const clearTreeStateForSourceSet = (sourceSetId: string) => {
  */
 export const clearTreeFolderCache = async (
   sourceSetId: string,
-  spaceId = getActiveWorkspaceSpaceId(),
+  spaceId = resolveWorkspaceSpaceId(),
 ) => {
   const state = treeState.get(sourceSetId);
   if (!state) return;

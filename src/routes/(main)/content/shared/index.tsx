@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from '@/features/ResourceSpaces/SharedWithMePage';
+export { default } from '@/features/ResourceSpaces/LegacySharedFilesRedirectPage';

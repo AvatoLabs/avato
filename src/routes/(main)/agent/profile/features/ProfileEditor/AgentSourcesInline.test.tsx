@@ -70,8 +70,22 @@ vi.mock('@/features/SourceSetModal', () => ({
 
 vi.mock('@/features/ResourceSpaces', () => ({
   useSpaceName: (spaceId?: string | null) =>
-    ({ 'space-1': 'My Space', 'space-2': 'Shared Space' })[spaceId || ''],
+    ({ 'space-1': 'My Space', 'space-2': 'Shared Space', 'space-route': 'Route Space' })[
+      spaceId || ''
+    ],
 }));
+
+vi.mock('@/helpers/activeWorkspaceSpace', async () => {
+  const actual = await vi.importActual('@/helpers/activeWorkspaceSpace');
+
+  return {
+    ...actual,
+    resolveWorkspaceSpaceId: () => {
+      const match = window.location.pathname.match(/^\/spaces\/([^/]+)/);
+      return match?.[1] ?? actual.getActiveWorkspaceSpaceId();
+    },
+  };
+});
 
 vi.mock('@/hooks/useInterceptingRoutes', () => ({
   useOpenChatSettings: () => mockOpenSourceSettings,
@@ -81,6 +95,7 @@ describe('AgentSourcesInline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setActiveWorkspaceSpaceId('space-1');
+    window.history.replaceState({}, '', '/');
 
     act(() => {
       useAgentStore.setState({
@@ -143,5 +158,37 @@ describe('AgentSourcesInline', () => {
 
     expect(removeFileFromAgent).toHaveBeenCalledWith('file-1');
     expect(detachSourceSetFromAgent).toHaveBeenCalledWith('kb-1');
+  });
+
+  it('prefers the current route workspace when deciding whether a source is cross-space', () => {
+    window.history.replaceState({}, '', '/spaces/space-route/files');
+
+    act(() => {
+      useAgentStore.setState({
+        activeAgentId: 'agent-1',
+        agentMap: {
+          'agent-1': {
+            files: [],
+            sourceSets: [
+              {
+                enabled: true,
+                id: 'kb-2',
+                name: 'Route Handbook',
+                spaceId: 'space-route',
+              },
+            ],
+          } as any,
+        },
+        removeFileFromAgent,
+        detachSourceSetFromAgent,
+      });
+    });
+
+    render(<AgentSourcesInline />);
+
+    expect(
+      screen.getByRole('button', { name: 'Route Handbook-icon Route Handbook' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Route Handbook · Route Space')).not.toBeInTheDocument();
   });
 });

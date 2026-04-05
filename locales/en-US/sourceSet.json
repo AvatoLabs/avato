@@ -8,6 +8,8 @@
   "addToSourceSet.id.title": "Target Source Set",
   "addToSourceSet.title": "Add to Source Set",
   "addToSourceSet.totalFiles": "{{count}} files selected",
+  "addToSourceSet.workspace": "Workspace",
+  "addToSourceSet.workspaceHint": "Showing source sets from {{name}} first.",
   "createNew.confirm": "Create New",
   "createNew.description.label": "Source Set Description (Optional)",
   "createNew.description.placeholder": "Description helps the model understand this source set",

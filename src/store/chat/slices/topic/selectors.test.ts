@@ -21,8 +21,8 @@ const topicItems = [
 ];
 
 // Helper to create topicDataMap with correct key format
-const createTopicDataMap = (agentId: string, groupId?: string) => ({
-  [topicMapKey({ agentId, groupId })]: {
+const createTopicDataMap = (agentId: string, groupId?: string, spaceId?: string | null) => ({
+  [topicMapKey({ agentId, groupId, spaceId })]: {
     items: topicItems,
     total: topicItems.length,
     currentPage: 0,
@@ -36,6 +36,9 @@ const topicDataMap = createTopicDataMap('test');
 describe('topicSelectors', () => {
   beforeEach(() => {
     setActiveWorkspaceSpaceId(undefined);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/');
+    }
   });
 
   describe('currentTopics', () => {
@@ -49,6 +52,29 @@ describe('topicSelectors', () => {
 
       const topics = topicSelectors.currentTopics(state);
       expect(topics).toEqual(topicItems);
+    });
+
+    it('should prefer the current workspace route over the mutable hint', () => {
+      setActiveWorkspaceSpaceId('space-hint');
+      window.history.replaceState({}, '', '/spaces/space-route/chat');
+
+      const routeScopedItems = [{ id: 'route-topic', name: 'Route Topic', favorite: false }];
+      const state = merge(initialStore, {
+        activeAgentId: 'test',
+        topicDataMap: {
+          ...createTopicDataMap('test', undefined, 'space-hint'),
+          [topicMapKey({ agentId: 'test', spaceId: 'space-route' })]: {
+            currentPage: 0,
+            hasMore: false,
+            items: routeScopedItems,
+            pageSize: 20,
+            total: routeScopedItems.length,
+          },
+        },
+      });
+
+      const topics = topicSelectors.currentTopics(state);
+      expect(topics).toEqual(routeScopedItems);
     });
   });
 

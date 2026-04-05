@@ -37,13 +37,15 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
+      const access = await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
       });
 
-      const asyncTaskId = await ctx.chunkService.asyncEmbeddingFileChunks(input.id);
+      const asyncTaskId = await ctx.chunkService.asyncEmbeddingFileChunks(input.id, {
+        contentGuardAuthzEpoch: access.authzEpoch,
+      });
 
       return { id: asyncTaskId, success: true };
     }),
@@ -56,13 +58,15 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.contentAuthorizer.assertCapability({
+      const access = await ctx.contentAuthorizer.assertCapability({
         capability: 'preview_content',
         id: input.id,
         kind: 'file',
       });
 
-      const asyncTaskId = await ctx.chunkService.asyncParseFileToChunks(input.id, input.skipExist);
+      const asyncTaskId = await ctx.chunkService.asyncParseFileToChunks(input.id, input.skipExist, {
+        contentGuardAuthzEpoch: access.authzEpoch,
+      });
 
       return { id: asyncTaskId, success: true };
     }),
@@ -102,6 +106,11 @@ export const chunkRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const access = await ctx.contentAuthorizer.assertCapability({
+        capability: 'preview_content',
+        id: input.id,
+        kind: 'file',
+      });
       const result = await ctx.resolver.requireFile(input.id, 'preview_content');
 
       if (!result) return;
@@ -112,7 +121,9 @@ export const chunkRouter = router({
       }
 
       // 2. create a new asyncTask for chunking
-      const asyncTaskId = await ctx.chunkService.asyncParseFileToChunks(input.id);
+      const asyncTaskId = await ctx.chunkService.asyncParseFileToChunks(input.id, undefined, {
+        contentGuardAuthzEpoch: access.authzEpoch,
+      });
 
       return { id: asyncTaskId, success: true };
     }),

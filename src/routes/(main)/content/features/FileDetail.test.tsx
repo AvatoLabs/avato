@@ -42,11 +42,29 @@ vi.mock('antd', () => ({
     </section>
   )),
   Divider: vi.fn(() => <hr />),
-  Input: vi.fn(({ _allowClear, onChange, placeholder, value, ...rest }) => (
+  Input: vi.fn(({ allowClear: _allowClear, onChange, placeholder, value, ...rest }) => (
     <input {...rest} placeholder={placeholder} value={value ?? ''} onChange={onChange} />
   )),
-  Select: vi.fn(({ onChange, options, value, ...rest }) => (
-    <select {...rest} value={value} onChange={(event) => onChange?.(event.target.value)}>
+  Select: vi.fn(({ mode, onChange, options, value, ...rest }) => (
+    <select
+      {...rest}
+      multiple={mode === 'multiple'}
+      value={value}
+      onChange={(event) => {
+        if (mode === 'multiple') {
+          const rawValue = (event.target as HTMLSelectElement & { value: string | string[] }).value;
+          if (Array.isArray(rawValue)) {
+            onChange?.(rawValue);
+            return;
+          }
+
+          onChange?.(Array.from(event.currentTarget.selectedOptions).map((option) => option.value));
+          return;
+        }
+
+        onChange?.(event.target.value);
+      }}
+    >
       {options?.map((option: any) => (
         <option key={option.value} value={option.value}>
           {option.label}
@@ -117,6 +135,11 @@ describe('FileDetail', () => {
         item: {
           classification: 'general',
           fileId: 'file-1',
+          metadata: {
+            legacyAuditTrail: { importedBy: 'legacy-script' },
+            renditions: [{ kind: 'preview' }],
+            version: { label: 'v1' },
+          },
           reviewStatus: 'draft',
           rightsOwner: null,
           spaceId: 'spc_team',
@@ -139,6 +162,10 @@ describe('FileDetail', () => {
         item: {
           classification: 'legal',
           fileId: 'file-1',
+          metadata: {
+            renditions: [{ kind: 'preview', label: 'Homepage' }, { kind: 'web' }],
+            version: { label: 'v2', variantOf: 'Brand System 2026' },
+          },
           reviewStatus: 'approved',
           rightsOwner: 'Legal Team',
           spaceId: 'spc_team',
@@ -155,6 +182,10 @@ describe('FileDetail', () => {
     expect(screen.getByText('detail.asset.reviewStatus.approved')).toBeInTheDocument();
     expect(screen.getByText('detail.asset.usagePolicy.restricted')).toBeInTheDocument();
     expect(screen.getByText('Legal Team')).toBeInTheDocument();
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.getByText('Brand System 2026')).toBeInTheDocument();
+    expect(screen.getByText('detail.asset.rendition.preview · Homepage')).toBeInTheDocument();
+    expect(screen.getByText('detail.asset.rendition.web')).toBeInTheDocument();
   });
 
   it('allows editors to update asset governance fields', async () => {
@@ -164,6 +195,11 @@ describe('FileDetail', () => {
         item: {
           classification: 'general',
           fileId: 'file-1',
+          metadata: {
+            legacyAuditTrail: { importedBy: 'legacy-script' },
+            renditions: [{ kind: 'preview' }],
+            version: { label: 'v1' },
+          },
           reviewStatus: 'draft',
           rightsOwner: null,
           spaceId: 'spc_team',
@@ -178,6 +214,10 @@ describe('FileDetail', () => {
       item: {
         classification: 'brand',
         fileId: 'file-1',
+        metadata: {
+          legacyAuditTrail: { importedBy: 'legacy-script' },
+          version: { label: 'v2', variantOf: 'Brand System 2026' },
+        },
         reviewStatus: 'draft',
         rightsOwner: 'Brand Team',
         spaceId: 'spc_team',
@@ -196,11 +236,25 @@ describe('FileDetail', () => {
     fireEvent.change(screen.getByLabelText('detail.asset.rightsOwner.label'), {
       target: { value: 'Brand Team' },
     });
+    fireEvent.change(screen.getByLabelText('detail.asset.version.label'), {
+      target: { value: 'v2' },
+    });
+    fireEvent.change(screen.getByLabelText('detail.asset.version.variantOfLabel'), {
+      target: { value: 'Brand System 2026' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('detail.asset.rendition.labelPlaceholder'), {
+      target: { value: 'Homepage' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'detail.asset.save' }));
 
     await waitFor(() => {
       expect(mockUpdateFileAssetGovernance).toHaveBeenCalledWith('file-1', {
         classification: 'brand',
+        metadata: {
+          legacyAuditTrail: { importedBy: 'legacy-script' },
+          renditions: [{ kind: 'preview', label: 'Homepage' }],
+          version: { label: 'v2', variantOf: 'Brand System 2026' },
+        },
         rightsOwner: 'Brand Team',
         usagePolicy: 'restricted',
       });

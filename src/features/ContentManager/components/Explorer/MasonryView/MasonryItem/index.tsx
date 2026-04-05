@@ -1,4 +1,4 @@
-import { Checkbox, showContextMenu, stopPropagation, Text } from '@lobehub/ui';
+import { Checkbox, showContextMenu, stopPropagation, Tag, Text } from '@lobehub/ui';
 import { App } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import { shallow } from 'zustand/shallow';
 
 import InlineRename from '@/components/InlineRename';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
+import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -127,6 +128,14 @@ const styles = createStaticStyles(({ css }) => ({
   contentWithPadding: css`
     padding: 12px;
   `,
+  governanceBadges: css`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    padding-block: 0 12px;
+    padding-inline: 12px;
+  `,
   dragOver: css`
     border-color: ${cssVar.colorText} !important;
     color: ${cssVar.colorBgElevated} !important;
@@ -189,6 +198,13 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     embeddingStatus,
     finishEmbedding,
     chunkCount,
+    assetClassification,
+    assetPrimaryRenditionKind,
+    assetPrimaryRenditionLabel,
+    assetReviewStatus,
+    assetRenditionCount,
+    assetUsagePolicy,
+    assetVersionLabel,
     url,
     name,
     fileType,
@@ -242,6 +258,30 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
     const uploadStatusKey = getInlineUploadStatusKey(uploadStatus);
     const uploadStatusType =
       uploadStatus === 'error' ? 'danger' : uploadStatus === 'cancelled' ? 'warning' : 'secondary';
+    const assetBadges = useMemo(
+      () =>
+        buildFileAssetBadges({
+          assetClassification,
+          compact: true,
+          assetPrimaryRenditionKind,
+          assetPrimaryRenditionLabel,
+          assetReviewStatus,
+          assetRenditionCount,
+          assetUsagePolicy,
+          assetVersionLabel,
+          t,
+        }).slice(0, 2),
+      [
+        assetClassification,
+        assetPrimaryRenditionKind,
+        assetPrimaryRenditionLabel,
+        assetReviewStatus,
+        assetRenditionCount,
+        assetUsagePolicy,
+        assetVersionLabel,
+        t,
+      ],
+    );
 
     // Use shared click handler hook
     const handleItemClick = useFileItemClick({
@@ -579,6 +619,21 @@ const MasonryFileItem = memo<MasonryFileItemProps>(
             }
           })()}
         </div>
+        {assetBadges.length > 0 && (
+          <div className={styles.governanceBadges}>
+            {assetBadges.map((badge) => (
+              <Tag
+                color={badge.color}
+                key={badge.key}
+                size={'small'}
+                title={badge.title}
+                variant={badge.variant}
+              >
+                {badge.label}
+              </Tag>
+            ))}
+          </div>
+        )}
       </div>
     );
   },

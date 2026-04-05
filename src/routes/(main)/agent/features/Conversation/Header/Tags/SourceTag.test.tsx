@@ -25,12 +25,15 @@ vi.mock('@/components/SourceIcon', () => ({
 
 vi.mock('@/features/ResourceSpaces', () => ({
   useSpaceName: (spaceId?: string | null) =>
-    ({ 'space-1': 'My Space', 'space-2': 'Shared Space' })[spaceId || ''],
+    ({ 'space-1': 'My Space', 'space-2': 'Shared Space', 'space-route': 'Ops Workspace' })[
+      spaceId || ''
+    ],
 }));
 
 describe('SourceTag', () => {
   beforeEach(() => {
     setActiveWorkspaceSpaceId('space-1');
+    window.history.replaceState({}, '', '/');
   });
 
   it('shows the workspace name for a source from a different space', () => {
@@ -56,5 +59,25 @@ describe('SourceTag', () => {
 
     expect(screen.getByText('Handbook · Shared Space')).toBeInTheDocument();
     expect(screen.getByText('(1+)')).toBeInTheDocument();
+  });
+
+  it('prefers the current route workspace over the mutable hint', () => {
+    window.history.replaceState({}, '', '/spaces/space-route/chat');
+
+    render(
+      <SourceTag
+        data={[
+          {
+            id: 'kb-1',
+            name: 'Ops Runbook',
+            spaceId: 'space-route',
+            type: AgentSourceKind.SourceSet,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Ops Runbook')).toBeInTheDocument();
+    expect(screen.queryByText('Ops Runbook · Ops Workspace')).not.toBeInTheDocument();
   });
 });

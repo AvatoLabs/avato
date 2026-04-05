@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import SourceIcon from '@/components/SourceIcon';
 import { useSpaceName } from '@/features/ResourceSpaces';
 import { AttachSourceSetModal } from '@/features/SourceSetModal';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useOpenChatSettings } from '@/hooks/useInterceptingRoutes';
 import { useIsDark } from '@/hooks/useIsDark';
 import { agentSelectors } from '@/store/agent/selectors';
@@ -92,7 +92,7 @@ const AgentSourcesInline = memo(() => {
   const [modalOpen, setModalOpen] = useState(false);
   const isDarkMode = useIsDark();
   const openSourceSettings = useOpenChatSettings(ChatSettingsTabs.Sources);
-  const activeWorkspaceSpaceId = getActiveWorkspaceSpaceId();
+  const activeWorkspaceSpaceId = resolveWorkspaceSpaceId();
 
   const [files, sourceSets] = useAgentStore(
     (s) => [agentSelectors.currentAgentFiles(s), agentSelectors.currentAgentSourceSets(s)],

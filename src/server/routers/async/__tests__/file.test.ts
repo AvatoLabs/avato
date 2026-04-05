@@ -98,7 +98,7 @@ vi.mock('@/server/services/file', () => ({
 }));
 
 vi.mock('@/server/services/content', () => ({
-  ResourceAuthorizer: vi.fn(() => ({
+  ContentAuthorizer: vi.fn(() => ({
     assertCapability: mockResourceAuthorizerAssertCapability,
   })),
 }));
@@ -132,7 +132,7 @@ describe('async fileRouter', () => {
     mockInitModelRuntimeFromDB.mockResolvedValue({
       embeddings: vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
     });
-    mockResourceAuthorizerAssertCapability.mockResolvedValue(undefined);
+    mockResourceAuthorizerAssertCapability.mockResolvedValue({ authzEpoch: 1 });
     mockFileModelFindByIdAny.mockResolvedValue({
       fileType: 'text/plain',
       id: 'file-1',
@@ -259,6 +259,44 @@ describe('async fileRouter', () => {
       error: new AsyncTaskError(
         AsyncTaskErrorType.ServerError,
         'moonshot/kimi-k2.5: The API you are accessing is not open',
+      ),
+      status: AsyncTaskStatus.Error,
+    });
+  });
+
+  it('should fail chunking when authz epoch changes before async execution', async () => {
+    mockAsyncTaskModelFindById.mockResolvedValue({
+      id: 'task-1',
+      metadata: {
+        contentGuard: {
+          authzEpoch: 7,
+          capability: 'preview_content',
+          fileId: 'file-1',
+        },
+      },
+      status: AsyncTaskStatus.Pending,
+    });
+    mockResourceAuthorizerAssertCapability.mockResolvedValue({ authzEpoch: 8 });
+
+    const caller = fileRouter.createCaller({
+      authorizationToken: 'test-token',
+      userId: 'test-user',
+    } as any);
+
+    await expect(caller.parseFileToChunks({ fileId: 'file-1', taskId: 'task-1' })).resolves.toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'Resource access changed after task creation. Please retry from the latest file view.',
+        ),
+        success: false,
+      }),
+    );
+
+    expect(mockFileServiceGetFileByteArray).not.toHaveBeenCalled();
+    expect(mockAsyncTaskModelUpdate).toHaveBeenLastCalledWith('task-1', {
+      error: new AsyncTaskError(
+        AsyncTaskErrorType.ServerError,
+        'Resource access changed after task creation. Please retry from the latest file view.',
       ),
       status: AsyncTaskStatus.Error,
     });

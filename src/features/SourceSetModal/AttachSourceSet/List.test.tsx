@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
@@ -24,7 +24,10 @@ vi.mock('@lobehub/ui', () => ({
   ),
   Center: ({ children }: any) => <div>{children}</div>,
   Empty: ({ description }: any) => <div>{description}</div>,
-  Flexbox: ({ children }: any) => <div>{children}</div>,
+  Flexbox: ({ as, children, ...props }: any) => {
+    const Component = as || 'div';
+    return <Component {...props}>{children}</Component>;
+  },
   Icon: () => <span>icon</span>,
   SearchBar: ({ onChange, placeholder, value }: any) => (
     <input placeholder={placeholder} value={value} onChange={onChange} />
@@ -59,7 +62,7 @@ vi.mock('antd-style', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) =>
+    t: (key: string, options?: { name?: string }) =>
       ({
         'conversationFiles.picker.action.add': 'Add to Conversation',
         'conversationFiles.picker.action.addVisible': 'Add This View',
@@ -84,11 +87,23 @@ vi.mock('react-i18next', () => ({
         'sourceSet.picker.empty': 'No files here yet.',
         'sourceSet.picker.scope': 'Agent knowledge',
         'sourceSet.picker.searchPlaceholder': 'Search files in this location',
+        'sourceSet.picker.sourceWorkspace': `From ${options?.name}`,
         'sourceSet.picker.sources': 'Resources',
+        'sourceSet.picker.workspace': 'Workspace',
+        'sourceSet.picker.workspaceHint': `Browsing content from ${options?.name} first.`,
         'loading': 'Loading...',
         'networkError': 'Network error',
       })[key] || key,
   }),
+}));
+
+vi.mock('@/features/ResourceSpaces', () => ({
+  useSpaceName: (spaceId?: string | null) =>
+    ({
+      'space-route': 'Ops Workspace',
+      'space-shared': 'Shared Workspace',
+      'spc_test': 'Hint Workspace',
+    })[spaceId || ''],
 }));
 
 vi.mock('@/components/SourceIcon', () => ({
@@ -167,19 +182,33 @@ vi.mock('@/store/session/store', () => ({
 describe('SourceSetPickerList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseFetchSourceSetList.mockReturnValue({
+      data: [
+        {
+          description: 'Shared handbook',
+          id: 'ss-1',
+          name: 'Handbook',
+          spaceId: 'space-shared',
+        },
+      ],
+    });
     setActiveWorkspaceSpaceId('spc_test');
+    window.history.replaceState({}, '', '/spaces/space-route/files');
   });
 
-  it('uses full file listing for agent scope', () => {
+  it('uses the current route workspace for source sets and shows workspace context', () => {
     render(<List scope="agent" />);
 
-    expect(mockUseFetchSourceSetList).toHaveBeenCalledWith('spc_test');
+    expect(mockUseFetchSourceSetList).toHaveBeenCalledWith('space-route');
     expect(mockGetSourceItems).toHaveBeenCalledWith(
       expect.objectContaining({
         attachableOnly: false,
-        spaceId: 'spc_test',
+        spaceId: 'space-route',
       }),
     );
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.getByText('Browsing content from Ops Workspace first.')).toBeInTheDocument();
+    expect(screen.getByText('From Shared Workspace')).toBeInTheDocument();
   });
 
   it('uses attachable-only listing for conversation scope', () => {
@@ -188,9 +217,24 @@ describe('SourceSetPickerList', () => {
     expect(mockGetSourceItems).toHaveBeenCalledWith(
       expect.objectContaining({
         attachableOnly: true,
-        spaceId: 'spc_test',
+        spaceId: 'space-route',
       }),
     );
+  });
+
+  it('switches file queries to the selected source set workspace', async () => {
+    render(<List scope="agent" />);
+
+    fireEvent.click(screen.getByText('Handbook'));
+
+    await waitFor(() => {
+      expect(mockGetSourceItems).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sourceSetId: 'ss-1',
+          spaceId: 'space-shared',
+        }),
+      );
+    });
   });
 
   it('keeps the empty state focused on import actions', () => {

@@ -14,6 +14,22 @@ export const mobileRoutes: RouteObject[] = [
     children: [
       // Chat routes
       {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/shared'),
+          'Mobile > Spaces > Shared',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
+        path: 'spaces/shared',
+      },
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/spaces/trash'),
+          'Mobile > Spaces > Trash',
+        ),
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
+        path: 'spaces/trash',
+      },
+      {
         children: [
           {
             element: redirectElement('/'),
@@ -384,17 +400,17 @@ export const mobileRoutes: RouteObject[] = [
       {
         element: dynamicElement(
           () => import('@/routes/(main)/content/shared'),
-          'Mobile > Files > Shared',
+          'Mobile > Files > Shared > Legacy Redirect',
         ),
-        errorElement: <ErrorBoundary resetPath="/content/shared" />,
+        errorElement: <ErrorBoundary resetPath="/spaces/shared" />,
         path: 'content/shared',
       },
       {
         element: dynamicElement(
           () => import('@/routes/(main)/content/trash'),
-          'Mobile > Files > Trash',
+          'Mobile > Files > Trash > Legacy Redirect',
         ),
-        errorElement: <ErrorBoundary resetPath="/content/trash" />,
+        errorElement: <ErrorBoundary resetPath="/spaces/trash" />,
         path: 'content/trash',
       },
 

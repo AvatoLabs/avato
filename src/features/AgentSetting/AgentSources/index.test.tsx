@@ -70,8 +70,12 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { count?: number }) => {
+    t: (key: string, options?: { count?: number; name?: string }) => {
       if (key === 'settingSources.count') return `${options?.count ?? 0} attached`;
+      if (key === 'settingSources.scope.workspaceHint')
+        return `Open and attach sources from ${options?.name} first.`;
+      if (key === 'settingSources.emptyDescInWorkspace')
+        return `Attach files or source sets from ${options?.name} for long-term reuse across conversations.`;
 
       return (
         {
@@ -90,6 +94,7 @@ vi.mock('react-i18next', () => ({
           'settingSources.scope.agent': 'Agent scope',
           'settingSources.scope.conversation':
             'Conversation attachments only stay with the current session.',
+          'settingSources.scope.workspace': 'Workspace',
           'settingSources.section.files': 'Files',
           'settingSources.section.sourceSets': 'Source Sets',
           'settingSources.title': 'Long-term Sources',
@@ -111,7 +116,9 @@ vi.mock('@/features/SourceSetModal', () => ({
 
 vi.mock('@/features/ResourceSpaces', () => ({
   useSpaceName: (spaceId?: string | null) =>
-    ({ 'space-1': 'My Space', 'space-2': 'Shared Space' })[spaceId || ''],
+    ({ 'space-1': 'My Space', 'space-2': 'Shared Space', 'space-route': 'Ops Space' })[
+      spaceId || ''
+    ],
   buildFilesRootPath: (spaceId: string | null | undefined) =>
     spaceId ? `/spaces/${spaceId}/files` : '/spaces',
   buildSourceSetPath: (spaceId: string | null | undefined, sourceSetId: string) =>
@@ -124,6 +131,7 @@ describe('AgentSources', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setActiveWorkspaceSpaceId('space-1');
+    window.history.replaceState({}, '', '/');
 
     act(() => {
       useAgentStore.setState({
@@ -166,6 +174,8 @@ describe('AgentSources', () => {
     expect(screen.getByText('Handbook')).toBeInTheDocument();
     expect(screen.getByText('guide.md')).toBeInTheDocument();
     expect(screen.getByText('Shared Space')).toBeInTheDocument();
+    expect(screen.getByText('Workspace')).toBeInTheDocument();
+    expect(screen.getByText('Open and attach sources from My Space first.')).toBeInTheDocument();
     expect(screen.getByTestId('attach-sources-modal')).toHaveTextContent('closed');
 
     fireEvent.click(screen.getByRole('button', { name: 'Attach Sources' }));
@@ -174,11 +184,13 @@ describe('AgentSources', () => {
   });
 
   it('closes the settings modal state before navigating to the resource center', () => {
+    window.history.replaceState({}, '', '/spaces/space-route/files');
+
     render(<AgentSources />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Content' }));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/files');
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-route/files');
     expect(useAgentStore.getState().showAgentSetting).toBe(false);
     expect(useAgentStore.getState().activeAgentSettingTab).toBeUndefined();
   });

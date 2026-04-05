@@ -48,7 +48,7 @@ vi.mock('@/envs/auth', () => ({
 const sessionRecord = {
   createdBy: 'user-1',
   expectedSize: 5,
-  storageKey: 'uploads/spc_1/ups_1/opq_1',
+  storageKey: 'v2/spaces/spc_1/blobs/ups_1/opq_1',
 };
 
 function makeRawUploadRequest({

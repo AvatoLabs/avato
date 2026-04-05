@@ -1,7 +1,6 @@
 import i18n from 'i18next';
 import { type SWRResponse } from 'swr';
 
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { useClientDataSWRWithSync } from '@/libs/swr/useClientDataSWRWithSync';
 import { documentService } from '@/services/document';
 import { type StoreSetter } from '@/store/types';
@@ -12,13 +11,13 @@ import {
   getPageDetailPath,
   getPageKindFromDocument,
   getPageRootPath,
-  getPageSpaceIdFromPathname,
   type PageKind,
   TABLE_PAGE_KIND,
 } from '@/utils/docs';
 import { setNamespace } from '@/utils/storeDebug';
 import { createDefaultTableDocument, tableDocumentToMarkdown } from '@/utils/tableDocument';
 
+import { resolvePageStoreSpaceId } from '../../spaceId';
 import { type PageStore } from '../../store';
 
 const n = setNamespace('page/crud');
@@ -28,12 +27,6 @@ const DEFAULT_TABLE_COLUMNS = 5;
 const DEFAULT_TABLE_ROWS = 8;
 const getDefaultTableSheetName = () =>
   i18n.t('docEditor.table.sheetDefaultName', { index: 1, ns: 'file' });
-
-const getCurrentPageSpaceId = () => {
-  if (typeof window === 'undefined') return undefined;
-
-  return getPageSpaceIdFromPathname(window.location.pathname);
-};
 
 /**
  * Page update parameters - flattened for easier use
@@ -69,9 +62,13 @@ export class CrudActionImpl {
   ): Promise<string> => {
     const { createOptimisticPage, createPage, replaceTempPageWithReal } = this.#get();
     const { sourceSetId, spaceId } = options;
+    const resolvedSpaceId = resolvePageStoreSpaceId({
+      queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+      spaceId,
+    });
 
     // Create optimistic page immediately
-    const tempPageId = createOptimisticPage(title, pageKind, sourceSetId, spaceId);
+    const tempPageId = createOptimisticPage(title, pageKind, sourceSetId, resolvedSpaceId);
     this.#set(
       { isCreatingNew: true, selectedPageId: tempPageId },
       false,
@@ -115,7 +112,7 @@ export class CrudActionImpl {
         parentId: newPage.parentId ?? null,
         source: 'document',
         sourceType: DocumentSourceType.EDITOR,
-        spaceId: newPage.spaceId ?? getActiveWorkspaceSpaceId() ?? null,
+        spaceId: newPage.spaceId ?? resolvedSpaceId ?? null,
         title: newPage.title || title,
         totalCharCount: newPage.content?.length || 0,
         totalLineCount: 0,
@@ -142,7 +139,7 @@ export class CrudActionImpl {
         false,
         n(`createNewDocument/${pageKind}/error`),
       );
-      this.#get().navigate?.(getPageRootPath(pageKind, spaceId ?? getCurrentPageSpaceId()));
+      this.#get().navigate?.(getPageRootPath(pageKind, resolvedSpaceId));
 
       throw error;
     }
@@ -165,7 +162,10 @@ export class CrudActionImpl {
     // Generate temporary ID with prefix to identify optimistic pages
     const tempId = `temp-page-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const now = new Date();
-    const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolvePageStoreSpaceId({
+      queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+      spaceId,
+    });
 
     const newPage: LobeDocument = {
       content:
@@ -230,7 +230,10 @@ export class CrudActionImpl {
     title: string;
   }): Promise<{ [key: string]: any; id: string }> => {
     const now = Date.now();
-    const activeSpaceId = spaceId ?? getActiveWorkspaceSpaceId();
+    const activeSpaceId = resolvePageStoreSpaceId({
+      queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+      spaceId,
+    });
 
     const newPage = await documentService.createDocument({
       content,
@@ -284,7 +287,12 @@ export class CrudActionImpl {
         duplicatedFrom: pageId,
       },
       parentId: sourcePage.parentId ?? undefined,
-      spaceId: sourcePage.spaceId ?? getActiveWorkspaceSpaceId() ?? undefined,
+      spaceId:
+        sourcePage.spaceId ??
+        resolvePageStoreSpaceId({
+          queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+        }) ??
+        undefined,
       title: `${sourcePage.title} (Copy)`,
     });
 
@@ -304,7 +312,12 @@ export class CrudActionImpl {
       source: 'document',
       sourceSetId: newPage.sourceSetId ?? null,
       sourceType: DocumentSourceType.EDITOR,
-      spaceId: newPage.spaceId ?? getActiveWorkspaceSpaceId() ?? null,
+      spaceId:
+        newPage.spaceId ??
+        resolvePageStoreSpaceId({
+          queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+        }) ??
+        null,
       title: newPage.title || '',
       totalCharCount: newPage.content?.length || 0,
       totalLineCount: 0,
@@ -318,7 +331,9 @@ export class CrudActionImpl {
 
   navigateToPage = (pageId: string | null, pageKind?: PageKind): void => {
     const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
-    const currentSpaceId = getCurrentPageSpaceId();
+    const currentSpaceId = resolvePageStoreSpaceId({
+      queryFilterSpaceId: this.#get().queryFilter?.spaceId,
+    });
 
     if (!pageId) {
       this.#get().navigate?.(`${getPageRootPath(pageKind, currentSpaceId)}${currentSearch}`);

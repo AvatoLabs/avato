@@ -38,6 +38,8 @@ const mockFileModelUpdate = vi.fn();
 const mockFileAssetModelFindByFileId = vi.fn();
 const mockFileAssetModelFindByFileIds = vi.fn();
 const mockFileAssetModelUpsert = vi.fn();
+const mockFileServiceDeleteFile = vi.fn();
+const mockFileServiceDeleteFiles = vi.fn();
 
 // Patch: Use actual router context middleware to inject the correct models/services
 function createCallerWithCtx(partialCtx: any = {}) {
@@ -62,8 +64,8 @@ function createCallerWithCtx(partialCtx: any = {}) {
   const fileService = {
     getFullFileUrl: vi.fn().mockResolvedValue('full-url'),
     getFileMetadata: vi.fn().mockResolvedValue({ contentLength: 2048, contentType: 'text/plain' }),
-    deleteFile: vi.fn().mockResolvedValue(undefined),
-    deleteFiles: vi.fn().mockResolvedValue(undefined),
+    deleteFile: mockFileServiceDeleteFile,
+    deleteFiles: mockFileServiceDeleteFiles,
   };
 
   const chunkModel = {
@@ -219,8 +221,8 @@ const mockFileServiceGetFileMetadata = vi.fn();
 
 vi.mock('@/server/services/file', () => ({
   FileService: vi.fn(() => ({
-    deleteFile: vi.fn(),
-    deleteFiles: vi.fn(),
+    deleteFile: mockFileServiceDeleteFile,
+    deleteFiles: mockFileServiceDeleteFiles,
     getFullFileUrl: mockFileServiceGetFullFileUrl,
     getFileMetadata: mockFileServiceGetFileMetadata,
   })),
@@ -275,7 +277,7 @@ describe('fileRouter', () => {
     mockFileModelQuery.mockResolvedValue([]);
     mockFileModelDelete.mockResolvedValue(undefined);
     mockFileModelDeleteMany.mockResolvedValue([]);
-    mockFileModelClear.mockResolvedValue({} as any);
+    mockFileModelClear.mockResolvedValue([]);
     mockFileModelSoftDeleteAny.mockResolvedValue(undefined);
     mockFileModelSoftDeleteManyAny.mockResolvedValue([]);
     mockFileModelUpdate.mockResolvedValue(undefined);
@@ -319,6 +321,8 @@ describe('fileRouter', () => {
       contentLength: 100,
       contentType: 'text/plain',
     });
+    mockFileServiceDeleteFile.mockReset();
+    mockFileServiceDeleteFiles.mockReset();
     mockResourceModelEnsureResourceRegistry.mockResolvedValue({ contentUid: 'res_test' });
     mockResourceModelFindSpaceBlobByHash.mockResolvedValue(undefined);
     mockResourceModelGetSpaceMemberRole.mockResolvedValue('owner');
@@ -648,6 +652,7 @@ describe('fileRouter', () => {
         {
           classification: 'brand',
           fileId: 'file-1',
+          metadata: { version: { label: 'v2' } },
           reviewStatus: 'archived',
           usagePolicy: 'public',
         },
@@ -657,8 +662,12 @@ describe('fileRouter', () => {
 
       expect(result[0]).toMatchObject({
         assetClassification: 'brand',
+        assetPrimaryRenditionKind: null,
+        assetPrimaryRenditionLabel: null,
         assetReviewStatus: 'archived',
+        assetRenditionCount: null,
         assetUsagePolicy: 'public',
+        assetVersionLabel: 'v2',
         id: 'file-1',
       });
       expect(mockFileAssetModelFindByFileIds).toHaveBeenCalledWith(['file-1']);
@@ -750,6 +759,10 @@ describe('fileRouter', () => {
         {
           classification: 'product',
           fileId: 'file-1',
+          metadata: {
+            renditions: [{ kind: 'preview', label: 'Homepage' }, { kind: 'thumbnail' }],
+            version: { label: '2026-Q2' },
+          },
           reviewStatus: 'approved',
           usagePolicy: 'restricted',
         },
@@ -766,8 +779,12 @@ describe('fileRouter', () => {
       expect(result.hasMore).toBe(false);
       expect(result.items[0]).toMatchObject({
         assetClassification: 'product',
+        assetPrimaryRenditionKind: 'preview',
+        assetPrimaryRenditionLabel: 'Homepage',
         assetReviewStatus: 'approved',
+        assetRenditionCount: 2,
         assetUsagePolicy: 'restricted',
+        assetVersionLabel: '2026-Q2',
         chunkCount: 10,
         chunkingStatus: AsyncTaskStatus.Success,
         embeddingStatus: AsyncTaskStatus.Success,
@@ -793,11 +810,35 @@ describe('fileRouter', () => {
 
   describe('removeAllFiles', () => {
     it('should clear files when personal space role allows write', async () => {
+      mockFileModelClear.mockResolvedValueOnce([
+        {
+          contentUid: 'res_clear_1',
+          fileHash: null,
+          id: 'file-clear-1',
+          spaceId: 'spc_team_1',
+          url: 'internal://clear-1',
+        },
+        {
+          contentUid: 'res_clear_2',
+          fileHash: 'hash-clear-2',
+          id: 'file-clear-2',
+          spaceId: 'spc_team_2',
+          url: 'internal://clear-2',
+        },
+      ] as any);
+      mockFileModelCheckHash.mockResolvedValueOnce({ isExist: false });
+
       await caller.removeAllFiles();
 
       expect(mockSpaceModelGetOrCreatePersonalSpace).toHaveBeenCalled();
       expect(mockResourceModelGetSpaceMemberRole).toHaveBeenCalledWith('spc_test');
-      expect(mockFileModelClear).toHaveBeenCalled();
+      expect(mockFileModelClear).toHaveBeenCalledWith(false);
+      expect(mockResourceModelInvalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
+        { contentUid: 'res_clear_1', spaceId: 'spc_team_1' },
+        { contentUid: 'res_clear_2', spaceId: 'spc_team_2' },
+      ]);
+      expect(mockFileServiceDeleteFile).toHaveBeenCalledWith('internal://clear-1');
+      expect(mockFileServiceDeleteFiles).not.toHaveBeenCalled();
     });
 
     it('should reject when personal space membership is viewer-only', async () => {
@@ -812,6 +853,24 @@ describe('fileRouter', () => {
 
       await expect(caller.removeAllFiles()).rejects.toThrow(TRPCError);
       expect(mockFileModelClear).not.toHaveBeenCalled();
+    });
+
+    it('should preserve hashed storage blobs when clear keeps global files', async () => {
+      mockFileModelClear.mockResolvedValueOnce([
+        {
+          contentUid: 'res_clear_3',
+          fileHash: 'hash-clear-3',
+          id: 'file-clear-3',
+          spaceId: 'spc_team_3',
+          url: 'internal://hashed-clear-3',
+        },
+      ] as any);
+
+      await caller.removeAllFiles();
+
+      expect(mockFileServiceDeleteFile).not.toHaveBeenCalled();
+      expect(mockFileServiceDeleteFiles).not.toHaveBeenCalled();
+      expect(mockFileModelCheckHash).not.toHaveBeenCalled();
     });
   });
 
@@ -842,7 +901,48 @@ describe('fileRouter', () => {
 
       await caller.removeFile({ id: 'invalid-id' });
 
-      expect(ctx.fileService.deleteFile).not.toHaveBeenCalled();
+      expect(mockFileServiceDeleteFile).not.toHaveBeenCalled();
+    });
+
+    it('should preserve hashed storage blobs when REMOVE_GLOBAL_FILE is disabled', async () => {
+      mockFileModelFindById.mockResolvedValue({
+        ...mockFile,
+        contentUid: 'res_test',
+        fileHash: 'hash-1',
+        id: 'test-id',
+        spaceId: 'spc_test',
+        url: 'storage/shared.txt',
+      });
+      mockFileModelDelete.mockResolvedValue(undefined);
+
+      await caller.removeFile({ id: 'test-id', trash: false });
+
+      expect(mockResourceAuthorizerAssertCapability).toHaveBeenCalledWith({
+        capability: 'delete',
+        id: 'test-id',
+        kind: 'file',
+      });
+      expect(mockResourceModelInvalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
+        { contentUid: 'res_test', spaceId: 'spc_test' },
+      ]);
+      expect(mockFileModelCheckHash).not.toHaveBeenCalled();
+      expect(mockFileServiceDeleteFile).not.toHaveBeenCalled();
+    });
+
+    it('should still delete storage for hard-deleted files without a global hash', async () => {
+      mockFileModelFindById.mockResolvedValue({
+        ...mockFile,
+        contentUid: 'res_test',
+        fileHash: null,
+        id: 'test-id',
+        spaceId: 'spc_test',
+        url: 'internal://document/doc-1',
+      });
+      mockFileModelDelete.mockResolvedValue(undefined);
+
+      await caller.removeFile({ id: 'test-id', trash: false });
+
+      expect(mockFileServiceDeleteFile).toHaveBeenCalledWith('internal://document/doc-1');
     });
   });
 
@@ -852,7 +952,36 @@ describe('fileRouter', () => {
 
       await caller.removeFiles({ ids: ['invalid-1', 'invalid-2'] });
 
-      expect(ctx.fileService.deleteFiles).not.toHaveBeenCalled();
+      expect(mockFileServiceDeleteFiles).not.toHaveBeenCalled();
+    });
+
+    it('should only delete storage keys that are truly orphaned', async () => {
+      mockFileModelFindById
+        .mockResolvedValueOnce({
+          ...mockFile,
+          contentUid: 'res_hashed',
+          fileHash: 'hash-1',
+          id: 'hashed',
+          spaceId: 'spc_test',
+          url: 'storage/shared.txt',
+        })
+        .mockResolvedValueOnce({
+          ...mockFile,
+          contentUid: 'res_internal',
+          fileHash: null,
+          id: 'internal',
+          spaceId: 'spc_test',
+          url: 'internal://document/doc-2',
+        });
+      mockFileModelDeleteMany.mockResolvedValue([]);
+
+      await caller.removeFiles({ ids: ['hashed', 'internal'], trash: false });
+
+      expect(mockResourceModelInvalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
+        { contentUid: 'res_hashed', spaceId: 'spc_test' },
+        { contentUid: 'res_internal', spaceId: 'spc_test' },
+      ]);
+      expect(mockFileServiceDeleteFiles).toHaveBeenCalledWith(['internal://document/doc-2']);
     });
   });
 
@@ -961,6 +1090,58 @@ describe('fileRouter', () => {
           spaceId: 'spc_test',
         },
       });
+    });
+
+    it('should pass version and rendition metadata through the typed governance contract', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'admin',
+      });
+
+      await caller.updateFileAssetGovernance({
+        id: 'test-id',
+        metadata: {
+          legacySource: 'brand-portal',
+          renditions: ['preview', { kind: 'web', label: 'Web Ready' }],
+          version: { label: 'v2', variantOf: 'Brand System 2026' },
+        } as any,
+      });
+
+      expect(mockFileAssetModelUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'test-id',
+          metadata: {
+            legacySource: 'brand-portal',
+            renditions: ['preview', { kind: 'web', label: 'Web Ready' }],
+            version: { label: 'v2', variantOf: 'Brand System 2026' },
+          },
+        }),
+      );
+    });
+
+    it('should preserve legacy top-level metadata fields through the governance contract', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'admin',
+      });
+
+      await caller.updateFileAssetGovernance({
+        id: 'test-id',
+        metadata: {
+          legacyAuditTrail: { importedBy: 'legacy-script' },
+          version: { label: 'v2' },
+        } as any,
+      });
+
+      expect(mockFileAssetModelUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'test-id',
+          metadata: {
+            legacyAuditTrail: { importedBy: 'legacy-script' },
+            version: { label: 'v2' },
+          },
+        }),
+      );
     });
 
     it('should reject viewers from mutating file asset metadata', async () => {

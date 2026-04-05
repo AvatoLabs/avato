@@ -8,6 +8,7 @@ import { useTopicItemDropdownMenu } from './useDropdownMenu';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+let mockResolvedSpaceId = 'spc_team';
 let mockSpaceMemoryTargets = {
   defaultSpaceId: 'spc_team',
   isLoading: false,
@@ -53,7 +54,7 @@ vi.mock('@/features/ResourceSpaces/useSpaceMemoryCandidateTargets', () => ({
 }));
 
 vi.mock('@/helpers/activeWorkspaceSpace', () => ({
-  getActiveWorkspaceSpaceId: () => 'spc_team',
+  resolveWorkspaceSpaceId: () => mockResolvedSpaceId,
 }));
 
 vi.mock('@/store/agent/store', () => ({
@@ -82,6 +83,7 @@ describe('useTopicItemDropdownMenu (agent)', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
+    mockResolvedSpaceId = 'spc_team';
     mockSpaceMemoryTargets = {
       defaultSpaceId: 'spc_team',
       isLoading: false,
@@ -133,5 +135,35 @@ describe('useTopicItemDropdownMenu (agent)', () => {
     const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
 
     expect(action).toBeUndefined();
+  });
+
+  it('uses the resolved route workspace for the preselected target space', async () => {
+    mockResolvedSpaceId = 'spc_route';
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: 'spc_route',
+      isLoading: false,
+      teamSpaces: [{ id: 'spc_route', kind: 'team', membershipRole: 'editor', name: 'Route Team' }],
+    };
+
+    const { result } = renderHook(() =>
+      useTopicItemDropdownMenu({
+        fav: false,
+        id: 'topic_2',
+        title: 'Route Workspace Topic',
+        toggleEditing: vi.fn(),
+      }),
+    );
+
+    const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
+
+    await act(async () => {
+      await action.onClick();
+    });
+
+    expect(mockOpenCreateSpaceMemoryCandidateModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialSpaceId: 'spc_route',
+      }),
+    );
   });
 });

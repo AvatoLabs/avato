@@ -17,7 +17,7 @@ import {
   useSpaceName,
 } from '@/features/ResourceSpaces';
 import { AttachSourceSetModal } from '@/features/SourceSetModal';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { agentSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { AgentSourceKind } from '@/types/sourceSet';
@@ -184,7 +184,8 @@ const AgentSources = memo(() => {
   const { t } = useTranslation('setting');
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
-  const activeWorkspaceSpaceId = getActiveWorkspaceSpaceId();
+  const activeWorkspaceSpaceId = resolveWorkspaceSpaceId();
+  const activeWorkspaceName = useSpaceName(activeWorkspaceSpaceId);
 
   const [files, sourceSets] = useAgentStore(
     (s) => [agentSelectors.currentAgentFiles(s), agentSelectors.currentAgentSourceSets(s)],
@@ -308,9 +309,19 @@ const AgentSources = memo(() => {
         </Flexbox>
 
         <Flexbox className={styles.note}>
-          <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
-            <Tag color={'blue'}>{t('settingSources.scope.agent')}</Tag>
-            <Text className={styles.secondaryText}>{t('settingSources.scope.conversation')}</Text>
+          <Flexbox gap={8}>
+            <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+              <Tag color={'blue'}>{t('settingSources.scope.agent')}</Tag>
+              <Text className={styles.secondaryText}>{t('settingSources.scope.conversation')}</Text>
+            </Flexbox>
+            {activeWorkspaceName && (
+              <Flexbox horizontal align={'center'} gap={8} wrap={'wrap'}>
+                <Tag bordered={false}>{t('settingSources.scope.workspace')}</Tag>
+                <Text className={styles.secondaryText}>
+                  {t('settingSources.scope.workspaceHint', { name: activeWorkspaceName })}
+                </Text>
+              </Flexbox>
+            )}
           </Flexbox>
         </Flexbox>
 
@@ -331,9 +342,13 @@ const AgentSources = memo(() => {
 
         {totalCount === 0 ? (
           <Empty
-            description={t('settingSources.emptyDesc')}
             descriptionProps={{ fontSize: 14 }}
             icon={LibraryBig}
+            description={
+              activeWorkspaceName
+                ? t('settingSources.emptyDescInWorkspace', { name: activeWorkspaceName })
+                : t('settingSources.emptyDesc')
+            }
           >
             <Button type={'primary'} onClick={() => setModalOpen(true)}>
               {t('settingSources.actions.add')}

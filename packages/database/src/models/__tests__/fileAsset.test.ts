@@ -1,6 +1,7 @@
 // @vitest-environment node
 import {
   FileAssetClassification,
+  FileAssetRenditionKind,
   FileAssetReviewStatus,
   FileAssetUsagePolicy,
 } from '@lobechat/types';
@@ -151,6 +152,38 @@ describe('FileAssetModel', () => {
         rightsOwner: 'Legal',
       });
       expect(updated.reviewedAt).toBeTruthy();
+    });
+
+    it('should normalize version and rendition metadata on write', async () => {
+      const item = await fileAssetModel.upsert({
+        createdBy: userId,
+        fileId,
+        metadata: {
+          legacySource: 'brand-portal',
+          license: '  CC-BY  ',
+          nestedLegacy: { keep: true },
+          renditions: [
+            { kind: FileAssetRenditionKind.Preview, label: ' Preview ' },
+            FileAssetRenditionKind.Web,
+            'invalid' as FileAssetRenditionKind,
+          ],
+          tags: [' brand ', 'brand', 'approved'],
+          version: { label: ' v2 ', variantOf: ' Brand System 2026 ' },
+        },
+        spaceId,
+      });
+
+      expect(item.metadata).toEqual({
+        legacySource: 'brand-portal',
+        license: 'CC-BY',
+        nestedLegacy: { keep: true },
+        renditions: [
+          { kind: FileAssetRenditionKind.Preview, label: 'Preview' },
+          { kind: FileAssetRenditionKind.Web },
+        ],
+        tags: ['brand', 'approved'],
+        version: { label: 'v2', variantOf: 'Brand System 2026' },
+      });
     });
   });
 

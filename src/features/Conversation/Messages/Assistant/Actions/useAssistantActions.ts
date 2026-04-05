@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useOpenCreateSpaceMemoryCandidateModal } from '@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal';
 import { useSpaceMemoryCandidateTargets } from '@/features/ResourceSpaces/useSpaceMemoryCandidateTargets';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { localeOptions } from '@/locales/contents';
 import { type UIChatMessage } from '@/types/index';
 
@@ -68,7 +68,7 @@ export const useAssistantActions = ({
 }: UseAssistantActionsParams): AssistantActions => {
   const { t } = useTranslation(['common', 'chat', 'file']);
   const { message } = App.useApp();
-  const activeSpaceId = getActiveWorkspaceSpaceId();
+  const activeSpaceId = resolveWorkspaceSpaceId();
   const { defaultSpaceId, teamSpaces } = useSpaceMemoryCandidateTargets(activeSpaceId);
   const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
   const sourceTitle = buildSpaceMemoryMessageSourceTitle(data.content);

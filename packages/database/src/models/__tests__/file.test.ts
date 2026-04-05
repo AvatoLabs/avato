@@ -128,6 +128,25 @@ describe('FileModel', () => {
       const result = await fileModel.createGlobalFile(globalFile);
       expect(result[0]).toMatchObject(globalFile);
     });
+
+    it('should ignore duplicate hashes without throwing', async () => {
+      const globalFile = {
+        hashId: 'dup-hash',
+        fileType: 'text/plain',
+        size: 100,
+        url: 'https://example.com/global-file.txt',
+        metadata: { key: 'value' },
+        creator: userId,
+      };
+
+      await expect(fileModel.createGlobalFile(globalFile)).resolves.toHaveLength(1);
+      await expect(fileModel.createGlobalFile(globalFile)).resolves.toEqual([]);
+
+      const rows = await serverDB.query.globalFiles.findMany({
+        where: eq(globalFiles.hashId, 'dup-hash'),
+      });
+      expect(rows).toHaveLength(1);
+    });
   });
 
   describe('checkHash', () => {
@@ -483,6 +502,60 @@ describe('FileModel', () => {
 
       const userFiles = await serverDB.query.files.findMany({ where: eq(files.userId, userId) });
       expect(userFiles).toHaveLength(0);
+    });
+
+    it('should preserve global files when removeGlobalFile is disabled', async () => {
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-1',
+          fileType: 'text/plain',
+          name: 'hashed-1.txt',
+          size: 100,
+          url: 'https://example.com/hashed-1.txt',
+        },
+        true,
+      );
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-2',
+          fileType: 'text/plain',
+          name: 'hashed-2.txt',
+          size: 200,
+          url: 'https://example.com/hashed-2.txt',
+        },
+        true,
+      );
+
+      const cleared = await fileModel.clear(false);
+
+      expect(cleared).toHaveLength(2);
+      await expect(
+        serverDB.query.globalFiles.findMany({
+          where: inArray(globalFiles.hashId, ['hash-clear-1', 'hash-clear-2']),
+        }),
+      ).resolves.toHaveLength(2);
+    });
+
+    it('should remove orphaned global files when removeGlobalFile is enabled', async () => {
+      await fileModel.create(
+        {
+          fileHash: 'hash-clear-3',
+          fileType: 'text/plain',
+          name: 'hashed-3.txt',
+          size: 100,
+          url: 'https://example.com/hashed-3.txt',
+        },
+        true,
+      );
+
+      const cleared = await fileModel.clear(true);
+
+      expect(cleared).toHaveLength(1);
+      await expect(
+        serverDB.query.globalFiles.findFirst({
+          where: eq(globalFiles.hashId, 'hash-clear-3'),
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 

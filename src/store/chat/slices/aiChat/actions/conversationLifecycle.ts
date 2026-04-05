@@ -14,7 +14,7 @@ import { TRPCClientError } from '@trpc/client';
 import { t } from 'i18next';
 
 import { markUserValidAction } from '@/business/client/markUserValidAction';
-import { getActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
+import { resolveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import { aiChatService } from '@/services/aiChat';
 import { topicService } from '@/services/topic';
 import { agentSelectors } from '@/store/agent/selectors';
@@ -258,7 +258,7 @@ export class ConversationLifecycleActionImpl {
           agentId: operationContext.agentId,
           // Pass groupId for group chat scenarios
           groupId: operationContext.groupId ?? undefined,
-          spaceId: operationContext.spaceId ?? getActiveWorkspaceSpaceId(),
+          spaceId: resolveWorkspaceSpaceId({ spaceId: operationContext.spaceId }),
           newAssistantMessage: {
             // Pass isSupervisor metadata for group orchestration
             metadata: operationContext.isSupervisor ? { isSupervisor: true } : undefined,
