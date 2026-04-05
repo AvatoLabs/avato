@@ -3,13 +3,16 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import EmptyPlaceholder from './EmptyPlaceholder';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSourceSet = vi.hoisted(() => vi.fn());
 const mockPushDockFileList = vi.hoisted(() => vi.fn());
+const memoryCapabilityState = vi.hoisted(() => ({
+  canReview: true,
+}));
 
 vi.mock('@lobehub/ui', () => ({
   Center: ({ children, className, style }: any) => (
@@ -61,7 +64,12 @@ vi.mock('antd-style', () => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
+    t: (key: string, options?: { count?: number; defaultValue?: string }) => {
+      if (key === 'space.home.recall.actions.open') return 'Open Space Memory';
+      if (key === 'space.home.recall.actions.review') return `Review ${options?.count} Pending`;
+
+      return options?.defaultValue ?? key;
+    },
   }),
 }));
 
@@ -92,12 +100,69 @@ vi.mock('@/features/ResourceSpaces', () => ({
     `/spaces/${spaceId}/files?scope=source-set:${id}`,
 }));
 
+vi.mock('@/features/ResourceSpaces/paths', () => ({
+  buildSpaceMemoryPath: (spaceId: string) => `/spaces/${spaceId}/memory`,
+}));
+
+vi.mock('@/features/ResourceSpaces/SpaceList', () => ({
+  SPACE_LIST_KEY: 'resource-space-list',
+}));
+
+vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
+  buildPendingGovernancePath: (
+    spaceId: string,
+    target: { recallFilter: string; section: string },
+  ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
+  canReviewSpaceMemorySummary: (summary?: {
+    contract?: { canManageRecall?: boolean };
+    surface?: string;
+  } | null) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  useTeamSpaceMemoryScopeSummaries: () => ({
+    pendingGovernanceCountBySpaceId: new Map([['space-1', memoryCapabilityState.canReview ? 2 : 0]]),
+    pendingGovernanceTargetBySpaceId: new Map([
+      [
+        'space-1',
+        memoryCapabilityState.canReview ? { recallFilter: 'stale', section: 'published' } : null,
+      ],
+    ]),
+    spaceSummaryMap: new Map([
+      [
+        'space-1',
+        {
+          canReview: memoryCapabilityState.canReview,
+          surface: memoryCapabilityState.canReview ? 'reviewer' : 'viewer',
+        },
+      ],
+    ]),
+  }),
+}));
+
 vi.mock('@/routes/(main)/content/features/store', () => ({
   useContentManagerStore: (selector: any) =>
     selector({
       sourceSetId: undefined,
       spaceId: 'space-1',
     }),
+}));
+
+vi.mock('@/libs/trpc/client', () => ({
+  lambdaClient: {
+    space: {
+      listSpaces: {
+        query: vi.fn(),
+      },
+    },
+  },
+}));
+
+vi.mock('swr', () => ({
+  default: (key: unknown) =>
+    key === 'resource-space-list'
+      ? {
+          data: [{ id: 'space-1', kind: 'team', name: 'Ops Space' }],
+          isLoading: false,
+        }
+      : { data: undefined, isLoading: false },
 }));
 
 vi.mock('@/store/file', () => ({
@@ -115,6 +180,11 @@ vi.mock('@/store/serverConfig', () => ({
 }));
 
 describe('EmptyPlaceholder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    memoryCapabilityState.canReview = true;
+  });
+
   it('renders keyboard-accessible buttons for all empty-state actions', () => {
     render(
       <MemoryRouter>
@@ -136,9 +206,35 @@ describe('EmptyPlaceholder', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /actions\.sourceSet/i }));
 
-    expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({
-      onSuccess: expect.any(Function),
-      spaceId: 'space-1',
-    });
+    expect(mockOpenCreateSourceSet).toHaveBeenCalledWith({ spaceId: 'space-1' });
+  });
+
+  it('shows a pending memory review action and deep links to the first governance target', () => {
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review 2 Pending' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/space-1/memory?section=published&recallFilter=stale',
+    );
+  });
+
+  it('shows an open memory action for viewers without review capability', () => {
+    memoryCapabilityState.canReview = false;
+
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Space Memory' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/memory');
+    expect(screen.queryByRole('button', { name: 'Review 2 Pending' })).not.toBeInTheDocument();
   });
 });

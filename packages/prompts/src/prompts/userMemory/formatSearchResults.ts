@@ -135,6 +135,9 @@ const formatExperienceResult = (item: ExperienceResult): string => {
   if (item.keyLearning) {
     children.push(`    <keyLearning>${item.keyLearning}</keyLearning>`);
   }
+  if (item.action) {
+    children.push(`    <action>${item.action}</action>`);
+  }
 
   const content = children.length > 0 ? `\n${children.join('\n')}\n  ` : '';
 
@@ -153,6 +156,16 @@ const formatPreferenceResult = (item: PreferenceResult): string => {
   }
   if (item.scorePriority !== null && item.scorePriority !== undefined) {
     attrs.push(`priority=${item.scorePriority}`);
+  }
+
+  if (item.suggestions) {
+    const children = [
+      `    <conclusionDirectives>${item.conclusionDirectives || ''}</conclusionDirectives>`,
+      `    <suggestions>${item.suggestions}</suggestions>`,
+    ];
+    const content = `\n${children.join('\n')}\n  `;
+
+    return `  <preference ${attrs.join(' ')}>${content}</preference>`;
   }
 
   const content = item.conclusionDirectives || '';

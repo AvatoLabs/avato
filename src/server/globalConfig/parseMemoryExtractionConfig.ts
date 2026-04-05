@@ -25,6 +25,8 @@ const parseTokenLimitEnv = (value?: string) => {
   return Math.floor(parsed);
 };
 
+const parseBooleanFlag = (value?: string) => value === 'true' || value === '1';
+
 export type MemoryAgentConfig = MemoryAgentPublicConfig & {
   apiKey?: string;
   language?: string;
@@ -63,6 +65,7 @@ export interface MemoryExtractionPrivateConfig {
   };
   triggerExtraHeaders?: Record<string, string>;
   webhook: {
+    allowInsecureDev?: boolean;
     baseUrl?: string;
     headers?: Record<string, string>;
   };
@@ -279,6 +282,9 @@ export const parseMemoryExtractionConfig = (): MemoryExtractionPrivateConfig => 
     observabilityS3: extractorObservabilityS3,
     triggerExtraHeaders,
     webhook: {
+      allowInsecureDev: parseBooleanFlag(
+        process.env.MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV,
+      ),
       baseUrl: process.env.MEMORY_USER_MEMORY_WEBHOOK_BASE_URL,
       headers: webhookHeaders,
     },

@@ -3,7 +3,12 @@ import { type StateCreator } from 'zustand/vanilla';
 import { type ContentManagerMode } from '@/features/ContentManager';
 import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
-import { type FilesTabs, type SortType } from '@/types/files';
+import {
+  type FileAssetClassification,
+  type FileAssetUsagePolicy,
+  type FilesTabs,
+  type SortType,
+} from '@/types/files';
 
 import { type State, type ViewMode } from './initialState';
 import { initialState } from './initialState';
@@ -35,6 +40,14 @@ export interface Action {
    * Handle multi-select actions (delete, chunking, source-set operations, etc.)
    */
   onActionClick: (type: MultiSelectActionType) => Promise<void>;
+  /**
+   * Set the current asset classification filter
+   */
+  setAssetClassification: (classification?: FileAssetClassification) => void;
+  /**
+   * Set the current asset usage policy filter
+   */
+  setAssetUsagePolicy: (usagePolicy?: FileAssetUsagePolicy) => void;
   /**
    * Set the current file category filter
    */
@@ -195,6 +208,18 @@ export const store: CreateStore = (publicState) => (set, get) => ({
         return;
       }
     }
+  },
+
+  setAssetClassification: (assetClassification) => {
+    if (get().assetClassification === assetClassification) return;
+
+    set({ assetClassification });
+  },
+
+  setAssetUsagePolicy: (assetUsagePolicy) => {
+    if (get().assetUsagePolicy === assetUsagePolicy) return;
+
+    set({ assetUsagePolicy });
   },
 
   setCategory: (category) => {

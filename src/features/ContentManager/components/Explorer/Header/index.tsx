@@ -42,7 +42,7 @@ const Header = memo(() => {
   const selectCount = selectFileIds.length;
   const isMultiSelected = selectCount > 1;
   const isMobile = useServerConfigStore((s) => s.isMobile);
-  const showCategoryFilter = !sourceSetId && !isMultiSelected;
+  const showHeaderFilters = !isMultiSelected;
 
   // Scope-first navigation lives in the sidebar. The header shows workspace-aware
   // breadcrumb context once users drill into a file, folder, or source set.
@@ -113,7 +113,7 @@ const Header = memo(() => {
 
   return (
     <NavHeader
-      children={showCategoryFilter ? <CategoryMenu /> : null}
+      children={showHeaderFilters ? <CategoryMenu /> : null}
       left={leftContent}
       showTogglePanelButton={!isMobile}
       right={
@@ -131,9 +131,9 @@ const Header = memo(() => {
         borderBottom: `1px solid ${cssVar.colorBorderSecondary}`,
       }}
       styles={{
-        center: showCategoryFilter ? { flex: 'none', minWidth: 0 } : undefined,
+        center: showHeaderFilters ? { flex: 'none', minWidth: 0 } : undefined,
         left: { flex: 1, minWidth: 0 },
-        right: showCategoryFilter
+        right: showHeaderFilters
           ? { flex: 1, justifyContent: 'flex-end', minWidth: 0 }
           : { flex: 'none' },
       }}

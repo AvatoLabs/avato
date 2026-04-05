@@ -1,13 +1,16 @@
 'use client';
 
+import { Alert, Flexbox } from '@lobehub/ui';
 import { type ReactNode } from 'react';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useFetchTopicMemories } from '@/hooks/useFetchMemoryForTopic';
 import { useFetchNotebookDocuments } from '@/hooks/useFetchNotebookDocuments';
 import { chatConfigByIdSelectors } from '@/store/agent/selectors';
 import { useAgentStore } from '@/store/agent/store';
 import { useUserStore } from '@/store/user';
+import { agentMemorySelectors, useUserMemoryStore } from '@/store/userMemory';
 import { settingsSelectors } from '@/store/user/selectors';
 
 import WideScreenContainer from '../../WideScreenContainer';
@@ -37,6 +40,7 @@ export interface ChatListProps {
  * Uses ConversationStore for message data and fetching.
  */
 const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent }) => {
+  const { t } = useTranslation('chat');
   // Fetch messages (SWR key is null when skipFetch is true)
   const context = useConversationStore((s) => s.context);
   const enableUserMemories = useUserStore(settingsSelectors.memoryEnabled);
@@ -59,6 +63,9 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
   const userMessageCount = useConversationStore(dataSelectors.userMessageCount);
   const effectiveMemoryEffort =
     agentChatConfig.memory?.effort ?? currentMemorySettings.effort ?? 'medium';
+  const topicMemoryRetrieval = useUserMemoryStore(
+    agentMemorySelectors.topicMemoryRetrieval(context.topicId),
+  );
 
   useFetchTopicMemories({
     effort: effectiveMemoryEffort,
@@ -70,6 +77,11 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
   // Use selectors for data
 
   const displayMessageIds = useConversationStore(dataSelectors.displayMessageIds);
+  const showTopicMemoryWarning =
+    enableUserMemories &&
+    !isSharePage &&
+    !!context.topicId &&
+    topicMemoryRetrieval?.status === 'error';
 
   const defaultItemContent = useCallback(
     (index: number, id: string) => {
@@ -106,10 +118,26 @@ const ChatList = memo<ChatListProps>(({ disableActionsBar, welcome, itemContent 
 
   return (
     <MessageActionProvider withSingletonActionsBar={!disableActionsBar}>
-      <VirtualizedList
-        dataSource={displayMessageIds}
-        itemContent={itemContent ?? defaultItemContent}
-      />
+      <Flexbox height={'100%'} style={{ minHeight: 0 }}>
+        {showTopicMemoryWarning && (
+          <WideScreenContainer>
+            <Flexbox paddingBlock={'8px 0'} paddingInline={12}>
+              <Alert
+                description={t('chatList.memoryUnavailable.desc')}
+                title={t('chatList.memoryUnavailable.title')}
+                type={'secondary'}
+                variant={'borderless'}
+              />
+            </Flexbox>
+          </WideScreenContainer>
+        )}
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <VirtualizedList
+            dataSource={displayMessageIds}
+            itemContent={itemContent ?? defaultItemContent}
+          />
+        </div>
+      </Flexbox>
     </MessageActionProvider>
   );
 });

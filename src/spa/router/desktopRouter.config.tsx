@@ -384,6 +384,13 @@ export const desktopRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/memory/audit/[entryId]'),
+                  'Desktop > Space > Memory > Audit',
+                ),
+                path: 'memory/audit/:entryId',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/spaces/[spaceId]/memory'),
                   'Desktop > Space > Memory',
                 ),

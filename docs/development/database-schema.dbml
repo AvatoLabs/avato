@@ -251,6 +251,30 @@ table agent_skills {
   }
 }
 
+table file_assets {
+  file_id text [pk, not null]
+  space_id text [not null]
+  created_by text
+  classification text [not null, default: 'general']
+  review_status text [not null, default: 'draft']
+  usage_policy text [not null, default: 'internal']
+  rights_owner text
+  reviewed_by text
+  reviewed_at "timestamp with time zone"
+  metadata jsonb
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    space_id [name: 'file_assets_space_id_idx']
+    created_by [name: 'file_assets_created_by_idx']
+    classification [name: 'file_assets_classification_idx']
+    review_status [name: 'file_assets_review_status_idx']
+    usage_policy [name: 'file_assets_usage_policy_idx']
+  }
+}
+
 table ai_models {
   id varchar(150) [not null]
   display_name varchar(200)
@@ -1521,6 +1545,10 @@ table space_memory_entries {
   content text
   source_refs jsonb
   metadata jsonb
+  recall_enabled boolean [not null, default: true]
+  expires_at "timestamp with time zone"
+  stale_at "timestamp with time zone"
+  last_verified_at "timestamp with time zone"
   published_at "timestamp with time zone"
   accessed_at "timestamp with time zone" [not null, default: `now()`]
   created_at "timestamp with time zone" [not null, default: `now()`]
@@ -1530,6 +1558,9 @@ table space_memory_entries {
     space_id [name: 'space_memory_entries_space_id_idx']
     (space_id, status) [name: 'space_memory_entries_space_status_idx']
     (space_id, category) [name: 'space_memory_entries_space_category_idx']
+    (space_id, status, recall_enabled) [name: 'space_memory_entries_space_recall_idx']
+    expires_at [name: 'space_memory_entries_expires_at_idx']
+    stale_at [name: 'space_memory_entries_stale_at_idx']
     reviewed_by [name: 'space_memory_entries_reviewed_by_idx']
   }
 }

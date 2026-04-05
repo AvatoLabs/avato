@@ -1,4 +1,9 @@
 import {
+  type FileAssetClassification,
+  type FileAssetState,
+  type FileAssetUsagePolicy,
+} from '@lobechat/types';
+import {
   buildFolderTree,
   createNanoId,
   sanitizeFolderName,
@@ -588,6 +593,58 @@ export class FileManageActionImpl {
       async () => {
         const response = await serverFileService.getKnowledgeItem(id!);
         return response ?? undefined;
+      },
+    );
+  };
+
+  refreshFileAsset = async (id: string): Promise<void> => {
+    await mutate(['useFetchFileAsset', id]);
+  };
+
+  updateFileAssetGovernance = async (
+    id: string,
+    data: {
+      classification?: FileAssetClassification;
+      metadata?: Record<string, unknown> | null;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    },
+  ): Promise<FileAssetState> => {
+    const response = await serverFileService.updateFileAssetGovernance(id, data);
+
+    await mutate(['useFetchFileAsset', id], response, {
+      revalidate: false,
+    });
+
+    return response;
+  };
+
+  approveFileAsset = async (id: string): Promise<FileAssetState> => {
+    const response = await serverFileService.approveFileAsset(id);
+
+    await mutate(['useFetchFileAsset', id], response, {
+      revalidate: false,
+    });
+
+    return response;
+  };
+
+  archiveFileAsset = async (id: string): Promise<FileAssetState> => {
+    const response = await serverFileService.archiveFileAsset(id);
+
+    await mutate(['useFetchFileAsset', id], response, {
+      revalidate: false,
+    });
+
+    return response;
+  };
+
+  useFetchFileAsset = (id?: string): SWRResponse<FileAssetState | undefined> => {
+    return useClientDataSWR<FileAssetState | undefined>(
+      !id ? null : ['useFetchFileAsset', id],
+      async () => {
+        const response = await serverFileService.getFileAsset(id!);
+        return response;
       },
     );
   };

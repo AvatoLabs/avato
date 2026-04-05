@@ -16,11 +16,17 @@ import { getPageRootPath } from '@/utils/docs';
 
 import {
   buildFilesRootPath,
-  buildSpaceMembersPath,
   buildSpaceMemoryPath,
+  buildSpaceMembersPath,
   buildSpaceSettingsPath,
 } from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
+import {
+  buildPendingGovernancePath,
+  canReviewSpaceMemorySummary,
+  REVIEWED_MEMORY_SECTIONS,
+  useTeamSpaceMemoryScopeSummaries,
+} from './useTeamSpaceMemoryScopeSummaries';
 
 const useStyles = createStyles(({ css, token }) => ({
   card: css`
@@ -70,6 +76,27 @@ const useStyles = createStyles(({ css, token }) => ({
   title: css`
     text-wrap: balance;
   `,
+  overviewCard: css`
+    padding: 18px;
+    border: 1px solid ${token.colorBorderSecondary};
+    border-radius: ${token.borderRadiusLG}px;
+    background: ${token.colorBgContainer};
+  `,
+  overviewActions: css`
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  `,
+  overviewLink: css`
+    color: ${token.colorPrimary};
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  `,
 }));
 
 const SpaceHomePage = memo(() => {
@@ -90,7 +117,28 @@ const SpaceHomePage = memo(() => {
   if (!space) return null;
 
   const isTeamSpace = space.kind === 'team';
+  const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
+    useTeamSpaceMemoryScopeSummaries(isTeamSpace ? [space] : undefined);
   const displayName = resolveSpaceDisplayName(space, t, { fullName, username });
+  const spaceMemorySummary = spaceSummaryMap.get(spaceId);
+  const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceMemorySummary);
+  const pendingCount = pendingGovernanceCountBySpaceId.get(spaceId) ?? 0;
+  const pendingTarget = pendingGovernanceTargetBySpaceId.get(spaceId) ?? null;
+  const recallOverview = spaceMemorySummary
+    ? REVIEWED_MEMORY_SECTIONS.reduce(
+        (acc, section) => {
+          const recall = spaceMemorySummary.sections[section].recall;
+
+          return {
+            active: acc.active + recall.active,
+            disabled: acc.disabled + recall.disabled,
+            expired: acc.expired + recall.expired,
+            stale: acc.stale + recall.stale,
+          };
+        },
+        { active: 0, disabled: 0, expired: 0, stale: 0 },
+      )
+    : null;
   const cards = [
     {
       description: t('space.home.cards.docs.description', { ns: 'file' }),
@@ -169,6 +217,63 @@ const SpaceHomePage = memo(() => {
             )}
         </Text>
       </Flexbox>
+
+      {isTeamSpace && canReviewSpaceMemory && recallOverview && (
+        <Flexbox className={styles.overviewCard} gap={14}>
+          <Flexbox horizontal align={'start'} justify={'space-between'} gap={12} wrap={'wrap'}>
+            <Flexbox gap={4}>
+              <Text fontSize={18} weight={600}>
+                {t('space.home.recall.title', { ns: 'file' })}
+              </Text>
+              <Text type={'secondary'}>
+                {pendingCount > 0
+                  ? t('space.home.recall.description.pending', { count: pendingCount, ns: 'file' })
+                  : t('space.home.recall.description.clear', { ns: 'file' })}
+              </Text>
+            </Flexbox>
+            <div className={styles.overviewActions}>
+              {pendingTarget && pendingCount > 0 && (
+                <Link
+                  className={styles.overviewLink}
+                  to={buildPendingGovernancePath(spaceId, pendingTarget)}
+                >
+                  {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
+                </Link>
+              )}
+              <Link className={styles.overviewLink} to={buildSpaceMemoryPath(spaceId)}>
+                {t('space.home.recall.actions.open', { ns: 'file' })}
+              </Link>
+            </div>
+          </Flexbox>
+
+          <Flexbox horizontal gap={8} wrap={'wrap'}>
+            <Tag size={'small'} variant={recallOverview.active > 0 ? 'filled' : 'outlined'}>
+              {t('space.home.recall.metrics.active', {
+                count: recallOverview.active,
+                ns: 'file',
+              })}
+            </Tag>
+            <Tag size={'small'} variant={recallOverview.disabled > 0 ? 'filled' : 'outlined'}>
+              {t('space.home.recall.metrics.paused', {
+                count: recallOverview.disabled,
+                ns: 'file',
+              })}
+            </Tag>
+            <Tag size={'small'} variant={recallOverview.expired > 0 ? 'filled' : 'outlined'}>
+              {t('space.home.recall.metrics.expired', {
+                count: recallOverview.expired,
+                ns: 'file',
+              })}
+            </Tag>
+            <Tag size={'small'} variant={recallOverview.stale > 0 ? 'filled' : 'outlined'}>
+              {t('space.home.recall.metrics.stale', {
+                count: recallOverview.stale,
+                ns: 'file',
+              })}
+            </Tag>
+          </Flexbox>
+        </Flexbox>
+      )}
 
       <div className={styles.cardGrid}>
         {cards.map((card) => (

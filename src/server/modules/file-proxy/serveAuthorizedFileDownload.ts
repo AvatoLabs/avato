@@ -6,13 +6,12 @@ import { ContentModel } from '@/database/models/content';
 import { getRedisConfig } from '@/envs/redis';
 import { initializeRedis, isRedisEnabled } from '@/libs/redis';
 import { ContentAuthorizer } from '@/server/services/content';
+import { resolveFileDownloadPolicy } from '@/server/services/content/downloadPolicy';
 import { FileService } from '@/server/services/file';
 
 const log = debug('lobe-file:proxy');
 
 const FILE_PROXY_KEY_PREFIX = 'file-proxy:';
-const PRESIGNED_URL_CACHE_TTL = 240;
-
 const buildCacheKey = (id: string, identity: string, authzEpoch: number) =>
   `${FILE_PROXY_KEY_PREFIX}${id}:${identity}:${authzEpoch}`;
 
@@ -67,6 +66,7 @@ export async function serveAuthorizedFileDownload(
   params: ServeAuthorizedFileDownloadParams,
 ): Promise<Response> {
   const { db, downloadVia, file, fileId, req, shareLinkId, shareToken, userId } = params;
+  const downloadPolicy = resolveFileDownloadPolicy(downloadVia);
 
   const principalId = userId || 'anonymous';
   const cacheIdentity = shareToken ? `share:${shareToken}` : `user:${principalId}`;
@@ -123,8 +123,11 @@ export async function serveAuthorizedFileDownload(
 
   const fileService = new FileService(db, userId || 'anonymous');
 
-  const redirectUrl = await fileService.createPreSignedUrlForPreview(file.url, 300);
-  log('Web S3 presigned URL generated (expires in 5 min)');
+  const redirectUrl = await fileService.createPreSignedUrlForPreview(
+    file.url,
+    downloadPolicy.signedUrlExpiresIn,
+  );
+  log('Web S3 presigned URL generated (expires in %ds)', downloadPolicy.signedUrlExpiresIn);
 
   if (shouldProxyFileResponse(redirectUrl)) {
     log('Proxying file content to avoid mixed content: %s', fileId);
@@ -167,9 +170,9 @@ export async function serveAuthorizedFileDownload(
 
   if (redisClient) {
     await redisClient.set(cacheKey, JSON.stringify({ redirectUrl }), {
-      ex: PRESIGNED_URL_CACHE_TTL,
+      ex: downloadPolicy.cacheTtlSeconds,
     });
-    log('Cached presigned URL for file: %s (TTL: %ds)', fileId, PRESIGNED_URL_CACHE_TTL);
+    log('Cached presigned URL for file: %s (TTL: %ds)', fileId, downloadPolicy.cacheTtlSeconds);
   }
 
   return Response.redirect(redirectUrl, 302);

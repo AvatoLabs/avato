@@ -64,4 +64,13 @@ export const buildSpaceMemoryPath = (
 ) =>
   `${buildSpaceRootPath(spaceId)}/memory${section ? `?section=${encodeURIComponent(section)}` : ''}`;
 
+export const buildSpaceMemoryAuditPath = (
+  spaceId: string,
+  entryId: string,
+  section?: 'inbox' | 'playbooks' | 'policies' | 'published',
+) =>
+  `${buildSpaceRootPath(spaceId)}/memory/audit/${encodeURIComponent(entryId)}${
+    section ? `?section=${encodeURIComponent(section)}` : ''
+  }`;
+
 export const buildPublicContentSharePath = (token: string) => `/share/r/${token}`;

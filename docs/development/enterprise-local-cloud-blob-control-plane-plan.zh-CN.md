@@ -1,13 +1,39 @@
 # 企业本地云、文件资产与权限控制架构方案
 
-> 状态：Draft  
-> 更新时间：2026-04-04  
-> 适用范围：`Space / Files / Source Set / Docs / Assets / RBAC / ACL / Share / Audit`  
+> 状态：Draft
+> 更新时间：2026-04-04（已同步首批 Blob / Share / Capability Policy、`file_assets` sidecar、首个 Files 资产治理 UI 与首版资产分类字段落地进展）
+> 适用范围：`Space / Files / Source Set / Docs / Assets / RBAC / ACL / Share / Audit`
 > 关联文档：
 >
 > - [resource-tree-sharing-security-plan.zh-CN.md](/Users/arthur/RustroverProjects/lobehub/docs/development/resource-tree-sharing-security-plan.zh-CN.md)
 > - [space-first-content-architecture-plan.zh-CN.md](/Users/arthur/RustroverProjects/lobehub/docs/development/space-first-content-architecture-plan.zh-CN.md)
 > - [space-root-workspace-redesign-plan.zh-CN.md](/Users/arthur/RustroverProjects/lobehub/docs/development/space-root-workspace-redesign-plan.zh-CN.md)
+
+---
+
+## 〇、当前落地进展（截至 2026-04-04）
+
+以下内容已经在主干代码中开始落地，用于和下文路线图对齐：
+
+- **Blob Provider 抽象已建立**：上传、下载 URL、对象元数据、字节读取、删除、服务端写入等能力，已经统一收口到 `BlobProvider`，而不再让业务代码直接散落依赖 `PrivateBlobS3 / FileS3`。
+- **Blob Plane 第一批调用方已迁移**：上传 session、同域上传、OpenAPI 文件 URL、skills、sandbox、market、用户头像、文件服务实现等路径，已经开始改走 `BlobProvider`。
+- **Download Policy 已抽离**：成员下载与分享下载的缓存 TTL / 预签名时效，已经从文件代理路由中抽成独立 helper。
+- **Share Policy 已抽离**：分享链接的过期时间、URL 构建、密码归一化、带密码分享校验，已经从 router / route 中抽成独立 helper。
+- **Capability Policy 已抽离**：`preview_content` 的 OR 规则、viewer 的 share-link 读取边界、以及 `owner / editor + canReshare` 的继续分享规则，已经从 `ContentAuthorizer` 中抽成可单测的显式 policy。
+- **`file_assets` sidecar 已建立**：`Files` 与未来 `Assets` 之间已经补上第一层边界，新增 `file_assets` 表与 `FileAssetModel`，用来承载 classification、review status、usage policy、rights owner 等资产治理字段，而不再继续把这类元数据塞进 `files.metadata`。
+- **Files 资产治理入口已接进现有详情面**：`FileDetail` 已经开始消费 `getFileAssetById / upsertFileAsset`，在现有文件详情弹窗里提供首批 `classification / review status / usage policy / rights owner` 治理字段，而不是另起一套孤立的 `Assets` 页面。
+- **Files 资产治理能力已切到动作级 policy**：文件资产不再只靠一个模糊的 `canManage` 开关；当前已经拆成 `canEditGovernance / canApprove / canArchive` 三个显式能力，默认 `editor` 只能编辑治理元数据，`owner / admin` 才能做批准和归档。
+- **首版资产分类字段已落地**：`file_assets.classification` 已作为正式字段进入 schema / migration / list contract / detail UI；当前先以轻量枚举承载首版企业分类能力，后续再继续拆更细的 `asset_classifications` 模型。
+
+这说明：
+
+> `Blob Plane + Control Plane` 的分层不是停留在方案里，而是已经开始进入代码主链。
+
+当前审计判断补充：
+
+- 整体进度大致处于 **Phase 1 完成、Phase 2 部分完成、Phase 4 起步**。
+- `BlobProvider`、upload session、download/share/capability policy 与 `file_assets` sidecar 已经证明方案方向正确。
+- 但“企业本地云”的多 provider、加密元数据、保留策略、资产版本/渲染版本、正式 DAM 能力仍未开始或只做了字段占位。
 
 ---
 
@@ -285,6 +311,13 @@ graph TD
 
 如果未来要做企业软资产管理，应该新增 `Assets`，而不是继续把所有需求压到 `Files` 里。
 
+当前已经开始落第一层 sidecar：
+
+- `file_assets.file_id` 绑定 `files.id`
+- 用 sidecar 承载 `classification / review_status / usage_policy / rights_owner / reviewed_by`
+- 这意味着 `Files` 仍然是原始文件对象，而 `Assets` 的治理字段已经有了独立落点
+- 下一步才是继续往 `asset_versions / asset_renditions / asset_classifications` 这些更细的资产实体扩
+
 `Assets` 负责：
 
 - 资产分类
@@ -310,7 +343,7 @@ graph TD
 
 - 组织某个专题下的 `Docs` 与 `Files`
 - 作为 AI / RAG / 记忆来源范围
-- 作为工作集而不是存储边界
+- 作为工作集与共同范围，而不是第三套主页面或存储边界
 
 ---
 
@@ -495,6 +528,11 @@ graph TD
 
 - 从 `Files` 中分出企业软资产层
 - 支持审批、版本、版权、品牌、渲染版本
+
+当前进展：
+
+- `file_assets` 已作为第一层 sidecar 落地
+- 下一步应继续拆 `asset_versions / asset_renditions / asset_classifications`
 
 ---
 

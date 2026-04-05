@@ -345,6 +345,13 @@ export const mobileRoutes: RouteObject[] = [
               },
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/spaces/[spaceId]/memory/audit/[entryId]'),
+                  'Mobile > Space > Memory > Audit',
+                ),
+                path: 'memory/audit/:entryId',
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/spaces/[spaceId]/memory'),
                   'Mobile > Space > Memory',
                 ),

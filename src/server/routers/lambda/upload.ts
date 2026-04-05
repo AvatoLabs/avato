@@ -10,7 +10,7 @@ import { SpaceModel } from '@/database/models/space';
 import { uploadSessions } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { AuthorizedResourceResolver } from '@/server/services/content';
 import { HOUR } from '@/utils/units';
 
@@ -132,8 +132,8 @@ export const uploadRouter = router({
       // Generate presigned upload URL
       let presignedUrl: string;
       try {
-        const privateS3 = getPrivateBlobS3();
-        presignedUrl = await privateS3.createPreSignedUploadUrl(storageKey, {
+        const blobProvider = getBlobProvider();
+        presignedUrl = await blobProvider.createUploadUrl(storageKey, {
           contentType: fileType,
           expiresIn: Math.floor(DEFAULT_UPLOAD_SESSION_EXPIRY_MS / 1000),
         });
@@ -193,8 +193,8 @@ export const uploadRouter = router({
       let actualSize: number;
       let actualEtag: string | undefined;
       try {
-        const privateS3 = getPrivateBlobS3();
-        const metadata = await privateS3.getObjectMetadata(session.storageKey);
+        const blobProvider = getBlobProvider();
+        const metadata = await blobProvider.getObjectMetadata(session.storageKey);
         actualSize = metadata.contentLength;
         actualEtag = metadata.etag;
       } catch (error) {

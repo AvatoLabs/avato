@@ -1,8 +1,25 @@
 # Long Memory Harness Interface RFC
 
-**状态**：Draft  
-**日期**：2026-04-04  
+**状态**：Draft；截至 2026-04-05 已完成 intake 入口、共享 harness payload/normalize contract，以及 webhook/async 接入  
+**日期**：2026-04-05  
 **目标**：为未来自研长记忆 harness 定义稳定接口与责任边界，确保 harness 可替换、可演进，但不破坏 LobeHub 的 `Memory V2` canonical schema 与 `Space Memory` 产品模型。
+
+---
+
+## 〇、当前落地进展（截至 2026-04-05）
+
+和本 RFC 对应的代码目前只完成了最前面的接入壳层，还远未到“稳定接口已经定型”的阶段。
+
+- **`harness` 已成为正式 intake origin**：`Space Memory` intake 现在已经支持 `manual / automation / harness` 三种来源。
+- **共享 harness contract 已落类型与 normalize 层**：仓库里现在已经有正式的 `SpaceMemoryHarnessCandidateDraft / SourceRef / DecisionDraft / RecallDraft / IngestPayload` 共享类型，并新增统一 normalize，把 richer harness payload 折叠进当前 `Space Memory` candidate schema。
+- **内部 webhook 已接 harness normalize**：`/api/webhooks/space-memory-ingest` 现在不再只接受 ad-hoc draft 数组，而是先走共享 harness payload schema，再统一落入 candidate intake。
+- **异步触发封装已补 dedicated harness path**：`SpaceMemoryTriggerService` 与 `SpaceMemoryAsyncService` 现在除了 generic intake 以外，也有专门的 harness contract 入口，`trpc/async.spaceMemory.ingestHarnessCandidates` 已经和 webhook 共用 normalize。
+- **仍然缺失的核心内容**：仓库里仍然没有 active harness 切换、真正的 adapter registry、可执行的 merge decision engine、recall candidate rerank contract，以及更细粒度的 source attribution projection。
+
+这意味着：
+
+> 当前代码已经证明 harness 可以“按正式 contract 把候选送进来”，  
+> 但还没有证明 harness 已经成为一个可替换、可并存、可配置的正式编排层。
 
 ---
 
@@ -109,6 +126,55 @@ interface MemoryCandidateDraft {
 
 这份输出只能进入 `memory_v2_candidates`，不能直接进入 `memory_v2_entries`。
 
+在 `Space Memory` 当前实现里，这对应一个统一的 candidate intake 层：
+
+- `spaceMemory.createCandidate`
+  - 单条手动入口
+- `spaceMemory.ingestCandidates`
+  - 批量 intake 入口，供 automation / harness 复用
+
+其中批量 intake 必须带：
+
+- `origin`
+- `producer`
+- `traceId`
+
+以便后续审计和回溯。
+
+当前还补了一条服务端自动 producer：
+
+- `spaceMemory.ingestTopicCandidate`
+  - 由服务端根据 `topicId` 自行生成 candidate draft
+  - 内部使用 `origin='automation'`
+  - 用于 topic/chat 侧的自动 intake，也为未来 harness 提供参考实现
+  - 当前已接到 `topic.historySummary` 的持久化更新链路
+  - 内部会对同一 `topic + summary` 做最小去重
+  - 自动链路本身已经改成：`topic.updateTopic -> triggerHarnessIngest -> internal webhook -> intake`
+
+并且已经有第二条“提取链接 intake”的参考实现：
+
+- `userMemory extraction -> triggerHarnessIngest -> spaceMemory.ingestCandidates`
+  - 当前接在 team-space topic 的 user-memory 提取成功链路之后
+  - 只把 `context / experience` 映射成团队候选记忆
+  - 显式跳过 `identity / preference / activity`
+  - 目的是证明 harness / extractor 不需要拥有 canonical schema，也能把结果接入统一 intake
+  - 这条链路现在也不再直接写本地 ingestion service，而是先走 trigger / webhook
+
+另外，当前已经补了第一条面向未来 harness 的内部入口：
+
+- `POST /api/webhooks/space-memory-ingest`
+  - 走 internal service auth
+  - 输入 `userId + spaceId + drafts + producer + traceId`
+  - 服务端统一归一化为 `origin='harness'`
+  - 最终仍然只进入 `Space Memory` candidate intake，不直接写 published
+- `SpaceMemoryTriggerService.triggerHarnessIngest`
+  - 为内部 workflow / harness 代码提供稳定触发器
+  - 默认使用 `INTERNAL_APP_URL`
+  - 自动附带 internal service auth
+- `trpc/async.spaceMemory.ingestCandidates`
+  - 为内部 worker / cron / workflow producer 提供更贴近现有异步基础设施的入口
+  - internal producer 优先走 async TRPC；external harness 或跨进程 producer 再走 webhook
+
 ### 2. Merge Decision Contract
 
 Harness 输入：
@@ -133,6 +199,9 @@ interface MemoryDecisionDraft {
 
 - `decision` 是建议，不是最终数据库操作
 - 最终写入仍然经过服务端 policy 与 review 规则
+- 当前 `Space Memory` reviewer UI 已经落了最小护栏：
+  - 基于 `space + category + summary` 命中已发布记忆时，提示“可能与已发布记忆重复”
+  - 这让 harness 在还没产出复杂 merge/diff 前，reviewer 也能先避开最常见的重复发布
 
 ### 3. Recall Candidate Contract
 

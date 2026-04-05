@@ -35,5 +35,6 @@ export interface FileItem {
   url: string;
 }
 
+export * from './asset';
 export * from './list';
 export * from './upload';

@@ -12,7 +12,7 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { marketUserInfo, serverDatabase, telemetry } from '@/libs/trpc/lambda/middleware';
 import { marketSDK, requireMarketAuth } from '@/libs/trpc/lambda/middleware/marketSDK';
 import { isTrustedClientEnabled } from '@/libs/trusted-client';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { DiscoverService } from '@/server/services/discover';
 import { FileService } from '@/server/services/file';
 import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
@@ -284,7 +284,9 @@ export const marketRouter = router({
             // Get S3 key from globalFiles
             const fileModel = new FileModel(ctx.serverDB, userId);
             const canAccess = await fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
-            const fileInfo = canAccess ? await fileModel.checkHash(skill.zipFileHash) : { isExist: false };
+            const fileInfo = canAccess
+              ? await fileModel.checkHash(skill.zipFileHash)
+              : { isExist: false };
 
             if (fileInfo.isExist && fileInfo.url) {
               // Convert S3 key to full URL
@@ -618,7 +620,7 @@ export const marketRouter = router({
           exportSpaceId = await resolveSpaceIdForSandboxExport(ctx.serverDB, ctx.userId, topicId);
         }
 
-        const s3 = new FileS3();
+        const blobProvider = getBlobProvider();
 
         // Use date-based sharding for privacy compliance (GDPR, CCPA)
         const today = new Date().toISOString().split('T')[0];
@@ -627,7 +629,7 @@ export const marketRouter = router({
         const key = `code-interpreter-exports/${today}/${topicId}/${filename}`;
 
         // Step 1: Generate pre-signed upload URL
-        const uploadUrl = await s3.createPreSignedUrl(key);
+        const uploadUrl = await blobProvider.createUploadUrl(key);
         log('Generated upload URL for key: %s', key);
 
         // Step 2: Use MarketService from ctx
@@ -662,7 +664,7 @@ export const marketRouter = router({
         }
 
         // Step 4: Get file metadata from S3 to verify upload and get actual size
-        const metadata = await s3.getFileMetadata(key);
+        const metadata = await blobProvider.getObjectMetadata(key);
         const fileSize = metadata.contentLength;
         const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 

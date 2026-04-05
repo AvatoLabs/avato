@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon, Flexbox, Text } from '@lobehub/ui';
+import { ActionIcon, Button, Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { BrainCircuitIcon, PlusIcon, Users2Icon } from 'lucide-react';
 import { memo } from 'react';
@@ -17,6 +17,11 @@ import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 import { buildSpaceMemoryPath } from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
 import { SPACE_LIST_KEY } from './SpaceList';
+import {
+  buildPendingGovernancePath,
+  canReviewSpaceMemorySummary,
+  useTeamSpaceMemoryScopeSummaries,
+} from './useTeamSpaceMemoryScopeSummaries';
 import { useOpenCreateSpaceModal } from './useOpenCreateSpaceModal';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -57,6 +62,65 @@ const MemoryScopeSection = memo<MemoryScopeSectionProps>(({ activeSpaceId, curre
   );
 
   const teamSpaces = spaces?.filter((space) => space.kind === 'team') ?? [];
+  const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
+    useTeamSpaceMemoryScopeSummaries(spaces);
+  const teamSpaceItems = teamSpaces.map((space) => {
+    const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceSummaryMap.get(space.id));
+    const pendingCount = pendingGovernanceCountBySpaceId.get(space.id) ?? 0;
+    const pendingTarget = pendingGovernanceTargetBySpaceId.get(space.id) ?? null;
+    const showOpenMemoryAction = spaceSummaryMap.has(space.id) && !canReviewSpaceMemory;
+
+    return (
+      <NavItem
+        active={currentScope === 'space' && activeSpaceId === space.id}
+        extra={
+          pendingCount > 0 ? (
+            pendingTarget ? (
+              <Button
+                size={'small'}
+                style={{ height: 'auto', paddingBlock: 0, paddingInline: 0 }}
+                title={t('scope.pendingHint', { count: pendingCount, ns: 'memory' })}
+                type={'text'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate(buildPendingGovernancePath(space.id, pendingTarget));
+                }}
+              >
+                {t('scope.pending', { count: pendingCount, ns: 'memory' })}
+              </Button>
+            ) : (
+              <Text
+                fontSize={11}
+                title={t('scope.pendingHint', { count: pendingCount, ns: 'memory' })}
+                type={'secondary'}
+              >
+                {t('scope.pending', { count: pendingCount, ns: 'memory' })}
+              </Text>
+            )
+          ) : showOpenMemoryAction ? (
+            <Button
+              size={'small'}
+              style={{ height: 'auto', paddingBlock: 0, paddingInline: 0 }}
+              title={t('scope.openHint', { ns: 'memory' })}
+              type={'text'}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                navigate(buildSpaceMemoryPath(space.id));
+              }}
+            >
+              {t('scope.open', { ns: 'memory' })}
+            </Button>
+          ) : undefined
+        }
+        icon={Users2Icon}
+        key={space.id}
+        title={resolveSpaceDisplayName(space, t, { fullName, username })}
+        onClick={() => navigate(buildSpaceMemoryPath(space.id))}
+      />
+    );
+  });
 
   return (
     <Flexbox gap={4} paddingInline={4}>
@@ -92,15 +156,7 @@ const MemoryScopeSection = memo<MemoryScopeSectionProps>(({ activeSpaceId, curre
           {t('scope.empty', { ns: 'memory' })}
         </Text>
       ) : (
-        teamSpaces.map((space) => (
-          <NavItem
-            active={currentScope === 'space' && activeSpaceId === space.id}
-            icon={Users2Icon}
-            key={space.id}
-            title={resolveSpaceDisplayName(space, t, { fullName, username })}
-            onClick={() => navigate(buildSpaceMemoryPath(space.id))}
-          />
-        ))
+        teamSpaceItems
       )}
     </Flexbox>
   );

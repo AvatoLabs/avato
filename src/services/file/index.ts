@@ -1,6 +1,9 @@
 import { lambdaClient } from '@/libs/trpc/client';
 import {
   type CheckFileHashResult,
+  type FileAssetClassification,
+  type FileAssetState,
+  type FileAssetUsagePolicy,
   type FileItem,
   type FileListItem,
   type QueryFileListParams,
@@ -106,6 +109,10 @@ export class FileService {
     }
   };
 
+  getFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.getFileAssetById.query({ id });
+  };
+
   getFolderBreadcrumb = async (slug: string, spaceId?: string) => {
     return lambdaClient.document.getFolderBreadcrumb.query(spaceId ? { slug, spaceId } : { slug });
   };
@@ -120,6 +127,26 @@ export class FileService {
 
   updateFile = async (id: string, data: { parentId?: string | null }) => {
     return lambdaClient.file.updateFile.mutate({ id, ...data });
+  };
+
+  updateFileAssetGovernance = async (
+    id: string,
+    data: {
+      classification?: FileAssetClassification;
+      metadata?: Record<string, unknown> | null;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    },
+  ): Promise<FileAssetState> => {
+    return lambdaClient.file.updateFileAssetGovernance.mutate({ id, ...data });
+  };
+
+  approveFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.approveFileAsset.mutate({ id });
+  };
+
+  archiveFileAsset = async (id: string): Promise<FileAssetState> => {
+    return lambdaClient.file.archiveFileAsset.mutate({ id });
   };
 
   getRecentFiles = async (limit?: number) => {

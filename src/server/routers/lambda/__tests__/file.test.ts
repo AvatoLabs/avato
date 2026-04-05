@@ -35,6 +35,9 @@ const mockFileModelClear = vi.fn();
 const mockFileModelSoftDeleteAny = vi.fn();
 const mockFileModelSoftDeleteManyAny = vi.fn();
 const mockFileModelUpdate = vi.fn();
+const mockFileAssetModelFindByFileId = vi.fn();
+const mockFileAssetModelFindByFileIds = vi.fn();
+const mockFileAssetModelUpsert = vi.fn();
 
 // Patch: Use actual router context middleware to inject the correct models/services
 function createCallerWithCtx(partialCtx: any = {}) {
@@ -85,6 +88,11 @@ function createCallerWithCtx(partialCtx: any = {}) {
   };
 
   const documentModel = {};
+  const fileAssetModel = {
+    findByFileId: mockFileAssetModelFindByFileId,
+    findByFileIds: mockFileAssetModelFindByFileIds,
+    upsert: mockFileAssetModelUpsert,
+  };
 
   const ctx = {
     serverDB: {} as any,
@@ -93,6 +101,7 @@ function createCallerWithCtx(partialCtx: any = {}) {
     chunkModel,
     documentModel,
     fileModel,
+    fileAssetModel,
     fileService,
     knowledgeRepo,
     resourceAuthorizer: {
@@ -179,6 +188,14 @@ vi.mock('@/database/models/file', () => ({
   })),
 }));
 
+vi.mock('@/database/models/fileAsset', () => ({
+  FileAssetModel: vi.fn(() => ({
+    findByFileId: mockFileAssetModelFindByFileId,
+    findByFileIds: mockFileAssetModelFindByFileIds,
+    upsert: mockFileAssetModelUpsert,
+  })),
+}));
+
 vi.mock('@/database/models/content', () => ({
   ContentModel: vi.fn(() => ({
     ensureOwnerPermission: mockResourceModelEnsureOwnerPermission,
@@ -234,7 +251,7 @@ vi.mock('@/server/services/content', () => ({
     requireFile: mockResolverRequireFile,
     requireSourceSet: mockResolverRequireKnowledgeBase,
   })),
-  ResourceAuthorizer: vi.fn(() => ({
+  ContentAuthorizer: vi.fn(() => ({
     assertCapability: mockResourceAuthorizerAssertCapability,
     filterVisibleDocumentIdsForList: mockFilterVisibleDocumentIdsForList,
     filterVisibleFileIdsForList: mockFilterVisibleFileIdsForList,
@@ -262,6 +279,16 @@ describe('fileRouter', () => {
     mockFileModelSoftDeleteAny.mockResolvedValue(undefined);
     mockFileModelSoftDeleteManyAny.mockResolvedValue([]);
     mockFileModelUpdate.mockResolvedValue(undefined);
+    mockFileAssetModelFindByFileId.mockResolvedValue(null);
+    mockFileAssetModelFindByFileIds.mockResolvedValue([]);
+    mockFileAssetModelUpsert.mockResolvedValue({
+      classification: 'general',
+      createdBy: 'test-user',
+      fileId: 'test-id',
+      reviewStatus: 'draft',
+      spaceId: 'spc_test',
+      usagePolicy: 'internal',
+    });
 
     mockResourceAuthorizerAssertCapability.mockResolvedValue({ canAccess: true });
     mockFilterVisibleDocumentIdsForList.mockImplementation(async (ids: string[]) => ids);
@@ -613,6 +640,57 @@ describe('fileRouter', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('file-2');
     });
+
+    it('should include lightweight asset status in file list rows', async () => {
+      mockFileModelQuery.mockResolvedValue([{ ...mockFile, id: 'file-1' }]);
+      mockChunkCountByFileIds.mockResolvedValue([{ id: 'file-1', count: 3 }]);
+      mockFileAssetModelFindByFileIds.mockResolvedValue([
+        {
+          classification: 'brand',
+          fileId: 'file-1',
+          reviewStatus: 'archived',
+          usagePolicy: 'public',
+        },
+      ]);
+
+      const result = await caller.getFiles({});
+
+      expect(result[0]).toMatchObject({
+        assetClassification: 'brand',
+        assetReviewStatus: 'archived',
+        assetUsagePolicy: 'public',
+        id: 'file-1',
+      });
+      expect(mockFileAssetModelFindByFileIds).toHaveBeenCalledWith(['file-1']);
+    });
+  });
+
+  describe('getFileAssetById', () => {
+    it('should return the file asset sidecar for readable files', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'editor',
+      });
+      mockFileAssetModelFindByFileId.mockResolvedValue({
+        classification: 'legal',
+        fileId: 'test-id',
+        reviewStatus: 'approved',
+        spaceId: 'spc_test',
+        usagePolicy: 'restricted',
+      });
+
+      await expect(caller.getFileAssetById({ id: 'test-id' })).resolves.toEqual({
+        capabilities: { canApprove: false, canArchive: false, canEditGovernance: true },
+        item: {
+          classification: 'legal',
+          fileId: 'test-id',
+          reviewStatus: 'approved',
+          spaceId: 'spc_test',
+          usagePolicy: 'restricted',
+        },
+      });
+      expect(mockFileAssetModelFindByFileId).toHaveBeenCalledWith('test-id');
+    });
   });
 
   describe('getKnowledgeItems', () => {
@@ -668,6 +746,14 @@ describe('fileRouter', () => {
       ];
 
       mockKnowledgeRepoQuery.mockResolvedValue(knowledgeItems);
+      mockFileAssetModelFindByFileIds.mockResolvedValue([
+        {
+          classification: 'product',
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          usagePolicy: 'restricted',
+        },
+      ]);
       mockChunkCountByFileIds.mockResolvedValue([{ count: 10, id: 'file-1' }]);
       mockAsyncTaskFindByIds
         .mockResolvedValueOnce([{ error: null, id: 'chunk-1', status: AsyncTaskStatus.Success }])
@@ -679,6 +765,9 @@ describe('fileRouter', () => {
       expect(result.items).toHaveLength(2);
       expect(result.hasMore).toBe(false);
       expect(result.items[0]).toMatchObject({
+        assetClassification: 'product',
+        assetReviewStatus: 'approved',
+        assetUsagePolicy: 'restricted',
         chunkCount: 10,
         chunkingStatus: AsyncTaskStatus.Success,
         embeddingStatus: AsyncTaskStatus.Success,
@@ -687,6 +776,7 @@ describe('fileRouter', () => {
         sourceType: 'file',
         url: '/f/file-1',
       });
+      expect(mockFileAssetModelFindByFileIds).toHaveBeenCalledWith(['file-1']);
       expect(result.items[1]).toMatchObject({
         chunkCount: null,
         chunkingError: null,
@@ -813,6 +903,162 @@ describe('fileRouter', () => {
       await caller.removeFileAsyncTask({ id: 'test-id', type: 'chunk' });
 
       expect(ctx.asyncTaskModel.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateFileAssetGovernance', () => {
+    it('should update asset governance fields for writable spaces', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'admin',
+      });
+
+      await expect(
+        caller.updateFileAssetGovernance({
+          classification: 'brand',
+          id: 'test-id',
+          rightsOwner: 'Brand Team',
+          usagePolicy: 'restricted',
+        }),
+      ).resolves.toMatchObject({
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'test-id',
+          reviewStatus: 'draft',
+          spaceId: 'spc_test',
+        },
+      });
+
+      expect(mockFileAssetModelUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          classification: 'brand',
+          createdBy: 'test-user',
+          fileId: 'test-id',
+          rightsOwner: 'Brand Team',
+          spaceId: 'spc_test',
+          usagePolicy: 'restricted',
+        }),
+      );
+    });
+
+    it('should allow editors to update metadata', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'editor',
+      });
+
+      await expect(
+        caller.updateFileAssetGovernance({
+          id: 'test-id',
+          rightsOwner: 'Brand Team',
+          usagePolicy: 'restricted',
+        }),
+      ).resolves.toMatchObject({
+        capabilities: { canApprove: false, canArchive: false, canEditGovernance: true },
+        item: {
+          fileId: 'test-id',
+          reviewStatus: 'draft',
+          spaceId: 'spc_test',
+        },
+      });
+    });
+
+    it('should reject viewers from mutating file asset metadata', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'viewer',
+      });
+
+      await expect(
+        caller.updateFileAssetGovernance({
+          id: 'test-id',
+          rightsOwner: 'Brand Team',
+        }),
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'FILE_ASSET_WRITE_DENIED',
+      });
+      expect(mockFileAssetModelUpsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('approveFileAsset', () => {
+    it('should allow admins to approve assets', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'admin',
+      });
+
+      await expect(caller.approveFileAsset({ id: 'test-id' })).resolves.toMatchObject({
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'test-id',
+          reviewStatus: 'draft',
+          spaceId: 'spc_test',
+        },
+      });
+
+      expect(mockFileAssetModelUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'test-user',
+          fileId: 'test-id',
+          reviewStatus: 'approved',
+          reviewedBy: 'test-user',
+          spaceId: 'spc_test',
+        }),
+      );
+    });
+
+    it('should reject editors from approving assets', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'editor',
+      });
+
+      await expect(caller.approveFileAsset({ id: 'test-id' })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'FILE_ASSET_APPROVE_DENIED',
+      });
+    });
+  });
+
+  describe('archiveFileAsset', () => {
+    it('should allow admins to archive assets', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'admin',
+      });
+
+      await expect(caller.archiveFileAsset({ id: 'test-id' })).resolves.toMatchObject({
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'test-id',
+          reviewStatus: 'draft',
+          spaceId: 'spc_test',
+        },
+      });
+
+      expect(mockFileAssetModelUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'test-user',
+          fileId: 'test-id',
+          reviewStatus: 'archived',
+          reviewedBy: 'test-user',
+          spaceId: 'spc_test',
+        }),
+      );
+    });
+
+    it('should reject editors from archiving assets', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({
+        id: 'spc_test',
+        membershipRole: 'editor',
+      });
+
+      await expect(caller.archiveFileAsset({ id: 'test-id' })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'FILE_ASSET_ARCHIVE_DENIED',
+      });
     });
   });
 });

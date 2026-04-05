@@ -42,8 +42,8 @@ export const useTopicItemDropdownMenu = ({
   const { modal } = App.useApp();
   const navigate = useNavigate();
   const activeSpaceId = getActiveWorkspaceSpaceId();
-  const { defaultSpaceId, teamSpaces } = useSpaceMemoryCandidateTargets(activeSpaceId);
-  const canAddToSpaceMemory = teamSpaces.length > 0;
+  const { defaultSpaceId } = useSpaceMemoryCandidateTargets(activeSpaceId);
+  const canAddToSpaceMemory = Boolean(defaultSpaceId);
   const openCreateSpaceMemoryCandidateModal = useOpenCreateSpaceMemoryCandidateModal();
 
   const openTopicInNewWindow = useGlobalStore((s) => s.openTopicInNewWindow);

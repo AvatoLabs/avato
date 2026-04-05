@@ -16,7 +16,7 @@ import { FileModel } from '@/database/models/file';
 import { SpaceModel } from '@/database/models/space';
 import { UserModel } from '@/database/models/user';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { FileService } from '@/server/services/file';
 import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
 import { MarketService } from '@/server/services/market';
@@ -184,14 +184,14 @@ class SkillServerRuntimeService implements SkillRuntimeService {
     }
 
     try {
-      const s3 = new FileS3();
+      const blobProvider = getBlobProvider();
 
       // Use date-based sharding (same as market.ts)
       const today = new Date().toISOString().split('T')[0];
       const key = `code-interpreter-exports/${today}/${this.topicId}/${filename}`;
 
       // Step 1: Generate pre-signed upload URL
-      const uploadUrl = await s3.createPreSignedUrl(key);
+      const uploadUrl = await blobProvider.createUploadUrl(key);
       log('Generated upload URL for key: %s', key);
 
       // Step 2: Call sandbox's exportFile tool with the upload URL
@@ -222,7 +222,7 @@ class SkillServerRuntimeService implements SkillRuntimeService {
       }
 
       // Step 3: Get file metadata from S3
-      const metadata = await s3.getFileMetadata(key);
+      const metadata = await blobProvider.getObjectMetadata(key);
       const fileSize = metadata.contentLength;
       const mimeType = metadata.contentType || result?.mimeType || 'application/octet-stream';
 

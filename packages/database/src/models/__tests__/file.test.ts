@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { FilesTabs, SortType } from '@lobechat/types';
+import { FileAssetClassification, FilesTabs, SortType } from '@lobechat/types';
 import { eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +8,7 @@ import {
   chunks,
   documents,
   embeddings,
+  fileAssets,
   fileChunks,
   files,
   filesToSessions,
@@ -44,6 +45,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await serverDB.delete(agentSkills);
   await serverDB.delete(filesToSessions);
+  await serverDB.delete(fileAssets);
   await serverDB.delete(documents);
   await serverDB.delete(spaces);
   await serverDB.delete(users);
@@ -686,6 +688,40 @@ describe('FileModel', () => {
       it('should include all files when showFilesInSourceSet is true', async () => {
         const result = await fileModel.query({ showFilesInSourceSet: true });
         expect(result).toHaveLength(2);
+      });
+
+      it('should filter files by asset classification', async () => {
+        await serverDB.insert(fileAssets).values({
+          classification: FileAssetClassification.Brand,
+          createdBy: userId,
+          fileId: 'file2',
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetClassification: FileAssetClassification.Brand,
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset usage policy', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          spaceId: 'spc_file_a',
+          usagePolicy: 'restricted',
+        });
+
+        const result = await fileModel.query({
+          assetUsagePolicy: 'restricted',
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
       });
     });
   });

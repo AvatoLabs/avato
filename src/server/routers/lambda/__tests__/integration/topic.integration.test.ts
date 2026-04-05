@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { topicRouter } from '../../topic';
 import { cleanupTestUser, createTestContext, createTestUser } from './setup';
 
+const mockTriggerTopicCandidate = vi.fn();
+
 // We need to mock getServerDB to return our test database instance
 let testDB: LobeChatDatabase;
 vi.mock('@/database/core/db-adaptor', () => ({
@@ -17,6 +19,12 @@ vi.mock('@/database/core/db-adaptor', () => ({
 // Mock next/server's after() to execute callback immediately in tests
 vi.mock('next/server', () => ({
   after: vi.fn((callback: () => void) => callback()),
+}));
+
+vi.mock('@/server/services/spaceMemory/topicIngestion', () => ({
+  SpaceMemoryTopicIngestionService: vi.fn(() => ({
+    triggerTopicCandidate: mockTriggerTopicCandidate,
+  })),
 }));
 
 /**
@@ -57,6 +65,8 @@ describe('Topic Router Integration Tests', () => {
       sessionId: testSessionId,
       userId,
     });
+
+    mockTriggerTopicCandidate.mockResolvedValue({ reason: 'empty', status: 'skipped' });
   });
 
   afterEach(async () => {
@@ -290,11 +300,11 @@ describe('Topic Router Integration Tests', () => {
       const caller = topicRouter.createCaller(createTestContext(userId));
 
       // Create topics with agentId directly (new data structure)
-      const topicId1 = await caller.createTopic({
+      const _topicId1 = await caller.createTopic({
         title: 'Agent Topic 1',
         agentId: testAgentId,
       });
-      const topicId2 = await caller.createTopic({
+      const _topicId2 = await caller.createTopic({
         title: 'Agent Topic 2',
         agentId: testAgentId,
       });
@@ -432,6 +442,49 @@ describe('Topic Router Integration Tests', () => {
 
       expect(updatedTopic.title).toBe('Updated Title');
       expect(updatedTopic.sessionId).toBe(newSession.id);
+    });
+
+    it('should schedule space memory ingestion when historySummary is updated', async () => {
+      const { spaceMembers, spaces } = await import('@/database/schemas');
+      const caller = topicRouter.createCaller(createTestContext(userId));
+
+      const [space] = await serverDB
+        .insert(spaces)
+        .values({
+          createdBy: userId,
+          kind: 'team',
+          name: 'Ops Space',
+        })
+        .returning();
+
+      await serverDB.insert(spaceMembers).values({
+        createdBy: userId,
+        role: 'owner',
+        spaceId: space.id,
+        userId,
+      });
+
+      const topicId = await caller.createTopic({
+        sessionId: testSessionId,
+        spaceId: space.id,
+        title: 'Ops Topic',
+      });
+
+      await caller.updateTopic({
+        id: topicId,
+        value: {
+          historySummary: 'The team aligned on deployment steps.',
+        },
+      });
+
+      expect(mockTriggerTopicCandidate).toHaveBeenCalledWith({
+        producer: 'chat-history-summary',
+        topicId,
+        traceId: `topic-history-summary:${topicId}`,
+      });
+
+      await serverDB.delete(spaceMembers).where(eq(spaceMembers.spaceId, space.id));
+      await serverDB.delete(spaces).where(eq(spaces.id, space.id));
     });
   });
 

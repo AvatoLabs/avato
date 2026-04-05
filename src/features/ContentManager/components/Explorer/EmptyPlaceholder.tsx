@@ -1,11 +1,22 @@
 import { Center, FileTypeIcon, Flexbox, Icon, Text } from '@lobehub/ui';
 import { Upload } from 'antd';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
+import { BrainCircuitIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
+import { buildSpaceMemoryPath } from '@/features/ResourceSpaces/paths';
+import {
+  buildPendingGovernancePath,
+  canReviewSpaceMemorySummary,
+  useTeamSpaceMemoryScopeSummaries,
+} from '@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
+import { lambdaClient } from '@/libs/trpc/client';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
@@ -102,12 +113,29 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 const EmptyPlaceholder = memo(() => {
-  const { t } = useTranslation('components');
+  const { t } = useTranslation(['components', 'file']);
   const isMobile = useServerConfigStore((s) => s.isMobile);
+  const navigate = useNavigate();
 
   const pushDockFileList = useFileStore((s) => s.pushDockFileList);
 
   const [sourceSetId, spaceId] = useContentManagerStore((s) => [s.sourceSetId, s.spaceId]);
+  const { data: spaces } = useSWR(
+    spaceId ? SPACE_LIST_KEY : null,
+    () => lambdaClient.space.listSpaces.query(),
+    {
+      revalidateOnFocus: false,
+    },
+  );
+  const currentSpace = spaces?.find((space) => space.id === spaceId);
+  const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
+    useTeamSpaceMemoryScopeSummaries(currentSpace ? [currentSpace] : undefined);
+  const spaceMemorySummary = spaceId ? spaceSummaryMap.get(spaceId) : undefined;
+  const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceMemorySummary);
+  const pendingCount = spaceId ? (pendingGovernanceCountBySpaceId.get(spaceId) ?? 0) : 0;
+  const pendingTarget = spaceId ? (pendingGovernanceTargetBySpaceId.get(spaceId) ?? null) : null;
+  const showOpenSpaceMemoryAction =
+    currentSpace?.kind === 'team' && !!spaceMemorySummary && !canReviewSpaceMemory;
 
   const { open } = useCreateSourceSetModal();
 
@@ -124,6 +152,48 @@ const EmptyPlaceholder = memo(() => {
         <Text type={'secondary'}>{t('FileManager.emptyStatus.or')}</Text>
       </Flexbox>
       <Flexbox gap={12} horizontal={!isMobile}>
+        {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+          <button
+            className={cx(styles.card, styles.cardButton)}
+            type="button"
+            onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
+          >
+            <Flexbox className={styles.cardContent}>
+              <span className={styles.actionTitle}>
+                {t('space.home.recall.actions.review', { count: pendingCount, ns: 'file' })}
+              </span>
+              <div className={styles.glow} style={{ background: accentColors[0] }} />
+              <FileTypeIcon
+                aria-hidden
+                className={styles.icon}
+                color={accentColors[0]}
+                icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                size={ICON_SIZE}
+              />
+            </Flexbox>
+          </button>
+        )}
+        {showOpenSpaceMemoryAction && (
+          <button
+            className={cx(styles.card, styles.cardButton)}
+            type="button"
+            onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+          >
+            <Flexbox className={styles.cardContent}>
+              <span className={styles.actionTitle}>
+                {t('space.home.recall.actions.open', { ns: 'file' })}
+              </span>
+              <div className={styles.glow} style={{ background: accentColors[0] }} />
+              <FileTypeIcon
+                aria-hidden
+                className={styles.icon}
+                color={accentColors[0]}
+                icon={<Icon color={cssVar.colorTextLightSolid} icon={BrainCircuitIcon} />}
+                size={ICON_SIZE}
+              />
+            </Flexbox>
+          </button>
+        )}
         {!sourceSetId && (
           <button
             className={cx(styles.card, styles.cardButton)}

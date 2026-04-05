@@ -1,4 +1,9 @@
-import { type FilesTabs, type SortType } from '@/types/files';
+import {
+  type FileAssetClassification,
+  type FileAssetUsagePolicy,
+  type FilesTabs,
+  type SortType,
+} from '@/types/files';
 
 /**
  * Unified resource item that represents both files and documents
@@ -76,6 +81,8 @@ export interface SyncOperation {
  * Query parameters for fetching resources
  */
 export interface ContentQueryParams {
+  assetClassification?: FileAssetClassification;
+  assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   limit?: number;
   offset?: number;

@@ -29,8 +29,11 @@ import { AiModelModel } from '@/database/models/aiModel';
 import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
 import { PluginModel } from '@/database/models/plugin';
+import { SpaceModel } from '@/database/models/space';
+import { SpaceMemoryModel } from '@/database/models/spaceMemory';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
+import { UserMemoryTopicRepository } from '@/database/repositories/userMemory';
 import { UserModel } from '@/database/models/user';
 import { UserPersonaModel } from '@/database/models/userMemory/persona';
 import {
@@ -45,9 +48,15 @@ import { type StepLifecycleCallbacks } from '@/server/services/agentRuntime/type
 import { FileService } from '@/server/services/file';
 import { KlavisService } from '@/server/services/klavis';
 import { MarketService } from '@/server/services/market';
+import {
+  buildUserMemoryDataFromSpaceMemory,
+  hasInjectedSpaceMemory,
+  mergeServerUserMemoryConfig,
+} from '@/server/services/spaceMemory/recall';
 import { deviceProxy } from '@/server/services/toolExecution/deviceProxy';
 
 const log = debug('lobe-server:ai-agent-service');
+const MAX_SPACE_MEMORY_RECALL_QUERY_LENGTH = 7000;
 
 const LEGACY_BUILTIN_ROLE_PATTERNS: Partial<Record<string, RegExp>> = {
   [BUILTIN_AGENT_SLUGS.agentBuilder]: /You are Lobe,\s+an Agent Builder integrated into LobeHub\./,
@@ -63,6 +72,13 @@ const isLegacyBuiltinSystemRole = (slug: string, systemRole?: string | null) => 
 
   return pattern ? pattern.test(systemRole) : false;
 };
+
+const buildSpaceMemoryRecallQuery = (parts: Array<string | null | undefined>) =>
+  parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join('\n')
+    .slice(-MAX_SPACE_MEMORY_RECALL_QUERY_LENGTH);
 
 /**
  * Format error for storage in thread metadata
@@ -610,6 +626,52 @@ export class AiAgentService {
         }
       } catch (error) {
         log('execAgent: failed to fetch user persona: %O', error);
+      }
+
+      try {
+        const recallSpaceId =
+          appContext?.spaceId ??
+          (topicId ? (await this.topicModel.findById(topicId))?.spaceId ?? undefined : undefined);
+
+        if (recallSpaceId) {
+          const space = await new SpaceModel(this.db, this.userId).findAccessibleSpaceById(
+            recallSpaceId,
+          );
+
+          if (space?.kind === 'team') {
+            const topicQuery = topicId
+              ? await new UserMemoryTopicRepository(
+                  this.db,
+                  this.userId,
+                ).getUserMessagesQueryForTopic(topicId)
+              : null;
+            const recallQuery = buildSpaceMemoryRecallQuery([topicQuery, prompt]);
+            const recallEntries = await new SpaceMemoryModel(
+              this.db,
+              this.userId,
+            ).listPublishedRecallEntries({
+              query: recallQuery,
+              spaceId: recallSpaceId,
+            });
+            const spaceMemoryData = buildUserMemoryDataFromSpaceMemory(recallEntries, {
+              query: recallQuery,
+            });
+
+            if (hasInjectedSpaceMemory(spaceMemoryData)) {
+              userMemory = mergeServerUserMemoryConfig(userMemory, spaceMemoryData);
+
+              log(
+                'execAgent: attached team space memory (space=%s, contexts=%d, experiences=%d, preferences=%d)',
+                recallSpaceId,
+                spaceMemoryData.contexts.length,
+                spaceMemoryData.experiences.length,
+                spaceMemoryData.preferences.length,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        log('execAgent: failed to fetch team space memory: %O', error);
       }
     }
 

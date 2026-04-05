@@ -1,5 +1,4 @@
 import { contentRegistry } from '@lobechat/database/schemas';
-import bcrypt from 'bcryptjs';
 import debug from 'debug';
 import { eq } from 'drizzle-orm';
 
@@ -8,6 +7,7 @@ import { ContentModel } from '@/database/models/content';
 import { FileModel } from '@/database/models/file';
 import { getServerDB } from '@/database/server';
 import { serveAuthorizedFileDownload } from '@/server/modules/file-proxy/serveAuthorizedFileDownload';
+import { resolveContentShareAccess } from '@/server/services/content/sharePolicy';
 
 const log = debug('lobe-file:share-f');
 
@@ -31,22 +31,21 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
 
     const db = await getServerDB();
     const contentModel = new ContentModel(db, 'anonymous');
-    const link = await contentModel.resolveShareLinkByToken(token);
+    const access = await resolveContentShareAccess({
+      contentModel,
+      password: sharePassword,
+      token,
+    });
 
-    if (!link) {
+    if (access.status === 'not_found') {
       return new Response('Not found', { status: 404 });
     }
 
-    if (link.passwordHash) {
-      if (!sharePassword) {
-        return new Response('Password required', { status: 401 });
-      }
-
-      const isValid = await bcrypt.compare(sharePassword, link.passwordHash);
-      if (!isValid) {
-        return new Response('Not found', { status: 404 });
-      }
+    if (access.status === 'missing_password') {
+      return new Response('Password required', { status: 401 });
     }
+
+    const { link } = access;
 
     const [reg] = await db
       .select()

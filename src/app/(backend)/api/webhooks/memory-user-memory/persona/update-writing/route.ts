@@ -37,6 +37,7 @@ export const POST = async (req: Request) => {
   const { webhook } = parseMemoryExtractionConfig();
 
   const authFailure = validateWebhookRequestAuth({
+    allowInsecureDev: webhook.allowInsecureDev,
     expectedHeaders: webhook.headers,
     requestHeaders: req.headers,
   });

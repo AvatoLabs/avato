@@ -300,6 +300,10 @@ export const desktopRoutes: RouteObject[] = [
                 path: 'memory',
               },
               {
+                element: <SpaceMemoryPage />,
+                path: 'memory/audit/:entryId',
+              },
+              {
                 element: <ResourceSpaceSettingsPage />,
                 path: 'settings',
               },

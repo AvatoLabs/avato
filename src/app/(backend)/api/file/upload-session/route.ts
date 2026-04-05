@@ -9,7 +9,7 @@ import { ContentModel } from '@/database/models/content';
 import { getServerDB } from '@/database/server';
 import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const privateS3 = getPrivateBlobS3();
-    await privateS3.uploadBody(uploadSession.storageKey, body, {
+    const blobProvider = getBlobProvider();
+    await blobProvider.uploadBody(uploadSession.storageKey, body, {
       contentLength: Buffer.isBuffer(body) ? body.length : uploadSession.expectedSize,
       contentType,
     });

@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { LOBE_CHAT_OIDC_AUTH_HEADER } from '@/envs/auth';
 import { validateOIDCJWT } from '@/libs/oidc-provider/jwt';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
 
     const objectKey = pathnameField as string;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const privateS3 = getPrivateBlobS3();
+    const blobProvider = getBlobProvider();
 
-    await privateS3.uploadBuffer(objectKey, fileBuffer, file.type || 'application/octet-stream');
+    await blobProvider.uploadBuffer(objectKey, fileBuffer, file.type || 'application/octet-stream');
 
     log('Uploaded file through legacy same-origin path (PrivateBlobS3): %s', objectKey);
 

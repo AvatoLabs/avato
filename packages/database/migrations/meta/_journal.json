@@ -735,6 +735,34 @@
       "when": 1775272671197,
       "tag": "0104_add_space_memory_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1775283738199,
+      "tag": "0105_add_file_assets",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1775287351673,
+      "tag": "0106_rare_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1775311647245,
+      "tag": "0107_mushy_skullbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1775312415903,
+      "tag": "0108_tiny_pestilence",
+      "breakpoints": true
     }
   ],
   "version": "6"

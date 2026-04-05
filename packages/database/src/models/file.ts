@@ -21,6 +21,7 @@ import {
   documentChunks,
   documents,
   embeddings,
+  fileAssets,
   fileChunks,
   type FileItem,
   files,
@@ -445,6 +446,8 @@ export class FileModel {
   };
 
   query = async ({
+    assetClassification,
+    assetUsagePolicy,
     category,
     q,
     sortType,
@@ -503,6 +506,31 @@ export class FileModel {
         url: files.url,
       })
       .from(files);
+
+    if (assetClassification || assetUsagePolicy) {
+      // @ts-ignore
+      query = query.leftJoin(fileAssets, eq(files.id, fileAssets.fileId));
+
+      if (assetClassification) {
+        whereClause =
+          assetClassification === 'general'
+            ? and(
+                whereClause,
+                or(eq(fileAssets.classification, assetClassification), isNull(fileAssets.fileId)),
+              )
+            : and(whereClause, eq(fileAssets.classification, assetClassification));
+      }
+
+      if (assetUsagePolicy) {
+        whereClause =
+          assetUsagePolicy === 'internal'
+            ? and(
+                whereClause,
+                or(eq(fileAssets.usagePolicy, assetUsagePolicy), isNull(fileAssets.fileId)),
+              )
+            : and(whereClause, eq(fileAssets.usagePolicy, assetUsagePolicy));
+      }
+    }
 
     // 4. Scope to a source set when requested
     if (sourceSetId) {

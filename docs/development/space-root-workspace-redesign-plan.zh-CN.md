@@ -1,8 +1,26 @@
 # Space 作为工作区根的产品与信息架构重构方案
 
-**状态**：提案  
-**日期**：2026-03-31  
+**状态**：当前 canonical 产品架构提案；截至 2026-04-04 已部分落地  
+**日期**：2026-04-04  
 **目标**：把 `space` 从“隐式默认容器”提升为产品一等根对象，重构 `docs / files / source set / team` 的前台语义与路由边界，让多 space / team space 的体验接近 Notion / 飞书式工作区。
+
+---
+
+## 〇、当前落地进展（截至 2026-04-04）
+
+本方案对应的工程改造已经进入主链，但整体仍处于 **Phase 1 ~ Phase 3 之间**，还没有完成最终收口。
+
+- **`/spaces/:spaceId/...` canonical routes 已建立**：`docs / files / memory / settings / members` 都已能以 space-scoped 路径直接访问。
+- **Docs 侧已开始承认 Space 是根**：文档列表侧栏、Header、Breadcrumb、详情页跳转都已显式携带 `spaceId`。
+- **Files 侧已基本成为 `space-first`**：空间列表、breadcrumb、文件树与 source set scope 都围绕当前 `spaceId` 工作。
+- **Space 首页与切换器已可用**：`/spaces` 会重定向到用户可访问空间；Space 首页也已经把 `Docs / Files / Memory / Members / Settings` 暴露为工作区入口。
+- **兼容层仍未清理完**：`/content/shared`、`/content/trash` 与部分 legacy query/path 仍保留，旧心智还没有完全退出。
+- **`activeWorkspaceSpaceId` 仍在作为提示状态存在**：它已经退化成 URL 之外的辅助 hint，但还没有从所有调用方彻底淡出。
+
+这意味着：
+
+> `Space` 作为工作区根已经被前台大面积承认，  
+> 但“旧 `content` 兼容层完全退场”和“所有旧路由仅保留 redirect”这两件事还没完成。
 
 ---
 
@@ -13,7 +31,7 @@
 用户今天的真实感受更像：
 
 - 我在一个全局的 `Docs` 里写东西
-- 我在一个全局的 `Content` 里传文件
+- 我在一个脱离 `Space` 的 `Files` 模块里传文件
 - `Source Set` 似乎是半个顶层导航
 - `Space` 明明存在，却不像真正的工作区根
 
@@ -28,7 +46,7 @@
 
 > **Space 是唯一的工作区根。**  
 > **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**  
-> **Source Set（资料集）是 Space 内的专题容器，也是唯一让 Docs 和 Files 同时出现的统一视图。**  
+> **Source Set（资料集）是 Space 内的专题容器，也是 Docs 和 Files 共享的专题范围，不再成为第三套主页面。**
 > **Content 退到实现层，作为统一资源注册表存在，不再是用户主语。**
 
 ---
@@ -39,7 +57,7 @@
 
 当前产品实际上同时混用了两套模型：
 
-- **正确模型**：`Content` 已经基本是 `space-first`
+- **正确模型**：`Files` 用户心智已经基本在往 `space-first` 收口，底层仍由 `content_registry / ContentAuthorizer` 支撑
 - **旧模型**：`Docs` 仍然带有明显的全局模块心智
 
 结果是：
@@ -54,7 +72,7 @@
 
 - 数据层已经有 `spaces`、`space_members`、`content_registry`
 - `ContentAuthorizer` 已经有空间角色和内容级授权能力
-- `Content` 路由基本已是 `space-first`
+- `Files` 路由基本已是 `space-first`
 - 团队空间、成员管理、角色更新、所有权转移的后端基础已经存在
 
 #### 真正缺口
@@ -129,9 +147,9 @@
 
 - 按主题组织 docs 和 files
 - 作为 AI / RAG / 检索复用边界
-- 提供唯一一个允许 docs 和 files 同时出现的专题视图
+- 提供 Docs / Files 共享的专题范围与过滤上下文
 
-`Source Set` 不是工作区根，不是全局一级导航，也不是伪文件系统根目录。
+`Source Set` 不是工作区根，不是全局一级导航，也不是第三套主页面或伪文件系统根目录。
 
 ### 3. `Content` 的正确定位
 
@@ -446,22 +464,35 @@ LobeHub 不需要变成页面树产品，但必须承认：
 
 把它们混成一个页面只会制造更多过滤和切换成本，不会让用户更清楚。
 
-### 3. `Source Set` 是唯一允许跨类型出现的视图
+### 3. `Source Set` 是唯一允许跨类型联结的专题范围
 
 进入一个资料集后，用户应该能在同一专题上下文中看到：
 
 - 该资料集内的文档
 - 该资料集内的文件
 
-但这不代表 `Docs` 页面也应该出现“文档/文件 switcher”。  
+但这不代表 `Source Set` 应该升级成第三套独立页面系统，也不代表 `Docs` 页面应该出现“文档/文件 switcher”。
 `Docs` 页面默认只看文档。  
 `Files` 页面默认只看文件。  
-只有 `Source Set` 详情页负责把两者联结起来。
+`Source Set` 负责通过同一专题范围把两者联结起来。
+
+### 4. `Files` 的筛选是视图状态，不是导航动作
+
+`Files` 中的类型筛选、资产分类、使用策略等都属于**当前工作面的视图状态**。
+
+这意味着：
+
+- 改变筛选时必须保留当前 `space`
+- 改变筛选时必须保留当前 `source set` scope
+- 如果用户当前在某个文件夹中，改变筛选时必须保留该文件夹上下文
+- 如果用户当前在文件预览中，改变筛选时可以退出预览态，但必须回到当前文件所属文件夹，而不是静默跳回 `Files` 根目录
+
+换句话说，`Files` 的筛选只应该改 query state，不应该把用户从当前浏览上下文中“弹回根视图”。
 
 实施前提：
 
-- 当前 Source Set 详情链路如果仍然只返回 files，不返回 documents，则这套跨类型统一视图无法真正落地
-- 因此前端改版前，必须先补齐 Source Set 详情 API，使其能稳定返回 docs + files
+- 当前 Source Set 相关读取链路如果仍然只返回 files，不返回 documents，则这套跨类型专题范围无法真正落地
+- 因此前端改版前，必须先补齐 Source Set 的统一读取 API / overview 契约，使其能稳定返回 docs + files
 
 ### 4. 来源关系，不等于版本绑定
 
@@ -730,13 +761,13 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 - 文档页只看文档
 - 文件页只看文件
-- 资料集页成为唯一跨类型视图
+- 资料集范围成为唯一跨类型联结入口
 
 验收标准：
 
 - docs 页面没有文件噪音
 - files 页面没有文档噪音
-- source set 详情页能同时消费两类内容
+- source set 的统一读取链路能同时消费两类内容
 
 ### Phase 4：团队与 RBAC UI
 
@@ -804,7 +835,7 @@ Personal space 和 Team space 的 empty state 应有所区分。
 
 > **Space 是唯一的工作区根。**  
 > **Docs（文档）是知识成果工作面，Files（文件）是原始资产工作面。**  
-> **Source Set（资料集）是 Space 内的专题容器，也是唯一让 Docs 和 Files 同时出现的统一视图。**  
+> **Source Set（资料集）是 Space 内的专题容器，也是 Docs 和 Files 共享的专题范围，不再成为第三套主页面。**
 > **Chat / Agent、Community、Personal Memory、Account 属于 Space 外模块。**  
 > **Content 退到实现层，作为统一资源注册表存在，不再作为用户主语。**
 

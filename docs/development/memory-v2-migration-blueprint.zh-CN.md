@@ -1,7 +1,25 @@
 # Memory V2 迁移实现蓝图
 
-状态：Draft  
+状态：Draft；截至 2026-04-04 基本尚未启动主链迁移  
+日期：2026-04-04  
 目标：放弃 LobeHub 当前分层记忆模型，迁移到更接近 ChatGPT 风格、适合 ToB 场景、允许编辑的自动记忆架构。
+
+---
+
+## 0.0 当前落地进展（截至 2026-04-04）
+
+需要明确：本蓝图对应的 **`Memory V2` 主链迁移当前基本尚未开始**。
+
+- **旧 `/memory` 仍是主入口**：当前个人记忆页面仍然是五层 `identities / contexts / preferences / experiences / activities` 模型。
+- **旧抽取链路仍是主链**：`user-memory` 的抽取、存储、检索和聊天注入仍然是当前系统真正在跑的路径。
+- **仓库里还没有 V2 核心对象**：当前没有 `memory_v2_entries / candidates / history / recall_logs` 这类表或 service 主线。
+- **`MEMORY_V2_ENABLED` 之类的切流开关也尚未出现**。
+- **已经发生的唯一相关推进**：旧 `user-memory` 抽取完成后，开始派生 `Space Memory` candidate；这属于团队候选治理前置铺垫，不等于 `Memory V2` 已落地。
+
+所以当前判断应明确为：
+
+> `Space Memory` 已经先走到产品壳层，  
+> 但 `Memory V2` 作为 canonical memory kernel 仍停留在蓝图阶段。
 
 ---
 

@@ -6,6 +6,7 @@ import { getTestDB } from '../../core/getTestDB';
 import { spaces, users } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { ContentModel } from '../content';
+import { DocumentModel } from '../document';
 import { FileModel } from '../file';
 import { SpaceModel } from '../space';
 
@@ -105,6 +106,80 @@ describe('ContentModel', () => {
         contentUid: sharedRegistry.contentUid,
       });
       expect(items.find((item) => item.contentUid === selfRegistry.contentUid)).toBeUndefined();
+    });
+
+    it('should include shared document metadata for route resolution', async () => {
+      const viewerResourceModel = new ContentModel(serverDB, viewerId);
+      const viewerSpaceModel = new SpaceModel(serverDB, viewerId);
+
+      const ownerDocumentModel = new DocumentModel(serverDB, ownerId);
+      const ownerFileModel = new FileModel(serverDB, ownerId);
+      const ownerResourceModel = new ContentModel(serverDB, ownerId);
+      const ownerSpaceModel = new SpaceModel(serverDB, ownerId);
+
+      await viewerSpaceModel.getOrCreatePersonalSpace();
+      const ownerSpace = await ownerSpaceModel.getOrCreatePersonalSpace();
+
+      const { id: fileId } = await ownerFileModel.create(
+        {
+          fileType: 'text/markdown',
+          name: 'shared-table.md',
+          size: 32,
+          spaceId: ownerSpace.id,
+          url: 'https://example.com/shared-table.md',
+        },
+        false,
+      );
+      const file = await ownerFileModel.findById(fileId);
+      if (!file) throw new Error('File not found after creation');
+
+      const document = await ownerDocumentModel.create({
+        content: '| name |\n| --- |\n| ops |',
+        fileId: file.id,
+        fileType: 'custom/document',
+        metadata: { pageKind: 'table' },
+        source: file.url,
+        sourceType: 'file',
+        spaceId: ownerSpace.id,
+        title: 'Shared Table',
+        totalCharCount: 25,
+        totalLineCount: 3,
+      });
+
+      const registry = await ownerResourceModel.ensureContentRegistry({
+        createdBy: ownerId,
+        kind: 'document',
+        localId: document.id,
+        spaceId: ownerSpace.id,
+      });
+      await ownerResourceModel.ensureOwnerPermission({
+        contentUid: registry.contentUid,
+        spaceId: ownerSpace.id,
+      });
+      await ownerResourceModel.grantPermission({
+        canReshare: false,
+        createdBy: ownerId,
+        inheritsToChildren: true,
+        contentUid: registry.contentUid,
+        role: 'viewer',
+        spaceId: ownerSpace.id,
+        subjectId: viewerId,
+        subjectType: 'user',
+      });
+
+      const items = await viewerResourceModel.listSharedWithMe();
+
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        contentUid: registry.contentUid,
+        createdBy: ownerId,
+        fileType: 'custom/document',
+        kind: 'document',
+        localId: document.id,
+        metadata: { pageKind: 'table' },
+        name: 'Shared Table',
+        spaceId: ownerSpace.id,
+      });
     });
   });
 });

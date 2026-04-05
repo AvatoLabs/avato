@@ -1,7 +1,14 @@
 import { type ContentQueryParams } from '@/types/content';
-import { type FilesTabs, type SortType } from '@/types/files';
+import {
+  type FileAssetClassification,
+  type FileAssetUsagePolicy,
+  type FilesTabs,
+  type SortType,
+} from '@/types/files';
 
 interface BuildExplorerQueryParamsOptions {
+  assetClassification?: FileAssetClassification;
+  assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   currentFolderSlug?: string | null;
   scope?: 'all' | 'unassigned';
@@ -18,6 +25,8 @@ export const isSpaceLevelContentFilter = (category?: FilesTabs) =>
   !!category && category !== 'all' && category !== 'home';
 
 export const buildExplorerQueryParams = ({
+  assetClassification,
+  assetUsagePolicy,
   category,
   currentFolderSlug,
   scope = 'all',
@@ -26,6 +35,8 @@ export const buildExplorerQueryParams = ({
   sortType,
   spaceId,
 }: BuildExplorerQueryParamsOptions): ContentQueryParams => ({
+  assetClassification,
+  assetUsagePolicy,
   category: getExplorerCategoryFilter(category, sourceSetId),
   parentId:
     !sourceSetId && isSpaceLevelContentFilter(category) ? undefined : currentFolderSlug || null,

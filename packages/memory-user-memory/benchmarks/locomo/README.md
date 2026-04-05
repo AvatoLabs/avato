@@ -112,8 +112,11 @@ Set the required envs and execute:
 
 ```bash
 MEMORY_USER_MEMORY_LOBEHUB_BASE_URL="http://localhost:3000" \
+MEMORY_USER_MEMORY_WEBHOOK_HEADERS="Authorization=Bearer internal-memory-secret" \
 MEMORY_USER_MEMORY_BENCHMARKS_LOCOMO_DATASETS="path/to/locomo/dataset/data/locomo10.json" \
 bun run tsx lobehub/packages/memory-user-memory/benchmarks/locomo/run.ts
 ```
+
+If you are running purely local development and do not want to configure webhook headers, you must explicitly enable `MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV=true` on the LobeHub server. Production does not allow this bypass.
 
 Only samples whose IDs pass the filter in `run.ts` (currently `conv-26`) will ingest; adjust the filter if you need more samples.

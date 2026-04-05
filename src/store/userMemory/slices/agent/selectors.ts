@@ -22,4 +22,10 @@ export const agentMemorySelectors = {
       if (!topicId) return undefined;
       return state.topicMemoriesMap[topicId];
     },
+  topicMemoryRetrieval:
+    (topicId: string | undefined) =>
+    (state: UserMemoryStoreState): RetrieveMemoryResult['retrieval'] | undefined => {
+      if (!topicId) return undefined;
+      return state.topicMemoriesMap[topicId]?.retrieval;
+    },
 };

@@ -1,3 +1,8 @@
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+} from '@lobechat/types';
 import { getMimeType } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -10,6 +15,7 @@ import { ChunkModel } from '@/database/models/chunk';
 import { ContentModel } from '@/database/models/content';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
+import { FileAssetModel } from '@/database/models/fileAsset';
 import { SpaceModel } from '@/database/models/space';
 import { KnowledgeRepo } from '@/database/repositories/knowledge';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
@@ -19,6 +25,7 @@ import {
   ContentAuthorizer,
   TreeGuard,
 } from '@/server/services/content';
+import { resolveFileAssetCapabilities } from '@/server/services/content/fileAssetPolicy';
 import { FileService } from '@/server/services/file';
 import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
@@ -50,6 +57,7 @@ const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
       chunkModel: new ChunkModel(ctx.serverDB, ctx.userId),
       documentModel: new DocumentModel(ctx.serverDB, ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
+      fileAssetModel: new FileAssetModel(ctx.serverDB),
       fileService: new FileService(ctx.serverDB, ctx.userId),
       knowledgeRepo: new KnowledgeRepo(ctx.serverDB, ctx.userId),
       resolver: new AuthorizedResourceResolver(ctx.serverDB, ctx.userId),
@@ -95,6 +103,26 @@ const resolveWriteSpaceId = async (
 
   const personalSpace = await ctx.spaceModel.getOrCreatePersonalSpace();
   return personalSpace.id;
+};
+
+const assertCanWriteFileAsset = async (
+  ctx: {
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  fileId: string,
+) => {
+  const item = await ctx.resolver.requireFile(fileId, 'read_metadata');
+  const targetSpaceId = item.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+  const space = await ctx.spaceModel.findAccessibleSpaceById(targetSpaceId);
+  const capabilities = resolveFileAssetCapabilities(space?.membershipRole);
+
+  if (!space?.id) throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  if (!capabilities.canEditGovernance && !capabilities.canApprove && !capabilities.canArchive) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_WRITE_DENIED' });
+  }
+
+  return { capabilities, file: item, spaceId: space.id };
 };
 
 const resolveParentDocumentId = async (
@@ -160,6 +188,21 @@ const restoreDeletedFiles = async (
   const restored = await Promise.all(fileRows.map((item) => ctx.fileModel.findByIdAny(item.id)));
 
   return restored.filter(Boolean);
+};
+
+const buildFileAssetMap = async (ctx: { fileAssetModel: FileAssetModel }, fileIds: string[]) => {
+  const assetRows = await ctx.fileAssetModel.findByFileIds(fileIds);
+
+  return new Map(
+    assetRows.map((item) => [
+      item.fileId,
+      {
+        assetClassification: item.classification,
+        assetReviewStatus: item.reviewStatus,
+        assetUsagePolicy: item.usagePolicy,
+      },
+    ]),
+  );
 };
 
 export const fileRouter = router({
@@ -390,10 +433,38 @@ export const fileRouter = router({
         id: item.id,
         metadata: item.metadata as Record<string, any> | null | undefined,
         name: item.name,
+        parentId: item.parentId,
         size: item.size,
+        sourceSetId: item.sourceSetId,
         sourceType: 'file' as const,
+        spaceId: item.spaceId,
         updatedAt: item.updatedAt,
         url: getFileProxyUrl(item.id),
+      };
+    }),
+
+  getFileAssetById: fileProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ctx.contentAuthorizer.assertCapability({
+        capability: 'read_metadata',
+        id: input.id,
+        kind: 'file',
+      });
+
+      const file = await ctx.resolver.requireFile(input.id, 'read_metadata');
+      const targetSpaceId = file.spaceId || (await ctx.spaceModel.getOrCreatePersonalSpace()).id;
+      const space = await ctx.spaceModel.findAccessibleSpaceById(targetSpaceId);
+
+      if (!space?.id) throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+
+      return {
+        capabilities: resolveFileAssetCapabilities(space.membershipRole),
+        item: (await ctx.fileAssetModel.findByFileId(input.id)) ?? null,
       };
     }),
 
@@ -404,6 +475,10 @@ export const fileRouter = router({
       await ctx.contentAuthorizer.filterVisibleFileIdsForList(fileList.map((item) => item.id)),
     );
     const visibleList = fileList.filter((item) => visibleIdSet.has(item.id));
+    const fileAssetMap = await buildFileAssetMap(
+      ctx,
+      visibleList.map((item) => item.id),
+    );
 
     const fileIds = visibleList.map((item) => item.id);
     const chunks = await ctx.chunkModel.countByFileIds(fileIds);
@@ -430,6 +505,7 @@ export const fileRouter = router({
         : null;
 
       const fileItem = {
+        ...fileAssetMap.get(item.id),
         ...item,
         chunkCount: chunks.find((chunk) => chunk.id === item.id)?.count ?? null,
         chunkingError: chunkTask?.error ?? null,
@@ -535,6 +611,7 @@ export const fileRouter = router({
     // Process files (add chunk info and async task status)
     const fileItems = scopedItems.filter((item) => item.sourceType === 'file');
     const fileIds = fileItems.map((item: any) => item.fileId || item.id);
+    const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
     const chunks = await ctx.chunkModel.countByFileIds(fileIds);
 
     const chunkTaskIds = fileItems.map((item) => item.chunkTaskId).filter(Boolean) as string[];
@@ -560,6 +637,7 @@ export const fileRouter = router({
           : null;
 
         resultItems.push({
+          ...fileAssetMap.get((item as any).fileId || item.id),
           ...item,
           attachable: input.attachableOnly
             ? Boolean(attachableFileIds?.has((item as any).fileId || item.id))
@@ -621,6 +699,7 @@ export const fileRouter = router({
 
       // Get file IDs for batch processing
       const fileIds = fileItems.map((item) => item.fileId || item.id);
+      const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
       const chunksArray = await ctx.chunkModel.countByFileIds(fileIds);
       const chunks: Record<string, number> = {};
       for (const item of chunksArray) {
@@ -653,6 +732,7 @@ export const fileRouter = router({
           : null;
 
         resultFiles.push({
+          ...fileAssetMap.get(actualFileId),
           ...item,
           chunkCount: chunks[actualFileId] ?? 0,
           chunkingError: chunkTask?.error ?? null,
@@ -868,6 +948,83 @@ export const fileRouter = router({
       }
 
       return { success: true };
+    }),
+
+  updateFileAssetGovernance: fileProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+        rightsOwner: z.string().nullable().optional(),
+        classification: z.nativeEnum(FileAssetClassification).optional(),
+        usagePolicy: z.nativeEnum(FileAssetUsagePolicy).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      if (!capabilities.canEditGovernance) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_GOVERNANCE_DENIED' });
+      }
+
+      const item = await ctx.fileAssetModel.upsert({
+        createdBy: ctx.userId,
+        fileId: input.id,
+        classification: input.classification,
+        metadata: input.metadata ?? undefined,
+        rightsOwner: input.rightsOwner ?? null,
+        spaceId,
+        usagePolicy: input.usagePolicy,
+      });
+
+      return { capabilities, item };
+    }),
+
+  approveFileAsset: fileProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      if (!capabilities.canApprove) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_APPROVE_DENIED' });
+      }
+
+      const item = await ctx.fileAssetModel.upsert({
+        createdBy: ctx.userId,
+        fileId: input.id,
+        reviewedAt: new Date(),
+        reviewedBy: ctx.userId,
+        reviewStatus: FileAssetReviewStatus.Approved,
+        spaceId,
+      });
+
+      return { capabilities, item };
+    }),
+
+  archiveFileAsset: fileProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { capabilities, spaceId } = await assertCanWriteFileAsset(ctx, input.id);
+      if (!capabilities.canArchive) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'FILE_ASSET_ARCHIVE_DENIED' });
+      }
+
+      const item = await ctx.fileAssetModel.upsert({
+        createdBy: ctx.userId,
+        fileId: input.id,
+        reviewedAt: new Date(),
+        reviewedBy: ctx.userId,
+        reviewStatus: FileAssetReviewStatus.Archived,
+        spaceId,
+      });
+
+      return { capabilities, item };
     }),
 });
 

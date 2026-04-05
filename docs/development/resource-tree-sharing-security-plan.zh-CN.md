@@ -1,7 +1,13 @@
 # 资源树与分享能力安全工程方案
 
-> 复核时间：2026-03-21；**文档进展同步：2026-03-22（含 `S3_SET_ACL` 改为 opt-in 安全默认）**\
+> 复核时间：2026-03-21；**文档进展同步：2026-04-04（含 `BlobProvider`、`download/share/capability policy` 首批落地）**\
 > 范围：Resource / Knowledge Base / Page / File 相关能力，从 “单用户私有资源管理” 演进到 “每用户独立文件树 + 可分享” 的安全工程方案
+>
+> 术语说明：
+>
+> - 当前前台 canonical 命名应以 `Space / Docs / Files / Source Set` 为准
+> - 本文中的 `Resource / Knowledge Base / Page` 主要用于对齐当时的 schema、路由和迁移上下文
+> - 因此出现旧术语并不表示今天仍建议把 `Content / KB / Page` 作为产品主名词
 >
 > 执行摘要：
 >
@@ -13,12 +19,13 @@
 > - Phase 0 不能只修 `/f/:id`，还要显式关闭私有资源的 public object /public domain 绕过路径，并把下载、预览、解析、检索统一收口到同一个 authorizer。
 > - 如果只补三样最关键的基础设施，优先级应是：`resource_registry`、`authz_epoch`、带状态机且强制 private-object 的 `space_blobs`。
 
-## 〇、落地进展（与下文 Phase 对照，截至 2026-03-22）
+## 〇、落地进展（与下文 Phase 对照，截至 2026-04-04）
 
 以下已在主干代码中**部分落地**，用于与正文路线图对齐；**不等于**某一 Phase 整段验收已全部完成。
 
 ### S3 与环境变量（第三轮审计对齐）
 
+- **`BlobProvider`**：已新增 `src/server/modules/BlobProvider/*`，作为统一 blob 抽象层；业务主链开始从直连 `PrivateBlobS3 / FileS3` 收口到 provider。
 - **`S3_SET_ACL`**（`src/envs/file.ts`）：**默认 `false`**，仅 **`process.env.S3_SET_ACL === '1'`** 时为 true（opt-in）。应用侧 **`FileS3` PutObject 不写对象 ACL**；该变量保留给历史/外部脚本读取，避免「未设置 env 却等价于允许 public-read 语义」的默认值陷阱。
 - **对象 ACL 代码路径**：`FileS3` / 基类 **已移除** `setAcl`、`public-read` 上传参数（与审计结论一致）。
 
@@ -33,9 +40,15 @@
 
 ### 授权与能力模型
 
+- **`capabilityPolicy`**：已新增 `src/server/services/content/capabilityPolicy.ts`，把 `preview_content` OR 规则、viewer 的分享读取边界、以及 `owner / editor + canReshare` 的继续分享规则抽成独立 policy，并补了单测。
 - **`preview_content`**：在 `ResourceAuthorizer` 中求值时，若请求能力为 `preview_content`，则具备 `preview_content` **或** `read_content` 即通过；单独请求 `read_content` 时仍只认 `read_content`（避免用「仅预览」顶替全文读）。
 - **转授 / 继续分享**：成员分享与分享链接相关 API 经 `assertCanDelegateSharing`；space `owner`/`admin` 直接放行；**space `editor`（仅凭空间成员身份命中 `share_member`）** 仍须在目标资源上具备 **`owner` 或 `editor + can_reshare`（直接授权或继承）**，否则 `RESOURCE_RESHARE_DENIED`；`direct` / `inherited` 路径下 **`editor` 须授权行 `can_reshare`** 的规则不变。
 - **分享链接**：viewer 能力集合包含 `preview_content`；与上述 `preview_content` OR `read_content` 规则一致。
+
+### 分享控制（首批 control plane）
+
+- **`downloadPolicy`**：已新增 `src/server/services/content/downloadPolicy.ts`，统一成员下载与分享下载的缓存 TTL / 预签名时效，并接入 `serveAuthorizedFileDownload` 与 OpenAPI 文件 URL。
+- **`sharePolicy`**：已新增 `src/server/services/content/sharePolicy.ts`，统一分享链接过期时间、分享 URL 构建、密码归一化和分享访问校验；`contentShareRouter` 与 `GET /share/f/[token]` 已复用这套逻辑，并补了路由级测试。
 
 ### 读路径（预览 / 解析 / RAG）
 
@@ -89,6 +102,12 @@
 
 - **`FileService.createFileRecord`**：默认已挂**个人空间** + **`space_blobs`**；若某类文件必须**不**绑定空间，可显式传 **`spaceId: null`**（慎用）。
 - **其余按原文推进**：Phase 3 **`v2/spaces/...` 存储 key**、Phase 4 **硬删除与 blob 延迟 GC**（Web 资料库/资源首页回收站与 **`0100` client_id 部分唯一**已落地；Notebook 侧仅提示至资源回收站）、**下线用户资源对 `global_files` 的依赖**、**`isPublic` 数据迁移**、异步 worker **执行时**对 **`authz_epoch`** 的强制复验等。
+
+审计结论补充：
+
+- 当前大致位于 **Phase 2 到 Phase 5 的交叉阶段**，不是线性完成。
+- `spaces / registry / permissions / share links / token-first file download / trash restore` 都已经进入主链。
+- 但 `global_files` 彻底退场、存储 key 规范化、worker 执行期复验、以及部分历史公开语义清理还没有收尾。
 
 ## 一、现状审计
 

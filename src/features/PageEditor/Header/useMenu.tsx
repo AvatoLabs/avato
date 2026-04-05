@@ -21,41 +21,9 @@ import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useSourceSetStore } from '@/store/sourceSet';
 import { TABLE_PAGE_KIND } from '@/utils/docs';
+import { decodeBase64, downloadBlob, normalizeExportFileName, XLSX_MIME_TYPE } from '@/utils/documentExport';
 
 import { usePageEditorStore, useStoreApi } from '../store';
-
-const XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-const normalizeExportFileName = (title: string | undefined, extension: string) =>
-  `${
-    (title || 'Untitled')
-      .trim()
-      .replaceAll(/[\\/:*?"<>|]+/g, '-')
-      .replaceAll(/\s+/g, ' ') || 'Untitled'
-  }.${extension}`;
-
-const downloadBlob = (blob: Blob, fileName: string) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
-
-const decodeBase64 = (value: string) => {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (const [index, char] of [...binary].entries()) {
-    bytes[index] = char.charCodeAt(0);
-  }
-
-  return bytes;
-};
 
 /**
  * Action menu for the page editor.

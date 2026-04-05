@@ -3,6 +3,7 @@ export * from './agentBotProvider';
 export * from './agentCronJob';
 export * from './agentEvals';
 export * from './agentSkill';
+export * from './asset';
 export * from './aiInfra';
 export * from './apiKey';
 export * from './asyncTask';

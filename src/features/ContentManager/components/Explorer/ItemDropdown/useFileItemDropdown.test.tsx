@@ -9,6 +9,12 @@ import { useFileItemDropdown } from './useFileItemDropdown';
 const mockEnsureFileDocument = vi.hoisted(() => vi.fn());
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+let mockSpace = {
+  id: 'spc_1',
+  kind: 'team',
+  membershipRole: 'editor',
+  name: 'Team Space',
+};
 
 interface MockContentManagerState {
   setCurrentViewItemId: ReturnType<typeof vi.fn>;
@@ -89,12 +95,7 @@ vi.mock('@/features/ResourceSpaces', () => ({
 
 vi.mock('@/features/ResourceSpaces/useSpaceItem', () => ({
   useSpaceItem: () => ({
-    space: {
-      id: 'spc_1',
-      kind: 'team',
-      membershipRole: 'editor',
-      name: 'Team Space',
-    },
+    space: mockSpace,
   }),
 }));
 
@@ -155,6 +156,12 @@ describe('useFileItemDropdown', () => {
       setCurrentViewItemId: vi.fn(),
       setMode: vi.fn(),
       spaceId: 'spc_1',
+    };
+    mockSpace = {
+      id: 'spc_1',
+      kind: 'team',
+      membershipRole: 'editor',
+      name: 'Team Space',
     };
   });
 
@@ -247,5 +254,29 @@ describe('useFileItemDropdown', () => {
       ],
       spaceId: 'spc_1',
     });
+  });
+
+  it('hides add-to-space-memory when the current space cannot create candidate memory', () => {
+    mockSpace = {
+      id: 'spc_1',
+      kind: 'team',
+      membershipRole: 'viewer',
+      name: 'Team Space',
+    };
+
+    const { result } = renderHook(() =>
+      useFileItemDropdown({
+        fileId: 'file_1',
+        fileType: 'image/png',
+        filename: 'Poster.png',
+        id: 'file_1',
+        sourceSetId: 'sst_1',
+        url: '/poster.png',
+      }),
+    );
+
+    const action = result.current.menuItems().find((item: any) => item?.key === 'addToSpaceMemory');
+
+    expect(action).toBeUndefined();
   });
 });

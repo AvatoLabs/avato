@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionIcon } from '@lobehub/ui';
+import { ActionIcon, Button, Flexbox, Text } from '@lobehub/ui';
 import { HouseIcon, Settings2Icon, Users2Icon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +13,13 @@ import { lambdaClient } from '@/libs/trpc/client';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/slices/auth/selectors';
 
-import { buildSpaceSettingsPath } from './paths';
+import { buildSpaceMemoryPath, buildSpaceSettingsPath } from './paths';
 import { resolveSpaceDisplayName } from './resolveSpaceDisplayName';
+import {
+  buildPendingGovernancePath,
+  canReviewSpaceMemorySummary,
+  useTeamSpaceMemoryScopeSummaries,
+} from './useTeamSpaceMemoryScopeSummaries';
 
 export const SPACE_LIST_KEY = 'resource-space-list';
 
@@ -24,7 +29,7 @@ interface SpaceListProps {
 }
 
 const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
-  const { t } = useTranslation('file');
+  const { t } = useTranslation(['file', 'memory']);
   const location = useLocation();
   const navigate = useNavigate();
   const username = useUserStore(userProfileSelectors.username);
@@ -37,6 +42,8 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
       revalidateOnFocus: false,
     },
   );
+  const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
+    useTeamSpaceMemoryScopeSummaries(spaces);
 
   if (isLoading) return <SkeletonList rows={4} />;
 
@@ -44,6 +51,10 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
     const isCurrentSettings =
       currentSpaceId === space.id && location.pathname.endsWith('/settings');
     const displayName = resolveSpaceDisplayName(space, t, { fullName, username });
+    const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceSummaryMap.get(space.id));
+    const pendingCount = pendingGovernanceCountBySpaceId.get(space.id) ?? 0;
+    const pendingTarget = pendingGovernanceTargetBySpaceId.get(space.id) ?? null;
+    const showOpenMemoryAction = spaceSummaryMap.has(space.id) && !canReviewSpaceMemory;
 
     return (
       <NavItem
@@ -53,17 +64,58 @@ const SpaceList = memo<SpaceListProps>(({ currentSpaceId, onSelectSpace }) => {
         title={displayName}
         extra={
           space.kind === 'team' ? (
-            <ActionIcon
-              active={isCurrentSettings}
-              icon={Settings2Icon}
-              size={'small'}
-              title={t('space.settings.title')}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                navigate(buildSpaceSettingsPath(space.id));
-              }}
-            />
+            <Flexbox horizontal align={'center'} gap={6}>
+              {pendingCount > 0 &&
+                (pendingTarget ? (
+                  <Button
+                    size={'small'}
+                    style={{ height: 'auto', paddingBlock: 0, paddingInline: 0 }}
+                    title={t('scope.pendingHint', { count: pendingCount, ns: 'memory' })}
+                    type={'text'}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      navigate(buildPendingGovernancePath(space.id, pendingTarget));
+                    }}
+                  >
+                    {t('scope.pending', { count: pendingCount, ns: 'memory' })}
+                  </Button>
+                ) : (
+                  <Text
+                    fontSize={11}
+                    title={t('scope.pendingHint', { count: pendingCount, ns: 'memory' })}
+                    type={'secondary'}
+                  >
+                    {t('scope.pending', { count: pendingCount, ns: 'memory' })}
+                  </Text>
+                ))}
+              {pendingCount === 0 && showOpenMemoryAction && (
+                <Button
+                  size={'small'}
+                  style={{ height: 'auto', paddingBlock: 0, paddingInline: 0 }}
+                  title={t('scope.openHint', { ns: 'memory' })}
+                  type={'text'}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigate(buildSpaceMemoryPath(space.id));
+                  }}
+                >
+                  {t('scope.open', { ns: 'memory' })}
+                </Button>
+              )}
+              <ActionIcon
+                active={isCurrentSettings}
+                icon={Settings2Icon}
+                size={'small'}
+                title={t('space.settings.title')}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate(buildSpaceSettingsPath(space.id));
+                }}
+              />
+            </Flexbox>
           ) : undefined
         }
         onClick={() => onSelectSpace(space.id)}

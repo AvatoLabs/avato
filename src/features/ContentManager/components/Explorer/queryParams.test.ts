@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FilesTabs, SortType } from '@/types/files';
+import { FileAssetClassification, FilesTabs, SortType } from '@/types/files';
 
 import { buildExplorerQueryParams, isSpaceLevelContentFilter } from './queryParams';
 
@@ -46,6 +46,30 @@ describe('buildExplorerQueryParams', () => {
     expect(params.category).toBe(FilesTabs.Home);
     expect(params.parentId).toBe(null);
     expect(params.showFilesInSourceSet).toBe(false);
+  });
+
+  it('passes through asset classification filters', () => {
+    const params = buildExplorerQueryParams({
+      assetClassification: FileAssetClassification.Brand,
+      category: FilesTabs.Home,
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.assetClassification).toBe(FileAssetClassification.Brand);
+  });
+
+  it('passes through asset usage policy filters', () => {
+    const params = buildExplorerQueryParams({
+      assetUsagePolicy: 'restricted',
+      category: FilesTabs.Home,
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.assetUsagePolicy).toBe('restricted');
   });
 
   it('disables category filters inside source sets while keeping folder scope', () => {

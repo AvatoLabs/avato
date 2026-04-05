@@ -7,6 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAssistantActions } from './useAssistantActions';
 
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+let mockSpaceMemoryTargets = {
+  defaultSpaceId: 'spc_team',
+  isLoading: false,
+  teamSpaces: [{ id: 'spc_team' }],
+};
 
 vi.mock('@lobehub/ui', () => ({
   copyToClipboard: vi.fn(),
@@ -32,11 +37,7 @@ vi.mock('@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal', () =
 }));
 
 vi.mock('@/features/ResourceSpaces/useSpaceMemoryCandidateTargets', () => ({
-  useSpaceMemoryCandidateTargets: () => ({
-    defaultSpaceId: 'spc_team',
-    isLoading: false,
-    teamSpaces: [{ id: 'spc_team' }],
-  }),
+  useSpaceMemoryCandidateTargets: () => mockSpaceMemoryTargets,
 }));
 
 vi.mock('@/helpers/activeWorkspaceSpace', () => ({
@@ -67,6 +68,11 @@ vi.mock('../../../store', () => ({
 describe('useAssistantActions', () => {
   beforeEach(() => {
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: 'spc_team',
+      isLoading: false,
+      teamSpaces: [{ id: 'spc_team' }],
+    };
   });
 
   it('offers add-to-space-memory for message sources', () => {
@@ -99,5 +105,28 @@ describe('useAssistantActions', () => {
         },
       ],
     });
+  });
+
+  it('hides add-to-space-memory when no writable team space is available', () => {
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: undefined,
+      isLoading: false,
+      teamSpaces: [],
+    };
+
+    const { result } = renderHook(() =>
+      useAssistantActions({
+        data: {
+          content: 'This is a long assistant answer about the weekly sync and next steps.',
+          createdAt: Date.now(),
+          id: 'msg_1',
+          role: 'assistant',
+        } as any,
+        id: 'msg_1',
+        index: 0,
+      }),
+    );
+
+    expect(result.current.addToSpaceMemory).toBeUndefined();
   });
 });

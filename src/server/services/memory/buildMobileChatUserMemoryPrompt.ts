@@ -57,6 +57,7 @@ const searchResultToPromptMemories = (result: SearchMemoryResult): Partial<UserM
     title: c.title,
   })),
   experiences: result.experiences.map((e) => ({
+    action: e.action,
     id: e.id,
     keyLearning: e.keyLearning,
     situation: e.situation,
@@ -66,6 +67,7 @@ const searchResultToPromptMemories = (result: SearchMemoryResult): Partial<UserM
     .map((p) => ({
       conclusionDirectives: p.conclusionDirectives,
       id: p.id,
+      suggestions: p.suggestions,
     })),
 });
 

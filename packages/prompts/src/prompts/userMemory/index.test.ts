@@ -100,6 +100,7 @@ describe('promptUserMemory', () => {
         memories: {
           experiences: [
             {
+              action: 'Share a concise example alongside the explanation',
               id: 'exp-1',
               keyLearning: 'User prefers concise explanations with code examples',
               situation: 'User asked about React hooks implementation',
@@ -182,6 +183,7 @@ describe('promptUserMemory', () => {
             {
               conclusionDirectives: 'Always use TypeScript strict mode',
               id: 'pref-1',
+              suggestions: 'Consider adding eslint rules for strictness drift',
             },
           ],
         },

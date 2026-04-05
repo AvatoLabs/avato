@@ -40,6 +40,11 @@ export interface SearchMemoryResult {
   preferences: Array<Omit<UserMemoryPreference, 'userId' | 'conclusionDirectivesVector'>>;
 }
 
+export interface RetrieveMemoryDiagnostics {
+  message: string;
+  status: 'error';
+}
+
 interface MemoryToolBaseResult {
   message: string;
   success: boolean;
@@ -81,4 +86,6 @@ export interface UpdateIdentityMemoryResult extends MemoryToolBaseResult {
 
 // Aliases for retrieval (search) usage
 export type RetrieveMemoryParams = SearchMemoryParams;
-export type RetrieveMemoryResult = SearchMemoryResult;
+export interface RetrieveMemoryResult extends SearchMemoryResult {
+  retrieval?: RetrieveMemoryDiagnostics;
+}

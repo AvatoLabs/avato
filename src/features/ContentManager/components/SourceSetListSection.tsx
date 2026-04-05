@@ -2,13 +2,23 @@
 
 import { Flexbox, Icon, Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { PlusIcon } from 'lucide-react';
+import { BrainCircuitIcon, PlusIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import useSWR from 'swr';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import { SPACE_LIST_KEY } from '@/features/ResourceSpaces/SpaceList';
+import { buildSpaceMemoryPath } from '@/features/ResourceSpaces/paths';
+import {
+  buildPendingGovernancePath,
+  canReviewSpaceMemorySummary,
+  useTeamSpaceMemoryScopeSummaries,
+} from '@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries';
 import { buildSourceSetFileScope, useFileScope } from '@/features/ContentManager/useFileScope';
 import { useCreateSourceSetModal } from '@/features/SourceSetModal';
+import { lambdaClient } from '@/libs/trpc/client';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
 import { useSourceSetStore } from '@/store/sourceSet';
 
@@ -75,9 +85,26 @@ const SourceSetListSection = memo(() => {
   const { t } = useTranslation(['file', 'components']);
   const spaceId = useContentManagerStore((s) => s.spaceId);
   const { setScope } = useFileScope(spaceId);
+  const navigate = useNavigate();
 
   const useFetchSourceSetList = useSourceSetStore((s) => s.useFetchSourceSetList);
   const { data: sourceSets, isLoading } = useFetchSourceSetList(spaceId);
+  const { data: spaces } = useSWR(
+    spaceId ? SPACE_LIST_KEY : null,
+    () => lambdaClient.space.listSpaces.query(),
+    {
+      revalidateOnFocus: false,
+    },
+  );
+  const currentSpace = spaces?.find((space) => space.id === spaceId);
+  const { pendingGovernanceCountBySpaceId, pendingGovernanceTargetBySpaceId, spaceSummaryMap } =
+    useTeamSpaceMemoryScopeSummaries(currentSpace ? [currentSpace] : undefined);
+  const spaceMemorySummary = spaceId ? spaceSummaryMap.get(spaceId) : undefined;
+  const canReviewSpaceMemory = canReviewSpaceMemorySummary(spaceMemorySummary);
+  const pendingCount = spaceId ? (pendingGovernanceCountBySpaceId.get(spaceId) ?? 0) : 0;
+  const pendingTarget = spaceId ? (pendingGovernanceTargetBySpaceId.get(spaceId) ?? null) : null;
+  const showOpenSpaceMemoryAction =
+    currentSpace?.kind === 'team' && !!spaceMemorySummary && !canReviewSpaceMemory;
 
   const { open } = useCreateSourceSetModal();
 
@@ -92,6 +119,28 @@ const SourceSetListSection = memo(() => {
           {t('sourceSet.title', { defaultValue: 'Source Sets' })}
         </Text>
         <Flexbox horizontal className={styles.list} gap={12}>
+          {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+            <button
+              className={styles.card}
+              type="button"
+              onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
+            >
+              <Icon aria-hidden icon={BrainCircuitIcon} size={20} />
+              <Text fontSize={14}>
+                {t('space.home.recall.actions.review', { count: pendingCount })}
+              </Text>
+            </button>
+          )}
+          {showOpenSpaceMemoryAction && (
+            <button
+              className={styles.card}
+              type="button"
+              onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+            >
+              <Icon aria-hidden icon={BrainCircuitIcon} size={20} />
+              <Text fontSize={14}>{t('space.home.recall.actions.open', { ns: 'file' })}</Text>
+            </button>
+          )}
           <button
             className={cx(styles.card, styles.createCard)}
             type="button"
@@ -111,6 +160,28 @@ const SourceSetListSection = memo(() => {
         {t('sourceSet.title', { defaultValue: 'Source Sets' })}
       </Text>
       <Flexbox horizontal className={styles.list} gap={12}>
+        {currentSpace?.kind === 'team' && pendingCount > 0 && pendingTarget && (
+          <button
+            className={styles.card}
+            type="button"
+            onClick={() => navigate(buildPendingGovernancePath(currentSpace.id, pendingTarget))}
+          >
+            <Icon aria-hidden icon={BrainCircuitIcon} size={20} />
+            <Text fontSize={14}>
+              {t('space.home.recall.actions.review', { count: pendingCount })}
+            </Text>
+          </button>
+        )}
+        {showOpenSpaceMemoryAction && (
+          <button
+            className={styles.card}
+            type="button"
+            onClick={() => navigate(buildSpaceMemoryPath(currentSpace.id))}
+          >
+            <Icon aria-hidden icon={BrainCircuitIcon} size={20} />
+            <Text fontSize={14}>{t('space.home.recall.actions.open', { ns: 'file' })}</Text>
+          </button>
+        )}
         {sourceSets.map((sourceSet) => (
           <button
             className={styles.card}

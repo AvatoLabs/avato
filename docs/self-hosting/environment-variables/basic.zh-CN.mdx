@@ -29,6 +29,27 @@ LobeHub 在部署时提供了一些额外的配置项，你可以使用环境变
 
 <GenerateSecret envName="KEY_VAULTS_SECRET" />
 
+### `MEMORY_USER_MEMORY_WEBHOOK_HEADERS`
+
+- 类型：可选
+- 描述：为 `/api/webhooks/memory-extraction` 等 user-memory webhook 配置共享密钥请求头，格式为 `Header=Value`，多个键值对用英文逗号分隔。
+- 默认值：-
+- 示例：`Authorization=Bearer internal-memory-secret` 或 `x-memory-secret=super-secret`
+
+当你从外部调度器或 worker 调用记忆抽取 webhook 时，建议使用这个变量。LobeHub 会对每个已配置的 header 做精确匹配。
+
+### `MEMORY_USER_MEMORY_WEBHOOK_ALLOW_INSECURE_DEV`
+
+- 类型：可选
+- 描述：仅在非生产环境下允许无鉴权调用 user-memory webhook。这个开关只用于本地开发。
+- 默认值：`false`
+- 示例：`true`
+
+<Callout type="warning">
+  该开关在生产环境中无效。生产环境仍必须配置
+  `MEMORY_USER_MEMORY_WEBHOOK_HEADERS` 或使用内部服务鉴权。
+</Callout>
+
 ### `API_KEY_SELECT_MODE`
 
 - 类型：可选

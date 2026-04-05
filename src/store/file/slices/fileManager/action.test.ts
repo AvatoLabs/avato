@@ -1,3 +1,4 @@
+import { FileAssetUsagePolicy } from '@lobechat/types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -59,10 +60,14 @@ vi.mock('@/libs/swr', async () => {
 vi.mock('@/libs/trpc/client', () => ({
   lambdaClient: {
     file: {
+      approveFileAsset: { mutate: vi.fn() },
+      archiveFileAsset: { mutate: vi.fn() },
+      getFileAssetById: { query: vi.fn() },
       getFileItemById: { query: vi.fn() },
       getFiles: { query: vi.fn() },
       getKnowledgeItems: { query: vi.fn() },
       removeFileAsyncTask: { mutate: vi.fn() },
+      updateFileAssetGovernance: { mutate: vi.fn() },
     },
   },
 }));
@@ -900,6 +905,120 @@ describe('FileManagerActions', () => {
 
       await waitFor(() => {
         expect(swrResult.current.data).toEqual(mockFile);
+      });
+    });
+  });
+
+  describe('useFetchFileAsset', () => {
+    it('should not fetch when id is undefined', () => {
+      const { result } = renderHook(() => useStore());
+
+      renderHook(() => result.current.useFetchFileAsset(undefined));
+
+      expect(lambdaClient.file.getFileAssetById.query).not.toHaveBeenCalled();
+    });
+
+    it('should fetch file asset sidecar when id is provided', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Brand Team',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.getFileAssetById.query).mockResolvedValue(mockAsset as any);
+
+      const { result: swrResult } = renderHook(() => result.current.useFetchFileAsset('file-1'), {
+        wrapper: withSWR,
+      });
+
+      await waitFor(() => {
+        expect(swrResult.current.data).toEqual(mockAsset);
+      });
+    });
+  });
+
+  describe('updateFileAssetGovernance', () => {
+    it('should update the file asset cache after mutation', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.updateFileAssetGovernance.mutate).mockResolvedValue(
+        mockAsset as any,
+      );
+
+      await expect(
+        result.current.updateFileAssetGovernance('file-1', {
+          rightsOwner: 'Legal',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        }),
+      ).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
+      });
+    });
+  });
+
+  describe('approveFileAsset', () => {
+    it('should update the file asset cache after approval', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'approved',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.approveFileAsset.mutate).mockResolvedValue(mockAsset as any);
+
+      await expect(result.current.approveFileAsset('file-1')).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
+      });
+    });
+  });
+
+  describe('archiveFileAsset', () => {
+    it('should update the file asset cache after archive', async () => {
+      const { result } = renderHook(() => useStore());
+      const mockAsset = {
+        capabilities: { canApprove: true, canArchive: true, canEditGovernance: true },
+        item: {
+          fileId: 'file-1',
+          reviewStatus: 'archived',
+          rightsOwner: 'Legal',
+          spaceId: 'spc_team',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        },
+      };
+
+      vi.mocked(lambdaClient.file.archiveFileAsset.mutate).mockResolvedValue(mockAsset as any);
+
+      await expect(result.current.archiveFileAsset('file-1')).resolves.toEqual(mockAsset);
+
+      expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
+        revalidate: false,
       });
     });
   });

@@ -1,7 +1,7 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 
 import { FileModel } from '@/database/models/file';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 
 import { type FileServiceImpl } from './type';
 
@@ -9,44 +9,43 @@ import { type FileServiceImpl } from './type';
  * S3-based file service implementation
  */
 export class S3StaticFileImpl implements FileServiceImpl {
-  private readonly s3: FileS3;
+  private readonly blobProvider = getBlobProvider();
   private readonly db: LobeChatDatabase;
 
   constructor(db: LobeChatDatabase) {
     this.db = db;
-    this.s3 = new FileS3();
   }
 
   async deleteFile(key: string) {
-    return this.s3.deleteFile(key);
+    return this.blobProvider.deleteObject(key);
   }
 
   async deleteFiles(keys: string[]) {
-    return this.s3.deleteFiles(keys);
+    return this.blobProvider.deleteObjects(keys);
   }
 
   async getFileContent(key: string): Promise<string> {
-    return this.s3.getFileContent(key);
+    return this.blobProvider.getObjectContent(key);
   }
 
   async getFileByteArray(key: string): Promise<Uint8Array> {
-    return this.s3.getFileByteArray(key);
+    return this.blobProvider.getObjectByteArray(key);
   }
 
   async createPreSignedUrl(key: string): Promise<string> {
-    return this.s3.createPreSignedUrl(key);
+    return this.blobProvider.createUploadUrl(key);
   }
 
   async getFileMetadata(key: string): Promise<{ contentLength: number; contentType?: string }> {
-    return this.s3.getFileMetadata(key);
+    return this.blobProvider.getObjectMetadata(key);
   }
 
   async createPreSignedUrlForPreview(key: string, expiresIn?: number): Promise<string> {
-    return this.s3.createPreSignedUrlForPreview(key, expiresIn);
+    return this.blobProvider.createDownloadUrl(key, { expiresIn });
   }
 
   async uploadContent(path: string, content: string) {
-    return this.s3.uploadContent(path, content);
+    return this.blobProvider.uploadContent(path, content);
   }
 
   async getFullFileUrl(url?: string | null, expiresIn?: number): Promise<string> {
@@ -88,12 +87,12 @@ export class S3StaticFileImpl implements FileServiceImpl {
   }
 
   async uploadMedia(key: string, buffer: Buffer): Promise<{ key: string }> {
-    await this.s3.uploadMedia(key, buffer);
+    await this.blobProvider.uploadMedia(key, buffer);
     return { key };
   }
 
   async uploadBuffer(key: string, buffer: Buffer, contentType: string): Promise<{ key: string }> {
-    await this.s3.uploadBuffer(key, buffer, contentType);
+    await this.blobProvider.uploadBuffer(key, buffer, contentType);
     return { key };
   }
 }

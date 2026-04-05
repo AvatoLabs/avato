@@ -1,4 +1,4 @@
-import { index, jsonb, pgTable, text, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, jsonb, pgTable, text, varchar } from 'drizzle-orm/pg-core';
 
 import { idGenerator } from '../utils/idGenerator';
 import { timestamps, timestamptz, varchar255 } from './_helpers';
@@ -38,6 +38,10 @@ export const spaceMemoryEntries = pgTable(
       }[]
     >(),
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+    recallEnabled: boolean('recall_enabled').notNull().default(true),
+    expiresAt: timestamptz('expires_at'),
+    staleAt: timestamptz('stale_at'),
+    lastVerifiedAt: timestamptz('last_verified_at'),
     publishedAt: timestamptz('published_at'),
     ...timestamps,
   },
@@ -45,6 +49,13 @@ export const spaceMemoryEntries = pgTable(
     index('space_memory_entries_space_id_idx').on(table.spaceId),
     index('space_memory_entries_space_status_idx').on(table.spaceId, table.status),
     index('space_memory_entries_space_category_idx').on(table.spaceId, table.category),
+    index('space_memory_entries_space_recall_idx').on(
+      table.spaceId,
+      table.status,
+      table.recallEnabled,
+    ),
+    index('space_memory_entries_expires_at_idx').on(table.expiresAt),
+    index('space_memory_entries_stale_at_idx').on(table.staleAt),
     index('space_memory_entries_reviewed_by_idx').on(table.reviewedBy),
   ],
 );

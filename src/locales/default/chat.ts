@@ -39,6 +39,9 @@ export default {
   'builtinCopilot': 'Built-in Copilot',
   'chatList.expandMessage': 'Expand Message',
   'chatList.longMessageDetail': 'View Details',
+  'chatList.memoryUnavailable.desc':
+    'Replies will continue without topic memory for now. Retry later if you need memory-backed context.',
+  'chatList.memoryUnavailable.title': 'Memory is temporarily unavailable',
   'clearCurrentMessages': 'Clear current session messages',
   'compressedHistory': 'Compressed History',
   'compression.cancel': 'Uncompress',

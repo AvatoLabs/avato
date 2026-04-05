@@ -1,9 +1,22 @@
 import { type ContentManagerMode } from '@/features/ContentManager';
-import { FilesTabs, SortType } from '@/types/files';
+import {
+  type FileAssetClassification,
+  type FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@/types/files';
 
 export type ViewMode = 'list' | 'masonry';
 
 export interface State {
+  /**
+   * Current asset classification filter
+   */
+  assetClassification?: FileAssetClassification;
+  /**
+   * Current asset usage policy filter
+   */
+  assetUsagePolicy?: FileAssetUsagePolicy;
   /**
    * Current file category filter
    */
@@ -71,6 +84,8 @@ export interface State {
 }
 
 export const initialState: State = {
+  assetClassification: undefined,
+  assetUsagePolicy: undefined,
   category: FilesTabs.Home,
   currentFolderId: undefined,
   currentViewItemId: undefined,

@@ -17,6 +17,7 @@ import { TopicImporterRepo } from '@/database/repositories/topicImporter';
 import { agents, chatGroups, chatGroupsAgents } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { SpaceMemoryTopicIngestionService } from '@/server/services/spaceMemory/topicIngestion';
 import { TopicTitleService } from '@/server/services/topicTitle';
 import { type BatchTaskResult } from '@/types/service';
 
@@ -630,7 +631,29 @@ export const topicRouter = router({
         resolvedSessionId = resolved.sessionId ?? undefined;
       }
 
-      return ctx.topicModel.update(input.id, { ...restValue, sessionId: resolvedSessionId });
+      const updatedTopics = await ctx.topicModel.update(input.id, {
+        ...restValue,
+        sessionId: resolvedSessionId,
+      });
+
+      if (restValue.historySummary?.trim()) {
+        after(async () => {
+          try {
+            await new SpaceMemoryTopicIngestionService(
+              ctx.serverDB,
+              ctx.userId,
+            ).triggerTopicCandidate({
+              producer: 'chat-history-summary',
+              topicId: input.id,
+              traceId: `topic-history-summary:${input.id}`,
+            });
+          } catch (error) {
+            console.error('[topic.updateTopic] auto space memory ingestion failed:', error);
+          }
+        });
+      }
+
+      return updatedTopics;
     }),
 
   updateTopicMetadata: topicProcedure

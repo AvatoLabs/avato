@@ -24,10 +24,9 @@ import {
   users,
 } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
-import type { S3 } from '@/server/modules/S3';
-import { FileS3 } from '@/server/modules/S3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { ContentAuthorizer } from '@/server/services/content';
+import { clampFileUrlExpiresIn } from '@/server/services/content/downloadPolicy';
 import { DocumentService } from '@/server/services/document';
 import { FileService as CoreFileService } from '@/server/services/file';
 import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
@@ -72,7 +71,7 @@ export class FileUploadService extends BaseService {
   private documentModel: DocumentModel;
   private coreFileService: CoreFileService;
   private documentService: DocumentService;
-  private s3Service: S3;
+  private blobProvider = getBlobProvider();
   private chunkModel: ChunkModel;
   private asyncTaskModel: AsyncTaskModel;
   private sourceSetModel: SourceSetModel;
@@ -88,7 +87,6 @@ export class FileUploadService extends BaseService {
     this.documentModel = new DocumentModel(db, userId);
     this.coreFileService = new CoreFileService(db, userId!);
     this.documentService = new DocumentService(db, userId);
-    this.s3Service = new FileS3();
     this.chunkModel = new ChunkModel(db, userId);
     this.asyncTaskModel = new AsyncTaskModel(db, userId);
     this.sourceSetModel = new SourceSetModel(db, userId);
@@ -640,11 +638,11 @@ export class FileUploadService extends BaseService {
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
 
-      // 设置过期时间（默认1小时）
-      const expiresIn = options.expiresIn || 3600;
+      // 设置过期时间（默认并最大均为 1 小时）
+      const expiresIn = clampFileUrlExpiresIn(options.expiresIn);
 
-      // 使用S3服务生成预签名URL
-      const signedUrl = await this.s3Service.createPreSignedUrlForPreview(file.url, expiresIn);
+      // 使用 blob provider 生成预签名访问 URL
+      const signedUrl = await this.blobProvider.createDownloadUrl(file.url, { expiresIn });
 
       // 计算过期时间戳
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -769,9 +767,9 @@ export class FileUploadService extends BaseService {
       const metadata = this.generateFileMetadata(file, options.directory);
 
       const fileBuffer = Buffer.from(fileArrayBuffer);
-      const privateBlobS3 = getPrivateBlobS3();
-      await privateBlobS3.uploadBuffer(metadata.path, fileBuffer, file.type);
-      const head = await privateBlobS3.getObjectMetadata(metadata.path);
+      const blobProvider = getBlobProvider();
+      await blobProvider.uploadBuffer(metadata.path, fileBuffer, file.type);
+      const head = await blobProvider.getObjectMetadata(metadata.path);
       if (head.contentLength !== file.size) {
         await this.contentModel.quarantineSpaceBlobAfterFailedVerify({
           actualSize: head.contentLength,

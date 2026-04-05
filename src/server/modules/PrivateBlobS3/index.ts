@@ -4,6 +4,7 @@ import {
   type BucketLocationConstraint,
   CreateBucketCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -11,8 +12,10 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import mime from 'mime';
 
 import { fileEnv } from '@/envs/file';
+import { YEAR } from '@/utils/units';
 
 const DEFAULT_S3_REGION = 'us-east-1';
 
@@ -202,6 +205,18 @@ export class PrivateBlobS3 {
   }
 
   /**
+   * Delete files from S3
+   */
+  public async deleteFiles(keys: string[]) {
+    const command = new DeleteObjectsCommand({
+      Bucket: this.bucket,
+      Delete: { Objects: keys.map((key) => ({ Key: key })) },
+    });
+
+    return this.client.send(command);
+  }
+
+  /**
    * Get file content from S3
    */
   public async getFileContent(key: string): Promise<string> {
@@ -217,6 +232,24 @@ export class PrivateBlobS3 {
     }
 
     return response.Body.transformToString();
+  }
+
+  /**
+   * Get file bytes from S3
+   */
+  public async getFileByteArray(key: string): Promise<Uint8Array> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    const response = await this.client.send(command);
+
+    if (!response.Body) {
+      throw new Error(`No body in response with ${key}`);
+    }
+
+    return response.Body.transformToByteArray();
   }
 
   /**
@@ -256,6 +289,36 @@ export class PrivateBlobS3 {
       });
 
       return this.client.send(command);
+    });
+  }
+
+  public async uploadContent(path: string, content: string) {
+    return this.withBucketAutoCreateRetry(async () => {
+      const command = new PutObjectCommand({
+        Body: content,
+        Bucket: this.bucket,
+        Key: path,
+      });
+
+      return this.client.send(command);
+    });
+  }
+
+  /**
+   * Upload media file with long-term cache while keeping the blob private.
+   */
+  public async uploadMedia(key: string, buffer: Buffer) {
+    await this.withBucketAutoCreateRetry(async () => {
+      const contentType = mime.getType(key) || 'application/octet-stream';
+      const command = new PutObjectCommand({
+        Body: buffer,
+        Bucket: this.bucket,
+        CacheControl: `public, max-age=${YEAR}`,
+        ContentType: contentType,
+        Key: key,
+      });
+
+      await this.client.send(command);
     });
   }
 }

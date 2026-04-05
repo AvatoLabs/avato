@@ -7,11 +7,18 @@ import {
   sourceSets,
   spaces,
 } from '@lobechat/database/schemas';
-import type { ContentKind, ContentRole, ExplainAccessResult, SpaceRole } from '@lobechat/types';
+import type { ContentKind, ContentRole, ExplainAccessResult } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 
 import { ContentModel } from '@/database/models/content';
+import {
+  contentGrantAllowsDelegatingSharing,
+  RESOURCE_ROLE_CAPABILITIES,
+  resourceRoleHasCapability,
+  shareViewerAllowsCapability,
+  spaceRoleHasCapability,
+} from '@/server/services/content/capabilityPolicy';
 
 export type ContentCapability =
   | 'create_child'
@@ -45,102 +52,6 @@ interface AccessMatch {
   reason?: string;
   spaceId: string;
 }
-
-const RESOURCE_ROLE_CAPABILITIES: Record<ContentRole, ContentCapability[]> = {
-  editor: [
-    'create_child',
-    'delete',
-    'download_blob',
-    'move',
-    'preview_content',
-    'read_content',
-    'read_metadata',
-    'share_link',
-    'share_member',
-  ],
-  owner: [
-    'create_child',
-    'delete',
-    'download_blob',
-    'manage_members',
-    'move',
-    'preview_content',
-    'read_content',
-    'read_metadata',
-    'share_link',
-    'share_member',
-  ],
-  viewer: ['download_blob', 'preview_content', 'read_content', 'read_metadata'],
-};
-
-const SPACE_ROLE_CAPABILITIES: Record<SpaceRole, ContentCapability[]> = {
-  admin: [
-    'create_child',
-    'delete',
-    'download_blob',
-    'manage_members',
-    'move',
-    'preview_content',
-    'read_content',
-    'read_metadata',
-    'share_link',
-    'share_member',
-  ],
-  editor: [
-    'create_child',
-    'delete',
-    'download_blob',
-    'move',
-    'preview_content',
-    'read_content',
-    'read_metadata',
-    'share_link',
-    'share_member',
-  ],
-  owner: [
-    'create_child',
-    'delete',
-    'download_blob',
-    'manage_members',
-    'move',
-    'preview_content',
-    'read_content',
-    'read_metadata',
-    'share_link',
-    'share_member',
-  ],
-  viewer: ['download_blob', 'preview_content', 'read_content', 'read_metadata'],
-};
-
-const hasCapability = (capabilitySet: ContentCapability[], capability: ContentCapability) =>
-  capabilitySet.includes(capability);
-
-/** Parse / preview / RAG / search: allow `preview_content` or stricter `read_content`. */
-const resourceRoleHasCapability = (role: ContentRole, capability: ContentCapability) => {
-  const caps = RESOURCE_ROLE_CAPABILITIES[role];
-  if (capability === 'preview_content') {
-    return hasCapability(caps, 'preview_content') || hasCapability(caps, 'read_content');
-  }
-  return hasCapability(caps, capability);
-};
-
-const spaceRoleHasCapability = (role: SpaceRole, capability: ContentCapability) => {
-  const caps = SPACE_ROLE_CAPABILITIES[role];
-  if (capability === 'preview_content') {
-    return hasCapability(caps, 'preview_content') || hasCapability(caps, 'read_content');
-  }
-  return hasCapability(caps, capability);
-};
-
-const shareViewerAllowsCapability = (capability: ContentCapability) => {
-  if (capability === 'preview_content') {
-    return (
-      hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, 'preview_content') ||
-      hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, 'read_content')
-    );
-  }
-  return hasCapability(RESOURCE_ROLE_CAPABILITIES.viewer, capability);
-};
 
 export class ContentAuthorizer {
   private readonly db: LobeChatDatabase;
@@ -298,7 +209,7 @@ export class ContentAuthorizer {
     return (
       inheritedPermissions.find(
         (item: { canReshare: boolean; contentUid: string; role: ContentRole }) =>
-          hasCapability(RESOURCE_ROLE_CAPABILITIES[item.role], 'share_member'),
+          resourceRoleHasCapability(item.role, 'share_member'),
       ) ?? null
     );
   };
@@ -474,12 +385,15 @@ export class ContentAuthorizer {
       }
 
       const direct = await this.getDirectPermissionForUser(resource.contentUid);
-      if (direct?.role === 'owner') return;
-      if (direct?.role === 'editor' && direct.canReshare) return;
+      if (direct && contentGrantAllowsDelegatingSharing(direct.role, direct)) return;
 
       const inheritedSpace = await this.resolveInheritedShareDelegatingGrant(resource);
-      if (inheritedSpace?.role === 'owner') return;
-      if (inheritedSpace?.role === 'editor' && inheritedSpace.canReshare) return;
+      if (
+        inheritedSpace &&
+        contentGrantAllowsDelegatingSharing(inheritedSpace.role, inheritedSpace)
+      ) {
+        return;
+      }
 
       throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
     }
@@ -489,16 +403,13 @@ export class ContentAuthorizer {
       if (!direct) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
       }
-      if (direct.role === 'owner') {
+      if (contentGrantAllowsDelegatingSharing(direct.role, direct)) {
         return;
       }
-      if (direct.role === 'editor' && !direct.canReshare) {
+      if (direct.role === 'editor') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
       }
-      if (direct.role === 'viewer') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
-      }
-      return;
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
     }
 
     if (access.matchedBy === 'inherited') {
@@ -507,16 +418,13 @@ export class ContentAuthorizer {
       if (!inherited) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
       }
-      if (inherited.role === 'owner') {
+      if (contentGrantAllowsDelegatingSharing(inherited.role, inherited)) {
         return;
       }
-      if (inherited.role === 'editor' && !inherited.canReshare) {
+      if (inherited.role === 'editor') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_RESHARE_DENIED' });
       }
-      if (inherited.role === 'viewer') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
-      }
-      return;
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });
     }
 
     throw new TRPCError({ code: 'FORBIDDEN', message: 'RESOURCE_ACCESS_DENIED' });

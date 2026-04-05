@@ -1,8 +1,21 @@
-# Space First 内容架构重构方案（Breaking Cutover）
+# Space First 内容架构重构方案（Breaking Cutover，历史探索稿）
 
+> 状态：**Superseded / 历史探索稿**\
 > 复核时间：2026-03-28\
 > 范围：围绕 `Space / Docs / Files / Agent / AI Sources` 的产品模型、数据模型、运行时模型与一次性切换方案。\
-> 本文档明确采用 **不做后向兼容、一步到位切换、产品体验优先于迁移成本** 的策略。
+> 本文档记录的是一版 **激进 breaking-cutover 探索**：主张统一 `resource_nodes`、一步移除旧模型、完全不做后向兼容。\
+> **它不再是当前 canonical 执行方案。**
+>
+> 当前应以以下文档为准：
+>
+> - [space-root-workspace-redesign-plan.zh-CN.md](/Users/arthur/RustroverProjects/lobehub/docs/development/space-root-workspace-redesign-plan.zh-CN.md)
+> - [enterprise-local-cloud-blob-control-plane-plan.zh-CN.md](/Users/arthur/RustroverProjects/lobehub/docs/development/enterprise-local-cloud-blob-control-plane-plan.zh-CN.md)
+>
+> 本文档仍保留的价值主要是：
+>
+> - `Knowledge Base -> Source Set` 的问题拆解
+> - `Agent Source Ref` 的演进思路
+> - 对旧 `KB / Resource / Page` 模型的批判性分析
 >
 > 执行摘要：
 >
@@ -12,7 +25,7 @@
 > - 新架构的唯一顶层容器是 `Space`；统一的存储骨架是 `resource_nodes`；统一的领域对象是 `Resource`；产品对象只暴露为 `Doc / File / Folder`。AI 是 Resource 的能力，不是新的内容层级。
 > - Agent 不归属 Space，但可引用一个或多个 Space 下的内容来源；运行时不再围绕 `knowledgeBaseIds` 构建，而围绕通用 `Source Ref` 与 `resource_id` 构建。
 
-## 一、硬性要求
+## 一、历史前提
 
 本方案以以下要求为前提，不再以兼容现有模型为目标：
 

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
 import { getServerDB } from '@/database/server';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 
 import { POST } from './route';
 
@@ -31,8 +31,8 @@ vi.mock('@/database/models/content', () => ({
   })),
 }));
 
-vi.mock('@/server/modules/PrivateBlobS3', () => ({
-  getPrivateBlobS3: vi.fn(() => ({
+vi.mock('@/server/modules/BlobProvider', () => ({
+  getBlobProvider: vi.fn(() => ({
     uploadBody: (...args: unknown[]) => mockUploadBody(...args),
   })),
 }));
@@ -93,7 +93,7 @@ describe('POST /api/file/upload-session', () => {
       user: { id: 'user-1' },
     } as Awaited<ReturnType<typeof auth.api.getSession>>);
     vi.mocked(getServerDB).mockResolvedValue({} as Awaited<ReturnType<typeof getServerDB>>);
-    vi.mocked(getPrivateBlobS3).mockClear();
+    vi.mocked(getBlobProvider).mockClear();
   });
 
   it('should stream raw uploads to PrivateBlobS3 with an explicit content length', async () => {

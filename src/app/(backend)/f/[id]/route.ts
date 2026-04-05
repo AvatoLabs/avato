@@ -25,8 +25,12 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
   try {
     const params = await segmentData.params;
     const { id } = params;
-    const { searchParams } = new URL(req.url);
-    const shareToken = searchParams.get('token');
+    const requestUrl =
+      req.url.startsWith('http://') || req.url.startsWith('https://')
+        ? new URL(req.url)
+        : new URL(req.url, appEnv.APP_URL);
+    const { searchParams } = requestUrl;
+    const shareToken = searchParams.get('token')?.trim() || null;
     const sharePassword = searchParams.get('password');
 
     log('File proxy request: %s', id);
@@ -43,17 +47,13 @@ export const GET = async (req: Request, segmentData: { params: Params }) => {
     }
 
     // Token-first share download: do not keep resource id in the URL surface.
-    if (shareToken?.trim()) {
-      const base =
-        req.url.startsWith('http://') || req.url.startsWith('https://')
-          ? new URL(req.url)
-          : new URL(req.url, appEnv.APP_URL);
-      base.pathname = `/share/f/${encodeURIComponent(shareToken.trim())}`;
-      base.search = '';
+    if (shareToken) {
+      requestUrl.pathname = `/share/f/${encodeURIComponent(shareToken)}`;
+      requestUrl.search = '';
       if (sharePassword) {
-        base.searchParams.set('password', sharePassword);
+        requestUrl.searchParams.set('password', sharePassword);
       }
-      return Response.redirect(base.toString(), 307);
+      return Response.redirect(requestUrl.toString(), 307);
     }
 
     const db = await getServerDB();

@@ -2,8 +2,23 @@ import { z } from 'zod';
 
 import type { AsyncTaskStatus } from '../asyncTask';
 import type { ContentRole, InheritMode } from '../content';
+import type { FileAssetClassification, FileAssetReviewStatus, FileAssetUsagePolicy } from './asset';
+
+const fileAssetClassificationValues = [
+  'brand',
+  'finance',
+  'general',
+  'hr',
+  'legal',
+  'product',
+] as const;
+
+const fileAssetUsagePolicyValues = ['internal', 'public', 'restricted'] as const;
 
 export interface FileListItem {
+  assetClassification?: FileAssetClassification | null;
+  assetReviewStatus?: FileAssetReviewStatus | null;
+  assetUsagePolicy?: FileAssetUsagePolicy | null;
   attachable?: boolean;
   chunkCount: number | null;
   chunkingError: any | null;
@@ -47,6 +62,8 @@ export enum SortType {
 
 export const QueryFileListSchema = z.object({
   attachableOnly: z.boolean().default(false),
+  assetClassification: z.enum(fileAssetClassificationValues).optional(),
+  assetUsagePolicy: z.enum(fileAssetUsagePolicyValues).optional(),
   category: z.string().optional(),
   sourceSetId: z.string().optional(),
   limit: z.number().int().positive().default(50),
@@ -63,6 +80,8 @@ export const QueryFileListSchema = z.object({
 export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
 
 export interface QueryFileListParams {
+  assetClassification?: FileAssetClassification;
+  assetUsagePolicy?: FileAssetUsagePolicy;
   attachableOnly?: boolean;
   category?: string;
   limit?: number;

@@ -1,10 +1,12 @@
 'use client';
 
-import { Block, Center, Flexbox, Image, Text } from '@lobehub/ui';
+import { Block, Center, Flexbox, Image, Tag, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
 import Time from '@/routes/(main)/home/features/components/Time';
 import { RECENT_BLOCK_SIZE } from '@/routes/(main)/home/features/const';
 import { type FileListItem } from '@/types/files';
@@ -24,7 +26,14 @@ interface RecentResourceItemProps {
 }
 
 const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
+  const { t } = useTranslation('file');
   const isImage = IMAGE_FILE_TYPES.has(file.fileType);
+  const assetBadges = buildFileAssetBadges({
+    assetClassification: file.assetClassification,
+    assetReviewStatus: file.assetReviewStatus,
+    assetUsagePolicy: file.assetUsagePolicy,
+    t,
+  }).slice(0, 2);
 
   return (
     <Block
@@ -66,6 +75,15 @@ const RecentResourceItem = memo<RecentResourceItemProps>(({ file }) => {
         <Text ellipsis fontSize={13} style={{ lineHeight: 1.4 }} weight={500}>
           {file.name}
         </Text>
+        {assetBadges.length > 0 && (
+          <Flexbox horizontal gap={6} wrap={'wrap'}>
+            {assetBadges.map((badge) => (
+              <Tag color={badge.color} key={badge.key} size={'small'} variant={badge.variant}>
+                {badge.label}
+              </Tag>
+            ))}
+          </Flexbox>
+        )}
         <Flexbox horizontal align={'center'} gap={8}>
           <Time date={file.updatedAt} />
           <Text ellipsis fontSize={12} type={'secondary'}>

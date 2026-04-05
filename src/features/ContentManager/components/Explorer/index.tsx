@@ -32,6 +32,8 @@ const ResourceExplorer = memo(() => {
   // Get state from Resource Manager store
   const [
     sourceSetId,
+    assetClassification,
+    assetUsagePolicy,
     category,
     mode,
     viewMode,
@@ -42,6 +44,8 @@ const ResourceExplorer = memo(() => {
     spaceId,
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
+    s.assetClassification,
+    s.assetUsagePolicy,
     s.category,
     s.mode,
     s.viewMode,
@@ -66,6 +70,8 @@ const ResourceExplorer = memo(() => {
   const queryParams = useMemo(
     () =>
       buildExplorerQueryParams({
+        assetClassification,
+        assetUsagePolicy,
         category,
         currentFolderSlug,
         scope,
@@ -74,7 +80,17 @@ const ResourceExplorer = memo(() => {
         sortType,
         spaceId,
       }),
-    [category, currentFolderSlug, scope, sourceSetId, sorter, sortType, spaceId],
+    [
+      assetClassification,
+      assetUsagePolicy,
+      category,
+      currentFolderSlug,
+      scope,
+      sourceSetId,
+      sorter,
+      sortType,
+      spaceId,
+    ],
   );
 
   const { data, hasResolvedData, isLoading, isValidating } = useExplorerItems({
@@ -93,7 +109,14 @@ const ResourceExplorer = memo(() => {
   // Clear selections when category/source-set/search changes.
   useEffect(() => {
     setSelectedFileIds([]);
-  }, [category, sourceSetId, searchQuery, setSelectedFileIds]);
+  }, [
+    assetClassification,
+    assetUsagePolicy,
+    category,
+    sourceSetId,
+    searchQuery,
+    setSelectedFileIds,
+  ]);
 
   const showEmptyStatus =
     hasResolvedData && !isLoading && !isValidating && data.length === 0 && !currentFolderSlug;

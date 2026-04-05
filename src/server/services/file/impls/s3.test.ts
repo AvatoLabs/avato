@@ -18,21 +18,22 @@ vi.mock('@/envs/file', () => ({
   },
 }));
 
-// 模拟 S3 类
-vi.mock('@/server/modules/S3', () => ({
-  FileS3: vi.fn().mockImplementation(() => ({
-    createPreSignedUrlForPreview: vi
-      .fn()
-      .mockResolvedValue('https://presigned.example.com/test.jpg'),
-    getFileContent: vi.fn().mockResolvedValue('file content'),
-    getFileByteArray: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    getFileMetadata: vi.fn().mockResolvedValue({ contentLength: 1024, contentType: 'image/png' }),
-    deleteFile: vi.fn().mockResolvedValue({}),
-    deleteFiles: vi.fn().mockResolvedValue({}),
-    createPreSignedUrl: vi.fn().mockResolvedValue('https://upload.example.com/test.jpg'),
-    uploadContent: vi.fn().mockResolvedValue({}),
-    uploadMedia: vi.fn().mockResolvedValue({}),
-  })),
+const mockBlobProvider = {
+  createDownloadUrl: vi.fn().mockResolvedValue('https://presigned.example.com/test.jpg'),
+  createUploadUrl: vi.fn().mockResolvedValue('https://upload.example.com/test.jpg'),
+  deleteObject: vi.fn().mockResolvedValue({}),
+  deleteObjects: vi.fn().mockResolvedValue({}),
+  getObjectByteArray: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+  getObjectContent: vi.fn().mockResolvedValue('file content'),
+  getObjectMetadata: vi.fn().mockResolvedValue({ contentLength: 1024, contentType: 'image/png' }),
+  uploadBody: vi.fn().mockResolvedValue({ key: 'body-key' }),
+  uploadBuffer: vi.fn().mockResolvedValue({ key: 'buffer-key' }),
+  uploadContent: vi.fn().mockResolvedValue({}),
+  uploadMedia: vi.fn().mockResolvedValue({}),
+};
+
+vi.mock('@/server/modules/BlobProvider', () => ({
+  getBlobProvider: vi.fn(() => mockBlobProvider),
 }));
 
 // Mock db
@@ -42,6 +43,7 @@ describe('S3StaticFileImpl', () => {
   let fileService: S3StaticFileImpl;
 
   beforeEach(() => {
+    Object.values(mockBlobProvider).forEach((mock) => mock.mockClear());
     fileService = new S3StaticFileImpl(mockDb);
   });
 
@@ -148,14 +150,14 @@ describe('S3StaticFileImpl', () => {
   describe('deleteFile', () => {
     it('应该调用S3的deleteFile方法', async () => {
       await fileService.deleteFile('test.jpg');
-      expect(fileService['s3'].deleteFile).toHaveBeenCalledWith('test.jpg');
+      expect(mockBlobProvider.deleteObject).toHaveBeenCalledWith('test.jpg');
     });
   });
 
   describe('deleteFiles', () => {
     it('应该调用S3的deleteFiles方法', async () => {
       await fileService.deleteFiles(['test1.jpg', 'test2.jpg']);
-      expect(fileService['s3'].deleteFiles).toHaveBeenCalledWith(['test1.jpg', 'test2.jpg']);
+      expect(mockBlobProvider.deleteObjects).toHaveBeenCalledWith(['test1.jpg', 'test2.jpg']);
     });
   });
 
@@ -170,13 +172,13 @@ describe('S3StaticFileImpl', () => {
     it('should call S3 getFileMetadata and return metadata', async () => {
       const result = await fileService.getFileMetadata('test.png');
 
-      expect(fileService['s3'].getFileMetadata).toHaveBeenCalledWith('test.png');
+      expect(mockBlobProvider.getObjectMetadata).toHaveBeenCalledWith('test.png');
       expect(result).toEqual({ contentLength: 1024, contentType: 'image/png' });
     });
 
     it('should handle S3 errors', async () => {
       const error = new Error('File not found');
-      fileService['s3'].getFileMetadata = vi.fn().mockRejectedValue(error);
+      mockBlobProvider.getObjectMetadata.mockRejectedValueOnce(error);
 
       await expect(fileService.getFileMetadata('non-existent.txt')).rejects.toThrow(
         'File not found',
@@ -187,7 +189,7 @@ describe('S3StaticFileImpl', () => {
   describe('uploadContent', () => {
     it('应该调用S3的uploadContent方法', async () => {
       await fileService.uploadContent('test.jpg', 'content');
-      expect(fileService['s3'].uploadContent).toHaveBeenCalledWith('test.jpg', 'content');
+      expect(mockBlobProvider.uploadContent).toHaveBeenCalledWith('test.jpg', 'content');
     });
   });
 
@@ -266,13 +268,11 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'images/test.jpg';
       const testBuffer = Buffer.from('fake image data');
 
-      fileService['s3'].uploadMedia = vi.fn().mockResolvedValue(undefined);
-
       // 执行
       const result = await fileService.uploadMedia(testKey, testBuffer);
 
       // 验证
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
       expect(result).toEqual({ key: testKey });
     });
 
@@ -281,13 +281,11 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'videos/test.mp4';
       const testBuffer = Buffer.from('fake video data');
 
-      fileService['s3'].uploadMedia = vi.fn().mockResolvedValue(undefined);
-
       // 执行
       const result = await fileService.uploadMedia(testKey, testBuffer);
 
       // 验证
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
       expect(result).toEqual({ key: testKey });
     });
 
@@ -296,14 +294,13 @@ describe('S3StaticFileImpl', () => {
       const testKey = 'images/test.jpg';
       const testBuffer = Buffer.from('fake image data');
       const uploadError = new Error('S3 upload failed');
-
-      fileService['s3'].uploadMedia = vi.fn().mockRejectedValue(uploadError);
+      mockBlobProvider.uploadMedia.mockRejectedValueOnce(uploadError);
 
       // 执行和验证
       await expect(fileService.uploadMedia(testKey, testBuffer)).rejects.toThrow(
         'S3 upload failed',
       );
-      expect(fileService['s3'].uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
+      expect(mockBlobProvider.uploadMedia).toHaveBeenCalledWith(testKey, testBuffer);
     });
   });
 });

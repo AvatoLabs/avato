@@ -6,6 +6,7 @@ import {
   Flexbox,
   Icon,
   stopPropagation,
+  Tag,
   Text,
 } from '@lobehub/ui';
 import { App, Input } from 'antd';
@@ -20,6 +21,7 @@ import { shallow } from 'zustand/shallow';
 import FileIcon from '@/components/FileIcon';
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { clearTreeFolderCache } from '@/features/ContentManager/components/SourceSetTree/treeState';
+import { buildFileAssetBadges } from '@/features/ContentManager/utils/buildFileAssetBadges';
 import { resolveResourceKind } from '@/features/ContentManager/utils/resolveResourceKind';
 import {
   getTransparentDragImage,
@@ -151,6 +153,9 @@ const FileListItem = memo<FileListItemProps>(
     embeddingStatus,
     finishEmbedding,
     chunkCount,
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
     url,
     name,
     fileType,
@@ -282,6 +287,11 @@ const FileListItem = memo<FileListItemProps>(
           ? dayjs(createdAt).fromNow()
           : dayjs(createdAt).format('YYYY-MM-DD'),
       [createdAt],
+    );
+
+    const assetBadges = useMemo(
+      () => buildFileAssetBadges({ assetClassification, assetReviewStatus, assetUsagePolicy, t }),
+      [assetClassification, assetReviewStatus, assetUsagePolicy, t],
     );
 
     const handleRenameStart = useCallback(() => {
@@ -493,10 +503,14 @@ const FileListItem = memo<FileListItemProps>(
                   }}
                 />
               ) : (
-                <TruncatedFileName
-                  className={styles.name}
-                  name={name || t('file:pageList.untitled')}
-                />
+                <Flexbox horizontal align={'center'} className={styles.name} gap={8}>
+                  <TruncatedFileName name={name || t('file:pageList.untitled')} />
+                  {assetBadges.map((badge) => (
+                    <Tag color={badge.color} key={badge.key} size={'small'} variant={badge.variant}>
+                      {badge.label}
+                    </Tag>
+                  ))}
+                </Flexbox>
               )}
             </Flexbox>
             <Flexbox
@@ -580,6 +594,9 @@ const FileListItem = memo<FileListItemProps>(
       prevProps.chunkingStatus === nextProps.chunkingStatus &&
       prevProps.embeddingStatus === nextProps.embeddingStatus &&
       prevProps.chunkCount === nextProps.chunkCount &&
+      prevProps.assetClassification === nextProps.assetClassification &&
+      prevProps.assetReviewStatus === nextProps.assetReviewStatus &&
+      prevProps.assetUsagePolicy === nextProps.assetUsagePolicy &&
       prevProps.chunkingError === nextProps.chunkingError &&
       prevProps.embeddingError === nextProps.embeddingError &&
       prevProps.finishEmbedding === nextProps.finishEmbedding &&

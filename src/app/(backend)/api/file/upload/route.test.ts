@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
-import { getPrivateBlobS3 } from '@/server/modules/PrivateBlobS3';
+import { getBlobProvider } from '@/server/modules/BlobProvider';
 
 import { getLegacyUploadPathnameValidationError, POST } from './route';
 
@@ -16,8 +16,8 @@ vi.mock('@/auth', () => ({
 }));
 
 const mockUploadBuffer = vi.fn();
-vi.mock('@/server/modules/PrivateBlobS3', () => ({
-  getPrivateBlobS3: vi.fn(() => ({
+vi.mock('@/server/modules/BlobProvider', () => ({
+  getBlobProvider: vi.fn(() => ({
     uploadBuffer: (...args: unknown[]) => mockUploadBuffer(...args),
   })),
 }));
@@ -62,7 +62,7 @@ describe('POST /api/file/upload', () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: 'user-1' },
     } as Awaited<ReturnType<typeof auth.api.getSession>>);
-    vi.mocked(getPrivateBlobS3).mockClear();
+    vi.mocked(getBlobProvider).mockClear();
   });
 
   afterEach(() => {

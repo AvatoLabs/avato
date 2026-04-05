@@ -8,6 +8,11 @@ import { useTopicItemDropdownMenu } from './useDropdownMenu';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSpaceMemoryCandidateModal = vi.hoisted(() => vi.fn());
+let mockSpaceMemoryTargets = {
+  defaultSpaceId: 'spc_team',
+  isLoading: false,
+  teamSpaces: [{ id: 'spc_team', kind: 'team', membershipRole: 'editor', name: 'Ops Team' }],
+};
 
 vi.mock('@lobehub/ui', () => ({
   Icon: vi.fn(() => null),
@@ -44,11 +49,7 @@ vi.mock('@/features/ResourceSpaces/useOpenCreateSpaceMemoryCandidateModal', () =
 }));
 
 vi.mock('@/features/ResourceSpaces/useSpaceMemoryCandidateTargets', () => ({
-  useSpaceMemoryCandidateTargets: () => ({
-    defaultSpaceId: 'spc_team',
-    isLoading: false,
-    teamSpaces: [{ id: 'spc_team', kind: 'team', membershipRole: 'editor', name: 'Ops Team' }],
-  }),
+  useSpaceMemoryCandidateTargets: () => mockSpaceMemoryTargets,
 }));
 
 vi.mock('@/helpers/activeWorkspaceSpace', () => ({
@@ -81,6 +82,11 @@ describe('useTopicItemDropdownMenu (agent)', () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     mockOpenCreateSpaceMemoryCandidateModal.mockReset();
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: 'spc_team',
+      isLoading: false,
+      teamSpaces: [{ id: 'spc_team', kind: 'team', membershipRole: 'editor', name: 'Ops Team' }],
+    };
   });
 
   it('offers add-to-space-memory with a preselected target space', async () => {
@@ -106,5 +112,26 @@ describe('useTopicItemDropdownMenu (agent)', () => {
       initialSpaceId: 'spc_team',
       sourceRefs: [{ id: 'topic_1', kind: 'topic', title: 'Weekly Sync' }],
     });
+  });
+
+  it('hides add-to-space-memory when no writable team space is available', () => {
+    mockSpaceMemoryTargets = {
+      defaultSpaceId: undefined,
+      isLoading: false,
+      teamSpaces: [],
+    };
+
+    const { result } = renderHook(() =>
+      useTopicItemDropdownMenu({
+        fav: false,
+        id: 'topic_1',
+        title: 'Weekly Sync',
+        toggleEditing: vi.fn(),
+      }),
+    );
+
+    const action = result.current().find((item: any) => item?.key === 'addToSpaceMemory');
+
+    expect(action).toBeUndefined();
   });
 });

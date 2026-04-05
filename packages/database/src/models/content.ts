@@ -276,6 +276,8 @@ export class ContentModel {
       const [doc] = await this.db
         .select({
           id: documents.id,
+          fileType: documents.fileType,
+          metadata: documents.metadata,
           name: sql<string>`coalesce(${documents.title}, ${documents.filename}, 'Untitled')`,
           parentId: documents.parentId,
         })
@@ -283,7 +285,13 @@ export class ContentModel {
         .where(and(eq(documents.id, registry.localId), isNull(documents.deletedAt)))
         .limit(1);
 
-      return { ...registry, name: doc?.name || 'Untitled', parentId: doc?.parentId || null };
+      return {
+        ...registry,
+        fileType: doc?.fileType || null,
+        metadata: doc?.metadata || null,
+        name: doc?.name || 'Untitled',
+        parentId: doc?.parentId || null,
+      };
     }
 
     if (registry.kind === 'file') {

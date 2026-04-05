@@ -47,6 +47,7 @@ const ModalContent = memo<ModalContentProps>(
     const { close } = useModalContext();
     const hasFixedSpace = Boolean(spaceId);
     const { teamSpaces } = useSpaceMemoryCandidateTargets(initialSpaceId);
+    const writableSpaceIds = useMemo(() => new Set(teamSpaces.map((space) => space.id)), [teamSpaces]);
     const [title, setTitle] = useState(defaultTitle ?? '');
     const [summary, setSummary] = useState(defaultSummary ?? '');
     const [category, setCategory] = useState<SpaceMemoryCategory>('general');
@@ -55,6 +56,7 @@ const ModalContent = memo<ModalContentProps>(
     );
     const [creating, setCreating] = useState(false);
     const targetSpaceId = spaceId ?? selectedSpaceId;
+    const hasWritableTargetSpace = Boolean(targetSpaceId && writableSpaceIds.has(targetSpaceId));
 
     useEffect(() => {
       if (hasFixedSpace) return;
@@ -100,15 +102,25 @@ const ModalContent = memo<ModalContentProps>(
         return;
       }
 
+      if (!hasWritableTargetSpace) {
+        message.warning(t('space.memory.actions.createPermissionDenied'));
+        return;
+      }
+
       try {
         setCreating(true);
 
-        await lambdaClient.spaceMemory.createCandidate.mutate({
-          category,
-          sourceRefs,
+        await lambdaClient.spaceMemory.ingestCandidates.mutate({
+          drafts: [
+            {
+              category,
+              sourceRefs,
+              summary: summary.trim() || undefined,
+              title: nextTitle,
+            },
+          ],
+          origin: 'manual',
           spaceId: targetSpaceId,
-          summary: summary.trim() || undefined,
-          title: nextTitle,
         });
 
         await Promise.all([
@@ -124,12 +136,27 @@ const ModalContent = memo<ModalContentProps>(
       } finally {
         setCreating(false);
       }
-    }, [category, close, message, mutate, onCreated, sourceRefs, summary, t, targetSpaceId, title]);
+    }, [
+      category,
+      close,
+      hasWritableTargetSpace,
+      message,
+      mutate,
+      onCreated,
+      sourceRefs,
+      summary,
+      t,
+      targetSpaceId,
+      title,
+    ]);
 
     return (
       <Flexbox gap={16}>
         <Flexbox gap={4}>
           <Text type={'secondary'}>{t('space.memory.composer.description')}</Text>
+          {!hasWritableTargetSpace && (
+            <Text type={'danger'}>{t('space.memory.composer.permissionHint')}</Text>
+          )}
         </Flexbox>
 
         {!hasFixedSpace && (
@@ -201,7 +228,7 @@ const ModalContent = memo<ModalContentProps>(
         </Flexbox>
 
         <Flexbox horizontal justify={'flex-end'}>
-          <Button loading={creating} type={'primary'} onClick={handleSubmit}>
+          <Button disabled={!hasWritableTargetSpace} loading={creating} type={'primary'} onClick={handleSubmit}>
             {t('space.memory.actions.addFromSource')}
           </Button>
         </Flexbox>

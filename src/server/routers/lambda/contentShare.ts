@@ -7,10 +7,16 @@ import { z } from 'zod';
 
 import { ContentModel } from '@/database/models/content';
 import { UserModel } from '@/database/models/user';
-import { appEnv } from '@/envs/app';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { ContentAuthorizer } from '@/server/services/content';
+import {
+  buildContentShareUrls,
+  CONTENT_SHARE_EXPIRY_OPTIONS,
+  normalizeContentSharePassword,
+  resolveContentShareAccess,
+  resolveContentShareExpiresAt,
+} from '@/server/services/content/sharePolicy';
 
 const resolveTargetContent = async (
   model: ContentModel,
@@ -46,10 +52,17 @@ export const contentShareRouter = router({
   createContentShareLink: shareProcedure
     .input(
       z.object({
-        expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7),
+        expiresInDays: z.coerce
+          .number()
+          .refine((value): value is (typeof CONTENT_SHARE_EXPIRY_OPTIONS)[number] =>
+            CONTENT_SHARE_EXPIRY_OPTIONS.includes(
+              value as (typeof CONTENT_SHARE_EXPIRY_OPTIONS)[number],
+            ),
+          )
+          .default(7),
         id: z.string().optional(),
         kind: z.enum(['document', 'file', 'source_set']).optional(),
-        password: z.string().min(1).optional(),
+        password: z.string().optional(),
         contentUid: z.string().optional(),
       }),
     )
@@ -62,8 +75,11 @@ export const contentShareRouter = router({
       await ctx.contentAuthorizer.assertCanDelegateSharing(registry.contentUid);
 
       const rawToken = nanoid();
-      const passwordHash = input.password ? await bcrypt.hash(input.password, 10) : undefined;
-      const expiresAt = new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000);
+      const normalizedPassword = normalizeContentSharePassword(input.password);
+      const passwordHash = normalizedPassword
+        ? await bcrypt.hash(normalizedPassword, 10)
+        : undefined;
+      const expiresAt = resolveContentShareExpiresAt(input.expiresInDays);
 
       const link = await ctx.contentModel.createShareLink({
         createdBy: ctx.userId,
@@ -83,10 +99,8 @@ export const contentShareRouter = router({
 
       return {
         expiresAt,
-        fileShareDownloadUrl:
-          registry.kind === 'file' ? `${appEnv.APP_URL}/share/f/${rawToken}` : undefined,
         id: link.id,
-        shareUrl: `${appEnv.APP_URL}/share/r/${rawToken}`,
+        ...buildContentShareUrls({ kind: registry.kind, token: rawToken }),
       };
     }),
 
@@ -135,17 +149,21 @@ export const contentShareRouter = router({
     )
     .query(async ({ ctx, input }) => {
       const contentModel = new ContentModel(ctx.serverDB, 'anonymous');
-      const link = await contentModel.resolveShareLinkByToken(input.token);
-      if (!link) throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      const access = await resolveContentShareAccess({
+        contentModel,
+        password: input.password,
+        token: input.token,
+      });
 
-      if (link.passwordHash) {
-        if (!input.password) {
-          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'SHARE_PASSWORD_REQUIRED' });
-        }
-
-        const isValid = await bcrypt.compare(input.password, link.passwordHash);
-        if (!isValid) throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      if (access.status === 'missing_password') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'SHARE_PASSWORD_REQUIRED' });
       }
+
+      if (access.status === 'not_found') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });
+      }
+
+      const { link } = access;
 
       const summary = await contentModel.getContentSummary(link.contentUid);
       if (!summary) throw new TRPCError({ code: 'NOT_FOUND', message: 'SHARE_NOT_FOUND' });

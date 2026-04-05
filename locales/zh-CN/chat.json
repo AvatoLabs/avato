@@ -30,6 +30,8 @@
   "builtinCopilot": "内置 Copilot",
   "chatList.expandMessage": "展开消息",
   "chatList.longMessageDetail": "查看详情",
+  "chatList.memoryUnavailable.desc": "本轮回复会先在不引用话题记忆的情况下继续。需要记忆上下文时，你可以稍后再试。",
+  "chatList.memoryUnavailable.title": "记忆暂时不可用",
   "clearCurrentMessages": "清空当前会话消息",
   "compressedHistory": "压缩历史",
   "compression.cancel": "取消压缩",
