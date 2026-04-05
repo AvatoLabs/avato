@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
+import { type MultiSelectActionType } from '@/routes/(main)/content/features/store/action';
 
 const styles = createStaticStyles(({ css }) => ({
   total: css`
@@ -13,14 +14,6 @@ const styles = createStaticStyles(({ css }) => ({
     height: 27px;
   `,
 }));
-
-export type MultiSelectActionType =
-  | 'addToSourceSet'
-  | 'moveToSourceSet'
-  | 'batchChunking'
-  | 'delete'
-  | 'deleteSourceSet'
-  | 'removeFromSourceSet';
 
 interface MultiSelectActionsProps {
   onActionClick: (type: MultiSelectActionType) => Promise<void>;
@@ -124,6 +117,49 @@ const MultiSelectActions = memo<MultiSelectActionsProps>(
                 {t('FileManager.actions.addToSourceSet')}
               </Button>
             )}
+            <Button
+              color={'default'}
+              icon={<Icon icon={RESOURCE_ENTRY_ICONS.check} />}
+              size={'small'}
+              variant={'filled'}
+              onClick={async () => {
+                try {
+                  await onActionClick('approveAssets');
+                  message.success(
+                    t('FileManager.actions.approveAssetsSuccess', { count: selectCount }),
+                  );
+                } catch (error) {
+                  console.error(error);
+                  message.error(t('FileManager.actions.approveAssetsError'));
+                }
+              }}
+            >
+              {t('FileManager.actions.approveAssets')}
+            </Button>
+            <Button
+              color={'default'}
+              icon={<Icon icon={RESOURCE_ENTRY_ICONS.archive} />}
+              size={'small'}
+              variant={'filled'}
+              onClick={() => {
+                modal.confirm({
+                  onOk: async () => {
+                    try {
+                      await onActionClick('archiveAssets');
+                      message.success(
+                        t('FileManager.actions.archiveAssetsSuccess', { count: selectCount }),
+                      );
+                    } catch (error) {
+                      console.error(error);
+                      message.error(t('FileManager.actions.archiveAssetsError'));
+                    }
+                  },
+                  title: t('FileManager.actions.confirmArchiveAssets', { count: selectCount }),
+                });
+              }}
+            >
+              {t('FileManager.actions.archiveAssets')}
+            </Button>
             <Button
               color={'default'}
               icon={<Icon icon={RESOURCE_ENTRY_ICONS.chunk} />}

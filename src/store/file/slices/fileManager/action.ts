@@ -622,6 +622,21 @@ export class FileManageActionImpl {
     return response;
   };
 
+  updateFileAssetsGovernance = async (
+    ids: string[],
+    data: {
+      classification?: FileAssetClassification;
+      metadata?: FileAssetMetadata | null;
+      rightsOwner?: string | null;
+      usagePolicy?: FileAssetUsagePolicy;
+    },
+  ): Promise<void> => {
+    if (ids.length === 0) return;
+
+    await pMap(ids, async (id) => this.updateFileAssetGovernance(id, data), { concurrency: 5 });
+    await this.#get().refreshFileList();
+  };
+
   approveFileAsset = async (id: string): Promise<FileAssetState> => {
     const response = await serverFileService.approveFileAsset(id);
 
@@ -632,6 +647,13 @@ export class FileManageActionImpl {
     return response;
   };
 
+  approveFileAssets = async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) return;
+
+    await pMap(ids, async (id) => this.approveFileAsset(id), { concurrency: 5 });
+    await this.#get().refreshFileList();
+  };
+
   archiveFileAsset = async (id: string): Promise<FileAssetState> => {
     const response = await serverFileService.archiveFileAsset(id);
 
@@ -640,6 +662,13 @@ export class FileManageActionImpl {
     });
 
     return response;
+  };
+
+  archiveFileAssets = async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) return;
+
+    await pMap(ids, async (id) => this.archiveFileAsset(id), { concurrency: 5 });
+    await this.#get().refreshFileList();
   };
 
   useFetchFileAsset = (id?: string): SWRResponse<FileAssetState | undefined> => {

@@ -16,6 +16,8 @@ import { initialState } from './initialState';
 
 export type MultiSelectActionType =
   | 'addToSourceSet'
+  | 'approveAssets'
+  | 'archiveAssets'
   | 'moveToSourceSet'
   | 'batchChunking'
   | 'delete'
@@ -165,6 +167,18 @@ export const store: CreateStore = (publicState) => (set, get) => ({
       case 'delete': {
         await fileStore.deleteContentItems(selectedFileIds);
 
+        set({ selectedFileIds: [] });
+        return;
+      }
+
+      case 'approveAssets': {
+        await fileStore.approveFileAssets(selectedFileIds);
+        set({ selectedFileIds: [] });
+        return;
+      }
+
+      case 'archiveAssets': {
+        await fileStore.archiveFileAssets(selectedFileIds);
         set({ selectedFileIds: [] });
         return;
       }

@@ -8,6 +8,12 @@ export default {
   'DragUpload.dragFileTitle': 'Upload Files',
   'DragUpload.dragTitle': 'Upload Images',
   'FileManager.actions.addToSourceSet': 'Add to Reference Set',
+  'FileManager.actions.approveAssets': 'Approve assets',
+  'FileManager.actions.approveAssetsError': 'Failed to approve the selected assets.',
+  'FileManager.actions.approveAssetsSuccess': '{{count}} assets approved.',
+  'FileManager.actions.archiveAssets': 'Archive assets',
+  'FileManager.actions.archiveAssetsError': 'Failed to archive the selected assets.',
+  'FileManager.actions.archiveAssetsSuccess': '{{count}} assets archived.',
   'FileManager.actions.batchChunking': 'Batch Chunking',
   'FileManager.actions.chunking': 'Chunking',
   'FileManager.actions.chunkingTooltip':
@@ -19,6 +25,8 @@ export default {
     'You are about to delete this folder and all of its contents. This action cannot be undone. Please confirm your decision.',
   'FileManager.actions.confirmDeleteMultiFiles':
     'You are about to delete the selected {{count}} files. Once deleted, they cannot be recovered. Please confirm your action.',
+  'FileManager.actions.confirmArchiveAssets':
+    'You are about to archive the selected {{count}} files. Confirm to continue.',
   'FileManager.actions.confirmRemoveFromSourceSet':
     "You're about to remove {{count}} selected file(s) from this reference set. They'll still be available in Content. Confirm to continue.",
   'FileManager.actions.copyUrl': 'Copy Link',
@@ -43,6 +51,11 @@ export default {
   'FileManager.actions.rename': 'Rename',
   'FileManager.actions.renameError': 'Rename failed',
   'FileManager.actions.renameSuccess': 'Rename successful',
+  'FileManager.actions.setAssetClassification': 'Set classification',
+  'FileManager.actions.setAssetUsagePolicy': 'Set usage policy',
+  'FileManager.actions.updateAssetGovernanceError': 'Failed to update the selected assets.',
+  'FileManager.actions.updateClassificationSuccess': 'Classification updated for {{count}} assets.',
+  'FileManager.actions.updateUsagePolicySuccess': 'Usage policy updated for {{count}} assets.',
   'FileManager.bottom': "You've reached the end.",
   'FileManager.config.showFilesInSourceSet': 'Show content in Reference Set',
   'FileManager.emptyStatus.actions.file': 'Upload File',

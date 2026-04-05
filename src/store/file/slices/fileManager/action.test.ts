@@ -1,4 +1,4 @@
-import { FileAssetUsagePolicy } from '@lobechat/types';
+import { FileAssetClassification, FileAssetUsagePolicy } from '@lobechat/types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -975,6 +975,50 @@ describe('FileManagerActions', () => {
     });
   });
 
+  describe('updateFileAssetsGovernance', () => {
+    it('should update selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.updateFileAssetGovernance.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.updateFileAssetsGovernance(['file-1', 'file-2'], {
+          classification: FileAssetClassification.Legal,
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        });
+      });
+
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(1, {
+        classification: FileAssetClassification.Legal,
+        id: 'file-1',
+        usagePolicy: FileAssetUsagePolicy.Restricted,
+      });
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).toHaveBeenNthCalledWith(2, {
+        classification: FileAssetClassification.Legal,
+        id: 'file-2',
+        usagePolicy: FileAssetUsagePolicy.Restricted,
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch governance update when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.updateFileAssetsGovernance([], {
+          classification: FileAssetClassification.Brand,
+        });
+      });
+
+      expect(lambdaClient.file.updateFileAssetGovernance.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('approveFileAsset', () => {
     it('should update the file asset cache after approval', async () => {
       const { result } = renderHook(() => useStore());
@@ -999,6 +1043,41 @@ describe('FileManagerActions', () => {
     });
   });
 
+  describe('approveFileAssets', () => {
+    it('should approve selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.approveFileAsset.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.approveFileAssets(['file-1', 'file-2']);
+      });
+
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenNthCalledWith(1, {
+        id: 'file-1',
+      });
+      expect(lambdaClient.file.approveFileAsset.mutate).toHaveBeenNthCalledWith(2, {
+        id: 'file-2',
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch approve when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.approveFileAssets([]);
+      });
+
+      expect(lambdaClient.file.approveFileAsset.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('archiveFileAsset', () => {
     it('should update the file asset cache after archive', async () => {
       const { result } = renderHook(() => useStore());
@@ -1020,6 +1099,41 @@ describe('FileManagerActions', () => {
       expect(mutate).toHaveBeenCalledWith(['useFetchFileAsset', 'file-1'], mockAsset, {
         revalidate: false,
       });
+    });
+  });
+
+  describe('archiveFileAssets', () => {
+    it('should archive selected assets and refresh once', async () => {
+      const { result } = renderHook(() => useStore());
+
+      vi.mocked(lambdaClient.file.archiveFileAsset.mutate).mockResolvedValue({} as any);
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.archiveFileAssets(['file-1', 'file-2']);
+      });
+
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenCalledTimes(2);
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenNthCalledWith(1, {
+        id: 'file-1',
+      });
+      expect(lambdaClient.file.archiveFileAsset.mutate).toHaveBeenNthCalledWith(2, {
+        id: 'file-2',
+      });
+      expect(refreshSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip batch archive when selection is empty', async () => {
+      const { result } = renderHook(() => useStore());
+
+      const refreshSpy = vi.spyOn(result.current, 'refreshFileList').mockResolvedValue();
+
+      await act(async () => {
+        await result.current.archiveFileAssets([]);
+      });
+
+      expect(lambdaClient.file.archiveFileAsset.mutate).not.toHaveBeenCalled();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
   });
 

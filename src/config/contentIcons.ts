@@ -1,4 +1,5 @@
 import {
+  IconArchive,
   IconArrowLeft,
   IconArrowUp,
   IconBinaryTree2,
@@ -41,6 +42,7 @@ import { createEntryIcon } from './entryIcons';
 
 export const RESOURCE_ENTRY_ICONS = {
   all: createEntryIcon(IconLayoutGrid),
+  archive: createEntryIcon(IconArchive),
   audios: createEntryIcon(IconMusic),
   back: createEntryIcon(IconArrowLeft),
   calendar: createEntryIcon(IconCalendar),

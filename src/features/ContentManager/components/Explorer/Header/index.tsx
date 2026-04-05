@@ -70,6 +70,41 @@ const Header = memo(() => {
       ) : null}
 
       <ActionIcon
+        icon={RESOURCE_ENTRY_ICONS.check}
+        title={t('FileManager.actions.approveAssets')}
+        onClick={async () => {
+          try {
+            await onActionClick('approveAssets');
+            message.success(t('FileManager.actions.approveAssetsSuccess', { count: selectCount }));
+          } catch (error) {
+            console.error(error);
+            message.error(t('FileManager.actions.approveAssetsError'));
+          }
+        }}
+      />
+
+      <ActionIcon
+        icon={RESOURCE_ENTRY_ICONS.archive}
+        title={t('FileManager.actions.archiveAssets')}
+        onClick={() => {
+          modal.confirm({
+            onOk: async () => {
+              try {
+                await onActionClick('archiveAssets');
+                message.success(
+                  t('FileManager.actions.archiveAssetsSuccess', { count: selectCount }),
+                );
+              } catch (error) {
+                console.error(error);
+                message.error(t('FileManager.actions.archiveAssetsError'));
+              }
+            },
+            title: t('FileManager.actions.confirmArchiveAssets', { count: selectCount }),
+          });
+        }}
+      />
+
+      <ActionIcon
         icon={RESOURCE_ENTRY_ICONS.chunk}
         title={t('FileManager.actions.batchChunking')}
         onClick={async () => {

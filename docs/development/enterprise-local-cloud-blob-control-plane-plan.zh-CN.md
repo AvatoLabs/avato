@@ -34,6 +34,7 @@
 - **治理筛选 summary contract 已进入 Header**：Files header 现在不再只能显示 “当前筛了几个条件”，而是会通过独立的 server-side summary query 为 `classification / review status / usage policy` 选项显示当前 scope 下的实时计数，开始具备真正可用的治理决策辅助，而不只是 query 参数壳层。
 - **治理筛选空态已开始具备恢复动作**：当 `classification / review status / usage policy` 把当前列表筛空时，Files 空态不再退回默认上传文案，而会明确提示 “当前治理筛选下没有匹配的文件”，展示当前生效的治理筛选，并提供一键或逐项清除筛选的恢复入口。
 - **治理筛选状态条已开始带出结果规模**：当前 header 里生效的 `classification / review status / usage policy` 不再只显示 compact chips；同一条状态条现在还会补一个 “{{count}} matching files / {{count}} 个匹配文件” 的 summary，让用户在不展开 popover 的情况下也能快速判断筛选是否过窄。
+- **Files 多选已开始具备首批批量治理动作**：当前 Explorer 多选工具栏和 batch actions dropdown 已开始支持 `approve assets / archive assets`，并且 batch dropdown 还支持直接批量更新 `classification / usage policy`；reviewer 不再必须逐个点进 `FileDetail` 才能完成最常见的审核流转，这意味着 Files 资产治理已经从 “筛选 + 单条编辑” 进入 “最小批量操作闭环”。
 
 这说明：
 

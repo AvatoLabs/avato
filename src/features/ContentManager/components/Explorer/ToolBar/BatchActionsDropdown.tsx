@@ -1,3 +1,4 @@
+import { FileAssetClassification, FileAssetUsagePolicy } from '@lobechat/types';
 import { type DropdownItem } from '@lobehub/ui';
 import { DropdownMenu, Icon } from '@lobehub/ui';
 import { App } from 'antd';
@@ -6,17 +7,11 @@ import { useTranslation } from 'react-i18next';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
 import { useContentManagerStore } from '@/routes/(main)/content/features/store';
+import { type MultiSelectActionType } from '@/routes/(main)/content/features/store/action';
+import { useFileStore } from '@/store/file';
 import { useSourceSetStore } from '@/store/sourceSet';
 
 import ActionIconWithChevron from './ActionIconWithChevron';
-
-export type MultiSelectActionType =
-  | 'addToSourceSet'
-  | 'moveToSourceSet'
-  | 'batchChunking'
-  | 'delete'
-  | 'deleteSourceSet'
-  | 'removeFromSourceSet';
 
 interface BatchActionsDropdownProps {
   onActionClick: (type: MultiSelectActionType) => Promise<void>;
@@ -27,11 +22,13 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
   const { t } = useTranslation(['components', 'common', 'file', 'sourceSet']);
   const { modal, message } = App.useApp();
 
-  const [sourceSetId, selectedFileIds] = useContentManagerStore((s) => [
+  const [sourceSetId, selectedFileIds, setSelectedFileIds] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.selectedFileIds,
+    s.setSelectedFileIds,
   ]);
   const spaceId = useContentManagerStore((s) => s.spaceId);
+  const updateFileAssetsGovernance = useFileStore((s) => s.updateFileAssetsGovernance);
   const [useFetchSourceSetList, addFilesToSourceSet] = useSourceSetStore((s) => [
     s.useFetchSourceSetList,
     s.addFilesToSourceSet,
@@ -65,6 +62,43 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
 
     const availableSourceSets = (sourceSets || []).filter(
       (sourceSet) => sourceSet.id !== sourceSetId,
+    );
+    const applyBatchGovernance = async (
+      patch: {
+        classification?: FileAssetClassification;
+        usagePolicy?: FileAssetUsagePolicy;
+      },
+      successKey: string,
+    ) => {
+      try {
+        await updateFileAssetsGovernance(selectedFileIds, patch);
+        setSelectedFileIds([]);
+        message.success(t(successKey, { count: selectCount }));
+      } catch (error) {
+        console.error(error);
+        message.error(t('FileManager.actions.updateAssetGovernanceError'));
+      }
+    };
+    const classificationSubmenu: DropdownItem[] = Object.values(FileAssetClassification).map(
+      (classification) => ({
+        disabled: selectCount === 0,
+        key: `set-classification-${classification}`,
+        label: t(`detail.asset.classification.${classification}`, { ns: 'file' }),
+        onClick: async () =>
+          applyBatchGovernance(
+            { classification },
+            'FileManager.actions.updateClassificationSuccess',
+          ),
+      }),
+    );
+    const usagePolicySubmenu: DropdownItem[] = Object.values(FileAssetUsagePolicy).map(
+      (usagePolicy) => ({
+        disabled: selectCount === 0,
+        key: `set-usage-policy-${usagePolicy}`,
+        label: t(`detail.asset.usagePolicy.${usagePolicy}`, { ns: 'file' }),
+        onClick: async () =>
+          applyBatchGovernance({ usagePolicy }, 'FileManager.actions.updateUsagePolicySuccess'),
+      }),
     );
 
     const addToSourceSetSubmenu: DropdownItem[] = availableSourceSets.map((sourceSet) => ({
@@ -131,6 +165,63 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
 
     items.push(
       {
+        children: classificationSubmenu as any,
+        disabled: selectCount === 0,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
+        key: 'setAssetClassification',
+        label: t('FileManager.actions.setAssetClassification'),
+      },
+      {
+        children: usagePolicySubmenu as any,
+        disabled: selectCount === 0,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.edit} />,
+        key: 'setAssetUsagePolicy',
+        label: t('FileManager.actions.setAssetUsagePolicy'),
+      },
+      {
+        type: 'divider',
+      },
+      {
+        disabled: selectCount === 0,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.check} />,
+        key: 'approveAssets',
+        label: t('FileManager.actions.approveAssets'),
+        onClick: async () => {
+          try {
+            await onActionClick('approveAssets');
+            message.success(t('FileManager.actions.approveAssetsSuccess', { count: selectCount }));
+          } catch (error) {
+            console.error(error);
+            message.error(t('FileManager.actions.approveAssetsError'));
+          }
+        },
+      },
+      {
+        disabled: selectCount === 0,
+        icon: <Icon icon={RESOURCE_ENTRY_ICONS.archive} />,
+        key: 'archiveAssets',
+        label: t('FileManager.actions.archiveAssets'),
+        onClick: async () => {
+          modal.confirm({
+            onOk: async () => {
+              try {
+                await onActionClick('archiveAssets');
+                message.success(
+                  t('FileManager.actions.archiveAssetsSuccess', { count: selectCount }),
+                );
+              } catch (error) {
+                console.error(error);
+                message.error(t('FileManager.actions.archiveAssetsError'));
+              }
+            },
+            title: t('FileManager.actions.confirmArchiveAssets', { count: selectCount }),
+          });
+        },
+      },
+      {
+        type: 'divider',
+      },
+      {
         disabled: selectCount === 0,
         icon: <Icon icon={RESOURCE_ENTRY_ICONS.chunk} />,
         key: 'batchChunking',
@@ -169,10 +260,12 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
     selectCount,
     selectedFileIds,
     onActionClick,
+    updateFileAssetsGovernance,
     addFilesToSourceSet,
     t,
     modal,
     message,
+    setSelectedFileIds,
     sourceSets,
   ]);
 
