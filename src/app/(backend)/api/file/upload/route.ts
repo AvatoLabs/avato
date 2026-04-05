@@ -18,10 +18,12 @@ export const runtime = 'nodejs';
 const log = debug('lobe-server:file-upload');
 
 const MAX_LEGACY_PATHNAME_LEN = 2048;
+const LEGACY_ALLOWED_UPLOAD_PREFIXES = ['files/', 'v2/spaces/'] as const;
 
 /**
  * Reject path traversal and absolute keys. Exported for unit tests.
- * Clients must send a relative object key (e.g. `files/<bucket>/…` as today).
+ * Clients must send a relative object key under an allowed storage namespace
+ * (legacy `files/...` or current `v2/spaces/...`).
  */
 export function getLegacyUploadPathnameValidationError(pathname: unknown): string | null {
   if (typeof pathname !== 'string' || !pathname) return 'Invalid pathname.';
@@ -31,6 +33,9 @@ export function getLegacyUploadPathnameValidationError(pathname: unknown): strin
   if (norm.includes('\0')) return 'Invalid pathname.';
   for (const segment of norm.split('/')) {
     if (segment === '..') return 'Invalid pathname.';
+  }
+  if (!LEGACY_ALLOWED_UPLOAD_PREFIXES.some((prefix) => norm.startsWith(prefix))) {
+    return 'Invalid pathname.';
   }
   return null;
 }

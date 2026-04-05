@@ -41,21 +41,21 @@ export const buildFileAssetBadges = ({
   const normalizeCompactLabel = (value: string, maxLength = 14) =>
     value.length <= maxLength ? value : `${value.slice(0, maxLength - 1).trimEnd()}…`;
 
-  if (assetReviewStatus === 'archived') {
-    badges.push({
-      color: 'gold',
-      key: `review:${assetReviewStatus}`,
-      label: t(`detail.asset.reviewStatus.${assetReviewStatus}`, { ns: 'file' }),
-      variant: 'filled',
-    });
-  }
-
   if (assetUsagePolicy && assetUsagePolicy !== 'internal') {
     badges.push({
       color: assetUsagePolicy === 'restricted' ? 'gold' : 'processing',
       key: `usage:${assetUsagePolicy}`,
       label: t(`detail.asset.usagePolicy.${assetUsagePolicy}`, { ns: 'file' }),
       variant: 'outlined',
+    });
+  }
+
+  if (assetReviewStatus && assetReviewStatus !== 'draft') {
+    badges.push({
+      color: assetReviewStatus === 'archived' ? 'gold' : 'success',
+      key: `review:${assetReviewStatus}`,
+      label: t(`detail.asset.reviewStatus.${assetReviewStatus}`, { ns: 'file' }),
+      variant: 'filled',
     });
   }
 

@@ -18,6 +18,8 @@ const fileAssetClassificationValues = [
   'product',
 ] as const;
 
+const fileAssetReviewStatusValues = ['approved', 'archived', 'draft'] as const;
+
 const fileAssetUsagePolicyValues = ['internal', 'public', 'restricted'] as const;
 
 export interface FileListItem {
@@ -64,6 +66,17 @@ export interface FileListItem {
   url: string;
 }
 
+export interface FileGovernanceSummaryGroup<T extends string> {
+  counts: Partial<Record<T, number>>;
+  total: number;
+}
+
+export interface FileGovernanceSummary {
+  classification: FileGovernanceSummaryGroup<FileAssetClassification>;
+  reviewStatus: FileGovernanceSummaryGroup<FileAssetReviewStatus>;
+  usagePolicy: FileGovernanceSummaryGroup<FileAssetUsagePolicy>;
+}
+
 export enum SortType {
   Asc = 'asc',
   Desc = 'desc',
@@ -72,6 +85,7 @@ export enum SortType {
 export const QueryFileListSchema = z.object({
   attachableOnly: z.boolean().default(false),
   assetClassification: z.enum(fileAssetClassificationValues).optional(),
+  assetReviewStatus: z.enum(fileAssetReviewStatusValues).optional(),
   assetUsagePolicy: z.enum(fileAssetUsagePolicyValues).optional(),
   category: z.string().optional(),
   sourceSetId: z.string().optional(),
@@ -90,6 +104,7 @@ export type QueryFileListSchemaType = z.infer<typeof QueryFileListSchema>;
 
 export interface QueryFileListParams {
   assetClassification?: FileAssetClassification;
+  assetReviewStatus?: FileAssetReviewStatus;
   assetUsagePolicy?: FileAssetUsagePolicy;
   attachableOnly?: boolean;
   category?: string;

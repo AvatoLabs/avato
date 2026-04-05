@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FileAssetClassification, FilesTabs, SortType } from '@/types/files';
+import { FileAssetClassification, FileAssetReviewStatus, FilesTabs, SortType } from '@/types/files';
 
 import { buildExplorerQueryParams, isSpaceLevelContentFilter } from './queryParams';
 
@@ -70,6 +70,18 @@ describe('buildExplorerQueryParams', () => {
     });
 
     expect(params.assetUsagePolicy).toBe('restricted');
+  });
+
+  it('passes through asset review status filters', () => {
+    const params = buildExplorerQueryParams({
+      assetReviewStatus: FileAssetReviewStatus.Approved,
+      category: FilesTabs.Home,
+      sorter: 'createdAt',
+      sortType: SortType.Desc,
+      spaceId: 'spc_1',
+    });
+
+    expect(params.assetReviewStatus).toBe(FileAssetReviewStatus.Approved);
   });
 
   it('disables category filters inside source sets while keeping folder scope', () => {

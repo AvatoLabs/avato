@@ -37,7 +37,11 @@ vi.mock('antd', () => ({
   ),
   Select: ({ onChange, options, value, ...rest }: any) => {
     const testId =
-      rest['aria-label'] === 'Classification' ? 'classification-select' : 'usage-select';
+      rest['aria-label'] === 'Classification'
+        ? 'classification-select'
+        : rest['aria-label'] === 'Review Status'
+          ? 'review-status-select'
+          : 'usage-select';
 
     return (
       <select
@@ -82,6 +86,11 @@ vi.mock('react-i18next', () => ({
           'detail.asset.classification.finance': 'Finance',
           'detail.asset.classification.hr': 'HR',
           'detail.asset.classification.label': 'Classification',
+          'detail.asset.reviewStatus.all': 'All review statuses',
+          'detail.asset.reviewStatus.approved': 'Approved',
+          'detail.asset.reviewStatus.archived': 'Archived',
+          'detail.asset.reviewStatus.draft': 'Draft',
+          'detail.asset.reviewStatus.label': 'Review Status',
           'detail.asset.usagePolicy.all': 'All usage policies',
           'detail.asset.usagePolicy.internal': 'Internal',
           'detail.asset.usagePolicy.public': 'Public',
@@ -89,7 +98,9 @@ vi.mock('react-i18next', () => ({
           'detail.asset.usagePolicy.label': 'Usage Policy',
           'filters.governance': 'Governance',
           'filters.governanceActive': `Governance (${options?.count})`,
+          'filters.matchingFiles': `${options?.count} matching files`,
           'filters.clearGovernance': 'Clear governance filters',
+          'filters.clearGovernanceFilter': `Clear ${options?.label} filter`,
         } as Record<string, string>
       )[key] ||
       key,
@@ -112,11 +123,50 @@ vi.mock('@/features/ResourceSpaces', () => ({
 }));
 
 vi.mock('@/routes/(main)/content/features/store', () => ({
+  useContentManagerFetchGovernanceSummary: () => ({
+    data: {
+      classification: {
+        counts: {
+          brand: 2,
+          finance: 0,
+          general: 5,
+          hr: 0,
+          legal: 0,
+          product: 1,
+        },
+        total: 8,
+      },
+      reviewStatus: {
+        counts: {
+          approved: 3,
+          archived: 1,
+          draft: 4,
+        },
+        total: 8,
+      },
+      usagePolicy: {
+        counts: {
+          internal: 4,
+          public: 1,
+          restricted: 3,
+        },
+        total: 8,
+      },
+    },
+  }),
   useContentManagerStore: (selector: any) =>
     selector({
       category: 'home',
+      currentFolderId: null,
       sourceSetId: undefined,
       setMode: mockSetMode,
+    }),
+}));
+
+vi.mock('@/store/file', () => ({
+  useFileStore: (selector: any) =>
+    selector({
+      total: 3,
     }),
 }));
 
@@ -219,6 +269,21 @@ describe('CategoryMenu', () => {
     expect(params.get('view')).toBe('masonry');
   });
 
+  it('preserves current governance params when switching review status', () => {
+    renderCategoryMenu('/spaces/spc_1/files?assetClassification=brand&assetUsagePolicy=restricted');
+
+    fireEvent.change(screen.getByTestId('review-status-select'), {
+      target: { value: 'approved' },
+    });
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetClassification')).toBe('brand');
+    expect(params.get('assetUsagePolicy')).toBe('restricted');
+    expect(params.get('assetReviewStatus')).toBe('approved');
+  });
+
   it('preserves the current folder path when changing governance filters', () => {
     renderCategoryMenu('/spaces/spc_1/files/folder-a?view=masonry&scope=source-set:sst_1');
 
@@ -256,7 +321,7 @@ describe('CategoryMenu', () => {
 
   it('clears governance filters without dropping the current folder scope', () => {
     renderCategoryMenu(
-      '/spaces/spc_1/files/folder-a?scope=source-set:sst_1&view=masonry&assetClassification=brand&assetUsagePolicy=restricted',
+      '/spaces/spc_1/files/folder-a?scope=source-set:sst_1&view=masonry&assetClassification=brand&assetReviewStatus=approved&assetUsagePolicy=restricted',
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear governance filters' }));
@@ -268,6 +333,45 @@ describe('CategoryMenu', () => {
     expect(params.get('scope')).toBe('source-set:sst_1');
     expect(params.get('view')).toBe('masonry');
     expect(params.has('assetClassification')).toBe(false);
+    expect(params.has('assetReviewStatus')).toBe(false);
     expect(params.has('assetUsagePolicy')).toBe(false);
+  });
+
+  it('shows active governance chips and clears one filter at a time', () => {
+    renderCategoryMenu(
+      '/spaces/spc_1/files?assetClassification=brand&assetReviewStatus=approved&assetUsagePolicy=restricted',
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Clear Classification: Brand filter' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear Review Status: Approved filter' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear Usage Policy: Restricted filter' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Classification: Brand')).toBeInTheDocument();
+    expect(screen.getByText('Review Status: Approved')).toBeInTheDocument();
+    expect(screen.getByText('Usage Policy: Restricted')).toBeInTheDocument();
+    expect(screen.getByText('3 matching files')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Review Status: Approved filter' }));
+
+    const location = screen.getByTestId('location').textContent || '';
+    const params = new URLSearchParams(location.split('?')[1]);
+
+    expect(params.get('assetClassification')).toBe('brand');
+    expect(params.get('assetUsagePolicy')).toBe('restricted');
+    expect(params.has('assetReviewStatus')).toBe(false);
+  });
+
+  it('shows governance summary counts inside filter options', () => {
+    renderCategoryMenu('/spaces/spc_1/files');
+
+    expect(screen.getByRole('option', { name: 'All classifications (8)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Brand (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Approved (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Restricted (3)' })).toBeInTheDocument();
   });
 });

@@ -20,6 +20,7 @@ import { getBlobProvider } from '@/server/modules/BlobProvider';
 import { FileService } from '@/server/services/file';
 import { resolveSpaceIdForSandboxExport } from '@/server/services/file/resolveSpaceIdForSandboxExport';
 import { MarketService } from '@/server/services/market';
+import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 import { SkillResourceService } from '@/server/services/skill/resource';
 
 import { type ServerRuntimeRegistration } from './types';
@@ -123,19 +124,19 @@ class SkillServerRuntimeService implements SkillRuntimeService {
         }
 
         if (skill.zipFileHash) {
-          // Get S3 key from globalFiles
-          const canAccess = await this.fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
-          const fileInfo = canAccess
-            ? await this.fileModel.checkHash(skill.zipFileHash)
-            : { isExist: false };
-
-          if (fileInfo.isExist && fileInfo.url) {
-            // Convert S3 key to full URL
-            const fullUrl = await this.fileService.getFullFileUrl(fileInfo.url);
-            if (fullUrl) {
-              enhancedParams.zipUrl = fullUrl;
-              log('Added zipUrl to execScript params for skill %s: %s', skill.name, fullUrl);
-            }
+          const zipUrl = await resolveAccessibleSkillZipProxyUrl({
+            fileModel: this.fileModel,
+            internal: true,
+            skillId: skill.id,
+            zipFileHash: skill.zipFileHash,
+          });
+          if (zipUrl) {
+            enhancedParams.zipUrl = zipUrl;
+            log(
+              'Added stable zipUrl to execScript params for skill %s: %s',
+              skill.name,
+              enhancedParams.zipUrl,
+            );
           }
         }
       }

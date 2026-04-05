@@ -2,10 +2,56 @@ import type { ChatFileItem, ChatImageItem, ChatVideoItem, UIChatMessage } from '
 
 import { appEnv } from '@/envs/app';
 
-const shouldUseProxyUrl = (url?: string) => {
+const STABLE_APP_FILE_PROXY_PATTERNS = [
+  /^\/f\/[^/?#]+$/,
+  /^\/share\/f\/[^/?#]+$/,
+  /^\/share\/t\/[^/?#]+\/f\/[^/?#]+$/,
+  /^\/skills\/[^/?#]+\/zip$/,
+  /^\/eval\/records\/[^/?#]+$/,
+] as const;
+
+const isSameOriginAppUrl = (url: string) => {
+  try {
+    return new URL(url).origin === new URL(appEnv.APP_URL).origin;
+  } catch {
+    return false;
+  }
+};
+
+const getUrlPathname = (url: string) => {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (!isSameOriginAppUrl(url)) return null;
+
+    try {
+      return new URL(url).pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  return url.split(/[?#]/, 1)[0];
+};
+
+const isStableAppFileProxyUrl = (url?: string) => {
   if (!url) return false;
 
-  return appEnv.APP_URL.startsWith('https://') && url.startsWith('http://');
+  const pathname = getUrlPathname(url);
+  if (!pathname) return false;
+
+  return STABLE_APP_FILE_PROXY_PATTERNS.some((pattern) => pattern.test(pathname));
+};
+
+const shouldUseProxyUrl = (url?: string) => {
+  if (!url) return false;
+  if (isStableAppFileProxyUrl(url)) return false;
+
+  if (appEnv.APP_URL.startsWith('https://') && url.startsWith('http://')) return true;
+
+  try {
+    return new URL(url).origin === new URL(appEnv.APP_URL).origin;
+  } catch {
+    return false;
+  }
 };
 
 const withProxyUrl = <T extends { id: string; url: string }>(items?: T[]): T[] | undefined => {

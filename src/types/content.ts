@@ -1,5 +1,6 @@
 import {
   type FileAssetClassification,
+  type FileAssetReviewStatus,
   type FileAssetUsagePolicy,
   type FilesTabs,
   type SortType,
@@ -82,6 +83,7 @@ export interface SyncOperation {
  */
 export interface ContentQueryParams {
   assetClassification?: FileAssetClassification;
+  assetReviewStatus?: FileAssetReviewStatus;
   assetUsagePolicy?: FileAssetUsagePolicy;
   category?: FilesTabs;
   limit?: number;

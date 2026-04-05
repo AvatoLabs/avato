@@ -1,9 +1,15 @@
 // @vitest-environment node
-import { FilesTabs } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+} from '@lobechat/types';
 import { and, eq, isNull } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
+import { fileAssets, spaces } from '../../schemas';
 import type { NewDocument, NewFile } from '../../schemas/file';
 import { documents, files } from '../../schemas/file';
 import { users } from '../../schemas/user';
@@ -19,10 +25,17 @@ const serverDB: LobeChatDatabase = await getTestDB();
 
 beforeEach(async () => {
   // Clean up
+  await serverDB.delete(fileAssets);
+  await serverDB.delete(documents);
+  await serverDB.delete(files);
+  await serverDB.delete(spaces);
   await serverDB.delete(users);
 
   // Create test users
   await serverDB.insert(users).values([{ id: userId }, { id: otherUserId }]);
+  await serverDB
+    .insert(spaces)
+    .values([{ createdBy: userId, id: 'spc_knowledge', kind: 'team', name: 'Knowledge Space' }]);
 
   // Initialize repo
   knowledgeRepo = new KnowledgeRepo(serverDB, userId);
@@ -308,6 +321,68 @@ describe('KnowledgeRepo', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('Meeting Notes');
+    });
+  });
+
+  describe('query - governance filtering', () => {
+    beforeEach(async () => {
+      await serverDB.insert(files).values([
+        {
+          id: 'governance-file-1',
+          fileType: 'application/pdf',
+          name: 'brand-guidelines.pdf',
+          size: 1024,
+          url: 'governance-file-1-url',
+          userId,
+        },
+        {
+          id: 'governance-file-2',
+          fileType: 'application/pdf',
+          name: 'general-notes.pdf',
+          size: 768,
+          url: 'governance-file-2-url',
+          userId,
+        },
+      ]);
+
+      await serverDB.insert(documents).values({
+        content: 'Team playbook',
+        fileType: 'custom/document',
+        filename: 'team-playbook.md',
+        source: 'editor-source',
+        sourceType: 'api',
+        totalCharCount: 120,
+        totalLineCount: 12,
+        userId,
+      });
+
+      await serverDB.insert(fileAssets).values({
+        classification: FileAssetClassification.Brand,
+        createdBy: userId,
+        fileId: 'governance-file-1',
+        reviewStatus: FileAssetReviewStatus.Approved,
+        spaceId: 'spc_knowledge',
+        usagePolicy: FileAssetUsagePolicy.Restricted,
+      });
+    });
+
+    it('should filter file results by governance fields before pagination', async () => {
+      const results = await knowledgeRepo.query({
+        assetClassification: FileAssetClassification.Brand,
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe('governance-file-1');
+      expect(results[0].sourceType).toBe('file');
+    });
+
+    it('should exclude documents when governance filters are active', async () => {
+      const results = await knowledgeRepo.query({
+        assetReviewStatus: FileAssetReviewStatus.Draft,
+      });
+
+      expect(results.every((item) => item.sourceType === 'file')).toBe(true);
+      expect(results.map((item) => item.id).sort()).toEqual(['governance-file-2']);
     });
   });
 

@@ -31,7 +31,7 @@ import { FileService } from '@/server/services/file';
 import { resolveRemovableStorageUrls } from '@/server/services/file/removableStorageUrls';
 import { isStorageObjectMissingError } from '@/server/services/file/storageErrors';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
-import { type FileListItem } from '@/types/files';
+import { type FileGovernanceSummary, type FileListItem } from '@/types/files';
 import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
 
 /**
@@ -242,6 +242,66 @@ const buildFileAssetMap = async (ctx: { fileAssetModel: FileAssetModel }, fileId
       ];
     }),
   );
+};
+
+const buildFileGovernanceSummaryGroup = <T extends string>(
+  rows: Array<{
+    assetClassification?: FileAssetClassification | null;
+    assetReviewStatus?: FileAssetReviewStatus | null;
+    assetUsagePolicy?: FileAssetUsagePolicy | null;
+  }>,
+  values: readonly T[],
+  resolveValue: (row: (typeof rows)[number]) => T,
+) => {
+  const counts = Object.fromEntries(values.map((value) => [value, 0])) as Partial<
+    Record<T, number>
+  >;
+
+  for (const row of rows) {
+    const value = resolveValue(row);
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+
+  return {
+    counts,
+    total: rows.length,
+  };
+};
+
+const assertAccessibleKnowledgeSpace = async (
+  ctx: {
+    documentModel: DocumentModel;
+    resolver: AuthorizedResourceResolver;
+    spaceModel: SpaceModel;
+  },
+  input: {
+    parentId?: string | null;
+    sourceSetId?: string;
+    spaceId?: string;
+  },
+) => {
+  if (!input.spaceId) return;
+
+  const space = await ctx.spaceModel.findAccessibleSpaceById(input.spaceId);
+  if (space?.id) return;
+
+  let scopedSpaceId: string | null | undefined;
+
+  if (input.sourceSetId) {
+    const sourceSet = await ctx.resolver.requireSourceSet(input.sourceSetId, 'read_content');
+    scopedSpaceId = sourceSet.spaceId;
+  } else if (input.parentId) {
+    const resolvedParentId = await resolveParentDocumentId(ctx, {
+      parentId: input.parentId,
+      spaceId: input.spaceId,
+    });
+    const folder = await ctx.resolver.requireDocument(resolvedParentId!, 'read_content');
+    scopedSpaceId = folder.spaceId;
+  }
+
+  if (!scopedSpaceId || scopedSpaceId !== input.spaceId) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
+  }
 };
 
 export const fileRouter = router({
@@ -563,28 +623,7 @@ export const fileRouter = router({
   }),
 
   getKnowledgeItems: fileProcedure.input(QueryFileListSchema).query(async ({ ctx, input }) => {
-    if (input.spaceId) {
-      const space = await ctx.spaceModel.findAccessibleSpaceById(input.spaceId);
-      if (!space?.id) {
-        let scopedSpaceId: string | null | undefined;
-
-        if (input.sourceSetId) {
-          const sourceSet = await ctx.resolver.requireSourceSet(input.sourceSetId, 'read_content');
-          scopedSpaceId = sourceSet.spaceId;
-        } else if (input.parentId) {
-          const resolvedParentId = await resolveParentDocumentId(ctx, {
-            parentId: input.parentId,
-            spaceId: input.spaceId,
-          });
-          const folder = await ctx.resolver.requireDocument(resolvedParentId!, 'read_content');
-          scopedSpaceId = folder.spaceId;
-        }
-
-        if (!scopedSpaceId || scopedSpaceId !== input.spaceId) {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'SPACE_ACCESS_DENIED' });
-        }
-      }
-    }
+    await assertAccessibleKnowledgeSpace(ctx, input);
 
     // Request one more item than limit to check if there are more items
     const limit = input.limit ?? 50;
@@ -628,6 +667,11 @@ export const fileRouter = router({
       return true;
     });
 
+    const fileIds = aclFiltered
+      .filter((item) => item.sourceType === 'file')
+      .map((item: any) => item.fileId || item.id);
+    const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
+
     const attachableFileIds = input.attachableOnly
       ? new Set(
           await ctx.fileModel.getConversationAttachableFileIds(
@@ -649,9 +693,8 @@ export const fileRouter = router({
 
     // Process files (add chunk info and async task status)
     const fileItems = scopedItems.filter((item) => item.sourceType === 'file');
-    const fileIds = fileItems.map((item: any) => item.fileId || item.id);
-    const fileAssetMap = await buildFileAssetMap(ctx, fileIds);
-    const chunks = await ctx.chunkModel.countByFileIds(fileIds);
+    const scopedFileIds = fileItems.map((item: any) => item.fileId || item.id);
+    const chunks = await ctx.chunkModel.countByFileIds(scopedFileIds);
 
     const chunkTaskIds = fileItems.map((item) => item.chunkTaskId).filter(Boolean) as string[];
     const chunkTasks = await ctx.asyncTaskModel.findByIds(chunkTaskIds, AsyncTaskType.Chunking);
@@ -715,6 +758,56 @@ export const fileRouter = router({
       items: resultItems,
     };
   }),
+
+  getKnowledgeGovernanceSummary: fileProcedure
+    .input(QueryFileListSchema)
+    .query(async ({ ctx, input }): Promise<FileGovernanceSummary> => {
+      await assertAccessibleKnowledgeSpace(ctx, input);
+
+      const [classificationRows, reviewStatusRows, usagePolicyRows] = await Promise.all([
+        ctx.fileModel.queryGovernanceRows({
+          ...input,
+          assetClassification: undefined,
+        }),
+        ctx.fileModel.queryGovernanceRows({
+          ...input,
+          assetReviewStatus: undefined,
+        }),
+        ctx.fileModel.queryGovernanceRows({
+          ...input,
+          assetUsagePolicy: undefined,
+        }),
+      ]);
+
+      const [visibleClassificationRows, visibleReviewStatusRows, visibleUsagePolicyRows] =
+        await Promise.all(
+          [classificationRows, reviewStatusRows, usagePolicyRows].map(async (rows) => {
+            const visibleIds = new Set(
+              await ctx.contentAuthorizer.filterVisibleFileIdsForList(rows.map((item) => item.id)),
+            );
+
+            return rows.filter((item) => visibleIds.has(item.id));
+          }),
+        );
+
+      return {
+        classification: buildFileGovernanceSummaryGroup(
+          visibleClassificationRows,
+          Object.values(FileAssetClassification),
+          (row) => row.assetClassification ?? FileAssetClassification.General,
+        ),
+        reviewStatus: buildFileGovernanceSummaryGroup(
+          visibleReviewStatusRows,
+          Object.values(FileAssetReviewStatus),
+          (row) => row.assetReviewStatus ?? FileAssetReviewStatus.Draft,
+        ),
+        usagePolicy: buildFileGovernanceSummaryGroup(
+          visibleUsagePolicyRows,
+          Object.values(FileAssetUsagePolicy),
+          (row) => row.assetUsagePolicy ?? FileAssetUsagePolicy.Internal,
+        ),
+      };
+    }),
 
   recentFiles: fileProcedure
     .input(z.object({ limit: z.number().optional() }).optional())
@@ -814,7 +907,10 @@ export const fileRouter = router({
       throw new TRPCError({ code: 'FORBIDDEN', message: 'CLEAR_FILES_DENIED' });
     }
 
-    const cleared = await ctx.fileModel.clear(serverDBEnv.REMOVE_GLOBAL_FILE);
+    const cleared = await ctx.fileModel.clear(serverDBEnv.REMOVE_GLOBAL_FILE, {
+      includeUnscoped: true,
+      spaceId: personalSpace.id,
+    });
     await ctx.contentModel.invalidateAuthzEpochsAfterRemoval(
       cleared.map((file) => ({ contentUid: file.contentUid, spaceId: file.spaceId })),
     );

@@ -101,6 +101,45 @@ describe('serveAuthorizedFileDownload', () => {
   });
 
   describe('access events', () => {
+    it('supports accessOverride for topic-share downloads and preserves custom via metadata', async () => {
+      const res = await serveAuthorizedFileDownload({
+        accessOverride: {
+          authzEpoch: 11,
+          canAccess: true,
+          contentUid: 'cnt_topic_1',
+          matchedBy: 'share_link',
+          spaceId: 'spc_topic_1',
+        },
+        cacheIdentity: 'topic-share:share-1',
+        db: {} as LobeChatDatabase,
+        downloadVia: 'share_path',
+        eventVia: 'topic_share',
+        file: minimalFile,
+        fileId: 'file-1',
+        req: new Request('https://app.example.com/share/t/share-1/f/file-1'),
+        shareLinkId: null,
+        shareToken: null,
+        userId: undefined,
+      });
+
+      expect(res.status).toBe(302);
+      expect(mockGetAccessMatch).not.toHaveBeenCalled();
+      expect(mockCreateAccessEvent).toHaveBeenCalledWith({
+        accessType: 'file_download',
+        contentUid: 'cnt_topic_1',
+        metadata: {
+          downloadVia: 'share_path',
+          fileId: 'file-1',
+          matchedBy: 'share_link',
+          via: 'topic_share',
+        },
+        shareLinkId: null,
+        sourceIp: null,
+        spaceId: 'spc_topic_1',
+        userAgent: null,
+      });
+    });
+
     it('records share downloads with share_download accessType', async () => {
       mockGetAccessMatch.mockResolvedValue({
         authzEpoch: 3,

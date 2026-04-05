@@ -1,4 +1,11 @@
-import { FilesTabs, type QueryFileListParams, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  type QueryFileListParams,
+  SortType,
+} from '@lobechat/types';
 import {
   and,
   asc,
@@ -122,6 +129,122 @@ export class FileModel {
       size: item.size,
       url: item.url,
     };
+  };
+
+  private buildFileListWhereClause = ({
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
+    category,
+    q,
+    sortType,
+    sorter,
+    sourceSetId,
+    showFilesInSourceSet,
+    spaceId,
+  }: QueryFileListParams = {}) => {
+    let whereClause = and(
+      q ? ilike(files.name, `%${q}%`) : undefined,
+      spaceId ? eq(files.spaceId, spaceId) : eq(files.userId, this.userId),
+    );
+    if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
+      const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
+      if (Array.isArray(fileTypePrefix)) {
+        whereClause = and(
+          whereClause,
+          or(...fileTypePrefix.map((prefix) => ilike(files.fileType, `${prefix}%`))),
+        );
+      } else {
+        whereClause = and(whereClause, ilike(files.fileType, `${fileTypePrefix}%`));
+      }
+    }
+
+    let orderByClause = desc(files.createdAt);
+    const sortableFields = {
+      createdAt: files.createdAt,
+      name: files.name,
+      size: files.size,
+      updatedAt: files.updatedAt,
+    } as const;
+    type SortableField = keyof typeof sortableFields;
+
+    if (sorter && sortType && sorter in sortableFields) {
+      const sortFunction = sortType.toLowerCase() === SortType.Asc ? asc : desc;
+      orderByClause = sortFunction(sortableFields[sorter as SortableField]);
+    }
+
+    const shouldJoinFileAssets = Boolean(
+      assetClassification || assetReviewStatus || assetUsagePolicy,
+    );
+
+    if (assetClassification) {
+      whereClause =
+        assetClassification === FileAssetClassification.General
+          ? and(
+              whereClause,
+              or(eq(fileAssets.classification, assetClassification), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.classification, assetClassification));
+    }
+
+    if (assetReviewStatus) {
+      whereClause =
+        assetReviewStatus === FileAssetReviewStatus.Draft
+          ? and(
+              whereClause,
+              or(eq(fileAssets.reviewStatus, assetReviewStatus), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.reviewStatus, assetReviewStatus));
+    }
+
+    if (assetUsagePolicy) {
+      whereClause =
+        assetUsagePolicy === FileAssetUsagePolicy.Internal
+          ? and(
+              whereClause,
+              or(eq(fileAssets.usagePolicy, assetUsagePolicy), isNull(fileAssets.fileId)),
+            )
+          : and(whereClause, eq(fileAssets.usagePolicy, assetUsagePolicy));
+    }
+
+    return {
+      orderByClause,
+      shouldJoinFileAssets,
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    };
+  };
+
+  private applyFileListScope = <T extends { where: (clause: unknown) => unknown }>(
+    queryBuilder: T,
+    {
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    }: {
+      showFilesInSourceSet?: boolean;
+      sourceSetId?: string;
+      whereClause: unknown;
+    },
+  ) => {
+    let query: any = queryBuilder;
+
+    if (sourceSetId) {
+      query = query.innerJoin(
+        sourceSetFiles,
+        and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
+      );
+    } else if (!showFilesInSourceSet) {
+      const nextWhereClause = and(
+        whereClause as any,
+        notExists(this.db.select().from(sourceSetFiles).where(eq(sourceSetFiles.fileId, files.id))),
+      );
+
+      return query.where(nextWhereClause);
+    }
+
+    return query.where(whereClause as any);
   };
 
   /**
@@ -374,10 +497,22 @@ export class FileModel {
     return ids;
   };
 
-  clear = async (removeGlobalFile: boolean = true) => {
+  clear = async (
+    removeGlobalFile: boolean = true,
+    options?: { includeUnscoped?: boolean; spaceId?: string },
+  ) => {
     return this.db.transaction(async (trx) => {
+      const scopedWhereClause = and(
+        eq(files.userId, this.userId),
+        options?.spaceId
+          ? or(
+              eq(files.spaceId, options.spaceId),
+              options.includeUnscoped ? isNull(files.spaceId) : undefined,
+            )
+          : undefined,
+      );
       const fileList = await trx.query.files.findMany({
-        where: eq(files.userId, this.userId),
+        where: scopedWhereClause,
       });
 
       if (fileList.length === 0) return [];
@@ -386,7 +521,7 @@ export class FileModel {
       const hashList = Array.from(new Set(fileList.map((file) => file.fileHash!).filter(Boolean)));
 
       await this.deleteFileChunks(trx as any, fileIds);
-      await trx.delete(files).where(eq(files.userId, this.userId));
+      await trx.delete(files).where(scopedWhereClause);
 
       if (!removeGlobalFile || hashList.length === 0) return fileList;
 
@@ -477,6 +612,7 @@ export class FileModel {
 
   query = async ({
     assetClassification,
+    assetReviewStatus,
     assetUsagePolicy,
     category,
     q,
@@ -486,42 +622,25 @@ export class FileModel {
     showFilesInSourceSet,
     spaceId,
   }: QueryFileListParams = {}) => {
-    // 1. Build where clause
-    let whereClause = and(
-      q ? ilike(files.name, `%${q}%`) : undefined,
-      spaceId ? eq(files.spaceId, spaceId) : eq(files.userId, this.userId),
-    );
-    if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
-      const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
-      if (Array.isArray(fileTypePrefix)) {
-        // For multiple file types (e.g., Documents includes 'application' and 'custom')
-        whereClause = and(
-          whereClause,
-          or(...fileTypePrefix.map((prefix) => ilike(files.fileType, `${prefix}%`))),
-        );
-      } else {
-        whereClause = and(whereClause, ilike(files.fileType, `${fileTypePrefix}%`));
-      }
-    }
+    const {
+      orderByClause,
+      shouldJoinFileAssets,
+      showFilesInSourceSet: scopedShowFilesInSourceSet,
+      sourceSetId: scopedSourceSetId,
+      whereClause,
+    } = this.buildFileListWhereClause({
+      assetClassification,
+      assetReviewStatus,
+      assetUsagePolicy,
+      category,
+      q,
+      sortType,
+      sorter,
+      sourceSetId,
+      showFilesInSourceSet,
+      spaceId,
+    });
 
-    // 2. Build order clause
-
-    let orderByClause = desc(files.createdAt);
-    // create a map for sortable fields
-    const sortableFields = {
-      createdAt: files.createdAt,
-      name: files.name,
-      size: files.size,
-      updatedAt: files.updatedAt,
-    } as const;
-    type SortableField = keyof typeof sortableFields;
-
-    if (sorter && sortType && sorter in sortableFields) {
-      const sortFunction = sortType.toLowerCase() === SortType.Asc ? asc : desc;
-      orderByClause = sortFunction(sortableFields[sorter as SortableField]);
-    }
-
-    // 3. Build base query
     let query = this.db
       .select({
         chunkTaskId: files.chunkTaskId,
@@ -537,49 +656,36 @@ export class FileModel {
       })
       .from(files);
 
-    if (assetClassification || assetUsagePolicy) {
-      // @ts-ignore
+    if (shouldJoinFileAssets) {
       query = query.leftJoin(fileAssets, eq(files.id, fileAssets.fileId));
-
-      if (assetClassification) {
-        whereClause =
-          assetClassification === 'general'
-            ? and(
-                whereClause,
-                or(eq(fileAssets.classification, assetClassification), isNull(fileAssets.fileId)),
-              )
-            : and(whereClause, eq(fileAssets.classification, assetClassification));
-      }
-
-      if (assetUsagePolicy) {
-        whereClause =
-          assetUsagePolicy === 'internal'
-            ? and(
-                whereClause,
-                or(eq(fileAssets.usagePolicy, assetUsagePolicy), isNull(fileAssets.fileId)),
-              )
-            : and(whereClause, eq(fileAssets.usagePolicy, assetUsagePolicy));
-      }
     }
 
-    // 4. Scope to a source set when requested
-    if (sourceSetId) {
-      // @ts-ignore
-      query = query.innerJoin(
-        sourceSetFiles,
-        and(eq(files.id, sourceSetFiles.fileId), eq(sourceSetFiles.sourceSetId, sourceSetId)),
-      );
-    }
-    // 5. Otherwise exclude source-set files by default
-    else if (!showFilesInSourceSet) {
-      whereClause = and(
-        whereClause,
-        notExists(this.db.select().from(sourceSetFiles).where(eq(sourceSetFiles.fileId, files.id))),
-      );
-    }
+    return this.applyFileListScope(query, {
+      showFilesInSourceSet: scopedShowFilesInSourceSet,
+      sourceSetId: scopedSourceSetId,
+      whereClause,
+    }).orderBy(orderByClause);
+  };
 
-    // Otherwise, we are just filtering in the global files
-    return query.where(whereClause).orderBy(orderByClause);
+  queryGovernanceRows = async (params: QueryFileListParams = {}) => {
+    const { showFilesInSourceSet, sourceSetId, whereClause } =
+      this.buildFileListWhereClause(params);
+
+    const query = this.db
+      .select({
+        assetClassification: fileAssets.classification,
+        assetReviewStatus: fileAssets.reviewStatus,
+        assetUsagePolicy: fileAssets.usagePolicy,
+        id: files.id,
+      })
+      .from(files)
+      .leftJoin(fileAssets, eq(files.id, fileAssets.fileId));
+
+    return this.applyFileListScope(query, {
+      showFilesInSourceSet,
+      sourceSetId,
+      whereClause,
+    });
   };
 
   findByIds = async (ids: string[]) => {

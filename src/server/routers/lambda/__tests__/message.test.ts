@@ -494,11 +494,22 @@ describe('messageRouter', () => {
 
       // Verify we use the owner's id to create MessageModel
       const messageModel = new MessageModel({} as any, share.ownerId);
-      await messageModel.query({ topicId: share.topicId }, {});
+      await messageModel.query(
+        { topicId: share.topicId },
+        { postProcessUrl: async (_path, file) => `/share/t/${share.shareId}/f/${file.id}` },
+      );
 
       // Verify MessageModel was instantiated with owner's id
       expect(MessageModel).toHaveBeenCalledWith({} as any, 'topic-owner');
-      expect(mockQuery).toHaveBeenCalledWith({ topicId: 'shared-topic' }, {});
+      expect(mockQuery).toHaveBeenCalledWith(
+        { topicId: 'shared-topic' },
+        expect.objectContaining({ postProcessUrl: expect.any(Function) }),
+      );
+
+      const queryOptions = mockQuery.mock.calls[0][1];
+      await expect(
+        queryOptions.postProcessUrl('internal://file', { fileType: 'image/png', id: 'file-1' }),
+      ).resolves.toBe('/share/t/share-abc/f/file-1');
     });
   });
 });

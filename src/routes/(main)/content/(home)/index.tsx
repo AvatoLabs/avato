@@ -5,7 +5,12 @@ import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 
 import ContentManager from '@/features/ContentManager';
 import { getFileScope, getSourceSetScopeId } from '@/features/ContentManager/useFileScope';
-import { type FileAssetClassification, type FileAssetUsagePolicy, FilesTabs } from '@/types/files';
+import {
+  type FileAssetClassification,
+  type FileAssetReviewStatus,
+  type FileAssetUsagePolicy,
+  FilesTabs,
+} from '@/types/files';
 
 import { useInitFileCheck } from '../features/hooks/useInitFileCheck';
 import { useContentManagerStore } from '../features/store';
@@ -16,22 +21,26 @@ const ContentHomePage = memo(() => {
   const { spaceId } = useParams<{ spaceId?: string }>();
   const [
     assetClassification,
+    assetReviewStatus,
     assetUsagePolicy,
     category,
     currentSourceSetId,
     currentSpaceId,
     setAssetClassification,
+    setAssetReviewStatus,
     setAssetUsagePolicy,
     setCategory,
     setActiveSourceSetId,
     setSpaceId,
   ] = useContentManagerStore((s) => [
     s.assetClassification,
+    s.assetReviewStatus,
     s.assetUsagePolicy,
     s.category,
     s.sourceSetId,
     s.spaceId,
     s.setAssetClassification,
+    s.setAssetReviewStatus,
     s.setAssetUsagePolicy,
     s.setCategory,
     s.setSourceSetId,
@@ -40,6 +49,8 @@ const ContentHomePage = memo(() => {
 
   const assetClassificationParam =
     (searchParams.get('assetClassification') as FileAssetClassification | null) || undefined;
+  const assetReviewStatusParam =
+    (searchParams.get('assetReviewStatus') as FileAssetReviewStatus | null) || undefined;
   const assetUsagePolicyParam =
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
   const categoryParam = (searchParams.get('category') as FilesTabs) || FilesTabs.Home;
@@ -50,6 +61,7 @@ const ContentHomePage = memo(() => {
     (currentSpaceId === spaceId &&
       currentSourceSetId === scopedSourceSetId &&
       assetClassification === assetClassificationParam &&
+      assetReviewStatus === assetReviewStatusParam &&
       assetUsagePolicy === assetUsagePolicyParam &&
       category === categoryParam);
 
@@ -66,15 +78,18 @@ const ContentHomePage = memo(() => {
   useLayoutEffect(() => {
     if (isOnHomeRoute) {
       setAssetClassification(assetClassificationParam);
+      setAssetReviewStatus(assetReviewStatusParam);
       setAssetUsagePolicy(assetUsagePolicyParam);
       setCategory(categoryParam);
     }
   }, [
     assetClassificationParam,
+    assetReviewStatusParam,
     assetUsagePolicyParam,
     categoryParam,
     isOnHomeRoute,
     setAssetClassification,
+    setAssetReviewStatus,
     setAssetUsagePolicy,
     setCategory,
   ]);

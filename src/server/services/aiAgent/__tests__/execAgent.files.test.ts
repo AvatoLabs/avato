@@ -3,13 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AiAgentService } from '../index';
 
-const { mockMessageCreate, mockCreateOperation, mockUploadFromUrl, mockFindFilesByIds } =
-  vi.hoisted(() => ({
-    mockCreateOperation: vi.fn(),
-    mockFindFilesByIds: vi.fn(),
-    mockMessageCreate: vi.fn(),
-    mockUploadFromUrl: vi.fn(),
-  }));
+const {
+  mockMessageCreate,
+  mockCreateOperation,
+  mockUploadFromUrl,
+  mockFindFilesByIds,
+  mockResolveProviderReadableFileReference,
+} = vi.hoisted(() => ({
+  mockCreateOperation: vi.fn(),
+  mockFindFilesByIds: vi.fn(),
+  mockMessageCreate: vi.fn(),
+  mockResolveProviderReadableFileReference: vi.fn(),
+  mockUploadFromUrl: vi.fn(),
+}));
 
 vi.mock('@/libs/trusted-client', () => ({
   generateTrustedClientToken: vi.fn().mockReturnValue(undefined),
@@ -105,6 +111,10 @@ vi.mock('@/server/services/file', () => ({
   })),
 }));
 
+vi.mock('@/server/services/file/resolveProviderReadableFileReference', () => ({
+  resolveProviderReadableFileReference: mockResolveProviderReadableFileReference,
+}));
+
 vi.mock('@/server/modules/Mecha', () => ({
   createServerAgentToolsEngine: vi.fn().mockReturnValue({
     generateToolsDetailed: vi.fn().mockReturnValue({ enabledToolIds: [], tools: [] }),
@@ -152,6 +162,11 @@ describe('AiAgentService.execAgent - file upload handling', () => {
       messageId: 'queue-msg-1',
       operationId: 'op-123',
       success: true,
+    });
+    mockResolveProviderReadableFileReference.mockResolvedValue({
+      fileId: 'file-img',
+      key: 'files/test-user-id/xxx/screenshot.jpg',
+      url: 'https://provider.example.com/file-img',
     });
 
     service = new AiAgentService(mockDb, userId);
@@ -236,9 +251,16 @@ describe('AiAgentService.execAgent - file upload handling', () => {
         {
           alt: 'screenshot.jpg',
           id: 'file-img',
-          url: 'https://app.lobehub.com/f/file-img',
+          url: 'https://provider.example.com/file-img',
         },
       ]);
+      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith({
+        db: mockDb,
+        fileService: expect.any(Object),
+        url: 'https://app.lobehub.com/f/file-img',
+        userId,
+        via: 'ai_agent_input_image',
+      });
     });
 
     it('should not include imageList for non-image files', async () => {
@@ -309,9 +331,41 @@ describe('AiAgentService.execAgent - file upload handling', () => {
         {
           alt: 'diagram.png',
           id: 'file-existing',
-          url: expect.stringContaining('/f/file-existing'),
+          url: 'https://provider.example.com/file-img',
         },
       ]);
+      expect(mockResolveProviderReadableFileReference).toHaveBeenCalledWith({
+        db: mockDb,
+        fileService: expect.any(Object),
+        url: '/f/file-existing',
+        userId,
+        via: 'ai_agent_input_image',
+      });
+    });
+
+    it('should keep fileIds even when provider-readable image url issuance fails', async () => {
+      mockFindFilesByIds.mockResolvedValue([
+        {
+          fileType: 'image/png',
+          id: 'file-existing',
+          name: 'diagram.png',
+        },
+      ]);
+      mockResolveProviderReadableFileReference.mockRejectedValueOnce(new Error('forbidden'));
+
+      await service.execAgent({
+        agentId: 'agent-1',
+        existingFileIds: ['file-existing'],
+        prompt: 'Describe this diagram',
+      } as any);
+
+      const userMessageCall = mockMessageCreate.mock.calls.find((call) => call[0].role === 'user');
+      expect(userMessageCall![0].files).toEqual(['file-existing']);
+
+      const createOpArgs = mockCreateOperation.mock.calls[0][0];
+      const lastMessage = createOpArgs.initialMessages.at(-1);
+
+      expect(lastMessage.imageList).toBeUndefined();
     });
   });
 

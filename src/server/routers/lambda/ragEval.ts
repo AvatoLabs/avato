@@ -28,6 +28,9 @@ import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { createAsyncCaller } from '@/server/routers/async';
 import { FileService } from '@/server/services/file';
 
+const getEvaluationRecordsDownloadPath = (evaluationId: string) =>
+  `/eval/records/${encodeURIComponent(evaluationId)}`;
+
 const ragEvalProcedure = authedProcedure
   .use(serverDatabase)
   .use(keyVaults)
@@ -269,7 +272,8 @@ export const ragEvalRouter = router({
         // Save data
         await ctx.evaluationModel.update(input.id, {
           status: EvalEvaluationStatus.Success,
-          evalRecordsUrl: await ctx.fileService.getFullFileUrl(path),
+          // Persist the raw storage key and expose a stable download route from query surfaces.
+          evalRecordsUrl: path,
         });
       }
 
@@ -297,6 +301,13 @@ export const ragEvalRouter = router({
   getEvaluationList: ragEvalProcedure
     .input(z.object({ sourceSetId: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.evaluationModel.queryBySourceSetId(input.sourceSetId);
+      const evaluations = await ctx.evaluationModel.queryBySourceSetId(input.sourceSetId);
+
+      return evaluations.map((evaluation) => ({
+        ...evaluation,
+        evalRecordsUrl: evaluation.evalRecordsUrl
+          ? getEvaluationRecordsDownloadPath(evaluation.id)
+          : evaluation.evalRecordsUrl,
+      }));
     }),
 });

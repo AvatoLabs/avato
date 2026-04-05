@@ -8,7 +8,7 @@ import {
 
 import { MessageModel } from '@/database/models/message';
 
-import { FileService } from '../file';
+import { createAuthenticatedAttachmentUrlResolver } from './createAuthenticatedAttachmentUrlResolver';
 import { normalizeMessageFileUrlsForClient } from './normalizeMessageFileUrls';
 
 interface QueryOptions {
@@ -32,12 +32,10 @@ interface CreateMessageResult {
  */
 export class MessageService {
   private messageModel: MessageModel;
-  private fileService: FileService;
   private compressionRepository: CompressionRepository;
 
   constructor(db: LobeChatDatabase, userId: string) {
     this.messageModel = new MessageModel(db, userId);
-    this.fileService = new FileService(db, userId);
     this.compressionRepository = new CompressionRepository(db, userId);
   }
 
@@ -45,7 +43,7 @@ export class MessageService {
    * Unified URL processing function
    */
   private get postProcessUrl() {
-    return (path: string | null) => this.fileService.getFullFileUrl(path);
+    return createAuthenticatedAttachmentUrlResolver();
   }
 
   /**

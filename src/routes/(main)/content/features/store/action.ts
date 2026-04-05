@@ -5,6 +5,7 @@ import { buildFilesRootPath } from '@/features/ResourceSpaces';
 import { setActiveWorkspaceSpaceId } from '@/helpers/activeWorkspaceSpace';
 import {
   type FileAssetClassification,
+  type FileAssetReviewStatus,
   type FileAssetUsagePolicy,
   type FilesTabs,
   type SortType,
@@ -44,6 +45,10 @@ export interface Action {
    * Set the current asset classification filter
    */
   setAssetClassification: (classification?: FileAssetClassification) => void;
+  /**
+   * Set the current asset review status filter
+   */
+  setAssetReviewStatus: (reviewStatus?: FileAssetReviewStatus) => void;
   /**
    * Set the current asset usage policy filter
    */
@@ -214,6 +219,12 @@ export const store: CreateStore = (publicState) => (set, get) => ({
     if (get().assetClassification === assetClassification) return;
 
     set({ assetClassification });
+  },
+
+  setAssetReviewStatus: (assetReviewStatus) => {
+    if (get().assetReviewStatus === assetReviewStatus) return;
+
+    set({ assetReviewStatus });
   },
 
   setAssetUsagePolicy: (assetUsagePolicy) => {

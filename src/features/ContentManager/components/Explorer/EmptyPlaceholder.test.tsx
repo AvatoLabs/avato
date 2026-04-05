@@ -10,6 +10,9 @@ import EmptyPlaceholder from './EmptyPlaceholder';
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockOpenCreateSourceSet = vi.hoisted(() => vi.fn());
 const mockPushDockFileList = vi.hoisted(() => vi.fn());
+const searchParamsState = vi.hoisted(() => ({
+  value: 'assetClassification=brand&category=images',
+}));
 const memoryCapabilityState = vi.hoisted(() => ({
   canReview: true,
 }));
@@ -65,6 +68,18 @@ vi.mock('antd-style', () => {
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { count?: number; defaultValue?: string }) => {
+      if (key === 'filters.clearGovernance') return 'Clear governance filters';
+      if (key === 'filters.clearGovernanceFilter') return `Clear ${options?.label} filter`;
+      if (key === 'filters.empty.activeTitle') return 'Active governance filters';
+      if (key === 'filters.empty.description')
+        return 'Try clearing one or more governance filters to see matching files.';
+      if (key === 'filters.empty.title') return 'No files match the current governance filters';
+      if (key === 'detail.asset.classification.label') return 'Classification';
+      if (key === 'detail.asset.classification.brand') return 'Brand';
+      if (key === 'detail.asset.reviewStatus.label') return 'Review Status';
+      if (key === 'detail.asset.reviewStatus.approved') return 'Approved';
+      if (key === 'detail.asset.usagePolicy.label') return 'Usage Policy';
+      if (key === 'detail.asset.usagePolicy.restricted') return 'Restricted';
       if (key === 'space.home.recall.actions.open') return 'Open Space Memory';
       if (key === 'space.home.recall.actions.review') return `Review ${options?.count} Pending`;
 
@@ -78,7 +93,11 @@ vi.mock('react-router-dom', async () => {
 
   return {
     ...actual,
+    useLocation: () => ({
+      pathname: '/spaces/space-1/files',
+    }),
     useNavigate: () => mockNavigate,
+    useSearchParams: () => [new URLSearchParams(searchParamsState.value)],
   };
 });
 
@@ -113,12 +132,16 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
     spaceId: string,
     target: { recallFilter: string; section: string },
   ) => `/spaces/${spaceId}/memory?section=${target.section}&recallFilter=${target.recallFilter}`,
-  canReviewSpaceMemorySummary: (summary?: {
-    contract?: { canManageRecall?: boolean };
-    surface?: string;
-  } | null) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
+  canReviewSpaceMemorySummary: (
+    summary?: {
+      contract?: { canManageRecall?: boolean };
+      surface?: string;
+    } | null,
+  ) => summary?.contract?.canManageRecall ?? summary?.surface === 'reviewer',
   useTeamSpaceMemoryScopeSummaries: () => ({
-    pendingGovernanceCountBySpaceId: new Map([['space-1', memoryCapabilityState.canReview ? 2 : 0]]),
+    pendingGovernanceCountBySpaceId: new Map([
+      ['space-1', memoryCapabilityState.canReview ? 2 : 0],
+    ]),
     pendingGovernanceTargetBySpaceId: new Map([
       [
         'space-1',
@@ -140,6 +163,9 @@ vi.mock('@/features/ResourceSpaces/useTeamSpaceMemoryScopeSummaries', () => ({
 vi.mock('@/routes/(main)/content/features/store', () => ({
   useContentManagerStore: (selector: any) =>
     selector({
+      assetClassification: 'brand',
+      assetReviewStatus: undefined,
+      assetUsagePolicy: undefined,
       sourceSetId: undefined,
       spaceId: 'space-1',
     }),
@@ -183,6 +209,7 @@ describe('EmptyPlaceholder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     memoryCapabilityState.canReview = true;
+    searchParamsState.value = 'assetClassification=brand&category=images';
   });
 
   it('renders keyboard-accessible buttons for all empty-state actions', () => {
@@ -192,9 +219,44 @@ describe('EmptyPlaceholder', () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByText('No files match the current governance filters')).toBeInTheDocument();
+    expect(screen.getByText('Active governance filters')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear Classification: Brand filter' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear governance filters' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /actions\.sourceSet/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /actions\.file/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /actions\.folder/i })).toBeInTheDocument();
+  });
+
+  it('clears governance filters without dropping unrelated query params', () => {
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear governance filters' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/spaces/space-1/files?category=images');
+  });
+
+  it('clears a single governance filter without dropping the others', () => {
+    searchParamsState.value =
+      'assetClassification=brand&assetUsagePolicy=restricted&category=images';
+
+    render(
+      <MemoryRouter>
+        <EmptyPlaceholder />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Classification: Brand filter' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/spaces/space-1/files?assetUsagePolicy=restricted&category=images',
+    );
   });
 
   it('keeps create source-set action wired after switching to button semantics', () => {

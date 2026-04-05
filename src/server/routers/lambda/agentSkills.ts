@@ -9,7 +9,6 @@ import { FileModel } from '@/database/models/file';
 import { filterBuiltinSkills } from '@/helpers/skillFilters';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { FileService } from '@/server/services/file';
 import { MarketService } from '@/server/services/market';
 import {
   SkillImporter,
@@ -17,6 +16,7 @@ import {
   SkillResourceError,
   SkillResourceService,
 } from '@/server/services/skill';
+import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 
 // ===== Error Handling =====
 
@@ -61,7 +61,6 @@ const skillProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   return opts.next({
     ctx: {
       fileModel: new FileModel(ctx.serverDB, ctx.userId),
-      fileService: new FileService(ctx.serverDB, ctx.userId),
       marketService: new MarketService({ userInfo: { userId: ctx.userId } }),
       skillImporter: new SkillImporter(ctx.serverDB, ctx.userId),
       skillModel: new AgentSkillModel(ctx.serverDB, ctx.userId),
@@ -87,7 +86,6 @@ const updateSkillSchema = z.object({
 });
 
 const BUILTIN_SKILL_DATE = new Date(0);
-
 const toBuiltinSkillListItem = (): SkillListItem[] =>
   filterBuiltinSkills(builtinSkills).map((skill) => ({
     createdAt: BUILTIN_SKILL_DATE,
@@ -141,18 +139,13 @@ export const agentSkillsRouter = router({
         return { name: skill.name, url: null };
       }
 
-      const canAccess = await ctx.fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
-      if (!canAccess) {
-        return { name: skill.name, url: null };
-      }
+      const url = await resolveAccessibleSkillZipProxyUrl({
+        fileModel: ctx.fileModel,
+        skillId: skill.id,
+        zipFileHash: skill.zipFileHash,
+      });
 
-      const fileInfo = await ctx.fileModel.checkHash(skill.zipFileHash);
-      if (!fileInfo.isExist || !fileInfo.url) {
-        return { name: skill.name, url: null };
-      }
-
-      const fullUrl = await ctx.fileService.getFullFileUrl(fileInfo.url);
-      return { name: skill.name, url: fullUrl || null };
+      return { name: skill.name, url: url ?? null };
     }),
 
   getByIdentifier: skillProcedure

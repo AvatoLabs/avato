@@ -38,16 +38,20 @@ function makeUploadRequest(pathname: string, fileContent: BlobPart = 'hi') {
 }
 
 describe('getLegacyUploadPathnameValidationError', () => {
-  it('should accept a normal relative key', () => {
+  it('should accept legacy and space-scoped relative keys', () => {
     expect(getLegacyUploadPathnameValidationError('files/bucket/u/f.bin')).toBeNull();
+    expect(getLegacyUploadPathnameValidationError('v2/spaces/spc_1/blobs/ups_1/opq_1')).toBeNull();
   });
 
-  it('should reject empty, non-string, absolute, traversal, NUL, and overlong', () => {
+  it('should reject empty, non-string, absolute, traversal, invalid prefix, NUL, and overlong', () => {
     expect(getLegacyUploadPathnameValidationError('')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError(null)).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('/abs')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('a/../b')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('..')).toBe('Invalid pathname.');
+    expect(getLegacyUploadPathnameValidationError('skills/source_files/zip123/README.md')).toBe(
+      'Invalid pathname.',
+    );
     expect(getLegacyUploadPathnameValidationError('ok\\..\\x')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('a\0b')).toBe('Invalid pathname.');
     expect(getLegacyUploadPathnameValidationError('x'.repeat(2049))).toBe('Invalid pathname.');
@@ -108,5 +112,18 @@ describe('POST /api/file/upload', () => {
     );
     const buf = mockUploadBuffer.mock.calls[0][1] as Buffer;
     expect([...buf]).toEqual([1, 2, 3]);
+  });
+
+  it('should upload current space-scoped keys used by upload sessions', async () => {
+    const res = await POST(
+      makeUploadRequest('v2/spaces/spc_1/blobs/ups_1/opq_1', new Uint8Array([4, 5])),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockUploadBuffer).toHaveBeenCalledWith(
+      'v2/spaces/spc_1/blobs/ups_1/opq_1',
+      expect.any(Buffer),
+      'application/octet-stream',
+    );
   });
 });

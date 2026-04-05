@@ -34,6 +34,11 @@ import { isChunkingUnsupported } from '@/utils/isChunkingUnsupported';
 import { nanoid } from '@/utils/uuid';
 
 import { BaseService } from '../common/base.service';
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+  toAbsoluteStableAppFileProxyUrl,
+} from '../helpers/file';
 import { processPaginationConditions } from '../helpers/pagination';
 import type {
   AsyncTaskErrorResponse,
@@ -103,24 +108,99 @@ export class FileUploadService extends BaseService {
       return '';
     }
 
-    // 检查URL是否已经是完整URL（向后兼容历史数据）
-    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-      return url; // 已经是完整URL，直接返回
-    } else {
-      // 相对路径，生成完整URL
-      return await this.coreFileService.getFullFileUrl(url);
+    if ((url.startsWith('http://') || url.startsWith('https://')) && !isSameOriginAppUrl(url)) {
+      return url;
     }
+
+    if (isStableAppFileProxyUrl(url)) {
+      return toAbsoluteStableAppFileProxyUrl(url);
+    }
+
+    return await this.coreFileService.getFullFileUrl(url);
+  }
+
+  private async resolveResponseFileUrl(
+    file: Pick<FileItem, 'id' | 'url'>,
+    options?: {
+      access?: { contentUid: string; matchedBy?: string; spaceId: string };
+      downloadable?: boolean;
+      via?: 'openapi_file_detail' | 'openapi_file_list';
+    },
+  ): Promise<string> {
+    if (!file.url) return '';
+    if (options?.downloadable === false) return '';
+
+    let access = options?.access;
+
+    if (options?.downloadable !== true && !access) {
+      try {
+        access = await this.contentAuthorizer.assertCapability({
+          capability: 'download_blob',
+          id: file.id,
+          kind: 'file',
+        });
+      } catch (error) {
+        this.log('warn', 'Omitting non-downloadable file url from OpenAPI response', {
+          error,
+          fileId: file.id,
+        });
+        return '';
+      }
+    }
+
+    const fullUrl = await this.ensureFullUrl(file.url);
+
+    if (fullUrl && access && options?.via) {
+      this.recordResponseFileUrlIssuedAccess(file.id, access, options.via);
+    }
+
+    return fullUrl;
+  }
+
+  private recordResponseFileUrlIssuedAccess(
+    fileId: string,
+    access: { contentUid: string; matchedBy?: string; spaceId: string },
+    via: 'openapi_file_detail' | 'openapi_file_list',
+  ) {
+    void this.contentModel
+      .createAccessEvent({
+        accessType: 'file_url_issued',
+        contentUid: access.contentUid,
+        metadata: {
+          fileId,
+          matchedBy: access.matchedBy,
+          via,
+        },
+        shareLinkId: null,
+        sourceIp: null,
+        spaceId: access.spaceId,
+        userAgent: null,
+      })
+      .catch((error) => {
+        this.log('warn', 'Failed to record OpenAPI response file URL issued access event', {
+          error,
+          fileId,
+          via,
+        });
+      });
   }
 
   /**
    * 转换为上传响应格式
    */
-  private async convertToResponse(file: FileItem): Promise<FileDetailResponse['file']> {
-    const fullUrl = await this.ensureFullUrl(file.url);
+  private async convertToResponse(
+    file: FileItem,
+    options?: {
+      access?: { contentUid: string; matchedBy?: string; spaceId: string };
+      downloadable?: boolean;
+      via?: 'openapi_file_detail' | 'openapi_file_list';
+    },
+  ): Promise<FileDetailResponse['file']> {
+    const fullUrl = await this.resolveResponseFileUrl(file, options);
 
     return {
       ...file,
-      url: fullUrl || file.url,
+      url: fullUrl,
     };
   }
 
@@ -584,7 +664,7 @@ export class FileUploadService extends BaseService {
       // 检查是否为图片文件
       const isImage = file.fileType.startsWith('image/');
 
-      const convertedFile = await this.convertToResponse(file);
+      const convertedFile = await this.convertToResponse(file, { via: 'openapi_file_detail' });
 
       if (!isImage) {
         // 非图片文件：获取解析结果
@@ -638,12 +718,20 @@ export class FileUploadService extends BaseService {
       }
 
       const file = await this.findFileByIdWithPermission(fileId, permissionResult);
+      const access = await this.contentAuthorizer
+        .assertCapability({
+          capability: 'download_blob',
+          id: fileId,
+          kind: 'file',
+        })
+        .catch((error) => this.mapContentAccessError(error, '无权下载此文件'));
 
       // 设置过期时间（默认并最大均为 1 小时）
       const expiresIn = clampFileUrlExpiresIn(options.expiresIn);
 
-      // 使用 blob provider 生成预签名访问 URL
-      const signedUrl = await this.blobProvider.createDownloadUrl(file.url, { expiresIn });
+      const signedUrl = isStableAppFileProxyUrl(file.url)
+        ? toAbsoluteStableAppFileProxyUrl(file.url)
+        : await this.coreFileService.getFullFileUrl(file.url, expiresIn);
 
       // 计算过期时间戳
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -653,6 +741,28 @@ export class FileUploadService extends BaseService {
         fileId,
         name: file.name,
       });
+
+      try {
+        await this.contentModel.createAccessEvent({
+          accessType: 'file_url_issued',
+          contentUid: access.contentUid,
+          metadata: {
+            expiresIn,
+            fileId,
+            matchedBy: access.matchedBy,
+            via: 'openapi_signed_url',
+          },
+          shareLinkId: null,
+          sourceIp: null,
+          spaceId: access.spaceId,
+          userAgent: null,
+        });
+      } catch (eventError) {
+        this.log('warn', 'Failed to record OpenAPI file URL issued access event', {
+          error: eventError,
+          fileId,
+        });
+      }
 
       return {
         expiresAt,
@@ -1502,10 +1612,18 @@ export class FileUploadService extends BaseService {
       ]);
     }
 
+    const downloadableFileAccessById =
+      await this.contentAuthorizer.getDownloadableFileAccessByIdForList(fileIds);
+
     // 构建响应数据
     return Promise.all(
       dedupedFiles.map(async (file) => {
-        const base = await this.convertToResponse(file);
+        const access = downloadableFileAccessById[file.id];
+        const base = await this.convertToResponse(file, {
+          access,
+          downloadable: Boolean(access),
+          via: access ? 'openapi_file_list' : undefined,
+        });
 
         const chunkCountItem = chunkCounts.find((c) => c.id === file.id);
         const chunkTask = file.chunkTaskId

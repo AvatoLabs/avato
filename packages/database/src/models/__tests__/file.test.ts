@@ -1,5 +1,11 @@
 // @vitest-environment node
-import { FileAssetClassification, FilesTabs, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@lobechat/types';
 import { eq, inArray } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -557,6 +563,78 @@ describe('FileModel', () => {
         }),
       ).resolves.toBeUndefined();
     });
+
+    it('should only clear files within the scoped space', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'clear-space-a',
+          name: 'space-a.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/space-a.txt',
+          userId,
+        },
+        {
+          fileType: 'text/plain',
+          id: 'clear-space-b',
+          name: 'space-b.txt',
+          size: 100,
+          spaceId: 'spc_file_b',
+          url: 'https://example.com/space-b.txt',
+          userId,
+        },
+      ]);
+
+      const cleared = await fileModel.clear(true, { spaceId: 'spc_file_a' });
+
+      expect(cleared.map((item) => item.id)).toEqual(['clear-space-a']);
+      await expect(
+        serverDB.query.files.findMany({
+          where: eq(files.userId, userId),
+        }),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'clear-space-b',
+            spaceId: 'spc_file_b',
+          }),
+        ]),
+      );
+    });
+
+    it('should include legacy unscoped files when requested', async () => {
+      await serverDB.insert(files).values([
+        {
+          fileType: 'text/plain',
+          id: 'clear-unscoped',
+          name: 'unscoped.txt',
+          size: 100,
+          spaceId: null,
+          url: 'https://example.com/unscoped.txt',
+          userId,
+        },
+        {
+          fileType: 'text/plain',
+          id: 'clear-personal-scoped',
+          name: 'scoped.txt',
+          size: 100,
+          spaceId: 'spc_file_a',
+          url: 'https://example.com/scoped.txt',
+          userId,
+        },
+      ]);
+
+      const cleared = await fileModel.clear(true, {
+        includeUnscoped: true,
+        spaceId: 'spc_file_a',
+      });
+
+      expect(cleared.map((item) => item.id).sort()).toEqual([
+        'clear-personal-scoped',
+        'clear-unscoped',
+      ]);
+    });
   });
 
   describe('Query', () => {
@@ -795,6 +873,55 @@ describe('FileModel', () => {
 
         expect(result).toHaveLength(1);
         expect(result[0].id).toBe('file2');
+      });
+
+      it('should filter files by asset review status', async () => {
+        await serverDB.insert(fileAssets).values({
+          createdBy: userId,
+          fileId: 'file2',
+          reviewStatus: 'approved',
+          spaceId: 'spc_file_a',
+        });
+
+        const result = await fileModel.query({
+          assetReviewStatus: 'approved',
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('file2');
+      });
+
+      it('should return lightweight governance rows with default null metadata', async () => {
+        await serverDB.insert(fileAssets).values({
+          classification: FileAssetClassification.Brand,
+          createdBy: userId,
+          fileId: 'file2',
+          reviewStatus: FileAssetReviewStatus.Approved,
+          spaceId: 'spc_file_a',
+          usagePolicy: FileAssetUsagePolicy.Restricted,
+        });
+
+        const result = await fileModel.queryGovernanceRows({
+          showFilesInSourceSet: true,
+        });
+
+        expect(result).toEqual(
+          expect.arrayContaining([
+            {
+              assetClassification: null,
+              assetReviewStatus: null,
+              assetUsagePolicy: null,
+              id: 'file1',
+            },
+            {
+              assetClassification: FileAssetClassification.Brand,
+              assetReviewStatus: FileAssetReviewStatus.Approved,
+              assetUsagePolicy: FileAssetUsagePolicy.Restricted,
+              id: 'file2',
+            },
+          ]),
+        );
       });
     });
   });

@@ -21,6 +21,7 @@ import {
   contentBlocksToString,
   processContentBlocks,
 } from '@/server/services/mcp/contentProcessor';
+import { resolveAccessibleSkillZipProxyUrl } from '@/server/services/skill/resolveAccessibleSkillZipProxyUrl';
 
 import { scheduleToolCallReport } from './_helpers';
 
@@ -278,27 +279,25 @@ export const marketRouter = router({
             }
           }
 
-          // If skill exists and has zipFileHash, get the full URL
+          // If skill exists and has zipFileHash, pass the stable proxy URL.
           if (skill?.zipFileHash) {
-            const fileService = ctx.fileService;
-            // Get S3 key from globalFiles
             const fileModel = new FileModel(ctx.serverDB, userId);
-            const canAccess = await fileModel.canAccessGlobalFileByHash(skill.zipFileHash);
-            const fileInfo = canAccess
-              ? await fileModel.checkHash(skill.zipFileHash)
-              : { isExist: false };
-
-            if (fileInfo.isExist && fileInfo.url) {
-              // Convert S3 key to full URL
-              const fullUrl = await fileService.getFullFileUrl(fileInfo.url);
-              if (fullUrl) {
-                // Add zipUrl to params
-                enhancedParams = {
-                  ...params,
-                  zipUrl: fullUrl,
-                };
-                log('Added zipUrl to execScript params for skill %s: %s', skill.name, fullUrl);
-              }
+            const zipUrl = await resolveAccessibleSkillZipProxyUrl({
+              fileModel,
+              internal: true,
+              skillId: skill.id,
+              zipFileHash: skill.zipFileHash,
+            });
+            if (zipUrl) {
+              enhancedParams = {
+                ...params,
+                zipUrl,
+              };
+              log(
+                'Added stable zipUrl to execScript params for skill %s: %s',
+                skill.name,
+                enhancedParams.zipUrl,
+              );
             }
           }
         }

@@ -33,6 +33,7 @@ const ResourceExplorer = memo(() => {
   const [
     sourceSetId,
     assetClassification,
+    assetReviewStatus,
     assetUsagePolicy,
     category,
     mode,
@@ -45,6 +46,7 @@ const ResourceExplorer = memo(() => {
   ] = useContentManagerStore((s) => [
     s.sourceSetId,
     s.assetClassification,
+    s.assetReviewStatus,
     s.assetUsagePolicy,
     s.category,
     s.mode,
@@ -71,6 +73,7 @@ const ResourceExplorer = memo(() => {
     () =>
       buildExplorerQueryParams({
         assetClassification,
+        assetReviewStatus,
         assetUsagePolicy,
         category,
         currentFolderSlug,
@@ -82,6 +85,7 @@ const ResourceExplorer = memo(() => {
       }),
     [
       assetClassification,
+      assetReviewStatus,
       assetUsagePolicy,
       category,
       currentFolderSlug,
@@ -111,6 +115,7 @@ const ResourceExplorer = memo(() => {
     setSelectedFileIds([]);
   }, [
     assetClassification,
+    assetReviewStatus,
     assetUsagePolicy,
     category,
     sourceSetId,

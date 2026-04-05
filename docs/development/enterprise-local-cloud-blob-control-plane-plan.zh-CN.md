@@ -27,6 +27,13 @@
 - **首版资产版本 / 衍生版本 surface 已落地**：`file_assets.metadata` 已开始承载正式 typed 的 `version / renditions` contract，而不再只是完全自由的 JSON；`FileDetail` 也已接入 `Current Version / Derived From / Renditions` 首版治理入口，作为未来拆 `asset_versions / asset_renditions` 独立实体前的过渡层。
 - **衍生版本 label 已进入可编辑 UI**：`FileDetail` 现已支持为每个 rendition 记录可选 `label`，不再把 typed contract 降级成只有 `kind`；只读视图也会直接展示 `Preview · Homepage` 这类带标签的衍生版本摘要。
 - **compact list/card 已开始消费版本 /rendition summary**：Files 列表、masonry 卡片与首页 Recent 资源现在已经通过轻量 badge 消费 `assetVersionLabel` 与首个 rendition summary，不再把 typed `renditions` 永远困在详情页；同时 badge 顺序仍优先保留 `restricted/public` 这类更强治理信号。
+- **compact list/card 已开始显式露出审核状态**：除 `archived` 外，`approved` 也开始进入 Files 列表、masonry 卡片与首页 Recent 资源的 compact governance badge；这样筛成 `review status=approved` 后，列表本身也能直接解释当前治理状态，而不会只剩版本 /rendition 徽标。
+- **Files header 已开始暴露正式治理筛选面**：当前 `CategoryMenu` 里的 governance popover 已不再只停留在 `classification / usage policy`，而是补上了 `review status` 维度，并且三类过滤都会通过 URL /store/list query 贯通到 `file_assets` 查询层，开始具备最小可用的资产治理筛选能力。
+- **Files header 已开始把治理筛选显式外露成状态条**：除了 popover 内的三维筛选外，当前已生效的 `classification / review status / usage policy` 也会在 header 里以可单独清除的 compact chips 显示，并显式带出 “维度 + 当前值”，不再只用一个 “Governance (3)” 总数按钮让用户猜测当前到底筛了什么。
+- **治理筛选已真正作用到 Content 列表结果**：`getKnowledgeItems` 不再只是透传治理 query 参数；当前文件侧的 `classification / review status / usage policy` 已经会在列表结果里真正生效，并在筛选激活时自动排除不带资产治理语义的文档项，避免 UI 看起来在筛、结果却没变。
+- **治理筛选 summary contract 已进入 Header**：Files header 现在不再只能显示 “当前筛了几个条件”，而是会通过独立的 server-side summary query 为 `classification / review status / usage policy` 选项显示当前 scope 下的实时计数，开始具备真正可用的治理决策辅助，而不只是 query 参数壳层。
+- **治理筛选空态已开始具备恢复动作**：当 `classification / review status / usage policy` 把当前列表筛空时，Files 空态不再退回默认上传文案，而会明确提示 “当前治理筛选下没有匹配的文件”，展示当前生效的治理筛选，并提供一键或逐项清除筛选的恢复入口。
+- **治理筛选状态条已开始带出结果规模**：当前 header 里生效的 `classification / review status / usage policy` 不再只显示 compact chips；同一条状态条现在还会补一个 “{{count}} matching files / {{count}} 个匹配文件” 的 summary，让用户在不展开 popover 的情况下也能快速判断筛选是否过窄。
 
 这说明：
 
@@ -509,7 +516,7 @@ graph TD
 目标：
 
 - 正式化 `resource registry`
-- ACL /share/audit /trash/revoke cache 收口
+- ACL /share/audit/trash/revoke cache 收口
 - 强化 `space-first` 的访问控制
 
 交付：

@@ -3,16 +3,30 @@
 import { Button, Flexbox, Icon, Segmented, type SegmentedProps } from '@lobehub/ui';
 import { Popover, Select } from 'antd';
 import { createStaticStyles } from 'antd-style';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { RESOURCE_ENTRY_ICONS } from '@/config/contentIcons';
+import {
+  buildExplorerQueryParams,
+  getExplorerCategoryFilter,
+} from '@/features/ContentManager/components/Explorer/queryParams';
+import { getFileScope } from '@/features/ContentManager/useFileScope';
 import { buildFilesRootPath, stripFilesItemPath } from '@/features/ResourceSpaces';
-import { useContentManagerStore } from '@/routes/(main)/content/features/store';
+import {
+  useContentManagerFetchGovernanceSummary,
+  useContentManagerStore,
+} from '@/routes/(main)/content/features/store';
+import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
-import { FileAssetClassification, FileAssetUsagePolicy, FilesTabs } from '@/types/files';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+} from '@/types/files';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   containerMobile: css`
@@ -79,6 +93,18 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   governanceButton: css`
     flex-shrink: 0;
   `,
+  governanceFilters: css`
+    flex-wrap: wrap;
+  `,
+  governanceFilterChip: css`
+    flex-shrink: 0;
+  `,
+  governanceSummaryText: css`
+    flex-shrink: 0;
+    font-size: 12px;
+    color: ${cssVar.colorTextSecondary};
+    white-space: nowrap;
+  `,
   governancePopover: css`
     min-width: 216px;
   `,
@@ -95,8 +121,9 @@ const CategoryMenu = memo(() => {
   const { spaceId } = useParams<{ spaceId?: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [activeKey, sourceSetId, setMode] = useContentManagerStore((s) => [
+  const [activeKey, currentFolderId, sourceSetId, setMode] = useContentManagerStore((s) => [
     s.category,
+    s.currentFolderId,
     s.sourceSetId,
     s.setMode,
   ]);
@@ -110,11 +137,44 @@ const CategoryMenu = memo(() => {
   }, [location.pathname, rootPath]);
   const classificationParam =
     (searchParams.get('assetClassification') as FileAssetClassification | null) || undefined;
+  const reviewStatusParam =
+    (searchParams.get('assetReviewStatus') as FileAssetReviewStatus | null) || undefined;
   const usagePolicyParam =
     (searchParams.get('assetUsagePolicy') as FileAssetUsagePolicy | null) || undefined;
   const showCategoryTabs = !sourceSetId;
   const activeGovernanceFilterCount =
-    Number(Boolean(classificationParam)) + Number(Boolean(usagePolicyParam));
+    Number(Boolean(classificationParam)) +
+    Number(Boolean(reviewStatusParam)) +
+    Number(Boolean(usagePolicyParam));
+  const fileScope = getFileScope(searchParams);
+  const governanceSummaryParams = useMemo(
+    () =>
+      buildExplorerQueryParams({
+        assetClassification: classificationParam,
+        assetReviewStatus: reviewStatusParam,
+        assetUsagePolicy: usagePolicyParam,
+        category: getExplorerCategoryFilter(activeKey, sourceSetId),
+        currentFolderSlug: currentFolderId,
+        scope: fileScope === 'unassigned' ? 'unassigned' : 'all',
+        sourceSetId,
+        spaceId,
+      }),
+    [
+      activeKey,
+      classificationParam,
+      currentFolderId,
+      fileScope,
+      reviewStatusParam,
+      sourceSetId,
+      spaceId,
+      usagePolicyParam,
+    ],
+  );
+  const { data: governanceSummary } =
+    useContentManagerFetchGovernanceSummary(governanceSummaryParams);
+
+  const withGovernanceCount = (label: string, count?: number) =>
+    governanceSummary ? `${label} (${count ?? 0})` : label;
 
   const items = useMemo<SegmentedProps['options']>(
     () => [
@@ -178,17 +238,71 @@ const CategoryMenu = memo(() => {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
+  const classificationLabels = useMemo(
+    () => ({
+      [FileAssetClassification.Brand]: t('detail.asset.classification.brand'),
+      [FileAssetClassification.Finance]: t('detail.asset.classification.finance'),
+      [FileAssetClassification.General]: t('detail.asset.classification.general'),
+      [FileAssetClassification.Hr]: t('detail.asset.classification.hr'),
+      [FileAssetClassification.Legal]: t('detail.asset.classification.legal'),
+      [FileAssetClassification.Product]: t('detail.asset.classification.product'),
+    }),
+    [t],
+  );
+
   const classificationOptions = useMemo(
     () => [
-      { label: t('detail.asset.classification.all'), value: 'all' },
-      { label: t('detail.asset.classification.general'), value: FileAssetClassification.General },
-      { label: t('detail.asset.classification.brand'), value: FileAssetClassification.Brand },
-      { label: t('detail.asset.classification.product'), value: FileAssetClassification.Product },
-      { label: t('detail.asset.classification.legal'), value: FileAssetClassification.Legal },
-      { label: t('detail.asset.classification.finance'), value: FileAssetClassification.Finance },
-      { label: t('detail.asset.classification.hr'), value: FileAssetClassification.Hr },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.all'),
+          governanceSummary?.classification.total,
+        ),
+        value: 'all',
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.general'),
+          governanceSummary?.classification.counts[FileAssetClassification.General],
+        ),
+        value: FileAssetClassification.General,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.brand'),
+          governanceSummary?.classification.counts[FileAssetClassification.Brand],
+        ),
+        value: FileAssetClassification.Brand,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.product'),
+          governanceSummary?.classification.counts[FileAssetClassification.Product],
+        ),
+        value: FileAssetClassification.Product,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.legal'),
+          governanceSummary?.classification.counts[FileAssetClassification.Legal],
+        ),
+        value: FileAssetClassification.Legal,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.finance'),
+          governanceSummary?.classification.counts[FileAssetClassification.Finance],
+        ),
+        value: FileAssetClassification.Finance,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.classification.hr'),
+          governanceSummary?.classification.counts[FileAssetClassification.Hr],
+        ),
+        value: FileAssetClassification.Hr,
+      },
     ],
-    [t],
+    [governanceSummary, t],
   );
 
   const getClassificationUrl = (value?: string) => {
@@ -207,13 +321,91 @@ const CategoryMenu = memo(() => {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
+  const getClearedClassificationUrl = () => getClassificationUrl('all');
+
   const usagePolicyOptions = useMemo(
     () => [
-      { label: t('detail.asset.usagePolicy.all'), value: 'all' },
-      { label: t('detail.asset.usagePolicy.internal'), value: FileAssetUsagePolicy.Internal },
-      { label: t('detail.asset.usagePolicy.public'), value: FileAssetUsagePolicy.Public },
-      { label: t('detail.asset.usagePolicy.restricted'), value: FileAssetUsagePolicy.Restricted },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.usagePolicy.all'),
+          governanceSummary?.usagePolicy.total,
+        ),
+        value: 'all',
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.usagePolicy.internal'),
+          governanceSummary?.usagePolicy.counts[FileAssetUsagePolicy.Internal],
+        ),
+        value: FileAssetUsagePolicy.Internal,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.usagePolicy.public'),
+          governanceSummary?.usagePolicy.counts[FileAssetUsagePolicy.Public],
+        ),
+        value: FileAssetUsagePolicy.Public,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.usagePolicy.restricted'),
+          governanceSummary?.usagePolicy.counts[FileAssetUsagePolicy.Restricted],
+        ),
+        value: FileAssetUsagePolicy.Restricted,
+      },
     ],
+    [governanceSummary, t],
+  );
+
+  const usagePolicyLabels = useMemo(
+    () => ({
+      [FileAssetUsagePolicy.Internal]: t('detail.asset.usagePolicy.internal'),
+      [FileAssetUsagePolicy.Public]: t('detail.asset.usagePolicy.public'),
+      [FileAssetUsagePolicy.Restricted]: t('detail.asset.usagePolicy.restricted'),
+    }),
+    [t],
+  );
+
+  const reviewStatusOptions = useMemo(
+    () => [
+      {
+        label: withGovernanceCount(
+          t('detail.asset.reviewStatus.all'),
+          governanceSummary?.reviewStatus.total,
+        ),
+        value: 'all',
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.reviewStatus.draft'),
+          governanceSummary?.reviewStatus.counts[FileAssetReviewStatus.Draft],
+        ),
+        value: FileAssetReviewStatus.Draft,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.reviewStatus.approved'),
+          governanceSummary?.reviewStatus.counts[FileAssetReviewStatus.Approved],
+        ),
+        value: FileAssetReviewStatus.Approved,
+      },
+      {
+        label: withGovernanceCount(
+          t('detail.asset.reviewStatus.archived'),
+          governanceSummary?.reviewStatus.counts[FileAssetReviewStatus.Archived],
+        ),
+        value: FileAssetReviewStatus.Archived,
+      },
+    ],
+    [governanceSummary, t],
+  );
+
+  const reviewStatusLabels = useMemo(
+    () => ({
+      [FileAssetReviewStatus.Approved]: t('detail.asset.reviewStatus.approved'),
+      [FileAssetReviewStatus.Archived]: t('detail.asset.reviewStatus.archived'),
+      [FileAssetReviewStatus.Draft]: t('detail.asset.reviewStatus.draft'),
+    }),
     [t],
   );
 
@@ -233,11 +425,32 @@ const CategoryMenu = memo(() => {
     return queryString ? `${basePath}?${queryString}` : basePath;
   };
 
+  const getClearedUsagePolicyUrl = () => getUsagePolicyUrl('all');
+
+  const getReviewStatusUrl = (value?: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('file');
+    nextParams.delete('files');
+
+    if (!value || value === 'all') {
+      nextParams.delete('assetReviewStatus');
+    } else {
+      nextParams.set('assetReviewStatus', value);
+    }
+
+    const queryString = nextParams.toString();
+
+    return queryString ? `${basePath}?${queryString}` : basePath;
+  };
+
+  const getClearedReviewStatusUrl = () => getReviewStatusUrl('all');
+
   const getClearedGovernanceUrl = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('file');
     nextParams.delete('files');
     nextParams.delete('assetClassification');
+    nextParams.delete('assetReviewStatus');
     nextParams.delete('assetUsagePolicy');
 
     const queryString = nextParams.toString();
@@ -249,6 +462,49 @@ const CategoryMenu = memo(() => {
     activeGovernanceFilterCount > 0
       ? t('filters.governanceActive', { count: activeGovernanceFilterCount })
       : t('filters.governance');
+  const matchingFilesCount = useFileStore((s) => s.total);
+
+  const activeGovernanceFilters = useMemo(
+    () =>
+      [
+        classificationParam
+          ? {
+              clearUrl: getClearedClassificationUrl(),
+              key: 'classification',
+              label: `${t('detail.asset.classification.label')}: ${
+                classificationLabels[classificationParam] ?? classificationParam
+              }`,
+            }
+          : null,
+        reviewStatusParam
+          ? {
+              clearUrl: getClearedReviewStatusUrl(),
+              key: 'reviewStatus',
+              label: `${t('detail.asset.reviewStatus.label')}: ${
+                reviewStatusLabels[reviewStatusParam] ?? reviewStatusParam
+              }`,
+            }
+          : null,
+        usagePolicyParam
+          ? {
+              clearUrl: getClearedUsagePolicyUrl(),
+              key: 'usagePolicy',
+              label: `${t('detail.asset.usagePolicy.label')}: ${
+                usagePolicyLabels[usagePolicyParam] ?? usagePolicyParam
+              }`,
+            }
+          : null,
+      ].filter(Boolean) as Array<{ clearUrl: string; key: string; label: string }>,
+    [
+      classificationLabels,
+      classificationParam,
+      reviewStatusLabels,
+      reviewStatusParam,
+      t,
+      usagePolicyLabels,
+      usagePolicyParam,
+    ],
+  );
 
   return (
     <Flexbox
@@ -303,6 +559,20 @@ const CategoryMenu = memo(() => {
                 }}
               />
             </Flexbox>
+            <Flexbox className={styles.governanceSection} gap={6}>
+              <span>{t('detail.asset.reviewStatus.label')}</span>
+              <Select
+                aria-label={t('detail.asset.reviewStatus.label')}
+                className={styles.governanceSelect}
+                options={reviewStatusOptions}
+                size={'small'}
+                value={reviewStatusParam ?? 'all'}
+                onChange={(value) => {
+                  setMode('explorer');
+                  navigate(getReviewStatusUrl(value), { replace: true });
+                }}
+              />
+            </Flexbox>
             {activeGovernanceFilterCount > 0 && (
               <Flexbox horizontal justify={'flex-end'}>
                 <Button
@@ -330,6 +600,31 @@ const CategoryMenu = memo(() => {
           {governanceLabel}
         </Button>
       </Popover>
+      {activeGovernanceFilters.length > 0 && (
+        <Flexbox horizontal className={styles.governanceFilters} gap={6}>
+          {typeof matchingFilesCount === 'number' && (
+            <span className={styles.governanceSummaryText}>
+              {t('filters.matchingFiles', { count: matchingFilesCount })}
+            </span>
+          )}
+          {activeGovernanceFilters.map((filter) => (
+            <Button
+              aria-label={t('filters.clearGovernanceFilter', { label: filter.label })}
+              className={styles.governanceFilterChip}
+              icon={X}
+              key={filter.key}
+              size={'small'}
+              variant={'outlined'}
+              onClick={() => {
+                setMode('explorer');
+                navigate(filter.clearUrl, { replace: true });
+              }}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </Flexbox>
+      )}
     </Flexbox>
   );
 });

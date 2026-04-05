@@ -481,6 +481,42 @@ export class ContentAuthorizer {
     return fileIds.filter((_, i) => matches[i]?.canAccess);
   };
 
+  filterDownloadableFileIdsForList = async (fileIds: string[]) => {
+    const accessById = await this.getDownloadableFileAccessByIdForList(fileIds);
+
+    return fileIds.filter((fileId) => Boolean(accessById[fileId]));
+  };
+
+  getDownloadableFileAccessByIdForList = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return {};
+
+    const matches = await Promise.all(
+      fileIds.map((fileId) =>
+        this.getAccessMatch({
+          capability: 'download_blob',
+          id: fileId,
+          kind: 'file',
+        }),
+      ),
+    );
+
+    return fileIds.reduce<
+      Record<string, { contentUid: string; matchedBy?: string; spaceId: string }>
+    >((acc, fileId, index) => {
+      const match = matches[index];
+
+      if (match?.canAccess) {
+        acc[fileId] = {
+          contentUid: match.contentUid,
+          matchedBy: match.matchedBy,
+          spaceId: match.spaceId,
+        };
+      }
+
+      return acc;
+    }, {});
+  };
+
   /** List endpoints: only include files the caller may see at metadata level. */
   filterVisibleFileIdsForList = async (fileIds: string[]) => {
     if (fileIds.length === 0) return [];

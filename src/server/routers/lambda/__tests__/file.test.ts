@@ -31,6 +31,7 @@ const mockFileModelDeleteMany = vi.fn();
 const mockFileModelFindExistingByBlobAndContext = vi.fn();
 const mockFileModelFindById = vi.fn();
 const mockFileModelQuery = vi.fn();
+const mockFileModelQueryGovernanceRows = vi.fn();
 const mockFileModelClear = vi.fn();
 const mockFileModelSoftDeleteAny = vi.fn();
 const mockFileModelSoftDeleteManyAny = vi.fn();
@@ -54,6 +55,7 @@ function createCallerWithCtx(partialCtx: any = {}) {
     findById: mockFileModelFindById,
     findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
+    queryGovernanceRows: mockFileModelQueryGovernanceRows,
     clear: mockFileModelClear,
     softDeleteAny: mockFileModelSoftDeleteAny,
     softDeleteManyAny: mockFileModelSoftDeleteManyAny,
@@ -182,6 +184,7 @@ vi.mock('@/database/models/file', () => ({
     findById: mockFileModelFindById,
     findByIdAny: mockFileModelFindById,
     query: mockFileModelQuery,
+    queryGovernanceRows: mockFileModelQueryGovernanceRows,
     clear: mockFileModelClear,
     softDeleteAny: mockFileModelSoftDeleteAny,
     softDeleteManyAny: mockFileModelSoftDeleteManyAny,
@@ -275,6 +278,7 @@ describe('fileRouter', () => {
     mockFileModelCreate.mockResolvedValue({ id: 'test-id' });
     mockFileModelFindById.mockResolvedValue(undefined);
     mockFileModelQuery.mockResolvedValue([]);
+    mockFileModelQueryGovernanceRows.mockResolvedValue([]);
     mockFileModelDelete.mockResolvedValue(undefined);
     mockFileModelDeleteMany.mockResolvedValue([]);
     mockFileModelClear.mockResolvedValue([]);
@@ -806,6 +810,121 @@ describe('fileRouter', () => {
         name: 'Document 1',
       });
     });
+
+    it('should pass governance filters to knowledge repo and only process returned file items', async () => {
+      mockKnowledgeRepoQuery.mockResolvedValue([
+        {
+          ...mockFile,
+          fileId: 'file-1',
+          id: 'file-1',
+          sourceType: 'file' as const,
+        },
+      ]);
+      mockFileAssetModelFindByFileIds.mockResolvedValue([
+        {
+          classification: 'brand',
+          fileId: 'file-1',
+          metadata: {},
+          reviewStatus: 'approved',
+          usagePolicy: 'restricted',
+        },
+      ]);
+      mockChunkCountByFileIds.mockResolvedValue([{ count: 2, id: 'file-1' }]);
+      mockAsyncTaskFindByIds.mockResolvedValue([]);
+
+      const result = await caller.getKnowledgeItems({
+        assetClassification: 'brand',
+      });
+
+      expect(mockKnowledgeRepoQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assetClassification: 'brand',
+          limit: 51,
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        assetClassification: 'brand',
+        id: 'file-1',
+        sourceType: 'file',
+      });
+      expect(mockFileAssetModelFindByFileIds).toHaveBeenCalledWith(['file-1']);
+    });
+  });
+
+  describe('getKnowledgeGovernanceSummary', () => {
+    it('should return dimension-specific visible governance counts', async () => {
+      mockSpaceModelFindAccessibleSpaceById.mockResolvedValue({ id: 'spc_shared' });
+      mockFileModelQueryGovernanceRows
+        .mockResolvedValueOnce([
+          { assetClassification: 'brand', id: 'file-1' },
+          { assetClassification: null, id: 'file-2' },
+        ])
+        .mockResolvedValueOnce([
+          { assetReviewStatus: 'approved', id: 'file-1' },
+          { assetReviewStatus: null, id: 'file-2' },
+        ])
+        .mockResolvedValueOnce([
+          { assetUsagePolicy: 'restricted', id: 'file-1' },
+          { assetUsagePolicy: null, id: 'file-2' },
+        ]);
+      mockFilterVisibleFileIdsForList
+        .mockResolvedValueOnce(['file-1', 'file-2'])
+        .mockResolvedValueOnce(['file-1'])
+        .mockResolvedValueOnce(['file-1', 'file-2']);
+
+      const result = await caller.getKnowledgeGovernanceSummary({
+        assetClassification: 'brand',
+        assetReviewStatus: 'approved',
+        spaceId: 'spc_shared',
+      });
+
+      expect(mockFileModelQueryGovernanceRows).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          assetClassification: undefined,
+          assetReviewStatus: 'approved',
+          spaceId: 'spc_shared',
+        }),
+      );
+      expect(mockFileModelQueryGovernanceRows).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          assetClassification: 'brand',
+          assetReviewStatus: undefined,
+          spaceId: 'spc_shared',
+        }),
+      );
+      expect(result).toEqual({
+        classification: {
+          counts: {
+            brand: 1,
+            finance: 0,
+            general: 1,
+            hr: 0,
+            legal: 0,
+            product: 0,
+          },
+          total: 2,
+        },
+        reviewStatus: {
+          counts: {
+            approved: 1,
+            archived: 0,
+            draft: 0,
+          },
+          total: 1,
+        },
+        usagePolicy: {
+          counts: {
+            internal: 1,
+            public: 0,
+            restricted: 1,
+          },
+          total: 2,
+        },
+      });
+    });
   });
 
   describe('removeAllFiles', () => {
@@ -815,14 +934,14 @@ describe('fileRouter', () => {
           contentUid: 'res_clear_1',
           fileHash: null,
           id: 'file-clear-1',
-          spaceId: 'spc_team_1',
+          spaceId: 'spc_test',
           url: 'internal://clear-1',
         },
         {
           contentUid: 'res_clear_2',
           fileHash: 'hash-clear-2',
           id: 'file-clear-2',
-          spaceId: 'spc_team_2',
+          spaceId: 'spc_test',
           url: 'internal://clear-2',
         },
       ] as any);
@@ -832,10 +951,13 @@ describe('fileRouter', () => {
 
       expect(mockSpaceModelGetOrCreatePersonalSpace).toHaveBeenCalled();
       expect(mockResourceModelGetSpaceMemberRole).toHaveBeenCalledWith('spc_test');
-      expect(mockFileModelClear).toHaveBeenCalledWith(false);
+      expect(mockFileModelClear).toHaveBeenCalledWith(false, {
+        includeUnscoped: true,
+        spaceId: 'spc_test',
+      });
       expect(mockResourceModelInvalidateAuthzEpochsAfterRemoval).toHaveBeenCalledWith([
-        { contentUid: 'res_clear_1', spaceId: 'spc_team_1' },
-        { contentUid: 'res_clear_2', spaceId: 'spc_team_2' },
+        { contentUid: 'res_clear_1', spaceId: 'spc_test' },
+        { contentUid: 'res_clear_2', spaceId: 'spc_test' },
       ]);
       expect(mockFileServiceDeleteFile).toHaveBeenCalledWith('internal://clear-1');
       expect(mockFileServiceDeleteFiles).not.toHaveBeenCalled();
@@ -861,7 +983,7 @@ describe('fileRouter', () => {
           contentUid: 'res_clear_3',
           fileHash: 'hash-clear-3',
           id: 'file-clear-3',
-          spaceId: 'spc_team_3',
+          spaceId: 'spc_test',
           url: 'internal://hashed-clear-3',
         },
       ] as any);

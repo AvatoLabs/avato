@@ -1,6 +1,7 @@
 import { type ContentManagerMode } from '@/features/ContentManager';
 import {
   type FileAssetClassification,
+  type FileAssetReviewStatus,
   type FileAssetUsagePolicy,
   FilesTabs,
   SortType,
@@ -13,6 +14,10 @@ export interface State {
    * Current asset classification filter
    */
   assetClassification?: FileAssetClassification;
+  /**
+   * Current asset review status filter
+   */
+  assetReviewStatus?: FileAssetReviewStatus;
   /**
    * Current asset usage policy filter
    */
@@ -85,6 +90,7 @@ export interface State {
 
 export const initialState: State = {
   assetClassification: undefined,
+  assetReviewStatus: undefined,
   assetUsagePolicy: undefined,
   category: FilesTabs.Home,
   currentFolderId: undefined,

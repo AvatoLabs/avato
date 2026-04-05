@@ -5,6 +5,7 @@ import {
   type FileAssetMetadata,
   type FileAssetState,
   type FileAssetUsagePolicy,
+  type FileGovernanceSummary,
   type FileItem,
   type FileListItem,
   type QueryFileListParams,
@@ -69,6 +70,12 @@ export class FileService {
   // V2.0 Migrate from getFiles to getKnowledgeItems
   getKnowledgeItems = async (params: QueryFileListParams) => {
     return lambdaClient.file.getKnowledgeItems.query(params as QueryFileListSchemaType);
+  };
+
+  getKnowledgeGovernanceSummary = async (
+    params: QueryFileListParams,
+  ): Promise<FileGovernanceSummary> => {
+    return lambdaClient.file.getKnowledgeGovernanceSummary.query(params as QueryFileListSchemaType);
   };
 
   // V2.0 Migrate from getFileItem to getKnowledgeItem

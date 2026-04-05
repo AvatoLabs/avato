@@ -33,7 +33,7 @@
 
 - **`src/services/upload.ts`**：`uploadToServerS3` / `uploadFileToS3` 改为 **`prepareResourceUpload` → 客户端 PUT 预签名 URL（或 HTTPS 页对 HTTP 预签名时的同域回退）→ `completeResourceUpload`**，不再调用已废弃的 **`createS3PreSignedUrl`**。
 - **同域回退**：`POST /api/file/upload-session`（`uploadSessionId` + `file`），服务端用 **`PrivateBlobS3.uploadBuffer`** 写入会话 **`storageKey`**，与预签名 PUT 同一私有桶契约。
-- **遗留 pathname 同域上传**：`POST /api/file/upload`（`pathname` + `file`，供旧客户端 / 移动端等）已改为 **`getPrivateBlobS3().uploadBuffer`**，与私有 blob 桶一致；**Web 主路径**仍应以 **`upload-session` + 会话 key** 为主。
+- **遗留 pathname 同域上传**：`POST /api/file/upload`（`pathname` + `file`，供旧客户端 / 移动端等）已改为 **`getPrivateBlobS3().uploadBuffer`**，与私有 blob 桶一致；当前仅接受受控对象前缀（旧 **`files/...`** 与新 **`v2/spaces/...`**），避免任意相对路径写入。**Web 主路径**仍应以 **`upload-session` + 会话 key** 为主。
 - **带进度上传**：`uploadWithProgress` 向 prepare 传入 **`knowledgeBaseId` / `parentId` / `spaceId` / `sha256`**，与写库 **`createFile`** 的空间上下文一致。
 - **对象 key 不含展示文件名**：`lambda/upload` 的 **`generateStorageKey`** 已切到 **`v2/spaces/{spaceId}/blobs/{sessionId}/{nanoid}`**；展示名仍在会话 **`metadata.filename`** 与 **`files.name`**。客户端 **`FileMetadata.filename`** 使用 **`File.name`**，避免 UI 误用路径末段。
 - **OpenAPI 公开上传**（`packages/openapi/.../file.service.ts`）：直传改为 **`getPrivateBlobS3().uploadBuffer`**，**`HeadObject`** 校验 **`contentLength === file.size`** 后再 **`upsertSpaceBlob`**（并写入 **`etag`**）；**`generateFileMetadata`** 路径末段为 **`nanoid()`**，**`metadata.filename`** 为用户 **`file.name`**。
@@ -70,7 +70,7 @@
 
 - **`FileModel.canAccessGlobalFileByHash`**：仅当满足以下之一才视为可读该 CAS：**`global_files.creator` 为当前用户**、当前用户有一条 **`files.fileHash` 命中**、或当前用户的 **`agent_skills`** 通过 **`zipFileHash`** 或 **`resources` JSON 内嵌的 `fileHash`** 引用该 hash。
 - **`FileService.getFileContentByHash` / `getFileByteArrayByHash`**：先 **`canAccessGlobalFileByHash`**，不通过则与「不存在」统一为 **`NOT_FOUND`**（降低存在性侧信道）。
-- **技能 ZIP 预签名 / `zipUrl`**：`agentSkills.getByIdWithZipUrl`、`routers/tools/market`（内置工具补 `zipUrl`）、`toolExecution/serverRuntimes/skills` 在取存储 `url` 并拼 **`getFullFileUrl`** 前同样先走 **`canAccessGlobalFileByHash`**。
+- **技能 ZIP 下载面已分层**：用户可见的 `agentSkills.getByIdWithZipUrl` 现在统一返回稳定 `/skills/:id/zip` 路由，由新后端路由在请求时重新校验 `canAccessGlobalFileByHash` 并换发下载 URL；而 `routers/tools/market`（内置工具补 `zipUrl`）和 `toolExecution/serverRuntimes/skills` 这两条 server-side 执行链路仍保留直接换发 `zipUrl` 的内部语义，但在取存储 `url` 并拼 **`getFullFileUrl`** 前同样先走 **`canAccessGlobalFileByHash`**。
 
 ### OpenAPI 公开上传去重（Space 作用域）
 
@@ -109,6 +109,20 @@
 
 - **`FileService.createFileRecord`**：默认已挂**个人空间** + **`space_blobs`**；若某类文件必须**不**绑定空间，可显式传 **`spaceId: null`**（慎用）。
 - **其余按原文推进**：Phase 3 **`v2/spaces/...` 存储 key** 已在上传 session / 客户端 upload /import 链路起步，但旧对象与历史读路径仍需继续双读收口；Phase 4 **硬删除与 blob 延迟 GC**（Web 资料库 / 资源首页回收站与 **`0100` client_id 部分唯一**已落地；Notebook 侧仅提示至资源回收站）、**下线用户资源对 `global_files` 的依赖**、**`isPublic` 数据迁移**、以及把 `authz_epoch` 执行期复验继续扩到更多 async worker /processing surface。
+- **OpenAPI 下载地址签发审计已补齐一条主路径**：`getFileUrl` 生成成员侧预签名下载 URL 时，现已 best-effort 写入 `content_access_events(accessType=file_url_issued)`，把 “签发可下载地址” 与真实 `file_download` 执行面分开。
+- **OpenAPI `file list/detail` 已与 blob 下载能力解耦**：文件列表与详情接口继续允许 `read_metadata` 级可见性，但在把对象路径转换成可直接访问 URL 前，现会单独校验 `download_blob`；若调用方只有元数据访问权，则返回体里的 `url` 为空，不再把 “能看见文件卡片” 默认升级成 “能直接拿到 blob URL”。
+- **OpenAPI `file list/detail` 的 URL 发放现已补签发审计**：当列表或详情接口实际返回可访问文件 URL 时，会 best-effort 写入 `content_access_events(accessType=file_url_issued)`，并用 `via=openapi_file_list / openapi_file_detail` 区分来源；审计写入失败不会阻断响应。
+- **OpenAPI `file list/detail` 同样会收口历史同域绝对 URL**：如果数据库里残留的是同域绝对文件地址，detail/list 返回前会先区分它到底是 “稳定代理” 还是 “原始对象引用”；`/f/:id`、`/share/t/:shareId/f/:fileId`、`/skills/:id/zip`、`/eval/records/:evaluationId` 这类稳定代理会原样保留（相对路径会补成绝对 app URL），只有真正的对象 key / 需重签发地址才继续走 `getFullFileUrl`。
+- **OpenAPI 消息附件 URL 已收口到文件能力与签发审计**：`packages/openapi/.../MessageService.formatMessages` 现在会对附件统一校验 `download_blob`；相对 file key 会换成可访问 URL，历史绝对 URL 也不再绕过权限链，并会 best-effort 写入 `content_access_events(accessType=file_url_issued, via=openapi_message_attachment)`；其中若附件本身已经是同域稳定代理 URL，则会保留代理语义而不是再做一次对象级重签发；单个附件若已无权访问则会被剔除，而不会让整条消息接口失败。
+- **登录态消息附件已改走 `/f/:id` 代理**：`lambda/message.getMessages` 的认证分支、`MessageService` 以及 `AiChatService` 在返回消息附件 URL 时，不再直接预签名 blob，而是统一返回 `/f/:id`；授权与下载审计因此延后到真实文件请求执行。
+- **公开 `topicShare` 附件已改走专用 share-aware 代理**：`lambda/message.getMessages(topicShareId)` 对共享话题里的内部附件，现统一返回 `/share/t/:shareId/f/:fileId`；新路由会先校验 topic share 可见性，再确认该文件确实挂在该 topic 的消息上，随后复用文件代理下载链路执行实际发放与审计，不再把 owner 预签名 URL 直接暴露给共享页。
+- **消息附件 resolver 现也会收口历史同域绝对 URL**：登录态与 `topicShare` 两条 resolver 在遇到同域绝对附件地址时，不再把旧绝对 URL 原样回给前端，而会统一折回 `/f/:id` 或 `/share/t/:shareId/f/:fileId`；只有 truly external 的跨域 URL 才继续直通。
+- **图片 / 视频生成的 provider read path 已开始接入同一能力链**：`lambda/image` 与 `lambda/video` 在处理内部 `/f/:id` 或同域 `/f/:id` 引用图时，现会先校验 `preview_content`，再换发 provider 可读 URL，并 best-effort 写入 `content_access_events(accessType=file_url_issued, via=image_generation_input / video_generation_input)`；数据库侧仍只持久化 storage key，不再把内部代理 URL 直接下发给模型运行时。
+- **`AiAgentService` 的内部图片输入也已改走 provider-readable URL**：`execAgent` 在处理已有内部图片附件或刚上传的外部图片时，不再把 `/f/:id` 代理 URL 直接塞进 `imageList`；当前会先走 `preview_content` 校验，再换发 provider 可读 URL，并沿用同一批 `file_url_issued` 审计链，避免模型运行时再去请求一个需要用户会话的内部代理地址。
+- **Skill ZIP 的 runtime egress 已改走稳定代理**：`agentSkills.getByIdWithZipUrl`、`toolExecution/serverRuntimes/skills.execScript` 与 `routers/tools/market` 在为 skill zip 填充 `zipUrl` 时，现统一返回 `/skills/:id/zip`；其中 server-to-server 场景会使用 `INTERNAL_APP_URL` 并附带短时效 query token，这样执行环境无需用户 session 或额外 header，也不再直接拿到 presigned blob URL。
+- **Skill ZIP 的调用侧预检已收掉**：`agentSkills.getByIdWithZipUrl`、`toolExecution/serverRuntimes/skills.execScript` 与 `routers/tools/market` 现在在发放稳定 proxy URL 前只做 `canAccessGlobalFileByHash` 授权判断，不再额外 `checkHash` 预探对象是否存在；真正的对象存在性检查统一下沉到 `/skills/:id/zip` 路由执行，避免在调用侧重新暴露 storage 存在性侧信道。
+- **Skill ZIP / RAG Eval 稳定代理已补签发审计**：`/skills/:id/zip` 与 `/eval/records/:evaluationId` 在真正换发下载 URL 前，现会 best-effort 记入 `content_access_events(accessType=file_url_issued)`，并在 `metadata.via` 中分别标记 `skill_zip_proxy / rag_eval_records_proxy`，把 “稳定代理发放 URL” 也纳入统一审计。
+- **RAG Eval 导出记录已改走稳定下载路由**：`ragEval.checkEvaluationStatus` 现在在数据库里只持久化 `rag_eval_records/...` storage key；`getEvaluationList` 对前台统一返回 `/eval/records/:evaluationId`，再由新路由在请求时重新校验当前用户并换发下载 URL，避免把 presigned URL 直接持久化到 `rag_eval_evaluations.eval_records_url`。
 
 审计结论补充：
 

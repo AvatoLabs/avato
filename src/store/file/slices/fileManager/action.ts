@@ -3,6 +3,7 @@ import {
   type FileAssetMetadata,
   type FileAssetState,
   type FileAssetUsagePolicy,
+  type FileGovernanceSummary,
 } from '@lobechat/types';
 import {
   buildFolderTree,
@@ -33,6 +34,7 @@ import { fileManagerSelectors } from './selectors';
 
 const serverFileService = new FileService();
 const FETCH_ALL_KNOWLEDGE_KEY = 'useFetchKnowledgeItems';
+const FETCH_ALL_KNOWLEDGE_GOVERNANCE_SUMMARY_KEY = 'useFetchKnowledgeGovernanceSummary';
 const createUploadId = createNanoId(12);
 
 const createPendingUploadItem = (
@@ -668,6 +670,15 @@ export class FileManageActionImpl {
 
       return response.items;
     });
+  };
+
+  useFetchKnowledgeGovernanceSummary = (
+    params: QueryFileListParams | null,
+  ): SWRResponse<FileGovernanceSummary | undefined> => {
+    return useClientDataSWR<FileGovernanceSummary | undefined>(
+      !params ? null : [FETCH_ALL_KNOWLEDGE_GOVERNANCE_SUMMARY_KEY, params],
+      async () => serverFileService.getKnowledgeGovernanceSummary(params!),
+    );
   };
 }
 

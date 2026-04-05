@@ -150,12 +150,15 @@ class DiscoverService {
     await this.safeInjectMPToken();
 
     const locale = globalHelpers.getCurrentLanguage();
-    return lambdaClient.market.getMcpList.query({
-      ...params,
-      locale,
-      page: params.page ? Number(params.page) : 1,
-      pageSize: params.pageSize ? Number(params.pageSize) : 20,
-    });
+    return lambdaClient.market.getMcpList.query(
+      {
+        ...params,
+        locale,
+        page: params.page ? Number(params.page) : 1,
+        pageSize: params.pageSize ? Number(params.pageSize) : 20,
+      },
+      { context: { showNotification: false } },
+    );
   };
 
   getMCPPluginList = async (params: MCPPluginListParams): Promise<McpListResponse> => {
@@ -163,12 +166,15 @@ class DiscoverService {
 
     const locale = globalHelpers.getCurrentLanguage();
 
-    return lambdaClient.market.getMcpList.query({
-      ...params,
-      locale,
-      page: params.page ? Number(params.page) : 1,
-      pageSize: params.pageSize ? Number(params.pageSize) : 21,
-    });
+    return lambdaClient.market.getMcpList.query(
+      {
+        ...params,
+        locale,
+        page: params.page ? Number(params.page) : 1,
+        pageSize: params.pageSize ? Number(params.pageSize) : 21,
+      },
+      { context: { showNotification: false } },
+    );
   };
 
   getMcpManifest = async (params: { identifier: string; locale?: string; version?: string }) => {

@@ -33,9 +33,9 @@ import { SpaceModel } from '@/database/models/space';
 import { SpaceMemoryModel } from '@/database/models/spaceMemory';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
-import { UserMemoryTopicRepository } from '@/database/repositories/userMemory';
 import { UserModel } from '@/database/models/user';
 import { UserPersonaModel } from '@/database/models/userMemory/persona';
+import { UserMemoryTopicRepository } from '@/database/repositories/userMemory';
 import {
   createServerAgentToolsEngine,
   type EvalContext,
@@ -46,6 +46,7 @@ import { AgentService } from '@/server/services/agent';
 import { AgentRuntimeService } from '@/server/services/agentRuntime';
 import { type StepLifecycleCallbacks } from '@/server/services/agentRuntime/types';
 import { FileService } from '@/server/services/file';
+import { resolveProviderReadableFileReference } from '@/server/services/file/resolveProviderReadableFileReference';
 import { KlavisService } from '@/server/services/klavis';
 import { MarketService } from '@/server/services/market';
 import {
@@ -631,7 +632,7 @@ export class AiAgentService {
       try {
         const recallSpaceId =
           appContext?.spaceId ??
-          (topicId ? (await this.topicModel.findById(topicId))?.spaceId ?? undefined : undefined);
+          (topicId ? ((await this.topicModel.findById(topicId))?.spaceId ?? undefined) : undefined);
 
         if (recallSpaceId) {
           const space = await new SpaceModel(this.db, this.userId).findAccessibleSpaceById(
@@ -717,16 +718,29 @@ export class AiAgentService {
           fileIds.push(fileId);
 
           if (storedFile.fileType?.startsWith('image/')) {
-            const fileProxyBaseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL;
-            const fileUrl = fileProxyBaseUrl
-              ? new URL(`/f/${storedFile.id}`, fileProxyBaseUrl).toString()
-              : storedFile.url;
+            try {
+              const providerReadable = await resolveProviderReadableFileReference({
+                db: this.db,
+                fileService,
+                url: `/f/${storedFile.id}`,
+                userId: this.userId,
+                via: 'ai_agent_input_image',
+              });
 
-            imageList.push({
-              alt: storedFile.name || 'image',
-              id: storedFile.id,
-              url: fileUrl,
-            });
+              if (providerReadable?.url) {
+                imageList.push({
+                  alt: storedFile.name || 'image',
+                  id: storedFile.id,
+                  url: providerReadable.url,
+                });
+              }
+            } catch (error) {
+              log(
+                'execAgent: failed to issue provider-readable url for existing image file %s: %O',
+                storedFile.id,
+                error,
+              );
+            }
           }
         }
       }
@@ -743,7 +757,29 @@ export class AiAgentService {
             // Build imageList for vision-capable models
             const mimeType = file.mimeType || '';
             if (mimeType.startsWith('image/')) {
-              imageList.push({ alt: file.name || 'image', id: result.fileId, url: result.url });
+              try {
+                const providerReadable = await resolveProviderReadableFileReference({
+                  db: this.db,
+                  fileService,
+                  url: result.url,
+                  userId: this.userId,
+                  via: 'ai_agent_input_image',
+                });
+
+                if (providerReadable?.url) {
+                  imageList.push({
+                    alt: file.name || 'image',
+                    id: result.fileId,
+                    url: providerReadable.url,
+                  });
+                }
+              } catch (error) {
+                log(
+                  'execAgent: failed to issue provider-readable url for uploaded image file %s: %O',
+                  result.fileId,
+                  error,
+                );
+              }
             }
           } catch (error) {
             log('execAgent: failed to upload file %s: %O', file.url, error);

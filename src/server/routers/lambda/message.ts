@@ -12,8 +12,9 @@ import { TopicShareModel } from '@/database/models/topicShare';
 import { CompressionRepository } from '@/database/repositories/compression';
 import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
-import { FileService } from '@/server/services/file';
 import { MessageService } from '@/server/services/message';
+import { createAuthenticatedAttachmentUrlResolver } from '@/server/services/message/createAuthenticatedAttachmentUrlResolver';
+import { createTopicShareAttachmentUrlResolver } from '@/server/services/message/createTopicShareAttachmentUrlResolver';
 import { normalizeMessageFileUrlsForClient } from '@/server/services/message/normalizeMessageFileUrls';
 
 import { resolveAgentIdFromSession, resolveContext } from './_helpers/resolveContext';
@@ -25,7 +26,6 @@ const messageProcedure = authedProcedure.use(serverDatabase).use(async (opts) =>
   return opts.next({
     ctx: {
       compressionRepo: new CompressionRepository(ctx.serverDB, ctx.userId),
-      fileService: new FileService(ctx.serverDB, ctx.userId),
       messageModel: new MessageModel(ctx.serverDB, ctx.userId),
       messageService: new MessageService(ctx.serverDB, ctx.userId),
     },
@@ -52,7 +52,7 @@ export const messageRouter = router({
   /**
    * Cancel compression by deleting the compression group and restoring original messages
    */
-cancelCompression: messageProcedure
+  cancelCompression: messageProcedure
     .input(
       z.object({
         agentId: z.string(),
@@ -73,8 +73,7 @@ cancelCompression: messageProcedure
       });
     }),
 
-  
-count: messageProcedure
+  count: messageProcedure
     .input(
       z
         .object({
@@ -88,9 +87,7 @@ count: messageProcedure
       return ctx.messageModel.count(input);
     }),
 
-  
-  
-countWords: messageProcedure
+  countWords: messageProcedure
     .input(
       z
         .object({
@@ -104,13 +101,12 @@ countWords: messageProcedure
       return ctx.messageModel.countWords(input);
     }),
 
-  
-/**
+  /**
    * Create a compression group for old messages
    * Creates a placeholder group, marks messages as compressed
    * Returns messages to summarize for frontend AI generation
    */
-createCompressionGroup: messageProcedure
+  createCompressionGroup: messageProcedure
     .input(
       z.object({
         agentId: z.string(),
@@ -131,8 +127,6 @@ createCompressionGroup: messageProcedure
       });
     }),
 
-  
-  
   createMessage: messageProcedure
     .input(CreateNewMessageParamsSchema)
     .mutation(async ({ input, ctx }) => {
@@ -146,22 +140,17 @@ createCompressionGroup: messageProcedure
       // If there's no agentId but has sessionId, resolve agentId from sessionId
       let agentId = input.agentId;
       if (!agentId && input.sessionId) {
-        agentId = (await resolveAgentIdFromSession(
-          input.sessionId,
-          ctx.serverDB,
-          ctx.userId,
-        ))!;
+        agentId = (await resolveAgentIdFromSession(input.sessionId, ctx.serverDB, ctx.userId))!;
       }
 
       // Create message with the resolved agentId
       return ctx.messageService.createMessage({ ...input, agentId } as any);
     }),
 
-  
   /**
    * Finalize compression by updating the group with generated summary
    */
-finalizeCompression: messageProcedure
+  finalizeCompression: messageProcedure
     .input(
       z.object({
         agentId: z.string(),
@@ -208,12 +197,11 @@ finalizeCompression: messageProcedure
         );
 
         const messageModel = new MessageModel(ctx.serverDB, share.ownerId);
-        const fileService = new FileService(ctx.serverDB, share.ownerId);
 
         const messages = await messageModel.query(
           { ...queryParams, topicId: share.topicId },
           {
-            postProcessUrl: (path) => fileService.getFullFileUrl(path),
+            postProcessUrl: createTopicShareAttachmentUrlResolver(topicShareId),
           },
         );
 
@@ -226,10 +214,9 @@ finalizeCompression: messageProcedure
       }
 
       const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
-      const fileService = new FileService(ctx.serverDB, ctx.userId);
 
       const messages = await messageModel.query(queryParams, {
-        postProcessUrl: (path) => fileService.getFullFileUrl(path),
+        postProcessUrl: createAuthenticatedAttachmentUrlResolver(),
       });
 
       return normalizeMessageFileUrlsForClient(messages);

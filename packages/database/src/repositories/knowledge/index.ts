@@ -1,10 +1,16 @@
 import type { QueryFileListParams } from '@lobechat/types';
-import { FilesTabs, SortType } from '@lobechat/types';
+import {
+  FileAssetClassification,
+  FileAssetReviewStatus,
+  FileAssetUsagePolicy,
+  FilesTabs,
+  SortType,
+} from '@lobechat/types';
 import { sql } from 'drizzle-orm';
 
 import { DocumentModel } from '../../models/document';
 import { FileModel } from '../../models/file';
-import { documents, files, sourceSetFiles } from '../../schemas';
+import { documents, fileAssets, files, sourceSetFiles } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 
 export interface AgentSourceItem {
@@ -67,10 +73,53 @@ export class KnowledgeRepo {
     return docBySlug?.id || parentId;
   };
 
+  private buildFileAssetWhereConditions = ({
+    alias,
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
+  }: {
+    alias: string;
+    assetClassification?: QueryFileListParams['assetClassification'];
+    assetReviewStatus?: QueryFileListParams['assetReviewStatus'];
+    assetUsagePolicy?: QueryFileListParams['assetUsagePolicy'];
+  }) => {
+    const assetConditions: ReturnType<typeof sql>[] = [];
+
+    if (assetClassification) {
+      assetConditions.push(
+        assetClassification === FileAssetClassification.General
+          ? sql`(${sql.raw(`${alias}.classification`)} = ${assetClassification} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.classification`)} = ${assetClassification}`,
+      );
+    }
+
+    if (assetReviewStatus) {
+      assetConditions.push(
+        assetReviewStatus === FileAssetReviewStatus.Draft
+          ? sql`(${sql.raw(`${alias}.review_status`)} = ${assetReviewStatus} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.review_status`)} = ${assetReviewStatus}`,
+      );
+    }
+
+    if (assetUsagePolicy) {
+      assetConditions.push(
+        assetUsagePolicy === FileAssetUsagePolicy.Internal
+          ? sql`(${sql.raw(`${alias}.usage_policy`)} = ${assetUsagePolicy} OR ${sql.raw(`${alias}.file_id`)} IS NULL)`
+          : sql`${sql.raw(`${alias}.usage_policy`)} = ${assetUsagePolicy}`,
+      );
+    }
+
+    return assetConditions;
+  };
+
   /**
    * Query combined results from files and documents tables
    */
   async query({
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
     sortType,
@@ -87,6 +136,9 @@ export class KnowledgeRepo {
 
     // Build file query
     const fileQuery = this.buildFileQuery({
+      assetClassification,
+      assetReviewStatus,
+      assetUsagePolicy,
       category,
       sourceSetId,
       parentId: resolvedParentId,
@@ -100,6 +152,9 @@ export class KnowledgeRepo {
 
     // Build document query (notes)
     const documentQuery = this.buildDocumentQuery({
+      assetClassification,
+      assetReviewStatus,
+      assetUsagePolicy,
       category,
       sourceSetId,
       parentId: resolvedParentId,
@@ -328,6 +383,9 @@ export class KnowledgeRepo {
   }
 
   private buildFileQuery({
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
     sourceSetId,
@@ -340,6 +398,12 @@ export class KnowledgeRepo {
       spaceId ? sql`f.space_id = ${spaceId}` : sql`f.user_id = ${this.userId}`,
       trash ? sql`f.deleted_at IS NOT NULL` : sql`f.deleted_at IS NULL`,
     ];
+    const assetWhereConditions = this.buildFileAssetWhereConditions({
+      alias: 'fa',
+      assetClassification,
+      assetReviewStatus,
+      assetUsagePolicy,
+    });
 
     // Parent ID filter
     if (parentId !== undefined) {
@@ -404,6 +468,8 @@ export class KnowledgeRepo {
         }
       }
 
+      kbWhereConditions.push(...assetWhereConditions);
+
       return sql`
         SELECT
           COALESCE(d.id, f.id) as id,
@@ -427,6 +493,12 @@ export class KnowledgeRepo {
         INNER JOIN ${sourceSetFiles} kbf
           ON f.id = kbf.file_id
           AND kbf.source_set_id = ${sourceSetId}
+        ${
+          assetWhereConditions.length > 0
+            ? sql`LEFT JOIN ${fileAssets} fa
+              ON f.id = fa.file_id`
+            : sql``
+        }
         LEFT JOIN ${documents} d
           ON f.id = d.file_id
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
@@ -444,6 +516,8 @@ export class KnowledgeRepo {
         `,
       );
     }
+
+    whereConditions.push(...assetWhereConditions);
 
     return sql`
       SELECT
@@ -465,6 +539,12 @@ export class KnowledgeRepo {
         f.parent_id,
         NULL::text as source_set_id
       FROM ${files} f
+      ${
+        assetWhereConditions.length > 0
+          ? sql`LEFT JOIN ${fileAssets} fa
+            ON f.id = fa.file_id`
+          : sql``
+      }
       LEFT JOIN ${documents} d
         ON f.id = d.file_id
       WHERE ${sql.join(whereConditions, sql` AND `)}
@@ -472,6 +552,9 @@ export class KnowledgeRepo {
   }
 
   private buildDocumentQuery({
+    assetClassification,
+    assetReviewStatus,
+    assetUsagePolicy,
     category,
     q,
     sourceSetId,
@@ -479,6 +562,30 @@ export class KnowledgeRepo {
     spaceId,
     trash,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
+    if (assetClassification || assetReviewStatus || assetUsagePolicy) {
+      return sql`
+        SELECT
+          NULL::varchar(30) as id,
+          NULL::varchar(30) as file_id,
+          NULL::text as name,
+          NULL::varchar(255) as file_type,
+          NULL::integer as size,
+          NULL::text as url,
+          NULL::timestamp with time zone as created_at,
+          NULL::timestamp with time zone as updated_at,
+          NULL::uuid as chunk_task_id,
+          NULL::uuid as embedding_task_id,
+          NULL::jsonb as editor_data,
+          NULL::text as content,
+          NULL::varchar(255) as slug,
+          NULL::jsonb as metadata,
+          NULL::text as source_type,
+          NULL::varchar(255) as parent_id,
+          NULL::text as source_set_id
+        WHERE false
+      `;
+    }
+
     const whereConditions: any[] = [
       spaceId ? sql`${documents.spaceId} = ${spaceId}` : sql`${documents.userId} = ${this.userId}`,
       sql`${documents.sourceType} != ${'file'}`,

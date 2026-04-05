@@ -1,11 +1,18 @@
 import { and, asc, count, desc, eq, ilike, inArray, isNull } from 'drizzle-orm';
 
+import { ContentModel } from '@/database/models/content';
 import { messages, messagesFiles } from '@/database/schemas';
 import type { LobeChatDatabase } from '@/database/type';
 import { idGenerator } from '@/database/utils/idGenerator';
+import { ContentAuthorizer } from '@/server/services/content';
 import { FileService as CoreFileService } from '@/server/services/file';
 
 import { BaseService } from '../common/base.service';
+import {
+  isSameOriginAppUrl,
+  isStableAppFileProxyUrl,
+  toAbsoluteStableAppFileProxyUrl,
+} from '../helpers/file';
 import { processPaginationConditions } from '../helpers/pagination';
 import type { ServiceResult } from '../types';
 import type {
@@ -31,12 +38,67 @@ export interface MessageCountResult {
  * 提供各种消息数量统计功能
  */
 export class MessageService extends BaseService {
+  private contentAuthorizer: ContentAuthorizer;
+  private contentModel: ContentModel;
   private coreFileService: CoreFileService;
 
   constructor(db: LobeChatDatabase, userId: string | null) {
     super(db, userId);
 
+    this.contentAuthorizer = new ContentAuthorizer(db, userId || '');
+    this.contentModel = new ContentModel(db, userId || '');
     this.coreFileService = new CoreFileService(db, userId!);
+  }
+
+  private async resolveAttachmentFileUrl(file: FileItem): Promise<FileItem | null> {
+    try {
+      const access = await this.contentAuthorizer.assertCapability({
+        capability: 'download_blob',
+        id: file.id,
+        kind: 'file',
+      });
+
+      const resolvedUrl =
+        (file.url.startsWith('http://') || file.url.startsWith('https://')) &&
+        !isSameOriginAppUrl(file.url)
+          ? file.url
+          : isStableAppFileProxyUrl(file.url)
+            ? toAbsoluteStableAppFileProxyUrl(file.url)
+            : await this.coreFileService.getFullFileUrl(file.url);
+
+      try {
+        await this.contentModel.createAccessEvent({
+          accessType: 'file_url_issued',
+          contentUid: access.contentUid,
+          metadata: {
+            fileId: file.id,
+            matchedBy: access.matchedBy,
+            via: 'openapi_message_attachment',
+          },
+          shareLinkId: null,
+          sourceIp: null,
+          spaceId: access.spaceId,
+          userAgent: null,
+        });
+      } catch (eventError) {
+        this.log('warn', 'Failed to record OpenAPI message attachment URL issued access event', {
+          error: eventError,
+          fileId: file.id,
+        });
+      }
+
+      return {
+        ...file,
+        url: resolvedUrl,
+      };
+    } catch (error) {
+      this.log('warn', 'Skipping inaccessible message attachment', {
+        error,
+        fileId: file.id,
+      });
+
+      return null;
+    }
   }
 
   /**
@@ -58,18 +120,13 @@ export class MessageService extends BaseService {
 
         return {
           ...messageWithoutFiles,
-          files: await Promise.all(
-            message.filesToMessages?.map(async ({ file }) => {
-              if (file.url.startsWith('http')) {
-                return file;
-              }
-
-              return {
-                ...file,
-                url: await this.coreFileService.getFullFileUrl(file.url),
-              };
-            }) ?? [],
-          ),
+          files: (
+            await Promise.all(
+              message.filesToMessages?.map(async ({ file }) =>
+                this.resolveAttachmentFileUrl(file),
+              ) ?? [],
+            )
+          ).filter(Boolean) as FileItem[],
         };
       }),
     );

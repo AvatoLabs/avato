@@ -26,20 +26,50 @@ describe('buildFileAssetBadges', () => {
       },
       {
         color: 'success',
+        key: 'review:approved',
+        label: 'detail.asset.reviewStatus.approved',
+        variant: 'filled',
+      },
+      {
+        color: 'success',
         key: 'version:v2',
         label: 'v2',
+        title: undefined,
         variant: 'filled',
       },
       {
         color: 'processing',
         key: 'rendition:preview:Homepage:2',
         label: 'detail.asset.rendition.preview · Homepage · +2',
+        title: undefined,
         variant: 'outlined',
       },
       {
         key: 'classification:brand',
         label: 'detail.asset.classification.brand',
         variant: 'outlined',
+      },
+    ]);
+  });
+
+  it('should surface archived review status in compact governance badges', () => {
+    expect(
+      buildFileAssetBadges({
+        assetClassification: 'general',
+        assetPrimaryRenditionKind: null,
+        assetPrimaryRenditionLabel: null,
+        assetReviewStatus: 'archived',
+        assetRenditionCount: null,
+        assetUsagePolicy: 'internal',
+        assetVersionLabel: null,
+        t: t as any,
+      }),
+    ).toEqual([
+      {
+        color: 'gold',
+        key: 'review:archived',
+        label: 'detail.asset.reviewStatus.archived',
+        variant: 'filled',
       },
     ]);
   });
@@ -59,7 +89,7 @@ describe('buildFileAssetBadges', () => {
     ).toEqual([]);
   });
 
-  it('should summarize the primary rendition when governance badges are absent', () => {
+  it('should keep approved review state visible alongside the primary rendition summary', () => {
     expect(
       buildFileAssetBadges({
         assetClassification: 'general',
@@ -73,6 +103,12 @@ describe('buildFileAssetBadges', () => {
         t: t as any,
       }),
     ).toEqual([
+      {
+        color: 'success',
+        key: 'review:approved',
+        label: 'detail.asset.reviewStatus.approved',
+        variant: 'filled',
+      },
       {
         color: 'processing',
         key: 'rendition:preview:Homepage:1',

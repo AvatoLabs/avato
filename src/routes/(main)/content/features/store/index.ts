@@ -7,7 +7,11 @@ import { shallow } from 'zustand/shallow';
 import { createWithEqualityFn } from 'zustand/traditional';
 
 import { useFileStore } from '@/store/file';
-import { type FileListItem, type QueryFileListParams } from '@/types/files';
+import {
+  type FileGovernanceSummary,
+  type FileListItem,
+  type QueryFileListParams,
+} from '@/types/files';
 
 import { type FolderCrumb } from './action';
 import { store } from './action';
@@ -41,6 +45,12 @@ export const useContentManagerFetchContentItems = (
   }, [fileListHasMore, fileListOffset]);
 
   return result;
+};
+
+export const useContentManagerFetchGovernanceSummary = (
+  params: QueryFileListParams | null,
+): SWRResponse<FileGovernanceSummary | undefined> => {
+  return useFileStore((s) => s.useFetchKnowledgeGovernanceSummary)(params);
 };
 
 export const useContentManagerFetchContentItem = (

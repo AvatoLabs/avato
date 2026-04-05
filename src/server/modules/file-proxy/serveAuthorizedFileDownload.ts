@@ -48,9 +48,20 @@ export const clientIpFromRequest = (req: Request): string | undefined => {
 
 export type FileDownloadVia = 'session' | 'share_query' | 'share_path';
 
+interface AuthorizedDownloadAccess {
+  authzEpoch: number;
+  canAccess: true;
+  contentUid: string;
+  matchedBy?: string;
+  spaceId: string;
+}
+
 export interface ServeAuthorizedFileDownloadParams {
+  accessOverride?: AuthorizedDownloadAccess;
+  cacheIdentity?: string | null;
   db: LobeChatDatabase;
   downloadVia: FileDownloadVia;
+  eventVia?: string;
   file: FileItem;
   fileId: string;
   req: Request;
@@ -65,18 +76,33 @@ export interface ServeAuthorizedFileDownloadParams {
 export async function serveAuthorizedFileDownload(
   params: ServeAuthorizedFileDownloadParams,
 ): Promise<Response> {
-  const { db, downloadVia, file, fileId, req, shareLinkId, shareToken, userId } = params;
+  const {
+    accessOverride,
+    cacheIdentity,
+    db,
+    downloadVia,
+    eventVia,
+    file,
+    fileId,
+    req,
+    shareLinkId,
+    shareToken,
+    userId,
+  } = params;
   const downloadPolicy = resolveFileDownloadPolicy(downloadVia);
 
   const principalId = userId || 'anonymous';
-  const cacheIdentity = shareToken ? `share:${shareToken}` : `user:${principalId}`;
+  const resolvedCacheIdentity =
+    cacheIdentity || (shareToken ? `share:${shareToken}` : `user:${principalId}`);
   const authorizer = new ContentAuthorizer(db, principalId);
-  const access = await authorizer.getAccessMatch({
-    capability: 'download_blob',
-    id: fileId,
-    kind: 'file',
-    shareToken,
-  });
+  const access =
+    accessOverride ||
+    (await authorizer.getAccessMatch({
+      capability: 'download_blob',
+      id: fileId,
+      kind: 'file',
+      shareToken,
+    }));
 
   if (!access?.canAccess) {
     log('Access denied for file: %s user: %s', fileId, principalId);
@@ -96,7 +122,7 @@ export async function serveAuthorizedFileDownload(
           downloadVia,
           fileId,
           matchedBy: access.matchedBy,
-          via: shareToken ? 'share_link' : 'session',
+          via: eventVia || (shareToken ? 'share_link' : 'session'),
         },
         contentUid: access.contentUid,
         shareLinkId,
@@ -112,7 +138,7 @@ export async function serveAuthorizedFileDownload(
   const redisConfig = getRedisConfig();
   const redisClient = isRedisEnabled(redisConfig) ? await initializeRedis(redisConfig) : null;
 
-  const cacheKey = buildCacheKey(fileId, cacheIdentity, access.authzEpoch);
+  const cacheKey = buildCacheKey(fileId, resolvedCacheIdentity, access.authzEpoch);
   if (redisClient) {
     const cachedStr = await redisClient.get(cacheKey);
     const cached = cachedStr ? (JSON.parse(cachedStr) as CachedFileData) : null;
